@@ -3,9 +3,7 @@ use core::mem;
 use alloc::vec;
 use ordered_float::NotNan;
 
-use crate::block::{
-    self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
-};
+use crate::block::{self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, AIR};
 use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, Rgb, Vol};
 use crate::op::Operation;
 use crate::universe;
@@ -207,11 +205,15 @@ fn evaluate_composition(
         animation_hint: src_att.animation_hint | dst_att.animation_hint, // TODO: some operators should ignore some hints (e.g. `In` should ignore destination color changes)
     };
 
-    let voxels = if effective_resolution == R1 && output_bounds == GridAab::ORIGIN_CUBE {
-        Evoxels::One(operator.blend_evoxel(
-            src_voxels.single_voxel().unwrap(),
-            dst_voxels.single_voxel().unwrap(),
-        ))
+    let voxels = if let (true, Some(src_voxel), Some(dst_voxel)) = (
+        output_bounds == GridAab::ORIGIN_CUBE,
+        src_voxels.single_voxel(),
+        dst_voxels.single_voxel(),
+    ) {
+        // The output is nonempty
+        // TODO: Do we need the `output_bounds == ORIGIN_CUBE` test?
+        // It skips this branch to keep the bounds empty, but is that good?
+        Evoxels::One(operator.blend_evoxel(src_voxel, dst_voxel))
     } else {
         Evoxels::Many(
             effective_resolution,
