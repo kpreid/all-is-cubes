@@ -69,7 +69,6 @@ impl Palette {
         }
     }
 
-    #[allow(clippy::doc_markdown)]
     /// Constructs a `Palette` with the given blocks and all zero counts.
     ///
     /// If the input contains any duplicate entries, then they will be combined, and the
