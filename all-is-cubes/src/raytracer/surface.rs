@@ -1,7 +1,6 @@
-use alloc::sync::Arc;
 use euclid::Vector3D;
 
-use crate::block::{Evoxel, Evoxels};
+use crate::block::Evoxel;
 use crate::camera::LightingOption;
 use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, Vol};
 use crate::raycast::{RayIsh as _, RaycasterIsh};
@@ -209,8 +208,8 @@ where
         }
 
         let tb: &TracingBlock<D> = &self.blocks[cube_data.block_index as usize];
-        Some(match tb.voxels {
-            Evoxels::One(Evoxel {
+        Some(match tb.voxels.single_voxel() {
+            Some(Evoxel {
                 color, emission, ..
             }) => {
                 if color.fully_transparent() {
@@ -231,7 +230,9 @@ where
                     })
                 }
             }
-            Evoxels::Many(resolution, ref array) => {
+            None => {
+                let resolution = tb.voxels.resolution();
+                let array = tb.voxels.as_vol_ref();
                 let block_cube = rc_step.cube_ahead();
                 let (sub_raycaster, sub_ray) =
                     R::recursive_raycast(rc_step, self.ray, resolution, array.bounds());
@@ -268,7 +269,7 @@ where
     block_data: &'a D,
     /// Reciprocal of resolution, for scaling back to outer world
     antiscale: FreeCoordinate,
-    array: &'a Vol<Arc<[Evoxel]>>,
+    array: Vol<&'a [Evoxel]>,
 
     /// Cube these voxels are located in, for lighting lookups.
     block_cube: Cube,

@@ -79,14 +79,15 @@ impl Zoom {
         // (this is probably wrong in that we need to duplicate voxels if it happens)
         let zoom_resolution = (original_resolution / scale).unwrap_or(R1);
 
-        Ok(match voxels {
-            Evoxels::One(_) => {
+        Ok(match voxels.single_voxel() {
+            Some(_) => {
                 // Block has resolution 1.
                 // Zoom::new() checks that the region is not outside the block's unit cube,
                 // so we can just unconditionally return the original color.
                 MinEval { attributes, voxels }
             }
-            Evoxels::Many(_, voxels) => {
+            None => {
+                let voxels = voxels.as_vol_ref();
                 let voxel_offset = offset_in_zoomed_blocks
                     .map(GridCoordinate::from)
                     .to_vector()

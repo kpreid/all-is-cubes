@@ -6,7 +6,7 @@ use core::fmt;
 
 use euclid::point3;
 
-use crate::block::{Block, EvaluatedBlock, Evoxel, Evoxels};
+use crate::block::{Block, EvaluatedBlock, Evoxel};
 use crate::content::palette;
 use crate::math::{
     Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridCoordinate,
@@ -40,16 +40,17 @@ pub fn cursor_raycast(
         }
 
         // Check intersection with recursive block
-        match evaluated.voxels {
-            Evoxels::One(evoxel) => {
+        match evaluated.voxels.single_voxel() {
+            Some(evoxel) => {
                 if !evoxel.selectable {
                     continue;
                 }
                 face_selected = Some(step.face());
             }
-            Evoxels::Many(resolution, ref voxels) => {
+            None => {
+                let voxels = evaluated.voxels.as_vol_ref();
                 let recursive_hit: Option<(Cube, &Evoxel)> = step
-                    .recursive_raycast(ray, resolution, voxels.bounds())
+                    .recursive_raycast(ray, evaluated.resolution(), voxels.bounds())
                     .0
                     .filter_map(|voxel_step| {
                         if face_selected.is_none() {

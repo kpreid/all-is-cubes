@@ -82,10 +82,10 @@ impl Move {
         // but that will involve some sort of predicate and transformation on tick actions.)
         input = block::Quote::default().evaluate(input, filter)?;
 
-        let (original_bounds, effective_resolution) = match input.voxels {
-            Evoxels::Many(resolution, ref array) => (array.bounds(), resolution),
-            // Treat color blocks as having a resolution of 16. TODO: Improve on this hardcoded constant
-            Evoxels::One(_) => (GridAab::for_block(R16), R16),
+        let (original_bounds, effective_resolution) = match input.voxels.single_voxel() {
+            None => (input.voxels.bounds(), input.resolution()),
+            // Treat atom blocks as having a resolution of 16. TODO: Improve on this hardcoded constant
+            Some(_) => (GridAab::for_block(R16), R16),
         };
 
         // For now, our strategy is to work in units of the block's resolution.
@@ -154,12 +154,17 @@ impl Move {
                     displaced_bounds.volume().unwrap(),
                 )?;
 
-                let displaced_voxels = match &input.voxels {
-                    Evoxels::Many(_, voxels) => Evoxels::Many(
-                        effective_resolution,
-                        Vol::from_fn(displaced_bounds, |cube| voxels[cube - translation_in_res]),
-                    ),
-                    &Evoxels::One(voxel) => {
+                let displaced_voxels = match input.voxels.single_voxel() {
+                    None => {
+                        let voxels = input.voxels.as_vol_ref();
+                        Evoxels::Many(
+                            effective_resolution,
+                            Vol::from_fn(displaced_bounds, |cube| {
+                                voxels[cube - translation_in_res]
+                            }),
+                        )
+                    }
+                    Some(voxel) => {
                         // Input block is a solid color; synthesize voxels.
                         // TODO: Also synthesize if the resolution is merely low
                         // compared to the velocity.

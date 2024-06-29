@@ -1,6 +1,5 @@
 //! Algorithms for collision detection with [`Space`](crate::space::Space)s.
 
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -12,13 +11,12 @@ use hashbrown::HashSet as HbHashSet;
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
-use super::POSITION_EPSILON;
-use crate::block::Evoxels;
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
 use crate::math::{
     Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate,
     LineVertex, Vol,
 };
+use crate::physics::POSITION_EPSILON;
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
 use crate::util::{ConciseDebug, MapExtend, Refmt as _};
@@ -562,25 +560,24 @@ impl CollisionSpace for Space {
         evaluated: &EvaluatedBlock,
         stop_at: StopAt,
     ) -> Option<CollisionRayEnd> {
-        match &evaluated.voxels {
-            // Unreachable unless the evaluated block is falsely claiming lack of uniform
-            // collision. TODO: Stop needing this branch by using the methods of Evoxels
-            // instead of a match.
-            Evoxels::One(_) => unreachable!(),
-            &Evoxels::Many(resolution, ref voxels) => {
-                let cube_translation = cube
-                    .lower_bounds()
-                    .to_vector()
-                    .map(|s| -FreeCoordinate::from(s));
-                let scale = FreeCoordinate::from(resolution);
-                // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
-                // Note: aab is not translated since it's relative to the ray anyway.
-                let voxel_aab = space_aab.scale(scale);
-                let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
-                let result = collide_along_ray(voxels, voxel_ray, voxel_aab, |_| {}, stop_at);
-                result.map(|end| end.wrap_as_voxel(cube, resolution))
-            }
-        }
+        let resolution = evaluated.resolution();
+        let cube_translation = cube
+            .lower_bounds()
+            .to_vector()
+            .map(|s| -FreeCoordinate::from(s));
+        let scale = FreeCoordinate::from(resolution);
+        // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
+        // Note: aab is not translated since it's relative to the ray anyway.
+        let voxel_aab = space_aab.scale(scale);
+        let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
+        let result = collide_along_ray(
+            &evaluated.voxels.as_vol_ref(),
+            voxel_ray,
+            voxel_aab,
+            |_| {},
+            stop_at,
+        );
+        result.map(|end| end.wrap_as_voxel(cube, resolution))
     }
 
     #[inline]
@@ -590,30 +587,23 @@ impl CollisionSpace for Space {
         space_ray: Ray,
         evaluated: &EvaluatedBlock,
     ) -> Option<CollisionRayEnd> {
-        match &evaluated.voxels {
-            // Unreachable unless the evaluated block is falsely claiming lack of uniform
-            // collision. TODO: Stop needing this branch by using the methods of Evoxels
-            // instead of a match.
-            Evoxels::One(_) => unreachable!(),
-            &Evoxels::Many(resolution, ref voxels) => {
-                // TODO: deduplicate scaling code
-                let cube_translation = cube
-                    .lower_bounds()
-                    .to_vector()
-                    .map(|s| -FreeCoordinate::from(s));
-                let scale = FreeCoordinate::from(resolution);
-                // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
-                // Note: aab is not translated since it's relative to the ray anyway.
-                let voxel_aab = space_aab.scale(scale);
-                let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
-                let result = escape_along_ray(voxels, voxel_ray, voxel_aab);
-                result.map(|end| end.wrap_as_voxel(cube, resolution))
-            }
-        }
+        let resolution = evaluated.resolution();
+        // TODO: deduplicate scaling code
+        let cube_translation = cube
+            .lower_bounds()
+            .to_vector()
+            .map(|s| -FreeCoordinate::from(s));
+        let scale = FreeCoordinate::from(resolution);
+        // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
+        // Note: aab is not translated since it's relative to the ray anyway.
+        let voxel_aab = space_aab.scale(scale);
+        let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
+        let result = escape_along_ray(&evaluated.voxels.as_vol_ref(), voxel_ray, voxel_aab);
+        result.map(|end| end.wrap_as_voxel(cube, resolution))
     }
 }
 
-impl CollisionSpace for Vol<Arc<[Evoxel]>> {
+impl CollisionSpace for Vol<&[Evoxel]> {
     type Cell = Evoxel;
 
     fn bounds(&self) -> GridAab {
