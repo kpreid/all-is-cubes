@@ -74,11 +74,8 @@ pub mod builder;
 #[doc(inline)]
 pub use builder::BlockBuilder;
 
-mod evaluated;
-pub use evaluated::*;
-
-mod evaluation;
-pub use evaluation::*;
+mod eval;
+pub use eval::*;
 
 mod modifier;
 pub use modifier::*;

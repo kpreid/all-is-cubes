@@ -1,5 +1,5 @@
-//! Components of the process of block evaluation
-//! (excluding the original input and final output)
+//! Details of block evaluation control flow, such as [`EvalFilter`], [`Budget`],
+//! and errors.
 
 use core::cell::Cell;
 
@@ -65,11 +65,11 @@ impl Default for EvalFilter {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct Budget {
     /// Number of [`Primitive`]s and [`Modifier`]s.
-    pub(super) components: u32,
+    pub(crate) components: u32,
 
     /// Number of individual voxels produced (e.g. by a [`Primitive::Recur`]) or altered
     /// (e.g. by a [`Modifier::Composite`]).
-    voxels: u32,
+    pub(crate) voxels: u32,
 
     /// Number of levels of evaluation recursion permitted.
     ///
@@ -78,12 +78,12 @@ pub(crate) struct Budget {
     ///
     /// This must be set low enough to avoid Rust stack overflows which cannot be recovered from.
     /// Unlike the other budget parameters, this is not cumulative over the entire evaluation.
-    recursion: u8,
+    pub(crate) recursion: u8,
 
     /// Number of recursion levels actually used by the evaluation.
     /// This is tracked separately so that it can be reported afterward,
     /// whereas the other counters are only ever decremented and so a subtraction suffices.
-    recursion_used: u8,
+    pub(crate) recursion_used: u8,
 }
 
 impl Budget {
@@ -232,6 +232,9 @@ pub enum EvalBlockError {
     #[displaydoc("cached block definition exceeded evaluation budget; used {used:?} so far and only {budget:?} available")]
     PriorBudgetExceeded {
         /// Budget that was available for the evaluation.
+        //---
+        // Design note: This field is not of type `Budget` because `Budget` is private and
+        // structured to support its use *during* evaluation.
         budget: Cost,
         /// Computation steps actually used before failure.
         used: Cost,
