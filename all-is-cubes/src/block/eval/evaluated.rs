@@ -370,17 +370,7 @@ impl PartialEq for EvKey {
             && *tick_action == other.attributes.tick_action
             && *activation_action == other.attributes.activation_action
             && animation_hint == other.attributes.animation_hint
-            && match (voxels, &other.voxels) {
-                (&Evoxels::One(a), &Evoxels::One(b)) => a == b,
-                (
-                    &Evoxels::Many(resolution_a, ref voxels_a),
-                    &Evoxels::Many(resolution_b, ref voxels_b),
-                ) => {
-                    resolution_a == resolution_b
-                        && ptr::eq(voxels_a.as_linear(), voxels_b.as_linear())
-                }
-                _ => false,
-            }
+            && voxels.cheap_or_ptr_eq(&other.voxels)
     }
 }
 impl Eq for EvKey {}
@@ -405,6 +395,6 @@ impl core::hash::Hash for EvKey {
         tick_action.hash(state);
         activation_action.hash(state);
         animation_hint.hash(state);
-        voxels.as_vol_ref().as_linear().as_ptr().hash(state);
+        voxels.cheap_or_ptr_hash(state);
     }
 }

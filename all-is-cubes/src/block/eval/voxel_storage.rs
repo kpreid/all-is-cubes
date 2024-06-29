@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use core::hash::Hash as _;
 use core::ops;
 
 // Things mentioned in doc comments only
@@ -188,6 +189,42 @@ impl Evoxels {
         }
     }
 
+    /// Check if `self` is equal to `other` without checking every voxel.
+    ///
+    /// May return a false negative if the two are large and do not have equal
+    /// storage pointers.
+    pub(crate) fn cheap_or_ptr_eq(&self, other: &Self) -> bool {
+        // TODO: We could probably afford to compare the voxels if there are sufficiently few.
+        // Need a benchmark to judge the threshold.
+        match (self.single_voxel(), other.single_voxel()) {
+            (Some(v1), Some(v2)) => v1 == v2,
+            (None, Some(_)) | (Some(_), None) => false, // Must be unequal!
+            (None, None) => {
+                self.resolution() == other.resolution()
+                    && self.bounds() == other.bounds()
+                    && core::ptr::eq(
+                        self.as_vol_ref().as_linear(),
+                        other.as_vol_ref().as_linear(),
+                    )
+            }
+        }
+    }
+
+    /// Hash function that matches [`Self::cheap_or_ptr_eq()`].
+    pub(crate) fn cheap_or_ptr_hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        match self.single_voxel() {
+            Some(v) => {
+                0u8.hash(state);
+                v.hash(state);
+            }
+            None => {
+                1u8.hash(state);
+                self.resolution().hash(state);
+                self.as_vol_ref().as_linear().as_ptr().hash(state);
+            }
+        }
+    }
+
     #[cfg(debug_assertions)]
     pub(crate) fn consistency_check(&self) {
         let allowed_bounds = GridAab::for_block(self.resolution());
@@ -235,5 +272,81 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
                 Vol::<Arc<[Evoxel]>>::size_hint(depth),
             ),
         ])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::Resolution::*;
+    use core::hash::{BuildHasher as _, Hasher};
+
+    #[test]
+    fn cheap_eq_hash() {
+        // Some distinct voxels to compare
+        let vox1 = Evoxel::AIR;
+        let vox2 = Evoxel {
+            emission: Rgb::new(1.0, 2.0, 3.0),
+            ..Evoxel::AIR
+        };
+
+        let vol_of_vox1 = Vol::from_element(vox1);
+        let samples = [
+            // We need multiple Evoxels::One to prove we're not incorrectly using the address
+            // of the direct value.
+            (0, Evoxels::One(vox1)),
+            (0, Evoxels::One(vox1)),
+            (1, Evoxels::One(vox2)),
+            // these clones should ve equal
+            (2, Evoxels::Many(R2, vol_of_vox1.clone())),
+            (2, Evoxels::Many(R2, vol_of_vox1.clone())),
+            // these two will be unequal since they are separate allocations for the same values,
+            (3, Evoxels::Many(R2, Vol::from_element(vox2))),
+            (4, Evoxels::Many(R2, Vol::from_element(vox2))),
+            // Different resolution makes this different from group 2
+            (5, Evoxels::Many(R4, vol_of_vox1.clone())),
+            // Different bounds makes this different from vol_of_vox1
+            (6, Evoxels::Many(R2, vol_of_vox1.translate([1, 0, 0]))),
+        ];
+
+        let hasher = std::hash::BuildHasherDefault::<std::hash::DefaultHasher>::default();
+        let cheap_hash_one = |value: &Evoxels| {
+            let mut state = hasher.build_hasher();
+            value.cheap_or_ptr_hash(&mut state);
+            state.finish()
+        };
+
+        let mut equals = 0;
+        let mut collisions = 0;
+        let mut checks = 0;
+        for all1 @ (_index1, (class1, value1)) in samples.iter().enumerate() {
+            for all2 @ (_index2, (class2, value2)) in samples.iter().enumerate() {
+                eprintln!("checking {value1:?} == {value2:?}");
+
+                let equal12 = value1.cheap_or_ptr_eq(value2);
+                let hash1 = cheap_hash_one(value1);
+                let hash2 = cheap_hash_one(value2);
+
+                assert_eq!(
+                    equal12,
+                    class1 == class2,
+                    "equality not as expected for:\nleft: {all1:?}\nright: {all2:?}"
+                );
+
+                if equal12 {
+                    assert_eq!(hash1, hash2);
+                    equals += 1;
+                } else if hash1 == hash2 {
+                    collisions += 1;
+                }
+                checks += 1;
+            }
+        }
+
+        dbg!(equals, collisions, checks);
+
+        // This is unfortunately probabilistic and might be broken by a change in implementation,
+        // but we do want to be assured that the hash is okayish.
+        assert!(collisions < checks / 10);
     }
 }
