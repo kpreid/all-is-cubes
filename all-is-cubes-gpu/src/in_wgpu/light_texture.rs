@@ -133,6 +133,11 @@ impl LightTexture {
     pub fn ensure_as_big_as(&mut self, label_prefix: &str, device: &wgpu::Device, size: GridSize) {
         let current = extent_to_size3d(self.texture.size());
         if current.lower_than(size).any() {
+            // Explicitly destroy the old texture, because we know it will not be used any more
+            // and don't need the memory it occupies. This ensures that the old memory will be
+            // deallocated promptly before the new allocation is created, keeping peak usage lower.
+            self.texture.destroy();
+
             *self = Self::new(label_prefix, device, size);
         }
     }

@@ -249,6 +249,9 @@ where
             ));
         }
         debug_assert_eq!(texel_vector.len(), element_count);
+
+        temp_buffer.destroy();
+
         texel_vector
     }
 }

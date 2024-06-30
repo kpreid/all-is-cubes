@@ -189,6 +189,13 @@ impl ResizingBuffer {
                 // zero bytes to write
             }
         } else {
+            // Explicitly destroy the old buffer, because we know it will not be used any more
+            // and don't need the memory it occupies. This ensures that the old memory will be
+            // deallocated promptly before the new allocation is created, keeping peak usage lower.
+            if let Some(buffer) = self.buffer.as_ref() {
+                buffer.destroy();
+            }
+
             self.buffer = Some(bwp.device.create_buffer_init(descriptor));
         }
     }
@@ -206,6 +213,13 @@ impl ResizingBuffer {
         if self.buffer.as_ref().map_or(0, |b| b.size()) >= new_size {
             // Already sufficient size
         } else {
+            // Explicitly destroy the old buffer, because we know it will not be used any more
+            // and don't need the memory it occupies. This ensures that the old memory will be
+            // deallocated promptly before the new allocation is created, keeping peak usage lower.
+            if let Some(buffer) = self.buffer.as_ref() {
+                buffer.destroy();
+            }
+
             self.buffer = Some(device.create_buffer(descriptor));
         }
     }
