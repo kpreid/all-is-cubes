@@ -1,3 +1,4 @@
+use num_traits::Euclid as _;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
@@ -6,7 +7,7 @@ use crate::character::Spawn;
 use crate::color_block;
 use crate::content::{free_editing_starter_inventory, palette};
 use crate::linking::InGenError;
-use crate::math::{Face6, FaceMap, GridAab, GridSize, Rgba};
+use crate::math::{Face6, FaceMap, GridAab, GridCoordinate, GridSize, Rgba};
 use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 use crate::util::YieldProgress;
@@ -25,72 +26,48 @@ pub async fn lighting_bench_space(
     progress: YieldProgress,
     requested_space_size: GridSize,
 ) -> Result<Space, InGenError> {
-    // Constant sizes
-    let section_width = 6;
-    let margin = 4;
-    let section_spacing = section_width + margin;
+    let layout = LightingBenchLayout::new(requested_space_size)?;
 
-    // Sizes chosen based on constants and space_size
-    let array_side_lengths = euclid::default::Vector2D::new(
-        (requested_space_size.width - margin) / section_spacing,
-        (requested_space_size.depth - margin) / section_spacing,
-    );
-    let between_bottom_and_top = requested_space_size.height - 2;
-    if between_bottom_and_top < 2 {
-        return Err(InGenError::Other("height too small".into()));
-    }
-    let yup = between_bottom_and_top * 4 / 14;
-    let ydown = between_bottom_and_top - yup;
+    let mut space = {
+        let mut space = Space::builder(layout.space_bounds())
+            .light_physics(LightPhysics::None)
+            .spawn({
+                let mut spawn = Spawn::looking_at_space(layout.space_bounds(), [0., 0.5, 1.]);
+                spawn.set_inventory(free_editing_starter_inventory(true));
+                spawn
+            })
+            .build();
 
-    // These bounds should be a rounded version of requested_space_size
-    let space_bounds = GridAab::from_lower_upper(
-        [0, -ydown - 1, 0],
-        [
-            section_spacing * array_side_lengths.x + margin,
-            yup + 1,
-            section_spacing * array_side_lengths.y + margin,
-        ],
-    );
-    let mut space = Space::builder(space_bounds)
-        .light_physics(LightPhysics::None)
-        .spawn({
-            let mut spawn = Spawn::looking_at_space(space_bounds, [0., 0.5, 1.]);
-            spawn.set_inventory(free_editing_starter_inventory(true));
-            spawn
-        })
-        .build();
-
-    // Ground level
-    // TODO: Make this async-yielding somehow (will need work in Space itself)
-    space
-        .fill_uniform(
-            space_bounds.expand(FaceMap::default().with(Face6::PY, -yup)),
-            &color_block!(0.5, 0.5, 0.5),
-        )
-        .unwrap();
+        // Ground level
+        // TODO: Make this async-yielding somehow (will need work in Space itself)
+        space
+            .fill_uniform(
+                space
+                    .bounds()
+                    .expand(FaceMap::default().with(Face6::PY, -layout.yup())),
+                &color_block!(0.5, 0.5, 0.5),
+            )
+            .unwrap();
+        space
+    };
 
     let progress = progress.finish_and_cut(0.25).await;
 
     // Individual test sections (buildings/caves)
-    for (progress, sx) in progress
-        .split_evenly(array_side_lengths.x as usize)
-        .zip(0..)
-    {
-        for (progress, sz) in progress
-            .split_evenly(array_side_lengths.y as usize)
-            .zip(0..)
+    let section_iter = {
+        let i = layout.section_iter();
+        progress.split_evenly(i.len()).zip(i)
+    };
+    for (progress, (sx, sz)) in section_iter {
         {
+            // This block ensures its variables are dropped before the await.
+
             // Independent RNG for each section, so that the number of values used doesn't
             // affect the next section.
-            let mut rng = Xoshiro256Plus::seed_from_u64((sx + sz * array_side_lengths.x) as u64);
-            let section_bounds = GridAab::from_lower_size(
-                [
-                    margin + sx * section_spacing,
-                    -ydown + 1,
-                    margin + sz * section_spacing,
-                ],
-                [section_width, yup + ydown, section_width],
+            let mut rng = Xoshiro256Plus::seed_from_u64(
+                (sx + sz * i32::from(layout.array_side_lengths.x)) as u64,
             );
+            let section_bounds = layout.section_bounds(sx, sz);
             let color = Block::from(Rgba::new(
                 rng.gen_range(0.0..=1.0),
                 rng.gen_range(0.0..=1.0),
@@ -104,7 +81,8 @@ pub async fn lighting_bench_space(
                 1 => {
                     space
                         .fill_uniform(
-                            section_bounds.expand(FaceMap::default().with(Face6::PY, -yup)),
+                            section_bounds
+                                .expand(FaceMap::default().with(Face6::PY, -layout.yup())),
                             &color,
                         )
                         .unwrap();
@@ -135,13 +113,13 @@ pub async fn lighting_bench_space(
                 }
                 _ => unreachable!("rng range"),
             }
-            progress.finish().await;
         }
+        progress.finish().await;
     }
 
     space.set_physics(SpacePhysics {
         light: LightPhysics::Rays {
-            maximum_distance: space_bounds.size().width.max(space_bounds.size().depth) as _,
+            maximum_distance: space.bounds().size().width.max(space.bounds().size().depth) as _,
         },
         sky: {
             let sky_ground = palette::ALMOST_BLACK;
@@ -157,4 +135,98 @@ pub async fn lighting_bench_space(
         ..SpacePhysics::default()
     });
     Ok(space)
+}
+
+/// Layout calculations for [`lighting_bench_space()`].
+///
+/// Expressing them as this bundle of functions avoids putting many local variables into
+/// the `async fn` future and increasing its overall size.
+///
+/// TODO: all of the functions are sloppily named because they used to be simple variables.
+struct LightingBenchLayout {
+    array_side_lengths: euclid::default::Vector2D<u8>,
+    height: u8,
+}
+
+impl LightingBenchLayout {
+    fn new(requested_space_size: GridSize) -> Result<LightingBenchLayout, InGenError> {
+        let layout = LightingBenchLayout {
+            array_side_lengths: euclid::default::Vector2D::new(
+                saturating_cast(
+                    (requested_space_size.width - Self::MARGIN) / Self::SECTION_SPACING,
+                ),
+                saturating_cast(
+                    (requested_space_size.depth - Self::MARGIN) / Self::SECTION_SPACING,
+                ),
+            ),
+            height: saturating_cast(requested_space_size.height),
+        };
+
+        if layout.section_height() < 2 {
+            return Err(InGenError::Other("height too small".into()));
+        }
+
+        Ok(layout)
+    }
+
+    // Constant sizes
+    const SECTION_WIDTH: GridCoordinate = 6;
+    const MARGIN: GridCoordinate = 4;
+    const SECTION_SPACING: GridCoordinate = Self::SECTION_WIDTH + Self::MARGIN;
+
+    fn space_bounds(&self) -> GridAab {
+        // These bounds should be a rounded version of requested_space_size.
+        GridAab::from_lower_upper(
+            [0, -self.ydown() - 1, 0],
+            [
+                Self::SECTION_SPACING * i32::from(self.array_side_lengths.x) + Self::MARGIN,
+                self.yup() + 1,
+                Self::SECTION_SPACING * i32::from(self.array_side_lengths.y) + Self::MARGIN,
+            ],
+        )
+    }
+
+    fn section_height(&self) -> GridCoordinate {
+        // Subtract 2 so that there can be air and non-section ground space at the top and bottom.
+        GridCoordinate::from(self.height.saturating_sub(2))
+    }
+
+    /// Height above y=0 (ground) that the sections extend.
+    fn yup(&self) -> GridCoordinate {
+        self.section_height() * 4 / 14
+    }
+    /// Depth below y=0 (ground) that the sections extend.
+    fn ydown(&self) -> GridCoordinate {
+        self.section_height() - self.yup()
+    }
+
+    fn section_iter(&self) -> impl ExactSizeIterator<Item = (GridCoordinate, GridCoordinate)> {
+        let size = self.array_side_lengths;
+        let size_z = GridCoordinate::from(size.y);
+        let total = GridCoordinate::from(size.x) * size_z;
+        (0..total).map(move |i| i.div_rem_euclid(&size_z))
+    }
+
+    // Bounds in which one of the sections should be drawn.
+    fn section_bounds(&self, sx: GridCoordinate, sz: GridCoordinate) -> GridAab {
+        GridAab::from_lower_size(
+            [
+                Self::MARGIN + sx * Self::SECTION_SPACING,
+                -self.ydown() + 1,
+                Self::MARGIN + sz * Self::SECTION_SPACING,
+            ],
+            [
+                Self::SECTION_WIDTH,
+                self.section_height(),
+                Self::SECTION_WIDTH,
+            ],
+        )
+    }
+}
+
+fn saturating_cast(input: i32) -> u8 {
+    match u8::try_from(input) {
+        Ok(output) => output,
+        Err(_) => u8::MAX,
+    }
 }
