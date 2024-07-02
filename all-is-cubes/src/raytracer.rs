@@ -160,7 +160,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                     }
 
                     match step {
-                        DepthStep::Invisible => {
+                        DepthStep::Invisible | DepthStep::EnterBlock { .. } => {
                             // Side effect: called count_step_should_stop.
                         }
                         DepthStep::Span(span) => {

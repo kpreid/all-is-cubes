@@ -112,7 +112,13 @@ pub(crate) enum TraceStep<'a, D> {
     /// In particular, otherwise an unbounded number of steps could be taken if the ray
     /// passes through a large number of recursive blocks with small bounds (such that no
     /// actual voxels exist to be visible or invisible).
-    EnterBlock { t_distance: FreeCoordinate },
+    ///
+    /// It also allows the recipient to note all `block_data` traversed even if none of the
+    /// involved voxels are hit.
+    EnterBlock {
+        t_distance: FreeCoordinate,
+        block_data: &'a D,
+    },
 }
 
 /// An [`Iterator`] which reports each visible surface a [`Raycaster`] ray passes through.
@@ -242,6 +248,7 @@ where
 
                 TraceStep::EnterBlock {
                     t_distance: rc_step.t_distance(),
+                    block_data: &tb.block_data,
                 }
             }
         })
@@ -308,9 +315,14 @@ where
     R: RaycasterIsh,
 {
     surface_iter: SurfaceIter<'a, D, R>,
+
     /// Present if the last `EnterSurface` we discovered was transparent, or if
     /// we have another surface to report.
     last_surface: Option<Surface<'a, D>>,
+
+    /// If present, the iterator returns this before doing anything else.
+    /// Used to produce two items from one input.
+    buffered_next: Option<DepthStep<'a, D>>,
 }
 
 impl<'a, D, R> DepthIter<'a, D, R>
@@ -322,6 +334,17 @@ where
         Self {
             surface_iter,
             last_surface: None,
+            buffered_next: None,
+        }
+    }
+
+    fn flush_last_surface(&mut self, t_distance: f64) -> DepthStep<'a, D> {
+        match self.last_surface.take() {
+            Some(last_surface) => DepthStep::Span(Span {
+                surface: last_surface,
+                exit_t_distance: t_distance,
+            }),
+            None => DepthStep::Invisible,
         }
     }
 }
@@ -334,6 +357,10 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
+        if let ret @ Some(_) = self.buffered_next.take() {
+            return ret;
+        }
+
         // TODO: .next()? isn't quite right; we need to flush the last input, potentially? Or, no, that should never happen, but we should assert that.
         Some(match self.surface_iter.next()? {
             TraceStep::EnterSurface(this_surface) => {
@@ -346,14 +373,17 @@ where
                     None => DepthStep::Invisible,
                 }
             }
-            TraceStep::Invisible { t_distance } | TraceStep::EnterBlock { t_distance } => {
-                match self.last_surface.take() {
-                    Some(last_surface) => DepthStep::Span(Span {
-                        surface: last_surface,
-                        exit_t_distance: t_distance,
-                    }),
-                    None => DepthStep::Invisible,
-                }
+            TraceStep::Invisible { t_distance } => self.flush_last_surface(t_distance),
+            TraceStep::EnterBlock {
+                t_distance,
+                block_data,
+            } => {
+                let item = self.flush_last_surface(t_distance);
+                self.buffered_next = Some(DepthStep::EnterBlock {
+                    t_distance,
+                    block_data,
+                });
+                item
             }
         })
     }
@@ -362,7 +392,14 @@ where
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum DepthStep<'a, D> {
     Invisible,
+
     Span(Span<'a, D>),
+
+    /// See [`TraceStep::EnterBlock`].
+    EnterBlock {
+        t_distance: FreeCoordinate,
+        block_data: &'a D,
+    },
 }
 
 #[cfg(test)]
@@ -424,7 +461,10 @@ mod tests {
                     intersection_point: point3(0.25, 1.0, 0.25),
                     normal: Face7::NY
                 }),
-                EnterBlock { t_distance: 2.5 },
+                EnterBlock {
+                    t_distance: 2.5,
+                    block_data: &()
+                },
                 EnterSurface(Surface {
                     block_data: &(),
                     diffuse_color: slab_test_color,
@@ -499,7 +539,10 @@ mod tests {
         assert_eq!(
             SurfaceIterR::new(&rt, ray).collect::<Vec<TraceStep<'_, ()>>>(),
             vec![
-                EnterBlock { t_distance: 0.5 },
+                EnterBlock {
+                    t_distance: 0.5,
+                    block_data: &()
+                },
                 Invisible { t_distance: 1.5 },
             ]
         );
@@ -507,7 +550,14 @@ mod tests {
         assert_eq!(
             DepthIter::new(SurfaceIterR::new(&rt, ray)).collect::<Vec<DepthStep<'_, ()>>>(),
             vec![
+                // TODO: This step isn't, I think, really necessary for anything, and removing
+                // it could increase performance.
+                // But if we remove it we're making `EnterBlock` mean more. Think carefully.
                 DepthStep::Invisible,
+                DepthStep::EnterBlock {
+                    t_distance: 0.5,
+                    block_data: &()
+                },
                 DepthStep::Invisible,
             ]
         );
