@@ -160,13 +160,17 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                     }
 
                     match step {
-                        DepthStep::Invisible | DepthStep::EnterBlock { .. } => {
+                        DepthStep::Invisible { .. } => {
                             // Side effect: called count_step_should_stop.
                         }
                         DepthStep::Span(span) => {
                             debug_assert!(!span.surface.diffuse_color.fully_transparent());
                             state.trace_through_span(span, self);
                         }
+                        DepthStep::EnterBlock {
+                            t_distance: _,
+                            block_data,
+                        } => state.accumulator.enter_block(block_data),
                     }
                 }
             }
@@ -178,9 +182,13 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
                     use TraceStep::*;
                     match step {
-                        Invisible { .. } | EnterBlock { .. } => {
+                        Invisible { .. } => {
                             // Side effect: called count_step_should_stop.
                         }
+                        EnterBlock {
+                            t_distance: _,
+                            block_data,
+                        } => state.accumulator.enter_block(block_data),
                         EnterSurface(surface) => {
                             debug_assert!(!surface.diffuse_color.fully_transparent());
                             state.trace_through_surface(&surface, self);

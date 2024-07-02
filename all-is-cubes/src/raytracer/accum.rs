@@ -37,7 +37,7 @@ impl<'a, C> Clone for RtOptionsRef<'a, C> {
 /// i.e. fully transparent/no light accumulated.
 ///
 /// Each implementation should provide its own conversion to a final output format,
-/// if any (e.g. an inherent method or an [`impl From`](From)).
+/// if any (e.g. an inherent method or an [`impl From<...`](From)).
 pub trait Accumulate: Default {
     /// Data precomputed for each distinct block or other type of visible object.
     ///
@@ -56,6 +56,12 @@ pub trait Accumulate: Default {
     /// TODO: this interface might want even more information; generalize it to be
     /// more future-proof.
     fn add(&mut self, surface_color: Rgba, block_data: &Self::BlockData);
+
+    /// Called before the ray traverses any surfaces found in a block; that is,
+    /// before all [`add()`](Self::add) calls pertaining to that block.
+    fn enter_block(&mut self, block_data: &Self::BlockData) {
+        _ = block_data;
+    }
 
     /// Indicates that the trace did not intersect any space that could have contained
     /// anything to draw. May be used for special diagnostic drawing. If used, should
