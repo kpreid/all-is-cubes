@@ -14,6 +14,9 @@ use crate::math::{
 };
 use crate::resolution::Resolution;
 
+mod axis_aligned;
+pub use axis_aligned::AxisAlignedRaycaster;
+
 mod ray;
 pub use ray::Ray;
 

@@ -2,11 +2,20 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use all_is_cubes::math::GridAab;
-use all_is_cubes::raycast::Raycaster;
+use all_is_cubes::math::{Cube, Face7, GridAab};
+use all_is_cubes::raycast::{AxisAlignedRaycaster, Raycaster};
 
-pub fn raycast_bench(c: &mut Criterion) {
-    c.bench_function("raycast: single step diagonal", |b| {
+criterion_main!(benches);
+criterion_group! {
+    name = benches;
+    config = Criterion::default();
+    targets = raycaster_bench, axis_aligned_raycaster_bench
+}
+
+fn raycaster_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("raycaster");
+
+    group.bench_function("single step diagonal", |b| {
         // Test the individual step cost, without setup
         let mut raycaster =
             Raycaster::new(black_box([0.0, -0.25, -0.5]), black_box([1.0, 1.0, 1.0]));
@@ -16,31 +25,31 @@ pub fn raycast_bench(c: &mut Criterion) {
     // Note: When I tried checking the other axes, z was slightly faster. This is
     // probably due to how the axis picking logic is compiled since there shouldn't
     // be any other differences.
-    c.bench_function("raycast: single step +X", |b| {
+    group.bench_function("single step +X", |b| {
         let mut raycaster =
             Raycaster::new(black_box([0.0, -0.25, -0.5]), black_box([1.0, 0.0, 0.0]));
         b.iter(|| raycaster.next().unwrap());
     });
 
-    c.bench_function("raycast: initialization", |b| {
+    group.bench_function("initialization", |b| {
         b.iter(|| Raycaster::new(black_box([0.0, -0.25, -0.5]), black_box([1.0, 1.0, 1.0])))
     });
 
-    c.bench_function("raycast: initialization with bounds (inside)", |b| {
+    group.bench_function("initialization with bounds (inside)", |b| {
         b.iter(|| {
             Raycaster::new(black_box([0.0, -0.25, -0.5]), black_box([1.0, 1.0, 1.0]))
                 .within(GridAab::from_lower_size([-1, -2, -3], [4, 5, 6]))
         })
     });
 
-    c.bench_function("raycast: initialization with bounds (outside)", |b| {
+    group.bench_function("initialization with bounds (outside)", |b| {
         b.iter(|| {
             Raycaster::new(black_box([0.0, -0.25, -0.5]), black_box([1.0, 1.0, 1.0]))
                 .within(GridAab::from_lower_size([101, 102, 103], [4, 5, 6]))
         })
     });
 
-    c.bench_function("raycast: many steps inside bounds", |b| {
+    group.bench_function("many steps inside bounds", |b| {
         b.iter(|| {
             let mut raycaster =
                 Raycaster::new(black_box([0.5, 0.5, 0.5]), black_box([1.0, 0.3, 0.7]))
@@ -51,7 +60,7 @@ pub fn raycast_bench(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("raycast: many steps from outside bounds", |b| {
+    group.bench_function("many steps from outside bounds", |b| {
         b.iter(|| {
             let mut raycaster =
                 Raycaster::new(black_box([-50.0, 0.5, 0.5]), black_box([1.0, 0.3, 0.7]))
@@ -61,7 +70,62 @@ pub fn raycast_bench(c: &mut Criterion) {
             }
         })
     });
+
+    group.finish();
 }
 
-criterion_group!(benches, raycast_bench);
-criterion_main!(benches);
+/// These are as similar to the normal [`Raycaster`] as possible, but can't be perfect.
+///
+/// TODO: If we want to rigorously compare things, parameterize this to allow using the regular
+/// raycaster on the same inputs.
+fn axis_aligned_raycaster_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("aa");
+
+    group.bench_function("single step +X", |b| {
+        let mut raycaster =
+            AxisAlignedRaycaster::new(black_box(Cube::new(0, 0, 0)), black_box(Face7::PX));
+        b.iter(|| raycaster.next().unwrap());
+    });
+
+    group.bench_function("initialization", |b| {
+        b.iter(|| AxisAlignedRaycaster::new(black_box(Cube::new(0, 0, 0)), black_box(Face7::PX)))
+    });
+
+    group.bench_function("initialization with bounds (inside)", |b| {
+        b.iter(|| {
+            AxisAlignedRaycaster::new(black_box(Cube::new(0, 0, 0)), black_box(Face7::PX))
+                .within(GridAab::from_lower_size([-1, -2, -3], [4, 5, 6]))
+        })
+    });
+
+    group.bench_function("initialization with bounds (outside)", |b| {
+        b.iter(|| {
+            AxisAlignedRaycaster::new(black_box(Cube::new(0, 0, 0)), black_box(Face7::PX))
+                .within(GridAab::from_lower_size([101, 102, 103], [4, 5, 6]))
+        })
+    });
+
+    group.bench_function("many steps inside bounds", |b| {
+        b.iter(|| {
+            let mut raycaster =
+                AxisAlignedRaycaster::new(black_box(Cube::new(0, 0, 0)), black_box(Face7::PX))
+                    .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]));
+            for _ in 1..100 {
+                black_box(raycaster.next());
+            }
+        })
+    });
+
+    group.bench_function("many steps from outside bounds", |b| {
+        b.iter(|| {
+            let mut raycaster =
+                AxisAlignedRaycaster::new(black_box(Cube::new(-50, 0, 0)), black_box(Face7::PX))
+                    .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]));
+            for _ in 1..100 {
+                black_box(raycaster.next());
+            }
+        })
+    });
+
+    group.finish();
+}

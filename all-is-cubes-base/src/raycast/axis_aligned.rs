@@ -1,0 +1,241 @@
+use crate::math::{self, Cube, Face7, GridAab};
+
+use super::RaycastStep;
+
+#[cfg(doc)]
+use super::Raycaster;
+
+/// Alternative to [`Raycaster`] which uses an axis-aligned ray,
+/// and produces exactly the same [`RaycastStep`]s more efficiently.
+#[derive(Clone, Debug)]
+pub struct AxisAlignedRaycaster {
+    /// Next cube to emit.
+    /// If it is outside of `self.bounds` then the iterator has ended.
+    upcoming: Cube,
+    /// Faces hit by the raycaster. Opposite of the direction of movement.
+    hitting: Face7,
+    distance: math::GridSizeCoord,
+    bounds: GridAab,
+}
+
+impl AxisAlignedRaycaster {
+    /// Construct an [`AxisAlignedRaycaster`] for a ray whose origin is centered in `origin` and whose
+    /// direction is equal to `direction.normal_vector()`.
+    ///
+    /// It will produce the same outputs as [`Raycaster`] would for that ray, more efficiently.
+    #[must_use]
+    #[inline]
+    pub fn new(origin: Cube, direction: Face7) -> Self {
+        Self {
+            upcoming: origin,
+            hitting: direction.opposite(),
+            distance: 0,
+            bounds: GridAab::EVERYWHERE,
+        }
+    }
+
+    /// Restrict the cubes iterated over to those which lie within the given [`GridAab`].
+    ///
+    /// This makes the iterator finite: [`next()`](Self::next) will return [`None`]
+    /// forevermore once there are no more cubes intersecting the bounds to report.
+    #[must_use]
+    #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
+    #[inline]
+    pub fn within(mut self, bounds: GridAab) -> Self {
+        self.bounds = self
+            .bounds
+            .intersection_box(bounds)
+            .unwrap_or(GridAab::ORIGIN_EMPTY);
+
+        // Restore invariant that `upcoming` is within `bounds`.
+        self.fast_forward();
+
+        self
+    }
+
+    /// Advance the position until it enters the bounds.
+    fn fast_forward(&mut self) {
+        if let Some(axis) = self.hitting.axis() {
+            let delta = if self.hitting.is_negative() {
+                // Fast forward in the positive direction to enter the lower bound
+                self.bounds.lower_bounds()[axis]
+                    .checked_sub(self.upcoming[axis])
+                    .filter(|d| d.is_positive())
+            } else {
+                // Fast forward in the positive direction to enter the upper bound
+                self.bounds.upper_bounds()[axis]
+                    .checked_sub(self.upcoming[axis])
+                    .and_then(|d| d.checked_sub(1)) // cube coordinates are the lower corner!
+                    .filter(|d| d.is_negative())
+            };
+
+            // If we found a move that is forward and not overflowing, apply it.
+            if let Some(delta) = delta {
+                self.upcoming[axis] += delta;
+                self.distance = self.distance.saturating_add(delta.unsigned_abs());
+            }
+        }
+    }
+}
+
+impl Iterator for AxisAlignedRaycaster {
+    type Item = RaycastStep;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.bounds.contains_cube(self.upcoming) {
+            return None;
+        }
+
+        let step = RaycastStep {
+            cube_face: math::CubeFace {
+                cube: self.upcoming,
+                face: if self.distance == 0 {
+                    Face7::Within
+                } else {
+                    self.hitting
+                },
+            },
+            t_distance: (f64::from(self.distance) - 0.5).max(0.),
+            t_max: {
+                let mut v = euclid::Vector3D::splat(math::FreeCoordinate::INFINITY);
+                if let Some(axis) = self.hitting.axis() {
+                    v[axis] = f64::from(self.distance) + 0.5;
+                }
+                v
+            },
+        };
+
+        if let Some(axis) = self.hitting.axis() {
+            match self.upcoming[axis].checked_sub(if self.hitting.is_positive() { 1 } else { -1 }) {
+                Some(next) => self.upcoming[axis] = next,
+                None => {
+                    // Don't emit any more cubes.
+                    self.bounds = GridAab::ORIGIN_CUBE;
+                }
+            }
+        }
+        self.distance = self.distance.saturating_add(1);
+
+        Some(step)
+    }
+
+    // TODO: Add an `Iterator::fold()` implementation.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::math::GridCoordinate;
+    use crate::raycast::Raycaster;
+    use alloc::vec::Vec;
+
+    /// Run a comparison between [`Raycaster`] and [`AxisAlignedRaycaster`], and
+    /// return the steps’ cubes. (There is no need to return the full [`RaycastStep`]
+    /// since [`Raycaster`]’s output is considered the source of truth.)
+    ///
+    /// The number of steps checked is determined by how far this iterator is driven.
+    fn compare_aa_to_regular(
+        origin: Cube,
+        direction: Face7,
+        bounds: Option<GridAab>,
+    ) -> impl Iterator<Item = Cube> {
+        let mut arb_rc = Raycaster::new(origin.midpoint(), direction.normal_vector());
+        let mut aa_rc = AxisAlignedRaycaster::new(origin, direction);
+        if let Some(bounds) = bounds {
+            arb_rc = arb_rc.within(bounds);
+            aa_rc = aa_rc.within(bounds);
+        }
+        itertools::Itertools::zip_longest(arb_rc, aa_rc).map(|steps| match steps {
+            itertools::EitherOrBoth::Both(arb_step, aa_step) => {
+                assert_eq!(arb_step, aa_step, "arb != aa");
+                dbg!(aa_step);
+                aa_step.cube_ahead()
+            }
+            itertools::EitherOrBoth::Left(arb_step) => panic!("extra Raycaster step {arb_step:?}"),
+            itertools::EitherOrBoth::Right(aa_step) => {
+                panic!("extra AxisAlignedRaycaster step {aa_step:?}")
+            }
+        })
+    }
+
+    #[test]
+    fn unbounded_positive() {
+        assert_eq!(
+            compare_aa_to_regular(Cube::new(1, 2, 3), Face7::PX, None)
+                .take(10)
+                .count(),
+            10
+        );
+    }
+
+    #[test]
+    fn unbounded_negative() {
+        assert_eq!(
+            compare_aa_to_regular(Cube::new(1, 2, 3), Face7::NX, None)
+                .take(10)
+                .count(),
+            10
+        );
+    }
+
+    #[test]
+    fn start_in_bounds() {
+        assert_eq!(
+            compare_aa_to_regular(
+                Cube::new(1, 1, 1),
+                Face7::PX,
+                Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
+            )
+            .take(10)
+            .collect::<Vec<Cube>>(),
+            vec![Cube::new(1, 1, 1), Cube::new(2, 1, 1)]
+        );
+    }
+
+    #[test]
+    fn start_out_of_bounds_positive() {
+        assert_eq!(
+            compare_aa_to_regular(
+                Cube::new(-1, 1, 1),
+                Face7::PX,
+                Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
+            )
+            .take(10)
+            .collect::<Vec<Cube>>(),
+            vec![Cube::new(0, 1, 1), Cube::new(1, 1, 1), Cube::new(2, 1, 1)]
+        );
+    }
+
+    #[test]
+    fn start_out_of_bounds_negative() {
+        assert_eq!(
+            compare_aa_to_regular(
+                Cube::new(4, 1, 1),
+                Face7::NX,
+                Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
+            )
+            .take(10)
+            .collect::<Vec<Cube>>(),
+            vec![Cube::new(2, 1, 1), Cube::new(1, 1, 1), Cube::new(0, 1, 1)]
+        );
+    }
+
+    #[test]
+    fn reach_numeric_bounds() {
+        assert_eq!(
+            compare_aa_to_regular(Cube::new(GridCoordinate::MAX - 2, 10, 20), Face7::PX, None)
+                .take(10)
+                .collect::<Vec<Cube>>(),
+            vec![
+                Cube::new(GridCoordinate::MAX - 2, 10, 20),
+                Cube::new(GridCoordinate::MAX - 1, 10, 20),
+                // ...and we stop here, not producing GridCoordinate::MAX
+                // because it is problematic.
+            ]
+        );
+    }
+
+    // TODO: test of Face7::Within as input
+    // TODO: test of fast forward *not* jumping backwards
+}
