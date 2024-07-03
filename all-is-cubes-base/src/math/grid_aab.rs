@@ -893,6 +893,10 @@ impl<'a> arbitrary::Arbitrary<'a> for GridAab {
 #[displaydoc("{0}")]
 pub struct GridOverflowError(String);
 
+crate::util::cfg_should_impl_error! {
+    impl std::error::Error for GridOverflowError {}
+}
+
 /// `Debug`-formatting helper
 struct RangeWithLength(Range<GridCoordinate>);
 impl fmt::Debug for RangeWithLength {
