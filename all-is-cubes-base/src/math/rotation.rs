@@ -6,7 +6,7 @@
 use core::marker::PhantomData;
 use core::ops::Mul;
 
-use crate::math::{Face6, GridCoordinate, GridMatrix, GridVector, Gridgid, Vector3D};
+use crate::math::{Face6, GridCoordinate, GridMatrix, GridSize, GridVector, Gridgid, Vector3D};
 
 #[cfg(doc)]
 use crate::math::GridAab;
@@ -371,7 +371,6 @@ impl GridRotation {
     ///
     /// May panic or wrap if `vector` has any components equal to [`GridCoordinate::MIN`].
     #[inline]
-    #[track_caller] // TODO: temporary for troubleshooting a panic in fuzzing
     pub fn transform_vector(self, vector: GridVector) -> GridVector {
         #[inline(always)]
         fn inner(rotation: GridRotation, vector: GridVector) -> Option<GridVector> {
@@ -407,6 +406,21 @@ impl GridRotation {
         // }
         //
         // but the actual generated machine code is larger and involves computed jumps.
+    }
+
+    /// Rotate the size value by this rotation.
+    ///
+    /// This is similar to [`GridRotation::transform_vector()`] except that the components
+    /// are only swapped, not negated.
+    #[inline]
+    pub fn transform_size(self, size: GridSize) -> GridSize {
+        let basis = self.to_basis();
+
+        let mut result = GridSize::zero();
+        result[basis.x.axis()] = size.width;
+        result[basis.y.axis()] = size.height;
+        result[basis.z.axis()] = size.depth;
+        result
     }
 
     /// Returns whether this is a reflection.
@@ -665,6 +679,17 @@ mod tests {
                 rot.transform_vector(point.to_vector()).to_point(),
                 rot.to_rotation_matrix().transform_point(point),
             );
+        }
+    }
+
+    #[test]
+    fn equivalent_transform_vector_transform_size() {
+        for rot in GridRotation::ALL {
+            let vector = GridVector::new(1, 20, 300);
+            assert_eq!(
+                rot.transform_vector(vector).abs(),
+                rot.transform_size(GridSize::from(vector)).to_vector()
+            )
         }
     }
 

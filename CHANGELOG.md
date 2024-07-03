@@ -20,6 +20,7 @@
     - `math::GridAab::union_cubes()` is a new definition of union which returns a smaller box in zero-volume/flat cases.
     - `math::GridAab::union_cube()` is a convenience for expanding the box to include one cube.
     - `math::GridAab::to_free()` is another name for `Aab::from()`, useful for method chaining and not importing `Aab`.
+    - `math::GridRotation::transform_size()` rotates `GridSize` values, like `transform_vector()` without negation.
     - `math::GridSize` type alias for `euclid::Size3D<GridCoordinate, Cube>`.
     - `math::Octant` is a new type identifying an octant.
     - `math::OctantMap` is a new type storing eight values associated with octants (like `FaceMap` is to `Face6`).
