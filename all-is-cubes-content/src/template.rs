@@ -482,6 +482,8 @@ mod tests {
         ));
     }
 
+    /// Test one template.
+    /// This function is called by the [`generate_template_test!`] macro.
     pub(super) async fn check_universe_template(template: UniverseTemplate) {
         let params = if let UniverseTemplate::Islands = template {
             // Kludge: the islands template is known to be very slow.
@@ -513,6 +515,29 @@ mod tests {
                 let _ = u.get_default_character().unwrap().read().unwrap();
             }
             u.step(false, time::DeadlineNt::Asap);
+        }
+
+        // Test that asking for an impossibly huge size does not panic, but returns an error or
+        // ignores the size.
+        //
+        // (This shouldn't ever actually hog memory because it'd be too much to succeed
+        // in allocating, regardless of platform, unless the template clamps all but exactly one
+        // dimension.)
+        // TODO: This test doesn't pass but it should.
+        if false {
+            println!(
+                "too-big result: {:?}",
+                template
+                    .clone()
+                    .build::<std::time::Instant>(
+                        yield_progress_for_testing(),
+                        TemplateParameters {
+                            seed: Some(0),
+                            size: Some(GridSize::splat(GridCoordinate::MAX)),
+                        }
+                    )
+                    .await
+            );
         }
     }
 }
