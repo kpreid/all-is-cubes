@@ -753,9 +753,10 @@ impl fmt::Display for VolLengthError {
 
             (None, None) => write!(
                 f,
-                "{bounds:?} has a volume of {volume_f64}, \
+                "{bounds:?} has a volume of {volume_u128}, \
                     which is too large to be linearized",
-                volume_f64 = bounds.volume_f64(),
+                // u128 is large enough to hold the multiplication of three u32s
+                volume_u128 = bounds.size().cast::<u128>().volume(),
             ),
 
             (None, Some(_)) => write!(f, "<malformed error {self:?}>"),

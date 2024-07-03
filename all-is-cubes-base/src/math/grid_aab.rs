@@ -1,25 +1,25 @@
 //! Axis-aligned integer-coordinate box volumes ([`GridAab`]), three-dimensional data within those
 //! volumes ([`Vol`]), and related.
 
-use alloc::string::String;
 use core::fmt;
 use core::ops::Range;
 
 use euclid::{Size3D, Vector3D};
+use manyfmt::Refmt;
 
 use crate::math::{
     sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, GridIter,
-    GridPoint, GridSize, GridVector, Gridgid, VectorOps as _, Vol,
+    GridPoint, GridSize, GridVector, Gridgid, Vol,
 };
 use crate::resolution::Resolution;
+use crate::util::ConciseDebug;
 
 #[allow(missing_docs)] // documented in its all-is-cubes reexport
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct GridAab {
     lower_bounds: GridPoint,
-    /// Constructor checks ensure this is non-negative and that adding it
-    /// to `lower_bounds` will not overflow.
-    sizes: GridSize,
+    /// Constructor checks ensure this is not smaller than `lower_bounds`.
+    upper_bounds: GridPoint,
 }
 
 impl GridAab {
@@ -52,7 +52,7 @@ impl GridAab {
     /// have *some* box.
     pub const ORIGIN_EMPTY: GridAab = GridAab {
         lower_bounds: GridPoint::new(0, 0, 0),
-        sizes: GridSize::new(0, 0, 0),
+        upper_bounds: GridPoint::new(0, 0, 0),
     };
 
     /// Constructs a [`GridAab`] from coordinate lower bounds and sizes.
@@ -63,50 +63,12 @@ impl GridAab {
     /// rather than discrete coordinates) spans 5 to 15.
     ///
     /// Panics if the sizes are negative or the resulting range would cause
-    /// numeric overflow. Use [`GridAab::checked_from_lower_size`] to avoid panics.
+    /// numeric overflow. Use [`GridAab::checked_from_lower_upper`] to avoid panics.
     #[track_caller]
     #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn from_lower_size(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridSize>) -> Self {
         Self::checked_from_lower_size(lower_bounds.into(), sizes.into())
             .expect("GridAab::from_lower_size")
-    }
-
-    /// Constructs a [`GridAab`] from coordinate lower bounds and sizes.
-    ///
-    /// For example, if on one axis the lower bound is 5 and the size is 10,
-    /// then the positions where blocks can exist are numbered 5 through 14
-    /// (inclusive) and the occupied volume (from a perspective of continuous
-    /// rather than discrete coordinates) spans 5 to 15.
-    ///
-    /// Returns [`Err`] if the sizes are negative or the resulting range would cause
-    /// numeric overflow.
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
-    pub fn checked_from_lower_size(
-        lower_bounds: impl Into<GridPoint>,
-        sizes: impl Into<GridSize>,
-    ) -> Result<Self, GridOverflowError> {
-        fn inner(lower_bounds: GridPoint, sizes: GridSize) -> Result<GridAab, GridOverflowError> {
-            // TODO: Test these error cases.
-            // TODO: Replace string error construction with an error enum.
-            for axis in Axis::ALL {
-                if sizes[axis] < 0 {
-                    return Err(GridOverflowError(format!(
-                        "sizes.{axis:x} must be ≥ 0, not {sa}",
-                        sa = sizes[axis]
-                    )));
-                }
-                lower_bounds[axis].checked_add(sizes[axis]).ok_or_else(|| {
-                    GridOverflowError(format!("lower_bounds.{axis:x} too large for sizes"))
-                })?;
-            }
-
-            Ok(GridAab {
-                lower_bounds,
-                sizes,
-            })
-        }
-
-        inner(lower_bounds.into(), sizes.into())
     }
 
     /// Constructs a [`GridAab`] from inclusive lower bounds and exclusive upper bounds.
@@ -116,15 +78,54 @@ impl GridAab {
     /// (inclusive) and the occupied volume (from a perspective of continuous
     /// rather than discrete coordinates) spans 5 to 10.
     ///
-    /// Panics if the `upper_bounds` are less than the `lower_bounds`.
+    /// Returns [`Err`] if any of the `upper_bounds` are less than the `lower_bounds`.
+    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    pub fn checked_from_lower_upper(
+        lower_bounds: impl Into<GridPoint>,
+        upper_bounds: impl Into<GridPoint>,
+    ) -> Result<Self, GridOverflowError> {
+        fn inner(
+            lower_bounds: GridPoint,
+            upper_bounds: GridPoint,
+        ) -> Result<GridAab, GridOverflowError> {
+            // TODO: Test these error cases.
+            // TODO: Replace string error construction with an error enum.
+            for axis in Axis::ALL {
+                let lower = lower_bounds[axis];
+                let upper = upper_bounds[axis];
+                if upper < lower {
+                    return Err(GridOverflowError(OverflowKind::Inverted {
+                        lower_bounds,
+                        upper_bounds,
+                    }));
+                }
+            }
+
+            Ok(GridAab {
+                lower_bounds,
+                upper_bounds,
+            })
+        }
+
+        inner(lower_bounds.into(), upper_bounds.into())
+    }
+
+    /// Constructs a [`GridAab`] from inclusive lower bounds and exclusive upper bounds.
+    ///
+    /// For example, if on one axis the lower bound is 5 and the upper bound is 10,
+    /// then the positions where blocks can exist are numbered 5 through 9
+    /// (inclusive) and the occupied volume (from a perspective of continuous
+    /// rather than discrete coordinates) spans 5 to 10.
+    ///
+    /// Panics if any of the `upper_bounds` are less than the `lower_bounds`.
     #[track_caller]
     #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
         upper_bounds: impl Into<GridPoint>,
     ) -> GridAab {
-        let lower_bounds = lower_bounds.into();
-        GridAab::from_lower_size(lower_bounds, upper_bounds.into() - lower_bounds)
+        Self::checked_from_lower_upper(lower_bounds.into(), upper_bounds.into())
+            .expect("GridAab::from_lower_upper")
     }
 
     /// Constructs a [`GridAab`] from [`Range`]s.
@@ -140,17 +141,32 @@ impl GridAab {
         )
     }
 
-    /// Constructs a [`GridAab`] from inclusive lower bounds and exclusive upper bounds.
+    /// Constructs a [`GridAab`] from coordinate lower bounds and sizes.
     ///
-    /// Returns [`Err`] if the `upper_bounds` are less than the `lower_bounds`.
+    /// Returns [`Err`] if the `size` is negative or adding it to `lower_bounds` overflows.
     #[track_caller]
     #[allow(clippy::missing_inline_in_public_items)] // is generic already
-    pub fn checked_from_lower_upper(
+    pub fn checked_from_lower_size(
         lower_bounds: impl Into<GridPoint>,
-        upper_bounds: impl Into<GridPoint>,
+        size: impl Into<GridSize>,
     ) -> Result<Self, GridOverflowError> {
-        let lower_bounds = lower_bounds.into();
-        GridAab::checked_from_lower_size(lower_bounds, upper_bounds.into() - lower_bounds)
+        #[inline]
+        fn inner(lower_bounds: GridPoint, size: GridSize) -> Result<GridAab, GridOverflowError> {
+            let upper_bounds = (|| {
+                Some(GridPoint::new(
+                    lower_bounds.x.checked_add(size.width)?,
+                    lower_bounds.y.checked_add(size.height)?,
+                    lower_bounds.z.checked_add(size.depth)?,
+                ))
+            })()
+            .ok_or(GridOverflowError(OverflowKind::OverflowedSize {
+                lower_bounds,
+                size,
+            }))?;
+            GridAab::checked_from_lower_upper(lower_bounds, upper_bounds)
+        }
+
+        inner(lower_bounds.into(), size.into())
     }
 
     /// Constructs a [`GridAab`] with a volume of 1, containing the specified cube.
@@ -174,7 +190,7 @@ impl GridAab {
         let size = resolution.to_grid();
         GridAab {
             lower_bounds: GridPoint::new(0, 0, 0),
-            sizes: GridSize::new(size, size, size),
+            upper_bounds: GridPoint::new(size, size, size),
         }
     }
 
@@ -197,7 +213,7 @@ impl GridAab {
     // TODO: add doctest example of failure
     #[inline]
     pub fn volume(&self) -> Option<usize> {
-        let sizes = self.sizes;
+        let sizes = self.unsigned_size();
         let mut volume: usize = 1;
         for i in Axis::ALL {
             volume = volume.checked_mul(usize::try_from(sizes[i]).ok()?)?;
@@ -209,7 +225,7 @@ impl GridAab {
     /// converted to [`f64`].
     #[inline]
     pub fn volume_f64(&self) -> f64 {
-        self.size().to_f64().volume()
+        self.unsigned_size().to_f64().volume()
     }
 
     /// Computes the surface area of this box; 1 unit of area = 1 cube-face.
@@ -218,7 +234,7 @@ impl GridAab {
     /// want float anyway.
     #[inline]
     pub fn surface_area_f64(&self) -> f64 {
-        let size = self.sizes.to_f64();
+        let size = self.unsigned_size().to_f64();
         size.width * size.height * 2. + size.width * size.depth * 2. + size.height * size.depth * 2.
     }
 
@@ -227,7 +243,7 @@ impl GridAab {
     /// This does not necessarily mean that its size is zero on all axes.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.sizes.is_empty()
+        self.unsigned_size().is_empty()
     }
 
     /// Inclusive upper bounds on cube coordinates, or the most negative corner of the
@@ -243,19 +259,18 @@ impl GridAab {
     pub fn upper_bounds(&self) -> GridPoint {
         // Cannot overflow due to constructor-enforced invariants,
         // so always use un-checked arithmetic
-        self.lower_bounds
-            .zip(
-                self.sizes.to_vector().to_point(),
-                GridCoordinate::wrapping_add,
-            )
-            .to_point()
+        self.upper_bounds
     }
 
     /// Size of the box in each axis; equivalent to
     /// `self.upper_bounds() - self.lower_bounds()`.
+    ///
+    /// TODO: This calculation can overflow. Switch to unsigned arithmetic or `Option` or something.
     #[inline]
     pub fn size(&self) -> GridSize {
-        self.sizes
+        self.upper_bounds
+            .zip(self.lower_bounds, GridCoordinate::wrapping_sub)
+            .into()
     }
 
     /// Size of the box in each axis; equivalent to
@@ -266,11 +281,15 @@ impl GridAab {
     /// unsigned integers do not need to write a fallible-looking conversion.
     #[inline]
     pub fn unsigned_size(&self) -> Size3D<u32, Cube> {
-        // Convert the i32 we know to be positive to u32.
-        // Declaring the parameter type ensures that if we ever decide to change the numeric type
-        // of `GridCoordinate`, this will fail to compile.
-        // Not using `to_u32()` because that has an unnecessary range check and panic branch.
-        self.sizes.map(|s: i32| s as u32)
+        self.upper_bounds
+            // Two’s complement math trick: If the subtraction overflows and wraps, the following
+            // conversion to u32 will give us the right answer anyway.
+            .zip(self.lower_bounds, GridCoordinate::wrapping_sub)
+            // Declaring the parameter type ensures that if we ever decide to change the numeric
+            // type of `GridCoordinate`, this will fail to compile.
+            // Not using `to_u32()` because that has an unnecessary range check and panic branch.
+            .map(|s: i32| s as u32)
+            .into()
     }
 
     /// The range of X coordinates for unit cubes within the box.
@@ -309,7 +328,9 @@ impl GridAab {
     /// ```
     #[inline]
     pub fn center(&self) -> FreePoint {
-        self.lower_bounds.map(FreeCoordinate::from) + self.sizes.map(FreeCoordinate::from) / 2.0
+        (self.lower_bounds.map(FreeCoordinate::from)
+            + self.upper_bounds.map(FreeCoordinate::from).to_vector())
+            / 2.
     }
 
     /// Iterate over all cubes that this contains.
@@ -564,11 +585,9 @@ impl GridAab {
     #[inline]
     #[must_use]
     pub fn union_cube(self, other: Cube) -> GridAab {
-        let lower = self.lower_bounds().min(other.lower_bounds());
-        let upper = self.upper_bounds().max(other.upper_bounds());
         Self {
-            lower_bounds: lower,
-            sizes: Size3D::from(upper - lower),
+            lower_bounds: self.lower_bounds().min(other.lower_bounds()),
+            upper_bounds: self.upper_bounds().max(other.upper_bounds()),
         }
     }
 
@@ -745,7 +764,8 @@ impl GridAab {
     #[track_caller]
     #[must_use]
     pub fn multiply(self, scale: GridCoordinate) -> Self {
-        Self::from_lower_size(self.lower_bounds * scale, self.sizes * scale)
+        // TODO: this should use checked multiplications to guarantee panic
+        Self::from_lower_upper(self.lower_bounds * scale, self.upper_bounds * scale)
     }
 
     /// Moves all bounds outward or inward by the specified distances.
@@ -835,7 +855,11 @@ impl GridAab {
             // TODO: better error message
             self.lower_bounds[axis]
                 .checked_sub(thickness)
-                .ok_or_else(|| GridOverflowError("abut() overflowed available range".into()))?
+                .ok_or(GridOverflowError(OverflowKind::OverflowedAbut {
+                    original: self,
+                    face,
+                    thickness,
+                }))?
         };
 
         let mut lower_bounds = self.lower_bounds();
@@ -888,10 +912,82 @@ impl<'a> arbitrary::Arbitrary<'a> for GridAab {
 }
 
 /// Error when a [`GridAab`] or [`Cube`] cannot be constructed from the given input.
-// TODO: Make this allocation-free
-#[derive(Clone, Debug, displaydoc::Display, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, displaydoc::Display, Eq, PartialEq)]
 #[displaydoc("{0}")]
-pub struct GridOverflowError(String);
+pub struct GridOverflowError(OverflowKind);
+
+/// Error details for [`GridOverflowError`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum OverflowKind {
+    Inverted {
+        lower_bounds: GridPoint,
+        upper_bounds: GridPoint,
+    },
+    OverflowedSize {
+        lower_bounds: GridPoint,
+        size: GridSize,
+    },
+    // TODO: implement this specific error
+    // NegativeSize {
+    //     lower_bounds: GridPoint,
+    //     size: GridSize,
+    // },
+    OverflowedAbut {
+        original: GridAab,
+        face: Face6,
+        thickness: GridCoordinate,
+    },
+}
+
+impl fmt::Display for OverflowKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OverflowKind::Inverted {
+                lower_bounds,
+                upper_bounds,
+            } => {
+                write!(
+                    f,
+                    "GridAab's lower bounds {} were greater than upper bounds {}",
+                    lower_bounds.refmt(&ConciseDebug),
+                    upper_bounds.refmt(&ConciseDebug)
+                )
+            }
+            OverflowKind::OverflowedSize { lower_bounds, size } => {
+                write!(
+                    f,
+                    "GridAab's size {size} plus lower bounds {lower_bounds} \
+                        produced {upper_bounds} which overflows",
+                    lower_bounds = lower_bounds.refmt(&ConciseDebug),
+                    // Do the math in i64, which is big enough not to overflow.
+                    upper_bounds = (lower_bounds.to_i64() + size.to_i64()).refmt(&ConciseDebug),
+                    size = size.refmt(&ConciseDebug),
+                )
+            }
+            // OverflowKind::NegativeSize {
+            //     lower_bounds: _,
+            //     size,
+            // } => {
+            //     write!(
+            //         f,
+            //         "GridAab's size {size} cannot be negative",
+            //         size = size.refmt(&ConciseDebug),
+            //     )
+            // }
+            OverflowKind::OverflowedAbut {
+                original,
+                face,
+                thickness,
+            } => {
+                write!(
+                    f,
+                    // TODO: don't use Debug format here
+                    "extending {face:?} face of {original:?} by {thickness:+} overflowed",
+                )
+            }
+        }
+    }
+}
 
 crate::util::cfg_should_impl_error! {
     impl std::error::Error for GridOverflowError {}
@@ -904,7 +1000,11 @@ impl fmt::Debug for RangeWithLength {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let range = &self.0;
         if f.alternate() {
-            write!(f, "{range:?} ({len})", len = range.len())
+            write!(
+                f,
+                "{range:?} ({len})",
+                len = i64::from(range.end) - i64::from(range.start)
+            )
         } else {
             range.fmt(f)
         }
@@ -974,7 +1074,7 @@ mod tests {
         assert_eq!(
             big.to_vol::<ZMaj>().unwrap_err().to_string(),
             "GridAab(0..2147483647, 0..2147483647, 0..2147483647) has a volume of \
-                9903520300447984000000000000, which is too large to be linearized"
+                9903520300447984150353281023, which is too large to be linearized"
         );
     }
 
@@ -1052,4 +1152,6 @@ mod tests {
             "}
         );
     }
+
+    // TODO: test overflow error formatting
 }
