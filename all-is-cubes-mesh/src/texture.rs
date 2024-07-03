@@ -7,7 +7,7 @@ use core::fmt;
 use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Axis, Cube, GridAab, Rgb, Vol};
+use all_is_cubes::math::{Axis, Cube, GridAab, GridSizeCoord, Rgb, Vol};
 use all_is_cubes::util::{ConciseDebug, Fmt};
 
 /// Numeric type used to calculate texture coordinates and store them in [`BlockVertex`].
@@ -204,7 +204,7 @@ pub fn validate_slice(tile_bounds: GridAab, slice_bounds: GridAab) -> Axis {
         tile_bounds.contains_box(slice_bounds),
         "Tile::slice() bounds {slice_bounds:?} are not within the tile bounds {tile_bounds:?}"
     );
-    match Into::<[i32; 3]>::into(slice_bounds.size()) {
+    match Into::<[GridSizeCoord; 3]>::into(slice_bounds.size()) {
         [_, _, 1] => Axis::Z,
         [_, 1, _] => Axis::Y,
         [1, _, _] => Axis::X,

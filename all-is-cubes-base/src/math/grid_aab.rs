@@ -4,12 +4,12 @@
 use core::fmt;
 use core::ops::Range;
 
-use euclid::{Size3D, Vector3D};
+use euclid::Vector3D;
 use manyfmt::Refmt;
 
 use crate::math::{
     sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, GridIter,
-    GridPoint, GridSize, GridVector, Gridgid, Vol,
+    GridPoint, GridSize, GridSizeCoord, GridVector, Gridgid, Vol,
 };
 use crate::resolution::Resolution;
 use crate::util::ConciseDebug;
@@ -64,6 +64,10 @@ impl GridAab {
     ///
     /// Panics if the sizes are negative or the resulting range would cause
     /// numeric overflow. Use [`GridAab::checked_from_lower_upper`] to avoid panics.
+    //---
+    // TODO: It would be more convenient for callers if `sizes` accepted `Size3D<GridCoordinate>`
+    // and other such alternate numeric types. There would be no disadvantage since this is a
+    // range-checked operation anyway. However, we'd need a custom conversion trait to handle that.
     #[track_caller]
     #[allow(clippy::missing_inline_in_public_items)] // is generic already
     pub fn from_lower_size(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridSize>) -> Self {
@@ -154,9 +158,9 @@ impl GridAab {
         fn inner(lower_bounds: GridPoint, size: GridSize) -> Result<GridAab, GridOverflowError> {
             let upper_bounds = (|| {
                 Some(GridPoint::new(
-                    lower_bounds.x.checked_add(size.width)?,
-                    lower_bounds.y.checked_add(size.height)?,
-                    lower_bounds.z.checked_add(size.depth)?,
+                    lower_bounds.x.checked_add_unsigned(size.width)?,
+                    lower_bounds.y.checked_add_unsigned(size.height)?,
+                    lower_bounds.z.checked_add_unsigned(size.depth)?,
                 ))
             })()
             .ok_or(GridOverflowError(OverflowKind::OverflowedSize {
@@ -213,7 +217,7 @@ impl GridAab {
     // TODO: add doctest example of failure
     #[inline]
     pub fn volume(&self) -> Option<usize> {
-        let sizes = self.unsigned_size();
+        let sizes = self.size();
         let mut volume: usize = 1;
         for i in Axis::ALL {
             volume = volume.checked_mul(usize::try_from(sizes[i]).ok()?)?;
@@ -225,7 +229,7 @@ impl GridAab {
     /// converted to [`f64`].
     #[inline]
     pub fn volume_f64(&self) -> f64 {
-        self.unsigned_size().to_f64().volume()
+        self.size().to_f64().volume()
     }
 
     /// Computes the surface area of this box; 1 unit of area = 1 cube-face.
@@ -234,7 +238,7 @@ impl GridAab {
     /// want float anyway.
     #[inline]
     pub fn surface_area_f64(&self) -> f64 {
-        let size = self.unsigned_size().to_f64();
+        let size = self.size().to_f64();
         size.width * size.height * 2. + size.width * size.depth * 2. + size.height * size.depth * 2.
     }
 
@@ -243,7 +247,7 @@ impl GridAab {
     /// This does not necessarily mean that its size is zero on all axes.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.unsigned_size().is_empty()
+        self.size().is_empty()
     }
 
     /// Inclusive upper bounds on cube coordinates, or the most negative corner of the
@@ -263,24 +267,10 @@ impl GridAab {
     }
 
     /// Size of the box in each axis; equivalent to
-    /// `self.upper_bounds() - self.lower_bounds()`.
-    ///
-    /// TODO: This calculation can overflow. Switch to unsigned arithmetic or `Option` or something.
+    /// `self.upper_bounds() - self.lower_bounds()`, except that the result is
+    /// unsigned (which is necessary so that it cannot overflow).
     #[inline]
     pub fn size(&self) -> GridSize {
-        self.upper_bounds
-            .zip(self.lower_bounds, GridCoordinate::wrapping_sub)
-            .into()
-    }
-
-    /// Size of the box in each axis; equivalent to
-    /// `self.upper_bounds() - self.lower_bounds()`, except that the result is an
-    /// unsigned integer.
-    ///
-    /// Compared to [`GridAab::size()`], this is a convenience so that callers needing
-    /// unsigned integers do not need to write a fallible-looking conversion.
-    #[inline]
-    pub fn unsigned_size(&self) -> Size3D<u32, Cube> {
         self.upper_bounds
             // Two’s complement math trick: If the subtraction overflows and wraps, the following
             // conversion to u32 will give us the right answer anyway.
@@ -563,7 +553,7 @@ impl GridAab {
         let lower = self.lower_bounds().min(other.lower_bounds());
         let upper = self.upper_bounds().max(other.upper_bounds());
         // Subtraction and construction should not fail.
-        Self::from_lower_size(lower, upper - lower)
+        Self::from_lower_size(lower, (upper - lower).to_u32())
     }
 
     /// Extend the bounds of `self` as needed to enclose `other`.
@@ -845,8 +835,18 @@ impl GridAab {
     pub fn abut(self, face: Face6, thickness: GridCoordinate) -> Result<Self, GridOverflowError> {
         let axis = face.axis();
 
+        // Apply change in size.
         let mut size = self.size();
-        size[axis] = thickness.max(-size[axis]).abs();
+        size[axis] = match GridSizeCoord::try_from(thickness) {
+            // If thickness is nonnegative, the new size is defined by it directly.
+            Ok(positive) => positive,
+            Err(_) => {
+                // If negative, the new size cannot be larger than the old size.
+                // The tricky part is handling GridCoordinate::MIN, which cannot be
+                // directly negated without overflow -- so we use unsigned_abs() to do it.
+                thickness.unsigned_abs().min(size[axis])
+            }
+        };
 
         // Coordinate on the axis that the two boxes share
         let abutting_coordinate = if face.is_positive() {
@@ -867,7 +867,7 @@ impl GridAab {
             abutting_coordinate
         } else {
             // Cannot overflow because we already min()ed it.
-            abutting_coordinate - size[axis]
+            abutting_coordinate.wrapping_sub_unsigned(size[axis])
         };
         lower_bounds[axis] = new_lower_bound;
 
@@ -1070,7 +1070,7 @@ mod tests {
 
     #[test]
     fn to_vol_error() {
-        let big = GridAab::from_lower_size([0, 0, 0], [i32::MAX, i32::MAX, i32::MAX]);
+        let big = GridAab::from_lower_size([0, 0, 0], GridSize::splat(i32::MAX as u32));
         assert_eq!(
             big.to_vol::<ZMaj>().unwrap_err().to_string(),
             "GridAab(0..2147483647, 0..2147483647, 0..2147483647) has a volume of \

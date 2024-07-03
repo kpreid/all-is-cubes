@@ -16,7 +16,7 @@ use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation,
-    GridSize, GridVector, Gridgid,
+    GridSize, GridVector, Gridgid, VectorOps,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::raycast::Raycaster;
@@ -77,7 +77,10 @@ pub(crate) async fn demo_city<I: Instant>(
     let lamp_spacing = 20;
     let sky_height = 30;
     let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
-    let space_size = params.size.unwrap_or(GridSize::new(160, 60, 160));
+    let space_size = params
+        .size
+        .unwrap_or(GridSize::new(160, 60, 160))
+        .map(|size| i32::try_from(size).unwrap_or(i32::MAX));
     let bounds = GridAab::from_lower_upper(
         [-space_size.width / 2, -ground_depth, -space_size.depth / 2],
         [space_size.width / 2, sky_height, space_size.depth / 2],
@@ -513,7 +516,7 @@ fn place_one_exhibit<I: Instant>(
                     .bounds()
                     .size()
                     .width
-                    .min(enclosure_footprint.size().width * i32::from(info_resolution)),
+                    .min(enclosure_footprint.size().width * u32::from(info_resolution)),
                 ..exhibit_info_space.bounds().size()
             },
         );
@@ -559,8 +562,11 @@ fn place_one_exhibit<I: Instant>(
             Placement::Underground => GridVector::new(
                 // centered horizontally
                 enclosure_footprint.lower_bounds().x
-                    + (enclosure_footprint.size().width - info_sign_space.bounds().size().width)
-                        / 2,
+                    + i32::try_from(
+                        (enclosure_footprint.size().width - info_sign_space.bounds().size().width)
+                            / 2,
+                    )
+                    .unwrap(),
                 // at above-the-entrance level
                 entranceway_height,
                 // on the surface of the corridor wall -- TODO: We don't actually know fundamentally that the corridor

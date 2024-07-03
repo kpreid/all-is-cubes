@@ -8,7 +8,6 @@ use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
-use all_is_cubes::math::GridCoordinate;
 use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::universe::Handle;
 
@@ -164,7 +163,7 @@ impl TooltipContents {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Tooltip {
-    width_in_hud: GridCoordinate,
+    width_in_hud: u16,
     hud_blocks: Arc<HudBlocks>,
 
     text_builder: text::TextBuilder,
@@ -198,7 +197,7 @@ impl Tooltip {
 impl Layoutable for Tooltip {
     fn requirements(&self) -> LayoutRequest {
         LayoutRequest {
-            minimum: size3(self.width_in_hud, 1, 1),
+            minimum: size3(self.width_in_hud.into(), 1, 1),
         }
     }
 }

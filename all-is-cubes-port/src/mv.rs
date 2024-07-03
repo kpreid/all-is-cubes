@@ -160,12 +160,10 @@ fn dot_vox_model_to_space(
     model: &dot_vox::Model,
 ) -> Result<Space, DotVoxConversionError> {
     let transform = mv_to_aic_coordinate_transform(model.size);
-    let bounds = GridAab::from_lower_size(
-        [0, 0, 0],
-        vec3(model.size.x, model.size.y, model.size.z).to_i32(),
-    )
-    .transform(transform)
-    .expect("TODO: return error");
+    let bounds =
+        GridAab::from_lower_size([0, 0, 0], vec3(model.size.x, model.size.y, model.size.z))
+            .transform(transform)
+            .expect("TODO: return error");
 
     let mut space = Space::builder(bounds)
         .spawn({
@@ -249,10 +247,7 @@ fn space_to_dot_vox_model(
 
     Ok(dot_vox::Model {
         size: {
-            let size = transform
-                .rotation
-                .transform_size(space.bounds().size())
-                .to_u32(); // conversion from positive i32 to u32 cannot overflow
+            let size = transform.rotation.transform_size(space.bounds().size());
             dot_vox::Size {
                 x: size.width,
                 y: size.height,
@@ -307,11 +302,9 @@ fn mv_to_aic_coordinate_transform(mv_size: dot_vox::Size) -> Gridgid {
 /// Also translates coordinates so that the lower bounds are zero, since the dot-vox format
 /// does not support arbitrary lower bounds.
 fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
-    let aic_size = aic_bounds.size();
     let rotated_size = MV_TO_AIC_ROTATION
         .inverse()
-        .transform_size(aic_size)
-        .to_u32();
+        .transform_size(aic_bounds.size());
     let mv_size = dot_vox::Size {
         x: rotated_size.width,
         y: rotated_size.height,

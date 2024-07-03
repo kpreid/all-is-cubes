@@ -18,7 +18,9 @@ use crate::arcstr::{literal, ArcStr};
 use crate::block::{Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::color_block;
 use crate::inv::{Slot, Tool};
-use crate::math::{rgb_const, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, Rgb, Rgba};
+use crate::math::{
+    rgb_const, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, Rgb, Rgba,
+};
 use crate::raycast::Raycaster;
 use crate::space::{SetCubeError, Space};
 use crate::transaction::Transactional as _;
@@ -154,13 +156,20 @@ pub fn make_slab_txn(
     numerator: GridCoordinate,
     denominator: Resolution,
 ) -> Block {
+    // Don't ever generate a space unnecessarily bigger than the block bounds
+    let numerator = numerator.min(Resolution::MAX.into());
+
     let voxel_palette = [
         color_block!(palette::PLANK),
         Block::from(palette::PLANK * 1.06),
     ];
     let bounds = GridAab::from_lower_size(
         [0, 0, 0],
-        [denominator.to_grid(), numerator, denominator.to_grid()],
+        GridSize::new(
+            denominator.into(),
+            numerator.try_into().unwrap(), // can't fail due to earlier check
+            denominator.into(),
+        ),
     );
 
     let mut space = Space::builder(bounds).build();

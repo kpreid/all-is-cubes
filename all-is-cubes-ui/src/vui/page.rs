@@ -7,7 +7,9 @@ use all_is_cubes::camera;
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{size2, Size2D};
-use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSize, Rgba};
+use all_is_cubes::math::{
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba,
+};
 use all_is_cubes::space::{self, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Universe};
@@ -24,11 +26,11 @@ use crate::vui::{
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct UiSize {
     /// Two-dimensional size; individual pages may have their own choices of depth.
-    size: Size2D<GridCoordinate, Cube>,
+    size: Size2D<u32, Cube>,
 }
 
 impl UiSize {
-    pub(crate) const DEPTH_BEHIND_VIEW_PLANE: GridCoordinate = 5;
+    pub(crate) const DEPTH_BEHIND_VIEW_PLANE: u8 = 5;
 
     /// Construct [`UiSize`] that suits the given viewport
     /// (based on pixel resolution and aspect ratio).
@@ -38,9 +40,8 @@ impl UiSize {
         let width = 25;
         // we want to ceil() the height because the camera setup makes the height match
         // the viewport and ignores width, so we want to prefer too-narrow over too-wide
-        let height = ((FreeCoordinate::from(width) / viewport.nominal_aspect_ratio()).ceil()
-            as GridCoordinate)
-            .max(8);
+        let height =
+            ((FreeCoordinate::from(width) / viewport.nominal_aspect_ratio()).ceil() as u32).max(8);
         let height = height / 2 * 2 + 1; // ensure odd
         Self {
             size: size2(width, height),
@@ -49,9 +50,10 @@ impl UiSize {
 
     /// TODO: depth should be up to the choice of the individual pages.
     pub(crate) fn space_bounds(self) -> GridAab {
+        let size_c = self.size.to_i32();
         GridAab::from_lower_upper(
-            [0, 0, -Self::DEPTH_BEHIND_VIEW_PLANE],
-            [self.size.width, self.size.height, 5],
+            [0, 0, -GridCoordinate::from(Self::DEPTH_BEHIND_VIEW_PLANE)],
+            [size_c.width, size_c.height, 5],
         )
     }
 
@@ -173,7 +175,7 @@ impl PageInst {
 }
 
 // TODO: contribute this to euclid
-fn drop_depth(size: GridSize) -> Size2D<GridCoordinate, Cube> {
+fn drop_depth(size: GridSize) -> Size2D<u32, Cube> {
     Size2D::new(size.width, size.height)
 }
 
@@ -187,7 +189,11 @@ pub(crate) fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
                 // magic number 2 allows us to fill the edges of the viewport, ish
                 // TODO: VUI camera positioning should give us the option of "overscan",
                 // where all edges of the space spill off the window.
-                minimum: GridSize::new(0, 0, UiSize::DEPTH_BEHIND_VIEW_PLANE + 2),
+                minimum: GridSize::new(
+                    0,
+                    0,
+                    GridSizeCoord::from(UiSize::DEPTH_BEHIND_VIEW_PLANE) + 2,
+                ),
             })),
             vui::leaf_widget(widgets::Frame::with_block(color_block!(0., 0., 0., 0.7))),
             foreground,
@@ -242,12 +248,12 @@ mod tests {
 
     #[test]
     fn ui_size() {
-        let cases: Vec<([u32; 2], [i32; 2])> =
+        let cases: Vec<([u32; 2], [u32; 2])> =
             vec![([800, 600], [25, 19]), ([1000, 600], [25, 15])];
         let mut failed = 0;
         for (nominal_viewport, expected_size) in cases {
             let actual_size = UiSize::new(camera::Viewport::with_scale(1.0, nominal_viewport)).size;
-            let actual_size: [i32; 2] = actual_size.into();
+            let actual_size: [u32; 2] = actual_size.into();
             if actual_size != expected_size {
                 println!("{nominal_viewport:?} expected to produce {expected_size:?}; got {actual_size:?}");
                 failed += 1;

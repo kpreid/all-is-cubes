@@ -12,7 +12,7 @@ use strum::IntoEnumIterator;
 
 use all_is_cubes::camera;
 use all_is_cubes::euclid::Size2D;
-use all_is_cubes::math::{GridCoordinate, GridSize};
+use all_is_cubes::math::{GridSize, GridSizeCoord};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_desktop::logging::LoggingArgs;
 use all_is_cubes_port::ExportFormat;
@@ -291,18 +291,18 @@ impl FromStr for SpaceSizeArg {
         if s.to_ascii_lowercase() == "default" {
             Ok(SpaceSizeArg(None))
         } else {
-            let dims: [GridCoordinate; 3] = s
+            let dims: [GridSizeCoord; 3] = s
                 .split(&['×', 'x', ',', ';', ' '][..])
                 .map(|s| {
                     let i = s
-                        .parse::<GridCoordinate>()
+                        .parse::<GridSizeCoord>()
                         .map_err(|_| format!("{s:?} not an integer or \"default\""))?;
                     if i < 1 {
                         return Err(format!("{s:?} not an integer or \"default\""));
                     }
                     Ok(i)
                 })
-                .collect::<Result<Vec<GridCoordinate>, String>>()?
+                .collect::<Result<Vec<GridSizeCoord>, String>>()?
                 .try_into()
                 .map_err(|_| String::from("must be three integers or \"default\""))?;
             Ok(SpaceSizeArg(Some(GridSize::from(dims))))

@@ -86,8 +86,8 @@ pub fn write_texture_by_aab<T: Pod>(
         bytemuck::cast_slice::<T, u8>(data),
         wgpu::ImageDataLayout {
             offset: 0,
-            bytes_per_row: Some(std::mem::size_of::<T>() as u32 * region.size().width as u32),
-            rows_per_image: Some(region.size().height as u32),
+            bytes_per_row: Some(std::mem::size_of::<T>() as u32 * region.size().width),
+            rows_per_image: Some(region.size().height),
         },
         size3d_to_extent(region.size()),
     )
@@ -106,28 +106,18 @@ pub fn point_to_origin<U>(origin: Point3D<GridCoordinate, U>) -> wgpu::Origin3d 
     .expect("negative origin")
 }
 
-/// Convert [`GridSize`] to [`wgpu::Extent3d`]. Panics if the input is negative.
+/// Convert [`GridSize`] to [`wgpu::Extent3d`].
 pub fn size3d_to_extent(size: GridSize) -> wgpu::Extent3d {
-    (|| -> Result<_, TryFromIntError> {
-        Ok(wgpu::Extent3d {
-            width: size.width.try_into()?,
-            height: size.height.try_into()?,
-            depth_or_array_layers: size.depth.try_into()?,
-        })
-    })()
-    .expect("negative size")
+    wgpu::Extent3d {
+        width: size.width,
+        height: size.height,
+        depth_or_array_layers: size.depth,
+    }
 }
 
-/// Convert [`wgpu::Extent3d`] to [`GridSize`]. Panics if the input overflows.
+/// Convert [`wgpu::Extent3d`] to [`GridSize`].
 pub fn extent_to_size3d(size: wgpu::Extent3d) -> GridSize {
-    (|| -> Result<_, TryFromIntError> {
-        Ok(GridSize::new(
-            size.width.try_into()?,
-            size.height.try_into()?,
-            size.depth_or_array_layers.try_into()?,
-        ))
-    })()
-    .expect("overflowing size")
+    GridSize::new(size.width, size.height, size.depth_or_array_layers)
 }
 
 pub(crate) struct BeltWritingParts<'sh, 'mu> {

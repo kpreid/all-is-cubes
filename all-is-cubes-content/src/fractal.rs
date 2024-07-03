@@ -4,7 +4,7 @@ use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{rgba_const, Cube, GridAab, GridCoordinate, GridPoint, GridVector};
+use all_is_cubes::math::{rgba_const, Cube, GridAab, GridCoordinate, GridPoint, GridSize};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 
@@ -78,5 +78,5 @@ where
 }
 
 fn pow3aab(level: u8) -> GridAab {
-    GridAab::from_lower_size([0, 0, 0], GridVector::new(1, 1, 1) * 3i32.pow(level.into()))
+    GridAab::from_lower_size([0, 0, 0], GridSize::splat(3u32.pow(level.into())))
 }

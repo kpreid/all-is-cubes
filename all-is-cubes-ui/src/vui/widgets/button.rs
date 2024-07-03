@@ -502,7 +502,7 @@ pub(crate) fn make_button_label_block(
 ) -> Result<BlockBuilder<BlockBuilderVoxels, ()>, InGenError> {
     let mut space = Space::builder(GridAab::from_lower_size(
         [0, 0, 0],
-        [theme::RESOLUTION_G, theme::RESOLUTION_G, 1],
+        [theme::RESOLUTION.into(), theme::RESOLUTION.into(), 1],
     ))
     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
     .build();
@@ -550,10 +550,10 @@ mod theme {
     }
 
     pub fn create_space(max_z: GridCoordinate) -> Space {
-        let multi_resolution_g = MULTI_RESOLUTION.to_grid();
+        let multi_resolution_g = u32::from(MULTI_RESOLUTION);
         Space::builder(GridAab::from_lower_size(
             [0, 0, 0],
-            [multi_resolution_g, multi_resolution_g, max_z],
+            [multi_resolution_g, multi_resolution_g, max_z as u32],
         ))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build()

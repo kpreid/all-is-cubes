@@ -7,7 +7,7 @@ use criterion::{
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::GridAab;
+use all_is_cubes::math::{GridAab, GridCoordinate, GridSize};
 use all_is_cubes::raytracer::UpdatingSpaceRaytracer;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -16,9 +16,8 @@ use all_is_cubes::universe::{Handle, Name};
 fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("bulk");
 
-    for &mutation_size in &[1, 4, 16] {
-        let bounds =
-            GridAab::from_lower_size([0, 0, 0], [mutation_size, mutation_size, mutation_size]);
+    for &mutation_size in &[1u16, 4, 16] {
+        let bounds = GridAab::from_lower_size([0, 0, 0], GridSize::splat(u32::from(mutation_size)));
         let bigger_bounds = bounds.multiply(2);
         let size_description = format!("{mutation_size}×{mutation_size}×{mutation_size}");
         let mutation_volume = bounds.volume().unwrap();
@@ -106,6 +105,7 @@ fn space_bulk_mutation(c: &mut Criterion) {
             b.iter_batched(
                 || Space::empty(bounds),
                 |mut space| {
+                    let mutation_size = GridCoordinate::from(mutation_size);
                     for x in 0..mutation_size {
                         for y in 0..mutation_size {
                             for z in 0..mutation_size {

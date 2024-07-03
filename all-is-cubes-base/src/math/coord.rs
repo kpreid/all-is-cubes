@@ -7,6 +7,11 @@ use crate::math::Cube;
 /// Coordinates that are locked to the cube grid.
 pub type GridCoordinate = i32;
 
+/// Numeric type in a [`GridSize`].
+///
+/// TODO: This needs a cleaner name.
+pub type GridSizeCoord = u32;
+
 /// Positions that are locked to the cube grid.
 pub type GridPoint = Point3D<GridCoordinate, Cube>;
 
@@ -14,7 +19,7 @@ pub type GridPoint = Point3D<GridCoordinate, Cube>;
 pub type GridVector = Vector3D<GridCoordinate, Cube>;
 
 /// Sizes of grid-aligned objects.
-pub type GridSize = Size3D<GridCoordinate, Cube>;
+pub type GridSize = Size3D<GridSizeCoord, Cube>;
 
 /// Coordinates that are not locked to the cube grid.
 ///

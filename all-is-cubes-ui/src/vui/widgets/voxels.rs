@@ -1,8 +1,8 @@
-use all_is_cubes::euclid::Size3D;
 use alloc::sync::Arc;
 
 use all_is_cubes::block::{Block, BlockAttributes, Primitive, Resolution};
-use all_is_cubes::math::{GridAab, GridCoordinate, GridMatrix, GridPoint, GridVector};
+use all_is_cubes::euclid::Size3D;
+use all_is_cubes::math::{GridAab, GridMatrix, GridPoint, GridSizeCoord, GridVector};
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::universe::Handle;
 
@@ -45,7 +45,7 @@ impl Voxels {
 
 impl vui::Layoutable for Voxels {
     fn requirements(&self) -> vui::LayoutRequest {
-        let scale = GridCoordinate::from(self.scale);
+        let scale = GridSizeCoord::from(self.scale);
         let size = self.region.size();
 
         vui::LayoutRequest {
@@ -61,13 +61,14 @@ impl vui::Widget for Voxels {
     fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         // This is similar but not identical to block::space_to_blocks().
 
-        let scale_g = GridCoordinate::from(self.scale);
         let position = position.shrink_to(self.requirements().minimum, true);
 
         // Calculate where the voxels should land in the blocks, respecting layout gravity,
         // by using the shrink_to algorithm again.
-        let grant_in_voxels =
-            GridAab::from_lower_size(GridPoint::origin(), position.bounds.size() * scale_g);
+        let grant_in_voxels = GridAab::from_lower_size(
+            GridPoint::origin(),
+            position.bounds.size() * GridSizeCoord::from(self.scale),
+        );
         let gravity_offset_in_voxels: GridVector = vui::LayoutGrant {
             bounds: grant_in_voxels,
             gravity: position.gravity,
@@ -84,7 +85,7 @@ impl vui::Widget for Voxels {
             GridMatrix::from_translation(
                 self.region.lower_bounds().to_vector() - gravity_offset_in_voxels)
             // Scale up from blocks to voxels
-            * GridMatrix::from_scale(scale_g)
+            * GridMatrix::from_scale(self.scale.into())
             // Subtract the absolute position to get relative position
             * GridMatrix::from_translation(-position.bounds.lower_bounds().to_vector())
         };

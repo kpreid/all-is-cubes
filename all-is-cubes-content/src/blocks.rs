@@ -21,7 +21,7 @@ use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     rgb_const, rgba_const, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation,
-    GridVector, Gridgid, Rgb, Rgba,
+    GridSizeCoord, GridVector, Gridgid, Rgb, Rgba,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
@@ -287,7 +287,7 @@ pub async fn install_demo_blocks(
                 space.fill_uniform(
                     GridAab::from_lower_size(
                         [resolution_g / 2 - 1, 0, resolution_g / 2 - 1],
-                        [2, resolution_g / 2, 2],
+                        [2, GridSizeCoord::from(resolution) / 2, 2],
                     ),
                     &leg,
                 )?;

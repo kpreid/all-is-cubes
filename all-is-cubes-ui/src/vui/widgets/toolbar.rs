@@ -8,7 +8,9 @@ use all_is_cubes::block::{self, text, Block, Resolution};
 use all_is_cubes::character::Character;
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{Listen as _, ListenableSource, Listener};
-use all_is_cubes::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridSize, GridVector};
+use all_is_cubes::math::{
+    Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridSize, GridSizeCoord, GridVector,
+};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
@@ -76,7 +78,7 @@ impl Layoutable for Toolbar {
     fn requirements(&self) -> LayoutRequest {
         LayoutRequest {
             minimum: GridSize::new(
-                GridCoordinate::from(self.slot_count) * Self::TOOLBAR_STEP + 1,
+                GridSizeCoord::from(self.slot_count) * Self::TOOLBAR_STEP as GridSizeCoord + 1,
                 3,
                 3,
             ),

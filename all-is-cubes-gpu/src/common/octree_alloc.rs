@@ -1,5 +1,7 @@
 use all_is_cubes::euclid::default::Translation3D;
-use all_is_cubes::math::{self, Cube, GridAab, GridCoordinate, GridPoint, Octant, OctantMap};
+use all_is_cubes::math::{
+    self, Cube, GridAab, GridCoordinate, GridPoint, GridSizeCoord, Octant, OctantMap,
+};
 
 /// An octree that knows how to allocate box regions of itself. It stores no other data.
 #[derive(Clone, Debug)]
@@ -139,8 +141,10 @@ impl Alloctree {
 
     /// Returns the region that could be allocated within.
     pub fn bounds(&self) -> GridAab {
-        let size = expsize(self.size_exponent);
-        GridAab::from_lower_size([0, 0, 0], [size, size, size])
+        GridAab::from_lower_size(
+            [0, 0, 0],
+            math::GridSize::splat(expsize(self.size_exponent)),
+        )
     }
 
     pub fn occupied_volume(&self) -> usize {
@@ -230,7 +234,7 @@ impl AlloctreeNode {
                     // The tree is subdivided into parts too small to use.
                     return None;
                 }
-                let child_size = expsize(size_exponent - 1);
+                let child_size = expisize(size_exponent - 1);
 
                 children.iter_mut().find_map(|(octant, child)| {
                     child.allocate(
@@ -255,7 +259,7 @@ impl AlloctreeNode {
             }
             AlloctreeNode::Oct(children) => {
                 debug_assert!(size_exponent > 0, "tree is deeper than size");
-                let child_size = expsize(size_exponent - 1);
+                let child_size = expisize(size_exponent - 1);
                 let octant = Octant::try_from_positive_cube(Cube::from(
                     relative_low_corner.map(|c| c.div_euclid(child_size)),
                 ))
@@ -291,7 +295,7 @@ fn fits(request: GridAab, size_exponent: u8) -> bool {
     max_edge_length(request.size()) <= expsize(size_exponent)
 }
 
-fn max_edge_length(size: math::GridSize) -> GridCoordinate {
+fn max_edge_length(size: math::GridSize) -> GridSizeCoord {
     size.width.max(size.height).max(size.depth).max(0)
 }
 
@@ -318,16 +322,25 @@ fn max_edge_length_exponent(size: math::GridSize) -> u8 {
     exp
 }
 
+/// Bigger than the maximum allowed exponent, but smaller than would overflow.
+const CLAMP_EXPONENT: u32 = Alloctree::MAX_SIZE_EXPONENT as u32 + 1;
+
 /// Convert `size_exponent` to actual size.
-fn expsize(size_exponent: u8) -> GridCoordinate {
-    if size_exponent >= (GridCoordinate::BITS - 1) as u8 {
-        // This case will never be hit in allocations that will succeed, but it makes the
-        // math have fewer edge cases.
-        GridCoordinate::MAX
-    } else {
-        // Using pow() instead of bit shift because it isn't defined to overflow to zero
-        2i32.pow(size_exponent.into())
-    }
+///
+/// Exponents greater than [`Alloctree::MAX_SIZE_EXPONENT`] are clamped
+/// to an arbitrary larger value.
+fn expsize(size_exponent: u8) -> GridSizeCoord {
+    // Using pow() instead of bit shift because it isn't defined to overflow to zero
+    2u32.pow(u32::from(size_exponent).min(CLAMP_EXPONENT))
+}
+
+/// Convert `size_exponent` to `GridCoordinate`.
+///
+/// Exponents greater than [`Alloctree::MAX_SIZE_EXPONENT`] are clamped
+/// to an arbitrary larger value.
+fn expisize(size_exponent: u8) -> GridCoordinate {
+    // Using pow() instead of bit shift because it isn't defined to overflow to zero
+    2i32.pow(u32::from(size_exponent).min(CLAMP_EXPONENT))
 }
 
 #[cfg(test)]
@@ -428,11 +441,18 @@ mod tests {
 
     #[test]
     fn expsize_edge_cases() {
+        assert_eq!(
+            Alloctree::MAX_SIZE_EXPONENT,
+            10,
+            "this test is hardcoded around 10"
+        );
+
         assert_eq!(expsize(0), 1);
-        assert_eq!(expsize(30), 1 << 30);
-        // expsize(31) would be equal to i32::MAX + 1 if that were representable
-        assert_eq!(expsize(31), i32::MAX);
-        assert_eq!(expsize(32), i32::MAX);
-        assert_eq!(expsize(33), i32::MAX);
+        assert_eq!(expsize(10), 1 << 10);
+        assert_eq!(expsize(11), 1 << 11);
+        assert_eq!(expsize(12), 1 << 11);
+        assert_eq!(expsize(31), 1 << 11);
+        assert_eq!(expsize(32), 1 << 11);
+        assert_eq!(expsize(33), 1 << 11);
     }
 }

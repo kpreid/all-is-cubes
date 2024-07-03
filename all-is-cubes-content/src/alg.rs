@@ -105,7 +105,7 @@ where
     let interior = bounding_box.expand(FaceMap::symmetric([-1, 0, -1]));
     let low = bounding_box.lower_bounds();
     let high = bounding_box.upper_bounds() - GridVector::new(1, 1, 1);
-    let size = bounding_box.size();
+    let size = bounding_box.size().to_i32();
     f(
         low,
         Face6::PZ,

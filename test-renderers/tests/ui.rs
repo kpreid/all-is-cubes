@@ -11,7 +11,9 @@ use all_is_cubes::camera::{self, GraphicsOptions, ImagePixel, Rendering, Viewpor
 use all_is_cubes::euclid::{point2, vec2, vec3, Point2D, Scale, Transform3D};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::{Axis, Cube, Face6, FreeVector, GridAab, GridRotation, Gridgid, Rgba};
+use all_is_cubes::math::{
+    Axis, Cube, Face6, FreeVector, GridAab, GridRotation, GridSizeCoord, Gridgid, Rgba,
+};
 use all_is_cubes::raycast::Ray;
 use all_is_cubes::space::Space;
 use all_is_cubes::time::NoTime;
@@ -317,7 +319,8 @@ struct OrthoCamera {
 
 impl OrthoCamera {
     pub fn new(resolution: block::Resolution, bounds: GridAab, viewed_face: Face6) -> Self {
-        let cube_to_pixel_scale: Scale<i32, Cube, ImagePixel> = Scale::new(i32::from(resolution));
+        let cube_to_pixel_scale: Scale<GridSizeCoord, Cube, ImagePixel> =
+            Scale::new(resolution.into());
         let pixel_to_cube_scale: Scale<f64, ImagePixel, Cube> =
             cube_to_pixel_scale.cast::<f64>().inverse();
 

@@ -304,7 +304,7 @@ mod internal {
                 let size = sliced_bounds
                     .transform(rotation.into())
                     .unwrap(/* cannot overflow? */)
-                    .unsigned_size();
+                    .size();
                 assert_eq!(
                     size.depth, 1,
                     "failed to rotate slice {sliced_bounds:?} into the XY plane with {rotation:?}: {size:?}"
@@ -345,7 +345,7 @@ mod internal {
                 let entry = &entries[index];
 
                 let rotated_slice_bounds = entry.rotated_slice_bounds();
-                let rotated_size = rotated_slice_bounds.unsigned_size();
+                let rotated_size = rotated_slice_bounds.size();
                 let unrotate = entry.rotation.inverse();
                 let texels_size = entry.source_bounds.size();
                 let texels = entry
@@ -376,8 +376,9 @@ mod internal {
                         );
 
                         // Position within tile bounds.
-                        let position_in_texels =
-                            unrotated.lower_bounds() - entry.source_bounds.lower_bounds();
+                        let position_in_texels = (unrotated.lower_bounds()
+                            - entry.source_bounds.lower_bounds())
+                        .to_u32();
                         // Index into the `texels` array at that position.
                         let index_in_texels = (position_in_texels.x
                             + texels_size.width * position_in_texels.y)

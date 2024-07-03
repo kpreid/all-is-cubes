@@ -1,6 +1,6 @@
 //! Algorithms for grouping cubes into cubical batches (chunks).
 
-use all_is_cubes_base::math::Octant;
+use all_is_cubes_base::math::{GridSize, Octant};
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -11,7 +11,7 @@ use core::ops::RangeTo;
 #[cfg(feature = "std")]
 use std::sync::Mutex;
 
-use euclid::{vec3, Point3D, Vector3D};
+use euclid::{Point3D, Vector3D};
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
@@ -71,7 +71,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     pub fn bounds(self) -> GridAab {
         GridAab::from_lower_size(
             self.0.lower_bounds() * CHUNK_SIZE,
-            [CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE],
+            GridSize::splat(CHUNK_SIZE as u32),
         )
     }
 
@@ -351,7 +351,7 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<
 
     let candidates = GridAab::from_lower_size(
         [0, 0, 0],
-        vec3(1, 1, 1) * (view_distance_in_squared_chunks + 1),
+        GridSize::splat(u32::try_from(view_distance_in_squared_chunks).unwrap() + 1),
     )
     .to_vol()
     .unwrap();

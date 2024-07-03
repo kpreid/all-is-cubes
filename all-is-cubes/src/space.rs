@@ -216,8 +216,18 @@ impl Space {
 
     /// Constructs a `Space` that is entirely empty and whose coordinate system
     /// is in the +X+Y+Z octant. This is a shorthand intended mainly for tests.
-    pub fn empty_positive(wx: GridCoordinate, wy: GridCoordinate, wz: GridCoordinate) -> Space {
-        Space::empty(GridAab::from_lower_size([0, 0, 0], [wx, wy, wz]))
+    ///
+    /// Panics if the volume is greater than [`usize::MAX`], if any dimension is greater than
+    /// [`i32::MAX`].
+    #[track_caller]
+    pub fn empty_positive<S>(wx: S, wy: S, wz: S) -> Space
+    where
+        S: Copy + num_traits::NumCast,
+    {
+        Space::empty(GridAab::from_lower_size(
+            [0, 0, 0],
+            euclid::Size3D::new(wx, wy, wz).cast(),
+        ))
     }
 
     /// Returns the [`GridAab`] describing the bounds of this space; no blocks may exist

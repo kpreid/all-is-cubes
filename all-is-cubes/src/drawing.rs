@@ -80,7 +80,7 @@ pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: Gri
 
         let type_converted = GridAab::from_lower_size(
             [rectangle.top_left.x, rectangle.top_left.y, 0],
-            [rectangle.size.width as i32, rectangle.size.height as i32, 0],
+            [rectangle.size.width, rectangle.size.height, 0],
         );
 
         // Transform into the target 3D coordinate system.
@@ -90,11 +90,7 @@ pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: Gri
         // drawn pixels overhang, because that's going to change.
         let type_converted_excluding_size = GridAab::from_lower_size(
             [rectangle.top_left.x, rectangle.top_left.y, 0],
-            [
-                (rectangle.size.width - 1) as i32,
-                (rectangle.size.height - 1) as i32,
-                0,
-            ],
+            [(rectangle.size.width - 1), (rectangle.size.height - 1), 0],
         );
 
         // Transform into the target 3D coordinate system.
@@ -234,7 +230,7 @@ fn rectangle_from_bounds(transform: Gridgid, bounds: GridAab) -> Rectangle {
         .transform(transform.inverse())
         .unwrap_or(GridAab::ORIGIN_CUBE);
 
-    let size = bounds.unsigned_size();
+    let size = bounds.size();
     Rectangle {
         top_left: Point {
             x: bounds.lower_bounds().x,

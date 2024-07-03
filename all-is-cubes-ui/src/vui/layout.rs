@@ -50,7 +50,7 @@ pub fn install_widgets(
 pub struct LayoutRequest {
     /// The minimum dimensions required, without which correct functionality
     /// is not possible.
-    pub minimum: Size3D<GridCoordinate, Cube>,
+    pub minimum: GridSize,
 }
 
 impl LayoutRequest {
@@ -101,11 +101,6 @@ impl LayoutGrant {
     /// (asymmetric placement).
     #[must_use]
     pub fn shrink_to(self, mut sizes: GridSize, enlarge_for_symmetry: bool) -> Self {
-        assert!(
-            sizes.width >= 0 && sizes.height >= 0 && sizes.depth >= 0,
-            "sizes to shrink to must be positive, not {sizes:?}"
-        );
-
         if enlarge_for_symmetry {
             for axis in Axis::ALL {
                 if self.gravity[axis] == Align::Center
@@ -121,8 +116,11 @@ impl LayoutGrant {
 
         let mut origin = GridPoint::new(0, 0, 0);
         for axis in Axis::ALL {
+            // TODO: numeric overflow considerations
             let l = self.bounds.lower_bounds()[axis];
-            let h = self.bounds.upper_bounds()[axis] - sizes[axis];
+            let h = self.bounds.upper_bounds()[axis]
+                .checked_sub_unsigned(sizes[axis])
+                .unwrap();
             origin[axis] = match self.gravity[axis] {
                 Align::Low => l,
                 Align::Center => l + (h - l) / 2,
@@ -211,7 +209,7 @@ pub enum LayoutTree<W> {
     /// Add the specified amount of space around the child.
     Margin {
         /// Minimum amount of space to leave on each face.
-        margin: FaceMap<GridCoordinate>,
+        margin: FaceMap<u8>,
         #[allow(missing_docs)]
         child: Arc<LayoutTree<W>>,
     },
@@ -324,7 +322,9 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
             LayoutTree::Margin { margin, ref child } => LayoutTree::Margin {
                 margin,
                 child: child.perform_layout(LayoutGrant {
-                    bounds: grant.bounds.expand(margin.map(|_, m| -m)),
+                    bounds: grant
+                        .bounds
+                        .expand(margin.map(|_, m| -GridCoordinate::from(m))),
                     gravity: grant.gravity,
                 })?,
             },
@@ -347,8 +347,8 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
                 let mut bounds = grant.bounds;
                 for child in children {
                     let requirements = child.requirements();
-                    let size_on_axis = requirements.minimum[axis];
-                    let available_size = bounds.size()[axis];
+                    let size_on_axis = requirements.minimum.to_i32()[axis];
+                    let available_size = bounds.size().to_i32()[axis];
                     if size_on_axis > available_size {
                         // TODO: emit detectable warning
                         break;
@@ -477,7 +477,7 @@ impl<W: Layoutable> Layoutable for LayoutTree<W> {
             LayoutTree::Spacer(ref requirements) => requirements.clone(),
             LayoutTree::Margin { margin, ref child } => {
                 let mut req = child.requirements();
-                req.minimum += Size3D::from(margin.negatives() + margin.positives());
+                req.minimum += Size3D::from(margin.negatives() + margin.positives()).to_u32();
                 req
             }
             LayoutTree::Stack {

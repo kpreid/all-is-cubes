@@ -24,12 +24,12 @@ use all_is_cubes::drawing::embedded_graphics::{
     primitives::{PrimitiveStyle, Rectangle, StyledDrawable},
 };
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::{size3, vec3, Point3D, Rotation2D, Vector2D, Vector3D};
+use all_is_cubes::euclid::{size3, vec3, Point3D, Rotation2D, Size3D, Vector2D, Vector3D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::{
     rgb_const, rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate,
-    GridPoint, GridRotation, GridVector, Gridgid, NotNan, Rgb, Rgba,
+    GridPoint, GridRotation, GridSize, GridVector, Gridgid, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{SetCubeError, Space, SpaceBuilder, SpacePhysics, SpaceTransaction};
@@ -923,7 +923,10 @@ fn COLOR_LIGHTS(_: Context<'_>) {
     let separator_width = 4; // less than room_width/2
     let brightness = 1.0;
 
-    let interior = GridAab::from_lower_size([0, 0, 0], [room_width, room_height, room_length]);
+    let interior = GridAab::from_lower_size(
+        [0, 0, 0],
+        Size3D::new(room_width, room_height, room_length).to_u32(),
+    );
     let mut space = Space::empty(interior.expand(FaceMap::repeat(1)));
 
     fn normalize(color: Rgb) -> Rgb {
@@ -1008,15 +1011,16 @@ fn COLOR_LIGHTS(_: Context<'_>) {
     .create_box(interior.expand(FaceMap::repeat(1)))
     .execute(&mut space, &mut transaction::no_outputs)?;
 
-    // Vertical separators
+    // Separators between floors
+    let floor_sep_size = Size3D::new(separator_width, 1, room_length).to_u32();
     space.fill_uniform(
-        GridAab::from_lower_size([0, room_height / 2, 0], [separator_width, 1, room_length]),
+        GridAab::from_lower_size([0, room_height / 2, 0], floor_sep_size),
         &wall_block,
     )?;
     space.fill_uniform(
         GridAab::from_lower_size(
             [room_width - separator_width, room_height / 2, 0],
-            [separator_width, 1, room_length],
+            floor_sep_size,
         ),
         &wall_block,
     )?;
@@ -1050,19 +1054,14 @@ fn COLOR_LIGHTS(_: Context<'_>) {
         )?;
 
         // Separator between different light areas
+        let wall_size = Size3D::new(separator_width, room_height, 1).to_u32();
         if i % 2 == 0 {
             space.fill_uniform(
-                GridAab::from_lower_size(
-                    [room_width - separator_width, 0, z],
-                    [separator_width, room_height, 1],
-                ),
+                GridAab::from_lower_size([room_width - separator_width, 0, z], wall_size),
                 &wall_block,
             )?;
         } else {
-            space.fill_uniform(
-                GridAab::from_lower_size([0, 0, z], [separator_width, room_height, 1]),
-                &wall_block,
-            )?;
+            space.fill_uniform(GridAab::from_lower_size([0, 0, z], wall_size), &wall_block)?;
         }
     }
 
@@ -1112,7 +1111,7 @@ fn COLORED_BOUNCE(_: Context<'_>) {
 
     let interior = GridAab::from_lower_size(
         GridPoint::splat(-interior_radius),
-        GridVector::splat(interior_radius * 2 + 1),
+        GridSize::splat(u32::try_from(interior_radius).unwrap() * 2 + 1),
     );
     let mut space = Space::empty(interior.expand(FaceMap::repeat(wall_thickness)));
 
@@ -1255,7 +1254,7 @@ fn DASHED_BOXES(_: Context<'_>) {
 fn SWIMMING_POOL(_: Context<'_>) {
     let width = 6;
     let depth = 6;
-    let water_area = GridAab::from_lower_size([0, -depth, 0], [width, depth, width]);
+    let water_area = GridAab::from_lower_upper([0, -depth, 0], [width, 0, width]);
     let mut space = Space::empty(water_area);
     space.fill_uniform(
         water_area,
@@ -1488,9 +1487,9 @@ fn TREES(ctx: Context<'_>) {
 fn DESTRUCTION(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
-    let width = 7;
+    let width: u16 = 7;
 
-    let footprint = GridAab::from_lower_size([0, 0, 0], [width, 3, 1]);
+    let footprint = GridAab::from_lower_size([0, 0, 0], [width.into(), 3, 1]);
     let mut space = Space::empty(footprint);
 
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(ctx.universe)?;
@@ -1526,7 +1525,7 @@ fn DESTRUCTION(ctx: Context<'_>) {
     }
 
     let mut next_mask = None;
-    for stage in 0i32..width {
+    for stage in 0i32..width.into() {
         let mask = generate_destruction_mask(
             &mut txn,
             R16,

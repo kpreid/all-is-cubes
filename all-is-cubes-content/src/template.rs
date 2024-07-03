@@ -9,10 +9,11 @@ use paste::paste;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::character::{Character, Spawn};
-use all_is_cubes::euclid::Point3D;
+use all_is_cubes::euclid::{Point3D, Size3D};
 use all_is_cubes::linking::{BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridVector, Rgb, Rgba,
+    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord, GridVector,
+    Rgb, Rgba,
 };
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
@@ -317,7 +318,16 @@ async fn islands(
     let size = size.unwrap_or(GridSize::new(1000, 400, 1000));
 
     // Set up dimensions
-    let bounds = GridAab::from_lower_size([size.width / -2, size.height / -2, size.depth], size);
+    #[allow(clippy::cast_possible_wrap)] // big numbers will break anyway
+    let bounds = GridAab::checked_from_lower_size(
+        [
+            -((size.width / 2) as i32),
+            -((size.height / 2) as i32),
+            size.depth as i32,
+        ],
+        size,
+    )
+    .map_err(InGenError::other)?; // TODO: add automatic error conversion?
 
     let mut space = Space::builder(bounds)
         .sky_color(palette::DAY_SKY_COLOR)
@@ -342,7 +352,7 @@ async fn islands(
     for (i, island_pos) in island_grid.interior_iter().enumerate() {
         let cell_bounds = GridAab::from_lower_size(
             (island_pos.lower_bounds().to_vector() * island_stride).to_point(),
-            [island_stride, island_stride, island_stride],
+            Size3D::splat(island_stride).to_u32(),
         )
         .intersection_cubes(bounds)
         .expect("island outside space bounds");
@@ -367,11 +377,13 @@ fn cornell_box() -> Result<Space, InGenError> {
     // Coordinates are set up based on this dimension because, being blocks, we're not
     // going to *exactly* replicate the original data, but we might want to adjust the
     // scale to something else entirely.
-    let box_size = 55;
+    let box_size: GridSizeCoord = 55;
+    let box_size_c: GridCoordinate = 55;
+
     // Add one block to all sides for wall thickness.
     let bounds = GridAab::from_lower_size(
         [-1, -1, -1],
-        GridVector::new(1, 1, 1) * box_size + GridVector::new(2, 2, 2),
+        GridSize::splat(box_size + 2),
     );
     let mut space = Space::builder(bounds)
         // There shall be no light but that which we make for ourselves!
@@ -400,13 +412,13 @@ fn cornell_box() -> Result<Space, InGenError> {
     // Floor.
     space.fill_uniform(GridAab::from_lower_size([0, -1, 0], [box_size, 1, box_size]), &white)?;
     // Ceiling.
-    space.fill_uniform(GridAab::from_lower_size([0, box_size, 0], [box_size, 1, box_size]), &white)?;
+    space.fill_uniform(GridAab::from_lower_size([0, box_size_c, 0], [box_size, 1, box_size]), &white)?;
     // Light in ceiling.
-    space.fill_uniform(GridAab::from_lower_upper([21, box_size, 23], [34, box_size + 1, 33]), &light)?;
+    space.fill_uniform(GridAab::from_lower_upper([21, box_size_c, 23], [34, box_size_c + 1, 33]), &light)?;
     // Back wall.
     space.fill_uniform(GridAab::from_lower_size([0, 0, -1], [box_size, box_size, 1]), &white)?;
     // Right wall (green).
-    space.fill_uniform(GridAab::from_lower_size([box_size, 0, 0], [1, box_size, box_size]), &green)?;
+    space.fill_uniform(GridAab::from_lower_size([box_size_c, 0, 0], [1, box_size, box_size]), &green)?;
     // Left wall (red).
     space.fill_uniform(GridAab::from_lower_size([-1, 0, 0], [1, box_size, box_size]), &red)?;
 
@@ -533,7 +545,7 @@ mod tests {
                         yield_progress_for_testing(),
                         TemplateParameters {
                             seed: Some(0),
-                            size: Some(GridSize::splat(GridCoordinate::MAX)),
+                            size: Some(GridSize::splat(GridSizeCoord::MAX)),
                         }
                     )
                     .await

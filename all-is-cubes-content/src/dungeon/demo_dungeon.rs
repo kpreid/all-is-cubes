@@ -177,10 +177,9 @@ impl DemoTheme {
 
         // Gate
         if has_gate {
-            let gate_box = doorway_box
-                .abut(face, -1)
-                .unwrap()
-                .translate(face.opposite().normal_vector() * doorway_box.size()[face.axis()] / 2);
+            let gate_box = doorway_box.abut(face, -1).unwrap().translate(
+                face.opposite().normal_vector() * doorway_box.size().to_i32()[face.axis()] / 2,
+            );
             let gate_side_1 = gate_box.abut(wall_parallel.opposite(), -1).unwrap();
             let gate_side_2 = gate_box
                 .abut(wall_parallel, if blocked { -2 } else { -1 })
@@ -415,11 +414,11 @@ pub(crate) async fn demo_dungeon(
         room_wall_thickness: FaceMap::repeat(1),
         gap_between_walls: Size3D::new(1, 1, 1),
     };
-    let perimeter_margin = 30;
+    let perimeter_margin: GridCoordinate = 30;
 
     let mut requested_rooms = Size3D::from(
         (requested_size.unwrap_or(Size3D::new(135, 40, 135))
-            - Size3D::new(perimeter_margin, 0, perimeter_margin))
+            - Size3D::new(perimeter_margin, 0, perimeter_margin).to_u32())
         .to_vector()
         .component_div(dungeon_grid.room_spacing().to_vector()),
     );

@@ -17,8 +17,8 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
 use crate::math::{
-    notnan, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector,
-    NotNan, OpacityCategory, Rgb, Rgba, Vol,
+    notnan, Cube, Face6, FaceMap, GridAab, GridPoint, GridRotation, GridVector, NotNan,
+    OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::space::{Space, SpaceTransaction};
 use crate::time::DeadlineNt;
@@ -403,8 +403,8 @@ mod eval {
     #[test]
     fn recur_with_offset() {
         let resolution = R4;
-        let resolution_g = GridCoordinate::from(resolution);
-        let offset = GridVector::new(resolution_g, 0, 0);
+        let resolution_g = u32::from(resolution);
+        let offset = GridVector::new(i32::from(resolution), 0, 0);
         let mut universe = Universe::new();
         let mut space = Space::empty_positive(resolution_g * 2, resolution_g, resolution_g);
         space

@@ -411,7 +411,7 @@ impl GridRotation {
     /// Rotate the size value by this rotation.
     ///
     /// This is similar to [`GridRotation::transform_vector()`] except that the components
-    /// are only swapped, not negated.
+    /// are only swapped, not negated, and there is no possibility of numeric overflow.
     #[inline]
     pub fn transform_size(self, size: GridSize) -> GridSize {
         let basis = self.to_basis();
@@ -687,8 +687,9 @@ mod tests {
         for rot in GridRotation::ALL {
             let vector = GridVector::new(1, 20, 300);
             assert_eq!(
-                rot.transform_vector(vector).abs(),
-                rot.transform_size(GridSize::from(vector)).to_vector()
+                rot.transform_vector(vector).abs().to_u32(),
+                rot.transform_size(GridSize::from(vector.to_u32()))
+                    .to_vector()
             )
         }
     }

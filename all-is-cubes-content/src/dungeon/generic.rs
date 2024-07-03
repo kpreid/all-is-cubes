@@ -1,7 +1,8 @@
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridSize, GridVector, VectorOps as _,
+    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridSize, GridSizeCoord, GridVector,
+    VectorOps as _,
 };
 use all_is_cubes::space::Space;
 use all_is_cubes::util::YieldProgress;
@@ -27,9 +28,9 @@ impl DungeonGrid {
     /// another, along each axis.
     #[rustfmt::skip]
     pub fn gap_between_rooms(&self) -> GridSize {
-        GridSize::from(self.gap_between_walls.map(GridCoordinate::from).to_vector()
-            + self.room_wall_thickness.negatives().map(GridCoordinate::from)
-            + self.room_wall_thickness.positives().map(GridCoordinate::from))
+        GridSize::from(self.gap_between_walls.map(GridSizeCoord::from).to_vector()
+            + self.room_wall_thickness.negatives().map(GridSizeCoord::from)
+            + self.room_wall_thickness.positives().map(GridSizeCoord::from))
     }
 
     /// Returns the distances from one room to the same point on the next room, along each axis.
@@ -43,7 +44,7 @@ impl DungeonGrid {
         room_position
             .lower_bounds()
             .to_vector()
-            .component_mul(self.room_spacing().to_vector())
+            .component_mul(self.room_spacing().to_vector().to_i32())
     }
 
     pub fn room_box_including_walls(&self) -> GridAab {
@@ -78,17 +79,17 @@ impl DungeonGrid {
     ///
     /// TODO: This is off by at least 1 (in the too-big direction); write tests and fix.
     pub fn minimum_space_for_rooms(&self, rooms: GridAab) -> GridAab {
-        let spacing = self.room_spacing();
+        let spacing = self.room_spacing().to_i32().to_vector();
         let basic_size = GridAab::from_lower_upper(
             rooms
                 .lower_bounds()
                 .to_vector()
-                .component_mul(spacing.to_vector())
+                .component_mul(spacing)
                 .to_point(),
             rooms
                 .upper_bounds()
                 .to_vector()
-                .component_mul(spacing.to_vector())
+                .component_mul(spacing)
                 .to_point()
                 // Correct "fencepost error": spacing * number of rooms has one extra
                 // "post" (gap_between_walls).

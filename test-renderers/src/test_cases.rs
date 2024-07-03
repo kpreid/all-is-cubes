@@ -19,7 +19,7 @@ use all_is_cubes::camera::{
 };
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::color_block;
-use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Vector3D};
+use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Size3D, Vector3D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
     notnan, rgb_const, rgba_const, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
@@ -1086,7 +1086,7 @@ async fn antialias_test_universe() -> Arc<Universe> {
 /// Construct a space suitable for testing long-distance rendering (fog).
 async fn fog_test_universe() -> Arc<Universe> {
     let z_length = 60;
-    let bounds = GridAab::from_lower_size([-30, 0, -z_length], [60, 20, z_length]);
+    let bounds = GridAab::from_lower_upper([-30, 0, -z_length], [30, 20, 0]);
     let mut space = Space::builder(bounds)
         .spawn({
             let mut spawn = Spawn::default_for_new_space(bounds);
@@ -1118,7 +1118,7 @@ async fn fog_test_universe() -> Arc<Universe> {
         .light_emission(rgb_const!(40.0, 0.05, 0.05))
         .build();
     for z in bounds.z_range().step_by(2) {
-        let x = (z * 19i32).rem_euclid(bounds.size().width) + bounds.lower_bounds().x;
+        let x = (z * 19i32).rem_euclid(bounds.size().to_i32().width) + bounds.lower_bounds().x;
 
         space
             .fill_uniform(
@@ -1222,11 +1222,12 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
 
     let bounds = GridAab::from_lower_size(
         [-1, -1, -1],
-        [
+        Size3D::new(
             luminance_ramp.len() as i32 * x_spacing + 1,
             colors.len() as i32 * y_spacing + 1,
             3,
-        ],
+        )
+        .to_u32(),
     );
     let mut space = Space::builder(bounds)
         // Solid layer we will put holes in, to prevent different compartments from spilling
@@ -1262,7 +1263,10 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
             // An emissive block and air space next to it.
             space
                 .fill_uniform(
-                    GridAab::from_lower_size([x, y, 0], [x_spacing - 1, y_spacing - 1, 1]),
+                    GridAab::from_lower_size(
+                        [x, y, 0],
+                        Size3D::new(x_spacing - 1, y_spacing - 1, 1).to_u32(),
+                    ),
                     &AIR,
                 )
                 .unwrap();

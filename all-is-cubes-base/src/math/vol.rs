@@ -207,7 +207,7 @@ where
         V: Clone,
     {
         Self::from_fn(
-            GridAab::from_lower_size([0, 0, 0], vec3(DX, DY, DZ).to_i32()),
+            GridAab::from_lower_size([0, 0, 0], vec3(DX, DY, DZ).to_u32()),
             |p| array[p.z as usize][(DY - 1) - (p.y as usize)][p.x as usize].clone(),
         )
     }
@@ -346,9 +346,9 @@ impl<C> Vol<C, ZMaj> {
             .to_point();
 
         // Bounds check, expressed as a single unsigned comparison.
-        if (deoffsetted.x as u32 >= sizes.width as u32)
-            | (deoffsetted.y as u32 >= sizes.height as u32)
-            | (deoffsetted.z as u32 >= sizes.depth as u32)
+        if (deoffsetted.x as u32 >= sizes.width)
+            | (deoffsetted.y as u32 >= sizes.height)
+            | (deoffsetted.z as u32 >= sizes.depth)
         {
             return None;
         }
@@ -658,7 +658,7 @@ pub(crate) mod vol_arb {
             volume: usize,
         ) -> arbitrary::Result<Self> {
             // Pick sizes within the volume constraint.
-            let mut limit: GridCoordinate = volume.try_into().unwrap_or(GridCoordinate::MAX);
+            let mut limit: u32 = volume.try_into().unwrap_or(u32::MAX);
             let size_1 = u.int_in_range(0..=limit)?;
             limit /= size_1.max(1);
             let size_2 = u.int_in_range(0..=limit)?;
@@ -667,24 +667,27 @@ pub(crate) mod vol_arb {
 
             // Shuffle the sizes to remove any bias.
             let sizes = *u.choose(&[
-                GridVector::new(size_1, size_2, size_3),
-                GridVector::new(size_1, size_3, size_2),
-                GridVector::new(size_2, size_1, size_3),
-                GridVector::new(size_2, size_3, size_1),
-                GridVector::new(size_3, size_1, size_2),
-                GridVector::new(size_3, size_2, size_1),
+                vec3(size_1, size_2, size_3),
+                vec3(size_1, size_3, size_2),
+                vec3(size_2, size_1, size_3),
+                vec3(size_2, size_3, size_1),
+                vec3(size_3, size_1, size_2),
+                vec3(size_3, size_2, size_1),
             ])?;
 
             // Compute lower bounds that are valid for the sizes.
+            let possible_lower_bounds = sizes.map(|coord| {
+                GridCoordinate::MIN..=GridCoordinate::MAX.saturating_sub_unsigned(coord)
+            });
             let lower_bounds = GridPoint::new(
-                u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes.x)?,
-                u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes.y)?,
-                u.int_in_range(GridCoordinate::MIN..=GridCoordinate::MAX - sizes.z)?,
+                u.int_in_range(possible_lower_bounds.x)?,
+                u.int_in_range(possible_lower_bounds.y)?,
+                u.int_in_range(possible_lower_bounds.z)?,
             );
 
             Ok(GridAab::from_lower_size(lower_bounds, sizes)
                 .to_vol()
-                .unwrap())
+                .expect("GridAab as Arbitrary failed to compute valid bounds"))
         }
     }
 
@@ -772,15 +775,17 @@ fn find_zmaj_subdivision(bounds: GridAab) -> Option<(GridAab, GridAab, usize)> {
     // for the result to be valid.
     for axis in [Axis::X, Axis::Y, Axis::Z] {
         let axis_range = bounds.axis_range(axis);
-        if axis_range.len() >= 2 {
-            let split_size = (axis_range.end - axis_range.start) / 2;
+        let size: u32 = bounds.size()[axis];
+        if size >= 2 {
+            #[allow(clippy::cast_possible_wrap)] // known to fit
+            let split_coordinate = axis_range.start + (size / 2) as i32;
 
-            let mut lower_half_size = bounds.size();
-            lower_half_size[axis] = split_size;
-            let lower_half = GridAab::from_lower_size(bounds.lower_bounds(), lower_half_size);
+            let mut lower_half_ub = bounds.upper_bounds();
+            lower_half_ub[axis] = split_coordinate;
+            let lower_half = GridAab::from_lower_upper(bounds.lower_bounds(), lower_half_ub);
 
             let mut upper_half_lb = bounds.lower_bounds();
-            upper_half_lb[axis] += split_size;
+            upper_half_lb[axis] = split_coordinate;
             let upper_half = GridAab::from_lower_upper(upper_half_lb, bounds.upper_bounds());
 
             let lower_half_volume = lower_half

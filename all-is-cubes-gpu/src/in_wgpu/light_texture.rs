@@ -8,7 +8,7 @@ use rayon::{
 use all_is_cubes::camera::Camera;
 use all_is_cubes::euclid::{size3, Vector3D};
 use all_is_cubes::math::{
-    Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize,
+    Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord,
 };
 use all_is_cubes::space::Space;
 
@@ -84,9 +84,6 @@ impl LightTexture {
         space_bounds: GridAab,
         view_distance: FreeCoordinate,
     ) -> GridSize {
-        #[allow(clippy::cast_possible_wrap)] // protected by min()
-        let max_texture_size = limits.max_texture_dimension_3d.min(i32::MAX as u32) as i32;
-
         // Extra volume of 1 extra cube around all sides automatically captures sky light.
         let space_size = space_bounds.size() + GridSize::splat(2);
 
@@ -95,14 +92,15 @@ impl LightTexture {
         let camera_size = GridSize::splat(
             view_distance
                 .mul_add(2., CAMERA_MARGIN_RADIUS.mul_add(2., 1.))
-                .ceil() as GridCoordinate,
+                .ceil() as GridSizeCoord,
         );
 
         // The texture need not be bigger than the Space or bigger than the viewable diameter.
         // But it must also be within wgpu's limits.
-        space_size
-            .min(camera_size)
-            .clamp(GridSize::splat(1), GridSize::splat(max_texture_size))
+        space_size.min(camera_size).clamp(
+            GridSize::splat(1),
+            GridSize::splat(limits.max_texture_dimension_3d),
+        )
     }
 
     /// Construct a new texture of the specified size with no data.
@@ -305,7 +303,7 @@ impl LightTexture {
             GridAab::from_lower_size(
                 region
                     .lower_bounds()
-                    .zip(ts.to_vector().to_point(), |coord, size| {
+                    .zip(ts.to_vector().to_point().to_i32(), |coord, size| {
                         coord.rem_euclid(size)
                     })
                     .to_point(),
@@ -330,7 +328,7 @@ impl LightTexture {
     ) -> usize {
         let mut total_count = 0;
 
-        let texture_size = extent_to_size3d(self.texture.size());
+        let texture_size = extent_to_size3d(self.texture.size()).to_i32();
 
         // Filter out out-of-bounds cubes.
         let cubes = cubes
@@ -398,12 +396,14 @@ impl LightTexture {
 /// Split `space_range` into two parts if needed to provide wrap-around.
 fn split_axis(
     space_range: Range,
-    texture_size: i32,
+    texture_size: u32,
     buffer: &mut Vec<Texel>,
     // This bounds change is valid because this is an internal function.
     #[cfg(feature = "auto-threads")] function: impl Fn(Range, &mut Vec<Texel>) + Sync,
     #[cfg(not(feature = "auto-threads"))] function: impl Fn(Range, &mut Vec<Texel>),
 ) {
+    let texture_size = i32::try_from(texture_size).expect("texture size overflow");
+
     let range_size = space_range.end - space_range.start;
     assert!(
         range_size <= texture_size,

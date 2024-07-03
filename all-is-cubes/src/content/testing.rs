@@ -1,3 +1,4 @@
+use euclid::vec2;
 use num_traits::Euclid as _;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
@@ -151,14 +152,13 @@ struct LightingBenchLayout {
 impl LightingBenchLayout {
     fn new(requested_space_size: GridSize) -> Result<LightingBenchLayout, InGenError> {
         let layout = LightingBenchLayout {
-            array_side_lengths: euclid::default::Vector2D::new(
-                saturating_cast(
-                    (requested_space_size.width - Self::MARGIN) / Self::SECTION_SPACING,
-                ),
-                saturating_cast(
-                    (requested_space_size.depth - Self::MARGIN) / Self::SECTION_SPACING,
-                ),
-            ),
+            array_side_lengths: vec2(
+                (requested_space_size.width - u32::from(Self::MARGIN))
+                    / u32::from(Self::SECTION_SPACING),
+                (requested_space_size.depth - u32::from(Self::MARGIN))
+                    / u32::from(Self::SECTION_SPACING),
+            )
+            .map(saturating_cast),
             height: saturating_cast(requested_space_size.height),
         };
 
@@ -170,34 +170,36 @@ impl LightingBenchLayout {
     }
 
     // Constant sizes
-    const SECTION_WIDTH: GridCoordinate = 6;
-    const MARGIN: GridCoordinate = 4;
-    const SECTION_SPACING: GridCoordinate = Self::SECTION_WIDTH + Self::MARGIN;
+    const SECTION_WIDTH: u8 = 6;
+    const MARGIN: u8 = 4;
+    const SECTION_SPACING: u8 = Self::SECTION_WIDTH + Self::MARGIN;
 
     fn space_bounds(&self) -> GridAab {
         // These bounds should be a rounded version of requested_space_size.
         GridAab::from_lower_upper(
             [0, -self.ydown() - 1, 0],
             [
-                Self::SECTION_SPACING * i32::from(self.array_side_lengths.x) + Self::MARGIN,
+                i32::from(Self::SECTION_SPACING) * i32::from(self.array_side_lengths.x)
+                    + i32::from(Self::MARGIN),
                 self.yup() + 1,
-                Self::SECTION_SPACING * i32::from(self.array_side_lengths.y) + Self::MARGIN,
+                i32::from(Self::SECTION_SPACING) * i32::from(self.array_side_lengths.y)
+                    + i32::from(Self::MARGIN),
             ],
         )
     }
 
-    fn section_height(&self) -> GridCoordinate {
+    fn section_height(&self) -> u8 {
         // Subtract 2 so that there can be air and non-section ground space at the top and bottom.
-        GridCoordinate::from(self.height.saturating_sub(2))
+        self.height.saturating_sub(2)
     }
 
     /// Height above y=0 (ground) that the sections extend.
     fn yup(&self) -> GridCoordinate {
-        self.section_height() * 4 / 14
+        GridCoordinate::from(self.section_height()) * 4 / 14
     }
     /// Depth below y=0 (ground) that the sections extend.
     fn ydown(&self) -> GridCoordinate {
-        self.section_height() - self.yup()
+        GridCoordinate::from(self.section_height()) - self.yup()
     }
 
     fn section_iter(&self) -> impl ExactSizeIterator<Item = (GridCoordinate, GridCoordinate)> {
@@ -211,20 +213,20 @@ impl LightingBenchLayout {
     fn section_bounds(&self, sx: GridCoordinate, sz: GridCoordinate) -> GridAab {
         GridAab::from_lower_size(
             [
-                Self::MARGIN + sx * Self::SECTION_SPACING,
+                i32::from(Self::MARGIN) + sx * i32::from(Self::SECTION_SPACING),
                 -self.ydown() + 1,
-                Self::MARGIN + sz * Self::SECTION_SPACING,
+                i32::from(Self::MARGIN) + sz * i32::from(Self::SECTION_SPACING),
             ],
             [
-                Self::SECTION_WIDTH,
-                self.section_height(),
-                Self::SECTION_WIDTH,
+                Self::SECTION_WIDTH.into(),
+                self.section_height().into(),
+                Self::SECTION_WIDTH.into(),
             ],
         )
     }
 }
 
-fn saturating_cast(input: i32) -> u8 {
+fn saturating_cast(input: u32) -> u8 {
     match u8::try_from(input) {
         Ok(output) => output,
         Err(_) => u8::MAX,
