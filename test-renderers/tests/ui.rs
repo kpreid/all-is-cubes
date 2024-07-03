@@ -239,7 +239,7 @@ fn render_orthographic(space: &Handle<Space>) -> Rendering {
         .collect();
 
     Rendering {
-        size: camera.image_size.to_u32(),
+        size: camera.image_size,
         data,
         flaws: camera::Flaws::empty(), // TODO: wrong
     }
