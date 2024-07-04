@@ -14,7 +14,7 @@ use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FreeVector, GridAab, GridRotation, GridSizeCoord, Gridgid, Rgba,
 };
-use all_is_cubes::raycast::Ray;
+use all_is_cubes::raycast;
 use all_is_cubes::space::Space;
 use all_is_cubes::time::NoTime;
 use all_is_cubes::transaction::Transaction as _;
@@ -230,7 +230,8 @@ fn render_orthographic(space: &Handle<Space>) -> Rendering {
             (0..camera.image_size.width).into_par_iter().map(move |x| {
                 match camera.project_pixel_into_world(point2(x, y)) {
                     Some(ray) => {
-                        let (pixel, _): (raytracer::ColorBuf, _) = rt.trace_ray(ray, true);
+                        let (pixel, _): (raytracer::ColorBuf, _) =
+                            rt.trace_axis_aligned_ray(ray, true);
                         Rgba::from(pixel)
                     }
                     None => Rgba::TRANSPARENT,
@@ -294,14 +295,17 @@ impl MultiOrthoCamera {
         }
     }
 
-    pub fn project_pixel_into_world(&self, point: Point2D<u32, ImagePixel>) -> Option<Ray> {
+    pub fn project_pixel_into_world(
+        &self,
+        point: Point2D<u32, ImagePixel>,
+    ) -> Option<raycast::AaRay> {
         // Find which camera's rectangle contains the point
         for &(ref cam, origin) in self.views.iter() {
             if let (Some(x), Some(y)) =
                 (point.x.checked_sub(origin.x), point.y.checked_sub(origin.y))
             {
                 if x < cam.image_size.width && y < cam.image_size.height {
-                    return Some(cam.project_pixel_into_world(point2(x, y)));
+                    return cam.project_pixel_into_world(point2(x, y));
                 }
             }
         }
@@ -377,13 +381,18 @@ impl OrthoCamera {
         }
     }
 
-    pub fn project_pixel_into_world(&self, point: Point2D<u32, ImagePixel>) -> Ray {
-        Ray {
+    pub fn project_pixel_into_world(
+        &self,
+        point: Point2D<u32, ImagePixel>,
+    ) -> Option<raycast::AaRay> {
+        raycast::Ray {
             origin: self
                 .transform
                 .transform_point3d(point.to_f64().to_3d())
                 .unwrap(),
             direction: self.ray_direction,
         }
+        .try_into()
+        .ok()
     }
 }
