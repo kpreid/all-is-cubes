@@ -88,11 +88,8 @@ pub struct Raycaster {
     /// ray where we passed through `last_face`.
     last_t_distance: FreeCoordinate,
 
-    /// Bounds to filter our outputs to within. This makes the iteration finite.
-    ///
-    /// Stored as ranges rather than [`GridAab`] because we need to work with only the
-    /// upper bound and not the size. (TODO: Maybe `GridAab` should do that too?)
-    bounds: Option<Vector3D<core::ops::Range<GridCoordinate>, Cube>>,
+    /// Bounds to filter our outputs to within.
+    bounds: GridAab,
 }
 
 impl Raycaster {
@@ -162,7 +159,7 @@ impl Raycaster {
             t_delta: direction.map(|x| x.abs().recip()).cast_unit(),
             last_face: Face7::Within,
             last_t_distance: 0.0,
-            bounds: None,
+            bounds: GridAab::EVERYWHERE,
         }
     }
 
@@ -178,7 +175,7 @@ impl Raycaster {
             t_delta: Vector3D::new(f64::INFINITY, f64::INFINITY, f64::INFINITY),
             last_face: Face7::Within,
             last_t_distance: 0.0,
-            bounds: None,
+            bounds: GridAab::ORIGIN_EMPTY,
         }
     }
 
@@ -186,6 +183,8 @@ impl Raycaster {
     ///
     /// This makes the iterator finite: [`next()`](Self::next) will return [`None`]
     /// forevermore once there are no more cubes intersecting the bounds to report.
+    ///
+    /// Calling this multiple times takes the intersection of all bounds.
     #[must_use]
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     #[inline]
@@ -200,20 +199,15 @@ impl Raycaster {
     #[doc(hidden)]
     #[allow(clippy::missing_inline_in_public_items)]
     pub fn set_bounds(&mut self, bounds: GridAab) {
-        if self.bounds.is_none() {
-            self.bounds = Some(Vector3D::new(
-                bounds.x_range(),
-                bounds.y_range(),
-                bounds.z_range(),
-            ));
-        } else {
-            unimplemented!("multiple uses of .within()");
-        }
+        self.bounds = self
+            .bounds
+            .intersection_cubes(bounds)
+            .unwrap_or(GridAab::ORIGIN_EMPTY);
         self.fast_forward();
     }
 
     /// Cancels a previous [`Raycaster::within`], allowing the raycast to proceed
-    /// an arbitrary distance.
+    /// an arbitrary distance (until `GridCoordinate` overflow).
     ///
     /// Note: The effect of calling `within()` and then `remove_bound()` without an
     /// intervening `next()` is not currently guaranteed.
@@ -222,7 +216,7 @@ impl Raycaster {
     #[doc(hidden)]
     #[inline]
     pub fn remove_bound(&mut self) {
-        self.bounds = None;
+        self.bounds = GridAab::EVERYWHERE;
     }
 
     /// Determine the axis to step on and move in the appropriate direction along that axis.
@@ -294,31 +288,27 @@ impl Raycaster {
     /// and the second boolean is if it the ray has _left_ the bounds. If the ray does
     /// not intersect the bounds, one or both might be true.
     fn is_out_of_bounds(&self) -> (bool, bool) {
-        match &self.bounds {
-            None => (false, false),
-            Some(bound_v) => {
-                let mut oob_enter = false;
-                let mut oob_exit = false;
-                for axis in Axis::ALL {
-                    let oob_low = self.cube[axis] < bound_v[axis].start;
-                    let oob_high = self.cube[axis] >= bound_v[axis].end;
-                    if self.step[axis] == 0 {
-                        // Case where the ray has no motion on that axis.
-                        oob_enter |= oob_low | oob_high;
-                        oob_exit |= oob_low | oob_high;
-                    } else {
-                        if self.step[axis] > 0 {
-                            oob_enter |= oob_low;
-                            oob_exit |= oob_high;
-                        } else {
-                            oob_enter |= oob_high;
-                            oob_exit |= oob_low;
-                        }
-                    }
+        let mut oob_enter = false;
+        let mut oob_exit = false;
+        for axis in Axis::ALL {
+            let range = self.bounds.axis_range(axis);
+            let oob_low = self.cube[axis] < range.start;
+            let oob_high = self.cube[axis] >= range.end;
+            if self.step[axis] == 0 {
+                // Case where the ray has no motion on that axis.
+                oob_enter |= oob_low | oob_high;
+                oob_exit |= oob_low | oob_high;
+            } else {
+                if self.step[axis] > 0 {
+                    oob_enter |= oob_low;
+                    oob_exit |= oob_high;
+                } else {
+                    oob_enter |= oob_high;
+                    oob_exit |= oob_low;
                 }
-                (oob_enter, oob_exit)
             }
         }
+        (oob_enter, oob_exit)
     }
 
     /// In the case where the current position is outside the bounds but might intersect
@@ -329,17 +319,17 @@ impl Raycaster {
         // intersect with. (Strictly speaking, this could be combined with the next
         // loop, but it seems more elegant to have a well-defined point.)
         let plane_origin: GridPoint = {
-            let bounds = self.bounds.as_ref().unwrap();
             let mut plane_origin = GridPoint::new(0, 0, 0);
             for axis in Axis::ALL {
-                if self.step[axis] < 0 {
+                let which_bounds = if self.step[axis] < 0 {
                     // Iff the ray is going negatively, then we must use the upper bound
                     // for the plane origin in this axis. Otherwise, either it doesn't
                     // matter (parallel) or should be lower bound.
-                    plane_origin[axis] = bounds[axis].end;
+                    self.bounds.upper_bounds()
                 } else {
-                    plane_origin[axis] = bounds[axis].start;
-                }
+                    self.bounds.lower_bounds()
+                };
+                plane_origin[axis] = which_bounds[axis];
             }
             plane_origin
         };
@@ -391,7 +381,7 @@ impl Raycaster {
                 // These fields don't depend on position.
                 step: self.step,
                 t_delta: self.t_delta,
-                bounds: self.bounds.clone(),
+                bounds: self.bounds,
             };
         }
     }

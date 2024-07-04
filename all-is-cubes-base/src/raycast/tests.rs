@@ -302,15 +302,15 @@ fn start_outside_of_integer_range_with_bounds() {
 /// stop (as if we were `within()` the entire space) rather than panicking.
 #[test]
 fn exiting_integer_range() {
+    // `MAX` is excluded because `Cube::grid_aab()` would panic in that case,
+    // and such a cube exists in zero `GridAab`s, so it is not very useful.
+    let highest = GridCoordinate::MAX - 1;
     assert_steps_option(
         &mut Raycaster::new(
-            [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MAX) + 0.5],
+            [0.5, 0.5, FreeCoordinate::from(highest) + 0.5],
             [0.0, 0.0, 1.0],
         ),
-        vec![
-            Some(step(0, 0, GridCoordinate::MAX, Face7::Within, 0.0)),
-            None,
-        ],
+        vec![Some(step(0, 0, highest, Face7::Within, 0.0)), None],
     );
     assert_steps_option(
         &mut Raycaster::new(
@@ -347,15 +347,6 @@ fn within_bounds() {
     r2.next();
     // Compare the Debug strings, since the state is otherwise private.
     assert_eq!(format!("{r:?}"), format!("{r2:?}"));
-}
-
-#[test]
-#[should_panic(expected = "not implemented: multiple uses of .within()")]
-fn within_twice() {
-    let bounds = GridAab::from_lower_size(GridPoint::new(2, -10, -10), [2, 20, 20]);
-    let _ = Raycaster::new(point3(0.0, 0.0, 0.0), vec3(1.0, 1.0, 1.0))
-        .within(bounds)
-        .within(bounds);
 }
 
 #[test]
