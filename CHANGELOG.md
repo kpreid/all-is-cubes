@@ -32,6 +32,8 @@
 
     - `raycast::AaRay` and `raycast::AxisAlignedRaycaster` represent rays which are always axis-aligned. This new raycaster is slightly simpler and faster.
 
+    - `raytracer::SpaceRaytracer::trace_axis_aligned_ray()` does what it says and is slightly faster than the non-axis-aligned version.
+
     - `transaction::Transaction::check()` now returns an error type specified by the new `Mismatch` associated type, rather than necessarily `PreconditionFailed`.
     - `transaction::Transactional::transact()` provides a convenient way to create and immediately execute transactions.
 

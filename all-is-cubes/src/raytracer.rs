@@ -2,7 +2,7 @@
 //!
 //! ## Why?
 //!
-//! The original reason this exists is that I thought “we have [`raycast`](crate::raycast),
+//! The original reason this exists is that I thought “we have [`raycast`],
 //! and that's nearly all the work, so why not?” Secondarily, it was written before
 //! the mesh-based renderer, and was useful as a cross-check since
 //! it is much simpler. It continues to serve as a “reference implementation” and is used
@@ -35,7 +35,7 @@ use crate::math::{
     rgb_const, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab,
     GridMatrix, Intensity, Rgb, Rgba, Vol,
 };
-use crate::raycast::Ray;
+use crate::raycast::{self, Ray, RayIsh};
 use crate::space::{BlockIndex, BlockSky, PackedLight, Sky, Space, SpaceBlockData};
 use crate::util::StatusText;
 
@@ -120,17 +120,36 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         ray: Ray,
         include_sky: bool,
     ) -> (P, RaytraceInfo) {
+        self.trace_ray_impl::<P, Ray>(ray, include_sky)
+    }
+
+    /// Computes a single image pixel from the given ray.
+    ///
+    /// This is identical to [`Self::trace_ray()`] except that it can be more efficient.
+    pub fn trace_axis_aligned_ray<P: Accumulate<BlockData = D>>(
+        &self,
+        ray: raycast::AaRay,
+        include_sky: bool,
+    ) -> (P, RaytraceInfo) {
+        self.trace_ray_impl::<P, raycast::AaRay>(ray, include_sky)
+    }
+
+    fn trace_ray_impl<P: Accumulate<BlockData = D>, R: RayIsh>(
+        &self,
+        ray: R,
+        include_sky: bool,
+    ) -> (P, RaytraceInfo) {
         let options = RtOptionsRef {
             graphics_options: &self.graphics_options,
             custom_options: &self.custom_options,
         };
 
         let mut state: TracingState<P> = TracingState {
-            t_to_absolute_distance: ray.direction.length(),
+            t_to_absolute_distance: ray.direction().length(),
             cubes_traced: 0,
             accumulator: P::default(),
         };
-        let surface_iter = SurfaceIter::new(self, ray);
+        let surface_iter: SurfaceIter<'_, D, R::Caster> = SurfaceIter::new(self, ray);
 
         // Use the more expensive volumetric tracing strategy only if we need it.
         match self.graphics_options.transparency {
@@ -172,7 +191,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         }
         state.finish(
             if include_sky {
-                self.sky.sample(ray.direction).with_alpha_one()
+                self.sky.sample(ray.direction()).with_alpha_one()
             } else {
                 Rgba::TRANSPARENT
             },

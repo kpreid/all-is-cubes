@@ -4,7 +4,7 @@ use euclid::Vector3D;
 use crate::block::{Evoxel, Evoxels};
 use crate::camera::LightingOption;
 use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, Vol};
-use crate::raycast::{Ray, Raycaster};
+use crate::raycast::{RayIsh as _, RaycasterIsh};
 use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
 
 /// Description of a surface the ray passes through (or from the volumetric perspective,
@@ -116,14 +116,16 @@ pub(crate) enum TraceStep<'a, D> {
 }
 
 /// An [`Iterator`] which reports each visible surface a [`Raycaster`] ray passes through.
-// TODO: make public?
 #[derive(Clone, Debug)]
-pub(crate) struct SurfaceIter<'a, D> {
-    ray: Ray,
-    block_raycaster: Raycaster,
+pub(crate) struct SurfaceIter<'a, D, R>
+where
+    R: RaycasterIsh,
+{
+    ray: R::Ray,
+    block_raycaster: R,
     state: SurfaceIterState,
     // TODO: Should `current_block` become part of the state?
-    current_block: Option<VoxelSurfaceIter<'a, D>>,
+    current_block: Option<VoxelSurfaceIter<'a, D, R>>,
     blocks: &'a [TracingBlock<D>],
     array: Vol<&'a [TracingCubeData]>,
 }
@@ -135,15 +137,14 @@ enum SurfaceIterState {
     EnteredSpace,
 }
 
-impl<'a, D: RtBlockData> SurfaceIter<'a, D> {
+impl<'a, D: RtBlockData, R: RaycasterIsh> SurfaceIter<'a, D, R> {
     #[inline]
-    pub(crate) fn new(rt: &'a SpaceRaytracer<D>, ray: Ray) -> Self {
+    pub(crate) fn new(rt: &'a SpaceRaytracer<D>, ray: R::Ray) -> Self {
+        let mut block_raycaster = ray.cast();
+        block_raycaster.add_bounds(rt.cubes.bounds());
         Self {
             ray,
-            block_raycaster: ray
-                .cast()
-                // Expand volume on the far side so that we can get a final step *with* t distance
-                .within(rt.cubes.bounds()),
+            block_raycaster,
             state: SurfaceIterState::Initial,
             current_block: None,
             blocks: &rt.blocks,
@@ -152,7 +153,10 @@ impl<'a, D: RtBlockData> SurfaceIter<'a, D> {
     }
 }
 
-impl<'a, D> Iterator for SurfaceIter<'a, D> {
+impl<'a, D, R> Iterator for SurfaceIter<'a, D, R>
+where
+    R: RaycasterIsh,
+{
     type Item = TraceStep<'a, D>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -216,7 +220,7 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
                         emission,
                         cube: rc_step.cube_ahead(),
                         t_distance: rc_step.t_distance(),
-                        intersection_point: rc_step.intersection_point(self.ray),
+                        intersection_point: rc_step.intersection_point(self.ray.into()),
                         normal: rc_step.face(),
                     })
                 }
@@ -224,7 +228,7 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
             Evoxels::Many(resolution, ref array) => {
                 let block_cube = rc_step.cube_ahead();
                 let (sub_raycaster, sub_ray) =
-                    rc_step.recursive_raycast(self.ray, resolution, array.bounds());
+                    R::recursive_raycast(rc_step, self.ray, resolution, array.bounds());
                 let antiscale = FreeCoordinate::from(resolution).recip();
 
                 self.current_block = Some(VoxelSurfaceIter {
@@ -248,9 +252,12 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
 
 /// Iterates over a [`Block`]'s voxels. Internal helper for [`SurfaceIter`].
 #[derive(Clone, Debug)]
-struct VoxelSurfaceIter<'a, D> {
-    voxel_ray: Ray,
-    voxel_raycaster: Raycaster,
+struct VoxelSurfaceIter<'a, D, R>
+where
+    R: RaycasterIsh,
+{
+    voxel_ray: R::Ray,
+    voxel_raycaster: R,
     block_data: &'a D,
     /// Reciprocal of resolution, for scaling back to outer world
     antiscale: FreeCoordinate,
@@ -259,7 +266,10 @@ struct VoxelSurfaceIter<'a, D> {
     /// Cube these voxels are located in, for lighting lookups.
     block_cube: Cube,
 }
-impl<'a, D> VoxelSurfaceIter<'a, D> {
+impl<'a, D, R> VoxelSurfaceIter<'a, D, R>
+where
+    R: RaycasterIsh,
+{
     /// This is not an  implementation of `Iterator` because it doesn't need to be — it's
     /// purely internal to [`SurfaceIter`].
     fn next(&mut self) -> Option<TraceStep<'a, D>> {
@@ -281,7 +291,7 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
             // Note: The proper scaling here depends on the direction vector scale, that
             // recursive_raycast() _doesn't_ change.
             t_distance: rc_step.t_distance() * self.antiscale,
-            intersection_point: rc_step.intersection_point(self.voxel_ray) * self.antiscale
+            intersection_point: rc_step.intersection_point(self.voxel_ray.into()) * self.antiscale
                 + self
                     .block_cube
                     .lower_bounds()
@@ -293,16 +303,22 @@ impl<'a, D> VoxelSurfaceIter<'a, D> {
 }
 
 /// Builds on [`SurfaceIter`] to report spans of transparency along the ray.
-pub(crate) struct DepthIter<'a, D> {
-    surface_iter: SurfaceIter<'a, D>,
+pub(crate) struct DepthIter<'a, D, R>
+where
+    R: RaycasterIsh,
+{
+    surface_iter: SurfaceIter<'a, D, R>,
     /// Present if the last `EnterSurface` we discovered was transparent, or if
     /// we have another surface to report.
     last_surface: Option<Surface<'a, D>>,
 }
 
-impl<'a, D> DepthIter<'a, D> {
+impl<'a, D, R> DepthIter<'a, D, R>
+where
+    R: RaycasterIsh,
+{
     #[inline]
-    pub(crate) fn new(surface_iter: SurfaceIter<'a, D>) -> Self {
+    pub(crate) fn new(surface_iter: SurfaceIter<'a, D, R>) -> Self {
         Self {
             surface_iter,
             last_surface: None,
@@ -310,7 +326,10 @@ impl<'a, D> DepthIter<'a, D> {
     }
 }
 
-impl<'a, D> Iterator for DepthIter<'a, D> {
+impl<'a, D, R> Iterator for DepthIter<'a, D, R>
+where
+    R: RaycasterIsh,
+{
     type Item = DepthStep<'a, D>;
 
     #[inline]
@@ -352,12 +371,15 @@ mod tests {
     use crate::block::{Block, Resolution::*, AIR};
     use crate::camera::GraphicsOptions;
     use crate::math::{rgba_const, GridAab};
+    use crate::raycast::{self, Ray};
     use crate::space::Space;
     use crate::universe::Universe;
     use alloc::vec::Vec;
     use euclid::point3;
     use pretty_assertions::assert_eq;
     use TraceStep::{EnterBlock, EnterSurface, Invisible};
+
+    type SurfaceIterR<'a> = SurfaceIter<'a, (), raycast::Raycaster>;
 
     #[test]
     fn surface_iter_smoke_test() {
@@ -388,7 +410,7 @@ mod tests {
         let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
 
         assert_eq!(
-            SurfaceIter::new(&rt, Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]))
+            SurfaceIterR::new(&rt, Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]))
                 .collect::<Vec<TraceStep<'_, ()>>>(),
             vec![
                 Invisible { t_distance: 0.5 }, // Cube [0, 0, 0] is empty
@@ -443,7 +465,7 @@ mod tests {
         let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
 
         assert_eq!(
-            SurfaceIter::new(&rt, Ray::new([-0.5, 0.5, 0.5], [1., 0., 0.]))
+            SurfaceIterR::new(&rt, Ray::new([-0.5, 0.5, 0.5], [1., 0., 0.]))
                 .collect::<Vec<TraceStep<'_, ()>>>(),
             vec![
                 EnterSurface(Surface {
