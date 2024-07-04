@@ -55,6 +55,20 @@ impl GridAab {
         upper_bounds: GridPoint::new(0, 0, 0),
     };
 
+    /// Box that covers everything every other box does.
+    pub const EVERYWHERE: GridAab = GridAab {
+        lower_bounds: GridPoint::new(
+            GridCoordinate::MIN,
+            GridCoordinate::MIN,
+            GridCoordinate::MIN,
+        ),
+        upper_bounds: GridPoint::new(
+            GridCoordinate::MAX,
+            GridCoordinate::MAX,
+            GridCoordinate::MAX,
+        ),
+    };
+
     /// Constructs a [`GridAab`] from coordinate lower bounds and sizes.
     ///
     /// For example, if on one axis the lower bound is 5 and the size is 10,
