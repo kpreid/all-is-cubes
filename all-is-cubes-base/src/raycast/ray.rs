@@ -1,13 +1,18 @@
 use core::f64::consts::TAU;
 
+use euclid::Point3D;
+
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::math::{self, FreeCoordinate, FreePoint, FreeVector, LineVertex};
+use crate::math::{self, Cube, Face7, FreeCoordinate, FreePoint, FreeVector, LineVertex};
+use crate::raycast::{AxisAlignedRaycaster, Raycaster};
+use crate::resolution::Resolution;
 
-use super::Raycaster;
+#[cfg(doc)]
+use crate::math::GridAab;
 
 /// A ray; a half-infinite line segment (sometimes used as finite by the length of the
 /// direction vector).
@@ -152,6 +157,108 @@ impl math::Geometry for Ray {
                 circle_point.into(),
                 adj_circle_point.into(),
             ]);
+        }
+    }
+}
+
+/// An axis-aligned, grid-aligned version of [`Ray`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AaRay {
+    /// Cube within which the ray starts.
+    pub(in crate::raycast) origin: Cube,
+    /// Axis-aligned direction in which the ray extends.
+    pub(in crate::raycast) direction: Face7,
+    /// Further offset within the `origin` cube.
+    /// Components are always in the range `0.0..1.0`.
+    //---
+    // TODO: switch this to f16 when that is supported — we really don't need more precision,
+    // because the goal is to hit individual voxels, not any finer subdivision than that.
+    // (In fact, fixed-point u8 would really suffice.)
+    pub(in crate::raycast) sub_origin: Point3D<f32, Cube>,
+}
+
+impl AaRay {
+    /// Constructs an [`AaRay`] from its origin cube and direction.
+    ///
+    /// The ray's exact origin is considered to be in the center of the given cube.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Cube, Face7};
+    /// use all_is_cubes::raycast::{AaRay, Ray};
+    ///
+    /// let aa_ray = AaRay::new(Cube::new(1, 2, 3), Face7::PX);
+    ///
+    /// assert_eq!(Ray::from(aa_ray), Ray::new([1.5, 2.5, 3.5], [1., 0., 0.]));
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn new(origin: Cube, direction: Face7) -> Self {
+        Self {
+            origin,
+            direction,
+            sub_origin: Point3D::splat(0.5),
+        }
+    }
+
+    /// Scale and translate this ray’s origin to occupy the given cube.
+    ///
+    /// Its current
+    /// Panics if `self`’s position is outside of the bounds of
+    /// [`GridAab::for_block(resolution)`](GridAab::for_block).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # mod all_is_cubes {
+    /// #   pub mod block { pub use all_is_cubes_base::resolution::Resolution; }
+    /// #   pub use all_is_cubes_base::{math, raycast};
+    /// # }
+    /// use all_is_cubes::block::Resolution;
+    /// use all_is_cubes::math::{Cube, Face7};
+    /// use all_is_cubes::raycast::{AaRay, Ray};
+    ///
+    /// let aa_ray =
+    ///     AaRay::new(Cube::new(1, 2, 0), Face7::PX)
+    ///         .within_cube(Cube::new(100, 100, 100), Resolution::R4);
+    ///
+    /// assert_eq!(Ray::from(aa_ray), Ray::new([100.375, 100.625, 100.125], [1., 0., 0.]));
+    /// ```
+    #[inline]
+    #[must_use]
+    #[track_caller]
+    pub fn within_cube(self, cube: Cube, resolution: Resolution) -> Self {
+        assert!(
+            math::GridAab::for_block(resolution).contains_cube(self.origin),
+            "ray origin {o:?} is out of bounds for within_cube({resolution:?}",
+            o = self.origin
+        );
+
+        let sub_origin = (self.origin.lower_bounds().to_f32() + self.sub_origin.to_vector())
+            / f32::from(resolution);
+
+        Self {
+            origin: cube,
+            direction: self.direction,
+            sub_origin,
+        }
+    }
+
+    /// Prepares an [`AxisAlignedRaycaster`] that will iterate over cubes intersected by this ray.
+    #[inline]
+    pub fn cast(self) -> AxisAlignedRaycaster {
+        AxisAlignedRaycaster::new(self)
+    }
+}
+
+impl From<AaRay> for Ray {
+    #[inline]
+    fn from(ray: AaRay) -> Self {
+        Ray {
+            origin: ray.origin.lower_bounds().to_f64() + (ray.sub_origin.to_f64().to_vector()),
+            direction: ray.direction.normal_vector(),
         }
     }
 }

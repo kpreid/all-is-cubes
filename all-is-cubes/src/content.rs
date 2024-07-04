@@ -215,7 +215,8 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
     for face in Face6::ALL {
         let axis = face.axis();
         let direction = face.normal_vector::<GridCoordinate, ()>()[axis];
-        let raycaster = crate::raycast::AxisAlignedRaycaster::new(Cube::ORIGIN, face.into())
+        let raycaster = crate::raycast::AaRay::new(Cube::ORIGIN, face.into())
+            .cast()
             .within(space.bounds());
         for step in raycaster {
             let i = step.cube_ahead().lower_bounds()[axis] * direction; // always positive

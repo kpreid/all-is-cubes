@@ -1,6 +1,6 @@
-use crate::math::{self, Cube, Face7, GridAab};
+use crate::math::{self, Cube, Face7, FreeCoordinate, GridAab};
 
-use super::RaycastStep;
+use super::{AaRay, RaycastStep};
 
 #[cfg(doc)]
 use super::Raycaster;
@@ -14,7 +14,11 @@ pub struct AxisAlignedRaycaster {
     upcoming: Cube,
     /// Faces hit by the raycaster. Opposite of the direction of movement.
     hitting: Face7,
-    distance: math::GridSizeCoord,
+    /// Whether `upcoming` is the origin cube and should be emitted as `Within`.
+    is_first: bool,
+    /// `t_distance` value for `upcoming`'s step. For the origin cube, may be negative,
+    /// in which case it is clamped to zero on output.
+    t_distance: FreeCoordinate,
     bounds: GridAab,
 }
 
@@ -25,11 +29,22 @@ impl AxisAlignedRaycaster {
     /// It will produce the same outputs as [`Raycaster`] would for that ray, more efficiently.
     #[must_use]
     #[inline]
-    pub fn new(origin: Cube, direction: Face7) -> Self {
+    pub fn new(ray: AaRay) -> Self {
         Self {
-            upcoming: origin,
-            hitting: direction.opposite(),
-            distance: 0,
+            upcoming: ray.origin,
+            hitting: ray.direction.opposite(),
+            t_distance: if let Some(axis) = ray.direction.axis() {
+                let coord = FreeCoordinate::from(ray.sub_origin[axis]);
+                // Always in the -1 to 0 range, which is then clamped to 0 for the first step.
+                if ray.direction.is_positive() {
+                    -coord
+                } else {
+                    coord - 1.0
+                }
+            } else {
+                0.0
+            },
+            is_first: true,
             bounds: GridAab::EVERYWHERE,
         }
     }
@@ -72,7 +87,11 @@ impl AxisAlignedRaycaster {
             // If we found a move that is forward and not overflowing, apply it.
             if let Some(delta) = delta {
                 self.upcoming[axis] += delta;
-                self.distance = self.distance.saturating_add(delta.unsigned_abs());
+                self.t_distance += FreeCoordinate::from(delta.unsigned_abs());
+                if delta != 0 {
+                    // If the position was moved at all, then this is not the origin cube any more.
+                    self.is_first = false;
+                }
             }
         }
     }
@@ -90,17 +109,18 @@ impl Iterator for AxisAlignedRaycaster {
         let step = RaycastStep {
             cube_face: math::CubeFace {
                 cube: self.upcoming,
-                face: if self.distance == 0 {
+                face: if self.is_first {
+                    self.is_first = false;
                     Face7::Within
                 } else {
                     self.hitting
                 },
             },
-            t_distance: (f64::from(self.distance) - 0.5).max(0.),
+            t_distance: self.t_distance.max(0.0),
             t_max: {
-                let mut v = euclid::Vector3D::splat(math::FreeCoordinate::INFINITY);
+                let mut v = euclid::Vector3D::splat(FreeCoordinate::INFINITY);
                 if let Some(axis) = self.hitting.axis() {
-                    v[axis] = f64::from(self.distance) + 0.5;
+                    v[axis] = self.t_distance + 1.0;
                 }
                 v
             },
@@ -115,7 +135,7 @@ impl Iterator for AxisAlignedRaycaster {
                 }
             }
         }
-        self.distance = self.distance.saturating_add(1);
+        self.t_distance += 1.0;
 
         Some(step)
     }
@@ -127,7 +147,7 @@ impl Iterator for AxisAlignedRaycaster {
 mod tests {
     use super::*;
     use crate::math::GridCoordinate;
-    use crate::raycast::Raycaster;
+    use crate::raycast::{Ray, Raycaster};
     use alloc::vec::Vec;
 
     /// Run a comparison between [`Raycaster`] and [`AxisAlignedRaycaster`], and
@@ -135,13 +155,9 @@ mod tests {
     /// since [`Raycaster`]’s output is considered the source of truth.)
     ///
     /// The number of steps checked is determined by how far this iterator is driven.
-    fn compare_aa_to_regular(
-        origin: Cube,
-        direction: Face7,
-        bounds: Option<GridAab>,
-    ) -> impl Iterator<Item = Cube> {
-        let mut arb_rc = Raycaster::new(origin.midpoint(), direction.normal_vector());
-        let mut aa_rc = AxisAlignedRaycaster::new(origin, direction);
+    fn compare_aa_to_regular(ray: AaRay, bounds: Option<GridAab>) -> impl Iterator<Item = Cube> {
+        let mut arb_rc: Raycaster = Ray::from(ray).cast();
+        let mut aa_rc: AxisAlignedRaycaster = ray.cast();
         if let Some(bounds) = bounds {
             arb_rc = arb_rc.within(bounds);
             aa_rc = aa_rc.within(bounds);
@@ -162,7 +178,7 @@ mod tests {
     #[test]
     fn unbounded_positive() {
         assert_eq!(
-            compare_aa_to_regular(Cube::new(1, 2, 3), Face7::PX, None)
+            compare_aa_to_regular(AaRay::new(Cube::new(1, 2, 3), Face7::PX), None)
                 .take(10)
                 .count(),
             10
@@ -172,7 +188,7 @@ mod tests {
     #[test]
     fn unbounded_negative() {
         assert_eq!(
-            compare_aa_to_regular(Cube::new(1, 2, 3), Face7::NX, None)
+            compare_aa_to_regular(AaRay::new(Cube::new(1, 2, 3), Face7::NX), None)
                 .take(10)
                 .count(),
             10
@@ -183,8 +199,7 @@ mod tests {
     fn start_in_bounds() {
         assert_eq!(
             compare_aa_to_regular(
-                Cube::new(1, 1, 1),
-                Face7::PX,
+                AaRay::new(Cube::new(1, 1, 1), Face7::PX),
                 Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
             )
             .take(10)
@@ -197,8 +212,7 @@ mod tests {
     fn start_out_of_bounds_positive() {
         assert_eq!(
             compare_aa_to_regular(
-                Cube::new(-1, 1, 1),
-                Face7::PX,
+                AaRay::new(Cube::new(-1, 1, 1), Face7::PX),
                 Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
             )
             .take(10)
@@ -211,8 +225,7 @@ mod tests {
     fn start_out_of_bounds_negative() {
         assert_eq!(
             compare_aa_to_regular(
-                Cube::new(4, 1, 1),
-                Face7::NX,
+                AaRay::new(Cube::new(4, 1, 1), Face7::NX),
                 Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
             )
             .take(10)
@@ -224,9 +237,12 @@ mod tests {
     #[test]
     fn reach_numeric_bounds() {
         assert_eq!(
-            compare_aa_to_regular(Cube::new(GridCoordinate::MAX - 2, 10, 20), Face7::PX, None)
-                .take(10)
-                .collect::<Vec<Cube>>(),
+            compare_aa_to_regular(
+                AaRay::new(Cube::new(GridCoordinate::MAX - 2, 10, 20), Face7::PX),
+                None
+            )
+            .take(10)
+            .collect::<Vec<Cube>>(),
             vec![
                 Cube::new(GridCoordinate::MAX - 2, 10, 20),
                 Cube::new(GridCoordinate::MAX - 1, 10, 20),

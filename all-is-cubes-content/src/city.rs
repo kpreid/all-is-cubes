@@ -157,7 +157,8 @@ pub(crate) async fn demo_city<I: Instant>(
         let other_side_of_road =
             GridRotation::from_basis([Face6::NX, Face6::PY, Face6::NZ]) * road_aligned_rotation;
         let rotations = [other_side_of_road, road_aligned_rotation];
-        let raycaster = all_is_cubes::raycast::AxisAlignedRaycaster::new(Cube::ORIGIN, face.into())
+        let raycaster = all_is_cubes::raycast::AaRay::new(Cube::ORIGIN, face.into())
+            .cast()
             .within(space.bounds());
         let curb_y = GridVector::new(0, 1, 0);
         for (i, step) in raycaster.enumerate() {

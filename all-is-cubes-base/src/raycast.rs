@@ -18,7 +18,7 @@ mod axis_aligned;
 pub use axis_aligned::AxisAlignedRaycaster;
 
 mod ray;
-pub use ray::Ray;
+pub use ray::{AaRay, Ray};
 
 #[cfg(test)]
 mod tests;

@@ -30,6 +30,8 @@
     - `op::Operation::Neighbors` allows an operation to modify nearby blocks.
     - `op::Operation::DestroyTo` allows an operation to express replacing a block when the replacement is less important than `Operation::Become`.
 
+    - `raycast::AaRay` and `raycast::AxisAlignedRaycaster` represent rays which are always axis-aligned. This new raycaster is slightly simpler and faster.
+
     - `transaction::Transaction::check()` now returns an error type specified by the new `Mismatch` associated type, rather than necessarily `PreconditionFailed`.
     - `transaction::Transactional::transact()` provides a convenient way to create and immediately execute transactions.
 

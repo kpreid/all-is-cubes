@@ -42,7 +42,7 @@ fuzz_target!(|input: Input| {
             exercise(raycaster, bounds)
         }
         Kind::AxisAligned { origin, direction } => {
-            let mut raycaster = raycast::AxisAlignedRaycaster::new(origin, direction);
+            let mut raycaster = raycast::AaRay::new(origin, direction).cast();
             if let Some(bounds) = bounds {
                 raycaster = raycaster.within(bounds)
             }
