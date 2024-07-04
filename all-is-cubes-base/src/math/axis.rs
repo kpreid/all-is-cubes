@@ -174,6 +174,8 @@ mod impl_index_axis {
     impl_xyz_e!(x y z, euclid::Vector3D);
     impl_xyz_e!(x y z, euclid::Point3D);
     impl_xyz_e!(width height depth, euclid::Size3D);
+
+    // `Cube` also has implementations like this, in its own module.
 }
 
 #[cfg(test)]

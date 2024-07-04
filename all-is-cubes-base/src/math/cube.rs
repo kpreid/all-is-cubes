@@ -188,6 +188,7 @@ impl manyfmt::Fmt<ConciseDebug> for Cube {
 
 mod arithmetic {
     use super::*;
+    use crate::math::Axis;
     use core::ops;
 
     impl ops::Add<GridVector> for Cube {
@@ -223,6 +224,28 @@ mod arithmetic {
         #[inline]
         fn sub(self, rhs: Cube) -> Self::Output {
             self.lower_bounds() - rhs.lower_bounds()
+        }
+    }
+
+    impl ops::Index<Axis> for Cube {
+        type Output = GridCoordinate;
+        #[inline]
+        fn index(&self, index: Axis) -> &Self::Output {
+            match index {
+                Axis::X => &self.x,
+                Axis::Y => &self.y,
+                Axis::Z => &self.z,
+            }
+        }
+    }
+    impl ops::IndexMut<Axis> for Cube {
+        #[inline]
+        fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
+            match index {
+                Axis::X => &mut self.x,
+                Axis::Y => &mut self.y,
+                Axis::Z => &mut self.z,
+            }
         }
     }
 }
