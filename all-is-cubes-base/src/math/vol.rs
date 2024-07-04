@@ -644,10 +644,11 @@ pub(crate) mod vol_arb {
     /// Size hint for [`Vol::arbitrary_with_max_volume()`].
     pub(crate) const ARBITRARY_BOUNDS_SIZE_HINT: (usize, Option<usize>) = {
         // 6 bounding coordinates plus one permutation selection.
-        // Depending on the volume we could *maybe* end up consuming only 1 byte each
-        // for the sizes.
+        // Depending on the volume, we could end up consuming as little as 1 byte each
+        // for the sizes, and none for the positions, because `int_in_range()` uses the range
+        // to decide how many bytes to consume.
         let gc = core::mem::size_of::<GridCoordinate>();
-        ((gc + 1) * 3 + 1, Some(gc * 6 + 1))
+        (3 + 1, Some(gc * 6 + 1))
     };
 
     impl<O: Default> Vol<(), O> {
