@@ -262,3 +262,61 @@ impl From<AaRay> for Ray {
         }
     }
 }
+
+impl TryFrom<Ray> for AaRay {
+    // TODO: proper error type
+    type Error = ();
+
+    /// Converts the given arbitrary ray into an axis-aligned ray.
+    ///
+    /// Currently, its length is discarded.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// * The ray’s origin lies outside of the bounds permitted by [`Cube::containing()`].
+    /// * The ray’s direction is not axis-aligned.
+    /// * The ray has NaN components.
+    #[inline]
+    fn try_from(ray: Ray) -> Result<Self, Self::Error> {
+        use core::cmp::Ordering::*;
+
+        // Find which axis is nonzero.
+        // Reject all cases where more than one axis is nonzero, or any axis is NaN.
+        let direction = match <[_; 3]>::from(ray.direction.map(|coord| coord.partial_cmp(&0.0))) {
+            [Some(Less), Some(Equal), Some(Equal)] => Face7::NX,
+            [Some(Equal), Some(Less), Some(Equal)] => Face7::NY,
+            [Some(Equal), Some(Equal), Some(Less)] => Face7::NZ,
+            [Some(Greater), Some(Equal), Some(Equal)] => Face7::PX,
+            [Some(Equal), Some(Greater), Some(Equal)] => Face7::PY,
+            [Some(Equal), Some(Equal), Some(Greater)] => Face7::PZ,
+            [Some(Equal), Some(Equal), Some(Equal)] => Face7::Within,
+            _ => return Err(()),
+        };
+
+        let origin = Cube::containing(ray.origin).ok_or(())?;
+        Ok(AaRay {
+            origin,
+            direction,
+            sub_origin: (ray.origin - origin.lower_bounds().to_vector().to_f64()).to_f32(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn aa_ray_round_trip() {
+        assert_eq!(
+            Ray::from(AaRay::try_from(Ray::new([1., 2., 3.], [0., 0., 0.])).unwrap()),
+            Ray::new([1., 2., 3.], [0., 0., 0.]),
+        );
+        assert_eq!(
+            Ray::from(AaRay::try_from(Ray::new([1., 2., 3.], [4., 0., 0.])).unwrap()),
+            Ray::new([1., 2., 3.], [1., 0., 0.]), // note length got reset
+        );
+    }
+}
