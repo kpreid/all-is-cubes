@@ -18,10 +18,7 @@ use crate::arcstr::{literal, ArcStr};
 use crate::block::{Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::color_block;
 use crate::inv::{Slot, Tool};
-use crate::math::{
-    rgb_const, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, Rgb, Rgba,
-};
-use crate::raycast::Raycaster;
+use crate::math::{rgb_const, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::transaction::Transactional as _;
 use crate::universe::{Universe, UniverseTransaction};
@@ -218,7 +215,7 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
     for face in Face6::ALL {
         let axis = face.axis();
         let direction = face.normal_vector::<GridCoordinate, ()>()[axis];
-        let raycaster = Raycaster::new([0.5, 0.5, 0.5], face.normal_vector::<FreeCoordinate, _>())
+        let raycaster = crate::raycast::AxisAlignedRaycaster::new(Cube::ORIGIN, face.into())
             .within(space.bounds());
         for step in raycaster {
             let i = step.cube_ahead().lower_bounds()[axis] * direction; // always positive
