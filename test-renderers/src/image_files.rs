@@ -5,13 +5,31 @@ use clap::builder::PossibleValue;
 
 use crate::{SuiteId, TestId};
 
+/// Uniquely identifies each distinct image produced/consumed by the renderer test suite.
+///
+/// There is one image-comparison assertion to be performed per [`ImageId`] value.
+/// That is, this does not distinguish “expected” from “actual”, but does distinguish
+/// between different expected/actual pairs.
 // TODO: better name
-#[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 #[allow(clippy::exhaustive_structs)]
 pub struct ImageId {
     pub test_id: TestId,
     pub renderer: RendererId,
+    /// Serial numbers start at 1 and increase whenever a single test case compares
+    /// more than one image.
     pub serial_number: u64,
+}
+
+impl fmt::Debug for ImageId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            test_id,
+            renderer,
+            serial_number,
+        } = self;
+        write!(f, "{{{test_id} in {renderer} #{serial_number}}}")
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]

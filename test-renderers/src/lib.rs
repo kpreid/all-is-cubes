@@ -10,7 +10,10 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::Instant;
 
+use all_is_cubes::util::ConciseDebug;
+use all_is_cubes::util::Refmt as _;
 use clap::builder::PossibleValue;
 use image::RgbaImage;
 use rendiff::{Histogram, Threshold};
@@ -197,6 +200,8 @@ pub fn compare_rendered_image(
     allowed_difference: &Threshold,
     actual_rendering: Rendering,
 ) -> ComparisonRecord {
+    let start_time = Instant::now();
+
     let actual_file_path = image_path(&test, Version::Actual);
     let diff_file_path = image_path(&test, Version::Diff);
 
@@ -223,7 +228,7 @@ pub fn compare_rendered_image(
                 // Look for a generic all-renderers output file
                 match load_and_copy_expected_image(&ImageId {
                     renderer: RendererId::All,
-                    ..test
+                    ..test.clone()
                 }) {
                     Ok(r) => r,
                     Err(NotFound(expected_file_path)) => {
@@ -240,7 +245,11 @@ pub fn compare_rendered_image(
         };
 
     // Compare expected and actual images
+    let start_diff_time = Instant::now();
     let diff_result = rendiff::diff((&actual_rendering).into(), expected_image.as_ref());
+    let end_diff_time = Instant::now();
+
+    // Save diff image to disk
     if let Some(image) = diff_result.diff_image() {
         RgbaImage::from_raw(
             image.width() as u32,
@@ -263,7 +272,7 @@ pub fn compare_rendered_image(
         }
     }
 
-    ComparisonRecord::from_paths(
+    let record = ComparisonRecord::from_paths(
         &expected_file_path,
         &actual_file_path,
         Some(&diff_file_path),
@@ -283,7 +292,20 @@ pub fn compare_rendered_image(
                     .map_or(0, |(i, _)| i as u8),
             }
         },
-    )
+    );
+
+    let end_time = Instant::now();
+    log::trace!(
+        "compare_rendered_image {test:?}: {} total, {} diff",
+        end_time
+            .saturating_duration_since(start_time)
+            .refmt(&ConciseDebug),
+        end_diff_time
+            .saturating_duration_since(start_diff_time)
+            .refmt(&ConciseDebug),
+    );
+
+    record
 }
 
 pub fn initialize_logging(args: &HarnessArgs) {
