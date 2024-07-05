@@ -206,6 +206,13 @@ impl AaRay {
         }
     }
 
+    /// Returns the cube which this ray’s origin point is located in.
+    #[inline]
+    #[must_use]
+    pub fn origin_cube(&self) -> Cube {
+        self.origin
+    }
+
     /// Scale and translate this ray’s origin to occupy the given cube;
     /// its prior origin now lies within that cube.
     ///
