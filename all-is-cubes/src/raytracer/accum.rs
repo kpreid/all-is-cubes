@@ -3,6 +3,7 @@
 use euclid::Vector3D;
 use ordered_float::NotNan;
 
+use crate::block::Resolution;
 use crate::camera::GraphicsOptions;
 use crate::math::{notnan, rgb_const, Intensity, Rgb, Rgba};
 use crate::space::SpaceBlockData;
@@ -135,6 +136,23 @@ impl RtBlockData for () {
     fn from_block(_: RtOptionsRef<'_, Self::Options>, _: &SpaceBlockData) -> Self {}
     fn error(_: RtOptionsRef<'_, Self::Options>) -> Self {}
     fn sky(_: RtOptionsRef<'_, Self::Options>) -> Self {}
+}
+
+/// Stores the block's resolution.
+impl RtBlockData for Resolution {
+    type Options = ();
+
+    fn from_block(_: RtOptionsRef<'_, Self::Options>, block: &SpaceBlockData) -> Self {
+        block.evaluated().resolution()
+    }
+
+    fn error(_: RtOptionsRef<'_, Self::Options>) -> Self {
+        Resolution::R1
+    }
+
+    fn sky(_: RtOptionsRef<'_, Self::Options>) -> Self {
+        Resolution::R1
+    }
 }
 
 /// Implements [`Accumulate`] for RGB(A) color with [`f32`] components,
