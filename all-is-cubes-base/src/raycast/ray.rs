@@ -7,7 +7,10 @@ use euclid::Point3D;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::math::{self, Cube, Face7, FreeCoordinate, FreePoint, FreeVector, LineVertex};
+use crate::math::{
+    self, Cube, Face7, FreeCoordinate, FreePoint, FreeVector, GridCoordinate, GridVector,
+    LineVertex,
+};
 use crate::raycast::{AxisAlignedRaycaster, Raycaster};
 use crate::resolution::Resolution;
 
@@ -203,9 +206,9 @@ impl AaRay {
         }
     }
 
-    /// Scale and translate this ray’s origin to occupy the given cube.
+    /// Scale and translate this ray’s origin to occupy the given cube;
+    /// its prior origin now lies within that cube.
     ///
-    /// Its current
     /// Panics if `self`’s position is outside of the bounds of
     /// [`GridAab::for_block(resolution)`](GridAab::for_block).
     ///
@@ -222,14 +225,14 @@ impl AaRay {
     ///
     /// let aa_ray =
     ///     AaRay::new(Cube::new(1, 2, 0), Face7::PX)
-    ///         .within_cube(Cube::new(100, 100, 100), Resolution::R4);
+    ///         .zoom_out(Cube::new(100, 100, 100), Resolution::R4);
     ///
     /// assert_eq!(Ray::from(aa_ray), Ray::new([100.375, 100.625, 100.125], [1., 0., 0.]));
     /// ```
     #[inline]
     #[must_use]
     #[track_caller]
-    pub fn within_cube(self, cube: Cube, resolution: Resolution) -> Self {
+    pub fn zoom_out(self, cube: Cube, resolution: Resolution) -> Self {
         assert!(
             math::GridAab::for_block(resolution).contains_cube(self.origin),
             "ray origin {o:?} is out of bounds for within_cube({resolution:?}",
@@ -243,6 +246,52 @@ impl AaRay {
             origin: cube,
             direction: self.direction,
             sub_origin,
+        }
+    }
+
+    /// Create a new ray which crosses a grid of resolution `resolution`
+    /// within the bounds of `cube`, along the same path this ray takes through that cube.
+    ///
+    /// This is not a perfect inverse of [`AaRay::zoom_in()`], because it does not
+    /// preserve the origin’s position along the path of the ray.
+    #[inline]
+    #[must_use]
+    pub fn zoom_in(self, cube: Cube, resolution: Resolution) -> Self {
+        let resolution_g = GridCoordinate::from(resolution);
+        let mut transformed_origin = self
+            .origin
+            .lower_bounds()
+            .zip(cube.lower_bounds(), GridCoordinate::saturating_sub)
+            .map(|coord| coord.saturating_mul(resolution_g))
+            .to_point();
+
+        // The origin coordinates may have saturated, but only along the axis of the ray, because
+        // the others must be within the cube bounds.
+        // Replace that coordinate with one which is just outside the bounds of the cube.
+        if let Some(axis) = self.direction.axis() {
+            // Only if not starting within that cube.
+            if !(0..resolution_g).contains(&transformed_origin[axis]) {
+                transformed_origin[axis] = if self.direction.is_positive() {
+                    -1
+                } else {
+                    resolution_g
+                };
+            }
+        }
+
+        // Translation vector for the cube of the high-resolution grid that the ray is within
+        // according to `sub_origin`.
+        let sub_cube_containing_sub_origin: GridVector =
+            Cube::containing(self.sub_origin.to_f64() * FreeCoordinate::from(resolution))
+                .unwrap() // can't fail because it's in the range 0..Resolution::MAX
+                .lower_bounds()
+                .to_vector();
+
+        Self {
+            origin: Cube::from(transformed_origin + sub_cube_containing_sub_origin),
+            direction: self.direction,
+            sub_origin: self.sub_origin * f32::from(resolution)
+                - sub_cube_containing_sub_origin.to_f32(),
         }
     }
 
