@@ -192,7 +192,7 @@ impl Raycaster {
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     #[inline]
     pub fn within(mut self, bounds: GridAab) -> Self {
-        self.set_bounds(bounds);
+        self.add_bounds(bounds);
         self
     }
 
@@ -201,7 +201,7 @@ impl Raycaster {
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
     #[doc(hidden)]
     #[allow(clippy::missing_inline_in_public_items)]
-    pub fn set_bounds(&mut self, bounds: GridAab) {
+    pub fn add_bounds(&mut self, bounds: GridAab) {
         self.bounds = self
             .bounds
             .intersection_cubes(bounds)
@@ -218,7 +218,7 @@ impl Raycaster {
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
     #[doc(hidden)]
     #[inline]
-    pub fn remove_bound(&mut self) {
+    pub fn remove_bounds(&mut self) {
         self.bounds = GridAab::EVERYWHERE;
     }
 

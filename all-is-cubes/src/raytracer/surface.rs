@@ -172,9 +172,9 @@ impl<'a, D> Iterator for SurfaceIter<'a, D> {
                     SurfaceIterState::Initial => {
                         // If the ray entered the space, we also want to notice leaving.
                         // Do this by expanding the raycast bounds by one cube.
-                        self.block_raycaster.remove_bound();
+                        self.block_raycaster.remove_bounds();
                         self.block_raycaster
-                            .set_bounds(self.array.bounds().expand(FaceMap::repeat(1)));
+                            .add_bounds(self.array.bounds().expand(FaceMap::repeat(1)));
 
                         self.state = SurfaceIterState::EnteredSpace;
                     }
