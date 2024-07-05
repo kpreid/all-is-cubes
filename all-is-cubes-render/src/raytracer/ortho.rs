@@ -3,6 +3,7 @@
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
+use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{point2, vec2, vec3, Point2D, Scale, Transform3D};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FreeVector, GridAab, GridRotation, GridSizeCoord, Gridgid, Rgba,
@@ -10,13 +11,16 @@ use all_is_cubes::math::{
 use all_is_cubes::raycast;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Handle;
-use all_is_cubes::{block, raytracer};
 
 use crate::camera::{self, GraphicsOptions, ImagePixel};
+use crate::raytracer;
 use crate::{Flaws, Rendering};
 
 /// Special-purpose renderer which uses a pixel-perfect orthographic projection and adapts to the
 /// size of the space input.
+//---
+// TODO: This renderer has no tests of its output other than the implicit testing where
+// it is used in UI tests.
 pub fn render_orthographic(space: &Handle<Space>) -> Rendering {
     // TODO: Figure out how to make this less of a from-scratch reimplementation and share
     // more components with the regular raytracer.
@@ -27,41 +31,34 @@ pub fn render_orthographic(space: &Handle<Space>) -> Rendering {
     // sampling so we can trace whole blocks at once when they're simple, and also detect if
     // the image scale is too low to accurately capture the scene.
     let space = &*space.read().expect("failed to read space to render");
-    let camera = &MultiOrthoCamera::new(block::Resolution::R32, space.bounds());
+    let camera = &MultiOrthoCamera::new(Resolution::R32, space.bounds());
     let rt = &raytracer::SpaceRaytracer::new(space, GraphicsOptions::UNALTERED_COLORS, ());
+
+    // TODO: The caching logic here saves time by skipping tracing pixels that are
+    // predictably equal to previous ones. However, the optimal solution would be 2D rather
+    // than 1D: breaking up the image into block-sized tiles, then casting one ray per tile
+    // (to start) to determine the resolution needed. That'll probably mean redesigning
+    // `OrthoCamera` to be more aware of its alignment with the block grid.
 
     #[cfg(feature = "auto-threads")]
     let data = (0..camera.image_size.height)
         .into_par_iter()
         .flat_map(|y| {
-            (0..camera.image_size.width).into_par_iter().map(move |x| {
-                match camera.project_pixel_into_world(point2(x, y)) {
-                    Some(ray) => {
-                        let (pixel, _): (raytracer::ColorBuf, _) =
-                            rt.trace_axis_aligned_ray(ray, true);
-                        Rgba::from(pixel)
-                    }
-                    None => Rgba::TRANSPARENT,
-                }
-                .to_srgb8()
-            })
+            (0..camera.image_size.width)
+                .into_par_iter()
+                .map_with(Cache::default(), move |cache: &mut Cache, x| {
+                    trace_one_pixel_with_cache(camera, rt, cache, x, y)
+                })
         })
         .collect();
 
     #[cfg(not(feature = "auto-threads"))]
     let data = (0..camera.image_size.height)
         .flat_map(|y| {
-            (0..camera.image_size.width).map(move |x| {
-                match camera.project_pixel_into_world(point2(x, y)) {
-                    Some(ray) => {
-                        let (pixel, _): (raytracer::ColorBuf, _) =
-                            rt.trace_axis_aligned_ray(ray, true);
-                        Rgba::from(pixel)
-                    }
-                    None => Rgba::TRANSPARENT,
-                }
-                .to_srgb8()
-            })
+            let mut cache = Cache::default();
+
+            (0..camera.image_size.width)
+                .map(move |x| trace_one_pixel_with_cache(camera, rt, &mut cache, x, y))
         })
         .collect();
 
@@ -69,6 +66,62 @@ pub fn render_orthographic(space: &Handle<Space>) -> Rendering {
         size: camera.image_size,
         data,
         flaws: Flaws::empty(), // TODO: wrong
+    }
+}
+
+fn trace_one_pixel_with_cache(
+    camera: &MultiOrthoCamera,
+    rt: &raytracer::SpaceRaytracer<Resolution>,
+    cache: &mut Cache,
+    x: u32,
+    y: u32,
+) -> [u8; 4] {
+    match camera.project_pixel_into_world(point2(x, y)) {
+        Some(ray) => {
+            let cache_key: CacheKey = (
+                ray.origin_cube(),
+                cache.resolution,
+                ray.zoom_in(ray.origin_cube(), cache.resolution)
+                    .origin_cube(),
+            );
+            if let Some((_, v)) = cache.pixel.filter(|&(k, _)| k == cache_key) {
+                v
+            } else {
+                let (pixel, _): (OrthoBuf, _) = rt.trace_axis_aligned_ray(ray, true);
+
+                let output = Rgba::from(pixel.color);
+
+                let cache_key = (
+                    ray.origin_cube(),
+                    pixel.max_resolution,
+                    ray.zoom_in(ray.origin_cube(), pixel.max_resolution)
+                        .origin_cube(),
+                );
+                *cache = Cache {
+                    resolution: pixel.max_resolution,
+                    pixel: Some((cache_key, output)),
+                };
+                output
+            }
+        }
+        None => Rgba::TRANSPARENT,
+    }
+    .to_srgb8()
+}
+
+type CacheKey = (Cube, Resolution, Cube);
+
+#[derive(Clone, Copy)]
+struct Cache {
+    resolution: Resolution,
+    pixel: Option<(CacheKey, Rgba)>,
+}
+impl Default for Cache {
+    fn default() -> Self {
+        Self {
+            resolution: Resolution::R1,
+            pixel: None,
+        }
     }
 }
 
@@ -80,7 +133,7 @@ pub struct MultiOrthoCamera {
 }
 
 impl MultiOrthoCamera {
-    pub fn new(resolution: block::Resolution, bounds: GridAab) -> Self {
+    pub fn new(resolution: Resolution, bounds: GridAab) -> Self {
         let top = OrthoCamera::new(resolution, bounds, Face6::PY);
         let left = OrthoCamera::new(resolution, bounds, Face6::NX);
         let front = OrthoCamera::new(resolution, bounds, Face6::PZ);
@@ -147,7 +200,7 @@ pub struct OrthoCamera {
 }
 
 impl OrthoCamera {
-    pub fn new(resolution: block::Resolution, bounds: GridAab, viewed_face: Face6) -> Self {
+    pub fn new(resolution: Resolution, bounds: GridAab, viewed_face: Face6) -> Self {
         let cube_to_pixel_scale: Scale<GridSizeCoord, Cube, ImagePixel> =
             Scale::new(resolution.into());
         let pixel_to_cube_scale: Scale<f64, ImagePixel, Cube> =
@@ -219,5 +272,44 @@ impl OrthoCamera {
         }
         .try_into()
         .ok()
+    }
+}
+
+struct OrthoBuf {
+    color: raytracer::ColorBuf,
+    max_resolution: Resolution,
+}
+
+impl Default for OrthoBuf {
+    fn default() -> Self {
+        Self {
+            color: Default::default(),
+            max_resolution: Resolution::R1,
+        }
+    }
+}
+
+impl raytracer::Accumulate for OrthoBuf {
+    type BlockData = Resolution;
+
+    fn opaque(&self) -> bool {
+        self.color.opaque()
+    }
+
+    fn add(&mut self, surface_color: Rgba, &resolution: &Self::BlockData) {
+        self.color.add(surface_color, &());
+        self.max_resolution = self.max_resolution.max(resolution);
+    }
+
+    // This ensures we check the resolution of blocks the ray doesn't hit any voxels of.
+    fn enter_block(&mut self, &resolution: &Self::BlockData) {
+        self.max_resolution = self.max_resolution.max(resolution);
+    }
+
+    fn mean<const N: usize>(bufs: [Self; N]) -> Self {
+        Self {
+            color: raytracer::ColorBuf::mean(bufs.each_ref().map(|buf| buf.color)),
+            max_resolution: bufs.iter().map(|buf| buf.max_resolution).max().unwrap(),
+        }
     }
 }
