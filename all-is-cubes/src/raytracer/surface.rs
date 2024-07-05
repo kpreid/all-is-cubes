@@ -370,6 +370,7 @@ mod tests {
     use super::*;
     use crate::block::{Block, Resolution::*, AIR};
     use crate::camera::GraphicsOptions;
+    use crate::content;
     use crate::math::{rgba_const, GridAab};
     use crate::raycast::{self, Ray};
     use crate::space::Space;
@@ -479,6 +480,35 @@ mod tests {
                 }),
                 // Exit block -- this is the critical step that we're checking for.
                 Invisible { t_distance: 1.5 },
+            ]
+        );
+    }
+
+    /// Test what happens, with both iterator types, when the ray passes through a block's cube but
+    /// hits none of its voxel data.
+    #[test]
+    fn ray_misses_voxels() {
+        let universe = &mut Universe::new();
+        let slab = content::make_slab(universe, 1, R2);
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+            .filled_with(slab)
+            .build();
+        let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
+        let ray = Ray::new([-0.5, 0.75, 0.25], [1., 0., 0.]);
+
+        assert_eq!(
+            SurfaceIterR::new(&rt, ray).collect::<Vec<TraceStep<'_, ()>>>(),
+            vec![
+                EnterBlock { t_distance: 0.5 },
+                Invisible { t_distance: 1.5 },
+            ]
+        );
+
+        assert_eq!(
+            DepthIter::new(SurfaceIterR::new(&rt, ray)).collect::<Vec<DepthStep<'_, ()>>>(),
+            vec![
+                DepthStep::Invisible,
+                DepthStep::Invisible,
             ]
         );
     }
