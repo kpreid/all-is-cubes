@@ -13,6 +13,12 @@ use manyfmt::Refmt as _;
 mod custom_format;
 pub use custom_format::*;
 
+#[cfg(any(feature = "std", test))]
+mod multi_failure;
+#[doc(hidden)] // experimental, may become a library
+#[cfg(any(feature = "std", test))]
+pub use multi_failure::MultiFailure;
+
 /// Interface to start concurrent tasks.
 ///
 /// In the typical case, applications making use of All is Cubes libraries provide an implementation
