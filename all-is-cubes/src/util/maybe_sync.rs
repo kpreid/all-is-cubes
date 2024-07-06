@@ -14,11 +14,11 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
         /// This type alias for a boxed future requires `Sync` if the `std` feature is
         /// enabled.
-        pub(crate) type BoxFuture<'a, T> = futures_core::future::BoxFuture<'a, T>;
+        pub(crate) type MaybeLocalBoxFuture<'a, T> = futures_core::future::BoxFuture<'a, T>;
     } else {
         /// This type alias for a boxed future requires `Sync` if the `std` feature is
         /// enabled.
-        pub(crate) type BoxFuture<'a, T> = futures_core::future::LocalBoxFuture<'a, T>;
+        pub(crate) type MaybeLocalBoxFuture<'a, T> = futures_core::future::LocalBoxFuture<'a, T>;
     }
 }
 

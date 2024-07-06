@@ -6,7 +6,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 
 use crate::universe::Universe;
-use crate::util::maybe_sync::BoxFuture;
+use crate::util::maybe_sync::MaybeLocalBoxFuture;
 use crate::util::{ErrorIfStd, YieldProgress};
 
 #[cfg(feature = "save")]
@@ -56,7 +56,7 @@ pub trait WhenceUniverse: fmt::Debug + Send + Sync + downcast_rs::Downcast + 'st
     fn load(
         &self,
         progress: YieldProgress,
-    ) -> BoxFuture<'static, Result<Universe, Box<dyn ErrorIfStd + Send + Sync>>>;
+    ) -> MaybeLocalBoxFuture<'static, Result<Universe, Box<dyn ErrorIfStd + Send + Sync>>>;
 
     /// Write the current state of the given universe into the storage denoted by `self`.
     ///
@@ -71,7 +71,7 @@ pub trait WhenceUniverse: fmt::Debug + Send + Sync + downcast_rs::Downcast + 'st
         &self,
         universe: &Universe,
         progress: YieldProgress,
-    ) -> BoxFuture<'static, Result<(), Box<dyn ErrorIfStd + Send + Sync>>>;
+    ) -> MaybeLocalBoxFuture<'static, Result<(), Box<dyn ErrorIfStd + Send + Sync>>>;
 }
 
 downcast_rs::impl_downcast!(WhenceUniverse);
@@ -95,7 +95,7 @@ impl WhenceUniverse for () {
     fn load(
         &self,
         _: YieldProgress,
-    ) -> BoxFuture<'static, Result<Universe, Box<dyn ErrorIfStd + Send + Sync>>> {
+    ) -> MaybeLocalBoxFuture<'static, Result<Universe, Box<dyn ErrorIfStd + Send + Sync>>> {
         Box::pin(core::future::ready(Err(
             "this universe cannot be reloaded because it has no source".into(),
         )))
@@ -105,7 +105,7 @@ impl WhenceUniverse for () {
         &self,
         _universe: &Universe,
         _progress: YieldProgress,
-    ) -> BoxFuture<'static, Result<(), Box<dyn ErrorIfStd + Send + Sync>>> {
+    ) -> MaybeLocalBoxFuture<'static, Result<(), Box<dyn ErrorIfStd + Send + Sync>>> {
         Box::pin(core::future::ready(Err(
             "this universe cannot be saved because a destination has not been specified".into(),
         )))

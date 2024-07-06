@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::sync::Arc;
 use core::fmt;
 
@@ -7,8 +7,8 @@ use euclid::{point2, vec2};
 use ordered_float::NotNan;
 
 use crate::camera::{
-    AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, HeadlessRenderer, Layers, Ndc,
-    NdcPoint2, RenderError, Rendering, StandardCameras, Viewport,
+    AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, Layers, Ndc, NdcPoint2,
+    RenderError, Rendering, StandardCameras, Viewport,
 };
 use crate::character::Cursor;
 use crate::content::palette;
@@ -20,7 +20,9 @@ use crate::raytracer::{
 };
 use crate::space::Space;
 use crate::universe::Handle;
-use crate::util::maybe_sync::BoxFuture;
+
+#[cfg(any(doc, feature = "std"))]
+use crate::camera::HeadlessRenderer;
 
 /// Builds upon [`UpdatingSpaceRaytracer`] to make a complete [`HeadlessRenderer`],
 /// following the scene and camera information in a [`StandardCameras`].
@@ -283,15 +285,22 @@ where
     }
 }
 
+/// This implementation is only available if the `std` feature is enabled.
+#[cfg(feature = "std")] // can't provide `Sync` futures otherwise
 impl HeadlessRenderer for RtRenderer<()> {
     fn update<'a>(
         &'a mut self,
         cursor: Option<&'a Cursor>,
-    ) -> BoxFuture<'a, Result<(), RenderError>> {
+    ) -> futures_core::future::BoxFuture<'a, Result<(), RenderError>> {
         Box::pin(async move { self.update(cursor) })
     }
 
-    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>> {
+    fn draw<'a>(
+        &'a mut self,
+        info_text: &'a str,
+    ) -> futures_core::future::BoxFuture<'a, Result<Rendering, RenderError>> {
+        use alloc::string::ToString as _;
+
         Box::pin(async {
             let (rendering, _rt_info) = self.draw_rgba(|_| info_text.to_string());
 
