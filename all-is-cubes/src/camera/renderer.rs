@@ -9,7 +9,6 @@ use embedded_graphics::Drawable;
 use crate::camera::{Flaws, ImageSize};
 use crate::character::Cursor;
 use crate::universe::HandleError;
-use crate::util::maybe_sync::BoxFuture;
 
 /// Rendering a previously-specified scene to an in-memory image.
 ///
@@ -30,7 +29,7 @@ pub trait HeadlessRenderer {
     fn update<'a>(
         &'a mut self,
         cursor: Option<&'a Cursor>,
-    ) -> BoxFuture<'a, Result<(), RenderError>>;
+    ) -> futures_core::future::BoxFuture<'a, Result<(), RenderError>>;
 
     /// Produce an image of the current state of the scene this renderer was created to
     /// track, as of the last call to [`Self::update()`], with the given overlaid text.
@@ -39,7 +38,10 @@ pub trait HeadlessRenderer {
     /// called while the [`Universe`] is being stepped on another thread.
     ///
     /// [`Universe`]: crate::universe::Universe
-    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>>;
+    fn draw<'a>(
+        &'a mut self,
+        info_text: &'a str,
+    ) -> futures_core::future::BoxFuture<'a, Result<Rendering, RenderError>>;
 }
 
 /// An error indicating that a [`HeadlessRenderer`] or other renderer failed to operate.
