@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use futures_core::future::BoxFuture;
 
-use all_is_cubes::camera::{Camera, ImageSize, Viewport};
 use all_is_cubes::rerun_glue as rg;
+use all_is_cubes_render::camera::{Camera, ImageSize, Viewport};
 
 use rg::datatypes::TensorDimension;
 

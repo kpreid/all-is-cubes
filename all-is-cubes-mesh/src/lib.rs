@@ -42,7 +42,7 @@ extern crate std;
 
 use core::fmt;
 
-use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
+use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
 mod block_vertex;
 pub use block_vertex::*;

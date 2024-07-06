@@ -448,7 +448,7 @@ impl Scope {
 /// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
 ///
 /// See also [`Config::do_for_all_workspaces`].
-const ALL_NONTEST_PACKAGES: [&str; 10] = [
+const ALL_NONTEST_PACKAGES: [&str; 11] = [
     "all-is-cubes",
     "all-is-cubes-base",
     "all-is-cubes-ui",
@@ -456,6 +456,7 @@ const ALL_NONTEST_PACKAGES: [&str; 10] = [
     "all-is-cubes-gpu",
     "all-is-cubes-content",
     "all-is-cubes-port",
+    "all-is-cubes-render",
     "all-is-cubes-desktop",
     "all-is-cubes-server",
     "all-is-cubes-wasm",

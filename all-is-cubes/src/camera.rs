@@ -1,5 +1,4 @@
-//! Projection and view matrices, viewport and aspect ratio, visibility,
-//! raycasting into the scene, etc.
+//! Note: This module is hidden, and its contents re-exported as `all_is_cubes_render::camera`.
 
 use euclid::{
     point3, vec3, Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D,
@@ -19,17 +18,12 @@ use crate::math::{
 };
 use crate::raycast::Ray;
 
-mod flaws;
-pub use flaws::*;
-
+// TODO: It'd be nice if GraphicsOptions were moved to all-is-cubes-render,
+// but we need it because it's strongly an input to the raytracer, which we need to be able to
+// `print_space()` in tests. Perhaps the raytracer types *here* could be made generic over the
+// options input, with a wrapper that hides that?
 mod graphics_options;
 pub use graphics_options::*;
-
-mod renderer;
-pub use renderer::*;
-
-mod stdcam;
-pub use stdcam::*;
 
 #[cfg(test)]
 mod tests;
@@ -42,22 +36,7 @@ mod tests;
 /// world position, rather than needing to be rotated by the view direction.
 pub type ViewTransform = RigidTransform3D<FreeCoordinate, Eye, Cube>;
 
-/// Defines a view in/of the world.
-///
-/// A [`Camera`] has the following independently controllable properties.
-///
-/// * A [`ViewTransform`], which specifies the viewpoint (eye position) and
-///   direction.
-/// * A [`Viewport`], whose aspect ratio is used in the projection matrix.
-/// * A [`GraphicsOptions`], whose `fov_y` is used in the projection matrix.
-/// * A “measured exposure” (luminance scale factor) value which should be provided by examining
-///   the world, and which is carried through to [the output](Self::exposure).
-///
-/// From this information, it derives [view](Self::view_matrix) and
-/// [projection](Self::projection_matrix) matrices.
-///
-/// See also [`StandardCameras`], which adds self-updating from a character’s viewport,
-/// among other features.
+// docs are on its re-export
 #[derive(Clone, Debug)]
 pub struct Camera {
     /// Caller-provided options. Always validated by [`GraphicsOptions::repair`].
@@ -396,7 +375,7 @@ impl Camera {
     }
 }
 
-/// Internals
+// Internals
 impl Camera {
     fn compute_matrices(&mut self) {
         let fov_cot = (self.fov_y() / 2.).to_radians().tan().recip();

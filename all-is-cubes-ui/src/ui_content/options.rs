@@ -2,8 +2,8 @@ use alloc::sync::Arc;
 use core::fmt;
 
 use all_is_cubes::arcstr::{self, literal};
-use all_is_cubes::camera::{self, AntialiasingOption, GraphicsOptions};
 use all_is_cubes::math::{notnan, Face6};
+use all_is_cubes_render::camera::{self, AntialiasingOption, GraphicsOptions};
 
 use crate::apps::ControlMessage;
 use crate::ui_content::hud::HudInputs;

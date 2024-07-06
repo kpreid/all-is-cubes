@@ -289,7 +289,7 @@ fn log_renderer_to_rerun<Ren: crate::glue::Renderer>(this: &LateLogging, rendere
 
 #[cfg(feature = "rerun")]
 fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::universe::Universe) {
-    use all_is_cubes::camera::{Camera, GraphicsOptions, Viewport};
+    use all_is_cubes_render::camera::{Camera, GraphicsOptions, Viewport};
 
     let LateLogging {
         kinds,

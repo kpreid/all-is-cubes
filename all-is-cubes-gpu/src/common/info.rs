@@ -1,11 +1,11 @@
 use std::time::Duration;
 use std::{fmt, ops};
 
-use all_is_cubes::camera::{Flaws, Layers};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::util::{Fmt, Refmt, ShowStatus, StatusText};
 use all_is_cubes_mesh::dynamic::CsmUpdateInfo;
+use all_is_cubes_render::{camera::Layers, Flaws};
 
 /// Performance info about drawing an entire scene.
 ///

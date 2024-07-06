@@ -13,8 +13,9 @@ use crate::{block::Block, space::Space};
 ///
 /// Some options may be ignored by some renderers, such as when they request a particular
 /// implementation approach or debug visualization. Renderers should make an effort to
-/// report such failings via [`Flaws`](crate::camera::Flaws).
-///
+/// report such failings, such as via the `all_is_cubes_render::Flaws` type.
+//---
+// (Due to crate splitting that can't be a doc-link.)
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Eq, PartialEq)]
 #[allow(clippy::unsafe_derive_deserialize)] // false positive from notnan! macro
@@ -63,14 +64,12 @@ pub struct GraphicsOptions {
     /// Whether to show the HUD or other UI elements.
     ///
     /// This does not affect UI state or clickability; it purely controls display.
-    /// It is intended for the purpose of asking a [renderer] to produce an image
+    /// It is intended for the purpose of asking a renderer to produce an image
     /// of the scene without any UI.
     ///
     /// The cursor is not currently considered part of the UI. This may be revisited
     /// later. The “info text” is controlled separately by
     /// [`debug_info_text`](Self::debug_info_text).
-    ///
-    /// [renderer]: crate::camera::HeadlessRenderer
     pub show_ui: bool,
 
     /// Whether to apply antialiasing techniques.
@@ -253,7 +252,7 @@ pub enum RenderMethod {
 
     /// Use the reference implementation of All is Cubes content rendering.
     ///
-    /// This means [`all_is_cubes::raytracer`](crate::raytracer), a CPU-based raytracer.
+    /// This means `all_is_cubes_render::raytracer`, a CPU-based raytracer.
     /// It is too slow for high-resolution interactive use, though it does have a potential
     /// advantage in rapidly changing content.
     Reference,
@@ -441,6 +440,10 @@ pub enum AntialiasingOption {
 }
 
 impl AntialiasingOption {
+    // TODO: These functions allow dependents to decide what to do even though the
+    // enum is non_exhaustive. Figure out if it really should be non_exhaustive or
+    // if we should make these really public.
+
     /// True if GPU renderers should enable multisampling
     #[doc(hidden)]
     #[mutants::skip] // a test would only reiterate the code
@@ -448,6 +451,17 @@ impl AntialiasingOption {
         match self {
             Self::None => false,
             Self::IfCheap => true,
+            Self::Always => true,
+        }
+    }
+
+    /// True if renderers for which antialiasing is expensive should do it anyway.
+    #[doc(hidden)]
+    #[mutants::skip] // a test would only reiterate the code
+    pub fn is_strongly_enabled(&self) -> bool {
+        match self {
+            Self::None => false,
+            Self::IfCheap => false,
             Self::Always => true,
         }
     }

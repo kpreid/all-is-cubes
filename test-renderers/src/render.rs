@@ -2,11 +2,12 @@
 
 use std::fmt::Debug;
 
-use all_is_cubes::camera::{GraphicsOptions, HeadlessRenderer, StandardCameras, Viewport};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::size2;
 use all_is_cubes::listen;
 use all_is_cubes::universe::Universe;
+use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
+use all_is_cubes_render::HeadlessRenderer;
 
 use crate::RendererId;
 
@@ -66,14 +67,14 @@ pub trait RendererFactory: Send + Sync + Debug {
     fn id(&self) -> RendererId;
 }
 
-/// [`RendererFactory`] implementor which produces [`all_is_cubes::raytracer::RtRenderer`]s.
+/// [`RendererFactory`] implementor which produces [`all_is_cubes_render::raytracer::RtRenderer`]s.
 #[derive(Clone, Debug)]
 #[allow(clippy::exhaustive_structs)]
 pub struct RtFactory;
 
 impl RendererFactory for RtFactory {
     fn renderer_from_cameras(&self, cameras: StandardCameras) -> Box<dyn HeadlessRenderer + Send> {
-        Box::new(all_is_cubes::raytracer::RtRenderer::new(
+        Box::new(all_is_cubes_render::raytracer::RtRenderer::new(
             cameras,
             Box::new(|v| v),
             listen::ListenableSource::constant(()),

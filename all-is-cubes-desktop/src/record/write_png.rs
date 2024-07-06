@@ -4,8 +4,8 @@ use std::sync::{mpsc, Arc};
 
 use png::{chunk::ChunkType, Encoder};
 
-use all_is_cubes::camera::Rendering;
 use all_is_cubes::listen;
+use all_is_cubes_render::Rendering;
 
 use crate::record::{RecordOptions, Status};
 

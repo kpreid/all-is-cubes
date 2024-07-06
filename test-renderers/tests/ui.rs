@@ -7,7 +7,6 @@ use clap::Parser as _;
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::camera::{self, GraphicsOptions, ImagePixel, Rendering, Viewport};
 use all_is_cubes::euclid::{point2, vec2, vec3, Point2D, Scale, Transform3D};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
@@ -21,6 +20,8 @@ use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{block, raytracer, space, transaction};
+use all_is_cubes_render::camera::{self, GraphicsOptions, ImagePixel, Viewport};
+use all_is_cubes_render::{Flaws, Rendering};
 
 use all_is_cubes_ui::apps::{Key, Session};
 use all_is_cubes_ui::notification::NotificationContent;
@@ -244,7 +245,7 @@ fn render_orthographic(space: &Handle<Space>) -> Rendering {
     Rendering {
         size: camera.image_size,
         data,
-        flaws: camera::Flaws::empty(), // TODO: wrong
+        flaws: Flaws::empty(), // TODO: wrong
     }
 }
 

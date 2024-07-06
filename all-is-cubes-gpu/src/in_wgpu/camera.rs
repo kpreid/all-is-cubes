@@ -1,5 +1,5 @@
-use all_is_cubes::camera::{Camera, FogOption, LightingOption};
 use all_is_cubes::euclid::Transform3D;
+use all_is_cubes_render::camera::{Camera, FogOption, LightingOption};
 
 /// Information corresponding to [`Camera`] but in a form suitable for passing in a
 /// uniform buffer to the `blocks-and-lines.wgsl` shader. Also includes some miscellaneous

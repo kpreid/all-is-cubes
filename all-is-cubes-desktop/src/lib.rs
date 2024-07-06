@@ -16,10 +16,10 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
 
-use all_is_cubes::camera;
 use all_is_cubes::euclid::{size2, Size2D};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::universe::Universe;
+use all_is_cubes_render::camera;
 use all_is_cubes_ui::apps::{ExitMainTask, MainTaskContext};
 
 mod audio;

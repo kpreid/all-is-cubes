@@ -13,9 +13,10 @@ use futures_util::stream;
 use futures_util::{FutureExt as _, StreamExt as _};
 use itertools::Itertools;
 
-use all_is_cubes::camera::{Flaws, HeadlessRenderer, Rendering};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{ConciseDebug, Refmt as _};
+use all_is_cubes_render::Flaws;
+use all_is_cubes_render::{HeadlessRenderer, Rendering};
 
 use crate::{
     results_json_path, write_report_file, ComparisonOutcome, ComparisonRecord, ImageId, Overlays,

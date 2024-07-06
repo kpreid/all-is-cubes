@@ -2,7 +2,6 @@ use alloc::sync::Arc;
 use core::fmt;
 use std::sync::Mutex;
 
-use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::character::Character;
 use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
@@ -10,6 +9,7 @@ use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::Face6;
 use all_is_cubes::universe::{Handle, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes_render::camera::GraphicsOptions;
 
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
 use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};

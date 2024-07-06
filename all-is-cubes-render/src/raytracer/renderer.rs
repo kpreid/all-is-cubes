@@ -3,26 +3,26 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use core::fmt;
 
-use euclid::{point2, vec2};
-use ordered_float::NotNan;
+use all_is_cubes::character::Cursor;
+use all_is_cubes::content::palette;
+use all_is_cubes::euclid::{self, point2, vec2};
+use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::math::{NotNan, Rgba};
+use all_is_cubes::space::Space;
+use all_is_cubes::universe::Handle;
 
 use crate::camera::{
-    AntialiasingOption, Camera, Flaws, FogOption, GraphicsOptions, Layers, Ndc, NdcPoint2,
-    RenderError, Rendering, StandardCameras, Viewport,
+    area_usize, Camera, FogOption, GraphicsOptions, Layers, Ndc, NdcPoint2, StandardCameras,
+    Viewport,
 };
-use crate::character::Cursor;
-use crate::content::palette;
-use crate::listen::ListenableSource;
-use crate::math::{area_usize, Rgba};
 use crate::raytracer::{
     Accumulate, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
     UpdatingSpaceRaytracer,
 };
-use crate::space::Space;
-use crate::universe::Handle;
+use crate::{Flaws, RenderError, Rendering};
 
 #[cfg(any(doc, feature = "std"))]
-use crate::camera::HeadlessRenderer;
+use crate::HeadlessRenderer;
 
 /// Builds upon [`UpdatingSpaceRaytracer`] to make a complete [`HeadlessRenderer`],
 /// following the scene and camera information in a [`StandardCameras`].
@@ -147,7 +147,7 @@ where
     /// with any [`Accumulate`] instead of requiring [`ColorBuf`] and [`Rgba`] output,
     /// is not async, and does not require `&mut self`.
     ///
-    /// [`Universe`]: crate::universe::Universe
+    /// [`Universe`]: all_is_cubes::universe::Universe
     pub fn draw<P, E, O, IF>(&self, info_text_fn: IF, encoder: E, output: &mut [O]) -> RaytraceInfo
     where
         P: Accumulate<BlockData = D>,
@@ -195,10 +195,11 @@ where
         cameras.world.set_viewport(viewport);
         cameras.ui.set_viewport(viewport);
 
-        let options = RtOptionsRef {
-            graphics_options: self.cameras.graphics_options(),
-            custom_options: &*self.custom_options_cache,
-        };
+        let options =
+            RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
+                self.cameras.graphics_options(),
+                &*self.custom_options_cache,
+            );
 
         RtScene {
             rts: self
@@ -376,29 +377,26 @@ fn trace_patch_in_one_space<P: Accumulate>(
     patch: NdcRect,
     include_sky: bool,
 ) -> (P, RaytraceInfo) {
-    match camera.options().antialiasing {
-        AntialiasingOption::None | AntialiasingOption::IfCheap => {
-            space.trace_ray(camera.project_ndc_into_world(patch.center()), include_sky)
-        }
-        AntialiasingOption::Always => {
-            const N: usize = 4;
-            const SAMPLE_POINTS: [euclid::default::Vector2D<f64>; N] = [
-                vec2(1. / 8., 5. / 8.),
-                vec2(3. / 8., 1. / 8.),
-                vec2(5. / 8., 7. / 8.),
-                vec2(7. / 8., 3. / 8.),
-            ];
-            let mut info = RaytraceInfo::default();
-            let samples: [P; N] = core::array::from_fn(|i| {
-                let (p, i) = space.trace_ray(
-                    camera.project_ndc_into_world(point_within_patch(patch, SAMPLE_POINTS[i])),
-                    include_sky,
-                );
-                info += i;
-                p
-            });
-            (P::mean(samples), info)
-        }
+    if camera.options().antialiasing.is_strongly_enabled() {
+        const N: usize = 4;
+        const SAMPLE_POINTS: [euclid::default::Vector2D<f64>; N] = [
+            vec2(1. / 8., 5. / 8.),
+            vec2(3. / 8., 1. / 8.),
+            vec2(5. / 8., 7. / 8.),
+            vec2(7. / 8., 3. / 8.),
+        ];
+        let mut info = RaytraceInfo::default();
+        let samples: [P; N] = core::array::from_fn(|i| {
+            let (p, i) = space.trace_ray(
+                camera.project_ndc_into_world(point_within_patch(patch, SAMPLE_POINTS[i])),
+                include_sky,
+            );
+            info += i;
+            p
+        });
+        (P::mean(samples), info)
+    } else {
+        space.trace_ray(camera.project_ndc_into_world(patch.center()), include_sky)
     }
 }
 
@@ -527,7 +525,7 @@ mod trace_image {
 
 mod eg {
     use super::*;
-    use crate::camera::info_text_drawable;
+    use crate::info_text_drawable;
     use embedded_graphics::draw_target::DrawTarget;
     use embedded_graphics::draw_target::DrawTargetExt;
     use embedded_graphics::pixelcolor::BinaryColor;
@@ -612,9 +610,9 @@ mod eg {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::listen::ListenableCell;
-    use crate::universe::Universe;
-    use crate::util::assert_conditional_send_sync;
+    use all_is_cubes::listen::ListenableCell;
+    use all_is_cubes::universe::Universe;
+    use all_is_cubes::util::assert_conditional_send_sync;
     use core::convert::identity;
 
     #[test]
@@ -632,7 +630,7 @@ mod tests {
             type Options = &'static str;
             fn from_block(
                 options: RtOptionsRef<'_, Self::Options>,
-                _: &crate::space::SpaceBlockData,
+                _: &all_is_cubes::space::SpaceBlockData,
             ) -> Self {
                 CatchCustomOptions {
                     custom_options: options.custom_options,

@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use anyhow::Context;
 use clap::{CommandFactory as _, Parser as _};
 
-use all_is_cubes::camera::{GraphicsOptions, Viewport};
+use all_is_cubes_render::camera::{GraphicsOptions, Viewport};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes_ui::notification;
@@ -183,7 +183,7 @@ fn main() -> Result<(), anyhow::Error> {
                     if graphics_type == GraphicsType::WindowRt {
                         // TODO: improve on this kludge by just having a general cmdline graphics config
                         dsession.session.graphics_options_mut().update_mut(|o| {
-                            o.render_method = all_is_cubes::camera::RenderMethod::Reference;
+                            o.render_method = all_is_cubes_render::camera::RenderMethod::Reference;
                         });
                     }
                     Ok(dsession)

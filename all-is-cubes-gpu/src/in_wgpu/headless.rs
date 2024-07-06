@@ -5,15 +5,16 @@ use std::sync::Arc;
 use futures_channel::oneshot;
 use futures_core::future::BoxFuture;
 
-use all_is_cubes::camera::{self, Flaws, HeadlessRenderer, StandardCameras, Viewport};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
 use all_is_cubes::util::Executor;
+use all_is_cubes_render::camera::{StandardCameras, Viewport};
+use all_is_cubes_render::{Flaws, HeadlessRenderer, RenderError, Rendering};
 
 use crate::common::{AdaptedInstant, FrameBudget};
 use crate::in_wgpu::{self, init};
 
-/// Builder for configuring a headless [`Renderer`].
+/// Builder for configuring a [headless](HeadlessRenderer) [`Renderer`].
 ///
 /// The builder owns a `wgpu::Device`; all created renderers will share this device.
 /// If the device is lost, a new `Builder` must be created.
@@ -104,14 +105,8 @@ struct RendererImpl {
 
 /// Messages from [`Renderer`] to [`RendererImpl`].
 pub(super) enum RenderMsg {
-    Update(
-        Option<Cursor>,
-        oneshot::Sender<Result<(), camera::RenderError>>,
-    ),
-    Render(
-        String,
-        oneshot::Sender<Result<camera::Rendering, camera::RenderError>>,
-    ),
+    Update(Option<Cursor>, oneshot::Sender<Result<(), RenderError>>),
+    Render(String, oneshot::Sender<Result<Rendering, RenderError>>),
 }
 
 impl Renderer {
@@ -158,7 +153,7 @@ impl HeadlessRenderer for Renderer {
     fn update<'a>(
         &'a mut self,
         cursor: Option<&'a Cursor>,
-    ) -> BoxFuture<'a, Result<(), camera::RenderError>> {
+    ) -> BoxFuture<'a, Result<(), RenderError>> {
         let (tx, rx) = oneshot::channel();
         Box::pin(async move {
             self.send_maybe_wait(RenderMsg::Update(cursor.cloned(), tx))
@@ -167,10 +162,7 @@ impl HeadlessRenderer for Renderer {
         })
     }
 
-    fn draw<'a>(
-        &'a mut self,
-        info_text: &'a str,
-    ) -> BoxFuture<'a, Result<camera::Rendering, camera::RenderError>> {
+    fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>> {
         let (tx, rx) = oneshot::channel();
         Box::pin(async move {
             self.send_maybe_wait(RenderMsg::Render(info_text.to_owned(), tx))
@@ -192,7 +184,7 @@ impl RendererImpl {
         }
     }
 
-    fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), camera::RenderError> {
+    fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
         let info =
             self.everything
                 .update(&self.queue, cursor, &FrameBudget::PRACTICALLY_INFINITE)?;
@@ -200,14 +192,14 @@ impl RendererImpl {
         Ok(())
     }
 
-    async fn draw(&mut self, info_text: &str) -> Result<camera::Rendering, camera::RenderError> {
+    async fn draw(&mut self, info_text: &str) -> Result<Rendering, RenderError> {
         // TODO: refactor so that this viewport read is done synchronously, outside the RendererImpl
         let viewport = self.viewport_source.snapshot();
 
         if viewport.is_empty() {
             // GPU doesn't accept zero size, so we have to short-circuit it at this layer or we will
             // get a placeholder at-least-1-pixel size that EverythingRenderer uses internally.
-            return Ok(camera::Rendering {
+            return Ok(Rendering {
                 size: viewport.framebuffer_size,
                 data: Vec::new(),
                 flaws: Flaws::empty(),

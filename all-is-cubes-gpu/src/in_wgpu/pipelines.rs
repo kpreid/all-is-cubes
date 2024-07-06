@@ -1,8 +1,8 @@
 use std::mem;
 
-use all_is_cubes::camera::{GraphicsOptions, TransparencyOption};
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::listen::{Listen, ListenableSource};
+use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::shaders::Shaders;

@@ -1,17 +1,18 @@
 use core::fmt;
 
+use all_is_cubes::character::{cursor_raycast, Character, Cursor};
+use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource};
+use all_is_cubes::math::FreeCoordinate;
+use all_is_cubes::space::Space;
+use all_is_cubes::universe::{Handle, Universe};
+
 use crate::camera::{Camera, GraphicsOptions, NdcPoint2, ViewTransform, Viewport};
-use crate::character::{cursor_raycast, Character, Cursor};
-use crate::listen::{DirtyFlag, ListenableCell, ListenableSource};
-use crate::math::FreeCoordinate;
-use crate::space::Space;
-use crate::universe::{Handle, Universe};
 
 /// A collection of values associated with each of the layers of graphics that
 /// is normally drawn (HUD on top of world, currently) by [`HeadlessRenderer`] or
 /// other renderers.
 ///
-/// [`HeadlessRenderer`]: crate::camera::HeadlessRenderer
+/// [`HeadlessRenderer`]: crate::HeadlessRenderer
 // Exhaustive: Changing this will probably be breaking anyway, until we make it a
 // more thorough abstraction.
 #[allow(clippy::exhaustive_structs)]
@@ -25,6 +26,7 @@ pub struct Layers<T> {
 
 impl<T> Layers<T> {
     // experimental API
+    #[cfg(feature = "raytracer")]
     pub(crate) fn as_refs(&self) -> Layers<&T> {
         Layers {
             world: &self.world,
@@ -33,6 +35,7 @@ impl<T> Layers<T> {
     }
 
     // experimental API
+    #[cfg(feature = "raytracer")]
     pub(crate) fn map<U, F: FnMut(T) -> U>(self, mut f: F) -> Layers<U> {
         Layers {
             world: f(self.world),

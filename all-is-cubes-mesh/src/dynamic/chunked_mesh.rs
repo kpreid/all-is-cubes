@@ -9,7 +9,6 @@ use indoc::indoc;
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{ParallelBridge, ParallelIterator as _};
 
-use all_is_cubes::camera::{Camera, Flaws};
 use all_is_cubes::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex, OctantMask};
@@ -19,6 +18,7 @@ use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
 use all_is_cubes::time::{self, Duration, Instant as _};
 use all_is_cubes::universe::Handle;
 use all_is_cubes::util::{ConciseDebug, Fmt, Refmt, StatusText, TimeStats};
+use all_is_cubes_render::{camera::Camera, Flaws};
 
 use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::chunk::ChunkTodoState;

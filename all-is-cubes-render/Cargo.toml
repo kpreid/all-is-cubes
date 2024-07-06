@@ -1,0 +1,56 @@
+[package]
+name = "all-is-cubes-render"
+version = "0.7.0"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Raytracer and rendering abstractions for the all-is-cubes engine."
+# TODO: add homepage = "..." when we have one
+repository.workspace = true
+license = "MIT OR Apache-2.0"
+categories = ["games", "graphics", "rendering"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lib]
+# Disable running as benchmark so that the default doesn't interfere with Criterion usage.
+bench = false
+
+[[bench]]
+name = "raytrace"
+harness = false
+required-features = ["raytracer"]
+
+# See src/lib.rs documentation for more details on features.
+[features]
+default = ["std"]
+# Adds `std`-dependent functionality such as thread safety.
+std = [
+    "all-is-cubes/std",
+]
+# Adds automatic parallelism to some algorithms.
+# If disabled, `std::thread` is never used.
+# If enabled, threads may be created and the active `rayon` thread pool may be used.
+auto-threads = ["std", "dep:rayon"]
+# Adds the `raytracer` module.
+raytracer = []
+
+[dependencies]
+all-is-cubes = { workspace = true }
+bitflags = { workspace = true }
+displaydoc = { workspace = true }
+# Used to render overlay info text.
+embedded-graphics = { workspace = true }
+futures-core = { workspace = true }
+imgref = { workspace = true }
+indoc = { workspace = true }
+rayon = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+# for async tests
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

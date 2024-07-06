@@ -3,7 +3,7 @@
 use std::ops;
 use std::time::Duration;
 
-use all_is_cubes::camera::Layers;
+use all_is_cubes_render::camera::Layers;
 
 mod debug_lines;
 pub(crate) use debug_lines::*;

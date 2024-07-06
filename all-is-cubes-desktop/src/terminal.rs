@@ -9,11 +9,13 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, Mouse
 use ratatui::layout::Rect;
 
 use all_is_cubes::arcstr::literal_substr;
-use all_is_cubes::camera::{self, Camera, StandardCameras, Viewport};
 use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::Rgba;
-use all_is_cubes::raytracer::{Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer};
+use all_is_cubes_render::camera::{self, Camera, StandardCameras, Viewport};
+use all_is_cubes_render::raytracer::{
+    Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer,
+};
 
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
 use crate::session::DesktopSession;

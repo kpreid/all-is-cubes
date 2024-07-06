@@ -13,7 +13,7 @@ use web_sys::{
     FocusEvent, HtmlElement, HtmlProgressElement, KeyboardEvent, MouseEvent, Text,
 };
 
-use all_is_cubes::camera::{GraphicsOptions, StandardCameras, Viewport};
+use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::{Universe, UniverseStepInfo};

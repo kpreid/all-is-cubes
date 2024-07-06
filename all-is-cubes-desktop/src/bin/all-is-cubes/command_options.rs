@@ -10,7 +10,7 @@ use clap::{builder::TypedValueParser, Parser, ValueEnum};
 use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
-use all_is_cubes::camera;
+use all_is_cubes_render::camera;
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::math::{GridSize, GridSizeCoord};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};

@@ -7,8 +7,8 @@ use std::borrow::Borrow;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
-use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes_content::UniverseTemplate;
+use all_is_cubes_render::camera::GraphicsOptions;
 
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::derive_partial_eq_without_eq)]

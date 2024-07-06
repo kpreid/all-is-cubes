@@ -14,7 +14,7 @@ use futures_task::noop_waker_ref;
 use sync_wrapper::SyncWrapper;
 
 use all_is_cubes::arcstr::{self, ArcStr};
-use all_is_cubes::camera::{GraphicsOptions, Layers, StandardCameras, UiViewState, Viewport};
+use all_is_cubes_render::camera::{GraphicsOptions, Layers, StandardCameras, UiViewState, Viewport};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;

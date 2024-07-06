@@ -6,9 +6,10 @@ use embedded_graphics::prelude::{PixelColor, Point};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
 
-use crate::camera::{Flaws, ImageSize};
-use crate::character::Cursor;
-use crate::universe::HandleError;
+use all_is_cubes::character::Cursor;
+
+use crate::camera::ImageSize;
+use crate::{Flaws, RenderError};
 
 /// Rendering a previously-specified scene to an in-memory image.
 ///
@@ -37,34 +38,11 @@ pub trait HeadlessRenderer {
     /// This operation should not attempt to access the scene objects and therefore may be
     /// called while the [`Universe`] is being stepped on another thread.
     ///
-    /// [`Universe`]: crate::universe::Universe
+    /// [`Universe`]: all_is_cubes::universe::Universe
     fn draw<'a>(
         &'a mut self,
         info_text: &'a str,
     ) -> futures_core::future::BoxFuture<'a, Result<Rendering, RenderError>>;
-}
-
-/// An error indicating that a [`HeadlessRenderer`] or other renderer failed to operate.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
-#[non_exhaustive]
-pub enum RenderError {
-    /// A component of the [`Universe`] that is to be rendered was not available
-    /// for reading.
-    ///
-    /// [`Universe`]: crate::universe::Universe
-    #[displaydoc("scene to be rendered was not available for reading")]
-    Read(HandleError),
-    // TODO: add errors for out of memory, lost GPU, etc.
-}
-
-crate::util::cfg_should_impl_error! {
-    impl std::error::Error for RenderError {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-            match self {
-                RenderError::Read(e) => Some(e),
-            }
-        }
-    }
 }
 
 /// Image container produced by a [`HeadlessRenderer`].

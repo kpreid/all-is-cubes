@@ -318,9 +318,9 @@ fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
 mod tests {
     use super::*;
     use all_is_cubes::block::BlockDef;
-    use all_is_cubes::raytracer::print_space;
     use all_is_cubes::universe::Handle;
     use all_is_cubes::util::yield_progress_for_testing;
+    use all_is_cubes_render::raytracer::print_space;
     use either::Either;
 
     #[test]

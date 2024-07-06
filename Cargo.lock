@@ -62,7 +62,6 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hashbrown",
- "imgref",
  "indoc",
  "itertools 0.12.1",
  "log",
@@ -147,6 +146,7 @@ dependencies = [
  "all-is-cubes-gpu",
  "all-is-cubes-mesh",
  "all-is-cubes-port",
+ "all-is-cubes-render",
  "all-is-cubes-ui",
  "anyhow",
  "bytemuck",
@@ -185,6 +185,7 @@ version = "0.7.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
+ "all-is-cubes-render",
  "bytemuck",
  "cfg-if",
  "criterion",
@@ -218,6 +219,7 @@ version = "0.7.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-content",
+ "all-is-cubes-render",
  "arbitrary",
  "bitvec",
  "bytemuck",
@@ -245,6 +247,7 @@ version = "0.7.0"
 dependencies = [
  "all-is-cubes",
  "all-is-cubes-mesh",
+ "all-is-cubes-render",
  "base64 0.21.7",
  "bytemuck",
  "dot_vox",
@@ -261,6 +264,22 @@ dependencies = [
  "stl_io",
  "tempfile",
  "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "all-is-cubes-render"
+version = "0.7.0"
+dependencies = [
+ "all-is-cubes",
+ "bitflags 2.5.0",
+ "criterion",
+ "displaydoc",
+ "embedded-graphics",
+ "futures-core",
+ "imgref",
+ "indoc",
+ "rayon",
  "tokio",
 ]
 
@@ -285,6 +304,7 @@ name = "all-is-cubes-ui"
 version = "0.7.0"
 dependencies = [
  "all-is-cubes",
+ "all-is-cubes-render",
  "async_fn_traits",
  "displaydoc",
  "exhaust",
@@ -5672,6 +5692,7 @@ dependencies = [
  "all-is-cubes-content",
  "all-is-cubes-gpu",
  "all-is-cubes-port",
+ "all-is-cubes-render",
  "all-is-cubes-ui",
  "async_fn_traits",
  "bytemuck",

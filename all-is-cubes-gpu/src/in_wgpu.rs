@@ -7,15 +7,15 @@ use std::sync::Arc;
 
 use wgpu::TextureViewDescriptor;
 
-use all_is_cubes::camera::{
-    info_text_drawable, Flaws, Layers, RenderError, RenderMethod, StandardCameras,
-};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Gray8, Drawable};
+use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Gray8, Drawable as _};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::math::{notnan, VectorOps as _};
+use all_is_cubes_render::camera::{Layers, RenderMethod, StandardCameras};
+use all_is_cubes_render::info_text_drawable;
+use all_is_cubes_render::{Flaws, RenderError};
 
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;

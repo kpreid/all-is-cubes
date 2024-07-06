@@ -5,8 +5,8 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::HtmlCanvasElement;
 
-use all_is_cubes::camera::Viewport;
 use all_is_cubes::euclid::Size2D;
+use all_is_cubes_render::camera::Viewport;
 
 // This uses the “JS snippet” feature of wasm-bindgen, to cause gui.js to be embedded in
 // the produced JS bundle.

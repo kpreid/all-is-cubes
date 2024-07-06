@@ -4,10 +4,10 @@
 use alloc::vec::Vec;
 
 use all_is_cubes::block::{Block, Resolution, AIR};
-use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::color_block;
 use all_is_cubes::math::{Cube, Rgba};
 use all_is_cubes::universe::Universe;
+use all_is_cubes_render::camera::GraphicsOptions;
 
 use crate::tests::test_block_mesh;
 use crate::texture::NoTextures;

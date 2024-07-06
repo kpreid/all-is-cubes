@@ -23,6 +23,7 @@ bench = false
 [dependencies]
 all-is-cubes = { workspace = true, features = ["save"] }
 all-is-cubes-mesh = { workspace = true }
+all-is-cubes-render = { workspace = true }
 dot_vox = { version = "5.1.1" }
 futures-core = { workspace = true }
 # Used to write glTF textures
@@ -43,6 +44,7 @@ bytemuck = { workspace = true, features = ["derive"] }
 gltf-json = { version = ">=1.4.1, <1.5.0", default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
 
 [dev-dependencies]
+all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 snapbox = { workspace = true, features = ["path"] }
 either = { workspace = true }
 pretty_assertions = { workspace = true }

@@ -1,12 +1,5 @@
-//! Raytracer for [`Space`]s.
-//!
-//! ## Why?
-//!
-//! The original reason this exists is that I thought “we have [`raycast`],
-//! and that's nearly all the work, so why not?” Secondarily, it was written before
-//! the mesh-based renderer, and was useful as a cross-check since
-//! it is much simpler. It continues to serve as a “reference implementation” and is used
-//! by the terminal UI and in unit tests via [`print_space`].
+//! Note: This module is hidden, and its contents re-exported as `all_is_cubes_render::raytracer`.
+//! It is located in this crate so that it can be used by unit tests.
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -41,8 +34,6 @@ use crate::util::StatusText;
 
 mod accum;
 pub use accum::*;
-mod renderer;
-pub use renderer::*;
 mod surface;
 use surface::{DepthIter, DepthStep, Span, Surface, SurfaceIter, TraceStep};
 // TODO: pub use surface::*;

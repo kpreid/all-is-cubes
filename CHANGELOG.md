@@ -4,6 +4,8 @@
 
 ### Added
 
+- New library crate `all-is-cubes-render`, which replaces `all_is_cubes::camera` and `all-is-cubes::raytracer`.
+
 - `all-is-cubes` library:
     - `color_block!` macro is a constant, non-allocating version of `Block::from(Rgba::new(...))`.
 
@@ -56,13 +58,6 @@
 - The `"threads"` feature has been renamed to `"auto-threads"` in those libraries which have it, for clarity.
 
 - `all-is-cubes` library:
-    - `camera::Camera::projection_matrix()` now produces a depth range of 0 to 1 instead of −1 to 1.
-    - `camera::ImageSize` is now an `euclid::Size2D` instead of `euclid::Vector2D`.
-    - `camera::Viewport`'s fields are now `euclid::Size2D` instead of `euclid::Vector2D`.
-    - Renamed `camera::Camera` methods:
-        - `projection()` to `projection_matrix()`
-        - `get_view_transform()` to `view_transform()`
-
     - `chunking::OctantMask` has been moved to the `math` module.
 
     - `listen::Listener::receive()` now accepts batches of messages instead of single messages, and the `alive()` method has been replaced with a return value from `receive()`. Implementors should review the new requirements documentation.
@@ -76,8 +71,6 @@
       If the alternative behavior is desired, see `intersection_box()`.
     - `math::GridAab::union()` has been renamed to `union_box()`, and is no longer fallible.
     
-    - `raytracer::SpaceRaytracer::trace_scene_to_text()` and `trace_scene_to_string()` have been replaced with the single method `to_text()`.
-
     - `transaction::ExecuteError` is now generic over the type of transaction it is an error from.
     - `transaction::Transaction` now has an associated type `Target` instead of a type parameter; it is no longer possible for a transaction type to be used with more than one target type.
 
@@ -102,6 +95,18 @@
     - `dynamic::ChunkedSpaceMesh::update()` requires the `render_data_updater` callback to be a `Fn`, not just a `FnMut`.
     - `dynamic::ChunkedSpaceMesh` requires a texture allocator passed to `new()` instead of `update()`.
 
+- `all-is-cubes-render` library (formerly part of `all-is-cubes`):
+    - `camera::Camera::projection_matrix()` now produces a depth range of 0 to 1 instead of −1 to 1.
+    - `camera::ImageSize` is now an `euclid::Size2D` instead of `euclid::Vector2D`.
+    - `camera::Viewport`'s fields are now `euclid::Size2D` instead of `euclid::Vector2D`.
+    - Renamed `camera::Camera` methods:
+        - `projection()` to `projection_matrix()`
+        - `get_view_transform()` to `view_transform()`
+
+    - `raytracer::SpaceRaytracer::trace_scene_to_text()` and `trace_scene_to_string()` have been replaced with the single method `to_text()`.
+
+    - `HeadlessRenderer` implementors must always produces futures that are `Send`.
+
 - `all-is-cubes-ui` library:
     - `apps::Session::set_universe_async()` has been replaced with the more flexible `set_main_task()`.
       It can do several things via the `MainTaskContext` type.
@@ -110,6 +115,9 @@
 ### Removed
 
 - `all-is-cubes` library:
+    - The modules `camera` and `raytracer` have been removed — or rather, made pseudo-private.
+      Use the new library `all-is-cubes-render` instead.
+
     - `block::AnimationHint::{TEMPORARY, CONTINUOUS}` constants have been removed.
       Use the new constructor functions and `AnimationChange` instead.
 

@@ -17,6 +17,19 @@ pub struct RtOptionsRef<'a, C> {
     pub custom_options: &'a C,
 }
 
+impl<'a, C> RtOptionsRef<'a, C> {
+    #[doc(hidden)]
+    pub fn _new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
+        graphics_options: &'a GraphicsOptions,
+        custom_options: &'a C,
+    ) -> Self {
+        Self {
+            graphics_options,
+            custom_options,
+        }
+    }
+}
+
 // Non-derived implementations for no `C: Clone` bound.
 impl<'a, C> Copy for RtOptionsRef<'a, C> {}
 impl<'a, C> Clone for RtOptionsRef<'a, C> {

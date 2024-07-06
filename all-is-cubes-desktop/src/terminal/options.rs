@@ -2,9 +2,9 @@ use std::ops;
 
 use crossterm::style::Color;
 
-use all_is_cubes::camera::{ImagePixel, Viewport};
 use all_is_cubes::euclid::{size2, Size2D, Vector2D, Vector3D};
 use all_is_cubes::math::Rgba;
+use all_is_cubes_render::camera::{ImagePixel, Viewport};
 
 /// Options specific to the terminal UI.
 ///
