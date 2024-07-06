@@ -999,6 +999,8 @@ impl Geometry for CubeFace {
 
 #[cfg(test)]
 mod tests {
+    use crate::util::MultiFailure;
+
     use super::*;
     use alloc::string::String;
     use alloc::vec::Vec;
@@ -1015,52 +1017,61 @@ mod tests {
     }
 
     #[test]
-        #[rustfmt::skip]
-        fn from_snapped_vector_cases() {
-            for (face, vector, comment) in [
-                (Some(Face6::PZ), [0., 0., 0.], "zero tie, positive Z, positive other"),
-                (Some(Face6::PZ), [-0., -0., 0.], "zero tie, positive Z, negative other"),
-                (Some(Face6::NZ), [0., 0., -0.], "zero tie, negative Z, positive other"),
-                (Some(Face6::NZ), [-0., -0., -0.], "zero tie, negative Z, negative other"),
+    #[rustfmt::skip]
+    fn from_snapped_vector_cases() {
+        let mut f = MultiFailure::new();
+        for (face, vector, comment) in [
+            (Some(Face6::PZ), [0., 0., 0.], "zero tie, positive Z, positive other"),
+            (Some(Face6::PZ), [-0., -0., 0.], "zero tie, positive Z, negative other"),
+            (Some(Face6::NZ), [0., 0., -0.], "zero tie, negative Z, positive other"),
+            (Some(Face6::NZ), [-0., -0., -0.], "zero tie, negative Z, negative other"),
 
-                (Some(Face6::NZ), [-2., -3., -3.], "2-axis tie YZ, negative"),
-                (Some(Face6::NY), [-3., -3., -2.], "2-axis tie XY, negative"),
-                (Some(Face6::PZ), [2., 3., 3.], "2-axis tie YZ, positive"),
-                (Some(Face6::PY), [3., 3., 2.], "2-axis tie XY, positive"),
-    
-                (None, [f64::NAN, 1.0, 1.0], "NaN X"),
-                (None, [1.0, f64::NAN, 1.0], "NaN Y"),
-                (None, [1.0, 1.0, f64::NAN], "NaN Z"),
-            ] {
+            (Some(Face6::NZ), [-2., -3., -3.], "2-axis tie YZ, negative"),
+            (Some(Face6::NY), [-3., -3., -2.], "2-axis tie XY, negative"),
+            (Some(Face6::PZ), [2., 3., 3.], "2-axis tie YZ, positive"),
+            (Some(Face6::PY), [3., 3., 2.], "2-axis tie XY, positive"),
+
+            (None, [f64::NAN, 1.0, 1.0], "NaN X"),
+            (None, [1.0, f64::NAN, 1.0], "NaN Y"),
+            (None, [1.0, 1.0, f64::NAN], "NaN Z"),
+        ] {
+            f.catch(|| {
                 let vector = FreeVector::from(vector);
                 assert_eq!(face, Face6::from_snapped_vector(vector), "{comment}, {vector:?}");
-            }
+            });
         }
+    }
 
     #[test]
     fn cross_6() {
+        let mut f = MultiFailure::new();
         for face1 in Face6::ALL {
             for face2 in Face6::ALL {
-                // Cross product of faces is identical to cross product of vectors.
-                assert_eq!(
-                    face1.cross(face2).normal_vector::<f64, ()>(),
-                    face1.normal_vector().cross(face2.normal_vector()),
-                    "{face1:?} cross {face2:?}",
-                );
+                f.catch(|| {
+                    // Cross product of faces is identical to cross product of vectors.
+                    assert_eq!(
+                        face1.cross(face2).normal_vector::<f64, ()>(),
+                        face1.normal_vector().cross(face2.normal_vector()),
+                        "{face1:?} cross {face2:?}",
+                    );
+                });
             }
         }
     }
 
     #[test]
     fn cross_7() {
+        let mut f = MultiFailure::new();
         for face1 in Face7::ALL {
             for face2 in Face7::ALL {
-                // Cross product of faces is identical to cross product of vectors.
-                assert_eq!(
-                    face1.cross(face2).normal_vector::<f64, ()>(),
-                    face1.normal_vector().cross(face2.normal_vector()),
-                    "{face1:?} cross {face2:?}",
-                );
+                f.catch(|| {
+                    // Cross product of faces is identical to cross product of vectors.
+                    assert_eq!(
+                        face1.cross(face2).normal_vector::<f64, ()>(),
+                        face1.normal_vector().cross(face2.normal_vector()),
+                        "{face1:?} cross {face2:?}",
+                    );
+                });
             }
         }
     }

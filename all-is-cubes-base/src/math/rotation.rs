@@ -567,6 +567,7 @@ impl Mul<Self> for GridRotation {
 mod tests {
     use super::*;
     use crate::math::GridPoint;
+    use crate::util::MultiFailure;
     use num_traits::One;
     use std::collections::HashSet;
     use Face6::*;
@@ -697,33 +698,36 @@ mod tests {
     /// The set of possible inputs is small enough to test its properties exhaustively
     #[test]
     fn from_to_exhaustive() {
+        let mut f = MultiFailure::new();
         for from_face in Face6::ALL {
             for to_face in Face6::ALL {
                 for up_face in Face6::ALL {
-                    let result = GridRotation::from_to(from_face, to_face, up_face);
-                    let info = (from_face, to_face, up_face, result);
-                    match result {
-                        Some(result) => {
-                            assert!(!result.is_reflection());
-                            assert_eq!(
-                                result.transform(from_face),
-                                to_face,
-                                "wrong from-to: {info:?}"
-                            );
-                            assert_eq!(
-                                result.transform(up_face),
-                                up_face,
-                                "did not preserve up vector: {info:?}"
-                            );
+                    f.catch(|| {
+                        let result = GridRotation::from_to(from_face, to_face, up_face);
+                        let info = (from_face, to_face, up_face, result);
+                        match result {
+                            Some(result) => {
+                                assert!(!result.is_reflection());
+                                assert_eq!(
+                                    result.transform(from_face),
+                                    to_face,
+                                    "wrong from-to: {info:?}"
+                                );
+                                assert_eq!(
+                                    result.transform(up_face),
+                                    up_face,
+                                    "did not preserve up vector: {info:?}"
+                                );
+                            }
+                            None => {
+                                assert!(
+                                    up_face.axis() == from_face.axis()
+                                        || up_face.axis() == to_face.axis(),
+                                    "returned None incorrectly: {info:?}"
+                                );
+                            }
                         }
-                        None => {
-                            assert!(
-                                up_face.axis() == from_face.axis()
-                                    || up_face.axis() == to_face.axis(),
-                                "returned None incorrectly: {info:?}"
-                            );
-                        }
-                    }
+                    });
                 }
             }
         }
