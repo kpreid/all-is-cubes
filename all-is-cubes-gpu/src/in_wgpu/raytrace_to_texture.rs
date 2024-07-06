@@ -12,15 +12,15 @@ use rand::SeedableRng as _;
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use web_time::{Duration, Instant};
 
-use all_is_cubes::camera::{Camera, RenderError};
-use all_is_cubes::camera::{StandardCameras, Viewport};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::drawing::embedded_graphics::pixelcolor::PixelColor;
 use all_is_cubes::drawing::embedded_graphics::{draw_target::DrawTarget, prelude::Point, Pixel};
 use all_is_cubes::euclid::{point2, vec2, Box2D};
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{area_usize, Rgb, Rgba, VectorOps as _};
-use all_is_cubes::raytracer::{ColorBuf, RtRenderer};
+use all_is_cubes::math::{Rgb, Rgba, VectorOps as _};
+use all_is_cubes_render::camera::{area_usize, Camera, StandardCameras, Viewport};
+use all_is_cubes_render::raytracer::{ColorBuf, RtRenderer};
+use all_is_cubes_render::RenderError;
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
 use crate::in_wgpu::pipelines::Pipelines;

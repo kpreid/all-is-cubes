@@ -6,13 +6,13 @@
 use pollster::block_on;
 
 use all_is_cubes::block::{EvaluatedBlock, Resolution};
-use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_content as content;
 use all_is_cubes_mesh as mesh;
+use all_is_cubes_render::camera::GraphicsOptions;
 use content::DemoBlocks;
 
 /// Private — do not use.

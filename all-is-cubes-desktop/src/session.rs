@@ -3,12 +3,12 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use all_is_cubes::arcstr;
-use all_is_cubes::camera::Viewport;
 use all_is_cubes::listen::{DirtyFlag, ListenableCell};
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::ErrorChain;
+use all_is_cubes_render::camera::Viewport;
 use all_is_cubes_ui::apps::ExitMainTask;
 
 use crate::Session;

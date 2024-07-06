@@ -3,13 +3,14 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, Resolution::R16, AIR};
-use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, Viewport};
 use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_voxel_blocks;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Name, Universe};
+use all_is_cubes_render::camera::{Camera, GraphicsOptions, Viewport};
+use all_is_cubes_render::Flaws;
 
 use all_is_cubes_mesh::testing::Allocator;
 use all_is_cubes_mesh::testing::TextureMt as Mt;

@@ -15,10 +15,11 @@ pub use gltf_json as json;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
 
-use all_is_cubes::camera::{Camera, Flaws, GraphicsOptions, ViewTransform};
 use all_is_cubes::universe::PartialUniverse;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{block_meshes_for_space, BlockMesh, MeshOptions, MeshTypes, SpaceMesh};
+use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform};
+use all_is_cubes_render::Flaws;
 
 mod buffer;
 use buffer::create_buffer_and_accessor;

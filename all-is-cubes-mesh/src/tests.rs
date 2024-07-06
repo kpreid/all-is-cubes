@@ -5,7 +5,6 @@ use alloc::vec::Vec;
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{self, Block, Resolution::*, AIR};
-use all_is_cubes::camera::{Flaws, TransparencyOption};
 use all_is_cubes::color_block;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::euclid::{point3, Point3D, Vector3D};
@@ -17,6 +16,8 @@ use all_is_cubes::math::{
 use all_is_cubes::math::{Cube, Rgb};
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
+use all_is_cubes_render::camera::TransparencyOption;
+use all_is_cubes_render::Flaws;
 
 use crate::testing::{mesh_blocks_and_space, Allocator, TexPoint, TextureMt};
 use crate::texture::TexelUnit;

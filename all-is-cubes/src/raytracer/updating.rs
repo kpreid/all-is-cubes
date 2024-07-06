@@ -1,3 +1,6 @@
+// TODO: ideally this would live in `all-is-cubes-render`,
+// but it depends on `maybe_sync` and the internals of `SpaceRaytracer`.
+
 use alloc::sync::{Arc, Weak};
 use core::fmt;
 use core::mem;

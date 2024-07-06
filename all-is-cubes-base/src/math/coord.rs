@@ -74,12 +74,3 @@ mod impl_euclid {
     impl_vector_ops!(Size2D, (width height));
     impl_vector_ops!(Size3D, (width height depth));
 }
-
-/// Calculate area and convert to `usize`, which is a common operation for image data lengths.
-#[inline]
-#[doc(hidden)]
-pub fn area_usize<T: TryInto<usize>, U>(size: Size2D<T, U>) -> Option<usize> {
-    let width = size.width.try_into().ok()?;
-    let height = size.height.try_into().ok()?;
-    width.checked_mul(height)
-}

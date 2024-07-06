@@ -5,14 +5,17 @@
 //! If you create a [`Session`], it will manage the [`Universe`], the [UI](crate::vui),
 //! and user input; you need to provide:
 //!
-//! * A renderer, possibly using the [`all-is-cubes-gpu`](https://docs.rs/all-is-cubes-gpu),
-//!   [the software raytracer](all_is_cubes::raytracer), or your own code.
-//! * Deliver input events to [`Session::input_processor`].
+//! * A renderer of [`Space`]s (both the game world and the UI); possibly using
+//!   [`all-is-cubes-gpu`](https://docs.rs/all-is-cubes-gpu),
+//!   [the software raytracer](all_is_cubes_render::raytracer), or your own code.
+//! * Delivery of input events to [`Session::input_processor`].
+//! * Various hooks into IO and windowing functionality.
 //!
 //! TODO: Modules of this crate need a review of their organization.
 //!
 //! [`Session`]: crate::apps::Session
 //! [`Session::input_processor`]: crate::apps::Session::input_processor
+//! [`Space`]: all_is_cubes::space::Space
 //! [`Universe`]: all_is_cubes::universe::Universe
 
 // This crate is not `no_std` because it currently uses `std::sync::mpsc`.

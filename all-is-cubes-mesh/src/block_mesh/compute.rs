@@ -5,11 +5,11 @@ use alloc::vec::Vec;
 use itertools::Itertools as _;
 
 use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
-use all_is_cubes::camera::Flaws;
 use all_is_cubes::euclid::point2;
 use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb, Rgba,
 };
+use all_is_cubes_render::Flaws;
 
 use crate::block_mesh::planar::{greedy_mesh, push_quad, GmRect, QuadColoring, QuadTransform};
 use crate::block_mesh::{analyze::analyze, BlockFaceMesh};

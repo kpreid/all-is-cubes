@@ -42,12 +42,15 @@ wgpu = ["dep:wgpu"]
 # If enabled, threads may be created and the active `rayon` thread pool may be used.
 auto-threads = [
     "dep:rayon",
-    "all-is-cubes-mesh/auto-threads", # not mandatory, but almost certainly wanted
+    # this cascade is not mandatory, but almost certainly wanted
+    "all-is-cubes-mesh/auto-threads",
+    "all-is-cubes-render/auto-threads",
 ]
 
 [dependencies]
 all-is-cubes = { workspace = true, features = ["std"] }
 all-is-cubes-mesh = { workspace = true }
+all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }
 # Used to implement ensure_polled(). Also a `wgpu` dependency already.

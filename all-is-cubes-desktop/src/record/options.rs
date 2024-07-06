@@ -4,7 +4,7 @@ use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use all_is_cubes::camera::{self, Viewport};
+use all_is_cubes_render::camera::{self, Viewport};
 
 /// Specifies a destination and format to write a recording.
 ///

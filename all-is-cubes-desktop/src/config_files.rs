@@ -6,7 +6,7 @@ use std::path::Path;
 use directories_next::ProjectDirs;
 use serde::{de::DeserializeOwned, Serialize};
 
-use all_is_cubes::camera::GraphicsOptions;
+use all_is_cubes_render::camera::GraphicsOptions;
 
 /// Load preferences/settings/config files from a platform-appropriate read/write location.
 pub fn load_config() -> Result<GraphicsOptions, anyhow::Error> {

@@ -12,11 +12,6 @@ use futures_core::future::BoxFuture;
 use futures_util::FutureExt;
 
 use all_is_cubes::block::{Block, Resolution::*, AIR};
-use all_is_cubes::camera::{
-    AntialiasingOption, ExposureOption, Flaws, FogOption, GraphicsOptions, LightingOption,
-    RenderError, StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState,
-    ViewTransform, Viewport,
-};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::color_block;
 use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Size3D, Vector3D};
@@ -31,6 +26,11 @@ use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Handle, HandleError, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{make_some_voxel_blocks, palette, UniverseTemplate};
+use all_is_cubes_render::camera::{
+    AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, LightingOption,
+    StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState, ViewTransform, Viewport,
+};
+use all_is_cubes_render::{Flaws, RenderError};
 
 use crate::{
     finish_universe_from_space, Overlays, RenderTestContext, TestCaseCollector, Threshold,

@@ -6,12 +6,12 @@ use core::{fmt, ops};
 use bitvec::vec::BitVec;
 use ordered_float::OrderedFloat;
 
-use all_is_cubes::camera::Flaws;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Vol,
 };
 use all_is_cubes::space::{BlockIndex, Space};
+use all_is_cubes_render::Flaws;
 
 #[cfg(doc)]
 use crate::texture;

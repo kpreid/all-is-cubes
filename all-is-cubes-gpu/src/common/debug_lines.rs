@@ -1,9 +1,9 @@
-use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Face7, FreePoint, Geometry, LineVertex, Rgba};
 use all_is_cubes::space::Space;
 use all_is_cubes::util::MapExtend;
+use all_is_cubes_render::camera::GraphicsOptions;
 
 /// TODO: give this trait a better name, especially now that `LineVertex` exists.
 pub(crate) trait DebugLineVertex {

@@ -7,8 +7,7 @@ use std::future::Future;
 use std::io::Write as _;
 use std::sync::Arc;
 
-use all_is_cubes::camera::{self, Rendering};
-use all_is_cubes::math::area_usize;
+use all_is_cubes_render::{camera, Flaws, Rendering};
 
 /// Create a [`wgpu::Instance`] controlled by environment variables.
 /// Then, check if the instance has any usable adapters,
@@ -145,7 +144,7 @@ pub fn get_image_from_gpu(
     device: &Arc<wgpu::Device>,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
-    flaws: camera::Flaws,
+    flaws: Flaws,
 ) -> impl Future<Output = Rendering> + 'static {
     // By making this an explicit `Future` return we avoid capturing the queue and texture
     // references.
@@ -237,7 +236,7 @@ where
             .expect("buffer reading failed");
         let mapped: &[u8] = &temp_buffer.slice(..).get_mapped_range();
 
-        let element_count = area_usize(dimensions).unwrap() * components;
+        let element_count = camera::area_usize(dimensions).unwrap() * components;
 
         // Copy the mapped buffer data into a Rust vector, removing row padding if present
         // by copying it one row at a time.

@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use itertools::Itertools as _;
 
-use all_is_cubes::camera::Camera;
+use all_is_cubes_render::camera::Camera;
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{Cube, GridCoordinate};
 use all_is_cubes::rerun_glue as rg;

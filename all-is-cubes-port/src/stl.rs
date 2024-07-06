@@ -6,7 +6,6 @@ use itertools::Itertools as _;
 use stl_io::Triangle;
 
 use all_is_cubes::block;
-use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::{notnan, Cube, FreeCoordinate};
 use all_is_cubes::space::Space;
@@ -17,6 +16,7 @@ use all_is_cubes_mesh::{
     texture::{NoTexture, NoTextures},
     BlockVertex,
 };
+use all_is_cubes_render::camera::GraphicsOptions;
 
 pub(crate) async fn export_stl(
     progress: YieldProgress,
@@ -81,7 +81,7 @@ pub(crate) fn block_to_stl_triangles(block: &block::EvaluatedBlock) -> Vec<Trian
 
 fn mesh_options_for_stl() -> mesh::MeshOptions {
     let mut g = GraphicsOptions::default();
-    g.transparency = all_is_cubes::camera::TransparencyOption::Threshold(notnan!(0.01));
+    g.transparency = all_is_cubes_render::camera::TransparencyOption::Threshold(notnan!(0.01));
     mesh::MeshOptions::new(&g)
 }
 

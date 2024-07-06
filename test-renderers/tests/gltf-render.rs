@@ -10,11 +10,11 @@ use std::sync::Arc;
 use clap::Parser as _;
 use futures_core::future::BoxFuture;
 
-use all_is_cubes::camera::{Flaws, HeadlessRenderer, RenderError, StandardCameras};
 use all_is_cubes::space::{Sky, Space};
 use all_is_cubes::universe::Handle;
 use all_is_cubes_content::palette;
 use all_is_cubes_port as port;
+use all_is_cubes_render::camera::{Flaws, HeadlessRenderer, RenderError, StandardCameras};
 use test_renderers::{RendererFactory, RendererId};
 
 const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -258,14 +258,14 @@ impl HeadlessRenderer for GltfRend3Renderer {
     fn draw<'a>(
         &'a mut self,
         info_text: &'a str,
-    ) -> BoxFuture<'a, Result<all_is_cubes::camera::Rendering, RenderError>> {
+    ) -> BoxFuture<'a, Result<all_is_cubes_render::camera::Rendering, RenderError>> {
         Box::pin(async {
             let aic_camera = &self.cameras.cameras().world;
             let viewport = aic_camera.viewport();
 
             if viewport.pixel_count() == Some(0) {
                 // Empty viewport; must not try to use the GPU at all.
-                return Ok(all_is_cubes::camera::Rendering {
+                return Ok(all_is_cubes_render::camera::Rendering {
                     size: viewport.framebuffer_size,
                     data: Vec::new(),
                     flaws: Flaws::empty(),
@@ -314,7 +314,7 @@ impl HeadlessRenderer for GltfRend3Renderer {
     }
 }
 
-fn convert_camera(aic_camera: &all_is_cubes::camera::Camera) -> rend3::types::Camera {
+fn convert_camera(aic_camera: &all_is_cubes_render::camera::Camera) -> rend3::types::Camera {
     // TODO: This conversion, or something else about the camera data path, is sometimes just mysteriously not working.
 
     // Convert translation

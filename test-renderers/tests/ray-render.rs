@@ -1,4 +1,4 @@
-//! Runs [`test_renderers::harness_main`] against [`all_is_cubes::raytracer`].
+//! Runs [`test_renderers::harness_main`] against [`all_is_cubes_render::raytracer`].
 
 use clap::Parser as _;
 

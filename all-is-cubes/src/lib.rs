@@ -77,9 +77,9 @@
 //!   Jumping is also hardcoded to work in the +Y direction.
 //!   Future versions may support arbitrary character orientation.
 //!
-//! ## Crate features
+//! ## Package features
 //!
-//! This crate, `all_is_cubes`, defines the following feature flags:
+//! This package, `all-is-cubes`, defines the following feature flags:
 //!
 //! * `"save"`:
 //!   Enable [`serde`] serialization of [`Universe`]s and some other types.
@@ -97,7 +97,6 @@
 //!     **which makes this feature non-additive**. Proceed with care.
 //!   * Certain data calculations are not memoized.
 //!   * Error types do not implement [`std::error::Error`].
-//!   
 //!
 //! ## Platform compatibility
 //!
@@ -156,6 +155,7 @@ extern crate alloc;
 
 pub mod behavior;
 pub mod block;
+#[doc(hidden)] // Exported only for use by all_is_cubes_render
 pub mod camera;
 pub mod character;
 pub mod chunking;
@@ -172,6 +172,7 @@ pub mod math;
 pub mod op;
 pub mod physics;
 pub mod raycast;
+#[doc(hidden)] // Exported only for use by all_is_cubes_render
 pub mod raytracer;
 #[cfg(feature = "rerun")]
 #[doc(hidden)]

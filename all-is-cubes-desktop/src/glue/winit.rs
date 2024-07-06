@@ -1,7 +1,7 @@
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::monitor::MonitorHandle;
 
-use all_is_cubes::camera::{self, Viewport};
+use all_is_cubes_render::camera::{self, Viewport};
 use all_is_cubes::euclid::Size2D;
 
 pub fn physical_size_to_viewport(scale_factor: f64, size: PhysicalSize<u32>) -> Viewport {

@@ -7,9 +7,9 @@ use crossterm::style::{Color, Colors, SetColors};
 use crossterm::QueueableCommand as _;
 use ratatui::backend::Backend;
 
-use all_is_cubes::camera::ImagePixel;
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::math::{Rgb, Rgba};
+use all_is_cubes_render::camera::ImagePixel;
 
 use super::options::{CharacterMode, ColorMode};
 use super::{TextAndColor, TextRayImage};
@@ -285,10 +285,9 @@ fn fallback_measure_str(text: &str) -> u16 {
 mod tests {
     use super::*;
     use crate::terminal::TerminalOptions;
-    use all_is_cubes::camera::{ImageSize, Viewport};
     use all_is_cubes::euclid::size2;
-    use all_is_cubes::math::area_usize;
-    use all_is_cubes::raytracer::RaytraceInfo;
+    use all_is_cubes_render::camera::{area_usize, ImageSize, Viewport};
+    use all_is_cubes_render::raytracer::RaytraceInfo;
 
     fn test_image(
         options: TerminalOptions,

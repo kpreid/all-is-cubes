@@ -7,7 +7,6 @@ use std::time::Duration;
 
 use itertools::Itertools as _;
 
-use all_is_cubes::camera::{Camera, Flaws, RenderError};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::num::Zero as _;
@@ -25,6 +24,8 @@ use all_is_cubes::universe::{Handle, HandleError};
 use all_is_cubes::util::Executor;
 use all_is_cubes_mesh::dynamic::{self, ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
+use all_is_cubes_render::camera::Camera;
+use all_is_cubes_render::{Flaws, RenderError};
 
 use crate::in_wgpu::block_texture::BlockTextureViews;
 use crate::in_wgpu::frame_texture::FramebufferTextures;

@@ -8,9 +8,9 @@ use core::fmt;
 use std::sync::Arc;
 
 use all_is_cubes::block::EvaluatedBlock;
-use all_is_cubes::camera::Flaws;
 use all_is_cubes::math::{Face7, FaceMap, OpacityCategory, Vol};
 use all_is_cubes::space::Space;
+use all_is_cubes_render::Flaws;
 
 use crate::texture::{self, Tile as _};
 use crate::{GfxVertex, IndexVec, MeshOptions, MeshTypes};

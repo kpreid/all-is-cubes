@@ -5,8 +5,9 @@
 
 use std::sync::Arc;
 
-use all_is_cubes::camera::{Flaws, GraphicsOptions, ToneMappingOperator};
 use all_is_cubes::time;
+use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator};
+use all_is_cubes_render::Flaws;
 
 use crate::in_wgpu::shaders::Shaders;
 

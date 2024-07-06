@@ -4,7 +4,6 @@ use flume::TryRecvError;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::camera::{FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
@@ -14,6 +13,9 @@ use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{Handle, Universe, UniverseStepInfo, UniverseTransaction};
+use all_is_cubes_render::camera::{
+    FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport,
+};
 
 use crate::apps::{
     ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, QuitCancelled, QuitFn,

@@ -5,12 +5,12 @@ use rayon::{
     slice::ParallelSliceMut as _,
 };
 
-use all_is_cubes::camera::Camera;
 use all_is_cubes::euclid::{size3, Vector3D};
 use all_is_cubes::math::{
     Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord,
 };
 use all_is_cubes::space::Space;
+use all_is_cubes_render::camera::Camera;
 
 use crate::in_wgpu::glue::{
     extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab,
@@ -437,9 +437,9 @@ fn split_axis(
 
 #[cfg(test)]
 mod tests {
-    use all_is_cubes::camera::{GraphicsOptions, ViewTransform, Viewport};
     use all_is_cubes::euclid::vec3;
     use all_is_cubes::math::NotNan;
+    use all_is_cubes_render::camera::{GraphicsOptions, ViewTransform, Viewport};
 
     use super::*;
 

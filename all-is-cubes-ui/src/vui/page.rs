@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::{text, AIR};
 use all_is_cubes::block::{Block, BlockAttributes, Resolution};
-use all_is_cubes::camera;
+use all_is_cubes_render::camera;
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{size2, Size2D};

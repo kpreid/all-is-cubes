@@ -1,7 +1,7 @@
 use core::time::Duration;
 use std::collections::{HashMap, HashSet};
 
-use all_is_cubes::camera::{
+use all_is_cubes_render::camera::{
     FogOption, GraphicsOptions, LightingOption, NdcPoint2, NominalPixel, RenderMethod,
     TransparencyOption, Viewport,
 };

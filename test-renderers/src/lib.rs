@@ -15,12 +15,12 @@ use clap::builder::PossibleValue;
 use image::RgbaImage;
 use rendiff::{Histogram, Threshold};
 
-use all_is_cubes::camera::Rendering;
 use all_is_cubes::character::Character;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Handle;
 use all_is_cubes::universe::Universe;
 use all_is_cubes_content::free_editing_starter_inventory;
+use all_is_cubes_render::Rendering;
 
 mod harness;
 pub use harness::*;

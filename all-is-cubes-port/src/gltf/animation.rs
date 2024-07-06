@@ -19,7 +19,7 @@ pub(crate) struct FrameState {
     pub visible_mesh_instances: Vec<MeshInstance>,
 
     // The camera's state in this frame.
-    pub camera_transform: all_is_cubes::camera::ViewTransform,
+    pub camera_transform: all_is_cubes_render::camera::ViewTransform,
 }
 
 pub(crate) fn add_camera_animation(
