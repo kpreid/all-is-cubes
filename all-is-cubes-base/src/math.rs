@@ -53,12 +53,16 @@ compile_error!("all-is-cubes does not support platforms with less than 32-bit `u
 /// needed; infallible construction can be written using `NotNan::from(an_integer)`,
 /// `NotNan::zero()`, and `NotNan::one()`.
 ///
+/// # Examples
+///
 /// ```
 /// # extern crate all_is_cubes_base as all_is_cubes;
 /// use all_is_cubes::{notnan, math::NotNan};
 ///
 /// const X: NotNan<f32> = notnan!(1.234);
 /// ```
+///
+/// If anything other than a floating-point literal is used, the code will not compile:
 ///
 /// ```compile_fail
 /// # extern crate all_is_cubes_base as all_is_cubes;
