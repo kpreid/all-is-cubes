@@ -18,3 +18,6 @@ pub use all_is_cubes::raytracer::{
 
 mod renderer;
 pub use renderer::{RtRenderer, RtScene};
+
+#[doc(hidden)] // experimental/internal, used only by test-renderers right now
+pub mod ortho;
