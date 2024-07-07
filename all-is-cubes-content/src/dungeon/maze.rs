@@ -1,10 +1,12 @@
+use alloc::boxed::Box;
 use alloc::collections::VecDeque;
+
 use rand::seq::{IteratorRandom as _, SliceRandom as _};
 use rand::SeedableRng;
 
-use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridArray, GridSize};
+use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridSize, Vol};
 
-pub type Maze = GridArray<MazeRoom>;
+pub type Maze = Vol<Box<[MazeRoom]>>;
 
 /// What role the room plays in the maze layout.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,7 +43,7 @@ fn open_passage(maze: &mut Maze, from: Cube, dir: Face6) {
 pub fn generate_maze(seed: u64, requested_rooms: GridSize) -> Maze {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
-    let mut maze = GridArray::repeat(
+    let mut maze: Maze = Vol::repeat(
         GridAab::from_lower_size([0, 0, 0], requested_rooms),
         MazeRoom {
             kind: MazeRoomKind::Unoccupied,

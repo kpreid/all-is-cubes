@@ -1,8 +1,8 @@
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridSize, GridSizeCoord, GridVector,
-    VectorOps as _,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, GridVector,
+    VectorOps as _, Vol,
 };
 use all_is_cubes::space::Space;
 use all_is_cubes::util::YieldProgress;
@@ -109,7 +109,7 @@ pub trait Theme<R> {
         &self,
         space: &mut Space,
         pass_index: usize,
-        map: &GridArray<R>,
+        map: Vol<&[R]>,
         position_in_room_grid: Cube,
         value: &R,
     ) -> Result<(), InGenError>;
@@ -118,7 +118,7 @@ pub trait Theme<R> {
 pub async fn build_dungeon<Room, ThemeT: Theme<Room>>(
     space: &mut Space,
     theme: &ThemeT,
-    map: &GridArray<Room>,
+    map: Vol<&[Room]>,
     progress: YieldProgress,
 ) -> Result<(), InGenError> {
     let passes = theme.passes();

@@ -1,5 +1,6 @@
 //! Algorithms for animating blocks.
 
+use alloc::boxed::Box;
 use core::f64::consts::TAU;
 use core::fmt;
 use core::time::Duration;
@@ -11,7 +12,7 @@ use all_is_cubes::behavior;
 use all_is_cubes::block::{Block, BlockCollision, AIR};
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{rgba_const, Cube, GridAab, GridArray, GridPoint, GridVector, Rgba};
+use all_is_cubes::math::{rgba_const, Cube, GridAab, GridPoint, GridVector, Rgba, Vol};
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
@@ -102,7 +103,7 @@ pub(crate) struct Fire {
     /// The bounds of this array determine the affected blocks.
     // TODO: should be using the attachment bounds instead of internally stored bounds
     #[allow(clippy::struct_field_names)]
-    fire_state: GridArray<u8>,
+    fire_state: Vol<Box<[u8]>>,
     rng: Xoshiro256Plus,
     /// Time accumulation not yet equal to a whole frame.
     /// TODO: Give [`Tick`] a concept of discrete time units we can reuse instead of
@@ -128,7 +129,7 @@ impl Fire {
         ];
         Self {
             blocks,
-            fire_state: GridArray::from_fn(bounds, |_cube| 0),
+            fire_state: Vol::from_fn(bounds, |_cube| 0),
             rng,
             accumulator: Duration::ZERO,
         }

@@ -1,5 +1,6 @@
 //! A voxel reinterpretation of the famous Sponza Atrium test scene.
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::f64::consts::TAU;
 use core::fmt;
@@ -13,8 +14,8 @@ use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    rgb_const, Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridArray, GridCoordinate,
-    GridPoint, GridRotation, GridVector, Gridgid, Rgb, Rgba,
+    rgb_const, Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint,
+    GridRotation, GridVector, Gridgid, Rgb, Rgba, Vol,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -140,7 +141,7 @@ pub(crate) async fn atrium(
 
     // Arches and atrium walls
     #[rustfmt::skip]
-    let arches_pattern = GridArray::from_y_flipped_array([[
+    let arches_pattern = Vol::<Box<[u8]>>::from_y_flipped_array([[
         *br"########", // Roof edge height
         *br"####.###",
         *br"########",
@@ -214,7 +215,7 @@ pub(crate) async fn atrium(
                 between_large_arches + WALL,
                 length / (between_large_arches + WALL),
                 direction,
-                &arches_pattern,
+                arches_pattern.as_ref(),
             )
         },
     )?;
@@ -333,7 +334,7 @@ fn arch_row(
     section_length: GridCoordinate,
     section_count: GridCoordinate,
     parallel: Face6,
-    pattern: &GridArray<u8>,
+    pattern: Vol<&[u8]>,
 ) -> Result<(), InGenError> {
     let offset = parallel.normal_vector() * section_length;
     let rotation = GridRotation::from_to(Face6::NX, parallel, Face6::PY).unwrap();
@@ -526,7 +527,7 @@ async fn install_atrium_blocks(
             &AIR
         }
     };
-    let pole_shape = GridArray::from_y_flipped_array([
+    let pole_shape = Vol::<Box<[u8]>>::from_y_flipped_array([
         [
             *br"                           #####",
             *br"                      ##########",

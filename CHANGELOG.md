@@ -70,6 +70,7 @@
     - `math::GridAab::intersection()` has been renamed to `intersection_cubes()`, and its precise behavior with zero-volume boxes clarified.
       If the alternative behavior is desired, see `intersection_box()`.
     - `math::GridAab::union()` has been renamed to `union_box()`, and is no longer fallible.
+    - `math::GridArray` has been removed. Uses of `GridArray<T>` may be replaced with `Vol<Box<[T]>>`.
     
     - `transaction::ExecuteError` is now generic over the type of transaction it is an error from.
     - `transaction::Transaction` now has an associated type `Target` instead of a type parameter; it is no longer possible for a transaction type to be used with more than one target type.

@@ -1,7 +1,9 @@
+use alloc::boxed::Box;
+
 use noise::NoiseFn;
 
 use all_is_cubes::block::Resolution;
-use all_is_cubes::math::{Cube, GridAab, GridArray, GridPoint};
+use all_is_cubes::math::{Cube, GridAab, GridPoint, Vol};
 
 /// Generates a [`Block`]-shape of noise values from a [`NoiseFn`].
 ///
@@ -14,8 +16,8 @@ pub(crate) fn array_of_noise<O>(
     resolution: Resolution,
     noise_fn: &impl NoiseFn<f64, 3>,
     mut postprocess: impl FnMut(f64) -> O,
-) -> GridArray<O> {
-    GridArray::from_fn(GridAab::for_block(resolution), |cube| {
+) -> Vol<Box<[O]>> {
+    Vol::from_fn(GridAab::for_block(resolution), |cube| {
         postprocess(noise_fn.get(cube.midpoint().into()))
     })
 }

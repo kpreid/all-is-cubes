@@ -3,13 +3,15 @@
 //! They are gathered in this module to encourage noting similarities rather than writing
 //! near-duplicate code.
 
+use alloc::boxed::Box;
+
 use hashbrown::HashSet;
 
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution, AIR};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
-    Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridArray, GridCoordinate,
-    GridPoint, GridVector, Gridgid, NotNan,
+    Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
+    GridVector, Gridgid, NotNan, Vol,
 };
 use all_is_cubes::space::{CubeTransaction, SetCubeError, Space, SpaceTransaction};
 
@@ -42,8 +44,8 @@ pub(crate) fn voronoi_pattern<'a>(
     // will not. However, this should be good enough for the procedural-generation
     // goals of this function.
 
-    let mut pattern: GridArray<(FreeCoordinate, &Block)> =
-        GridArray::from_fn(GridAab::for_block(resolution), |_| (f64::INFINITY, &AIR));
+    let mut pattern: Vol<Box<[(FreeCoordinate, &Block)]>> =
+        Vol::from_fn(GridAab::for_block(resolution), |_| (f64::INFINITY, &AIR));
     let mut flood_fill_todo = HashSet::<Cube>::new();
     for &(region_point, ref block) in points {
         let region_point = region_point * FreeCoordinate::from(resolution);

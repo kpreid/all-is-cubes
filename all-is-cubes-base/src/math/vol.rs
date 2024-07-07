@@ -23,11 +23,6 @@ use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, Grid
 #[allow(clippy::exhaustive_structs)]
 pub struct ZMaj;
 
-/// A container of volume data.
-// ---
-// TOOD: deprecate/replace this
-pub type GridArray<V> = Vol<Box<[V]>, ZMaj>;
-
 /// Type for volume data stored in a slice, or for generating linear indexing.
 ///
 /// * `C` is some slice container type, e.g. `&[T]` or `Box<[T]>`.

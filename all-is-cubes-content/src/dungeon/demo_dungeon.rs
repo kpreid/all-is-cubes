@@ -16,8 +16,8 @@ use all_is_cubes::euclid::Size3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridRotation, GridSize,
-    GridVector, Rgb, Rgba,
+    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Rgb,
+    Rgba, Vol,
 };
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::time;
@@ -115,7 +115,7 @@ impl DemoTheme {
     fn inside_doorway(
         &self,
         space: &mut Space,
-        map: &GridArray<Option<DemoRoom>>,
+        map: Vol<&[Option<DemoRoom>]>,
         room_position: Cube,
         face: Face6,
         has_gate: bool,
@@ -228,7 +228,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         &self,
         space: &mut Space,
         pass_index: usize,
-        map: &GridArray<Option<DemoRoom>>,
+        map: Vol<&[Option<DemoRoom>]>,
         room_position: Cube,
         room_data: &Option<DemoRoom>,
     ) -> Result<(), InGenError> {
@@ -490,7 +490,7 @@ pub(crate) async fn demo_dungeon(
     };
 
     let build_progress = progress.start_and_cut(0.2, "building rooms").await;
-    build_dungeon(&mut space, &theme, &dungeon_map, build_progress).await?;
+    build_dungeon(&mut space, &theme, dungeon_map.as_ref(), build_progress).await?;
 
     // Enable lighting
     let mut light_progress = progress;
@@ -526,7 +526,7 @@ fn generate_dungeon_map(
     // Expand bounds to allow for extra-tall rooms.
     let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
 
-    GridArray::from_fn(expanded_bounds, |room_position| {
+    Vol::from_fn(expanded_bounds, |room_position| {
         let maze_room = maze.get(room_position)?;
 
         // Allow rooms that are not start or end to have more interesting properties.

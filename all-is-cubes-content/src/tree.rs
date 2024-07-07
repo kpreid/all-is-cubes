@@ -6,7 +6,7 @@ use petgraph::visit::EdgeRef as _;
 use all_is_cubes::block::{self, Block, AIR};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridArray, GridCoordinate, GridRotation, GridVector,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Vol,
 };
 use all_is_cubes::space::SpaceTransaction;
 
@@ -225,12 +225,12 @@ mod graph {
     /// is in it yet; this allows traversing the graph to find places to put branches.
     pub(crate) struct Growph {
         // TODO: more accessors instead of pub
-        pub(crate) data: GridArray<GrowphCell>,
+        pub(crate) data: Vol<Box<[GrowphCell]>>,
     }
     impl Growph {
         pub fn new(bounds: GridAab) -> Self {
             Self {
-                data: GridArray::from_fn(bounds, |_| GrowphCell::new()),
+                data: Vol::from_fn(bounds, |_| GrowphCell::new()),
             }
         }
 
@@ -413,10 +413,10 @@ mod graph {
     }
 
     #[derive(Clone, Debug)]
-    pub struct VisitMap(GridArray<bool>);
+    pub struct VisitMap(Vol<Box<[bool]>>);
     impl VisitMap {
         fn new(bounds: GridAab) -> VisitMap {
-            Self(GridArray::from_fn(bounds, |_| false))
+            Self(Vol::from_fn(bounds, |_| false))
         }
     }
     impl petgraph::visit::VisitMap<Cube> for VisitMap {
