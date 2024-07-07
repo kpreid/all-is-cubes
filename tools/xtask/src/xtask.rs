@@ -445,21 +445,28 @@ impl Scope {
     }
 }
 
+/// List of all packges that are part of the application and not development tools.
+///
+/// * This is more than all *published* packages, because `all-is-cubes-wasm` is not
+///   currently published.
+/// * It must be ordered with dependencies before dependents, to allow `publish-all`
+///   to succeed.
+///
 /// TODO: fetch this list (or at least cross-check it) using `cargo metadata`.
 ///
 /// See also [`Config::do_for_all_workspaces`].
 const ALL_NONTEST_PACKAGES: [&str; 11] = [
-    "all-is-cubes",
     "all-is-cubes-base",
+    "all-is-cubes",
+    "all-is-cubes-render",
     "all-is-cubes-ui",
+    "all-is-cubes-content",
     "all-is-cubes-mesh",
     "all-is-cubes-gpu",
-    "all-is-cubes-content",
     "all-is-cubes-port",
-    "all-is-cubes-render",
     "all-is-cubes-desktop",
-    "all-is-cubes-server",
     "all-is-cubes-wasm",
+    "all-is-cubes-server",
 ];
 
 const CHECK_SUBCMD: &str = "clippy";
