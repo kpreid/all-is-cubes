@@ -35,9 +35,9 @@ hashbrown = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }
-noise = { version = "0.8.2", default-features = false }
+noise = { workspace = true }
 paste = { workspace = true }
-petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
+petgraph = { workspace = true }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 strum = { workspace = true, features = ["derive"] }

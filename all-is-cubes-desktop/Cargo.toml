@@ -49,7 +49,7 @@ itertools = { workspace = true }
 kira = { version = "0.8.3", default-features = false, features = ["cpal"] }
 log = { workspace = true }
 once_cell = { workspace = true }
-png = "0.17.6"
+png = { workspace = true }
 rand = { workspace = true, features = ["std", "std_rng"] }
 # re_sdk is a data-logging and visualization tool; we are currently using it _only_ for
 # development of All is Cubes itself.
@@ -60,7 +60,7 @@ simplelog = { workspace = true }
 strum = { workspace = true, features = ["derive", "std"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync"] }
 ratatui = { version = "0.26.1", default-features = false, features = ["crossterm"] }
-unicode-width = { version = "0.1.9", default-features = false }
+unicode-width = { workspace = true }
 # We have no true direct dependency on wgpu, but do need to select backends.
 # (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
 wgpu = { workspace = true, features = ["dx12", "metal"] }

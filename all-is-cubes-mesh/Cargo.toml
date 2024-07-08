@@ -51,7 +51,7 @@ either = { workspace = true }
 flume = { workspace = true }
 futures-channel = { workspace = true }
 futures-util = { workspace = true }
-fnv = "1.0.7"
+fnv = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }

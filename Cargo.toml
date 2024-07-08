@@ -78,17 +78,20 @@ clap = { version = "4.2.4", default-features = false, features = ["cargo", "depr
 # when benching/testing specific packages
 criterion = { version = "0.5.1", features = ["async_tokio", "cargo_bench_support", "html_reports"] }
 displaydoc = { version = "0.2.4", default-features = false}
+downcast-rs = { version = "1.2.0", default-features = false }
 either = { version = "1.10.0", default-features = false }
 embedded-graphics = "0.8.0"
 euclid = { version = "0.22.10", default-features = false }
 exhaust = { version = "0.1.0", default-features = false }
 flume = { version = "0.11.0", default-features = false, features = ["async"] }
+fnv = "1.0.7"
 futures-channel = { version = "0.3.28", default-features = false, features = ["alloc"] }
 futures-core = { version = "0.3.28", default-features = false, features = ["alloc"] }
 futures-task = { version = "0.3.28", default-features = false }
 futures-util = { version = "0.3.28", default-features = false, features = ["alloc"] }
 gilrs = { version = "0.10.4" }
 gloo-timers = { version = "0.3.0", default-features = false }
+half = { version = "2.3.1", features = ["bytemuck"] }
 hashbrown = { version = "0.14.0", default-features = false, features = ["ahash", "inline-more"] }
 image = { version = "0.25.1", default-features = false }
 imgref = "1.10.1"
@@ -98,10 +101,14 @@ log = { version = "0.4.17", default-features = false }
 macro_rules_attribute = "0.2.0"
 manyfmt = "0.1.0"
 mutants = "0.0.3"
+noise = { version = "0.8.2", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 once_cell = "1.19.0"
 ordered-float = { version = "4.2.0", default-features = false }
 paste = "1.0.12"
+petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
+png-decoder = "0.1.1" # used by all-is-cubes for no_std-compatible reading pngs
+png = "0.17.6" # used by all-is-cubes-desktop for writing pngs
 pollster = { version = "0.3.0", default-features = false }
 polonius-the-crab = { version = "0.4.1" }
 pretty_assertions = "1.2.0"
@@ -111,6 +118,7 @@ rayon = { version = "1.8.0" }
 re_log_types = { version = "0.16.0", default-features = false }
 re_sdk = { version = "0.16.0", default-features = false }
 re_types = { version = "0.16.0", default-features = false }
+rectangle-pack = "0.4.2"
 rendiff = { version = "0.2.0" }
 scopeguard = { version = "1.2.0", default-features = false }
 send_wrapper = { version = "0.6.0", features = ["futures"] }
@@ -127,6 +135,7 @@ thiserror = "1.0.56"
 tokio = { version = "1.28.0", default-features = false }
 trycmd = "0.15.4" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
+unicode-width = { version = "0.1.9", default-features = false }
 wasm-bindgen-futures = "0.4.40"
 web-time = "1.0.0"
 wgpu = { version = "0.19.3", default-features = false, features = ["wgsl"] }
