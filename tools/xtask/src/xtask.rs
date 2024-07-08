@@ -307,9 +307,25 @@ fn main() -> Result<(), ActionError> {
             }
         }
         XtaskCommand::SetVersion { version } => {
+            /// Given a dependency table entry like `foo = "1.2.3"` or
+            /// `foo = { version = "1.2.3" }`, find the version field.
+            /// Returns None if there is no such field.
+            fn find_version_field(input: &mut toml_edit::Item) -> Option<&mut toml_edit::Item> {
+                match input {
+                    toml_edit::Item::None => None,
+                    toml_edit::Item::Value(toml_edit::Value::String(_)) => Some(input),
+                    table_like => match &mut table_like["version"] {
+                        // Don't add a version that didn't exist.
+                        toml_edit::Item::None => None,
+                        value @ toml_edit::Item::Value(_) => Some(value),
+                        v => panic!("unexpected structure {v:?}"),
+                    },
+                }
+            }
+
             assert_eq!(config.scope, Scope::All);
 
-            let version_value = toml_edit::value(version.as_str());
+            let new_version_value: toml_edit::Item = toml_edit::value(version.as_str());
             for manifest_dir in ALL_NONTEST_PACKAGES.into_iter().chain(["."]) {
                 let manifest_path = format!("{manifest_dir}/Cargo.toml");
                 eprint!("Editing {manifest_path}...");
@@ -323,7 +339,7 @@ fn main() -> Result<(), ActionError> {
                     assert_eq!(manifest["package"]["name"].as_str(), Some(manifest_dir));
 
                     // Update version of the package itself
-                    manifest["package"]["version"] = version_value.clone();
+                    manifest["package"]["version"] = new_version_value.clone();
                     "package version and "
                 } else {
                     ""
@@ -336,12 +352,13 @@ fn main() -> Result<(), ActionError> {
                     manifest["dependencies"].as_table_mut()
                 };
                 let mut count_deps = 0;
-                for (_dep_key, dep_item) in deps_table
+                for version_field in deps_table
                     .expect("dependencies not a table")
                     .iter_mut()
                     .filter(|(dep_key, _)| ALL_NONTEST_PACKAGES.contains(&dep_key.get()))
+                    .filter_map(|(_, dep_value)| find_version_field(dep_value))
                 {
-                    dep_item["version"] = version_value.clone();
+                    *version_field = new_version_value.clone();
                     count_deps += 1;
                 }
 
