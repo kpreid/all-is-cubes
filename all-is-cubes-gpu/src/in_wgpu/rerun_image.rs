@@ -287,11 +287,14 @@ fn perform_image_copy(
             rg::archetypes::Image {
                 data: color_data,
                 draw_order: None,
+                opacity: None,
             },
             rg::archetypes::DepthImage {
                 data: depth_data,
                 meter: Some(1f32.into()),
                 draw_order: None,
+                colormap: None,
+                point_fill_ratio: None,
             },
             pinhole,
             transform,

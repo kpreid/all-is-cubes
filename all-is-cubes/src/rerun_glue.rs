@@ -177,11 +177,11 @@ where
     let array: [f32; 3] = v.cast::<f32>().into();
     datatypes::Vec3D::from(array)
 }
-fn convert_half_sizes<S, U>(size: euclid::Size3D<S, U>) -> components::HalfSizes3D
+fn convert_half_sizes<S, U>(size: euclid::Size3D<S, U>) -> components::HalfSize3D
 where
     S: num_traits::NumCast + Copy,
 {
-    components::HalfSizes3D(convert_vec(size.to_vector().cast::<f32>() / 2.0))
+    components::HalfSize3D(convert_vec(size.to_vector().cast::<f32>() / 2.0))
 }
 pub fn convert_quaternion<S, Src, Dst>(
     rot: euclid::Rotation3D<S, Src, Dst>,
@@ -214,7 +214,7 @@ pub fn convert_aabs(
     aabs: impl IntoIterator<Item = math::Aab>,
     offset: math::FreeVector,
 ) -> archetypes::Boxes3D {
-    let (half_sizes, centers): (Vec<components::HalfSizes3D>, Vec<components::Position3D>) = aabs
+    let (half_sizes, centers): (Vec<components::HalfSize3D>, Vec<components::Position3D>) = aabs
         .into_iter()
         .map(|aab| {
             (
@@ -253,10 +253,12 @@ pub fn convert_camera_to_pinhole(
             image_from_camera: components::PinholeProjection(pinhole_matrix),
             resolution: Some(components::Resolution(datatypes::Vec2D(size.into()))),
             camera_xyz: Some(OUR_VIEW_COORDINATES),
+            image_plane_distance: Some((2.0f32).into()),
         },
         archetypes::Transform3D {
             // TODO: shouldn't from_parent be true?
             transform: convert_transform(camera.view_transform(), false).into(),
+            axis_length: Some((1.0f32).into()),
         },
     )
 }
