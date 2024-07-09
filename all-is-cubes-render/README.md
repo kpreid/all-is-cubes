@@ -3,7 +3,8 @@ All is Cubes Renderer
 
 All is Cubes is a “voxel game” where each block is made out of smaller blocks (one level of recursion).
 
-This particular package provides a raytracer which can render All is Cubes scenes, as well as types related to rendering in general.
+This particular package provides a raytracer which can render All is Cubes scenes, as well as types related to rendering by any means.
+
 [all-is-cubes]: https://crates.io/crates/all-is-cubes
 
 License
