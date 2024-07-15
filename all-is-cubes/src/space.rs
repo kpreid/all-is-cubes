@@ -1051,6 +1051,7 @@ impl SpaceBehaviorAttachment {
 /// and so an instance of it can be reused for similar spaces (e.g.
 /// [`DEFAULT_FOR_BLOCK`](Self::DEFAULT_FOR_BLOCK)).
 #[derive(Clone, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct SpacePhysics {
     /// Gravity vector for moving objects, in cubes/s².
@@ -1103,29 +1104,6 @@ impl fmt::Debug for SpacePhysics {
 impl Default for SpacePhysics {
     fn default() -> Self {
         Self::DEFAULT
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-#[mutants::skip]
-impl<'a> arbitrary::Arbitrary<'a> for SpacePhysics {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self {
-            // Vector3D doesn't implement Arbitrary
-            gravity: vec3(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?),
-            sky: u.arbitrary()?,
-            light: u.arbitrary()?,
-        })
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::{size_hint::and_all, Arbitrary};
-        and_all(&[
-            <f64 as Arbitrary>::size_hint(depth),
-            <f64 as Arbitrary>::size_hint(depth),
-            <Sky as Arbitrary>::size_hint(depth),
-            <LightPhysics as Arbitrary>::size_hint(depth),
-        ])
     }
 }
 

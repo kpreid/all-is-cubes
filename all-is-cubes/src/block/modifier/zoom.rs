@@ -13,6 +13,7 @@ use crate::universe;
 /// Design note: This is a struct separate from [`Modifier`] so that it can have a
 /// constructor accepting only valid bounds.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Zoom {
     /// Scale factor to zoom in by.
     scale: Resolution,
@@ -151,30 +152,6 @@ impl universe::VisitHandles for Zoom {
             scale: _,
             offset: _,
         } = self;
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for Zoom {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let scale = u.arbitrary()?;
-        let max_offset = GridCoordinate::from(scale) - 1;
-        Ok(Self::new(
-            scale,
-            GridPoint::new(
-                u.int_in_range(0..=max_offset)?,
-                u.int_in_range(0..=max_offset)?,
-                u.int_in_range(0..=max_offset)?,
-            ),
-        ))
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::{size_hint::and_all, Arbitrary};
-        and_all(&[
-            <Resolution as Arbitrary>::size_hint(depth),
-            <[GridCoordinate; 3] as Arbitrary>::size_hint(depth),
-        ])
     }
 }
 

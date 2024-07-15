@@ -394,7 +394,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
         // text rendering because that'll be easier.
         // (Another possibility would be to actually restrict `layout_bounds` itself,)
         let layout_bounds = GridAab::checked_from_lower_upper(
-            // euclid::Point3D doesn't implement Arbitrary (just an oversight apparently)
             <[i16; 3]>::arbitrary(u)?.map(i32::from),
             <[u16; 3]>::arbitrary(u)?.map(i32::from),
         )
