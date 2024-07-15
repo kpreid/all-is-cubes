@@ -107,6 +107,8 @@ pub(crate) struct BlockAttributesV1Ser<'a> {
     #[serde(default = "return_true", skip_serializing_if = "is_true")]
     pub selectable: bool,
     #[serde(default, skip_serializing_if = "is_default")]
+    pub inventory: InvInBlockSer,
+    #[serde(default, skip_serializing_if = "is_default")]
     pub rotation_rule: RotationPlacementRuleSer,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tick_action: Option<TickActionSer<'a>>,
@@ -320,6 +322,30 @@ pub(crate) enum ToolSer {
     PushPullV1 {},
     JetpackV1 { active: bool },
     CustomV1 { op: op::Operation, icon: Block },
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(tag = "type")]
+pub(crate) enum InvInBlockSer {
+    InvInBlockV1 {
+        size: usize, // TODO: use platform-independent max size
+        icon_scale: block::Resolution,
+        icon_resolution: block::Resolution,
+        icon_rows: Vec<IconRowSerV1>,
+    },
+}
+impl Default for InvInBlockSer {
+    fn default() -> Self {
+        (&inv::InvInBlock::EMPTY).into()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub(crate) struct IconRowSerV1 {
+    pub(crate) first_slot: usize,
+    pub(crate) count: usize,
+    pub(crate) origin: [i32; 3],
+    pub(crate) stride: [i32; 3],
 }
 
 //------------------------------------------------------------------------------------------------//

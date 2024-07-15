@@ -5,12 +5,13 @@ use core::{fmt, ops};
 
 use arcstr::ArcStr;
 
+use crate::inv::InvInBlock;
 use crate::math::{Face6, GridRotation};
 use crate::op::Operation;
 
 #[cfg(doc)]
 use crate::{
-    block::{Block, BlockDef, Primitive},
+    block::{Block, BlockDef, Modifier, Primitive},
     space::Space,
     time::TickSchedule,
 };
@@ -35,6 +36,10 @@ pub struct BlockAttributes {
     ///
     /// The default value is `true`.
     pub selectable: bool,
+
+    /// Definition of, if this block has an attached [`Modifier::Inventory`],
+    /// what size and rendering it has.
+    pub inventory: InvInBlock,
 
     /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
     /// some agent not otherwise specifying rotation.
@@ -70,6 +75,7 @@ impl fmt::Debug for BlockAttributes {
             let Self {
                 display_name,
                 selectable,
+                inventory,
                 rotation_rule,
                 tick_action,
                 activation_action,
@@ -83,6 +89,9 @@ impl fmt::Debug for BlockAttributes {
             }
             if *selectable != Self::DEFAULT_REF.selectable {
                 s.field("selectable", selectable);
+            }
+            if *inventory != Self::DEFAULT_REF.inventory {
+                s.field("inventory", inventory);
             }
             if *rotation_rule != Self::DEFAULT_REF.rotation_rule {
                 s.field("rotation_rule", rotation_rule);
@@ -105,6 +114,7 @@ impl BlockAttributes {
     const DEFAULT: Self = BlockAttributes {
         display_name: arcstr::literal!(""),
         selectable: true,
+        inventory: InvInBlock::EMPTY,
         rotation_rule: RotationPlacementRule::Never,
         tick_action: None,
         activation_action: None,
@@ -127,13 +137,15 @@ impl BlockAttributes {
         let Self {
             display_name: _,
             selectable: _,
+            inventory,
             rotation_rule,
             tick_action,
             activation_action,
             animation_hint: _,
         } = self;
 
-        rotation_rule.rotationally_symmetric()
+        inventory.rotationally_symmetric()
+            && rotation_rule.rotationally_symmetric()
             && !tick_action
                 .as_ref()
                 .is_some_and(|a| !a.rotationally_symmetric())
@@ -146,6 +158,7 @@ impl BlockAttributes {
         let Self {
             display_name,
             selectable,
+            inventory,
             rotation_rule,
             mut tick_action,
             mut activation_action,
@@ -162,6 +175,7 @@ impl BlockAttributes {
         Self {
             display_name,
             selectable,
+            inventory: inventory.rotate(rotation),
             rotation_rule: rotation_rule.rotate(rotation),
             tick_action,
             activation_action,
@@ -186,6 +200,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
         Ok(BlockAttributes {
             display_name: u.arbitrary::<alloc::string::String>()?.into(),
             selectable: u.arbitrary()?,
+            inventory: u.arbitrary()?,
             rotation_rule: u.arbitrary()?,
             tick_action: u.arbitrary()?,
             activation_action: u.arbitrary()?,
@@ -197,6 +212,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
         arbitrary::size_hint::and_all(&[
             alloc::string::String::size_hint(depth),
             bool::size_hint(depth),
+            InvInBlock::size_hint(depth),
             RotationPlacementRule::size_hint(depth),
             TickAction::size_hint(depth),
             AnimationHint::size_hint(depth),
@@ -209,11 +225,13 @@ impl crate::universe::VisitHandles for BlockAttributes {
         let Self {
             display_name: _,
             selectable: _,
+            inventory,
             rotation_rule: _,
             tick_action,
             activation_action,
             animation_hint: _,
         } = self;
+        inventory.visit_handles(visitor);
         tick_action.visit_handles(visitor);
         activation_action.visit_handles(visitor);
     }

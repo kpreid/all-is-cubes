@@ -260,6 +260,7 @@ pub(in crate::block) const AIR_EVALUATED_MIN: MinEval = MinEval {
 const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     display_name: arcstr::literal!("<air>"),
     selectable: false,
+    inventory: crate::inv::InvInBlock::EMPTY,
     rotation_rule: block::RotationPlacementRule::Never,
     tick_action: None,
     activation_action: None,
@@ -353,6 +354,7 @@ impl PartialEq for EvKey {
                 BlockAttributes {
                     ref display_name,
                     selectable,
+                    ref inventory,
                     rotation_rule,
                     ref tick_action,
                     ref activation_action,
@@ -366,6 +368,7 @@ impl PartialEq for EvKey {
             display_name.as_ptr(),
             other.attributes.display_name.as_ptr(),
         ) && selectable == other.attributes.selectable
+            && *inventory == other.attributes.inventory
             && rotation_rule == other.attributes.rotation_rule
             && *tick_action == other.attributes.tick_action
             && *activation_action == other.attributes.activation_action
@@ -381,6 +384,7 @@ impl core::hash::Hash for EvKey {
                 BlockAttributes {
                     ref display_name,
                     selectable,
+                    ref inventory,
                     rotation_rule,
                     ref tick_action,
                     ref activation_action,
@@ -391,6 +395,7 @@ impl core::hash::Hash for EvKey {
 
         display_name.as_ptr().hash(state);
         selectable.hash(state);
+        inventory.hash(state);
         rotation_rule.hash(state);
         tick_action.hash(state);
         activation_action.hash(state);

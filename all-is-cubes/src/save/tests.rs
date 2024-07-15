@@ -16,7 +16,7 @@ use crate::block::{
 };
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
-use crate::inv::{EphemeralOpaque, Inventory, Tool};
+use crate::inv::{self, EphemeralOpaque, Inventory, Tool};
 use crate::math::{notnan, Cube, Face6, GridAab, GridRotation, Rgb, Rgba};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
@@ -172,6 +172,7 @@ fn block_atom_with_all_attributes() {
             .collision(block::BlockCollision::None)
             .display_name("foo")
             .selectable(false)
+            .inventory_config(inv::InvInBlock::new_placeholder())
             .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
             .tick_action(Some(block::TickAction {
                 operation: op::Operation::Become(AIR),
@@ -191,7 +192,33 @@ fn block_atom_with_all_attributes() {
                 "collision": "NoneV1",
                 "display_name": "foo",
                 "selectable": false,
-                "rotation_rule": {
+                "inventory": {
+                    "type": "InvInBlockV1",
+                        "size": 1,
+                        "icon_scale": 4,
+                        "icon_resolution": 16,
+                        "icon_rows": [
+                            {
+                                "count": 3,
+                                "first_slot": 0,
+                                "origin": [1, 1, 1],
+                                "stride": [5, 0, 0],
+                            },
+                            {
+                                "count": 3,
+                                "first_slot": 3,
+                                "origin": [1, 1, 6],
+                                "stride": [5, 0, 0],
+                            },
+                            {
+                                "count": 3,
+                                "first_slot": 6,
+                                "origin": [1, 1, 11],
+                                "stride": [5, 0, 0],
+                            },
+                        ],
+                    },
+                                    "rotation_rule": {
                     "type": "AttachV1",
                     "by": "PX",
                 },

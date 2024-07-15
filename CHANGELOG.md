@@ -1,5 +1,18 @@
 # Changelog
 
+## Unrelased
+
+### Added
+
+- `all-is-cubes` library:
+    - Block inventories are now more functional.
+        - `block::Block::with_inventory` attaches inventory to a block.
+        - `inv::InvInBlock`, stored in `block::BlockAtributes::inventory`, describes the size and rendering such inventories should have.
+
+### Changed
+
+### Removed
+
 ## 0.8.0 (2024-07-08)
 
 ### Added

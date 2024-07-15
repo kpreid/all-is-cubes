@@ -809,9 +809,17 @@ fn INVENTORY(ctx: Context<'_>) {
                 &AIR
             }
         })?
+        .inventory_config(inv::InvInBlock::new_placeholder())
         .build_txn(&mut txn);
+    // TODO: awkward that we have to evaluate
+    let config = inventory_display_block
+        .evaluate()
+        .unwrap()
+        .attributes
+        .inventory;
 
     let has_items_block = inventory_display_block.with_inventory(
+        &config,
         [
             inv::Tool::Block(demo_blocks[DemoBlocks::ExhibitBackground].clone()).into(),
             inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_RED)).into(),

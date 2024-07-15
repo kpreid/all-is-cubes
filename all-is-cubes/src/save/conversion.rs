@@ -188,6 +188,7 @@ mod block {
             let &BlockAttributes {
                 ref display_name,
                 selectable,
+                ref inventory,
                 rotation_rule,
                 ref tick_action,
                 ref activation_action,
@@ -196,6 +197,7 @@ mod block {
             schema::BlockAttributesV1Ser {
                 display_name: display_name.clone(),
                 selectable,
+                inventory: inventory.into(),
                 rotation_rule: rotation_rule.into(),
                 tick_action: tick_action.as_ref().map(
                     |&TickAction {
@@ -217,6 +219,7 @@ mod block {
             let schema::BlockAttributesV1Ser {
                 display_name,
                 selectable,
+                inventory,
                 rotation_rule,
                 tick_action,
                 activation_action,
@@ -225,6 +228,7 @@ mod block {
             Self {
                 display_name,
                 selectable,
+                inventory: inventory.into(),
                 rotation_rule: rotation_rule.into(),
                 tick_action: tick_action.map(|schema::TickActionSer { operation, period }| {
                     TickAction {
@@ -506,7 +510,7 @@ mod block {
 
 mod inv {
     use super::*;
-    use crate::inv::{Inventory, Slot, Tool};
+    use crate::inv::{self, Inventory, Slot, Tool};
 
     impl Serialize for Inventory {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -597,6 +601,75 @@ mod inv {
                 schema::ToolSer::JetpackV1 { active } => Tool::Jetpack { active },
                 schema::ToolSer::CustomV1 { op, icon } => Tool::Custom { op, icon },
             })
+        }
+    }
+
+    impl From<&inv::InvInBlock> for schema::InvInBlockSer {
+        fn from(value: &inv::InvInBlock) -> Self {
+            let inv::InvInBlock {
+                size,
+                icon_scale,
+                icon_resolution,
+                ref icon_rows,
+            } = *value;
+            schema::InvInBlockSer::InvInBlockV1 {
+                size,
+                icon_scale,
+                icon_resolution,
+                icon_rows: icon_rows.iter().map(schema::IconRowSerV1::from).collect(),
+            }
+        }
+    }
+
+    impl From<schema::InvInBlockSer> for inv::InvInBlock {
+        fn from(value: schema::InvInBlockSer) -> Self {
+            match value {
+                schema::InvInBlockSer::InvInBlockV1 {
+                    size,
+                    icon_scale,
+                    icon_resolution,
+                    icon_rows,
+                } => inv::InvInBlock {
+                    size,
+                    icon_scale,
+                    icon_resolution,
+                    icon_rows: icon_rows.into_iter().map(inv::IconRow::from).collect(),
+                },
+            }
+        }
+    }
+
+    impl From<&inv::IconRow> for schema::IconRowSerV1 {
+        fn from(value: &inv::IconRow) -> Self {
+            let inv::IconRow {
+                first_slot,
+                count,
+                origin,
+                stride,
+            } = *value;
+            schema::IconRowSerV1 {
+                first_slot,
+                count,
+                origin: origin.into(),
+                stride: stride.into(),
+            }
+        }
+    }
+
+    impl From<schema::IconRowSerV1> for inv::IconRow {
+        fn from(value: schema::IconRowSerV1) -> Self {
+            let schema::IconRowSerV1 {
+                first_slot,
+                count,
+                origin,
+                stride,
+            } = value;
+            inv::IconRow {
+                first_slot,
+                count,
+                origin: origin.into(),
+                stride: stride.into(),
+            }
         }
     }
 }

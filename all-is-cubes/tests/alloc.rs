@@ -2,6 +2,7 @@
 //!
 //! In a separate test crate to avoid modifying the global allocator elsewhere.
 
+use all_is_cubes::inv;
 use all_is_cubes::op::Operation;
 use allocation_counter::{measure, AllocationInfo};
 
@@ -20,6 +21,10 @@ fn clone_block_attributes() {
         // (though that's more of an `Operation` problem)
         tick_action: Some(block::TickAction::from(Operation::Become(block::AIR))),
         activation_action: Some(Operation::Become(block::AIR)),
+
+        // TODO(inventory): This field will allocate when cloned if it is nonempty,
+        // and we should fix that and test it.
+        inventory: inv::InvInBlock::default(),
 
         // These fields currently will never allocate when cloned
         rotation_rule: block::RotationPlacementRule::Never,

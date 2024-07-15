@@ -198,6 +198,7 @@ fn evaluate_composition(
     let attributes = block::BlockAttributes {
         display_name: dst_att.display_name, // TODO merge
         selectable: src_att.selectable | dst_att.selectable,
+        inventory: src_att.inventory.concatenate(dst_att.inventory),
         rotation_rule: dst_att.rotation_rule, // TODO merge
         tick_action: dst_att.tick_action,     // TODO: merge
         activation_action: operator.blend_operations(
@@ -448,8 +449,9 @@ pub(in crate::block) fn render_inventory(
         return Ok(input);
     }
 
-    // TODO(inventory): InvInBlock should be part of block attributes
-    let config = crate::inv::InvInBlock::default();
+    // TODO(inventory): clone necessary to avoid a borrow conflict
+    let config = input.attributes.inventory.clone();
+
     for (slot_index, icon_position) in config.icon_positions() {
         let Some(placed_icon_bounds) = GridAab::from_lower_size(
             icon_position,

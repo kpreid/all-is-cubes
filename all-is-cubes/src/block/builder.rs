@@ -10,6 +10,7 @@ use crate::block::{
     AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier,
     Primitive, Resolution, RotationPlacementRule, AIR,
 };
+use crate::inv;
 use crate::math::{Cube, GridAab, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::transaction::{self, Merge, Transaction};
@@ -88,6 +89,12 @@ impl<P, Txn> BlockBuilder<P, Txn> {
     /// Sets the value for [`BlockAttributes::selectable`].
     pub const fn selectable(mut self, value: bool) -> Self {
         self.attributes.selectable = value;
+        self
+    }
+
+    /// Sets the value for [`BlockAttributes::inventory`].
+    pub fn inventory_config(mut self, value: inv::InvInBlock) -> Self {
+        self.attributes.inventory = value;
         self
     }
 
@@ -446,6 +453,7 @@ mod tests {
     fn every_field_nondefault() {
         let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
         let emission = Rgb::new(0.1, 3.0, 0.1);
+        let inventory = inv::InvInBlock::new_placeholder();
         let rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
         let tick_action = Some(TickAction::from(Operation::Become(AIR)));
         let activation_action = Some(Operation::Become(color_block!(1.0, 1.0, 1.0)));
@@ -453,6 +461,7 @@ mod tests {
             Block::builder()
                 .color(color)
                 .display_name("hello world")
+                .inventory_config(inventory.clone())
                 .collision(BlockCollision::None)
                 .rotation_rule(rotation_rule)
                 .selectable(false)
@@ -464,8 +473,9 @@ mod tests {
             Block::from(Atom {
                 attributes: BlockAttributes {
                     display_name: "hello world".into(),
-                    rotation_rule,
                     selectable: false,
+                    inventory,
+                    rotation_rule,
                     tick_action,
                     activation_action,
                     animation_hint: AnimationHint::replacement(block::AnimationChange::Shape),
