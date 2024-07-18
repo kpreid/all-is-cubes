@@ -2,11 +2,10 @@
 //! and errors.
 
 use core::cell::Cell;
+use core::fmt;
 
-#[cfg(doc)]
-use crate::block::Block;
 use crate::block::{
-    self, BlockAttributes, BlockChange, EvaluatedBlock, Evoxel, Evoxels, Resolution,
+    self, Block, BlockAttributes, BlockChange, EvaluatedBlock, Evoxel, Evoxels, Resolution,
 };
 use crate::content::palette;
 use crate::listen;
@@ -127,7 +126,7 @@ impl Budget {
     }
 
     /// Express a budget as a [`Cost`] value, for public consumption.
-    pub(in crate::block) fn to_cost(self) -> Cost {
+    pub(crate) fn to_cost(self) -> Cost {
         Cost {
             components: self.components,
             voxels: self.voxels,
@@ -214,41 +213,50 @@ impl Cost {
 }
 
 /// Errors resulting from [`Block::evaluate()`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct EvalBlockError {
+    /// The block whose evaluation failed.
+    pub(crate) block: Block,
+
+    /// Computation budget that was available for the evaluation.
+    //---
+    // Design note: This field is not of type `Budget` because `Budget` is private, and
+    // structured to support its use *during* evaluation.
+    pub(crate) budget: Cost,
+
+    /// Computation steps actually used before the error was encountered.
+    pub(crate) used: Cost,
+
+    /// What specific failure was encountered.
+    pub(crate) kind: ErrorKind,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum EvalBlockError {
+pub enum ErrorKind {
     /// The evaluation budget was exceeded.
-    #[displaydoc("block definition exceeded evaluation budget; used {used:?} so far and only {budget:?} available")]
-    BudgetExceeded {
-        /// Budget that was available for the evaluation.
-        budget: Cost,
-        /// Computation steps actually used before failure.
-        used: Cost,
-    },
+    BudgetExceeded,
 
     /// The evaluation budget was exceeded, in a previous cached evaluation.
     /// rather than the current one (so the current evaluation's budget
     /// could not have affected the outcome).
-    #[displaydoc("cached block definition exceeded evaluation budget; used {used:?} so far and only {budget:?} available")]
     PriorBudgetExceeded {
-        /// Budget that was available for the evaluation.
-        //---
-        // Design note: This field is not of type `Budget` because `Budget` is private and
-        // structured to support its use *during* evaluation.
+        /// Budget that was available for the prior evaluation.
         budget: Cost,
-        /// Computation steps actually used before failure.
+        /// Computation steps actually used before failure of the prior evaluation.
         used: Cost,
     },
 
     /// The block definition contained a [`Handle`] which was not currently available to read.
     ///
     /// This may be temporary or permanent; consult the [`HandleError`] to determine that.
-    #[displaydoc("block data inaccessible: {0}")]
     Handle(HandleError),
 }
 
 /// Intra-evaluation error type; corresponds to [`EvalBlockError`]
 /// as `MinEval` corresponds to `EvaluatedBlock`.
+///
+/// TODO: This seems no longer needed since it has ended up identical.
 #[derive(Debug)]
 pub(in crate::block) enum InEvalError {
     BudgetExceeded,
@@ -256,13 +264,34 @@ pub(in crate::block) enum InEvalError {
     Handle(HandleError),
 }
 
+impl fmt::Display for EvalBlockError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            ErrorKind::BudgetExceeded => {
+                let Self { budget, used, .. } = self;
+                write!(
+                    f,
+                    "block definition exceeded evaluation budget; \
+                    used {used:?} so far and only {budget:?} available"
+                )
+            }
+            ErrorKind::PriorBudgetExceeded { budget, used } => write!(
+                f,
+                "cached block definition exceeded evaluation budget; \
+                used {used:?} so far and only {budget:?} available"
+            ),
+            ErrorKind::Handle(_) => write!(f, "block data inaccessible"),
+        }
+    }
+}
+
 crate::util::cfg_should_impl_error! {
     impl std::error::Error for EvalBlockError {
         fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-            match self {
-                EvalBlockError::BudgetExceeded { .. } => None,
-                EvalBlockError::PriorBudgetExceeded { .. } => None,
-                EvalBlockError::Handle(e) => Some(e),
+            match &self.kind {
+                ErrorKind::BudgetExceeded { .. } => None,
+                ErrorKind::PriorBudgetExceeded { .. } => None,
+                ErrorKind::Handle(e) => Some(e),
             }
         }
     }
@@ -275,25 +304,40 @@ impl From<HandleError> for InEvalError {
 }
 
 impl InEvalError {
-    pub(in crate::block) fn into_eval_error(self, budget: Cost, used: Cost) -> EvalBlockError {
-        match self {
-            InEvalError::BudgetExceeded => EvalBlockError::BudgetExceeded { budget, used },
-            InEvalError::PriorBudgetExceeded { budget, used } => {
-                EvalBlockError::PriorBudgetExceeded { budget, used }
-            }
-            InEvalError::Handle(e) => EvalBlockError::Handle(e),
+    pub(in crate::block) fn into_eval_error(
+        self,
+        block: Block,
+        budget: Cost,
+        used: Cost,
+    ) -> EvalBlockError {
+        EvalBlockError {
+            block,
+            budget,
+            used,
+            kind: match self {
+                InEvalError::BudgetExceeded => ErrorKind::BudgetExceeded,
+                InEvalError::PriorBudgetExceeded { budget, used } => {
+                    ErrorKind::PriorBudgetExceeded { budget, used }
+                }
+                InEvalError::Handle(e) => ErrorKind::Handle(e),
+            },
         }
     }
 }
 
 impl EvalBlockError {
+    /// Returns the block whose evaluation failed.
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+
     pub(in crate::block) fn into_internal_error_for_block_def(self) -> InEvalError {
-        match self {
-            EvalBlockError::PriorBudgetExceeded { budget, used } => {
+        match self.kind {
+            ErrorKind::PriorBudgetExceeded { budget, used } => {
                 InEvalError::PriorBudgetExceeded { budget, used }
             }
-            EvalBlockError::BudgetExceeded { .. } => InEvalError::BudgetExceeded,
-            EvalBlockError::Handle(e) => InEvalError::Handle(e),
+            ErrorKind::BudgetExceeded { .. } => InEvalError::BudgetExceeded,
+            ErrorKind::Handle(e) => InEvalError::Handle(e),
         }
     }
 
@@ -304,7 +348,7 @@ impl EvalBlockError {
     /// variants of [`EvalBlockError`] or [`HandleError`], that are similar but not equal,
     /// don't break the logic depending on this property.
     pub(crate) fn is_in_use(&self) -> bool {
-        matches!(self, EvalBlockError::Handle(HandleError::InUse(_)))
+        matches!(self.kind, ErrorKind::Handle(HandleError::InUse(_)))
     }
 
     /// Convert this error into an [`EvaluatedBlock`] which represents that an error has
@@ -329,11 +373,7 @@ impl EvalBlockError {
                     pattern[((cube.x + cube.y + cube.z).rem_euclid(2)) as usize]
                 }),
             ),
-            match *self {
-                EvalBlockError::BudgetExceeded { used, .. } => used,
-                EvalBlockError::PriorBudgetExceeded { .. } => Cost::ZERO,
-                EvalBlockError::Handle(_) => Cost::ZERO,
-            },
+            self.used,
         )
     }
 }
@@ -344,6 +384,7 @@ impl EvalBlockError {
 /// Note that the order of operands is such that the original budget may
 /// be passed in the form `filter.budget.get()` without a temporary variable.
 pub(in crate::block) fn finish_evaluation(
+    block: Block,
     original_budget: Budget,
     result: Result<block::MinEval, InEvalError>,
     filter: &EvalFilter,
@@ -351,6 +392,6 @@ pub(in crate::block) fn finish_evaluation(
     let cost = Cost::from_difference(original_budget, filter.budget.get());
     match result {
         Ok(ev) => Ok(ev.finish(cost)),
-        Err(err) => Err(err.into_eval_error(original_budget.to_cost(), cost)),
+        Err(err) => Err(err.into_eval_error(block, original_budget.to_cost(), cost)),
     }
 }

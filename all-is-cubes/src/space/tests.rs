@@ -11,8 +11,7 @@ use euclid::Vector3D;
 use indoc::indoc;
 
 use crate::block::{
-    Atom, Block, BlockDef, BlockDefTransaction, EvalBlockError, Primitive, Resolution::*,
-    TickAction, AIR,
+    self, Atom, Block, BlockDef, BlockDefTransaction, Primitive, Resolution::*, TickAction, AIR,
 };
 use crate::color_block;
 use crate::content::make_some_blocks;
@@ -79,7 +78,17 @@ fn set_success_despite_eval_error_gone() {
     // Check for the expected placeholder.
     assert_eq!(
         space.get_evaluated([0, 0, 0]),
-        &EvalBlockError::Handle(HandleError::Gone("bs".into())).to_placeholder()
+        &block::EvalBlockError {
+            block,
+            budget: block::Budget::default().to_cost(),
+            used: block::Cost {
+                components: 1,
+                voxels: 0,
+                recursion: 0
+            },
+            kind: block::ErrorKind::Handle(HandleError::Gone("bs".into()))
+        }
+        .to_placeholder()
     );
 
     // TODO: Test that evaluation works the next time around. (It will be tricky to

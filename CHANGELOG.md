@@ -11,6 +11,9 @@
 
 ### Changed
 
+- `all-is-cubes` library:
+    - `block::EvalBlockError` is now a `struct` with an inner `ErrorKind` enum, instead of an enum, and contains more information.
+
 ### Removed
 
 ## 0.8.0 (2024-07-08)

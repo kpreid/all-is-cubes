@@ -647,13 +647,15 @@ fn overflow_evaluate() {
         .extend((0..too_many_modifiers).map(|_| Modifier::Rotate(GridRotation::CLOCKWISE)));
     assert_eq!(
         block.evaluate(),
-        Err(EvalBlockError::BudgetExceeded {
+        Err(EvalBlockError {
+            block,
             budget: block::Budget::default().to_cost(),
             used: block::Cost {
                 components: too_many_modifiers,
                 voxels: 0,
                 recursion: 0
-            }
+            },
+            kind: block::ErrorKind::BudgetExceeded,
         })
     );
 }
@@ -664,7 +666,16 @@ fn self_referential_evaluate() {
     let block = self_referential_block(&mut universe);
     assert_eq!(
         block.evaluate(),
-        Err(EvalBlockError::Handle(HandleError::InUse(Name::Anonym(0))))
+        Err(EvalBlockError {
+            block,
+            budget: block::Budget::default().to_cost(),
+            used: block::Cost {
+                components: 1,
+                voxels: 0,
+                recursion: 0
+            },
+            kind: block::ErrorKind::Handle(HandleError::InUse(Name::Anonym(0)))
+        })
     );
 }
 

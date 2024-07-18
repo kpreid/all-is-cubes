@@ -551,7 +551,12 @@ impl Block {
     /// TODO: Placeholder name. At some point we may expose `EvalFilter` directly and make
     /// this be just `evaluate()`.
     pub(crate) fn evaluate2(&self, filter: &EvalFilter) -> Result<EvaluatedBlock, EvalBlockError> {
-        finish_evaluation(filter.budget.get(), self.evaluate_impl(filter), filter)
+        finish_evaluation(
+            self.clone(),
+            filter.budget.get(),
+            self.evaluate_impl(filter),
+            filter,
+        )
     }
 
     /// Equivalent to `Evoxel::from_block(block.evaluate2(filter))` except for the error type.

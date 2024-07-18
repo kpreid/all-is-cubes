@@ -6,6 +6,8 @@
 //! ([`crate::block::Primitive`] and [`crate::block::Modifier`])
 
 mod control;
+#[cfg(test)]
+pub(crate) use control::ErrorKind;
 pub(in crate::block) use control::{finish_evaluation, InEvalError};
 pub(crate) use control::{Budget, EvalFilter};
 pub use control::{Cost, EvalBlockError};

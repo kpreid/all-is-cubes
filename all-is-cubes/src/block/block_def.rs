@@ -89,6 +89,7 @@ impl BlockDef {
     pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
         let filter = block::EvalFilter::default();
         block::finish_evaluation(
+            self.block().clone(),
             filter.budget.get(),
             {
                 // This decrement makes the cost consistent with evaluating a
