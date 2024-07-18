@@ -9,14 +9,14 @@ use core::{fmt, ptr};
 use num_traits::float::FloatCore as _;
 
 use crate::block::{
-    self, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels,
+    self, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels,
     Resolution::{self, R1},
 };
 use crate::math::{Face6, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba, Vol};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
-use crate::block::{Block, Handle, AIR};
+use crate::block::{Handle, AIR};
 
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
 /// and physics, and does not require dereferencing [`Handle`]s or unbounded computation.
@@ -31,6 +31,18 @@ use crate::block::{Block, Handle, AIR};
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))] // TODO: Should have a custom Arbitrary producing only “possible” results
 #[non_exhaustive]
 pub struct EvaluatedBlock {
+    /// The original block which was evaluated to produce this result.
+    ///
+    /// Consider carefully when to use this field. As a general rule,
+    /// a block’s characteristics should be determined by the outputs of
+    /// evaluation, ignoring the block value itself.
+    /// The exception to this rule is that some operations upon the block
+    /// modify the block in a way determined by the result of its evaluation,
+    /// and thus require both pieces of information.
+    /// By keeping the block here, these operations can be simple methods of
+    /// `EvaluatedBlock` rather than needing to be supplied with both.
+    pub block: Block,
+
     /// The block's attributes.
     pub attributes: BlockAttributes,
 
@@ -93,6 +105,7 @@ pub struct EvaluatedBlock {
 impl fmt::Debug for EvaluatedBlock {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
+            block,
             attributes,
             color,
             face_colors,
@@ -105,6 +118,7 @@ impl fmt::Debug for EvaluatedBlock {
             cost,
         } = self;
         let mut ds = fmt.debug_struct("EvaluatedBlock");
+        ds.field("block", block);
         if *attributes != BlockAttributes::default() {
             ds.field("attributes", attributes);
         }
@@ -145,11 +159,12 @@ impl EvaluatedBlock {
     /// Normally, block evaluation calls [`crate::block::finish_evaluation`],
     /// which includes error processing and takes [`MinEval`] as input.
     pub(in crate::block) fn from_voxels(
+        original_block: Block,
         attributes: BlockAttributes,
         voxels: Evoxels,
         cost: Cost,
     ) -> EvaluatedBlock {
-        block::voxels_to_evaluated_block(attributes, voxels, cost)
+        block::voxels_to_evaluated_block(original_block, attributes, voxels, cost)
     }
 
     // --- Accessors ---
@@ -215,8 +230,12 @@ impl EvaluatedBlock {
     #[doc(hidden)]
     #[track_caller]
     pub fn consistency_check(&self) {
-        let regenerated =
-            EvaluatedBlock::from_voxels(self.attributes.clone(), self.voxels.clone(), self.cost);
+        let regenerated = EvaluatedBlock::from_voxels(
+            self.block.clone(),
+            self.attributes.clone(),
+            self.voxels.clone(),
+            self.cost,
+        );
         assert_eq!(self, &regenerated);
     }
 }
@@ -231,6 +250,7 @@ impl EvaluatedBlock {
 /// assert_eq!(Ok(AIR_EVALUATED), AIR.evaluate());
 /// ```
 pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
+    block: block::AIR,
     attributes: AIR_ATTRIBUTES,
     color: Rgba::TRANSPARENT,
     face_colors: FaceMap::repeat_copy(Rgba::TRANSPARENT),
@@ -303,9 +323,9 @@ impl MinEval {
     /// Note: This is not the complete algorithm for processing the end of block evaluation,
     /// only for handling the conversion of a `MinEval` value.
     /// Use [`crate::block::finish_evaluation`] to include error processing.
-    pub(in crate::block) fn finish(self, cost: Cost) -> EvaluatedBlock {
+    pub(in crate::block) fn finish(self, block: Block, cost: Cost) -> EvaluatedBlock {
         let MinEval { attributes, voxels } = self;
-        block::voxels_to_evaluated_block(attributes, voxels, cost)
+        block::voxels_to_evaluated_block(block, attributes, voxels, cost)
     }
 
     pub fn resolution(&self) -> Resolution {

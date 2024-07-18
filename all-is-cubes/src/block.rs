@@ -564,7 +564,7 @@ impl Block {
     fn evaluate_to_evoxel_internal(&self, filter: &EvalFilter) -> Result<Evoxel, InEvalError> {
         // TODO: Make this more efficient by not building the full `EvaluatedBlock`
         self.evaluate_impl(filter)
-            .map(|minev| Evoxel::from_block(&minev.finish(Cost::ZERO /* ignored */)))
+            .map(|minev| Evoxel::from_block(&minev.finish(self.clone(), Cost::ZERO /* ignored */)))
     }
 
     #[inline]

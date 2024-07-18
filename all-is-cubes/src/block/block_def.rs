@@ -492,22 +492,28 @@ mod tests {
             .build();
 
         let eval_bare = block.evaluate().unwrap();
-        let block_def = BlockDef::new(block);
+        let block_def = BlockDef::new(block.clone());
         let eval_def = block_def.evaluate().unwrap();
         let block_def_handle = universe.insert_anonymous(block_def);
-        let eval_indirect = Block::from(block_def_handle).evaluate().unwrap();
+        let indirect_block = Block::from(block_def_handle);
+        let eval_indirect = indirect_block.evaluate().unwrap();
 
         assert_eq!(
-            eval_def, eval_indirect,
-            "BlockDef::evaluate() same as Primitive::Indirect"
+            block::EvaluatedBlock {
+                block: indirect_block,
+                ..eval_def.clone()
+            },
+            eval_indirect,
+            "BlockDef::evaluate() same except for block as Primitive::Indirect"
         );
         assert_eq!(
             block::EvaluatedBlock {
+                block,
                 cost: eval_bare.cost,
                 ..eval_def
             },
             eval_bare,
-            "BlockDef::evaluate() same except for cost as the def block"
+            "BlockDef::evaluate() same except for block and cost as the def block"
         );
     }
 }

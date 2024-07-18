@@ -362,6 +362,7 @@ impl EvalBlockError {
         let pattern = [palette::BLOCK_EVAL_ERROR, Rgba::BLACK].map(Evoxel::from_color);
 
         EvaluatedBlock::from_voxels(
+            block::AIR, // TODO: wrong value. should get block through self
             BlockAttributes {
                 display_name: format!("Block error: {self}").into(),
                 selectable: false, // TODO: make this selectable but immutable
@@ -391,7 +392,7 @@ pub(in crate::block) fn finish_evaluation(
 ) -> Result<EvaluatedBlock, EvalBlockError> {
     let cost = Cost::from_difference(original_budget, filter.budget.get());
     match result {
-        Ok(ev) => Ok(ev.finish(cost)),
+        Ok(ev) => Ok(ev.finish(block, cost)),
         Err(err) => Err(err.into_eval_error(block, original_budget.to_cost(), cost)),
     }
 }

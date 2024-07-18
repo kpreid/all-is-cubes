@@ -507,13 +507,15 @@ mod eval {
 
         let eval_bare = block.evaluate().unwrap();
         let block_def_handle = universe.insert_anonymous(BlockDef::new(block));
-        let eval_def = Block::from(block_def_handle).evaluate().unwrap();
+        let indirect_block = Block::from(block_def_handle);
+        let eval_def = indirect_block.evaluate().unwrap();
 
         assert_eq!(
-            eval_bare,
+            eval_def,
             EvaluatedBlock {
-                cost: eval_bare.cost,
-                ..eval_def.clone()
+                cost: eval_def.cost,
+                block: indirect_block,
+                ..eval_bare.clone()
             }
         );
         assert_eq!(

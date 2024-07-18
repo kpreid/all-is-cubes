@@ -231,6 +231,7 @@ mod tests {
         assert_eq!(
             moved.evaluate().unwrap(),
             EvaluatedBlock {
+                block: moved,
                 attributes: ev_original.attributes.clone(),
                 color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
                 face_colors: FaceMap {
@@ -281,6 +282,7 @@ mod tests {
         assert_eq!(
             moved.evaluate().unwrap(),
             EvaluatedBlock {
+                block: moved,
                 attributes: ev_original.attributes.clone(),
                 color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
                 face_colors: FaceMap {

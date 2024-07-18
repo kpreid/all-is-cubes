@@ -18,26 +18,32 @@ fn evaluated_block_debug_simple() {
     assert_eq!(
         format!("{ev:#?}\n"),
         indoc! {"
-                EvaluatedBlock {
-                    color: Rgba(1.0, 1.0, 1.0, 1.0),
-                    opaque: {all: true},
-                    visible: true,
-                    uniform_collision: Some(Hard),
-                    resolution: 1,
-                    voxel: Evoxel {
+            EvaluatedBlock {
+                block: Block {
+                    primitive: Atom {
                         color: Rgba(1.0, 1.0, 1.0, 1.0),
-                        emission: Rgb(0.0, 0.0, 0.0),
-                        selectable: true,
                         collision: Hard,
                     },
-                    voxel_opacity_mask: Some(GridAab(0..1, 0..1, 0..1)),
-                    cost: Cost {
-                        components: 1,
-                        voxels: 0,
-                        recursion: 0,
-                    },
-                }
-            "}
+                },
+                color: Rgba(1.0, 1.0, 1.0, 1.0),
+                opaque: {all: true},
+                visible: true,
+                uniform_collision: Some(Hard),
+                resolution: 1,
+                voxel: Evoxel {
+                    color: Rgba(1.0, 1.0, 1.0, 1.0),
+                    emission: Rgb(0.0, 0.0, 0.0),
+                    selectable: true,
+                    collision: Hard,
+                },
+                voxel_opacity_mask: Some(GridAab(0..1, 0..1, 0..1)),
+                cost: Cost {
+                    components: 1,
+                    voxels: 0,
+                    recursion: 0,
+                },
+            }
+        "}
     );
 }
 
@@ -64,26 +70,40 @@ fn evaluated_block_debug_complex() {
 
     assert_eq!(
         format!("{ev:#?}\n"),
-        indoc! {"
-                EvaluatedBlock {
-                    attributes: BlockAttributes {
-                        display_name: \"hello\",
+        indoc! {r#"
+            EvaluatedBlock {
+                block: Block {
+                    primitive: Recur {
+                        attributes: BlockAttributes {
+                            display_name: "hello",
+                        },
+                        space: Handle([anonymous #0]),
+                        offset: (
+                            0,
+                            0,
+                            0,
+                        ),
+                        resolution: 2,
                     },
-                    color: Rgba(1.0, 1.0, 1.0, 1.0),
-                    light_emission: Rgb(1.0, 2.0, 3.0),
-                    opaque: {−all: true, +all: false},
-                    visible: true,
-                    uniform_collision: None,
-                    resolution: 2,
-                    voxels: GridAab(0..2, 0..2, 0..2),
-                    voxel_opacity_mask: Some(GridAab(0..2, 0..2, 0..2)),
-                    cost: Cost {
-                        components: 1,
-                        voxels: 8,
-                        recursion: 0,
-                    },
-                }
-            "}
+                },
+                attributes: BlockAttributes {
+                    display_name: "hello",
+                },
+                color: Rgba(1.0, 1.0, 1.0, 1.0),
+                light_emission: Rgb(1.0, 2.0, 3.0),
+                opaque: {−all: true, +all: false},
+                visible: true,
+                uniform_collision: None,
+                resolution: 2,
+                voxels: GridAab(0..2, 0..2, 0..2),
+                voxel_opacity_mask: Some(GridAab(0..2, 0..2, 0..2)),
+                cost: Cost {
+                    components: 1,
+                    voxels: 8,
+                    recursion: 0,
+                },
+            }
+        "#}
     );
 }
 
@@ -123,11 +143,13 @@ fn from_voxels_zero_bounds() {
     let bounds = GridAab::from_lower_size([1, 2, 3], [0, 0, 0]);
     assert_eq!(
         EvaluatedBlock::from_voxels(
+            AIR, // caution: incorrect placeholder value
             attributes.clone(),
             Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
             Cost::ZERO
         ),
         EvaluatedBlock {
+            block: AIR, // caution: incorrect placeholder value
             attributes,
             color: Rgba::TRANSPARENT,
             face_colors: FaceMap::repeat(Rgba::TRANSPARENT),
@@ -155,8 +177,9 @@ fn solid_block_equivalent_at_any_resolution() {
     ] {
         let voxel = Evoxel::from_color(color);
         let ev_one =
-            EvaluatedBlock::from_voxels(attributes.clone(), Evoxels::One(voxel), Cost::ZERO);
+            EvaluatedBlock::from_voxels(AIR, attributes.clone(), Evoxels::One(voxel), Cost::ZERO);
         let ev_many = EvaluatedBlock::from_voxels(
+            AIR, // caution: incorrect placeholder value
             attributes.clone(),
             Evoxels::Many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
             Cost::ZERO,
@@ -199,7 +222,7 @@ fn overall_color_ignores_interior() {
     );
 
     // The inner_color should be ignored because it is not visible.
-    let ev = EvaluatedBlock::from_voxels(BlockAttributes::default(), voxels, Cost::ZERO);
+    let ev = EvaluatedBlock::from_voxels(AIR, BlockAttributes::default(), voxels, Cost::ZERO);
 
     assert_eq!(ev.color, outer_color);
 }

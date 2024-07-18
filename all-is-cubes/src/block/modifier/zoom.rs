@@ -215,6 +215,7 @@ mod tests {
                 if x >= 2 {
                     // out of range
                     EvaluatedBlock::from_voxels(
+                        zoomed,
                         ev_original.attributes.clone(),
                         Evoxels::One(Evoxel::from_color(Rgba::TRANSPARENT)),
                         block::Cost {
@@ -225,6 +226,7 @@ mod tests {
                     )
                 } else {
                     EvaluatedBlock::from_voxels(
+                        zoomed,
                         ev_original.attributes.clone(),
                         Evoxels::Many(
                             zoom_resolution,

@@ -275,6 +275,7 @@ mod tests {
         assert_eq!(
             re,
             EvaluatedBlock {
+                block: rotated.clone(),
                 color: be.color,
                 face_colors: be.face_colors.rotate(rotation),
                 light_emission: Rgb::ZERO,
@@ -340,6 +341,7 @@ mod tests {
 
         assert_eq!(
             EvaluatedBlock {
+                block: rotated_twice,
                 cost: ev_rotated_twice.cost,
                 ..ev_two_rotations
             },

@@ -480,7 +480,7 @@ pub(in crate::block) fn render_inventory(
             let _recursion_scope = block::Budget::recurse(&filter.budget)?;
             // this is the wrong cost value but it doesn't matter
             icon.evaluate_impl(filter)?
-                .finish(filter.budget.get().to_cost())
+                .finish(icon.clone(), filter.budget.get().to_cost())
         };
 
         // TODO(inventory): We should be downsampling the icons (or more precisely,

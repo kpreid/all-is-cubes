@@ -13,8 +13,10 @@ use crate::math::{Cube, Face6, FaceMap, GridAab, Intensity, Rgb, Rgba, Vol};
 use crate::raytracer;
 
 /// Compute the derived properties of block voxels to create a full [`EvaluatedBlock`].
+/// from the information in a [`block::MinEval`] or similar.
 #[inline(never)] // neither cheap nor going to benefit from per-call optimizations
 pub(crate) fn voxels_to_evaluated_block(
+    block: block::Block,
     attributes: block::BlockAttributes,
     voxels: block::Evoxels,
     cost: block::Cost,
@@ -30,6 +32,7 @@ pub(crate) fn voxels_to_evaluated_block(
     {
         let visible = !color.fully_transparent();
         return EvaluatedBlock {
+            block,
             attributes,
             color,
             face_colors: FaceMap::repeat(color),
@@ -141,6 +144,7 @@ pub(crate) fn voxels_to_evaluated_block(
     };
 
     EvaluatedBlock {
+        block,
         attributes,
         color,
         face_colors,
