@@ -421,6 +421,7 @@ impl Block {
     /// or compared with others. Specifically, it has the following effects:
     ///
     /// * Removes [`Modifier::Rotate`].
+    /// * Splits some [`Modifier::Composite`] into their parts.
     ///
     /// In future versions there may be additional changes or ones customizable per block.
     ///
