@@ -93,11 +93,13 @@ where
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: "block_vertex_main",
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: &[WgpuBlockVertex::desc(), WgpuInstanceData::desc()],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
             entry_point: "test_entry_point",
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format: fbt.linear_scene_texture_format(),
                 blend: None,
@@ -122,6 +124,7 @@ where
         }),
         multisample: wgpu::MultisampleState::default(), // default = off
         multiview: None,
+        cache: None,
     });
 
     // Placeholder space data for the bind group

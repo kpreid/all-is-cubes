@@ -24,12 +24,15 @@ pub async fn create_instance_for_test_or_exit() -> wgpu::Instance {
     });
 
     // Report adapters that we *could* pick
-    _ = writeln!(
-        stderr,
-        "Available adapters (backend filter = {backends:?}):"
-    );
-    for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
-        _ = writeln!(stderr, "  {}", shortened_adapter_info(&adapter.get_info()));
+    #[cfg(not(target_family = "wasm"))]
+    {
+        _ = writeln!(
+            stderr,
+            "Available adapters (backend filter = {backends:?}):"
+        );
+        for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
+            _ = writeln!(stderr, "  {}", shortened_adapter_info(&adapter.get_info()));
+        }
     }
 
     let adapter = try_create_adapter_for_test(&instance, |m| _ = writeln!(stderr, "{m}")).await;

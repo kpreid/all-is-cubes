@@ -63,11 +63,13 @@ impl BloomPipelines {
             vertex: wgpu::VertexState {
                 module: shaders.bloom.get(),
                 entry_point: "bloom_vertex",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shaders.bloom.get(),
                 entry_point: "bloom_downsample_fragment",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: linear_scene_texture_format,
                     blend: None,
@@ -79,6 +81,7 @@ impl BloomPipelines {
             // default = off. No need for multisampling since we are not drawing triangles here.
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
+            cache: None,
         });
         let upsample_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("BloomPipelines::upsample_pipeline"),
@@ -86,11 +89,13 @@ impl BloomPipelines {
             vertex: wgpu::VertexState {
                 module: shaders.bloom.get(),
                 entry_point: "bloom_vertex",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shaders.bloom.get(),
                 entry_point: "bloom_upsample_fragment",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: linear_scene_texture_format,
                     blend: None,
@@ -102,6 +107,7 @@ impl BloomPipelines {
             // default = off. No need for multisampling since we are not drawing triangles here.
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
+            cache: None,
         });
 
         #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]

@@ -339,12 +339,13 @@ impl<I: time::Instant> EverythingRenderer<I> {
     /// A device descriptor suitable for the expectations of [`EverythingRenderer`].
     pub fn device_descriptor(available_limits: wgpu::Limits) -> wgpu::DeviceDescriptor<'static> {
         wgpu::DeviceDescriptor {
+            label: None,
             required_features: wgpu::Features::empty(),
             required_limits: wgpu::Limits {
                 max_inter_stage_shader_components: 32, // number used by blocks-and-lines shader
                 ..wgpu::Limits::downlevel_webgl2_defaults().using_resolution(available_limits)
             },
-            label: None,
+            memory_hints: wgpu::MemoryHints::default(), // TODO: consider setting
         }
     }
 
