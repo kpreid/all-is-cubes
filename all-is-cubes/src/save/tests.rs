@@ -937,29 +937,26 @@ fn universe_success() {
     );
 
     // Test that the members and handles are in fact hooked up.
-    let a_block = deserialized_universe
+    let a_block_def = deserialized_universe
         .get::<BlockDef>(&"a_block".into())
-        .unwrap()
-        .read()
         .unwrap();
     let a_space = deserialized_universe
         .get::<Space>(&"a_space".into())
-        .unwrap()
-        .read()
         .unwrap();
     let a_character = deserialized_universe
         .get::<Character>(&"a_character".into())
-        .unwrap()
-        .read()
         .unwrap();
 
-    let a_block_ev = a_block.evaluate().unwrap();
-    assert_eq!(a_block_ev.attributes.display_name, "0");
-
-    assert_eq!(a_space.get_evaluated([0, 0, 0]), &a_block_ev);
+    let a_block_def_ev = Block::from(a_block_def).evaluate().unwrap();
+    assert_eq!(a_block_def_ev.attributes.display_name, "0");
 
     assert_eq!(
-        a_character.space,
+        a_space.read().unwrap().get_evaluated([0, 0, 0]),
+        &a_block_def_ev
+    );
+
+    assert_eq!(
+        a_character.read().unwrap().space,
         deserialized_universe
             .get::<Space>(&"a_space".into())
             .unwrap()

@@ -417,10 +417,11 @@ fn listens_to_block_changes() {
 
     // Now mutate the block def .
     let new_block = color_block!(Rgba::BLACK);
-    let new_evaluated = new_block.evaluate().unwrap();
     block_def_handle
         .execute(&BlockDefTransaction::overwrite(new_block))
         .unwrap();
+    let new_evaluated = Block::from(block_def_handle).evaluate().unwrap();
+
     // This does not result in an outgoing notification, because we don't want
     // computations like reevaluation to happen during the notification process.
     assert_eq!(sink.drain(), vec![]);
