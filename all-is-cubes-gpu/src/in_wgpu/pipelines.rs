@@ -91,6 +91,9 @@ impl Pipelines {
         // place to ensure that no skew occurs.
         let current_graphics_options = graphics_options.get();
 
+        // Not using pipeline cache (but maybe we should set up hooks for that in the future).
+        let cache: Option<&wgpu::PipelineCache> = None;
+
         let block_texture_entry = |binding| wgpu::BindGroupLayoutEntry {
             binding,
             visibility: wgpu::ShaderStages::FRAGMENT,
@@ -184,11 +187,13 @@ impl Pipelines {
                 vertex: wgpu::VertexState {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: "block_vertex_main",
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: "block_fragment_opaque",
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
                         blend: None,
@@ -205,6 +210,7 @@ impl Pipelines {
                 }),
                 multisample,
                 multiview: None,
+                cache,
             });
 
         let transparent_render_pipeline =
@@ -214,6 +220,7 @@ impl Pipelines {
                 vertex: wgpu::VertexState {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: "block_vertex_main",
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
@@ -225,6 +232,7 @@ impl Pipelines {
                         }
                         ref t => panic!("unimplemented transparency option {t:?}"),
                     },
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
                         // Note that this blending configuration is for premultiplied alpha.
@@ -255,6 +263,7 @@ impl Pipelines {
                 }),
                 multisample,
                 multiview: None,
+                cache,
             });
 
         let skybox_render_pipeline =
@@ -266,11 +275,13 @@ impl Pipelines {
                 vertex: wgpu::VertexState {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: "skybox_vertex",
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: "skybox_fragment",
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
                         blend: None,
@@ -288,6 +299,7 @@ impl Pipelines {
                 }),
                 multisample,
                 multiview: None,
+                cache,
             });
 
         let lines_render_pipeline_layout =
@@ -304,11 +316,13 @@ impl Pipelines {
                 vertex: wgpu::VertexState {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: "lines_vertex",
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[WgpuLinesVertex::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: "lines_fragment",
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
                         blend: None,
@@ -328,6 +342,7 @@ impl Pipelines {
                 }),
                 multisample,
                 multiview: None,
+                cache,
             });
 
         let frame_copy_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -364,11 +379,13 @@ impl Pipelines {
             vertex: wgpu::VertexState {
                 module: shaders.frame_copy.get(),
                 entry_point: "frame_copy_vertex",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shaders.frame_copy.get(),
                 entry_point: "frame_copy_fragment",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Rgba16Float,
                     blend: None,
@@ -382,6 +399,7 @@ impl Pipelines {
             depth_stencil: None,
             multisample,
             multiview: None,
+            cache,
         });
 
         #[cfg(feature = "rerun")]
@@ -442,11 +460,13 @@ impl Pipelines {
             vertex: wgpu::VertexState {
                 module: shaders.rerun_copy.get(),
                 entry_point: "rerun_frame_copy_vertex",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shaders.rerun_copy.get(),
                 entry_point: "rerun_frame_copy_fragment",
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[
                     Some(wgpu::ColorTargetState {
                         format: wgpu::TextureFormat::Rgba8UnormSrgb,
@@ -468,6 +488,7 @@ impl Pipelines {
             // we're writing *to* a non-multisampled texture
             multisample: wgpu::MultisampleState::default(),
             multiview: None,
+            cache,
         });
 
         let linear_sampler = device.create_sampler(&wgpu::SamplerDescriptor {

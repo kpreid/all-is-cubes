@@ -67,7 +67,7 @@ arbitrary = { version = "1.3.2", features = ["derive"] }
 arrayvec = { version = "0.7.4", default-features = false }
 async_fn_traits = "0.1.1"
 base64 = { version = "0.22.1", default-features = false }
-bitflags = { version = "2.4", default-features = false }
+bitflags = { version = "2.6.0", default-features = false }
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
 # Note that this excludes the "derive" feature but some crates need it.
 bytemuck = { version = "1.13.1", default-features = false }
@@ -129,7 +129,7 @@ snapbox = "0.6.10" # keep in sync with `trycmd`
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 sync_wrapper = { version = "1.0.0", default-features = false }
 tempfile = "3.3.0"
-thiserror = "1.0.56"
+thiserror = "1.0.62"
 time = { version = "0.3.36", default-features = false }
 # Tokio is used for async test-running and for certain binaries.
 # The library crates do not require Tokio.
@@ -137,9 +137,9 @@ tokio = { version = "1.28.0", default-features = false }
 trycmd = "0.15.4" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
 unicode-width = { version = "0.1.9", default-features = false }
-wasm-bindgen-futures = "0.4.40"
+wasm-bindgen-futures = "0.4.42"
 web-time = "1.0.0"
-wgpu = { version = "0.19.3", default-features = false, features = ["wgsl"] }
+wgpu = { version = "22.1.0", default-features = false, features = ["wgsl"] }
 yield-progress = { version = "0.1.6", default-features = false }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.
