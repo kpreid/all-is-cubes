@@ -1,5 +1,6 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::{fmt, ptr};
 
@@ -9,9 +10,10 @@ use core::{fmt, ptr};
 use num_traits::float::FloatCore as _;
 
 use crate::block::{
-    self, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels,
+    self, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels, Modifier,
     Resolution::{self, R1},
 };
+use crate::inv;
 use crate::math::{Face6, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba, Vol};
 
 // Things mentioned in doc comments only
@@ -222,6 +224,33 @@ impl EvaluatedBlock {
         }
     }
 
+    // --- Transformations of the block ---
+
+    /// Given a block that does not yet have an [`Modifier::Inventory`], add it.
+    ///
+    /// The size of the added inventory is the maximum of the size set by
+    /// [`BlockAttributes::inventory`] and the size of `contents`.
+    //---
+    // TODO(inventory): Decide what happens when this is called on a block which
+    // already has an inventory. Currently, it just attaches another modifier.
+    //
+    // TODO(inventory): Decide what happens when `config.size == 0`.
+    // Should we refrain from adding the modifier?
+    #[must_use]
+    pub fn with_inventory(self, contents: impl Iterator<Item = inv::Slot>) -> Block {
+        let config = &self.attributes.inventory;
+
+        let inventory = inv::Inventory::from_slots(
+            itertools::Itertools::zip_longest(
+                contents,
+                core::iter::repeat(inv::Slot::Empty).take(config.size),
+            )
+            .map(|z| z.into_left())
+            .collect::<Box<[inv::Slot]>>(),
+        );
+        self.block.with_modifier(Modifier::Inventory(inventory))
+    }
+
     // --- Other ---
 
     /// Check that the derived properties are consistent with the fundamental ones.
@@ -280,7 +309,7 @@ pub(in crate::block) const AIR_EVALUATED_MIN: MinEval = MinEval {
 const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     display_name: arcstr::literal!("<air>"),
     selectable: false,
-    inventory: crate::inv::InvInBlock::EMPTY,
+    inventory: inv::InvInBlock::EMPTY,
     rotation_rule: block::RotationPlacementRule::Never,
     tick_action: None,
     activation_action: None,
