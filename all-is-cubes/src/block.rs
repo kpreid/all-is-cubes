@@ -354,7 +354,7 @@ impl Block {
 
     /// Given a block that does not yet have an [`Modifier::Inventory`], add it.
     ///
-    /// The size of the added inventory is the maximum of the size set by [`config`]
+    /// The size of the added inventory is the maximum of the size set by `config`
     /// (which should normally be from the evaluated [`BlockAttributes`] of this block)
     /// and the size of `contents`.
     //---

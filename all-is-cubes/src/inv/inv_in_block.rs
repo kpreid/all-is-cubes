@@ -46,8 +46,8 @@ pub struct IconRow {
 }
 
 impl InvInBlock {
-    /// Value for blocks which should not carry inventories.
-    pub(crate) const EMPTY: Self = Self {
+    /// Value appropriate for “normal” blocks which should not carry inventories.
+    pub const EMPTY: Self = Self {
         size: 0,
         icon_scale: Resolution::R1,      // arbitrary
         icon_resolution: Resolution::R1, // arbitrary
