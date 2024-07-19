@@ -21,10 +21,11 @@ const TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
 #[tokio::main]
 async fn main() -> test_renderers::HarnessResult {
-    test_renderers::initialize_logging();
+    let args = test_renderers::HarnessArgs::parse();
+    test_renderers::initialize_logging(&args);
 
     test_renderers::harness_main(
-        test_renderers::HarnessArgs::parse(),
+        &args,
         RendererId::Gltf,
         test_renderers::SuiteId::Renderers,
         test_renderers::test_cases::all_tests,

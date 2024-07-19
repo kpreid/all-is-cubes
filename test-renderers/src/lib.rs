@@ -279,13 +279,11 @@ pub fn compare_rendered_image(
     )
 }
 
-pub fn initialize_logging() {
-    // TODO: Enable logging under command line control, or with capturing,
-    // so we can inspect logs but don't have per-renderer-setup spam
-    if false {
+pub fn initialize_logging(args: &HarnessArgs) {
+    if args.verbose {
         // Note: Something like this log configuration also appears in all-is-cubes-desktop.
         simplelog::WriteLogger::init(
-            simplelog::LevelFilter::Debug,
+            simplelog::LevelFilter::Trace,
             simplelog::ConfigBuilder::new()
                 .add_filter_ignore_str("wgpu") // noisy
                 .add_filter_ignore_str("naga") // noisy

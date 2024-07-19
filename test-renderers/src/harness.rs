@@ -175,6 +175,10 @@ pub struct HarnessArgs {
 
     #[command(flatten)]
     action: Action,
+
+    /// Print log messages to stderr, rather than only printing test runner progress.
+    #[arg(long, short = 'v')]
+    pub(crate) verbose: bool,
 }
 
 #[derive(Debug, clap::Parser)]
@@ -209,7 +213,7 @@ pub type HarnessResult = ExitCode;
 /// [`RendererFactory`] for the type of renderer under test, which should be as isolated
 /// as is reasonable for testing.
 pub async fn harness_main<Factory, Ff>(
-    args: HarnessArgs,
+    args: &HarnessArgs,
     renderer_id: RendererId,
     suite_id: SuiteId,
     test_suite: fn(&mut TestCaseCollector<'_>),
@@ -224,13 +228,14 @@ where
         ignored,
         format,
         nocapture: _, // We never capture
-        filters,
+        ref filters,
         exact,
         action: Action {
             list: list_only,
-            dump_test_universes,
+            ref dump_test_universes,
         },
-    } = args;
+        verbose: _, // handled by initialize_logging()
+    } = *args;
 
     // Gather tests (don't run them yet).
     let mut test_table: BTreeMap<String, TestCase> = BTreeMap::new();

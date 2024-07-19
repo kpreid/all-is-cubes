@@ -10,7 +10,8 @@ use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main]
 async fn main() -> test_renderers::HarnessResult {
-    test_renderers::initialize_logging();
+    let args = test_renderers::HarnessArgs::parse();
+    test_renderers::initialize_logging(&args);
 
     WGPU_INSTANCE
         .set(init::create_instance_for_test_or_exit().await)
@@ -24,7 +25,7 @@ async fn main() -> test_renderers::HarnessResult {
     };
 
     test_renderers::harness_main(
-        test_renderers::HarnessArgs::parse(),
+        &args,
         RendererId::Wgpu,
         test_renderers::SuiteId::Renderers,
         test_renderers::test_cases::all_tests,

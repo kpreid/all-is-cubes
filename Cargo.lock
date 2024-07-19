@@ -5831,6 +5831,7 @@ dependencies = [
  "image 0.25.1",
  "imgref",
  "itertools 0.12.1",
+ "log",
  "mint",
  "rayon",
  "rend3",

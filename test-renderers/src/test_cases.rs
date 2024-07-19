@@ -8,8 +8,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use exhaust::Exhaust as _;
-use futures_core::future::BoxFuture;
-use futures_util::FutureExt;
 
 use all_is_cubes::block::{Block, Resolution::*, AIR};
 use all_is_cubes::character::{Character, Spawn};
