@@ -200,14 +200,35 @@ fn advance_time(session: &mut Session<NoTime>) {
 }
 
 fn render_session(session: &Session<NoTime>) -> Rendering {
-    render_orthographic(session.ui_view().get().space.as_ref().unwrap())
+    let start_time = Instant::now();
+    let rendering = render_orthographic(session.ui_view().get().space.as_ref().unwrap());
+    log::trace!(
+        "rendered session ui in {}",
+        start_time.elapsed().refmt(&ConciseDebug)
+    );
+    rendering
 }
 
 fn render_widget(widget: &vui::WidgetTree, gravity: vui::Gravity) -> Rendering {
-    render_orthographic(&Handle::new_pending(
+    let start_time = Instant::now();
+    let space_handle = Handle::new_pending(
         Name::Pending,
         widget
             .to_space(space::SpaceBuilder::default(), gravity)
             .unwrap(),
-    ))
+    );
+    let space_to_render_time = Instant::now();
+    let rendering = render_orthographic(&space_handle);
+    let end_time = Instant::now();
+    log::trace!(
+        "render_widget: {} to_space, {} render",
+        space_to_render_time
+            .saturating_duration_since(start_time)
+            .refmt(&ConciseDebug),
+        end_time
+            .saturating_duration_since(space_to_render_time)
+            .refmt(&ConciseDebug),
+    );
+
+    rendering
 }
