@@ -1,4 +1,5 @@
 use std::collections::{btree_map, BTreeMap, HashSet};
+use std::future::Future;
 use std::io::Write as _;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -25,11 +26,35 @@ use crate::{
 
 type BoxedTestFn = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()> + Send + Sync>;
 
+/// Wrapper for a `Future` which produces a `Universe` that may be used by multiple
+/// render tests (and should not be mutated).
 #[derive(Clone, Debug)]
 #[allow(clippy::exhaustive_structs)]
 pub struct UniverseFuture {
-    pub label: String,
-    pub future: Shared<BoxFuture<'static, Arc<Universe>>>,
+    label: String,
+    future: Shared<BoxFuture<'static, Arc<Universe>>>,
+}
+impl UniverseFuture {
+    pub fn new(label: &str, f: impl Future<Output = Arc<Universe>> + Send + 'static) -> Self {
+        let label = label.to_owned();
+        let label2 = label.clone();
+
+        let boxed: BoxFuture<'static, Arc<Universe>> = Box::pin(async move {
+            let start_time = Instant::now();
+            let universe = f.await;
+            let elapsed = start_time.elapsed();
+            log::trace!(
+                "universe {label2} ready in {elapsed}",
+                elapsed = elapsed.refmt(&ConciseDebug)
+            );
+            universe
+        });
+
+        UniverseFuture {
+            label,
+            future: boxed.shared(),
+        }
+    }
 }
 impl PartialEq for UniverseFuture {
     fn eq(&self, other: &Self) -> bool {
@@ -321,7 +346,7 @@ where
             async {
                 let test_id_tc = test_id.clone();
                 let comparison_log_tc = comparison_log.clone();
-                // This handle serves to act as a catch_unwind for the test case itself.
+                // This spawned task acts as a catch_unwind for the test case itself.
                 let test_case_handle = tokio::spawn(async move {
                     let context = RenderTestContext {
                         test_id: test_id_tc,

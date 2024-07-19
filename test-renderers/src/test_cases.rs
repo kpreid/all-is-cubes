@@ -129,11 +129,7 @@ pub fn u(
     label: &str,
     f: impl Future<Output = Arc<Universe>> + Send + 'static,
 ) -> Option<UniverseFuture> {
-    let boxed: BoxFuture<'static, Arc<Universe>> = Box::pin(f);
-    Some(UniverseFuture {
-        label: label.to_owned(),
-        future: boxed.shared(),
-    })
+    Some(UniverseFuture::new(label, f))
 }
 
 // --- Test cases ---------------------------------------------------------------------------------
