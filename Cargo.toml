@@ -130,6 +130,7 @@ strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 sync_wrapper = { version = "1.0.0", default-features = false }
 tempfile = "3.3.0"
 thiserror = "1.0.56"
+time = { version = "0.3.36", default-features = false }
 # Tokio is used for async test-running and for certain binaries.
 # The library crates do not require Tokio.
 tokio = { version = "1.28.0", default-features = false }

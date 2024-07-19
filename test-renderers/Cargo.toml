@@ -85,6 +85,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 simplelog = { workspace = true }
 tempfile = { workspace = true }
+time = { workspace = true }
 # tinytemplate is already in the workspace's dependency tree via criterion,
 # so let's use it for our output report template.
 tinytemplate = "1.2.1"

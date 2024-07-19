@@ -347,30 +347,34 @@ where
                 let test_id_tc = test_id.clone();
                 let comparison_log_tc = comparison_log.clone();
                 // This spawned task acts as a catch_unwind for the test case itself.
-                let test_case_handle = tokio::spawn(async move {
-                    let context = RenderTestContext {
-                        test_id: test_id_tc,
-                        renderer_factory: Box::new(factory_future.await),
-                        comparison_log: comparison_log_tc,
-                        universe: match universe_future {
-                            Some(uf) => Some(uf.future.await),
-                            None => None,
-                        },
-                        image_serial: 0,
-                    };
+                let test_case_handle =
+                    tokio::spawn(TEST_ID.scope(test_id_tc.clone(), async move {
+                        let context = RenderTestContext {
+                            test_id: test_id_tc,
+                            renderer_factory: Box::new(factory_future.await),
+                            comparison_log: comparison_log_tc,
+                            universe: match universe_future {
+                                Some(uf) => Some(uf.future.await),
+                                None => None,
+                            },
+                            image_serial: 0,
+                        };
 
-                    // Run the test case; its pass or fail (if it doesn't panic) is determined
-                    // by the comparison_log contents.
-                    // The timeout is in case the renderer hangs, so that we get a faster and more
-                    // specific answer than an entire CI job timeout. (Generally, renders should
-                    // finish in fractions of a second, but CI can be very slow; the large timeout
-                    // is to avoid flakiness under edge cases of high machine load.)
-                    let case_start_time = Instant::now();
-                    tokio::time::timeout(Duration::from_secs(30), (test_case.function)(context))
+                        // Run the test case; its pass or fail (if it doesn't panic) is determined
+                        // by the comparison_log contents.
+                        // The timeout is in case the renderer hangs, so that we get a faster and more
+                        // specific answer than an entire CI job timeout. (Generally, renders should
+                        // finish in fractions of a second, but CI can be very slow; the large timeout
+                        // is to avoid flakiness under edge cases of high machine load.)
+                        let case_start_time = Instant::now();
+                        tokio::time::timeout(
+                            Duration::from_secs(30),
+                            (test_case.function)(context),
+                        )
                         .await
                         .expect("render test case timed out");
-                    case_start_time.elapsed()
-                });
+                        case_start_time.elapsed()
+                    }));
                 let outcome: Result<Duration, tokio::task::JoinError> = test_case_handle.await;
 
                 TestRunResult {
@@ -577,6 +581,10 @@ impl<'a> TestCaseCollector<'a> {
             );
         }
     }
+}
+
+tokio::task_local! {
+    pub(crate) static TEST_ID: TestId;
 }
 
 /// Convert test variant data to a string.
