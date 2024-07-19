@@ -2,6 +2,7 @@
 //! as well as some of the behavior of [`Session`].
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use clap::Parser as _;
 
@@ -12,7 +13,7 @@ use all_is_cubes::math::Face6;
 use all_is_cubes::time::NoTime;
 use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
-use all_is_cubes::util::YieldProgress;
+use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 use all_is_cubes::{space, transaction};
 use all_is_cubes_render::camera::Viewport;
 use all_is_cubes_render::raytracer::ortho::render_orthographic;
@@ -167,7 +168,12 @@ async fn widget_progress_bar(mut context: RenderTestContext) {
 
 async fn create_session() -> Session<NoTime> {
     let viewport = ListenableSource::constant(Viewport::with_scale(1.0, [256, 192]));
+    let start_time = Instant::now();
     let session: Session<NoTime> = Session::builder().ui(viewport).build().await;
+    log::trace!(
+        "created session in {}",
+        start_time.elapsed().refmt(&ConciseDebug)
+    );
     session
 }
 
