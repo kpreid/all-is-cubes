@@ -5833,7 +5833,6 @@ dependencies = [
  "itertools 0.12.1",
  "log",
  "mint",
- "rayon",
  "rend3",
  "rend3-gltf",
  "rend3-routine",

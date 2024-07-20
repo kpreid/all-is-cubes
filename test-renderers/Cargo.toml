@@ -43,7 +43,13 @@ doctest = false
 harness = false
 
 [features]
-default = []
+default = ["auto-threads"]
+# This is a feature so that, if we want to, we can test the non-threaded build.
+auto-threads = [
+    "all-is-cubes/auto-threads",
+    "all-is-cubes-gpu/auto-threads",
+    "all-is-cubes-render/auto-threads",
+]
 gltf = [
     "dep:all-is-cubes-port",
     "dep:rend3",
@@ -55,11 +61,11 @@ gltf = [
 ]
 
 [dependencies]
-all-is-cubes = { workspace = true, features = ["auto-threads", "save"] }
+all-is-cubes = { workspace = true, features = ["save"] }
 all-is-cubes-content = { workspace = true }
 all-is-cubes-gpu = { workspace = true, features = ["wgpu"] }
 all-is-cubes-port = { workspace = true, optional = true, features = [] }
-all-is-cubes-render = { workspace = true, features = ["auto-threads", "raytracer", "std"] }
+all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
 all-is-cubes-ui = { workspace = true }
 async_fn_traits = { workspace = true }
 bytemuck = { workspace = true }
@@ -75,7 +81,6 @@ imgref = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 mint = { version = "0.5.9", optional = true }
-rayon = { workspace = true }
 rend3 = { git = "https://github.com/BVE-Reborn/rend3/", rev = "86bc4d2d2f4048a0adaa9af5ef542dc652308966", optional = true }
 rend3-gltf = { git = "https://github.com/BVE-Reborn/rend3/", rev = "86bc4d2d2f4048a0adaa9af5ef542dc652308966",  optional = true, default-features = false }
 rend3-routine = { git = "https://github.com/BVE-Reborn/rend3/", rev = "86bc4d2d2f4048a0adaa9af5ef542dc652308966", optional = true }
