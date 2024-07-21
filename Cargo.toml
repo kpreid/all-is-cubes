@@ -159,7 +159,8 @@ rust.trivial_numeric_casts = "warn"
 rust.unnameable_types = "warn"
 rust.unused_extern_crates = "warn"
 rust.unused_lifetimes = "warn"
-rust.unused_qualifications = "warn"
+# TODO: Reenable unused_qualifications when Rust 1.80 is released and we've updated our `mem::size_of` calls.
+# rust.unused_qualifications = "warn"
 # This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
 # rust.unused_crate_dependencies = "warn"
 
