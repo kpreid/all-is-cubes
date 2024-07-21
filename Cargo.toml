@@ -122,7 +122,7 @@ rectangle-pack = "0.4.2"
 rendiff = { version = "0.2.0" }
 scopeguard = { version = "1.2.0", default-features = false }
 send_wrapper = { version = "0.6.0", features = ["futures"] }
-serde = { version = "1.0.160", default-features = false, features = ["derive"] }
+serde = { version = "1.0.204", default-features = false, features = ["derive"] }
 serde_json = "1.0.79"
 simplelog = { version = "0.12.0", default-features = false, features = ["local-offset"] }
 snapbox = "0.6.10" # keep in sync with `trycmd`
