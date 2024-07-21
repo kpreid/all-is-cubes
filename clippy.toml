@@ -2,6 +2,15 @@ doc-valid-idents = ["glTF", "sRGB", "DirectX", "MagicaVoxel", "NaN", "OpenGL", "
 enforced-import-renames = [
     { path = "all_is_cubes::rerun_glue", rename = "rg" },
 ]
+ignore-interior-mutability = [
+    # Workaround for https://github.com/rust-lang/rust-clippy/issues/12951
+    "all_is_cubes::block::Block", # contains ArcStr
+    "all_is_cubes::block::BlockAttributes", # contains ArcStr
+    "all_is_cubes::block::EvaluatedBlock", # contains ArcStr
+    "arcstr::ArcStr",
+    "arcstr::SubStr",
+    "test_renderers::harness::UniverseFuture", # contains futures::Shared but does not use it as key
+]
 
 # --- Configurations for "large values" kinds of lints ---
 # It'd be nice if these were per-package/per-crate, but clippy doesn't support that,
