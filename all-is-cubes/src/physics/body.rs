@@ -3,7 +3,6 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use euclid::Vector3D;
-use manyfmt::Fmt;
 use ordered_float::NotNan;
 
 /// Acts as polyfill for float methods
@@ -25,7 +24,7 @@ use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;
 use crate::transaction::{self, Transaction};
-use crate::util::{ConciseDebug, Refmt as _, StatusText};
+use crate::util::{ConciseDebug, Fmt, Refmt as _, StatusText};
 
 #[cfg(feature = "rerun")]
 use crate::rerun_glue as rg;
@@ -275,9 +274,23 @@ impl Body {
 
         // TODO: after gravity, falling-below-the-world protection
 
+        let info = BodyStepInfo {
+            quiescent: false,
+            already_colliding,
+            push_out: push_out_info,
+            move_segments,
+            delta_v: self.velocity - velocity_before_gravity_and_collision,
+        };
+
         #[cfg(feature = "rerun")]
         {
             use crate::content::palette;
+
+            // Log step info as text.
+            rerun_destination.log(
+                &rg::entity_path!["step_info"],
+                &rg::archetypes::TextDocument::new(format!("{:#?}", info.refmt(&ConciseDebug))),
+            );
 
             // Log nearby cubes and whether they are contacts.
             if let Some(space) = colliding_space {
@@ -394,13 +407,7 @@ impl Body {
             }
         }
 
-        BodyStepInfo {
-            quiescent: false,
-            already_colliding,
-            push_out: push_out_info,
-            move_segments,
-            delta_v: self.velocity - velocity_before_gravity_and_collision,
-        }
+        info
     }
 
     /// Perform a single straight-line position change, stopping at the first obstacle.
