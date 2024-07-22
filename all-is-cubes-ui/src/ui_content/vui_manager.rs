@@ -206,25 +206,24 @@ impl Vui {
         let size = self.last_ui_size;
         let universe = &mut self.universe;
 
-        let next_page: Option<&mut PageInst> = match &*self.state.get() {
-            VuiPageState::Hud => Some(&mut self.hud_page),
-            VuiPageState::Paused => Some(&mut self.paused_page),
-            VuiPageState::Options => Some(&mut self.options_page),
-            VuiPageState::AboutText => Some(&mut self.about_page),
-            VuiPageState::Progress => Some(&mut self.progress_page),
+        let next_page: &mut PageInst = match &*self.state.get() {
+            VuiPageState::Hud => &mut self.hud_page,
+            VuiPageState::Paused => &mut self.paused_page,
+            VuiPageState::Options => &mut self.options_page,
+            VuiPageState::AboutText => &mut self.about_page,
+            VuiPageState::Progress => &mut self.progress_page,
 
             // Note: checking the `content` is handled in `set_state()`.
             VuiPageState::Dump {
                 previous: _,
                 content: _,
-            } => Some(&mut self.dump_page),
+            } => &mut self.dump_page,
         };
-        let next_space: Option<Handle<Space>> =
-            next_page.map(|p| p.get_or_create_space(size, universe));
+        let next_space: Handle<Space> = next_page.get_or_create_space(size, universe);
 
-        if next_space.as_ref() != Option::as_ref(&self.current_view.get().space) {
+        if Some(&next_space) != Option::as_ref(&self.current_view.get().space) {
             self.current_view
-                .set(Self::view_state_for(next_space, &self.hud_inputs));
+                .set(Self::view_state_for(Some(next_space), &self.hud_inputs));
             log::trace!(
                 "UI switched to {:?} ({:?})",
                 self.current_view.get().space,
