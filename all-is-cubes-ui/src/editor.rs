@@ -17,7 +17,7 @@ use crate::vui::{self, widgets};
 pub fn inspect_block_at_cursor(
     inputs: &HudInputs, // TODO: need this for the back button only ... feels wrong
     cursor: &Cursor,
-) -> vui::WidgetTree {
+) -> vui::Page {
     let hit = cursor.hit();
 
     let contents = Arc::new(vui::LayoutTree::Stack {
@@ -41,13 +41,7 @@ pub fn inspect_block_at_cursor(
         ],
     });
 
-    vui::page_modal_backdrop(Arc::new(vui::LayoutTree::Shrink(
-        inputs
-            .hud_blocks
-            .widget_theme
-            .dialog_background()
-            .as_background_of(contents),
-    )))
+    vui::Page::new_modal_dialog(&inputs.hud_blocks.widget_theme, contents)
 }
 
 fn inspect_block_definition(block: &Block) -> vui::WidgetTree {

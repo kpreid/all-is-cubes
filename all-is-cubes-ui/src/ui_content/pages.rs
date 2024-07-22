@@ -13,17 +13,14 @@ use crate::ui_content::hud::HudInputs;
 use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
 use crate::ui_content::{notification, VuiMessage, VuiPageState};
 use crate::vui::widgets::ButtonLabel;
-use crate::vui::{
-    self, page_modal_backdrop, parts, widgets, InstallVuiError, LayoutTree, UiBlocks, Widget,
-    WidgetTree,
-};
+use crate::vui::{self, parts, widgets, InstallVuiError, LayoutTree, UiBlocks, Widget, WidgetTree};
 
 // TODO: Disentangle general UI from the concept of "HUD" — i.e. the input accepted should be
 // not a `HudInputs` should become less specific, since this isn't actually part of the HUD.
-pub(super) fn new_paused_widget_tree(
+pub(super) fn new_paused_page(
     u: &mut Universe,
     hud_inputs: &HudInputs,
-) -> Result<WidgetTree, InstallVuiError> {
+) -> Result<vui::Page, InstallVuiError> {
     use parts::{heading, shrink};
 
     let mut children = vec![
@@ -67,19 +64,16 @@ pub(super) fn new_paused_widget_tree(
         direction: Face6::NY,
         children,
     });
-    Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
-        hud_inputs
-            .hud_blocks
-            .widget_theme
-            .dialog_background()
-            .as_background_of(contents),
-    ))))
+    Ok(vui::Page::new_modal_dialog(
+        &hud_inputs.hud_blocks.widget_theme,
+        contents,
+    ))
 }
 
-pub(super) fn new_progress_widget_tree(
+pub(super) fn new_progress_page(
     theme: &widgets::WidgetTheme,
     hub: &notification::Hub,
-) -> WidgetTree {
+) -> vui::Page {
     let children = vec![
         // impose desired width. TODO: better way to add a constraint
         LayoutTree::spacer(vui::LayoutRequest {
@@ -97,15 +91,13 @@ pub(super) fn new_progress_widget_tree(
         direction: Face6::NY,
         children,
     });
-    page_modal_backdrop(Arc::new(LayoutTree::Shrink(
-        theme.dialog_background().as_background_of(contents),
-    )))
+    vui::Page::new_modal_dialog(theme, contents)
 }
 
 pub(super) fn new_options_widget_tree(
     u: &mut Universe,
     hud_inputs: &HudInputs,
-) -> Result<WidgetTree, InstallVuiError> {
+) -> Result<vui::Page, InstallVuiError> {
     use parts::{heading, shrink};
 
     let contents = Arc::new(LayoutTree::Stack {
@@ -120,21 +112,18 @@ pub(super) fn new_options_widget_tree(
             }),
         ],
     });
-    Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
-        hud_inputs
-            .hud_blocks
-            .widget_theme
-            .dialog_background()
-            .as_background_of(contents),
-    ))))
+    Ok(vui::Page::new_modal_dialog(
+        &hud_inputs.hud_blocks.widget_theme,
+        contents,
+    ))
 }
 
 /// TODO: The content of the about page should be customizable in the final build or
 /// by configuration of the [`Session`].
-pub(super) fn new_about_widget_tree(
+pub(super) fn new_about_page(
     u: &mut Universe,
     hud_inputs: &HudInputs,
-) -> Result<WidgetTree, InstallVuiError> {
+) -> Result<vui::Page, InstallVuiError> {
     use parts::{heading, paragraph, shrink};
 
     let controls_text = indoc::indoc! {"
@@ -172,30 +161,23 @@ pub(super) fn new_about_widget_tree(
             // paragraph("TODO"),
         ],
     });
-    Ok(page_modal_backdrop(Arc::new(LayoutTree::Shrink(
-        hud_inputs
-            .hud_blocks
-            .widget_theme
-            .dialog_background()
-            .as_background_of(contents),
-    ))))
+
+    Ok(vui::Page::new_modal_dialog(
+        &hud_inputs.hud_blocks.widget_theme,
+        contents,
+    ))
 }
 
 /// A message in a "modal dialog box".
-pub(super) fn new_message_widget_tree(message: ArcStr, hud_inputs: &HudInputs) -> WidgetTree {
+pub(super) fn new_message_page(message: ArcStr, hud_inputs: &HudInputs) -> vui::Page {
     use parts::paragraph;
 
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![paragraph(message), back_button(hud_inputs)],
     });
-    page_modal_backdrop(Arc::new(LayoutTree::Shrink(
-        hud_inputs
-            .hud_blocks
-            .widget_theme
-            .dialog_background()
-            .as_background_of(contents),
-    )))
+
+    vui::Page::new_modal_dialog(&hud_inputs.hud_blocks.widget_theme, contents)
 }
 
 /// Make a button that sends [`VuiMessage::Open`].

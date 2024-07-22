@@ -3,7 +3,6 @@ use alloc::sync::Arc;
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::{text, AIR};
 use all_is_cubes::block::{Block, BlockAttributes, Resolution};
-use all_is_cubes_render::camera;
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{size2, Size2D};
@@ -13,6 +12,7 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{self, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Universe};
+use all_is_cubes_render::camera;
 
 use crate::vui::{
     self, install_widgets, widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest,
@@ -95,19 +95,76 @@ impl UiSize {
     }
 }
 
-/// Pair of a widget tree and a cached space it is instantiated in with a particular size,
-/// which can be recreated with a different size as needed.
+/// A widget tree combined with instructions for how to present it to the user.
+#[derive(Clone, Debug)]
+pub(crate) struct Page {
+    /// The widgets that this page displays.
+    pub tree: WidgetTree,
+
+    /// How the tree should be presented on screen.
+    pub layout: PageLayout,
+}
+
+impl Page {
+    pub fn empty() -> Self {
+        Self {
+            tree: LayoutTree::empty(),
+            layout: PageLayout::Hud,
+        }
+    }
+
+    /// Wrap the given widget tree in a dialog box and a transparent screen-filling background.
+    pub fn new_modal_dialog(theme: &widgets::WidgetTheme, contents: WidgetTree) -> Self {
+        let tree = Arc::new(LayoutTree::Stack {
+            direction: Face6::PZ,
+            children: vec![
+                Arc::new(LayoutTree::Spacer(LayoutRequest {
+                    // magic number 2 allows us to fill the edges of the viewport, ish
+                    // TODO: PageLayout should give us the option of "overscan",
+                    // where all edges of the space spill off the window.
+                    minimum: GridSize::new(
+                        0,
+                        0,
+                        GridSizeCoord::from(UiSize::DEPTH_BEHIND_VIEW_PLANE) + 2,
+                    ),
+                })),
+                vui::leaf_widget(widgets::Frame::with_block(color_block!(0., 0., 0., 0.7))),
+                Arc::new(vui::LayoutTree::Shrink(
+                    theme.dialog_background().as_background_of(contents),
+                )),
+            ],
+        });
+
+        Page {
+            tree,
+            layout: vui::PageLayout::Hud, // TODO: should have a scrollable-if-too-big dialog layout
+        }
+    }
+}
+
+/// How the camera should be positioned to look at a [`Page`]’s content.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum PageLayout {
+    /// The layout designed for the HUD.
+    ///
+    /// * The root [`LayoutGrant`] is always an odd width and height.
+    /// * Z = 0 meets the top and bottom edges of the viewport (if feasible).
+    Hud,
+}
+
+/// Pair of a [`Page`] and a cached space that is an instantiation of its widgets,
+/// which can be recreated with a different size as needed by viewport size changes.
 ///
 /// TODO: Give this a better name.
 #[derive(Clone, Debug)]
 pub(crate) struct PageInst {
-    tree: WidgetTree,
+    page: Page,
     space: Option<Handle<Space>>,
 }
 
 impl PageInst {
-    pub fn new(tree: WidgetTree) -> Self {
-        Self { tree, space: None }
+    pub fn new(page: Page) -> Self {
+        Self { page, space: None }
     }
 
     pub fn get_or_create_space(
@@ -122,12 +179,19 @@ impl PageInst {
             }
         }
 
+        // TODO: there will be multiple layouts and the size calculation will depend on the layout
+        match self.page.layout {
+            PageLayout::Hud => {}
+        }
+
         // If necessary, enlarge the proposed dimensions.
         // The camera may be bad but at least the widgets won't be missing parts.
         // TODO: We need overall better handling of this; for example, we should be able to
         // pan ("scroll") the camera over a tall dialog box.
         // Also, this doesn't handle Z size.
-        let fitting_size = size.size.max(drop_depth(self.tree.requirements().minimum));
+        let fitting_size = size
+            .size
+            .max(drop_depth(self.page.tree.requirements().minimum));
         if fitting_size != size.size {
             log::debug!("VUI page had to enlarge proposed size {size:?} to {fitting_size:?}");
             size.size = fitting_size;
@@ -156,8 +220,7 @@ impl PageInst {
         universe: &mut Universe,
     ) -> Result<Handle<Space>, InstallVuiError> {
         let space = universe.insert_anonymous(size.create_space());
-        // TODO: error handling for layout
-        let txn = install_widgets(LayoutGrant::new(size.space_bounds()), &self.tree)?;
+        let txn = install_widgets(LayoutGrant::new(size.space_bounds()), &self.page.tree)?;
         space
             .execute(&txn)
             .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
@@ -174,31 +237,15 @@ impl PageInst {
     }
 }
 
+impl From<Page> for PageInst {
+    fn from(page: Page) -> Self {
+        Self::new(page)
+    }
+}
+
 // TODO: contribute this to euclid
 fn drop_depth(size: GridSize) -> Size2D<u32, Cube> {
     Size2D::new(size.width, size.height)
-}
-
-/// Wrap the given widget tree in a transparent screen-filling background.
-pub(crate) fn page_modal_backdrop(foreground: WidgetTree) -> WidgetTree {
-    Arc::new(LayoutTree::Stack {
-        direction: Face6::PZ,
-        children: vec![
-            // TODO: have a better way to communicate our choice of "baseline" alignment
-            Arc::new(LayoutTree::Spacer(LayoutRequest {
-                // magic number 2 allows us to fill the edges of the viewport, ish
-                // TODO: VUI camera positioning should give us the option of "overscan",
-                // where all edges of the space spill off the window.
-                minimum: GridSize::new(
-                    0,
-                    0,
-                    GridSizeCoord::from(UiSize::DEPTH_BEHIND_VIEW_PLANE) + 2,
-                ),
-            })),
-            vui::leaf_widget(widgets::Frame::with_block(color_block!(0., 0., 0., 0.7))),
-            foreground,
-        ],
-    })
 }
 
 /// Helpers for assembling widget trees into dialog stuff.

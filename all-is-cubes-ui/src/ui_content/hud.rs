@@ -45,14 +45,14 @@ impl fmt::Debug for HudInputs {
 }
 
 #[allow(clippy::redundant_clone)]
-pub(super) fn new_hud_widget_tree(
+pub(super) fn new_hud_page(
     // TODO: mess of tightly coupled parameters
     character_source: ListenableSource<Option<Handle<Character>>>,
     hud_inputs: &HudInputs,
     // TODO: stop mutating the universe in widget construction
     universe: &mut Universe,
     tooltip_state: Arc<Mutex<TooltipState>>,
-) -> WidgetTree {
+) -> vui::Page {
     let toolbar = widgets::Toolbar::new(
         character_source,
         Arc::clone(&hud_inputs.hud_blocks),
@@ -72,7 +72,11 @@ pub(super) fn new_hud_widget_tree(
         }),
         control_bar: control_bar(hud_inputs),
     });
-    hud_widget_tree
+    vui::Page {
+        tree: hud_widget_tree,
+        layout: vui::PageLayout::Hud,
+        focus_on_ui: false,
+    }
 }
 
 /// Miscellaneous controls (pause, debug, etc., not gameplay controls) intended to be

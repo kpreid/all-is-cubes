@@ -24,7 +24,7 @@ use crate::apps::{
 use crate::ui_content::hud::{HudBlocks, HudInputs};
 use crate::ui_content::{notification, pages};
 use crate::vui::widgets::TooltipState;
-use crate::vui::{LayoutTree, PageInst, UiSize, WidgetTree};
+use crate::vui::{self, PageInst, UiSize};
 
 /// `Vui` builds user interfaces out of voxels. It owns a `Universe` dedicated to the
 /// purpose and draws into spaces to form the HUD and menus.
@@ -133,19 +133,18 @@ impl Vui {
             set_fullscreen,
             quit,
         };
-        let hud_widget_tree = super::hud::new_hud_widget_tree(
+        let hud_page = super::hud::new_hud_page(
             character_source.clone(),
             &hud_inputs,
             &mut universe,
             tooltip_state.clone(),
         );
 
-        let paused_widget_tree = pages::new_paused_widget_tree(&mut universe, &hud_inputs).unwrap();
-        let options_widget_tree =
-            pages::new_options_widget_tree(&mut universe, &hud_inputs).unwrap();
-        let about_widget_tree = pages::new_about_widget_tree(&mut universe, &hud_inputs).unwrap();
-        let progress_widget_tree =
-            pages::new_progress_widget_tree(&hud_inputs.hud_blocks.widget_theme, &notif_hub);
+        let paused_page = pages::new_paused_page(&mut universe, &hud_inputs).unwrap();
+        let options_page = pages::new_options_widget_tree(&mut universe, &hud_inputs).unwrap();
+        let about_page = pages::new_about_page(&mut universe, &hud_inputs).unwrap();
+        let progress_page =
+            pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, &notif_hub);
 
         let mut new_self = Self {
             universe,
@@ -157,12 +156,12 @@ impl Vui {
             last_ui_size: ui_size,
             hud_inputs,
 
-            hud_page: PageInst::new(hud_widget_tree),
-            paused_page: PageInst::new(paused_widget_tree),
-            options_page: PageInst::new(options_widget_tree),
-            about_page: PageInst::new(about_widget_tree),
-            dump_page: PageInst::new(LayoutTree::empty()),
-            progress_page: PageInst::new(progress_widget_tree),
+            hud_page: PageInst::new(hud_page),
+            paused_page: PageInst::new(paused_page),
+            options_page: PageInst::new(options_page),
+            about_page: PageInst::new(about_page),
+            dump_page: PageInst::new(vui::Page::empty()),
+            progress_page: PageInst::new(progress_page),
 
             control_channel: control_recv,
             changed_character: DirtyFlag::listening(false, &character_source),
@@ -191,9 +190,9 @@ impl Vui {
             content,
         } = &*self.state.get()
         {
-            let content: WidgetTree = match content.try_ref() {
-                Some(tree) => (*tree).clone(),
-                None => LayoutTree::empty(),
+            let content: vui::Page = match content.try_ref() {
+                Some(page) => (*page).clone(),
+                None => vui::Page::empty(),
             };
             self.dump_page = PageInst::new(content);
         }
@@ -347,10 +346,8 @@ impl Vui {
     }
 
     pub fn show_modal_message(&mut self, message: ArcStr) {
-        let content = EphemeralOpaque::from(Arc::new(pages::new_message_widget_tree(
-            message,
-            &self.hud_inputs,
-        )));
+        let content =
+            EphemeralOpaque::from(Arc::new(pages::new_message_page(message, &self.hud_inputs)));
         self.set_state(VuiPageState::Dump {
             previous: self.state.get(),
             content,
@@ -527,7 +524,7 @@ pub(crate) enum VuiPageState {
     /// viewing various reports/dialogs until we have a better idea.
     Dump {
         previous: Arc<VuiPageState>,
-        content: EphemeralOpaque<WidgetTree>,
+        content: EphemeralOpaque<vui::Page>,
     },
 }
 
