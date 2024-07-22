@@ -206,19 +206,21 @@ impl Vui {
         let size = self.last_ui_size;
         let universe = &mut self.universe;
 
-        let next_space: Option<Handle<Space>> = match &*self.state.get() {
-            VuiPageState::Hud => Some(self.hud_page.get_or_create_space(size, universe)),
-            VuiPageState::Paused => Some(self.paused_page.get_or_create_space(size, universe)),
-            VuiPageState::Options => Some(self.options_page.get_or_create_space(size, universe)),
-            VuiPageState::AboutText => Some(self.about_page.get_or_create_space(size, universe)),
-            VuiPageState::Progress => Some(self.progress_page.get_or_create_space(size, universe)),
+        let next_page: Option<&mut PageInst> = match &*self.state.get() {
+            VuiPageState::Hud => Some(&mut self.hud_page),
+            VuiPageState::Paused => Some(&mut self.paused_page),
+            VuiPageState::Options => Some(&mut self.options_page),
+            VuiPageState::AboutText => Some(&mut self.about_page),
+            VuiPageState::Progress => Some(&mut self.progress_page),
 
             // Note: checking the `content` is handled in `set_state()`.
             VuiPageState::Dump {
                 previous: _,
                 content: _,
-            } => Some(self.dump_page.get_or_create_space(size, universe)),
+            } => Some(&mut self.dump_page),
         };
+        let next_space: Option<Handle<Space>> =
+            next_page.map(|p| p.get_or_create_space(size, universe));
 
         if next_space.as_ref() != Option::as_ref(&self.current_view.get().space) {
             self.current_view
