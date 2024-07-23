@@ -15,14 +15,16 @@ Project organization
 This repository is divided into several Rust packages:
 
 * `all-is-cubes/` is a library containing all of the fundamental data types and simulation algorithms.
+* `all-is-cubes-render/` is a library containing the CPU raytracer rendering code, and abstract rendering types and traits.
 * `all-is-cubes-mesh/` is a library containing algorithms to generate triangle meshes from the voxel data.
 * `all-is-cubes-gpu/` is a library containing the GPU-based rendering code, depending on [`wgpu`](https://wgpu.rs/).
 * `all-is-cubes-ui/` is a library containing a widget framework and basic user interface functions (not platform-specific).
 * `all-is-cubes-content/` is a library containing “game content” — procedural generation and demos — that does not need to be part of the core library but is used by all of the below binaries.
-* `all-is-cubes-port/` is a library implementing import and export to various formats.
-* `all-is-cubes-desktop/` is a standalone game app which will use `winit` and `wgpu` for platform windowing & graphics, or ASCII-art raytracing in the terminal.
+* `all-is-cubes-port/` is a library implementing import and export to various file formats.
+* `all-is-cubes-desktop/` is a standalone game app which uses `winit` and `wgpu` for platform windowing & graphics, or ASCII-art raytracing in the terminal.
 * `all-is-cubes-wasm/` is the game app code for the browser/WebAssembly environment (if compiled outside of `wasm32` architecture, it will be an empty crate).
 * `all-is-cubes-server/` is to be a network server for the game, but right now only contains a preconfigured HTTP static file server.
+* `all-is-cubes-base/` is for internal use only.
 
 The following packages and other directories are for testing:
 
