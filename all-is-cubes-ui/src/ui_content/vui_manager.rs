@@ -39,7 +39,14 @@ pub(crate) struct Vui {
     /// The space that should be displayed to the user, drawn on top of the world.
     /// The value of this cell is derived from `self.state`.
     current_view: ListenableCell<UiViewState>,
-    /// Identifies which “page” the UI should be showing — what
+
+    /// The `focus_on_ui` value from the current [`vui::Page`].
+    ///
+    /// TODO: this is a kludge which should be part of a more general mechanism
+    /// analogous to `UiViewState.`
+    current_focus_on_ui: bool,
+
+    /// Identifies which [`Page`] the UI should be showing — what
     /// should be in `current_space`, taken from one of the [`PageInst`]s.
     state: ListenableCell<VuiPageState>,
 
@@ -148,7 +155,9 @@ impl Vui {
 
         let mut new_self = Self {
             universe,
+
             current_view: ListenableCell::new(UiViewState::default()),
+            current_focus_on_ui: false,
             state: ListenableCell::new(VuiPageState::Hud),
 
             changed_viewport,
@@ -178,6 +187,15 @@ impl Vui {
     // TODO: It'd be more encapsulating if we could provide a _read-only_ Handle...
     pub fn view(&self) -> ListenableSource<UiViewState> {
         self.current_view.as_source()
+    }
+
+    /// Returns whether the input/output mechanisms for this UI should direct input to the UI
+    /// rather than gameplay controls. That is: disable mouselook and direct typing to text input.
+    //---
+    // TODO: This should be public and be a ListenableCell, but we don't really know what the name
+    // and data type should be
+    pub(crate) fn should_focus_on_ui(&self) -> bool {
+        self.current_focus_on_ui
     }
 
     pub(crate) fn set_state(&mut self, state: impl Into<Arc<VuiPageState>>) {
@@ -223,6 +241,7 @@ impl Vui {
         if Some(&next_space) != Option::as_ref(&self.current_view.get().space) {
             self.current_view
                 .set(Self::view_state_for(Some(next_space), &self.hud_inputs));
+            self.current_focus_on_ui = next_page.page().focus_on_ui;
             log::trace!(
                 "UI switched to {:?} ({:?})",
                 self.current_view.get().space,

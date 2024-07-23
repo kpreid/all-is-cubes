@@ -103,6 +103,12 @@ pub(crate) struct Page {
 
     /// How the tree should be presented on screen.
     pub layout: PageLayout,
+
+    /// Whether, when this page is displayed,
+    ///
+    /// * mouselook is cancelled
+    /// * TODO: keyboard focus should go to UI elements and not to gameplay controls
+    pub focus_on_ui: bool,
 }
 
 impl Page {
@@ -110,6 +116,7 @@ impl Page {
         Self {
             tree: LayoutTree::empty(),
             layout: PageLayout::Hud,
+            focus_on_ui: false,
         }
     }
 
@@ -138,6 +145,7 @@ impl Page {
         Page {
             tree,
             layout: vui::PageLayout::Hud, // TODO: should have a scrollable-if-too-big dialog layout
+            focus_on_ui: true,
         }
     }
 }
@@ -234,6 +242,10 @@ impl PageInst {
             .unwrap();
 
         Ok(space)
+    }
+
+    pub fn page(&self) -> &Page {
+        &self.page
     }
 }
 

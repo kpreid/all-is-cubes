@@ -1,16 +1,16 @@
 use core::time::Duration;
 use std::collections::{HashMap, HashSet};
 
-use all_is_cubes_render::camera::{
-    FogOption, GraphicsOptions, LightingOption, NdcPoint2, NominalPixel, RenderMethod,
-    TransparencyOption, Viewport,
-};
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{notnan, FreeCoordinate, FreeVector};
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{Handle, Universe};
+use all_is_cubes_render::camera::{
+    FogOption, GraphicsOptions, LightingOption, NdcPoint2, NominalPixel, RenderMethod,
+    TransparencyOption, Viewport,
+};
 
 use crate::apps::ControlMessage;
 
@@ -288,6 +288,7 @@ impl InputProcessor {
             paused: paused_opt,
             graphics_options,
             control_channel,
+            ui,
         } = targets;
 
         // TODO: universe input is not yet used but it will be, as we start having inputs that trigger transactions
@@ -295,6 +296,14 @@ impl InputProcessor {
 
         let dt = tick.delta_t().as_secs_f64();
         let key_turning_step = 80.0 * dt;
+
+        // Effects of UI on input processing.
+        // TODO: this should be done *after* a session step in addition to before, for lower
+        // latency / immediate effects -- but currently this is the only place we have
+        // `InputTargets` available.
+        if ui.is_some_and(|ui| ui.should_focus_on_ui()) && *self.mouselook_mode.get() {
+            self.mouselook_mode.set(false)
+        }
 
         // Direct character controls
         if let Some(character_ref) = character_opt {
@@ -472,6 +481,7 @@ pub(crate) struct InputTargets<'a> {
     // TODO: replace cells with control channel?
     // TODO: make the control channel a type alias?
     pub control_channel: Option<&'a flume::Sender<ControlMessage>>,
+    pub ui: Option<&'a crate::ui_content::Vui>,
 }
 
 /// A platform-neutral representation of keyboard keys for [`InputProcessor`].
@@ -497,6 +507,7 @@ mod tests {
     use super::*;
     use all_is_cubes::euclid::vec3;
     use all_is_cubes::space::Space;
+    use all_is_cubes::time;
 
     fn apply_input_helper(
         input: &mut InputProcessor,
@@ -510,6 +521,7 @@ mod tests {
                 paused: None,
                 graphics_options: None,
                 control_channel: None,
+                ui: None,
             },
             Tick::arbitrary(),
         );
@@ -542,6 +554,55 @@ mod tests {
         input.key_down(Key::Character('d'));
         assert_eq!(input.movement(), vec3(1., 0., 0.));
         // TODO: test (and handle) key events arriving while focus is lost, just in case.
+    }
+
+    /// Test when the pause menu (or any menu, really) is displayed,
+    /// mouselook is ended so the mouse  can interact with the menus.
+    #[tokio::test]
+    async fn pause_menu_cancels_mouselook() {
+        let paused = ListenableCell::new(false);
+        // TODO: This test is both verbose and expensive.
+        // We need simpler way to create a cheap Vui for a test, or some abstraction here.
+        let (cctx, _) = flume::bounded(1);
+        let mut ui = crate::ui_content::Vui::new(
+            &InputProcessor::new(),
+            ListenableSource::constant(None),
+            paused.as_source(),
+            ListenableSource::constant(GraphicsOptions::default()),
+            cctx,
+            ListenableSource::constant(Viewport::ARBITRARY),
+            ListenableSource::constant(None),
+            None,
+            None,
+        )
+        .await;
+
+        // Create input processor and set it to have mouselook mode
+        let mut input = InputProcessor::new();
+        input.toggle_mouselook_mode();
+        assert!(input.mouselook_mode().snapshot());
+
+        // No effect when unpaused...
+        input.apply_input(
+            InputTargets {
+                ui: Some(&ui),
+                ..InputTargets::default()
+            },
+            Tick::arbitrary(),
+        );
+        assert!(input.mouselook_mode().snapshot());
+
+        // But when paused, the UI enters the pause menu and, as a consequence, cancels mouselook.
+        paused.set(true);
+        ui.step(Tick::arbitrary(), time::DeadlineNt::Asap);
+        input.apply_input(
+            InputTargets {
+                ui: Some(&ui),
+                ..InputTargets::default()
+            },
+            Tick::arbitrary(),
+        );
+        assert!(!input.mouselook_mode().snapshot());
     }
 
     #[test]

@@ -14,7 +14,6 @@ use futures_task::noop_waker_ref;
 use sync_wrapper::SyncWrapper;
 
 use all_is_cubes::arcstr::{self, ArcStr};
-use all_is_cubes_render::camera::{GraphicsOptions, Layers, StandardCameras, UiViewState, Viewport};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
@@ -28,6 +27,9 @@ use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{self, Handle, Universe, UniverseId, UniverseStepInfo};
 use all_is_cubes::util::{
     ConciseDebug, Fmt, Refmt as _, ShowStatus, StatusText, YieldProgressBuilder,
+};
+use all_is_cubes_render::camera::{
+    GraphicsOptions, Layers, StandardCameras, UiViewState, Viewport,
 };
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
@@ -335,6 +337,7 @@ impl<I: time::Instant> Session<I> {
                         paused: Some(&self.paused),
                         graphics_options: Some(&shuttle.graphics_options),
                         control_channel: Some(&self.control_channel_sender),
+                        ui: shuttle.ui.as_ref(),
                     },
                     game_tick,
                 );
