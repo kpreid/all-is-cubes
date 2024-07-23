@@ -32,7 +32,7 @@ pub(crate) type Storage<T> = BTreeMap<Name, RootHandle<T>>;
 /// public-in-private.
 #[doc(hidden)]
 #[allow(unnameable_types)]
-pub trait UniverseMember: Sized + 'static {
+pub trait UniverseMember: Sized + 'static + fmt::Debug {
     /// Generic constructor for [`AnyHandle`].
     fn into_any_handle(r: Handle<Self>) -> AnyHandle;
 }

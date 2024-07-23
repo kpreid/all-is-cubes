@@ -670,7 +670,7 @@ impl<T> RootHandle<T> {
 
 /// Object-safe trait implemented for [`Handle`], to allow code to operate on `Handle<T>`
 /// regardless of `T`.
-pub trait ErasedHandle: core::any::Any {
+pub trait ErasedHandle: core::any::Any + fmt::Debug {
     /// Same as [`Handle::name()`].
     fn name(&self) -> Name;
 
@@ -769,18 +769,23 @@ mod tests {
     #[test]
     fn handle_debug_in_universe() {
         let mut u = Universe::new();
-        let r = u
+        let handle = u
             .insert("foo".into(), BlockDef::new(color_block!(Rgba::WHITE)))
             .unwrap();
-        assert_eq!(format!("{r:?}"), "Handle('foo')");
-        assert_eq!(format!("{r:#?}"), "Handle('foo')");
+        assert_eq!(format!("{handle:?}"), "Handle('foo')");
+        assert_eq!(format!("{handle:#?}"), "Handle('foo')");
+
+        // Confirm that `ErasedHandle` also implements `Debug`.
+        // We don't need any further tests because it's a simple delegation.
+        let erased: &dyn ErasedHandle = &handle;
+        assert_eq!(format!("{erased:?}"), "Handle('foo')");
     }
 
     #[test]
     fn handle_debug_pending() {
-        let r = Handle::new_pending("foo".into(), BlockDef::new(color_block!(Rgba::WHITE)));
+        let handle = Handle::new_pending("foo".into(), BlockDef::new(color_block!(Rgba::WHITE)));
         assert_eq!(
-            format!("{r:?}"),
+            format!("{handle:?}"),
             "Handle('foo' in no universe = BlockDef { \
                 block: Block { primitive: Atom { \
                     color: Rgba(1.0, 1.0, 1.0, 1.0), \
@@ -790,7 +795,7 @@ mod tests {
                 notifier: Notifier(0), .. })"
         );
         assert_eq!(
-            format!("{r:#?}"),
+            format!("{handle:#?}"),
             indoc::indoc! { "\
             Handle('foo' in no universe = BlockDef {
                 block: Block {
