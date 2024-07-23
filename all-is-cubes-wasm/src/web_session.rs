@@ -13,12 +13,12 @@ use web_sys::{
     FocusEvent, HtmlElement, HtmlProgressElement, KeyboardEvent, MouseEvent, Text,
 };
 
-use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes::universe::{Universe, UniverseStepInfo};
 use all_is_cubes_gpu::in_wgpu;
 use all_is_cubes_port::file::NonDiskFile;
+use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes_ui::apps::{CursorIcon, Key};
 
 use crate::js_bindings::GuiHelpers;
@@ -109,6 +109,15 @@ impl WebSession {
     /// This method is broken out of `new()` so we can just use `self`. Well, some of the time.
     /// TODO: reconsider
     fn init_dom(self: Rc<Self>) {
+        let document = &self
+            .gui_helpers
+            .canvas_helper()
+            .canvas()
+            .owner_document()
+            .unwrap();
+        let mut options_passive_true = AddEventListenerOptions::new();
+        options_passive_true.passive(true);
+
         self.add_canvas_to_self_event_listener(
             "keydown",
             false,
@@ -207,7 +216,6 @@ impl WebSession {
         {
             let weak_self_ref: Weak<Self> = Rc::downgrade(&self);
             let ch = self.gui_helpers.canvas_helper();
-            let target = &ch.canvas().owner_document().unwrap();
             let listener = move |_event: Event| {
                 Self::upgrade_in_callback(&weak_self_ref, |this, _inner| {
                     let state = Some(ch.is_fullscreen());
@@ -215,11 +223,45 @@ impl WebSession {
                     this.fullscreen_cell.set(state);
                 })
             };
-            let mut options = AddEventListenerOptions::new();
-            options.passive(true);
-            add_event_listener(target, "fullscreenchange", listener.clone(), &options);
+            add_event_listener(
+                document,
+                "fullscreenchange",
+                listener.clone(),
+                &options_passive_true,
+            );
             // Safari still does not have unprefixed fullscreen API as of version 16.1
-            add_event_listener(target, "webkitfullscreenchange", listener, &options);
+            add_event_listener(
+                document,
+                "webkitfullscreenchange",
+                listener,
+                &options_passive_true,
+            );
+        }
+
+        // pointerlock* listeners, which go on the document, not the canvas
+        {
+            let weak_self_ref: Weak<Self> = Rc::downgrade(&self);
+            let listener = move |_event: Event| {
+                Self::upgrade_in_callback(&weak_self_ref, |this, inner| {
+                    if !this.check_pointer_lock() {
+                        // If pointer lock was active and stopped, or if it failed to activate,
+                        // then acknowledge this in the UI and stop trying.
+                        inner.session.input_processor.set_mouselook_mode(false);
+                    }
+                })
+            };
+            add_event_listener(
+                document,
+                "pointerlockchange",
+                listener.clone(),
+                &options_passive_true,
+            );
+            add_event_listener(
+                document,
+                "pointerlockerror",
+                listener,
+                &options_passive_true,
+            );
         }
 
         // File drop listener.

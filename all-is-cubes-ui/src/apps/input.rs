@@ -431,11 +431,16 @@ impl InputProcessor {
         self.mouselook_mode.as_source()
     }
 
-    // TODO: duplicated with the keybinding impl because of borrow conflicts
     pub(crate) fn toggle_mouselook_mode(&mut self) {
-        let new_state = !*self.mouselook_mode.get();
-        self.mouselook_mode.set(new_state);
-        if new_state {
+        self.set_mouselook_mode(!*self.mouselook_mode.get());
+    }
+
+    /// Activates or deactivates mouselook mode, identically to user input doing so.
+    pub fn set_mouselook_mode(&mut self, active: bool) {
+        // Note: duplicated with the keybinding impl because of borrow conflicts
+        let was_active = *self.mouselook_mode.get();
+        self.mouselook_mode.set(active);
+        if active && !was_active {
             // Clear delta tracking just in case
             self.mouse_previous_pixel_position = None;
         }
