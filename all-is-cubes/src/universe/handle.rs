@@ -740,7 +740,7 @@ impl alloc::borrow::ToOwned for dyn ErasedHandle {
     type Owned = AnyHandle;
 
     fn to_owned(&self) -> Self::Owned {
-        todo!()
+        self.to_any_handle()
     }
 }
 
