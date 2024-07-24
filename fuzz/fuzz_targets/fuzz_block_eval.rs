@@ -5,6 +5,7 @@ use libfuzzer_sys::fuzz_target;
 
 extern crate all_is_cubes;
 use all_is_cubes::block::Block;
+use all_is_cubes::universe::{self, VisitHandles as _};
 
 fuzz_target!(|block: Block| {
     // TODO: The `Block` will have pending `Handle`s (not inserted in a Universe).
@@ -22,6 +23,6 @@ fuzz_target!(|block: Block| {
     }
 
     // Exercise visit_handles(), because it is a recursive operation on the block + modifiers.
-    // TODO: To do this we need a handy visitor, but I think it should be simplified...
-    // block.visit_handles(visitor);
+    // Unfortunately there's not much we can predict about it.
+    block.visit_handles(&mut |_: &dyn universe::ErasedHandle| {});
 });
