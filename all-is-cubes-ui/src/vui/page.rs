@@ -144,7 +144,7 @@ impl Page {
 
         Page {
             tree,
-            layout: vui::PageLayout::Hud, // TODO: should have a scrollable-if-too-big dialog layout
+            layout: vui::PageLayout::Dialog,
             focus_on_ui: true,
         }
     }
@@ -158,6 +158,11 @@ pub(crate) enum PageLayout {
     /// * The root [`LayoutGrant`] is always an odd width and height.
     /// * Z = 0 meets the top and bottom edges of the viewport (if feasible).
     Hud,
+
+    /// Layout designed for displaying dialog boxes.
+    ///
+    /// TODO: Give it appropriate characteristics and document them.
+    Dialog,
 }
 
 impl PageLayout {
@@ -171,7 +176,7 @@ impl PageLayout {
         let mut ui_center = bounds.center();
 
         match self {
-            PageLayout::Hud => {
+            PageLayout::Hud | PageLayout::Dialog => {
                 // Arrange a view distance which will place the Z=0 plane sized to fill the viewport
                 // vertically.
                 ui_center.z = 0.0;
@@ -216,7 +221,7 @@ impl PageInst {
 
         // TODO: there will be multiple layouts and the size calculation will depend on the layout
         match self.page.layout {
-            PageLayout::Hud => {}
+            PageLayout::Hud | PageLayout::Dialog => {}
         }
 
         // If necessary, enlarge the proposed dimensions.
