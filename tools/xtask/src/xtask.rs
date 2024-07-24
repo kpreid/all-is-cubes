@@ -75,7 +75,10 @@ enum XtaskCommand {
         no_run: bool,
     },
 
-    /// Compile and report warnings without testing.
+    /// Check for lint and generate documentation, but do not test.
+    ///
+    /// Caution: If there are rustc or clippy warnings only, the exit code is still zero.
+    /// <https://github.com/rust-lang/rust-clippy/issues/1209>
     Lint,
 
     /// Format code (as `cargo fmt` but covering all packages)
@@ -201,7 +204,7 @@ fn main() -> Result<(), ActionError> {
             // libraries with docs elsewhere.
             if config.scope.includes_main_workspace() {
                 let _t = CaptureTime::new(&mut time_log, "doc");
-                cargo().arg("doc").run()?;
+                cargo().env("RUSTDOCFLAGS", "-Dwarnings").arg("doc").run()?;
             }
         }
         XtaskCommand::Fmt => {
