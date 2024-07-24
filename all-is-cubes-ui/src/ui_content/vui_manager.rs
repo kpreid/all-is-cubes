@@ -7,8 +7,7 @@ use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
-use all_is_cubes::math::FreeCoordinate;
-use all_is_cubes::math::{FreeVector, NotNan};
+use all_is_cubes::math::NotNan;
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
@@ -237,10 +236,14 @@ impl Vui {
             } => &mut self.dump_page,
         };
         let next_space: Handle<Space> = next_page.get_or_create_space(size, universe);
+        let layout = next_page.page().layout;
 
         if Some(&next_space) != Option::as_ref(&self.current_view.get().space) {
-            self.current_view
-                .set(Self::view_state_for(Some(next_space), &self.hud_inputs));
+            self.current_view.set(Self::view_state_for(
+                layout,
+                Some(next_space),
+                &self.hud_inputs,
+            ));
             self.current_focus_on_ui = next_page.page().focus_on_ui;
             log::trace!(
                 "UI switched to {:?} ({:?})",
@@ -250,13 +253,17 @@ impl Vui {
         }
     }
 
-    fn view_state_for(space: Option<Handle<Space>>, inputs: &HudInputs) -> UiViewState {
+    fn view_state_for(
+        page_layout: vui::PageLayout,
+        space: Option<Handle<Space>>,
+        inputs: &HudInputs,
+    ) -> UiViewState {
         // TODO: compute the derived graphics options only once
         let graphics_options = Self::graphics_options(inputs.graphics_options.snapshot());
 
         UiViewState {
             view_transform: match space.as_ref() {
-                Some(space) => Self::view_transform(
+                Some(space) => page_layout.view_transform(
                     &space.read().unwrap(), // TODO: eliminate this unwrap
                     graphics_options.fov_y.into_inner(),
                 ),
@@ -265,27 +272,6 @@ impl Vui {
             space,
             graphics_options,
         }
-    }
-
-    /// Computes a [`ViewTransform`] that should be used to view the [`Vui::current_space`].
-    ///
-    /// It does not need to be rechecked other than on aspect ratio changes.
-    ///
-    /// TODO: used to be public before [`UiViewState`]; refactor in light of
-    fn view_transform(space: &Space, fov_y_degrees: FreeCoordinate) -> ViewTransform {
-        let bounds = space.bounds();
-        let mut ui_center = bounds.center();
-
-        // Arrange a view distance which will place the Z=0 plane sized to fill the viewport
-        // (at least vertically, as we don't have aspect ratio support yet).
-        ui_center.z = 0.0;
-
-        let view_distance = FreeCoordinate::from(bounds.size().height)
-            / (fov_y_degrees / 2.).to_radians().tan()
-            / 2.;
-        ViewTransform::from_translation(
-            ui_center.to_vector() + FreeVector::new(0., 0., view_distance),
-        )
     }
 
     /// Compute graphics options to render the VUI space given the user's regular options.

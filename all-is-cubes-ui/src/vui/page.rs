@@ -7,12 +7,12 @@ use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{size2, Size2D};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba,
+    Cube, Face6, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba,
 };
 use all_is_cubes::space::{self, Space, SpaceBuilder, SpacePhysics};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Universe};
-use all_is_cubes_render::camera;
+use all_is_cubes_render::camera::{self, ViewTransform};
 
 use crate::vui::{
     self, install_widgets, widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest,
@@ -158,6 +158,33 @@ pub(crate) enum PageLayout {
     /// * The root [`LayoutGrant`] is always an odd width and height.
     /// * Z = 0 meets the top and bottom edges of the viewport (if feasible).
     Hud,
+}
+
+impl PageLayout {
+    /// Calculate the camera view transform that should be used for a page with this layout.
+    pub(crate) fn view_transform(
+        self,
+        space: &Space,
+        fov_y_degrees: FreeCoordinate,
+    ) -> ViewTransform {
+        let bounds = space.bounds();
+        let mut ui_center = bounds.center();
+
+        match self {
+            PageLayout::Hud => {
+                // Arrange a view distance which will place the Z=0 plane sized to fill the viewport
+                // vertically.
+                ui_center.z = 0.0;
+
+                let view_distance = FreeCoordinate::from(bounds.size().height)
+                    / (fov_y_degrees / 2.).to_radians().tan()
+                    / 2.;
+                ViewTransform::from_translation(
+                    ui_center.to_vector() + FreeVector::new(0., 0., view_distance),
+                )
+            }
+        }
+    }
 }
 
 /// Pair of a [`Page`] and a cached space that is an instantiation of its widgets,
