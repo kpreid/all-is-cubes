@@ -113,6 +113,7 @@ clippy.cast_possible_truncation = "allow" # we would need an alternative for int
 clippy.cast_precision_loss = "allow" # consider enabling
 clippy.cast_sign_loss = "allow" # consider enabling
 clippy.default_trait_access = "allow"
+clippy.empty_enum = "allow"
 clippy.enum_glob_use = "allow"
 clippy.explicit_iter_loop = "allow" # I prefer the opposite style
 clippy.float_cmp = "allow"
