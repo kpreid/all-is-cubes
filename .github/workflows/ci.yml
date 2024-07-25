@@ -458,13 +458,17 @@ jobs:
         rustup toolchain install stable --profile minimal
         rustup target add thumbv7em-none-eabihf
 
-    - name: no_std build
-      run: |
-        cargo check --no-default-features -p all-is-cubes --target thumbv7em-none-eabihf
+    # TODO: move this command into xtask so it centrally tracks package info like "no_std compatible"
 
     - name: no_std lint
       run: |
-        cargo clippy --no-default-features -p all-is-cubes --target thumbv7em-none-eabihf
+        cargo clippy --target=thumbv7em-none-eabihf --no-default-features -p all-is-cubes -p all-is-cubes-render
+
+    - name: no_std build
+      # This is `cargo build`, not `cargo check`, because `cargo check` won't detect problems like
+      # use of undefined linker symbols. Not sure if that matters.
+      run: |
+        cargo build --target=thumbv7em-none-eabihf --no-default-features -p all-is-cubes -p all-is-cubes-render
 
   fuzz:
     # Don't spend time on fuzzing if the build failed indicating the code is bad other ways
