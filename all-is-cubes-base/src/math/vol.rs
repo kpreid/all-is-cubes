@@ -525,7 +525,10 @@ impl<V, O> Vol<Box<[V]>, O> {
         Vol {
             bounds: self.bounds,
             ordering: self.ordering,
-            contents: self.contents.into_vec().into_iter().map(f).collect(),
+            // When we switch to Rust 2024 edition, replace this qualified call with a method call.
+            contents: <Box<[V]> as IntoIterator>::into_iter(self.contents)
+                .map(f)
+                .collect(),
         }
     }
 }
