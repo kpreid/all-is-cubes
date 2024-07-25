@@ -120,7 +120,7 @@ pub fn image_path(image_id: &ImageId, version: Version) -> PathBuf {
     } else {
         format!("-{serial_number}")
     };
-    path.push(&format!("{test}{serial_str}-{renderer}.png"));
+    path.push(format!("{test}{serial_str}-{renderer}.png"));
 
     path
 }

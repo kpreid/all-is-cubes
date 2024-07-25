@@ -25,7 +25,7 @@ fn template_bench(c: &mut Criterion) {
 
     for template in UniverseTemplate::iter().filter(|t| !matches!(t, UniverseTemplate::Islands)) {
         // TODO: specify a small size for each, where possible
-        group.bench_function(&format!("{template}"), |b| {
+        group.bench_function(format!("{template}"), |b| {
             b.to_async(FuturesExecutor).iter_with_large_drop(|| {
                 template.clone().build::<std::time::Instant>(
                     yield_progress_for_testing(),

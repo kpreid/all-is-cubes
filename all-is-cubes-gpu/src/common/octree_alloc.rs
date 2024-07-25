@@ -296,7 +296,7 @@ fn fits(request: GridAab, size_exponent: u8) -> bool {
 }
 
 fn max_edge_length(size: math::GridSize) -> GridSizeCoord {
-    size.width.max(size.height).max(size.depth).max(0)
+    size.width.max(size.height).max(size.depth)
 }
 
 fn max_edge_length_exponent(size: math::GridSize) -> u8 {
