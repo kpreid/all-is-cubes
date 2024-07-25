@@ -424,7 +424,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             postprocess_bind_group: Memo::new(),
             postprocess_camera_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("EverythingRenderer::postprocess_camera_buffer"),
-                size: mem::size_of::<PostprocessUniforms>().try_into().unwrap(),
+                size: size_of::<PostprocessUniforms>().try_into().unwrap(),
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),

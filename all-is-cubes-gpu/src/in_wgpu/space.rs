@@ -382,7 +382,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             bwp.device,
             &wgpu::BufferDescriptor {
                 label: Some(&self.instance_buffer_label),
-                size: u64::try_from(total_instance_count * mem::size_of::<WgpuInstanceData>())
+                size: u64::try_from(total_instance_count * size_of::<WgpuInstanceData>())
                     .expect("instance buffer size overflow"),
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::VERTEX,
                 mapped_at_creation: false,
@@ -648,7 +648,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         {
             let mut instance_data = instance_data.as_slice();
             let buffer_capacity = self.instance_buffer.get().map_or(0, |b| b.size() as usize)
-                / mem::size_of::<WgpuInstanceData>();
+                / size_of::<WgpuInstanceData>();
             let len = instance_data.len();
             if len > buffer_capacity {
                 // Doing anything about this is probably futile, because wgpu will emit a validation
@@ -827,7 +827,7 @@ impl SpaceCameraBuffer {
     pub fn new(space_label: &str, device: &wgpu::Device, pipelines: &Pipelines) -> Self {
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(&format!("{space_label} camera_buffer")),
-            size: mem::size_of::<ShaderSpaceCamera>().try_into().unwrap(),
+            size: size_of::<ShaderSpaceCamera>().try_into().unwrap(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });

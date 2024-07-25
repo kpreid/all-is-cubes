@@ -184,7 +184,7 @@ where
 
     // Check that the format matches
     let format = texture.format();
-    let size_of_texel = components * std::mem::size_of::<C>();
+    let size_of_texel = components * size_of::<C>();
     assert_eq!(
         (format.block_copy_size(None), format.block_dimensions()),
         (Some(size_of_texel as u32), (1, 1)),

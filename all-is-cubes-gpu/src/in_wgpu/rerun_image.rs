@@ -1,6 +1,5 @@
 //! Exports the rendered image to Rerun.
 
-use std::mem;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
@@ -91,7 +90,7 @@ impl RerunImageExport {
             || {
                 let camera_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("RerunImageExport::camera_buffer"),
-                    size: mem::size_of::<RerunCopyCamera>() as u64,
+                    size: size_of::<RerunCopyCamera>() as u64,
                     usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
                     mapped_at_creation: false,
                 });
@@ -156,7 +155,7 @@ impl RerunImageExport {
             .write_buffer_with(
                 camera_buffer,
                 0,
-                NonZeroU64::new(mem::size_of::<RerunCopyCamera>() as u64).unwrap(),
+                NonZeroU64::new(size_of::<RerunCopyCamera>() as u64).unwrap(),
             )
             .unwrap()
             .copy_from_slice(bytemuck::bytes_of(&RerunCopyCamera {

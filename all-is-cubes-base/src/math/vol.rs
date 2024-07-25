@@ -642,7 +642,7 @@ pub(crate) mod vol_arb {
         // Depending on the volume, we could end up consuming as little as 1 byte each
         // for the sizes, and none for the positions, because `int_in_range()` uses the range
         // to decide how many bytes to consume.
-        let gc = core::mem::size_of::<GridCoordinate>();
+        let gc = size_of::<GridCoordinate>();
         (3 + 1, Some(gc * 6 + 1))
     };
 

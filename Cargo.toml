@@ -43,7 +43,7 @@ resolver = "2"
 # When changing any of these values, be sure to also update the non-workspace packages
 # as listed above, if applicable.
 edition = "2021"
-rust-version = "1.79"
+rust-version = "1.80"
 license = "MIT OR Apache-2.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 # TODO: add homepage = "..." when we have one
@@ -159,8 +159,7 @@ rust.trivial_numeric_casts = "warn"
 rust.unnameable_types = "warn"
 rust.unused_extern_crates = "warn"
 rust.unused_lifetimes = "warn"
-# TODO: Reenable unused_qualifications when Rust 1.80 is released and we've updated our `mem::size_of` calls.
-# rust.unused_qualifications = "warn"
+rust.unused_qualifications = "warn"
 # This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
 # rust.unused_crate_dependencies = "warn"
 

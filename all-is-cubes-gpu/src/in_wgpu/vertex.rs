@@ -84,7 +84,7 @@ impl WgpuBlockVertex {
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: Self::ATTRIBUTE_LAYOUT,
         }
@@ -195,7 +195,7 @@ impl WgpuInstanceData {
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
             attributes: Self::ATTRIBUTE_LAYOUT,
         }
@@ -224,7 +224,7 @@ impl WgpuLinesVertex {
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+            array_stride: size_of::<Self>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: Self::ATTRIBUTE_LAYOUT,
         }
@@ -274,15 +274,14 @@ impl From<FixTexCoord> for f32 {
 mod tests {
     use super::*;
     use all_is_cubes::math::{Face6, Rgba};
-    use std::mem;
 
     /// Assert the vertex's size, just so that we're reminded to think about it when we
     /// change the amount of data in it. This assertion is not platform-dependent because
     /// the struct is designed to have a fixed layout communicating to the shader anyway.
     #[test]
     fn vertex_size() {
-        assert_eq!(mem::size_of::<WgpuBlockVertex>(), 40);
-        assert_eq!(mem::size_of::<WgpuLinesVertex>(), 28);
+        assert_eq!(size_of::<WgpuBlockVertex>(), 40);
+        assert_eq!(size_of::<WgpuLinesVertex>(), 28);
     }
 
     /// Test implementation of [`GfxVertex::position()`],

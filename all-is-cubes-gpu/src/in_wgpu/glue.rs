@@ -61,7 +61,7 @@ pub fn write_texture_by_aab<T: Pod>(
         bytemuck::cast_slice::<T, u8>(data),
         wgpu::ImageDataLayout {
             offset: 0,
-            bytes_per_row: Some(std::mem::size_of::<T>() as u32 * region.size().width),
+            bytes_per_row: Some(size_of::<T>() as u32 * region.size().width),
             rows_per_image: Some(region.size().height),
         },
         size3d_to_extent(region.size()),

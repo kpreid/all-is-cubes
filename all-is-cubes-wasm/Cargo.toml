@@ -6,7 +6,7 @@ name = "all-is-cubes-wasm"
 version = "0.8.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 edition = "2021"
-rust-version = "1.79"
+rust-version = "1.80"
 description = "Web client for the recursive voxel game All is Cubes."
 # TODO: add homepage = "..." when we have one
 repository = "https://github.com/kpreid/all-is-cubes"
@@ -98,8 +98,7 @@ rust.trivial_numeric_casts = "warn"
 rust.unnameable_types = "warn"
 rust.unused_extern_crates = "warn"
 rust.unused_lifetimes = "warn"
-# TODO: Reenable unused_qualifications when Rust 1.80 is released and we've updated our `mem::size_of` calls.
-# rust.unused_qualifications = "warn"
+rust.unused_qualifications = "warn"
 # This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
 # rust.unused_crate_dependencies = "warn"
 

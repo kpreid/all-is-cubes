@@ -218,7 +218,6 @@ mod tests {
     use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
     use crate::op::Operation;
     use crate::universe::Universe;
-    use core::mem::size_of;
     use pretty_assertions::assert_eq;
 
     /// Track the size of the `Modifier` enum to make sure we don't accidentally make it bigger

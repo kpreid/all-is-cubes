@@ -136,7 +136,7 @@ impl Page {
                     ),
                 })),
                 vui::leaf_widget(widgets::Frame::with_block(color_block!(0., 0., 0., 0.7))),
-                Arc::new(vui::LayoutTree::Shrink(
+                Arc::new(LayoutTree::Shrink(
                     theme.dialog_background().as_background_of(contents),
                 )),
             ],
@@ -144,7 +144,7 @@ impl Page {
 
         Page {
             tree,
-            layout: vui::PageLayout::Dialog,
+            layout: PageLayout::Dialog,
             focus_on_ui: true,
         }
     }

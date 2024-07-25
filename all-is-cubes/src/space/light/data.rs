@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn packed_light_is_packed() {
         // Technically this is not guaranteed by the compiler, but if it's false something probably went wrong.
-        assert_eq!(core::mem::size_of::<PackedLight>(), 4);
+        assert_eq!(size_of::<PackedLight>(), 4);
     }
 
     /// Demonstrate what range and step sizes we get out of the encoding.

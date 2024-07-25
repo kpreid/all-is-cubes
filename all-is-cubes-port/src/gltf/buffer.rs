@@ -4,7 +4,6 @@ use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io;
-use std::mem::size_of;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 

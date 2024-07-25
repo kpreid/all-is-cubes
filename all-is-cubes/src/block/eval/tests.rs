@@ -1,5 +1,3 @@
-use std::mem::size_of;
-
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 

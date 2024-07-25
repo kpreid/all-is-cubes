@@ -1,5 +1,3 @@
-use std::mem;
-
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::space::Sky;
 use half::f16;
@@ -135,7 +133,7 @@ fn compute_skybox(queue: &wgpu::Queue, texture: &wgpu::Texture, sky: &Sky) {
         bytemuck::cast_slice::<[Component; CHANNELS], u8>(&data[..]),
         wgpu::ImageDataLayout {
             offset: 0,
-            bytes_per_row: Some(resolution * (mem::size_of::<Component>() * CHANNELS) as u32),
+            bytes_per_row: Some(resolution * (size_of::<Component>() * CHANNELS) as u32),
             rows_per_image: Some(resolution),
         },
         texture.size(),
