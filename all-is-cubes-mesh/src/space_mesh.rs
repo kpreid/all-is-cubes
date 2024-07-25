@@ -907,9 +907,8 @@ impl DepthOrdering {
 
     #[allow(dead_code)] // TODO: not currently used but should it be in tests?
     fn from_index(index: usize) -> Self {
-        const LAST_ROT: usize = DepthOrdering::ROT_COUNT - 1;
         match index {
-            0..=LAST_ROT => Self::Direction(GridRotation::ALL[index]),
+            0..DepthOrdering::ROT_COUNT => Self::Direction(GridRotation::ALL[index]),
             DepthOrdering::ROT_COUNT => Self::Within,
             _ => panic!("out of range"),
         }

@@ -156,7 +156,7 @@ fn TRANSPARENCY_SMALL(_: Context<'_>) {
 
     let water_surface_block = Block::builder()
         .voxels_fn(R8, |p| match p.y {
-            0..=3 => &water_voxel,
+            0..4 => &water_voxel,
             4 => &water_surface_voxel,
             _ => &AIR,
         })?
