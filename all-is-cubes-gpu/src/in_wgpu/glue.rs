@@ -6,34 +6,9 @@ use core::ops::Range;
 use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
 
-use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{GridAab, GridCoordinate, GridSize, Rgba};
 use all_is_cubes_mesh::IndexSlice;
-
-/// A vector of 3 f32s padded to resemble a vector of 4, to satisfy
-/// GPU alignment expectations.
-#[repr(C, align(16))]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct PaddedVec3 {
-    pub data: [f32; 3],
-    padding: f32,
-}
-
-impl PartialEq for PaddedVec3 {
-    fn eq(&self, other: &Self) -> bool {
-        self.data == other.data
-    }
-}
-impl Eq for PaddedVec3 {}
-
-impl<U> From<Vector3D<f32, U>> for PaddedVec3 {
-    fn from(data: Vector3D<f32, U>) -> Self {
-        Self {
-            data: data.into(),
-            padding: 0.,
-        }
-    }
-}
 
 pub fn to_wgpu_color(color: Rgba) -> wgpu::Color {
     // TODO: Check whether this is gamma-correct
