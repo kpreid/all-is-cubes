@@ -128,7 +128,9 @@ jobs:
         # Override the default job-id-based key explicitly so that our dependent jobs can
         # reuse this cache.
         shared-key: "build"
-        
+        workspaces: |
+          ./
+          all-is-cubes-wasm/
 
     - run: df -h .
 
@@ -269,6 +271,9 @@ jobs:
         shared-key: "lint"
         # Job's likely to fail and yet have useful cache material.
         cache-on-failure: true
+        workspaces: |
+          ./
+          all-is-cubes-wasm/
 
     - name: Install tools
       run: |
@@ -329,6 +334,9 @@ jobs:
         prefix-key: "v1-rust-ubuntu-stable-locked"
         shared-key: "build"
         save-if: false
+        workspaces: |
+          ./
+          all-is-cubes-wasm/
 
     # break this out as a separate non-silenced build step
     - name: Compile xtask
@@ -391,6 +399,9 @@ jobs:
           prefix-key: "v1-rust-ubuntu-stable-locked"
           shared-key: "build"
           save-if: false
+          workspaces: |
+            ./
+            all-is-cubes-wasm/
 
       # Install cargo-mutants
       # This should usually be already installed, but is present in case of cache miss

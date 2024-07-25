@@ -87,6 +87,9 @@ jobs:
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
+        workspaces: |
+          ./
+          all-is-cubes-wasm/
 
     # break this out as a separate non-silenced build step
     - name: Compile xtask
