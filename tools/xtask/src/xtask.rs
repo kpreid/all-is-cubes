@@ -23,13 +23,13 @@ use std::io::Write as _;
 use std::mem;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 use std::time::Duration;
 use std::time::Instant;
 
 use anyhow::Context as _;
 use anyhow::Error as ActionError;
 use cargo_metadata::PackageId;
-use once_cell::sync::Lazy;
 use xshell::{cmd, pushd, Cmd, Pushd};
 
 mod fs_ops;
@@ -863,7 +863,7 @@ enum Features {
 /// Path to the main All is Cubes project/repository directory.
 ///
 /// (In the typical case, this will be equal to the current directory.)
-static PROJECT_DIR: Lazy<PathBuf> = Lazy::new(|| {
+static PROJECT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     let mut path = PathBuf::from(
         std::env::var_os("CARGO_MANIFEST_DIR")
             .expect("CARGO_MANIFEST_DIR environment variable not set"),

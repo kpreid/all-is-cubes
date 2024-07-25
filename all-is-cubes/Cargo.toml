@@ -51,7 +51,6 @@ required-features = ["rerun"]
 default = ["std"]
 # Adds std-dependent functionality such as thread safety.
 std = [
-    "dep:once_cell",
     "all-is-cubes-base/std",
     "arcstr/std", # not required but nicer behavior
     "yield-progress/sync",
@@ -112,7 +111,6 @@ log = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
 num-traits = { workspace = true }
-once_cell = { workspace = true, optional = true }
 ordered-float = { workspace = true }
 paste = { workspace = true }
 png-decoder = { workspace = true }

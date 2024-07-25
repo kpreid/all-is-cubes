@@ -190,7 +190,7 @@ pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
         #[doc(hidden)]
-        pub use ::once_cell::sync::Lazy as LazyForIncludeImage;
+        pub use ::std::sync::LazyLock as LazyForIncludeImage;
 
         /// Load an image from a relative path. Memoized if the `std` feature is enabled.
         #[doc(hidden)]

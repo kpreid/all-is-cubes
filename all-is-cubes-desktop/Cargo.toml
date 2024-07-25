@@ -48,7 +48,6 @@ indicatif = { version = "0.17.0", default-features = false }
 itertools = { workspace = true }
 kira = { version = "0.8.3", default-features = false, features = ["cpal"] }
 log = { workspace = true }
-once_cell = { workspace = true }
 png = { workspace = true }
 rand = { workspace = true, features = ["std", "std_rng"] }
 # re_sdk is a data-logging and visualization tool; we are currently using it _only_ for

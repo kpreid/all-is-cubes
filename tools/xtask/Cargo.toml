@@ -17,7 +17,6 @@ anyhow = { workspace = true }
 # wasm-pack, so using it (as long as it still works) saves on build time and space.
 cargo_metadata = "0.8.2"
 clap = { workspace = true }
-once_cell = { workspace = true }
 toml_edit = { version = "0.22.13" }
 walkdir = "2.3.2"
 xshell = "0.1.17"

@@ -4,10 +4,10 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
+use std::sync::LazyLock;
 
 use clap::builder::{PathBufValueParser, PossibleValue, PossibleValuesParser};
 use clap::{builder::TypedValueParser, Parser, ValueEnum};
-use once_cell::sync::Lazy;
 use strum::IntoEnumIterator;
 
 use all_is_cubes_render::camera;
@@ -210,7 +210,7 @@ impl AicDesktopArgs {
 /// clap doesn't automatically compile the possible value help
 /// (<https://github.com/clap-rs/clap/issues/3312>), so do it ourselves.
 /// This is in a static so that it can become an `&'static str`.
-static GRAPHICS_HELP_LONG: Lazy<String> = Lazy::new(|| {
+static GRAPHICS_HELP_LONG: LazyLock<String> = LazyLock::new(|| {
     let pv_iter = GraphicsType::value_variants()
         .iter()
         .filter_map(|v| v.to_possible_value())

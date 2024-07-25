@@ -67,7 +67,6 @@ futures-util = { workspace = true, features = [
 half = { workspace = true, features = ["bytemuck"] }
 itertools = { workspace = true }
 log = { workspace = true }
-once_cell = { workspace = true }
 # Used to implement ensure_polled on non-Wasm targets, and in the `rerun` support.
 pollster = { workspace = true }
 rand = { workspace = true }
