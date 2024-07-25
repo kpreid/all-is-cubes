@@ -23,9 +23,8 @@ pub(crate) fn threaded_write_frames(
         'frame_loop: loop {
             match image_data_receiver.recv() {
                 Ok((status, image)) => {
-                    png_writer.write_image_data(bytemuck::cast_slice::<[u8; 4], u8>(
-                        image.data.as_ref(),
-                    ))?;
+                    let image_data: &[[u8; 4]] = image.data.as_ref();
+                    png_writer.write_image_data(image_data.as_flattened())?;
                     status_notifier.notify(status);
                 }
                 Err(mpsc::RecvError) => {

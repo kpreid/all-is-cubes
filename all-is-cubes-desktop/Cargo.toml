@@ -36,7 +36,6 @@ all-is-cubes-port = { workspace = true }
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 all-is-cubes-ui = { workspace = true }
 anyhow = { workspace = true }
-bytemuck = { workspace = true }
 cfg-if = { workspace = true }
 clap = { workspace = true }
 # Note: keep crossterm in sync with ratatui's crossterm dependency.

@@ -376,11 +376,7 @@ impl LightTexture {
             // To do this optimally, `StagingBelt` will need to be modified to allow
             // us accessing its buffers to issue a `copy_buffer_to_texture` instead of
             // it issuing a `copy_buffer_to_buffer`.
-            queue.write_buffer(
-                &self.copy_buffer,
-                0,
-                bytemuck::cast_slice::<Texel, u8>(&data[..batch_count]),
-            );
+            queue.write_buffer(&self.copy_buffer, 0, data[..batch_count].as_flattened());
 
             queue.submit([encoder.finish()]);
         }

@@ -68,7 +68,6 @@ all-is-cubes-port = { workspace = true, optional = true, features = [] }
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
 all-is-cubes-ui = { workspace = true }
 async_fn_traits = { workspace = true }
-bytemuck = { workspace = true }
 # Using clap for parsing test command-line arguments
 clap = { workspace = true }
 exhaust = { workspace = true }

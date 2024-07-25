@@ -209,7 +209,7 @@ pub fn compare_rendered_image(
         let actual_to_save = image::ImageBuffer::<image::Rgba<u8>, _>::from_raw(
             actual_rendering.size.width,
             actual_rendering.size.height,
-            bytemuck::cast_slice::<[u8; 4], u8>(&actual_rendering.data),
+            actual_rendering.data.as_flattened(),
         )
         .unwrap();
 
@@ -254,7 +254,7 @@ pub fn compare_rendered_image(
         RgbaImage::from_raw(
             image.width() as u32,
             image.height() as u32,
-            bytemuck::cast_vec::<[u8; 4], u8>(image.buf().to_vec()),
+            image.buf().to_vec().into_flattened(),
         )
         .unwrap()
         .save(&diff_file_path)
