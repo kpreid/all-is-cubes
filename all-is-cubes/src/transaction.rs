@@ -249,11 +249,11 @@ where
 }
 
 crate::util::cfg_should_impl_error! {
-    impl<Txn> std::error::Error for ExecuteError<Txn>
+    impl<Txn> ErrorIfStd for ExecuteError<Txn>
     where
-        Txn: Transaction<Mismatch: std::error::Error + 'static> + Merge<Conflict: std::error::Error + 'static>,
+        Txn: Transaction<Mismatch: ErrorIfStd + 'static> + Merge<Conflict: ErrorIfStd + 'static>,
     {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        fn source(&self) -> Option<&(dyn ErrorIfStd + 'static)> {
             match self {
                 ExecuteError::Merge(e) => e.source(),
                 ExecuteError::Check(e) => e.source(),
@@ -374,8 +374,8 @@ impl CommitError {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for CommitError {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl ErrorIfStd for CommitError {
+        fn source(&self) -> Option<&(dyn ErrorIfStd + 'static)> {
             match &self.0 {
                 CommitErrorKind::Leaf { error, .. } => Some(error),
                 CommitErrorKind::LeafMessage { .. } => None,

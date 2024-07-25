@@ -399,8 +399,8 @@ pub enum SpaceTransactionConflict {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for SpaceTransactionMismatch {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for SpaceTransactionMismatch {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 SpaceTransactionMismatch::Cube(_) => None,
                 SpaceTransactionMismatch::OutOfBounds {.. } => None,
@@ -408,8 +408,8 @@ crate::util::cfg_should_impl_error! {
             }
         }
     }
-    impl std::error::Error for SpaceTransactionConflict {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for SpaceTransactionConflict {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 SpaceTransactionConflict::Cube { conflict, .. } => Some(conflict),
                 SpaceTransactionConflict::Behaviors(conflict) => Some(conflict),
@@ -636,7 +636,7 @@ pub struct CubeConflict {
     pub(crate) new: bool,
 }
 
-crate::util::cfg_should_impl_error! {impl std::error::Error for CubeConflict {}}
+crate::util::cfg_should_impl_error! {impl crate::util::ErrorIfStd for CubeConflict {}}
 
 impl fmt::Display for CubeConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

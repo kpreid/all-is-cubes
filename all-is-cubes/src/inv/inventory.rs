@@ -494,8 +494,8 @@ pub enum InventoryConflict {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for InventoryMismatch {}
-    impl std::error::Error for InventoryConflict {}
+    impl crate::util::ErrorIfStd for InventoryMismatch {}
+    impl crate::util::ErrorIfStd for InventoryConflict {}
 }
 
 /// Description of a change to an [`Inventory`] for use in listeners.

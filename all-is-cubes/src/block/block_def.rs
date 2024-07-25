@@ -394,8 +394,8 @@ pub struct BlockDefConflict {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for BlockDefMismatch {}
-    impl std::error::Error for BlockDefConflict {}
+    impl crate::util::ErrorIfStd for BlockDefMismatch {}
+    impl crate::util::ErrorIfStd for BlockDefConflict {}
 }
 
 impl fmt::Display for BlockDefConflict {

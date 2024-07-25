@@ -211,8 +211,8 @@ pub(crate) enum OperationError {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for OperationError {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for OperationError {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 Self::InternalConflict(e) => Some(e),
                 // _ => None,

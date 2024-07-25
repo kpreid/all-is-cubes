@@ -749,8 +749,8 @@ impl transaction::Merge for BodyTransaction {
 pub enum BodyMismatch {}
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for BodyMismatch {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for BodyMismatch {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match *self {
             }
         }

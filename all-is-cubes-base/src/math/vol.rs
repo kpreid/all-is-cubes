@@ -731,7 +731,7 @@ pub struct VolLengthError {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for VolLengthError {}
+    impl crate::util::ErrorIfStd for VolLengthError {}
 }
 
 impl fmt::Display for VolLengthError {

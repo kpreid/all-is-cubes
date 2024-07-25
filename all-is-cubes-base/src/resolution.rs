@@ -194,7 +194,7 @@ impl<'de> serde::Deserialize<'de> for Resolution {
 pub struct IntoResolutionError<N>(N);
 
 crate::util::cfg_should_impl_error! {
-    impl<N: fmt::Display + fmt::Debug> std::error::Error for IntoResolutionError<N> {}
+    impl<N: fmt::Display + fmt::Debug> crate::util::ErrorIfStd for IntoResolutionError<N> {}
 }
 
 impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {

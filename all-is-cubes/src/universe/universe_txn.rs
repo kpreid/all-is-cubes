@@ -259,8 +259,8 @@ pub enum UniverseConflict {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for UniverseMismatch {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for UniverseMismatch {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 UniverseMismatch::DifferentUniverse {..} => None,
                 UniverseMismatch::Member(mc) => Some(&mc.mismatch),
@@ -268,8 +268,8 @@ crate::util::cfg_should_impl_error! {
                 UniverseMismatch::InvalidPending => None,
             }
         }
-    } impl std::error::Error for UniverseConflict {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    } impl crate::util::ErrorIfStd for UniverseConflict {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 UniverseConflict::DifferentUniverse(_, _) => None,
                 UniverseConflict::Member(mc) => Some(&mc.conflict),
@@ -864,8 +864,8 @@ pub enum MemberConflict {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for MemberConflict {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for MemberConflict {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 MemberConflict::InsertVsOther => None,
                 MemberConflict::DeleteVsOther => None,
@@ -894,8 +894,8 @@ pub enum MemberMismatch {
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for MemberMismatch {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl crate::util::ErrorIfStd for MemberMismatch {
+    fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
         match self {
             MemberMismatch::Insert(e) => e.source(),
             MemberMismatch::DeleteNonexistent(_) => None,
@@ -924,13 +924,13 @@ pub struct ModifyMemberMismatch(AnyTransactionMismatch);
 pub struct ModifyMemberConflict(AnyTransactionConflict);
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for ModifyMemberMismatch {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for ModifyMemberMismatch {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             self.0.source()
         }
     }
-    impl std::error::Error for ModifyMemberConflict {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for ModifyMemberConflict {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             self.0.source()
         }
     }

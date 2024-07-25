@@ -794,7 +794,7 @@ pub enum InsertErrorKind {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for InsertError {}
+    impl crate::util::ErrorIfStd for InsertError {}
 }
 
 impl fmt::Display for InsertError {

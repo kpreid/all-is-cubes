@@ -573,7 +573,7 @@ pub enum PaletteError {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for PaletteError {}
+    impl crate::util::ErrorIfStd for PaletteError {}
 }
 
 impl fmt::Display for PaletteError {

@@ -25,14 +25,14 @@ pub struct MapConflict<K, C> {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl<K: fmt::Debug, E: std::error::Error + 'static> std::error::Error for MapMismatch<K, E> {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl<K: fmt::Debug, E: crate::util::ErrorIfStd + 'static> crate::util::ErrorIfStd for MapMismatch<K, E> {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             Some(&self.mismatch)
         }
     }
 
-    impl<K: fmt::Debug, C: std::error::Error + 'static> std::error::Error for MapConflict<K, C> {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl<K: fmt::Debug, C: crate::util::ErrorIfStd + 'static> crate::util::ErrorIfStd for MapConflict<K, C> {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             Some(&self.conflict)
         }
     }
@@ -276,18 +276,18 @@ macro_rules! impl_transaction_for_tuple {
             // TODO: TupleConflict should have its own message to report the position,
             // instead of delegating.
             crate::util::cfg_should_impl_error! {
-                impl<$( [<E $name>]: std::error::Error, )*> std::error::Error for
+                impl<$( [<E $name>]: crate::util::ErrorIfStd, )*> crate::util::ErrorIfStd for
                         [< TupleError $count >]<$( [<E $name>], )*> {
-                    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                    fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
                         match *self {
                             $( Self::[<At $name>](ref [<e $name>]) => [<e $name>].source(), )*
                         }
                     }
                 }
 
-                impl<$( [<C $name>]: std::error::Error, )*> std::error::Error for
+                impl<$( [<C $name>]: crate::util::ErrorIfStd, )*> crate::util::ErrorIfStd for
                         [< TupleConflict $count >]<$( [<C $name>], )*> {
-                    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                    fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
                         match *self {
                             $( Self::[<At $name>](ref [<c $name>]) => [<c $name>].source(), )*
                         }

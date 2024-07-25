@@ -212,7 +212,7 @@ impl<G> LockError<G> {
 }
 
 #[cfg(feature = "std")]
-impl<G> std::error::Error for LockError<G> {}
+impl<G> crate::util::ErrorIfStd for LockError<G> {}
 
 impl<G> fmt::Display for LockError<G> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -237,7 +237,7 @@ pub(crate) enum TryLockError<G> {
 }
 
 #[cfg(feature = "std")]
-impl<G> std::error::Error for TryLockError<G> {}
+impl<G> crate::util::ErrorIfStd for TryLockError<G> {}
 
 impl<G> fmt::Display for TryLockError<G> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

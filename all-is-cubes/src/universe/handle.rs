@@ -527,7 +527,7 @@ pub enum HandleError {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for HandleError {}
+    impl crate::util::ErrorIfStd for HandleError {}
 }
 
 /// Read access to the referent of a [`Handle`].

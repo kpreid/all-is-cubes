@@ -363,16 +363,16 @@ macro_rules! member_enums_and_impls {
         }
 
         crate::util::cfg_should_impl_error! {
-            impl std::error::Error for AnyTransactionMismatch {
-                fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            impl crate::util::ErrorIfStd for AnyTransactionMismatch {
+                fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
                     match self {
                         $( Self::$member_type(e) => Some(e), )*
                     }
                 }
             }
 
-            impl std::error::Error for AnyTransactionConflict {
-                fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            impl crate::util::ErrorIfStd for AnyTransactionConflict {
+                fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
                     match self {
                         Self::TypeMismatch => None,
                         $( Self::$member_type(e) => Some(e), )*

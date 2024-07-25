@@ -308,7 +308,7 @@ pub struct ProviderError {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for ProviderError {}
+    impl ErrorIfStd for ProviderError {}
 }
 
 /// An error resulting from “world generation”: failure to calculate/create/place objects
@@ -322,8 +322,8 @@ pub struct GenError {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for GenError {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl ErrorIfStd for GenError {
+        fn source(&self) -> Option<&(dyn ErrorIfStd + 'static)> {
             Some(&self.detail)
         }
     }
@@ -422,8 +422,8 @@ impl InGenError {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for InGenError {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl ErrorIfStd for InGenError {
+        fn source(&self) -> Option<&(dyn ErrorIfStd + 'static)> {
             match self {
                 InGenError::Other(e) => e.source(),
                 InGenError::Gen(e) => e.source(),
@@ -576,7 +576,6 @@ mod tests {
     #[cfg(feature = "std")] // Error::source only exists on std
     fn gen_error_message() {
         use alloc::string::ToString;
-        use std::error::Error;
 
         let set_cube_error = SetCubeError::OutOfBounds {
             modification: GridAab::for_block(R1),
@@ -587,7 +586,7 @@ mod tests {
             e.to_string(),
             "An error occurred while generating object 'x'",
         );
-        let source = Error::source(&e)
+        let source = ErrorIfStd::source(&e)
             .expect("has source")
             .downcast_ref::<InGenError>()
             .expect("is InGenError");

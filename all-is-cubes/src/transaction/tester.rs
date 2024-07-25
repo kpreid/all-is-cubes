@@ -1,8 +1,8 @@
+use crate::util::ErrorIfStd as Error;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 use core::fmt::Debug;
-use std::error::Error;
 
 use super::Transaction;
 

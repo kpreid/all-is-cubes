@@ -1,5 +1,7 @@
 //! Tools that we could imagine being in the Rust standard library, but aren't.
 
+#![allow(clippy::std_instead_of_core)] // TODO: remove this when core::error::Error is stable
+
 use alloc::sync::Arc;
 use core::fmt;
 use core::marker::PhantomData;
@@ -121,9 +123,11 @@ mod error_chain {
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
-
         /// Alias for [`std::error::Error`] that is a substitute when not on `std`.
-        /// Used to conditionally disable `Error` trait bounds.
+        /// Used to conditionally disable `Error` trait bounds, and as a path to `Error`
+        /// to suppress future `std_instead_of_core` lint.
+        /// TODO: When Rust 1.81 is released and `core::error::Error` exists, we can throw out
+        /// this mechanism entirely.
         #[doc(hidden)]
         pub use std::error::Error as ErrorIfStd;
 
@@ -143,6 +147,7 @@ cfg_if::cfg_if! {
         use alloc::boxed::Box;
 
         /// Substitute for [`std::error::Error`] with the same supertraits but no methods.
+        ///
         #[doc(hidden)]
         pub trait ErrorIfStd: fmt::Debug + fmt::Display {}
         impl<T> ErrorIfStd for T where T: fmt::Debug + fmt::Display {}

@@ -1178,7 +1178,7 @@ pub enum SetCubeError {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for SetCubeError {}
+    impl crate::util::ErrorIfStd for SetCubeError {}
 }
 
 impl fmt::Display for SetCubeError {

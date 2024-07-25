@@ -849,8 +849,8 @@ pub enum CharacterTransactionConflict {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for CharacterTransactionMismatch {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for CharacterTransactionMismatch {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 CharacterTransactionMismatch::Body(e) => Some(e),
                 CharacterTransactionMismatch::Inventory(e) => Some(e),
@@ -859,8 +859,8 @@ crate::util::cfg_should_impl_error! {
         }
     }
 
-    impl std::error::Error for CharacterTransactionConflict {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    impl crate::util::ErrorIfStd for CharacterTransactionConflict {
+        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 CharacterTransactionConflict::SetSpace => None,
                 CharacterTransactionConflict::Body(_) => None,

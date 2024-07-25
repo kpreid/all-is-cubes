@@ -791,8 +791,8 @@ pub struct BehaviorTransactionConflict {
 }
 
 crate::util::cfg_should_impl_error! {
-    impl std::error::Error for BehaviorTransactionMismatch {}
-    impl std::error::Error for BehaviorTransactionConflict {}
+    impl crate::util::ErrorIfStd for BehaviorTransactionMismatch {}
+    impl crate::util::ErrorIfStd for BehaviorTransactionConflict {}
 }
 
 impl fmt::Display for BehaviorTransactionMismatch {
