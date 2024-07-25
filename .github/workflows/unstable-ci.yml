@@ -11,6 +11,7 @@
 # * no deployment
 # * no testing of multiple feature configurations
 # * no concept of a "primary" matrix configuration
+# * no separate lint job
 
 name: Unstable Rust Features
 
