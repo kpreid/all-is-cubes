@@ -145,17 +145,36 @@ cfg_if::cfg_if! {
 
     } else {
         use alloc::boxed::Box;
+        use alloc::string::String;
 
         /// Substitute for [`std::error::Error`] with the same supertraits but no methods.
         ///
         #[doc(hidden)]
         pub trait ErrorIfStd: fmt::Debug + fmt::Display {}
-        impl<T> ErrorIfStd for T where T: fmt::Debug + fmt::Display {}
+        impl<T: ?Sized> ErrorIfStd for T where T: fmt::Debug + fmt::Display {}
 
         impl From<&str> for Box<dyn ErrorIfStd + Send + Sync> {
             #[allow(clippy::missing_inline_in_public_items)]
             fn from(s: &str) -> Self {
-                Box::new(alloc::string::String::from(s))
+                Box::new(String::from(s))
+            }
+        }
+        impl From<&str> for Box<dyn ErrorIfStd> {
+            #[allow(clippy::missing_inline_in_public_items)]
+            fn from(s: &str) -> Self {
+                Box::new(String::from(s))
+            }
+        }
+        impl From<String> for Box<dyn ErrorIfStd + Send + Sync> {
+            #[allow(clippy::missing_inline_in_public_items)]
+            fn from(s: String) -> Self {
+                Box::new(s)
+            }
+        }
+        impl From<String> for Box<dyn ErrorIfStd> {
+            #[allow(clippy::missing_inline_in_public_items)]
+            fn from(s: String) -> Self {
+                Box::new(s)
             }
         }
 
