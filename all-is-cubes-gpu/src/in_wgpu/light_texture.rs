@@ -5,7 +5,7 @@ use rayon::{
     slice::ParallelSliceMut as _,
 };
 
-use all_is_cubes::euclid::{size3, Vector3D};
+use all_is_cubes::euclid::{Box3D, Vector3D};
 use all_is_cubes::math::{
     Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord,
 };
@@ -296,18 +296,20 @@ impl LightTexture {
             }
         }
 
-        let ts = extent_to_size3d(self.texture.size());
+        let region = Box3D::from(region);
+        let texture_size = extent_to_size3d(self.texture.size());
         write_texture_by_aab(
             queue,
             &self.texture,
-            GridAab::from_lower_size(
+            Box3D::from_origin_and_size(
                 region
-                    .lower_bounds()
-                    .zip(ts.to_vector().to_point().to_i32(), |coord, size| {
-                        coord.rem_euclid(size)
+                    .min
+                    .zip(texture_size.to_vector().to_point().cast(), |coord, size| {
+                        // after rem_euclid it is guaranteed to be nonnegative
+                        coord.rem_euclid(size) as u32
                     })
                     .to_point(),
-                region.size(),
+                region.size().cast(),
             ),
             buffer,
         );
@@ -362,10 +364,16 @@ impl LightTexture {
                     wgpu::ImageCopyTexture {
                         texture: &self.texture,
                         mip_level: 0,
-                        origin: point_to_origin(cube.lower_bounds().rem_euclid(&texture_size)),
+                        origin: point_to_origin(
+                            cube.lower_bounds().rem_euclid(&texture_size).to_u32(),
+                        ),
                         aspect: wgpu::TextureAspect::All,
                     },
-                    size3d_to_extent(size3(1, 1, 1)),
+                    wgpu::Extent3d {
+                        width: 1,
+                        height: 1,
+                        depth_or_array_layers: 1,
+                    },
                 );
 
                 batch_count += 1;

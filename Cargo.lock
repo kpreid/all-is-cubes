@@ -195,6 +195,7 @@ dependencies = [
  "image 0.25.1",
  "itertools 0.12.1",
  "log",
+ "num-traits",
  "pollster",
  "rand",
  "rand_xoshiro",

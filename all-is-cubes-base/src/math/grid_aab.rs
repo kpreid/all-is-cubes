@@ -911,6 +911,16 @@ impl From<GridAab> for Aab {
     }
 }
 
+impl From<GridAab> for euclid::Box3D<GridCoordinate, Cube> {
+    #[inline]
+    fn from(aab: GridAab) -> Self {
+        Self {
+            min: aab.lower_bounds(),
+            max: aab.upper_bounds(),
+        }
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
 impl<'a> arbitrary::Arbitrary<'a> for GridAab {

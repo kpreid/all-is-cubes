@@ -1,14 +1,14 @@
 //! Miscellaneous conversion functions and trait impls for [`wgpu`].
 
-use core::num::TryFromIntError;
 use core::ops::Range;
 
 use bytemuck::Pod;
 use wgpu::util::DeviceExt as _;
 
-use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{GridAab, GridCoordinate, GridSize, Rgba};
+use all_is_cubes::euclid::{Box3D, Point3D, Size3D};
+use all_is_cubes::math::{GridSize, Rgba};
 use all_is_cubes_mesh::IndexSlice;
+use num_traits::NumCast;
 
 pub fn to_wgpu_color(color: Rgba) -> wgpu::Color {
     // TODO: Check whether this is gamma-correct
@@ -33,56 +33,56 @@ pub fn to_wgpu_index_range(range: Range<usize>) -> Range<u32> {
     range.start.try_into().unwrap()..range.end.try_into().unwrap()
 }
 
-/// Write to a texture, with the region written specified by a [`GridAab`].
+/// Write to the specified region of a 3D texture.
 ///
 /// `T` must be a single texel of the appropriate format.
 ///
-/// Panics if `region` has any negative coordinates.
-pub fn write_texture_by_aab<T: Pod>(
+/// Panics if `region`’s volume does not match the data length.
+pub fn write_texture_by_aab<T: Pod, U>(
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
-    region: GridAab,
+    region: Box3D<u32, U>,
     data: &[T],
 ) {
-    let volume = region.volume().unwrap();
+    let volume = usize::try_from(region.volume()).unwrap();
     let len = data.len();
     assert!(
         volume == len,
         "volume {volume} of texture region {region:?} does not match supplied data length {len}",
     );
 
+    let size = region.size();
+
     queue.write_texture(
         wgpu::ImageCopyTexture {
             texture,
             mip_level: 0,
-            origin: point_to_origin(region.lower_bounds()),
+            origin: point_to_origin(region.min),
             aspect: wgpu::TextureAspect::All,
         },
         bytemuck::cast_slice::<T, u8>(data),
         wgpu::ImageDataLayout {
             offset: 0,
-            bytes_per_row: Some(size_of::<T>() as u32 * region.size().width),
-            rows_per_image: Some(region.size().height),
+            bytes_per_row: Some(size_of::<T>() as u32 * size.width),
+            rows_per_image: Some(size.height),
         },
-        size3d_to_extent(region.size()),
+        size3d_to_extent(size),
     )
 }
 
-/// Convert point to [`wgpu::Origin3d`]. Panics if the input is negative.
+/// Convert point to [`wgpu::Origin3d`].
 #[inline(never)]
-pub fn point_to_origin<U>(origin: Point3D<GridCoordinate, U>) -> wgpu::Origin3d {
-    (|| -> Result<_, TryFromIntError> {
-        Ok(wgpu::Origin3d {
-            x: origin.x.try_into()?,
-            y: origin.y.try_into()?,
-            z: origin.z.try_into()?,
-        })
-    })()
-    .expect("negative origin")
+pub fn point_to_origin<U>(origin: Point3D<u32, U>) -> wgpu::Origin3d {
+    wgpu::Origin3d {
+        x: origin.x,
+        y: origin.y,
+        z: origin.z,
+    }
 }
 
-/// Convert [`GridSize`] to [`wgpu::Extent3d`].
-pub fn size3d_to_extent(size: GridSize) -> wgpu::Extent3d {
+/// Convert [`GridSize`] or similar size types to [`wgpu::Extent3d`].
+pub fn size3d_to_extent<T: Copy + NumCast, U>(size: Size3D<T, U>) -> wgpu::Extent3d {
+    let size = size.to_u32();
     wgpu::Extent3d {
         width: size.width,
         height: size.height,

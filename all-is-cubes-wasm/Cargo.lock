@@ -114,6 +114,7 @@ dependencies = [
  "half",
  "itertools 0.12.1",
  "log",
+ "num-traits",
  "pollster",
  "rand",
  "rand_xoshiro",

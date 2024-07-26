@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::content::palette;
-use all_is_cubes::euclid::Translation3D;
-use all_is_cubes::math::{GridAab, GridCoordinate, Vol};
+use all_is_cubes::euclid::{Box3D, Translation3D};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, VectorOps as _, Vol};
 use all_is_cubes::time;
 use all_is_cubes_mesh::texture::{self, Channels};
 
@@ -65,7 +65,7 @@ pub(crate) struct BlockTextureViews {
 #[derive(Debug)]
 struct WeakTile {
     /// Bounds of the allocation in the atlas.
-    allocated_bounds: GridAab,
+    allocated_bounds: Box3D<u16, AtlasTexel>,
     backing: Weak<Mutex<TileBacking>>,
 }
 
@@ -83,7 +83,7 @@ struct TileBacking {
     /// Allocator information, and the region of the atlas texture which this tile owns.
     ///
     /// Property: `self.handle.unwrap().allocation.volume() == self.data.len()`.
-    handle: Option<AlloctreeHandle>,
+    handle: Option<AlloctreeHandle<AtlasTexel>>,
 
     /// sRGB reflectance data (that might not be sent to the GPU yet, or reused upon resize).
     /// Is `Some` if `write()` has been called.
@@ -106,7 +106,7 @@ struct TileBacking {
 #[derive(Debug)]
 struct AllocatorBacking {
     /// Tracks which regions of the texture are free or allocated.
-    alloctree: Alloctree,
+    alloctree: Alloctree<AtlasTexel>,
 
     /// Whether flush needs to do anything.
     dirty: bool,
@@ -202,7 +202,8 @@ impl texture::Allocator for AtlasAllocator {
         let result = AtlasTile {
             requested_bounds,
             channels,
-            offset: Translation3D::from_untyped(&handle.offset),
+            // TODO: generalize Alloctree so it doesn't use Cube here and the units match automatically
+            offset: Translation3D::<_, texture::TexelUnit, Cube>::identity() + handle.offset,
             backing: Arc::new(Mutex::new(TileBacking {
                 handle: Some(handle),
                 reflectance: None,
@@ -384,11 +385,12 @@ impl AllocatorBacking {
                         {
                             let backing: &mut TileBacking = &mut strong_ref.lock().unwrap();
                             if backing.dirty || copy_everything_anyway {
-                                let region: GridAab = backing
+                                let region: Box3D<u32, AtlasTexel> = backing
                                     .handle
                                     .as_ref()
                                     .expect("can't happen: dead TileBacking")
-                                    .allocation;
+                                    .allocation
+                                    .map(u32::from);
 
                                 if let Some(data) = backing.reflectance.as_ref() {
                                     write_texture_by_aab(
@@ -427,12 +429,12 @@ impl AllocatorBacking {
                         // TODO: This is inefficient but we want to keep it at least until fixing
                         // <https://github.com/kpreid/all-is-cubes/issues/378>, at which point we
                         // might reasonably disable it.
-                        let region = weak_tile.allocated_bounds;
+                        let region = weak_tile.allocated_bounds.map(u32::from);
 
                         // TODO: keep a preallocated GPU buffer instead
                         let data = vec![
                             palette::UNALLOCATED_TEXELS_ERROR.to_srgb8();
-                            region.volume().unwrap()
+                            region.volume() as usize
                         ];
 
                         write_texture_by_aab(queue, &textures.reflectance.texture, region, &data);
@@ -458,7 +460,7 @@ impl AllocatorBacking {
                 flush_time: time::Duration::ZERO,
                 in_use_tiles: backing.in_use.len(),
                 in_use_texels: backing.alloctree.occupied_volume(),
-                capacity_texels: backing.alloctree.bounds().volume().unwrap(),
+                capacity_texels: backing.alloctree.bounds().to_usize().volume(),
             },
         );
 

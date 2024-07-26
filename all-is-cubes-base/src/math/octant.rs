@@ -1,8 +1,8 @@
 use core::{fmt, ops};
 
-use euclid::Vector3D;
+use euclid::{vec3, Vector3D};
 
-use crate::math::{Cube, Face6, FreeVector, GridCoordinate};
+use crate::math::{Cube, Face6, FreeVector, GridCoordinate, GridPoint};
 
 /// Identifies one of eight octants, or elements of a 2×2×2 cube.
 ///
@@ -80,6 +80,24 @@ impl Octant {
         }
     }
 
+    /// Given the low corner of an octant in the volume (0..2)³,
+    /// return which octant it is.
+    ///
+    /// That is, each coordinate of the returned [`Vector3D`] is either 0 or 1.
+    /// This is equivalent to [`Self::try_from_positive_cube()`] but with more flexible input.
+    ///
+    /// TODO: better trait bounds would be `Zero + One`
+    #[inline]
+    pub fn try_from_01<T: Copy + num_traits::NumCast, U>(
+        corner_or_translation: Vector3D<T, U>,
+    ) -> Option<Self> {
+        let low_corner: GridPoint = corner_or_translation
+            .try_cast::<GridCoordinate>()?
+            .cast_unit()
+            .to_point();
+        Self::try_from_positive_cube(Cube::from(low_corner))
+    }
+
     const fn to_zmaj_index(self) -> u8 {
         self as u8
     }
@@ -102,8 +120,18 @@ impl Octant {
     #[inline]
     #[must_use]
     pub fn to_positive_cube(self) -> Cube {
-        let i = GridCoordinate::from(self.to_zmaj_index());
-        Cube::new((i >> 2) & 1, (i >> 1) & 1, i & 1)
+        Cube::from(self.to_01::<Cube>().map(GridCoordinate::from).to_point())
+    }
+
+    /// Returns this octant of the volume (0..2)³ expressed as a translation vector
+    /// from the origin.
+    ///
+    /// That is, each coordinate of the returned [`Vector3D`] is either 0 or 1.
+    #[inline]
+    #[must_use]
+    pub fn to_01<U>(self) -> Vector3D<u8, U> {
+        let i = self.to_zmaj_index();
+        vec3((i >> 2) & 1, (i >> 1) & 1, i & 1)
     }
 
     /// For each component of `vector`, negate it if `self` is on the negative side of that axis.

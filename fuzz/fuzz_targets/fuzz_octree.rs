@@ -48,19 +48,19 @@ fuzz_target!(|input: FuzzOctree| {
     }
 });
 
-fn validate(tree: &Alloctree, handles: &[AlloctreeHandle]) {
+fn validate(tree: &Alloctree<()>, handles: &[AlloctreeHandle<()>]) {
     for (i, h1) in handles.iter().enumerate() {
         assert!(
-            tree.bounds().contains_box(h1.allocation),
+            tree.bounds().contains_box(&h1.allocation),
             "allocation was out of bounds"
         );
         for (j, h2) in handles.iter().enumerate() {
             if i == j {
                 continue;
             }
-            if let Some(intersection) = h1.allocation.intersection_cubes(h2.allocation) {
+            if let Some(intersection) = h1.allocation.intersection(&h2.allocation) {
                 assert!(
-                    intersection.volume() == Some(0),
+                    intersection.volume() == 0,
                     "intersection between\n{:?} and {:?}\n",
                     h1.allocation,
                     h2.allocation
@@ -71,5 +71,5 @@ fn validate(tree: &Alloctree, handles: &[AlloctreeHandle]) {
 }
 
 fn clean_exponent(input: u8) -> u8 {
-    input.rem_euclid(Alloctree::MAX_SIZE_EXPONENT + 1)
+    input.rem_euclid(Alloctree::<()>::MAX_SIZE_EXPONENT + 1)
 }
