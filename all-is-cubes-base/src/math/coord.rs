@@ -1,6 +1,6 @@
 //! Numeric types used for coordinates and related quantities.
 
-use euclid::{Point3D, Size2D, Size3D, Vector3D};
+use euclid::{Box3D, Point3D, Size2D, Size3D, Vector3D};
 
 use crate::math::Cube;
 
@@ -47,30 +47,55 @@ pub trait VectorOps<O> {
     fn zip<F: FnMut(Self::Elem, Self::Elem) -> O>(self, rhs: Self, f: F) -> Self::Output;
 }
 
-macro_rules! impl_vector_ops {
-    ($vec:ident, ($( $field:ident )*)) => {
-        impl<T, O, U> VectorOps<O> for $vec<T, U> {
-            type Elem = T;
-            type Output = $vec<O, U>;
-
-            #[inline]
-            fn map<F: FnMut(Self::Elem) -> O>(self, mut f: F) -> Self::Output {
-                $vec::new($(f(self.$field),)*)
-            }
-
-            #[inline]
-            fn zip<F: FnMut(Self::Elem, Self::Elem) -> O>(
-                self,
-                rhs: Self,
-                mut f: F,
-            ) -> Self::Output {
-                $vec::new($(f(self.$field, rhs.$field),)*)
-            }
-        }
-    };
-}
 mod impl_euclid {
     use super::*;
+
+    macro_rules! impl_vector_ops {
+        ($vec:ident, ($( $field:ident )*)) => {
+            impl<T, O, U> VectorOps<O> for $vec<T, U> {
+                type Elem = T;
+                type Output = $vec<O, U>;
+
+                #[inline]
+                fn map<F: FnMut(Self::Elem) -> O>(self, mut f: F) -> Self::Output {
+                    $vec::new($(f(self.$field),)*)
+                }
+
+                #[inline]
+                fn zip<F: FnMut(Self::Elem, Self::Elem) -> O>(
+                    self,
+                    rhs: Self,
+                    mut f: F,
+                ) -> Self::Output {
+                    $vec::new($(f(self.$field, rhs.$field),)*)
+                }
+            }
+        };
+    }
+
+    // TODO: contribute inherent methods for this to euclid
     impl_vector_ops!(Size2D, (width height));
     impl_vector_ops!(Size3D, (width height depth));
+
+    // TODO: contribute inherent methods for this (at least map()) to euclid
+    impl<T, O: Copy, U> VectorOps<O> for Box3D<T, U> {
+        type Elem = T;
+        type Output = Box3D<O, U>;
+
+        #[inline]
+        fn map<F: FnMut(Self::Elem) -> O>(self, mut f: F) -> Self::Output {
+            Box3D {
+                min: self.min.map(&mut f),
+                max: self.max.map(&mut f),
+            }
+        }
+
+        #[inline]
+        fn zip<F: FnMut(Self::Elem, Self::Elem) -> O>(self, rhs: Self, mut f: F) -> Self::Output {
+            Box3D {
+                min: self.min.zip(rhs.min, &mut f).to_point(),
+                max: self.max.zip(rhs.max, &mut f).to_point(),
+            }
+        }
+    }
 }
