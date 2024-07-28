@@ -8,8 +8,8 @@
     "rust-analyzer.imports.granularity.group": "module",
     "rust-analyzer.imports.prefix": "crate",
     "rust-analyzer.linkedProjects": [
-        "Cargo.toml",
-        "fuzz/Cargo.toml",
-        "all-is-cubes-wasm/Cargo.toml",
+        "${workspaceFolder}/Cargo.toml",
+        "${workspaceFolder}/fuzz/Cargo.toml",
+        "${workspaceFolder}/all-is-cubes-wasm/Cargo.toml",
     ]
 }
