@@ -192,8 +192,10 @@ impl WidgetBlocks {
                             R64, // 16 res × 4 tiles
                             txn.insert_anonymous(space_from_image(
                                 include_image!("theme/dialog-background.png"),
-                                GridRotation::IDENTITY,
-                                &default_srgb,
+                                GridRotation::RXYZ,
+                                // place image on the front face (of the R16 individual blocks!)
+                                // so it meets the back of the widgets in the dialog.
+                                &|color| default_srgb(color).translate([0, 0, 15]),
                             )?),
                         )
                         .build()
