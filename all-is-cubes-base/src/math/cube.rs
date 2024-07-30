@@ -6,7 +6,8 @@ use core::fmt;
 use num_traits::float::FloatCore as _;
 
 use crate::math::{
-    Aab, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint, GridVector,
+    Aab, Face6, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, GridPoint,
+    GridVector,
 };
 use crate::util::ConciseDebug;
 
@@ -224,6 +225,20 @@ mod arithmetic {
         #[inline]
         fn sub(self, rhs: Cube) -> Self::Output {
             self.lower_bounds() - rhs.lower_bounds()
+        }
+    }
+
+    impl ops::Add<Face6> for Cube {
+        type Output = Self;
+        #[inline]
+        fn add(self, rhs: Face6) -> Self::Output {
+            self + rhs.normal_vector()
+        }
+    }
+    impl ops::AddAssign<Face6> for Cube {
+        #[inline]
+        fn add_assign(&mut self, rhs: Face6) {
+            *self += rhs.normal_vector()
         }
     }
 
