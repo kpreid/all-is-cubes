@@ -140,11 +140,11 @@ fn set_error_format() {
         }
         .to_string(),
         // TODO: simplify the single cube case
-        "GridAab(1..2, 2..3, 3..4) is outside of the bounds GridAab(0..2, 0..2, 0..2)"
+        "GridAab(1..2, 2..3, 3..4) is outside of the Space bounds GridAab(0..2, 0..2, 0..2)"
     );
     assert_eq!(
         SetCubeError::TooManyBlocks().to_string(),
-        "more than 65536 block types is not yet supported"
+        "more than 65536 unique blocks in a Space is not yet supported"
     );
 }
 

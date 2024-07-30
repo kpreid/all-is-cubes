@@ -1189,11 +1189,11 @@ impl fmt::Display for SetCubeError {
                 space_bounds,
             } => write!(
                 f,
-                "{modification:?} is outside of the bounds {space_bounds:?}"
+                "{modification:?} is outside of the Space bounds {space_bounds:?}"
             ),
             SetCubeError::TooManyBlocks() => write!(
                 f,
-                "more than {} block types is not yet supported",
+                "more than {} unique blocks in a Space is not yet supported",
                 BlockIndex::MAX as usize + 1
             ),
         }
