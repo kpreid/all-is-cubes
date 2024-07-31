@@ -722,6 +722,9 @@ mod op {
                 op::Operation::AddModifiers(modifiers) => schema::OperationSer::AddModifiersV1 {
                     modifiers: modifiers.iter().map(schema::ModifierSer::from).collect(),
                 },
+                op::Operation::StartMove(m) => {
+                    schema::OperationSer::StartMoveV1 { modifier: m.into() }
+                }
                 op::Operation::Neighbors(neighbors) => schema::OperationSer::NeighborsV1 {
                     // TODO: arrange to be able to borrow here
                     neighbors: Cow::Owned(
@@ -749,6 +752,9 @@ mod op {
                         .map(crate::block::Modifier::from)
                         .collect(),
                 ),
+                schema::OperationSer::StartMoveV1 { modifier: m } => {
+                    op::Operation::StartMove(m.into())
+                }
                 schema::OperationSer::NeighborsV1 { neighbors } => op::Operation::Neighbors(
                     cow_into_iter(neighbors)
                         .map(|(offset, op)| (offset.into(), op))

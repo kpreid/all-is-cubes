@@ -60,6 +60,14 @@ pub enum Operation {
     /// TODO: Document these rules in a single location.
     AddModifiers(Arc<[block::Modifier]>),
 
+    /// Attach the given move modifier to the cube’s block, and create its complement
+    /// in the adjacent [`AIR`].
+    //---
+    // TODO: stop making [`AIR`] a special case, and let it be more flexible as part of
+    // a general pattern-matching system for operations.
+    // TODO: If the block already has a non-animated move modifier, then advance it?
+    StartMove(block::Move),
+
     /// Apply the given operations to the cubes offset from this one.
     //---
     // Design note: This would arguably make more sense as `GridVector` rather than `Cube`,
@@ -137,6 +145,27 @@ impl Operation {
 
                 Ok((space_txn, InventoryTransaction::default()))
             }
+            Operation::StartMove(move_modifier) => {
+                let target_cube = transform.transform_cube(Cube::ORIGIN);
+                let adjacent_cube =
+                    transform.transform_cube(Cube::ORIGIN + move_modifier.direction);
+                let target_block = space[target_cube].clone();
+
+                let new_adjacent = target_block
+                    .clone()
+                    .with_modifier(move_modifier.complement().rotate(transform.rotation));
+                let new_target = target_block
+                    .clone()
+                    .with_modifier(move_modifier.clone().rotate(transform.rotation));
+
+                let mut space_txn = SpaceTransaction::default();
+                *space_txn.at(target_cube) =
+                    CubeTransaction::replacing(Some(target_block), Some(new_target));
+                *space_txn.at(adjacent_cube) =
+                    CubeTransaction::replacing(Some(AIR), Some(new_adjacent));
+
+                Ok((space_txn, InventoryTransaction::default()))
+            }
             Operation::Neighbors(neighbors) => {
                 let mut txns = OpTxn::default();
                 for &(cube, ref op) in neighbors.iter() {
@@ -154,10 +183,11 @@ impl Operation {
 
     pub(crate) fn rotationally_symmetric(&self) -> bool {
         match self {
-            // TODO: should ask if blocks are relevantly symmetric
+            // TODO: should ask if contained blocks are relevantly symmetric
             Operation::Become(_) => false,
             Operation::DestroyTo(_) => false,
             Operation::AddModifiers(_) => true, // TODO: there is not a general notion of rotating a modifier, but probably there should be
+            Operation::StartMove(_) => true,    // all moves are directional
             Operation::Neighbors(_) => false,
         }
     }
@@ -167,11 +197,12 @@ impl Operation {
             return self;
         }
         match self {
-            // TODO: need to provide a way for blocks to opt out
+            // TODO: need to provide a way for blocks to opt out and have only one rotation
             Operation::Become(block) => Operation::Become(block.rotate(rotation)),
             Operation::DestroyTo(block) => Operation::DestroyTo(block.rotate(rotation)),
             // TODO: there is not a general notion of rotating a modifier, but probably there should be
             op @ Operation::AddModifiers(_) => op,
+            Operation::StartMove(m) => Operation::StartMove(m.rotate(rotation)),
             Operation::Neighbors(mut neighbors) => {
                 // TODO: cheaper placeholder value, like an Operation::Nop
                 let mut placeholder = Operation::Become(AIR);
@@ -194,6 +225,7 @@ impl VisitHandles for Operation {
         match self {
             Operation::Become(block) | Operation::DestroyTo(block) => block.visit_handles(visitor),
             Operation::AddModifiers(modifier) => modifier.visit_handles(visitor),
+            Operation::StartMove(modifier) => modifier.visit_handles(visitor),
             Operation::Neighbors(neighbors) => {
                 for (_, op) in neighbors.iter() {
                     op.visit_handles(visitor);

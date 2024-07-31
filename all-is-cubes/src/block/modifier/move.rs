@@ -1,3 +1,5 @@
+use all_is_cubes_base::math::GridRotation;
+
 use crate::block::TickAction;
 use crate::block::{
     self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16, AIR,
@@ -74,6 +76,13 @@ impl Move {
             velocity: -self.velocity,
             schedule: self.schedule,
         }
+    }
+
+    /// Rotate the movement direction as specified.
+    #[must_use]
+    pub fn rotate(mut self, rotation: GridRotation) -> Self {
+        self.direction = rotation.transform(self.direction);
+        self
     }
 
     /// Note that `Modifier::Move` does some preprocessing to keep this simpler.

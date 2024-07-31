@@ -379,6 +379,9 @@ pub(crate) enum OperationSer<'a> {
     AddModifiersV1 {
         modifiers: Cow<'a, [ModifierSer<'a>]>,
     },
+    StartMoveV1 {
+        modifier: MoveSer,
+    },
     NeighborsV1 {
         neighbors: Cow<'a, [([i32; 3], op::Operation)]>,
     },
