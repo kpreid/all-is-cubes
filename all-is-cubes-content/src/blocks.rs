@@ -25,6 +25,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
@@ -504,7 +505,7 @@ pub async fn install_demo_blocks(
             };
             attributes.tick_action = Some(TickAction {
                 operation: Operation::Become(provider_for_patch[BecomeBlinker(!state)].clone()),
-                period: NonZeroU16::new(60).unwrap(),
+                schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
             });
         });
     }
@@ -575,7 +576,7 @@ pub async fn install_demo_blocks(
             };
             attributes.tick_action = Some(TickAction {
                 operation: Operation::Neighbors(neighbor_ops),
-                period: NonZeroU16::new(2).unwrap(),
+                schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
             });
         });
     }

@@ -655,10 +655,10 @@ impl Space {
             .filter(|&cube| {
                 if let Some(TickAction {
                     operation: _,
-                    period,
+                    schedule,
                 }) = self.get_evaluated(cube).attributes.tick_action
                 {
-                    if tick.prev_phase().rem_euclid(period.get()) != 0 {
+                    if schedule.contains(tick) {
                         // Don't tick yet.
                         // TODO: Use a more efficient queue structure
                         self.cubes_wanting_ticks.insert(cube);
@@ -683,7 +683,7 @@ impl Space {
         for cube in cubes_to_tick.iter().copied() {
             let Some(TickAction {
                 operation,
-                period: _,
+                schedule: _,
             }) = self.get_evaluated(cube).attributes.tick_action.as_ref()
             else {
                 continue;

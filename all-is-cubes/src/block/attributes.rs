@@ -1,6 +1,5 @@
 //! [`BlockAttributes`] and closely related types.
 
-use core::num::NonZeroU16;
 use core::{fmt, ops};
 
 use arcstr::ArcStr;
@@ -9,6 +8,7 @@ use crate::inv::InvInBlock;
 use crate::math::{Face6, GridRotation};
 use crate::op::Operation;
 
+use crate::time;
 #[cfg(doc)]
 use crate::{
     block::{Block, BlockDef, Modifier, Primitive},
@@ -448,22 +448,28 @@ pub struct TickAction {
     /// For example, if this is `1`, then it will be executed on every tick.
     //---
     // TODO: This should probably be its own data type
-    pub period: NonZeroU16,
+    pub schedule: time::Schedule,
 }
 
 impl TickAction {
     fn rotationally_symmetric(&self) -> bool {
         let Self {
             operation,
-            period: _,
+            schedule: _,
         } = self;
         operation.rotationally_symmetric()
     }
 
     fn rotate(self, rotation: GridRotation) -> TickAction {
-        let Self { operation, period } = self;
+        let Self {
+            operation,
+            schedule,
+        } = self;
         let operation = operation.rotate(rotation);
-        Self { operation, period }
+        Self {
+            operation,
+            schedule,
+        }
     }
 }
 
@@ -472,7 +478,7 @@ impl From<Operation> for TickAction {
     fn from(operation: Operation) -> Self {
         Self {
             operation,
-            period: NonZeroU16::MIN,
+            schedule: time::Schedule::EVERY_TICK,
         }
     }
 }
@@ -481,7 +487,7 @@ impl crate::universe::VisitHandles for TickAction {
     fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
         let Self {
             operation,
-            period: _,
+            schedule: _,
         } = self;
         operation.visit_handles(visitor);
     }

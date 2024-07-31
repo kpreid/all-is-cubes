@@ -1,6 +1,7 @@
 //! Data types for simulated and real time.
 
 use core::fmt;
+use core::num::NonZeroU16;
 
 #[cfg(doc)]
 use crate::universe::Universe;
@@ -8,12 +9,14 @@ use crate::universe::Universe;
 #[doc(inline)]
 pub use all_is_cubes_base::time::*;
 
-/// Specifies an amount of time passing “in game” Home in a [`Universe`]
-/// and its contents.
+/// Specifies an amount of time passing “in game” in a [`Universe`] and its contents.
 ///
+/// [`Tick`] values are passed along through the `step()` operations that advance time.
+/// They are produced by a [`Clock`] which has a [`TickSchedule`], and the clock generates
+/// distinct but eventually repeating ticks based on its *phase*.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Tick {
-    /// Schedule from which this tick was derived, which also determines its lenfth.
+    /// Schedule from which this tick was derived, which also determines its length.
     schedule: TickSchedule,
 
     /// The phase of the clock *before* this tick happens.
@@ -51,7 +54,7 @@ impl Tick {
         Self {
             schedule: TickSchedule {
                 base_duration: Duration::from_micros((dt * 1e6) as u64),
-                divisor: 1,
+                divisor: NonZeroU16::MIN,
             },
             prev_phase: 0,
             paused: false,
@@ -90,6 +93,40 @@ impl Tick {
     }
 }
 
+/// Specifies which [`Tick`]s a repeating event occurs on.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct Schedule {
+    period: NonZeroU16,
+    // TODO: add a relative-phase field. Or, consider replacing `period` with a bitmask
+    // covering all ticks (if we restrict the max divisor to a size for which that is sane).
+}
+
+impl Schedule {
+    /// Schedule which includes every tick.
+    pub const EVERY_TICK: Self = Self {
+        period: NonZeroU16::MIN,
+    };
+
+    /// Creates a schedule which specifies executing some action every `period` ticks.
+    ///
+    /// The `period` should be divisible by the universe’s [`TickSchedule`]’s divisor.
+    /// If it is not, then schedule will have uneven periods.
+    /// If it is zero, it will be replaced with 1.
+    pub fn from_period(period: NonZeroU16) -> Self {
+        Schedule { period }
+    }
+
+    pub(crate) fn contains(self, tick: Tick) -> bool {
+        tick.prev_phase().rem_euclid(self.period.get()) != 0
+    }
+
+    /// If this schedule is of the form “every N ticks”, return N.
+    pub fn to_period(self) -> Option<NonZeroU16> {
+        Some(self.period)
+    }
+}
+
 /// Defines how time passes in a [`Universe`].
 ///
 /// Specifically, it defines a base real-time duration (for example, it could be 1 second),
@@ -103,14 +140,14 @@ impl Tick {
 ///
 /// This design provides the following properties:
 ///
-/// * Simulation systems with different schedules will proceed in simple ratios to each
+/// * Simulation systems with different [`Schedule`]s will proceed in simple ratios to each
 ///   other.
 /// * The only information which needs to be persistently stored is the _phase_ of the
 ///   clock — that is, how many ticks have elapsed since the last whole base duration.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct TickSchedule {
     base_duration: Duration,
-    divisor: u16,
+    divisor: NonZeroU16,
 }
 
 impl TickSchedule {
@@ -118,13 +155,16 @@ impl TickSchedule {
     pub const fn per_second(divisor: u16) -> Self {
         Self {
             base_duration: Duration::from_secs(1),
-            divisor,
+            divisor: match NonZeroU16::new(divisor) {
+                Some(x) => x,
+                None => panic!("divisor must be nonzero"),
+            },
         }
     }
 
     /// Returns the length of a [`Tick`] in this schedule.
     pub fn delta_t(&self) -> Duration {
-        self.base_duration / u32::from(self.divisor)
+        self.base_duration / u32::from(self.divisor.get())
     }
 }
 
@@ -164,7 +204,7 @@ impl Clock {
     pub const fn new(schedule: TickSchedule, phase: u16) -> Self {
         Self {
             schedule,
-            phase: phase % schedule.divisor,
+            phase: phase % schedule.divisor.get(),
         }
     }
 

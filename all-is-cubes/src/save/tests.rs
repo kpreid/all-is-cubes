@@ -176,7 +176,7 @@ fn block_atom_with_all_attributes() {
             .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
             .tick_action(Some(block::TickAction {
                 operation: op::Operation::Become(AIR),
-                period: NonZeroU16::new(3).unwrap(),
+                schedule: time::Schedule::from_period(NonZeroU16::new(3).unwrap()),
             }))
             .light_emission(Rgb::new(1.0, 0.0, 10.0))
             .animation_hint(AnimationHint {
@@ -223,7 +223,10 @@ fn block_atom_with_all_attributes() {
                     "by": "PX",
                 },
                 "tick_action": {
-                    "period": 3,
+                    "schedule": {
+                        "type": "ScheduleV1",
+                        "period": 3,
+                    },
                     "operation": {
                         "type": "BecomeV1",
                         "block": {

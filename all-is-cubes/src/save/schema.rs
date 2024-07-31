@@ -149,7 +149,7 @@ pub(crate) enum RotationPlacementRuleSer {
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct TickActionSer<'a> {
     pub operation: Cow<'a, op::Operation>,
-    pub period: NonZeroU16,
+    pub schedule: crate::time::Schedule,
 }
 #[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "type")]
@@ -433,6 +433,15 @@ pub(crate) enum SkySer {
 pub(crate) enum LightPhysicsSerV1 {
     NoneV1,
     RaysV1 { maximum_distance: u8 },
+}
+
+//------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `time` module
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum ScheduleSer {
+    ScheduleV1 { period: NonZeroU16 },
 }
 
 //------------------------------------------------------------------------------------------------//

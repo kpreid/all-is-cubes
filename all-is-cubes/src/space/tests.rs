@@ -584,7 +584,7 @@ fn block_tick_action_does_not_run_paused() {
         .color(Rgba::WHITE)
         .tick_action(TickAction {
             operation: Operation::Become(AIR),
-            period: NonZeroU16::MIN,
+            schedule: time::Schedule::EVERY_TICK,
         })
         .build();
     let mut space = Space::empty_positive(1, 1, 1);
@@ -609,7 +609,7 @@ fn block_tick_action_timing() {
         if let Primitive::Atom(Atom { attributes, .. }) = from.primitive_mut() {
             attributes.tick_action = Some(TickAction {
                 operation: Operation::Become(to.clone()),
-                period: NonZeroU16::new(2).unwrap(),
+                schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
             });
         } else {
             panic!();
@@ -668,7 +668,7 @@ fn block_tick_action_conflict() {
                         )]
                         .into(),
                     ),
-                    period: NonZeroU16::new(1).unwrap(),
+                    schedule: time::Schedule::from_period(NonZeroU16::new(1).unwrap()),
                 }
             });
         } else {

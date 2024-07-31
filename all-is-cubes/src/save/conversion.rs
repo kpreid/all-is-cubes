@@ -202,10 +202,10 @@ mod block {
                 tick_action: tick_action.as_ref().map(
                     |&TickAction {
                          ref operation,
-                         period,
+                         schedule,
                      }| schema::TickActionSer {
                         operation: Cow::Borrowed(operation),
-                        period,
+                        schedule,
                     },
                 ),
                 activation_action: activation_action.clone(),
@@ -230,12 +230,17 @@ mod block {
                 selectable,
                 inventory: inventory.into(),
                 rotation_rule: rotation_rule.into(),
-                tick_action: tick_action.map(|schema::TickActionSer { operation, period }| {
-                    TickAction {
-                        operation: operation.into_owned(),
-                        period,
-                    }
-                }),
+                tick_action: tick_action.map(
+                    |schema::TickActionSer {
+                         operation,
+                         schedule,
+                     }| {
+                        TickAction {
+                            operation: operation.into_owned(),
+                            schedule,
+                        }
+                    },
+                ),
                 activation_action,
                 animation_hint: animation_hint.into(),
             }
@@ -896,6 +901,31 @@ mod space {
                 S::NoneV1 => LightPhysics::None,
                 S::RaysV1 { maximum_distance } => LightPhysics::Rays { maximum_distance },
             }
+        }
+    }
+}
+
+mod time {
+    use super::*;
+    use crate::time;
+
+    impl Serialize for time::Schedule {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            schema::ScheduleSer::ScheduleV1 {
+                period: self.to_period().unwrap(),
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for time::Schedule {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            Ok(match schema::ScheduleSer::deserialize(deserializer)? {
+                schema::ScheduleSer::ScheduleV1 { period } => time::Schedule::from_period(period),
+            })
         }
     }
 }
