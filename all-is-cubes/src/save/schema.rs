@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use crate::block::Block;
 use crate::math::{Aab, Face6, GridAab, GridCoordinate, GridRotation};
 use crate::save::compress::{GzSerde, Leu16};
+use crate::time::Schedule;
 use crate::universe::Handle;
 use crate::{behavior, block, character, inv, op, space, universe};
 
@@ -149,7 +150,7 @@ pub(crate) enum RotationPlacementRuleSer {
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct TickActionSer<'a> {
     pub operation: Cow<'a, op::Operation>,
-    pub schedule: crate::time::Schedule,
+    pub schedule: Schedule,
 }
 #[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "type")]
@@ -198,6 +199,7 @@ pub(crate) enum ModifierSer<'a> {
         direction: Face6,
         distance: u16,
         velocity: i16,
+        schedule: Schedule,
     },
     /// This is called "`BlockInventory`" rather than "`Inventory`" so that the
     /// variant tags are unique across the entire schema, which might be useful

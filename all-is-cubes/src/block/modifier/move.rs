@@ -4,6 +4,7 @@ use crate::block::{
 };
 use crate::math::{Face6, GridAab, GridCoordinate, GridVector, Vol};
 use crate::op::Operation;
+use crate::time;
 use crate::universe;
 
 /// Data for [`Modifier::Move`]; displaces the block out of the grid, cropping it.
@@ -23,12 +24,18 @@ use crate::universe;
 pub struct Move {
     /// The direction in which the block is displaced.
     pub direction: Face6,
+
     /// The distance, in 1/256ths, by which it is displaced.
     pub distance: u16,
-    /// The velocity **per tick** with which the displacement is changing.
-    ///
-    /// TODO: "Per tick" is a bad unit.
+
+    /// The amount by which `self.distance` is changing every time
+    /// `self.schedule` fires.
     pub velocity: i16,
+
+    /// When to apply the velocity.
+    ///
+    /// If `self.velocity` is zero, this is ignored.
+    pub schedule: time::Schedule,
 }
 
 impl Move {
@@ -38,6 +45,7 @@ impl Move {
             direction,
             distance,
             velocity,
+            schedule: time::Schedule::EVERY_TICK,
         }
     }
 
@@ -64,6 +72,7 @@ impl Move {
             direction: self.direction.opposite(),
             distance: 256 - self.distance,
             velocity: -self.velocity,
+            schedule: self.schedule,
         }
     }
 
@@ -79,6 +88,7 @@ impl Move {
             direction,
             distance,
             velocity,
+            schedule,
         } = *self;
 
         // Apply Quote to ensure that the block's own `tick_action` and other effects
@@ -104,9 +114,9 @@ impl Move {
             .translate(translation_in_res)
             .intersection_cubes(GridAab::for_block(effective_resolution));
 
-        let animation_action: Option<TickAction> = if displaced_bounds.is_none() && velocity >= 0 {
+        let animation_op: Option<Operation> = if displaced_bounds.is_none() && velocity >= 0 {
             // Displaced to invisibility; turn into just plain air.
-            Some(TickAction::from(Operation::Become(AIR)))
+            Some(Operation::Become(AIR))
         } else if translation_in_res == GridVector::zero() && velocity == 0
             || distance == 0 && velocity < 0
         {
@@ -116,7 +126,7 @@ impl Move {
             );
             let mut new_block = block.clone();
             new_block.modifiers_mut().remove(this_modifier_index); // TODO: What if other modifiers want to do things?
-            Some(TickAction::from(Operation::Become(new_block)))
+            Some(Operation::Become(new_block))
         } else if velocity != 0 {
             // Movement in progress.
             assert!(
@@ -133,13 +143,13 @@ impl Move {
                             .try_into()
                             .unwrap(/* clamped to range */);
             }
-            Some(TickAction::from(Operation::Become(new_block)))
+            Some(Operation::Become(new_block))
         } else {
             // Stationary displacement; take no action
             None
         };
 
-        let animation_hint = if animation_action.is_some() {
+        let animation_hint = if animation_op.is_some() {
             input.attributes.animation_hint
                 | block::AnimationHint::replacement(block::AnimationChange::Shape)
         } else {
@@ -148,7 +158,10 @@ impl Move {
 
         let attributes = BlockAttributes {
             animation_hint,
-            tick_action: animation_action,
+            tick_action: animation_op.map(|operation| TickAction {
+                operation,
+                schedule,
+            }),
             ..input.attributes
         };
 
@@ -204,6 +217,7 @@ impl universe::VisitHandles for Move {
             direction: _,
             distance: _,
             velocity: _,
+            schedule: _,
         } = self;
     }
 }
@@ -215,7 +229,6 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::math::{notnan, rgba_const, FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
     use crate::space::Space;
-    use crate::time;
     use crate::universe::Universe;
     use ordered_float::NotNan;
     use pretty_assertions::assert_eq;
@@ -228,6 +241,7 @@ mod tests {
             direction: Face6::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
             velocity: 0,
+            schedule: time::Schedule::EVERY_TICK,
         });
 
         let expected_bounds = GridAab::from_lower_size([0, 8, 0], [16, 8, 16]);
@@ -279,6 +293,7 @@ mod tests {
             direction: Face6::PY,
             distance: 128, // distance 1/2 block × scale factor of 256
             velocity: 0,
+            schedule: time::Schedule::EVERY_TICK,
         });
 
         let expected_bounds = GridAab::from_lower_size([0, 1, 0], [2, 1, 2]);
@@ -328,6 +343,7 @@ mod tests {
             direction: Face6::PY,
             distance: 128,
             velocity: 0,
+            schedule: time::Schedule::EVERY_TICK,
         });
 
         assert_eq!(moved.evaluate().unwrap().attributes.tick_action, None);
@@ -393,6 +409,7 @@ mod tests {
                 direction: Face6::PX,
                 distance: 10,
                 velocity: 10,
+                schedule: time::Schedule::EVERY_TICK,
             })
             .with_modifier(composite.clone());
 
@@ -402,6 +419,7 @@ mod tests {
                 direction: Face6::PX,
                 distance: 20,
                 velocity: 10,
+                schedule: time::Schedule::EVERY_TICK,
             })
             .with_modifier(composite);
 
@@ -423,6 +441,7 @@ mod tests {
                 direction: Face6::PX,
                 distance: 10,
                 velocity: 10,
+                schedule: time::Schedule::EVERY_TICK,
             }),
             block::CompositeOperator::Over,
         ));
@@ -432,6 +451,7 @@ mod tests {
                 direction: Face6::PX,
                 distance: 10,
                 velocity: 10,
+                schedule: time::Schedule::EVERY_TICK,
             }),
             block::CompositeOperator::Over,
         ));

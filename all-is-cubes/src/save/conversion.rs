@@ -360,10 +360,12 @@ mod block {
                     direction,
                     distance,
                     velocity,
+                    schedule,
                 }) => ModifierSer::MoveV1 {
                     direction,
                     distance,
                     velocity,
+                    schedule,
                 },
                 Modifier::Inventory(ref inventory) => ModifierSer::BlockInventoryV1 {
                     inventory: Cow::Borrowed(inventory),
@@ -397,7 +399,13 @@ mod block {
                     direction,
                     distance,
                     velocity,
-                } => Modifier::Move(Move::new(direction, distance, velocity)),
+                    schedule,
+                } => Modifier::Move(Move {
+                    direction,
+                    distance,
+                    velocity,
+                    schedule,
+                }),
                 ModifierSer::BlockInventoryV1 { inventory } => {
                     Modifier::Inventory(inventory.into_owned())
                 }

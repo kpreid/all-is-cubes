@@ -535,11 +535,7 @@ mod eval {
         let block = Block::builder()
             .color(Rgba::new(1e28, 1e28, 1e28, 1e28))
             // Modifier matters because it causes the block to become voxels
-            .modifier(Modifier::Move(modifier::Move {
-                direction: Face6::NX,
-                distance: 0,
-                velocity: 0,
-            }))
+            .modifier(Modifier::Move(modifier::Move::new(Face6::NX, 0, 0)))
             .build();
         block.evaluate().unwrap();
     }
