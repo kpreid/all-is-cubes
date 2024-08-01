@@ -197,7 +197,7 @@ impl Tool {
                 }
 
                 let velocity = 8;
-                let [move_out, move_in] = block::Move::paired_move(direction, 0, velocity);
+                let [move_out, move_in] = block::Move::new(direction, 0, velocity).to_paired();
                 let leaving = input.set_cube(
                     cursor.cube(),
                     cursor.hit().block.clone(),

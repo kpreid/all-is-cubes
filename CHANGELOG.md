@@ -13,6 +13,7 @@
 
 - `all-is-cubes` library:
     - `block::EvalBlockError` is now a `struct` with an inner `ErrorKind` enum, instead of an enum, and contains more information.
+    - `block::Move`’s means of construction have been changed to be more systematic and orthogonal. In particular, paired moves are constructed from unpaired ones.
 
 ### Removed
 

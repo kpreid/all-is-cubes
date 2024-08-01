@@ -14,12 +14,12 @@ use crate::universe;
 /// * If the `distance` is zero then the modifier will remove itself, if possible,
 ///   on the next tick.
 /// * If the `distance` and `velocity` are such that the block is out of view and will
-///   never strt being in view, the block will be replaced with [`AIR`].
+///   never start being in view, the block will be replaced with [`AIR`].
 ///
 /// (TODO: Define the conditions for “if possible”.)
-#[non_exhaustive] // TODO: needs a constructor instead
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[non_exhaustive]
 pub struct Move {
     /// The direction in which the block is displaced.
     pub direction: Face6,
@@ -41,25 +41,30 @@ impl Move {
         }
     }
 
-    /// Create a pair of [`Modifier::Move`]s to displace a block.
-    /// The first goes on the block being moved and the second on the air
+    /// Create a pair of [`Move`]s to displace a block.
+    /// The first goes on the block being moved, and the second on the air
     /// it's moving into.
-    ///
-    /// TODO: This is going to need to change again in order to support
-    /// moving one block in and another out at the same time.
-    pub fn paired_move(direction: Face6, distance: u16, velocity: i16) -> [Modifier; 2] {
-        [
-            Modifier::Move(Move {
-                direction,
-                distance,
-                velocity,
-            }),
-            Modifier::Move(Move {
-                direction: direction.opposite(),
-                distance: 256 - distance,
-                velocity: -velocity,
-            }),
-        ]
+    //---
+    // TODO: This is going to need to change again in order to support
+    // moving one block in and another out at the same time.
+    //
+    // TODO: This would be a good candidate for an example, once doctests are not so slow.
+    #[must_use]
+    pub fn to_paired(self) -> [Self; 2] {
+        let complement = self.complement();
+        [self, complement]
+    }
+
+    /// Calculate the modifier which should be paired with this one, and located at the adjacent
+    /// cube pointed to by [`Self::direction`], to produce a complete moving block across two
+    /// cubes.
+    #[must_use]
+    pub fn complement(&self) -> Self {
+        Move {
+            direction: self.direction.opposite(),
+            distance: 256 - self.distance,
+            velocity: -self.velocity,
+        }
     }
 
     /// Note that `Modifier::Move` does some preprocessing to keep this simpler.
@@ -332,7 +337,7 @@ mod tests {
     fn move_block_test(direction: Face6, velocity: i16, checker: impl FnOnce(&Space, &Block)) {
         let [block] = make_some_blocks();
         let mut space = Space::empty(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]));
-        let [move_out, move_in] = Move::paired_move(direction, 0, velocity);
+        let [move_out, move_in] = Move::new(direction, 0, velocity).to_paired();
         space
             .set([0, 0, 0], block.clone().with_modifier(move_out))
             .unwrap();
