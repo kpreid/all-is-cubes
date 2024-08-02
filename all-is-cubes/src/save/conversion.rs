@@ -356,17 +356,7 @@ mod block {
                     disassemblable,
                 },
                 Modifier::Zoom(ref m) => m.to_serial_schema(),
-                Modifier::Move(Move {
-                    direction,
-                    distance,
-                    velocity,
-                    schedule,
-                }) => ModifierSer::MoveV1 {
-                    direction,
-                    distance,
-                    velocity,
-                    schedule,
-                },
+                Modifier::Move(ref m) => ModifierSer::Move(m.into()),
                 Modifier::Inventory(ref inventory) => ModifierSer::BlockInventoryV1 {
                     inventory: Cow::Borrowed(inventory),
                 },
@@ -395,20 +385,46 @@ mod block {
                 ModifierSer::ZoomV1 { scale, offset } => {
                     Modifier::Zoom(Zoom::new(scale, offset.map(i32::from).into()))
                 }
-                ModifierSer::MoveV1 {
-                    direction,
-                    distance,
-                    velocity,
-                    schedule,
-                } => Modifier::Move(Move {
-                    direction,
-                    distance,
-                    velocity,
-                    schedule,
-                }),
+                ModifierSer::Move(m) => Modifier::Move(m.into()),
                 ModifierSer::BlockInventoryV1 { inventory } => {
                     Modifier::Inventory(inventory.into_owned())
                 }
+            }
+        }
+    }
+
+    impl From<&Move> for schema::MoveSer {
+        fn from(value: &Move) -> Self {
+            let &Move {
+                direction,
+                distance,
+                velocity,
+                schedule,
+            } = value;
+
+            schema::MoveSer::MoveV1 {
+                direction,
+                distance,
+                velocity,
+                schedule,
+            }
+        }
+    }
+
+    impl From<schema::MoveSer> for Move {
+        fn from(value: schema::MoveSer) -> Self {
+            match value {
+                schema::MoveSer::MoveV1 {
+                    direction,
+                    distance,
+                    velocity,
+                    schedule,
+                } => Move {
+                    direction,
+                    distance,
+                    velocity,
+                    schedule,
+                },
             }
         }
     }

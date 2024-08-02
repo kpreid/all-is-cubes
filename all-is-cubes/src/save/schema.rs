@@ -195,17 +195,24 @@ pub(crate) enum ModifierSer<'a> {
         scale: block::Resolution,
         offset: [u8; 3],
     },
-    MoveV1 {
-        direction: Face6,
-        distance: u16,
-        velocity: i16,
-        schedule: Schedule,
-    },
     /// This is called "`BlockInventory`" rather than "`Inventory`" so that the
     /// variant tags are unique across the entire schema, which might be useful
     /// for future compatibility or other applications accessing the data.
     BlockInventoryV1 {
         inventory: Cow<'a, inv::Inventory>,
+    },
+    #[serde(untagged)]
+    Move(MoveSer),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum MoveSer {
+    MoveV1 {
+        direction: Face6,
+        distance: u16,
+        velocity: i16,
+        schedule: Schedule,
     },
 }
 
