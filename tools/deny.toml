@@ -19,6 +19,9 @@ allow = [
 ]
 private = { ignore = true }
 
+[advisories]
+yanked = "deny"
+
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
@@ -42,10 +45,7 @@ skip = [
 ]
 
 skip-tree = [
-    # Known issue: `noise` has stale deps including `rand` family
-    { name = "noise", version = "=0.8.2", depth = 2 },
-
-    # misc transitive deps
+    { name = "criterion" }, # criterion is rarely updated but only used for benching
     { name = "bitflags", version = "=1.3.2", depth = 1 },
     { name = "num_enum", version = "=0.5.11", depth = 2 },
     { name = "ndk", depth = 3 }, # winit and wgpu use different versions
