@@ -495,7 +495,7 @@ fn space_debug() {
                 physics: SpacePhysics {
                     gravity: (+0.000, -20.000, +0.000),
                     sky: Uniform(
-                        Rgb(0.8962694, 0.8962694, 1.0),
+                        Rgb(0.89626944, 0.89626944, 1.0),
                     ),
                     light: None,
                 },
