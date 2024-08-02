@@ -63,7 +63,7 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "displaydoc",
- "embedded-graphics",
+ "embedded-graphics-core",
  "euclid",
  "exhaust",
  "futures-core",

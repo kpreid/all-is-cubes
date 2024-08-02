@@ -80,7 +80,9 @@ criterion = { version = "0.5.1", features = ["async_tokio", "cargo_bench_support
 displaydoc = { version = "0.2.4", default-features = false}
 downcast-rs = { version = "1.2.0", default-features = false }
 either = { version = "1.10.0", default-features = false }
+# embedded-graphics and embedded-graphics-core must match
 embedded-graphics = "0.8.0"
+embedded-graphics-core = "0.4.0"
 euclid = { version = "0.22.10", default-features = false }
 exhaust = { version = "0.1.0", default-features = false }
 flume = { version = "0.11.0", default-features = false, features = ["async"] }

@@ -31,7 +31,7 @@ arbitrary = { workspace = true, optional = true }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }
 displaydoc = { workspace = true }
-embedded-graphics = { workspace = true }
+embedded-graphics-core = { workspace = true }
 # libm feature to guarantee compilability and compatibility with no_std
 euclid = { workspace = true, features = ["libm"] }
 exhaust = { workspace = true, default-features = false }
