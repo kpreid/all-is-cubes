@@ -100,6 +100,7 @@ dependencies = [
  "futures-util",
  "indoc",
  "itertools 0.12.1",
+ "libm",
  "manyfmt",
  "mutants",
  "num-traits",

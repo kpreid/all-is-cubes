@@ -68,6 +68,7 @@ dependencies = [
  "exhaust",
  "futures-core",
  "futures-util",
+ "libm",
  "manyfmt",
  "mutants",
  "num-traits",

@@ -37,6 +37,7 @@ euclid = { workspace = true, features = ["libm"] }
 exhaust = { workspace = true, default-features = false }
 futures-core = { workspace = true }
 futures-util = { workspace = true }
+libm = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
 num-traits = { workspace = true }
