@@ -9,6 +9,7 @@ use core::{fmt, ptr};
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
+use crate::block::eval::derived::Derived;
 use crate::block::{
     self, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels, Modifier,
     Resolution::{self, R1},
@@ -25,19 +26,18 @@ use crate::block::{Handle, AIR};
 ///
 /// To obtain this, call [`Block::evaluate()`].
 //---
-// TODO: The derived `PartialEq` impl will process redundant components such as
-// `voxel_opacity_mask`. We should make the whole structure read-only, so that we can
-// guarantee that they are consistent and don't need to be compared. Relatedly, it might
-// be good if those derived components were computed lazily.
+// TODO: The derived `PartialEq` impl will redundantly check `derived`. Stop doing that.
 //
 // TODO: Consider if we can further restrict field visibility (to ensure integrity of
 // data consistency) by moving the tests that make use of it.
 #[derive(Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))] // TODO: Should have a custom Arbitrary producing only “possible” results
 #[non_exhaustive]
 pub struct EvaluatedBlock {
     /// The original block which was evaluated to produce this result.
     pub(in crate::block) block: Block,
+
+    /// Cost of performing the evaluation.
+    pub(in crate::block) cost: Cost,
 
     /// The block's attributes.
     pub(in crate::block) attributes: BlockAttributes,
@@ -46,72 +46,26 @@ pub struct EvaluatedBlock {
     /// of those voxels.
     pub(in crate::block) voxels: Evoxels,
 
-    /// The block's color; if made of multiple voxels, then an average or representative
-    /// color.
-    pub(in crate::block) color: Rgba,
-
-    /// The average color of the block as viewed from each axis-aligned direction.
-    pub(in crate::block) face_colors: FaceMap<Rgba>,
-
-    /// The overall light emission aggregated from individual voxels.
-    /// This should be interpreted in the same way as the emission field of
-    /// [`block::Atom`].
-    ///
-    /// TODO: Add *some* directionality to this.
-    pub(in crate::block) light_emission: Rgb,
-
-    /// Whether the block is known to be completely opaque to light passing in or out of
-    /// each face.
-    ///
-    /// Currently, this is calculated as whether each of the surfaces of the block are
-    /// fully opaque, but in the future it might be refined to permit concave surfaces.
-    // TODO: generalize this to a matrix of face/face visibility and opacity relationships,
-    // so that light transport can be refined.
-    pub(in crate::block) opaque: FaceMap<bool>,
-
-    /// Whether the block has any voxels/color at all that make it visible; that is, this
-    /// is false if the block is completely transparent.
-    pub(in crate::block) visible: bool,
-
-    /// If all voxels in the cube have the same collision behavior, then this is that.
-    //
-    // TODO: As currently defined, this is None or Some(BlockCollision::None)
-    // if the voxels don't fill the cube bounds. But "collide with the bounding box"
-    // might be a nice efficient option.
-    //
-    // TODO: This won't generalize properly to having more than 2 states of
-    // BlockCollision in the way that transformation to `Evoxel` needs. We will need to
-    // make this its own enum, or a bitmask of all seen values, or something.
-    pub(in crate::block) uniform_collision: Option<BlockCollision>,
-
-    /// The opacity of all voxels. This is redundant with the main data, [`Self::voxels`],
-    /// and is provided as a pre-computed convenience that can be cheaply compared with
-    /// other values of the same type.
-    ///
-    /// May be [`None`] if the block is fully invisible. (TODO: This is a kludge to avoid
-    /// obligating [`AIR_EVALUATED`] to allocate at compile time, which is impossible.
-    /// It doesn't harm normal operation because the point of having this is to compare
-    /// block shapes, which is trivial if the block is invisible.)
-    pub(in crate::block) voxel_opacity_mask: Option<Vol<Arc<[OpacityCategory]>>>,
-
-    /// Cost of performing the evaluation.
-    pub(in crate::block) cost: Cost,
+    pub(in crate::block) derived: Derived,
 }
 
 impl fmt::Debug for EvaluatedBlock {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             block,
-            attributes,
-            color,
-            face_colors,
-            light_emission,
-            voxels,
-            opaque,
-            visible,
-            uniform_collision,
-            voxel_opacity_mask,
             cost,
+            attributes,
+            voxels,
+            derived:
+                Derived {
+                    color,
+                    face_colors,
+                    light_emission,
+                    opaque,
+                    visible,
+                    uniform_collision,
+                    voxel_opacity_mask,
+                },
         } = self;
         let mut ds = fmt.debug_struct("EvaluatedBlock");
         ds.field("block", block);
@@ -160,7 +114,13 @@ impl EvaluatedBlock {
         voxels: Evoxels,
         cost: Cost,
     ) -> EvaluatedBlock {
-        block::voxels_to_evaluated_block(original_block, attributes, voxels, cost)
+        EvaluatedBlock {
+            derived: block::eval::compute_derived(&attributes, &voxels),
+            block: original_block,
+            cost,
+            attributes,
+            voxels,
+        }
     }
 
     // --- Accessors ---
@@ -205,13 +165,13 @@ impl EvaluatedBlock {
     /// color. This is the color that is used when a block becomes a voxel.
     #[inline]
     pub fn color(&self) -> Rgba {
-        self.color
+        self.derived.color
     }
 
     /// The average color of the block as viewed from each axis-aligned direction.
     #[inline]
     pub fn face_colors(&self) -> FaceMap<Rgba> {
-        self.face_colors
+        self.derived.face_colors
     }
 
     /// The overall light emission aggregated from individual voxels.
@@ -219,7 +179,7 @@ impl EvaluatedBlock {
     /// [`block::Atom`].
     #[inline]
     pub fn light_emission(&self) -> Rgb {
-        self.light_emission
+        self.derived.light_emission
     }
 
     /// Whether the block is known to be completely opaque to light passing in or out of
@@ -230,14 +190,14 @@ impl EvaluatedBlock {
     /// concave surfaces too, as long as they have edges meeting all edges of the block face.
     #[inline]
     pub fn opaque(&self) -> FaceMap<bool> {
-        self.opaque
+        self.derived.opaque
     }
 
     /// Whether the block has any voxels/color at all that make it visible; that is, this
     /// is false if the block is completely transparent.
     #[inline]
     pub fn visible(&self) -> bool {
-        self.visible
+        self.derived.visible
     }
 
     /// If all voxels in the cube have the same collision behavior, then this is that.
@@ -246,7 +206,7 @@ impl EvaluatedBlock {
     /// bounds, even if all voxels in the voxel data bounds have the same collision.
     #[inline]
     pub fn uniform_collision(&self) -> Option<BlockCollision> {
-        self.uniform_collision
+        self.derived.uniform_collision
     }
 
     /// The opacity of all voxels. This is redundant with the main data, [`Self::voxels()`],
@@ -259,7 +219,7 @@ impl EvaluatedBlock {
     /// block shapes, which is trivial if the block is invisible.)
     #[inline]
     pub fn voxel_opacity_mask(&self) -> &Option<Vol<Arc<[OpacityCategory]>>> {
-        &self.voxel_opacity_mask
+        &self.derived.voxel_opacity_mask
     }
 
     // --- Non-cached computed properties ---
@@ -269,7 +229,7 @@ impl EvaluatedBlock {
     /// visible (by change of evaluation result rather than by being replaced).
     #[inline]
     pub(crate) fn visible_or_animated(&self) -> bool {
-        self.visible || self.attributes.animation_hint.might_become_visible()
+        self.derived.visible || self.attributes.animation_hint.might_become_visible()
     }
 
     /// Returns the bounding box of the voxels, or the full cube if no voxels,
@@ -285,8 +245,8 @@ impl EvaluatedBlock {
 
     pub(crate) fn face7_color(&self, face: Face7) -> Rgba {
         match Face6::try_from(face) {
-            Ok(face) => self.face_colors[face],
-            Err(_) => self.color,
+            Ok(face) => self.derived.face_colors[face],
+            Err(_) => self.derived.color,
         }
     }
 
@@ -299,9 +259,9 @@ impl EvaluatedBlock {
     /// TODO: Review uses of .opaque and .visible and see if they can be usefully replaced
     /// by this.
     pub(crate) fn opacity_as_category(&self) -> OpacityCategory {
-        if self.opaque == FaceMap::repeat(true) {
+        if self.derived.opaque == FaceMap::repeat(true) {
             OpacityCategory::Opaque
-        } else if !self.visible {
+        } else if !self.derived.visible {
             OpacityCategory::Invisible
         } else {
             OpacityCategory::Partial
@@ -353,6 +313,20 @@ impl EvaluatedBlock {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+#[mutants::skip]
+impl<'a> arbitrary::Arbitrary<'a> for EvaluatedBlock {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // TODO: Instead of AIR, this should in principle be a dead indirect block
+        // or something: “you can't prove it DIDN’T evaluate to this”.
+        Ok(MinEval::arbitrary(u)?.finish(block::AIR, Cost::arbitrary(u)?))
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        MinEval::size_hint(depth)
+    }
+}
+
 /// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>, as a constant.
 /// This may be used when an [`EvaluatedBlock`] value is needed but there is no block
 /// value.
@@ -364,19 +338,21 @@ impl EvaluatedBlock {
 /// ```
 pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     block: block::AIR,
-    attributes: AIR_ATTRIBUTES,
-    color: Rgba::TRANSPARENT,
-    face_colors: FaceMap::repeat_copy(Rgba::TRANSPARENT),
-    light_emission: Rgb::ZERO,
-    voxels: Evoxels::One(Evoxel::AIR),
-    opaque: FaceMap::repeat_copy(false),
-    visible: false,
-    uniform_collision: Some(BlockCollision::None),
-    voxel_opacity_mask: None,
     cost: Cost {
         components: 1,
         voxels: 0,
         recursion: 0,
+    },
+    attributes: AIR_ATTRIBUTES,
+    voxels: Evoxels::One(Evoxel::AIR),
+    derived: Derived {
+        color: Rgba::TRANSPARENT,
+        face_colors: FaceMap::repeat_copy(Rgba::TRANSPARENT),
+        light_emission: Rgb::ZERO,
+        opaque: FaceMap::repeat_copy(false),
+        visible: false,
+        uniform_collision: Some(BlockCollision::None),
+        voxel_opacity_mask: None,
     },
 };
 
@@ -408,6 +384,7 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
 /// mis-computing some of the derived data as an attempted optimization.
 /// This type is never exposed as part of the public API; only [`EvaluatedBlock`] is.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub(crate) struct MinEval {
     pub(crate) attributes: BlockAttributes,
     pub(crate) voxels: Evoxels,
@@ -438,7 +415,7 @@ impl MinEval {
     /// Use [`crate::block::finish_evaluation`] to include error processing.
     pub(in crate::block) fn finish(self, block: Block, cost: Cost) -> EvaluatedBlock {
         let MinEval { attributes, voxels } = self;
-        block::voxels_to_evaluated_block(block, attributes, voxels, cost)
+        EvaluatedBlock::from_voxels(block, attributes, voxels, cost)
     }
 
     pub fn resolution(&self) -> Resolution {

@@ -261,28 +261,30 @@ mod tests {
             EvaluatedBlock {
                 block: moved,
                 attributes: ev_original.attributes.clone(),
-                color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
-                face_colors: FaceMap {
-                    nx: color.to_rgb().with_alpha(notnan!(0.5)),
-                    ny: color.to_rgb().with_alpha(notnan!(1.0)),
-                    nz: color.to_rgb().with_alpha(notnan!(0.5)),
-                    px: color.to_rgb().with_alpha(notnan!(0.5)),
-                    py: color.to_rgb().with_alpha(notnan!(1.0)),
-                    pz: color.to_rgb().with_alpha(notnan!(0.5)),
-                },
-                light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     R16,
                     Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
                 ),
-                opaque: FaceMap::repeat(false).with(Face6::PY, true),
-                visible: true,
-                uniform_collision: None,
-                voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
                 cost: block::Cost {
                     components: ev_original.cost.components + 1,
                     voxels: expected_bounds.volume_f64() as u32,
                     recursion: 0
+                },
+                derived: block::Derived {
+                    color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
+                    face_colors: FaceMap {
+                        nx: color.to_rgb().with_alpha(notnan!(0.5)),
+                        ny: color.to_rgb().with_alpha(notnan!(1.0)),
+                        nz: color.to_rgb().with_alpha(notnan!(0.5)),
+                        px: color.to_rgb().with_alpha(notnan!(0.5)),
+                        py: color.to_rgb().with_alpha(notnan!(1.0)),
+                        pz: color.to_rgb().with_alpha(notnan!(0.5)),
+                    },
+                    light_emission: Rgb::ZERO,
+                    opaque: FaceMap::repeat(false).with(Face6::PY, true),
+                    visible: true,
+                    uniform_collision: None,
+                    voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
                 }
             }
         );
@@ -313,28 +315,30 @@ mod tests {
             EvaluatedBlock {
                 block: moved,
                 attributes: ev_original.attributes.clone(),
-                color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
-                face_colors: FaceMap {
-                    nx: color.to_rgb().with_alpha(notnan!(0.5)),
-                    ny: color.to_rgb().with_alpha(notnan!(1.0)),
-                    nz: color.to_rgb().with_alpha(notnan!(0.5)),
-                    px: color.to_rgb().with_alpha(notnan!(0.5)),
-                    py: color.to_rgb().with_alpha(notnan!(1.0)),
-                    pz: color.to_rgb().with_alpha(notnan!(0.5)),
-                },
-                light_emission: Rgb::ZERO,
-                voxels: Evoxels::Many(
-                    resolution,
-                    Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
-                ),
-                opaque: FaceMap::repeat(false).with(Face6::PY, true),
-                visible: true,
-                uniform_collision: None,
-                voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
                 cost: block::Cost {
                     components: ev_original.cost.components + 1,
                     voxels: 2u32.pow(3) * 3 / 2, // original recur + 1/2 block of Move
                     recursion: 0
+                },
+                voxels: Evoxels::Many(
+                    resolution,
+                    Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
+                ),
+                derived: block::Derived {
+                    color: color.to_rgb().with_alpha(NotNan::new(2. / 3.).unwrap()),
+                    face_colors: FaceMap {
+                        nx: color.to_rgb().with_alpha(notnan!(0.5)),
+                        ny: color.to_rgb().with_alpha(notnan!(1.0)),
+                        nz: color.to_rgb().with_alpha(notnan!(0.5)),
+                        px: color.to_rgb().with_alpha(notnan!(0.5)),
+                        py: color.to_rgb().with_alpha(notnan!(1.0)),
+                        pz: color.to_rgb().with_alpha(notnan!(0.5)),
+                    },
+                    light_emission: Rgb::ZERO,
+                    opaque: FaceMap::repeat(false).with(Face6::PY, true),
+                    visible: true,
+                    uniform_collision: None,
+                    voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
                 }
             }
         );

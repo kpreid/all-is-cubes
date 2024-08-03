@@ -275,9 +275,6 @@ mod tests {
             re,
             EvaluatedBlock {
                 block: rotated.clone(),
-                color: be.color,
-                face_colors: be.face_colors.rotate(rotation),
-                light_emission: Rgb::ZERO,
                 voxels: Evoxels::Many(
                     R2,
                     Vol::from_fn(block_bounds, |cube| {
@@ -289,16 +286,6 @@ mod tests {
                         }
                     })
                 ),
-                opaque: FaceMap::repeat(false).with(rotation.transform(Face6::NY), true),
-                visible: true,
-                uniform_collision: Some(BlockCollision::Hard),
-                voxel_opacity_mask: Some(Vol::from_fn(block_bounds, |cube| {
-                    if cube.x == 0 {
-                        OpacityCategory::Opaque
-                    } else {
-                        OpacityCategory::Invisible
-                    }
-                })),
                 attributes: BlockAttributes {
                     display_name: "foo".into(),
                     tick_action: Some(TickAction::from(Operation::Become(
@@ -311,7 +298,22 @@ mod tests {
                     components: 2,
                     voxels: 2u32.pow(3) * 2, // original + rotation
                     recursion: 0
-                }
+                },
+                derived: block::Derived {
+                    color: be.color(),
+                    face_colors: be.face_colors().rotate(rotation),
+                    light_emission: Rgb::ZERO,
+                    opaque: FaceMap::repeat(false).with(rotation.transform(Face6::NY), true),
+                    visible: true,
+                    uniform_collision: Some(BlockCollision::Hard),
+                    voxel_opacity_mask: Some(Vol::from_fn(block_bounds, |cube| {
+                        if cube.x == 0 {
+                            OpacityCategory::Opaque
+                        } else {
+                            OpacityCategory::Invisible
+                        }
+                    })),
+                },
             }
         );
     }

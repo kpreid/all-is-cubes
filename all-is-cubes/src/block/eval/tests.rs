@@ -1,6 +1,7 @@
 use indoc::indoc;
 use pretty_assertions::assert_eq;
 
+use crate::block::eval::Derived;
 use crate::block::{
     self, Block, BlockAttributes, BlockCollision, Cost, EvaluatedBlock, Evoxel, Evoxels,
     Resolution::*, AIR,
@@ -147,53 +148,21 @@ fn from_voxels_zero_bounds() {
             Cost::ZERO
         ),
         EvaluatedBlock {
-            block: AIR, // caution: incorrect placeholder value
-            attributes,
-            color: Rgba::TRANSPARENT,
-            face_colors: FaceMap::repeat(Rgba::TRANSPARENT),
-            light_emission: Rgb::ZERO,
-            voxels: Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
-            opaque: FaceMap::repeat(false),
-            visible: false,
-            uniform_collision: Some(BlockCollision::None),
-            voxel_opacity_mask: None,
+            block: AIR,       // caution: incorrect placeholder value
             cost: Cost::ZERO, // TODO wrong
+            attributes,
+            voxels: Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
+            derived: Derived {
+                color: Rgba::TRANSPARENT,
+                face_colors: FaceMap::repeat(Rgba::TRANSPARENT),
+                light_emission: Rgb::ZERO,
+                opaque: FaceMap::repeat(false),
+                visible: false,
+                uniform_collision: Some(BlockCollision::None),
+                voxel_opacity_mask: None,
+            }
         }
     );
-}
-
-#[test]
-fn solid_block_equivalent_at_any_resolution() {
-    let mut attributes = BlockAttributes::default();
-    attributes.display_name = "foo".into();
-
-    for color in [
-        Rgba::BLACK,
-        Rgba::WHITE,
-        Rgba::TRANSPARENT,
-        Rgba::new(0.0, 0.5, 1.0, 0.5),
-    ] {
-        let voxel = Evoxel::from_color(color);
-        let ev_one =
-            EvaluatedBlock::from_voxels(AIR, attributes.clone(), Evoxels::One(voxel), Cost::ZERO);
-        let ev_many = EvaluatedBlock::from_voxels(
-            AIR, // caution: incorrect placeholder value
-            attributes.clone(),
-            Evoxels::Many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
-            Cost::ZERO,
-        );
-
-        // Check that they are identical except for the voxel data
-        assert_eq!(
-            EvaluatedBlock {
-                voxels: ev_one.voxels().clone(),
-                voxel_opacity_mask: ev_one.voxel_opacity_mask().clone(),
-                ..ev_many
-            },
-            ev_one,
-            "Input color {color:?}"
-        );
-    }
 }
 
 /// Test that interior color is hidden by surface color.
@@ -222,7 +191,7 @@ fn overall_color_ignores_interior() {
     // The inner_color should be ignored because it is not visible.
     let ev = EvaluatedBlock::from_voxels(AIR, BlockAttributes::default(), voxels, Cost::ZERO);
 
-    assert_eq!(ev.color, outer_color);
+    assert_eq!(ev.color(), outer_color);
 }
 
 #[test]

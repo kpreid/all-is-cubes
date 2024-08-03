@@ -13,7 +13,9 @@ pub(crate) use control::{Budget, EvalFilter};
 pub use control::{Cost, EvalBlockError};
 
 mod derived;
-pub(in crate::block) use derived::voxels_to_evaluated_block;
+use derived::compute_derived;
+#[cfg(test)]
+pub(super) use derived::Derived;
 
 mod evaluated;
 pub(crate) use evaluated::AIR_EVALUATED_REF;

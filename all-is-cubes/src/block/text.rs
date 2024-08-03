@@ -1027,7 +1027,7 @@ mod tests {
             }
         );
         assert_eq!(ev.resolution(), Resolution::R1);
-        assert!(!ev.visible);
+        assert!(!ev.visible());
     }
 
     // TODO: test that voxel attributes are as expected

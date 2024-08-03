@@ -1,3 +1,4 @@
+use alloc::sync::Arc;
 use core::ops;
 
 use euclid::Vector3D;
@@ -8,19 +9,79 @@ use ordered_float::NotNan;
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
-use crate::block::{self, EvaluatedBlock};
-use crate::math::{Cube, Face6, FaceMap, GridAab, Intensity, Rgb, Rgba, Vol};
+use crate::block;
+use crate::math::{Cube, Face6, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol};
 use crate::raytracer;
 
-/// Compute the derived properties of block voxels to create a full [`EvaluatedBlock`].
-/// from the information in a [`block::MinEval`] or similar.
+/// Derived properties of an evaluated block.
+///
+/// All of these properties are calculated using only the `attributes` and `voxels` of
+/// the input; they do not depend on the block’s identity or the evaluation cost.
+///
+/// TODO: Further restrict field visibility?
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::block) struct Derived {
+    /// The block's color; if made of multiple voxels, then an average or representative
+    /// color.
+    pub(in crate::block) color: Rgba,
+
+    /// The average color of the block as viewed from each axis-aligned direction.
+    pub(in crate::block) face_colors: FaceMap<Rgba>,
+
+    /// The overall light emission aggregated from individual voxels.
+    /// This should be interpreted in the same way as the emission field of
+    /// [`block::Atom`].
+    ///
+    /// TODO: Add *some* directionality to this.
+    pub(in crate::block) light_emission: Rgb,
+
+    /// Whether the block is known to be completely opaque to light passing in or out of
+    /// each face.
+    ///
+    /// Currently, this is calculated as whether each of the surfaces of the block are
+    /// fully opaque, but in the future it might be refined to permit concave surfaces.
+    // TODO: generalize this to a matrix of face/face visibility and opacity relationships,
+    // so that light transport can be refined.
+    pub(in crate::block) opaque: FaceMap<bool>,
+
+    /// Whether the block has any voxels/color at all that make it visible; that is, this
+    /// is false if the block is completely transparent.
+    pub(in crate::block) visible: bool,
+
+    /// If all voxels in the cube have the same collision behavior, then this is that.
+    //
+    // TODO: As currently defined, this is None or Some(BlockCollision::None)
+    // if the voxels don't fill the cube bounds. But "collide with the bounding box"
+    // might be a nice efficient option.
+    //
+    // TODO: This won't generalize properly to having more than 2 states of
+    // BlockCollision in the way that transformation to `Evoxel` needs. We will need to
+    // make this its own enum, or a bitmask of all seen values, or something.
+    pub(in crate::block) uniform_collision: Option<block::BlockCollision>,
+
+    /// The opacity of all voxels. This is redundant with the main data, [`Self::voxels`],
+    /// and is provided as a pre-computed convenience that can be cheaply compared with
+    /// other values of the same type.
+    ///
+    /// May be [`None`] if the block is fully invisible. (TODO: This is a kludge to avoid
+    /// obligating [`AIR_EVALUATED`] to allocate at compile time, which is impossible.
+    /// It doesn't harm normal operation because the point of having this is to compare
+    /// block shapes, which is trivial if the block is invisible.)
+    pub(in crate::block) voxel_opacity_mask: Option<Vol<Arc<[OpacityCategory]>>>,
+}
+
+/// Compute the derived properties of block voxels
+/// from the information in a [`block::MinEval`] or similar,
+/// to enable constructing a [`block::EvaluatedBlock`].
 #[inline(never)] // neither cheap nor going to benefit from per-call optimizations
-pub(crate) fn voxels_to_evaluated_block(
-    block: block::Block,
-    attributes: block::BlockAttributes,
-    voxels: block::Evoxels,
-    cost: block::Cost,
-) -> EvaluatedBlock {
+pub(in crate::block::eval) fn compute_derived(
+    attributes: &block::BlockAttributes,
+    voxels: &block::Evoxels,
+) -> Derived {
+    // Currently, none of the attributes influence the derived properties,
+    // but this is likely to change.
+    _ = attributes;
+
     // Optimization for single voxels:
     // don't allocate any `Vol`s or perform any generalized scans.
     if let Some(block::Evoxel {
@@ -31,13 +92,10 @@ pub(crate) fn voxels_to_evaluated_block(
     }) = voxels.single_voxel()
     {
         let visible = !color.fully_transparent();
-        return EvaluatedBlock {
-            block,
-            attributes,
+        return Derived {
             color,
             face_colors: FaceMap::repeat(color),
             light_emission: emission,
-            voxels,
             opaque: FaceMap::repeat(color.fully_opaque()),
             visible,
             uniform_collision: Some(collision),
@@ -51,7 +109,6 @@ pub(crate) fn voxels_to_evaluated_block(
             } else {
                 Some(Vol::from_element(color.opacity_category()))
             },
-            cost,
         };
     }
 
@@ -83,7 +140,7 @@ pub(crate) fn voxels_to_evaluated_block(
                     debug_assert!(voxels.bounds().contains_cube(cube));
 
                     face_sum +=
-                        raytracer::trace_for_eval(&voxels, cube, face.opposite(), resolution);
+                        raytracer::trace_for_eval(voxels, cube, face.opposite(), resolution);
                 }
             }
             all_faces_sum += face_sum;
@@ -143,9 +200,7 @@ pub(crate) fn voxels_to_evaluated_block(
         }))
     };
 
-    EvaluatedBlock {
-        block,
-        attributes,
+    Derived {
         color,
         face_colors,
         light_emission: emission,
@@ -166,8 +221,6 @@ pub(crate) fn voxels_to_evaluated_block(
         visible,
         uniform_collision,
         voxel_opacity_mask,
-        voxels,
-        cost,
     }
 }
 
@@ -248,12 +301,48 @@ impl ops::AddAssign for VoxSum {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::{Evoxel, Evoxels, Resolution::*};
     use crate::raytracer::EvalTrace;
     use euclid::vec3;
 
-    /// Unit tests for `VoxSum`'s math. `VoxSum` is an internal helper type, so if there is reason
-    /// to change it, these tests should be freely discarded; the point of these tests is to help
-    /// directly test the arithmetic without the complication of setting up a voxel block scenario.
+    /// Test that resolution does not alter any derived properties, as long as the voxels are
+    /// all identical.
+    ///
+    /// TODO: A more thorough test would be to double the resolution of a non-uniform block,
+    /// though that might have rounding error.
+    #[test]
+    fn solid_block_equivalent_at_any_resolution() {
+        let mut attributes = block::BlockAttributes::default();
+        attributes.display_name = "foo".into();
+
+        for color in [
+            Rgba::BLACK,
+            Rgba::WHITE,
+            Rgba::TRANSPARENT,
+            Rgba::new(0.0, 0.5, 1.0, 0.5),
+        ] {
+            let voxel = Evoxel::from_color(color);
+            let ev_one = compute_derived(&attributes, &Evoxels::One(voxel));
+            let ev_many = compute_derived(
+                &attributes,
+                &Evoxels::Many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
+            );
+
+            // Check that the derived attributes are all identical (except for the opacity mask),
+            assert_eq!(
+                Derived {
+                    voxel_opacity_mask: ev_one.voxel_opacity_mask.clone(),
+                    ..ev_many
+                },
+                ev_one,
+                "Input color {color:?}"
+            );
+        }
+    }
+
+    // Unit tests for `VoxSum`'s math. `VoxSum` is an internal helper type, so if there is reason
+    // to change it, these tests should be freely discarded; the point of these tests is to help
+    // directly test the arithmetic without the complication of setting up a voxel block scenario.
 
     #[test]
     fn voxsum_simple_opaque() {

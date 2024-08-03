@@ -140,8 +140,8 @@ mod eval {
         });
         let e = block.evaluate().unwrap();
         assert_eq!(e.attributes, attributes);
-        assert_eq!(e.color, color);
-        assert_eq!(e.face_colors, FaceMap::repeat(color));
+        assert_eq!(e.color(), color);
+        assert_eq!(e.face_colors(), FaceMap::repeat(color));
         assert_eq!(
             e.voxels,
             Evoxels::One(Evoxel {
@@ -152,10 +152,10 @@ mod eval {
             })
         );
         assert_eq!(e.resolution(), R1);
-        assert_eq!(e.opaque, FaceMap::repeat(true));
-        assert_eq!(e.visible, true);
+        assert_eq!(e.opaque(), FaceMap::repeat(true));
+        assert_eq!(e.visible(), true);
         assert_eq!(
-            e.voxel_opacity_mask,
+            *e.voxel_opacity_mask(),
             Some(Vol::from_element(OpacityCategory::Opaque))
         )
     }
@@ -165,13 +165,13 @@ mod eval {
         let color = Rgba::new(1.0, 2.0, 3.0, 0.5);
         let block = Block::from(color);
         let e = block.evaluate().unwrap();
-        assert_eq!(e.color, color);
-        assert_eq!(e.face_colors, FaceMap::repeat(color));
+        assert_eq!(e.color(), color);
+        assert_eq!(e.face_colors(), FaceMap::repeat(color));
         assert!(matches!(e.voxels, Evoxels::One(_)));
-        assert_eq!(e.opaque, FaceMap::repeat(false));
-        assert_eq!(e.visible, true);
+        assert_eq!(e.opaque(), FaceMap::repeat(false));
+        assert_eq!(e.visible(), true);
         assert_eq!(
-            e.voxel_opacity_mask,
+            *e.voxel_opacity_mask(),
             Some(Vol::from_element(OpacityCategory::Partial))
         )
     }
@@ -180,12 +180,12 @@ mod eval {
     fn invisible_atom() {
         let block = color_block!(Rgba::TRANSPARENT);
         let e = block.evaluate().unwrap();
-        assert_eq!(e.color, Rgba::TRANSPARENT);
-        assert_eq!(e.face_colors, FaceMap::repeat(Rgba::TRANSPARENT));
+        assert_eq!(e.color(), Rgba::TRANSPARENT);
+        assert_eq!(e.face_colors(), FaceMap::repeat(Rgba::TRANSPARENT));
         assert!(matches!(e.voxels, Evoxels::One(_)));
-        assert_eq!(e.opaque, FaceMap::repeat(false));
-        assert_eq!(e.visible, false);
-        assert_eq!(e.voxel_opacity_mask, None)
+        assert_eq!(e.opaque(), FaceMap::repeat(false));
+        assert_eq!(e.visible(), false);
+        assert_eq!(*e.voxel_opacity_mask(), None)
     }
 
     #[test]
@@ -223,9 +223,9 @@ mod eval {
                 })
             )
         );
-        assert_eq!(e.color, Rgba::new(0.5, 0.5, 0.5, 1.0));
+        assert_eq!(e.color(), Rgba::new(0.5, 0.5, 0.5, 1.0));
         assert_eq!(
-            e.face_colors,
+            e.face_colors(),
             FaceMap {
                 nx: Rgba::new(0.0, 0.5, 0.5, 1.0),
                 ny: Rgba::new(0.5, 0.0, 0.5, 1.0),
@@ -236,10 +236,10 @@ mod eval {
             }
         );
         assert_eq!(e.resolution(), resolution);
-        assert_eq!(e.opaque, FaceMap::repeat(true));
-        assert_eq!(e.visible, true);
+        assert_eq!(e.opaque(), FaceMap::repeat(true));
+        assert_eq!(e.visible(), true);
         assert_eq!(
-            e.voxel_opacity_mask,
+            *e.voxel_opacity_mask(),
             Some(Vol::repeat(
                 GridAab::for_block(resolution),
                 OpacityCategory::Opaque,
@@ -277,7 +277,7 @@ mod eval {
         // faces, and only two out of six faces in this test block don't fully cover
         // the light paths with opaque surfaces.
         assert_eq!(
-            e.color,
+            e.color(),
             voxel_color.with_alpha(
                 NotNan::new(1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))).unwrap()
             )
@@ -286,7 +286,7 @@ mod eval {
         let one_face_transparency = voxel_color
             .with_alpha(NotNan::new(1.0 - (alpha / f32::from(resolution).powi(2))).unwrap());
         assert_eq!(
-            e.face_colors,
+            e.face_colors(),
             FaceMap {
                 nx: voxel_color.with_alpha_one(),
                 ny: one_face_transparency,
@@ -297,7 +297,7 @@ mod eval {
             }
         );
         assert_eq!(
-            e.opaque,
+            e.opaque(),
             FaceMap {
                 nx: false,
                 ny: false,
@@ -307,7 +307,7 @@ mod eval {
                 pz: true,
             }
         );
-        assert_eq!(e.visible, true);
+        assert_eq!(e.visible(), true);
     }
 
     /// Check that when a block has different transparent parts with different colors, the colors
@@ -331,15 +331,15 @@ mod eval {
 
         // for debugging, print the color multiplied by the surface area so that the
         // components end up round numbers
-        dbg!(e.color.to_rgb() * surface_area);
-        dbg!(e.face_colors.map(|_, c| c.to_rgb() * 4.));
+        dbg!(e.color().to_rgb() * surface_area);
+        dbg!(e.face_colors().map(|_, c| c.to_rgb() * 4.));
 
         // each semitransparent voxel is 1/2 of a full block so its opacity is ^(1/2)
         let half_semi_alpha = 0.5_f32.powf(0.5);
         let semi_on_opaque_blend = dbg!(c1 * (1. - half_semi_alpha) + c2 * half_semi_alpha);
 
         assert_eq!(
-            e.color.to_rgb(), // don't bother checking alpha; other tests do that
+            e.color().to_rgb(), // don't bother checking alpha; other tests do that
             (
                 c1 * 4. // -Y face
                 + semi_on_opaque_blend * 4. // +Y face
@@ -368,12 +368,12 @@ mod eval {
 
         let e = block.evaluate().unwrap();
         assert_eq!(
-            e.color,
+            e.color(),
             Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(2))
         );
         assert_eq!(e.resolution(), resolution);
-        assert_eq!(e.opaque, FaceMap::repeat(false));
-        assert_eq!(e.visible, true);
+        assert_eq!(e.opaque(), FaceMap::repeat(false));
+        assert_eq!(e.visible(), true);
     }
 
     /// Test the situation where the space is smaller than the block: in particular,
@@ -393,10 +393,10 @@ mod eval {
 
         let e = block.evaluate().unwrap();
         // of 6 faces, 2 are opaque and 2 are half-transparent, thus there are 8 opaque half-faces.
-        assert_eq!(e.color, Rgba::new(1.0, 1.0, 1.0, 8. / 12.));
+        assert_eq!(e.color(), Rgba::new(1.0, 1.0, 1.0, 8. / 12.));
         assert_eq!(e.resolution(), resolution);
-        assert_eq!(e.opaque, FaceMap::repeat(false).with(Face6::NX, true));
-        assert_eq!(e.visible, true);
+        assert_eq!(e.opaque(), FaceMap::repeat(false).with(Face6::NX, true));
+        assert_eq!(e.visible(), true);
     }
 
     /// Tests that the `offset` field of `Primitive::Recur` is respected.
@@ -456,7 +456,7 @@ mod eval {
         });
 
         let e = block_at_offset.evaluate().unwrap();
-        assert!(!e.visible);
+        assert!(!e.visible());
     }
 
     #[test]

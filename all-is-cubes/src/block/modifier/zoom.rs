@@ -257,6 +257,6 @@ mod tests {
             scale: R2,
             offset: point3(1, 0, 0),
         }));
-        assert_eq!(zoomed.evaluate().unwrap().color, original.color());
+        assert_eq!(zoomed.evaluate().unwrap().color(), original.color());
     }
 }
