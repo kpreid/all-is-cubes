@@ -698,7 +698,7 @@ fn ZOOM(ctx: Context<'_>) {
                 zoom_block
             })
             .unwrap();
-        if !space.get_evaluated(cube).visible {
+        if !space.get_evaluated(cube).visible() {
             // Cancel placing useless invisible zoomed blocks.
             // Note: This is not an equivalent optimization (if the original block has
             // BlockCollision::Hard or animation).
@@ -755,8 +755,8 @@ fn COMPOSITE(ctx: Context<'_>) {
 
                 let label_str = arcstr::format!(
                     "{s}\n{operator:?}\n{d}",
-                    s = source.evaluate().unwrap().attributes.display_name,
-                    d = destination.evaluate().unwrap().attributes.display_name
+                    s = source.evaluate().unwrap().attributes().display_name,
+                    d = destination.evaluate().unwrap().attributes().display_name
                 );
                 let label = text::Text::builder()
                     .string(label_str)

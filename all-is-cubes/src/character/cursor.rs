@@ -35,12 +35,12 @@ pub fn cursor_raycast(
         let evaluated = space.get_evaluated(cube);
         let mut face_selected = None;
 
-        if !evaluated.attributes.selectable {
+        if !evaluated.attributes().selectable {
             continue;
         }
 
         // Check intersection with recursive block
-        match evaluated.voxels.single_voxel() {
+        match evaluated.voxels().single_voxel() {
             Some(evoxel) => {
                 if !evoxel.selectable {
                     continue;
@@ -48,7 +48,7 @@ pub fn cursor_raycast(
                 face_selected = Some(step.face());
             }
             None => {
-                let voxels = evaluated.voxels.as_vol_ref();
+                let voxels = evaluated.voxels().as_vol_ref();
                 let recursive_hit: Option<(Cube, &Evoxel)> = step
                     .recursive_raycast(ray, evaluated.resolution(), voxels.bounds())
                     .0

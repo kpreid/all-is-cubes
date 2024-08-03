@@ -7,7 +7,7 @@ use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{
-    Block, BlockCollision, Primitive,
+    Block, BlockAttributes, BlockCollision, Primitive,
     Resolution::{self, R16},
     AIR,
 };
@@ -186,6 +186,14 @@ pub async fn install_landscape_blocks(
         move |cube: Cube| noise.at_grid(cube.lower_bounds()) * 0.4 + 0.7
     };
 
+    let attributes_from = |block: &Block| -> Result<BlockAttributes, InGenError> {
+        Ok(block
+            .evaluate()
+            .map_err(InGenError::other)?
+            .attributes()
+            .clone())
+    };
+
     BlockProvider::<LandscapeBlocks>::new(progress, |key| {
         let grass_blades = |txn, height: GrassHeight| -> Result<Block, InGenError> {
             let height_index = height as GridCoordinate - 1;
@@ -204,12 +212,7 @@ pub async fn install_landscape_blocks(
             let ao_fudge = 1.0 + f64::from(height as u8) * 0.15;
 
             Ok(Block::builder()
-                .attributes(
-                    grass_blade_atom
-                        .evaluate()
-                        .map_err(InGenError::other)?
-                        .attributes,
-                )
+                .attributes(attributes_from(&grass_blade_atom)?)
                 .display_name(arcstr::format!("Grass Blades {}", height as u8))
                 .voxels_fn(resolution, |cube| {
                     let mut cube_for_lookup = cube;
@@ -230,22 +233,12 @@ pub async fn install_landscape_blocks(
 
         Ok(match key {
             Stone => Block::builder()
-                .attributes(
-                    colors[Stone]
-                        .evaluate()
-                        .map_err(InGenError::other)?
-                        .attributes,
-                )
+                .attributes(attributes_from(&colors[Stone])?)
                 .voxels_fn(resolution, &stone_pattern)?
                 .build_txn(txn),
 
             Grass => Block::builder()
-                .attributes(
-                    colors[Grass]
-                        .evaluate()
-                        .map_err(InGenError::other)?
-                        .attributes,
-                )
+                .attributes(attributes_from(&colors[Grass])?)
                 .voxels_fn(resolution, |cube| {
                     if f64::from(cube.y) >= overhang_noise[cube] {
                         scale_color(colors[Grass].clone(), blade_color_noise(cube), 0.02)
@@ -258,12 +251,7 @@ pub async fn install_landscape_blocks(
             GrassBlades { height } => grass_blades(txn, height)?,
 
             Dirt => Block::builder()
-                .attributes(
-                    colors[Dirt]
-                        .evaluate()
-                        .map_err(InGenError::other)?
-                        .attributes,
-                )
+                .attributes(attributes_from(&colors[Dirt])?)
                 .voxels_fn(resolution, &dirt_pattern)?
                 .build_txn(txn),
 
@@ -277,12 +265,7 @@ pub async fn install_landscape_blocks(
                 );
                 let color_block = &colors[key];
                 Block::builder()
-                    .attributes(
-                        color_block
-                            .evaluate()
-                            .map_err(InGenError::other)?
-                            .attributes,
-                    )
+                    .attributes(attributes_from(color_block)?)
                     .voxels_fn(resolution, |cube| {
                         if trunk_box.contains_cube(cube) {
                             // TODO: separate bark from inner wood
@@ -295,12 +278,7 @@ pub async fn install_landscape_blocks(
             }
 
             key @ Leaves(growth) => Block::builder()
-                .attributes(
-                    colors[key]
-                        .evaluate()
-                        .map_err(InGenError::other)?
-                        .attributes,
-                )
+                .attributes(attributes_from(&colors[key])?)
                 .voxels_fn(resolution, |cube| {
                     // Distance this cube is from the center.
                     // TODO: This is the same computation as done by square_radius() but

@@ -101,7 +101,7 @@ impl Tool {
             Self::Activate => {
                 let cursor = input.cursor()?;
                 if let Some(activation_action) =
-                    &cursor.hit().evaluated.attributes.activation_action
+                    &cursor.hit().evaluated.attributes().activation_action
                 {
                     input.apply_operation(self, activation_action)
                 } else {
@@ -356,7 +356,7 @@ impl ToolInput {
         let rotation = match new_block
             .evaluate()
             .map_err(|e| ToolError::Internal(e.to_string()))? // TODO: better error typing here
-            .attributes
+            .attributes()
             .rotation_rule
         {
             RotationPlacementRule::Never => GridRotation::IDENTITY,

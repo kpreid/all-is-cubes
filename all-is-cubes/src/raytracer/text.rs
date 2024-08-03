@@ -24,7 +24,7 @@ impl RtBlockData for CharacterRtData {
 
     fn from_block(_: RtOptionsRef<'_, Self::Options>, s: &SpaceBlockData) -> Self {
         // TODO: allow customizing the fallback character
-        let name: &ArcStr = &s.evaluated().attributes.display_name;
+        let name: &ArcStr = &s.evaluated().attributes().display_name;
         let char = match name.graphemes(true).next() {
             Some(s) => name.substr_from(s),
             None => literal_substr!("#"),

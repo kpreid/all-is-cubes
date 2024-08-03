@@ -102,7 +102,7 @@ impl<M: DynamicMeshTypes> MeshJobQueue<M> {
             log::trace!(
                 "Block mesh took {}: {:?}",
                 compute_time.refmt(&ConciseDebug),
-                job.block.attributes.display_name,
+                job.block.attributes().display_name,
             );
         }
     }

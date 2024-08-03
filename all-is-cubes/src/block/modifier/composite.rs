@@ -808,15 +808,15 @@ mod tests {
                 .selectable(false)
                 .build();
 
-            assert!(eval_compose(is_sel, Over, is_sel).attributes.selectable);
-            assert!(eval_compose(is_sel, Over, not_sel).attributes.selectable);
-            assert!(eval_compose(not_sel, Over, is_sel).attributes.selectable);
-            assert!(!eval_compose(not_sel, Over, not_sel).attributes.selectable);
+            assert!(eval_compose(is_sel, Over, is_sel).attributes().selectable);
+            assert!(eval_compose(is_sel, Over, not_sel).attributes().selectable);
+            assert!(eval_compose(not_sel, Over, is_sel).attributes().selectable);
+            assert!(!eval_compose(not_sel, Over, not_sel).attributes().selectable);
 
-            assert!(eval_compose(is_sel, In, is_sel).attributes.selectable);
-            assert!(eval_compose(is_sel, In, not_sel).attributes.selectable);
-            assert!(eval_compose(not_sel, In, is_sel).attributes.selectable);
-            assert!(!eval_compose(not_sel, In, not_sel).attributes.selectable);
+            assert!(eval_compose(is_sel, In, is_sel).attributes().selectable);
+            assert!(eval_compose(is_sel, In, not_sel).attributes().selectable);
+            assert!(eval_compose(not_sel, In, is_sel).attributes().selectable);
+            assert!(!eval_compose(not_sel, In, not_sel).attributes().selectable);
         }
 
         #[test]
@@ -833,7 +833,7 @@ mod tests {
                 .build();
 
             assert_eq!(
-                eval_compose(b1, Over, b2).attributes.activation_action,
+                eval_compose(b1, Over, b2).attributes().activation_action,
                 Some(Operation::Become(
                     result2.with_modifier(Composite::new(result1, Over))
                 ))

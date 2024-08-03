@@ -302,7 +302,7 @@ impl Body {
                     .round_up_to_grid()
                     .interior_iter()
                     .filter(|cube| {
-                        space.get_evaluated(*cube).uniform_collision != Some(BlockCollision::None)
+                        space.get_evaluated(*cube).uniform_collision() != Some(BlockCollision::None)
                     });
                 let (class_ids, colors): (Vec<rg::ClassId>, Vec<_>) = cubes
                     .clone()
@@ -323,7 +323,7 @@ impl Body {
                                 )
                             }
                         } else {
-                            (rg::ClassId::SpaceBlock, space.get_evaluated(cube).color)
+                            (rg::ClassId::SpaceBlock, space.get_evaluated(cube).color())
                         }
                     })
                     .unzip();
@@ -335,7 +335,7 @@ impl Body {
                             // approximation of block's actual collision bounds
                             ev.voxels_bounds()
                                 .to_free()
-                                .scale(FreeCoordinate::from(ev.voxels.resolution()).recip())
+                                .scale(FreeCoordinate::from(ev.voxels().resolution()).recip())
                                 .translate(cube.lower_bounds().to_f64().to_vector())
                         }),
                         FreeVector::zero(),
@@ -548,7 +548,7 @@ impl Body {
                     .translate(adjusted_segment.unit_endpoint().to_vector());
                 for cube in step_aab.round_up_to_grid().interior_iter() {
                     // TODO: refactor to combine this with other collision attribute tests
-                    match space.get_evaluated(cube).uniform_collision {
+                    match space.get_evaluated(cube).uniform_collision() {
                         Some(BlockCollision::Hard) => {
                             // Not a clear space
                             continue 'raycast;

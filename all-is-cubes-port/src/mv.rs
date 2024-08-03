@@ -148,7 +148,7 @@ fn block_to_dot_vox_palette_entry(evaluated: &block::EvaluatedBlock) -> Option<d
     if *evaluated == block::AIR_EVALUATED {
         None
     } else {
-        let [r, g, b, a] = evaluated.color.to_srgb8();
+        let [r, g, b, a] = evaluated.color().to_srgb8();
         Some(dot_vox::Color { r, g, b, a })
     }
 }

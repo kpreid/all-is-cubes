@@ -161,7 +161,7 @@ impl LightStorage {
         for face in Face6::ALL {
             if let Some(neighbor) = cube.checked_add(face.normal_vector()) {
                 // Perform neighbor light updates if they can be affected by us
-                if !uc.get_evaluated(neighbor).opaque[face.opposite()] {
+                if !uc.get_evaluated(neighbor).opaque()[face.opposite()] {
                     self.light_needs_update(neighbor, Priority::NEWLY_VISIBLE);
                 }
             }
@@ -322,7 +322,7 @@ impl LightStorage {
                         if *neighbor_light == new_light_value {
                             continue;
                         }
-                        if uc.get_evaluated(neighbor_cube).opaque == FaceMap::repeat(true) {
+                        if uc.get_evaluated(neighbor_cube).opaque() == FaceMap::repeat(true) {
                             // neighbor is fully opaque — don't light it
                             continue;
                         }
@@ -376,11 +376,11 @@ impl LightStorage {
         };
 
         let ev_origin = uc.get_evaluated(cube);
-        let origin_is_opaque = ev_origin.opaque == FaceMap::repeat(true);
+        let origin_is_opaque = ev_origin.opaque() == FaceMap::repeat(true);
         if origin_is_opaque {
             // Opaque blocks are always dark inside — unless they are light sources.
             if !opaque_for_light_computation(ev_origin) {
-                cube_buffer.add_weighted_light(ev_origin.light_emission, 1.0);
+                cube_buffer.add_weighted_light(ev_origin.light_emission(), 1.0);
             }
         } else {
             let ev_neighbors =
@@ -597,7 +597,7 @@ fn directions_to_seek_light(
         FaceMap::from_fn(|face| {
             // We want directions that either face away from visible faces, or towards light sources.
             if neighborhood[face.opposite()].visible_or_animated()
-                || neighborhood[face].light_emission != Rgb::ZERO
+                || neighborhood[face].light_emission() != Rgb::ZERO
             {
                 // TODO: Once we have fancier block opacity precomputations, use them to
                 // have weights besides 1.0
@@ -705,9 +705,10 @@ impl LightBuffer {
         // Note that hit_opaque_face is not necessarily true when hit_alpha is 1.0, because
         // the former is strict “watertightness” and the latter is merely an averaged image of
         // the block. (TODO: But maybe we should always use hit_alpha anyway?)
+        let face_opacity = ev_hit.opaque();
         let hit_opaque_face: bool = match Face6::try_from(hit.face) {
-            Ok(face) => ev_hit.opaque[face],
-            Err(_) => ev_hit.opaque == FaceMap::repeat(true),
+            Ok(face) => face_opacity[face],
+            Err(_) => face_opacity == FaceMap::repeat(true),
         };
 
         if hit_opaque_face && hit.face == Face7::Within {
@@ -738,7 +739,8 @@ impl LightBuffer {
             let stored_light = light_behind_cache.unwrap_or_else(|| current_light.get(light_cube));
 
             let reflectance = hit_surface_color.to_rgb() * hit_alpha;
-            let light_from_struck_face = ev_hit.light_emission + stored_light.value() * reflectance;
+            let light_from_struck_face =
+                ev_hit.light_emission() + stored_light.value() * reflectance;
             self.incoming_light +=
                 light_from_struck_face * ray_state.alpha * ray_state.ray_weight_by_faces;
 
@@ -785,7 +787,7 @@ impl LightBuffer {
             // Note that light emission is *not* multiplied by the alpha, because alpha is about
             // reflection/transmission. It's perfectly okay to have a totally transparent (alpha
             // equals zero), yet emissive, block.
-            let light_from_traversed_block = ev_hit.light_emission + stored_light * hit_alpha;
+            let light_from_traversed_block = ev_hit.light_emission() + stored_light * hit_alpha;
             self.incoming_light +=
                 light_from_traversed_block * ray_state.alpha * ray_state.ray_weight_by_faces;
 
@@ -909,5 +911,5 @@ impl Fmt<StatusText> for LightUpdatesInfo {
 /// This function is fairly straightforward; it exists for purposes of *documenting
 /// the places that care about this* rather than for code reduction.
 pub(crate) fn opaque_for_light_computation(block: &EvaluatedBlock) -> bool {
-    block.opaque == FaceMap::repeat(true) && block.light_emission == Rgb::ZERO
+    block.opaque() == FaceMap::repeat(true) && block.light_emission() == Rgb::ZERO
 }

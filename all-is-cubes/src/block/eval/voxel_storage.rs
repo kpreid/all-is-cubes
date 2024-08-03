@@ -62,12 +62,12 @@ impl Evoxel {
     /// This is the same operation as is used for each block/voxel in a [`Primitive::Recur`].
     pub fn from_block(block: &EvaluatedBlock) -> Self {
         Self {
-            color: block.color,
-            emission: block.light_emission,
-            selectable: block.attributes.selectable,
+            color: block.color(),
+            emission: block.light_emission(),
+            selectable: block.attributes().selectable,
             // TODO: This won't generalize properly to having more than 2 states of
             // BlockCollision. We need uniform_collision to carry more info.
-            collision: block.uniform_collision.unwrap_or(BlockCollision::Hard),
+            collision: block.uniform_collision().unwrap_or(BlockCollision::Hard),
         }
     }
 

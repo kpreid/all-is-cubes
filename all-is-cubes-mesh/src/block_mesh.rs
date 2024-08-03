@@ -169,21 +169,18 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         }
 
         // Need to deref the Vec in self.textures_used before matching
-        match (&self.voxel_opacity_mask, &mut self.texture_used, block) {
-            (
-                Some(old_mask),
-                Some(existing_texture),
-                EvaluatedBlock {
-                    voxels,
-                    voxel_opacity_mask: Some(new_mask),
-                    ..
-                },
-            ) if old_mask == new_mask
-                && existing_texture
-                    .channels()
-                    .is_superset_of(texture::needed_channels(&block.voxels)) =>
+        match (
+            &self.voxel_opacity_mask,
+            &mut self.texture_used,
+            block.voxel_opacity_mask(),
+        ) {
+            (Some(old_mask), Some(existing_texture), Some(new_mask))
+                if old_mask == new_mask
+                    && existing_texture
+                        .channels()
+                        .is_superset_of(texture::needed_channels(block.voxels())) =>
             {
-                existing_texture.write(voxels.as_vol_ref());
+                existing_texture.write(block.voxels().as_vol_ref());
                 true
             }
             _ => false,

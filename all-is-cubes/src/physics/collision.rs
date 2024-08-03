@@ -549,7 +549,7 @@ impl CollisionSpace for Space {
 
     #[inline]
     fn collision(cell: &Self::Cell) -> Option<BlockCollision> {
-        cell.uniform_collision
+        cell.uniform_collision()
     }
 
     #[inline]
@@ -571,7 +571,7 @@ impl CollisionSpace for Space {
         let voxel_aab = space_aab.scale(scale);
         let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
         let result = collide_along_ray(
-            &evaluated.voxels.as_vol_ref(),
+            &evaluated.voxels().as_vol_ref(),
             voxel_ray,
             voxel_aab,
             |_| {},
@@ -598,7 +598,7 @@ impl CollisionSpace for Space {
         // Note: aab is not translated since it's relative to the ray anyway.
         let voxel_aab = space_aab.scale(scale);
         let voxel_ray = space_ray.translate(cube_translation).scale_all(scale);
-        let result = escape_along_ray(&evaluated.voxels.as_vol_ref(), voxel_ray, voxel_aab);
+        let result = escape_along_ray(&evaluated.voxels().as_vol_ref(), voxel_ray, voxel_aab);
         result.map(|end| end.wrap_as_voxel(cube, resolution))
     }
 }

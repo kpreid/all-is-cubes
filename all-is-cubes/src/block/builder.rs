@@ -22,7 +22,7 @@ use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 /// ([`BlockBuilder::default()`] is also available.)
 ///
 /// ```
-/// use all_is_cubes::block::Block;
+/// use all_is_cubes::block::{Block, EvaluatedBlock};
 /// use all_is_cubes::math::Rgba;
 ///
 /// let block = Block::builder()
@@ -30,11 +30,9 @@ use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 ///    .color(Rgba::new(0.5, 0.5, 0., 1.))
 ///    .build();
 ///
-/// assert_eq!(block.evaluate().unwrap().color, Rgba::new(0.5, 0.5, 0., 1.));
-/// assert_eq!(
-///     block.evaluate().unwrap().attributes.display_name.as_str(),
-///     "BROWN",
-/// );
+/// let evaluated: EvaluatedBlock = block.evaluate().unwrap();
+/// assert_eq!(evaluated.color(), Rgba::new(0.5, 0.5, 0., 1.));
+/// assert_eq!(evaluated.attributes().display_name.as_str(), "BROWN");
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]

@@ -145,7 +145,7 @@ fn graphics_toggle_button(
         OptionsStyle::LabeledColumn => Some(
             icon.evaluate()
                 .unwrap()
-                .attributes
+                .attributes()
                 .display_name
                 .clone()
                 .into(),

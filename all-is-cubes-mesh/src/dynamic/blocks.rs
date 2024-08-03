@@ -470,7 +470,7 @@ fn should_use_instances<M: DynamicMeshTypes>(
     }
 
     // TODO(instancing): if the animation hint is colors-in-definition-only then we don't want instancing
-    ev.attributes.animation_hint != block::AnimationHint::UNCHANGING
+    ev.attributes().animation_hint != block::AnimationHint::UNCHANGING
         || block_mesh.count_indices() > M::MAXIMUM_MERGED_BLOCK_MESH_SIZE
 }
 

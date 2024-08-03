@@ -249,7 +249,7 @@ mod tests {
                 .extract::<Vec<char>, _>(bounds, |e| {
                     e.block_data()
                         .evaluated()
-                        .attributes
+                        .attributes()
                         .display_name
                         .chars()
                         .last()

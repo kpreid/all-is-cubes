@@ -29,42 +29,36 @@ use crate::block::{Handle, AIR};
 // `voxel_opacity_mask`. We should make the whole structure read-only, so that we can
 // guarantee that they are consistent and don't need to be compared. Relatedly, it might
 // be good if those derived components were computed lazily.
+//
+// TODO: Consider if we can further restrict field visibility (to ensure integrity of
+// data consistency) by moving the tests that make use of it.
 #[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))] // TODO: Should have a custom Arbitrary producing only “possible” results
 #[non_exhaustive]
 pub struct EvaluatedBlock {
     /// The original block which was evaluated to produce this result.
-    ///
-    /// Consider carefully when to use this field. As a general rule,
-    /// a block’s characteristics should be determined by the outputs of
-    /// evaluation, ignoring the block value itself.
-    /// The exception to this rule is that some operations upon the block
-    /// modify the block in a way determined by the result of its evaluation,
-    /// and thus require both pieces of information.
-    /// By keeping the block here, these operations can be simple methods of
-    /// `EvaluatedBlock` rather than needing to be supplied with both.
-    pub block: Block,
+    pub(in crate::block) block: Block,
 
     /// The block's attributes.
-    pub attributes: BlockAttributes,
+    pub(in crate::block) attributes: BlockAttributes,
 
     /// The voxels making up the block, and the [`resolution`](Resolution) (scale factor)
     /// of those voxels.
-    pub voxels: Evoxels,
+    pub(in crate::block) voxels: Evoxels,
 
     /// The block's color; if made of multiple voxels, then an average or representative
     /// color.
-    pub color: Rgba,
+    pub(in crate::block) color: Rgba,
 
     /// The average color of the block as viewed from each axis-aligned direction.
-    pub face_colors: FaceMap<Rgba>,
+    pub(in crate::block) face_colors: FaceMap<Rgba>,
 
     /// The overall light emission aggregated from individual voxels.
     /// This should be interpreted in the same way as the emission field of
     /// [`block::Atom`].
     ///
     /// TODO: Add *some* directionality to this.
-    pub light_emission: Rgb,
+    pub(in crate::block) light_emission: Rgb,
 
     /// Whether the block is known to be completely opaque to light passing in or out of
     /// each face.
@@ -73,11 +67,11 @@ pub struct EvaluatedBlock {
     /// fully opaque, but in the future it might be refined to permit concave surfaces.
     // TODO: generalize this to a matrix of face/face visibility and opacity relationships,
     // so that light transport can be refined.
-    pub opaque: FaceMap<bool>,
+    pub(in crate::block) opaque: FaceMap<bool>,
 
     /// Whether the block has any voxels/color at all that make it visible; that is, this
     /// is false if the block is completely transparent.
-    pub visible: bool,
+    pub(in crate::block) visible: bool,
 
     /// If all voxels in the cube have the same collision behavior, then this is that.
     //
@@ -88,9 +82,9 @@ pub struct EvaluatedBlock {
     // TODO: This won't generalize properly to having more than 2 states of
     // BlockCollision in the way that transformation to `Evoxel` needs. We will need to
     // make this its own enum, or a bitmask of all seen values, or something.
-    pub uniform_collision: Option<BlockCollision>,
+    pub(in crate::block) uniform_collision: Option<BlockCollision>,
 
-    /// The opacity of all voxels. This is redundant with the data  [`Self::voxels`],
+    /// The opacity of all voxels. This is redundant with the main data, [`Self::voxels`],
     /// and is provided as a pre-computed convenience that can be cheaply compared with
     /// other values of the same type.
     ///
@@ -98,10 +92,10 @@ pub struct EvaluatedBlock {
     /// obligating [`AIR_EVALUATED`] to allocate at compile time, which is impossible.
     /// It doesn't harm normal operation because the point of having this is to compare
     /// block shapes, which is trivial if the block is invisible.)
-    pub voxel_opacity_mask: Option<Vol<Arc<[OpacityCategory]>>>,
+    pub(in crate::block) voxel_opacity_mask: Option<Vol<Arc<[OpacityCategory]>>>,
 
     /// Cost of performing the evaluation.
-    pub(crate) cost: Cost,
+    pub(in crate::block) cost: Cost,
 }
 
 impl fmt::Debug for EvaluatedBlock {
@@ -171,14 +165,104 @@ impl EvaluatedBlock {
 
     // --- Accessors ---
 
-    /// Returns the resolution (scale factor) of this block's voxels.
+    /// The original block which was evaluated to produce this result.
+    ///
+    /// Consider carefully when to use this. As a general rule,
+    /// a block’s characteristics should be determined by the outputs of
+    /// evaluation, ignoring the block value itself.
+    /// The exception to this rule is that some operations upon the block
+    /// modify the block in a way determined by the result of its evaluation,
+    /// and thus require both pieces of information.
+    /// The block is available here so these operations can be functions of
+    /// [`EvaluatedBlock`] rather than needing to be supplied with the corresponding
+    /// [`Block`] too.
+    #[inline]
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+
+    /// The resolution (scale factor) of this block's voxels.
     /// See [`Resolution`] for more information.
     #[inline]
     pub fn resolution(&self) -> Resolution {
         self.voxels.resolution()
     }
 
-    // --- Simple computed properties ---
+    /// The block's attributes.
+    #[inline]
+    pub fn attributes(&self) -> &BlockAttributes {
+        &self.attributes
+    }
+
+    /// The voxels making up the block, and the [`resolution`](Resolution) (scale factor)
+    /// of those voxels.
+    #[inline]
+    pub fn voxels(&self) -> &Evoxels {
+        &self.voxels
+    }
+
+    /// The block's color; if made of multiple voxels, then an average or representative
+    /// color. This is the color that is used when a block becomes a voxel.
+    #[inline]
+    pub fn color(&self) -> Rgba {
+        self.color
+    }
+
+    /// The average color of the block as viewed from each axis-aligned direction.
+    #[inline]
+    pub fn face_colors(&self) -> FaceMap<Rgba> {
+        self.face_colors
+    }
+
+    /// The overall light emission aggregated from individual voxels.
+    /// This should be interpreted in the same way as the emission field of
+    /// [`block::Atom`].
+    #[inline]
+    pub fn light_emission(&self) -> Rgb {
+        self.light_emission
+    }
+
+    /// Whether the block is known to be completely opaque to light passing in or out of
+    /// each face.
+    ///
+    /// Currently, this is calculated as whether each of the surfaces of the block are
+    /// fully opaque, but in the future, the computation might be refined to permit
+    /// concave surfaces too, as long as they have edges meeting all edges of the block face.
+    #[inline]
+    pub fn opaque(&self) -> FaceMap<bool> {
+        self.opaque
+    }
+
+    /// Whether the block has any voxels/color at all that make it visible; that is, this
+    /// is false if the block is completely transparent.
+    #[inline]
+    pub fn visible(&self) -> bool {
+        self.visible
+    }
+
+    /// If all voxels in the cube have the same collision behavior, then this is that.
+    ///
+    /// Note that this is [`None`] for all blocks with voxels that do not fill the cube
+    /// bounds, even if all voxels in the voxel data bounds have the same collision.
+    #[inline]
+    pub fn uniform_collision(&self) -> Option<BlockCollision> {
+        self.uniform_collision
+    }
+
+    /// The opacity of all voxels. This is redundant with the main data, [`Self::voxels()`],
+    /// and is provided as a pre-computed convenience that can be cheaply compared with
+    /// other values of the same type.
+    ///
+    /// May be [`None`] if the block is fully invisible. (TODO: This is a kludge to avoid
+    /// obligating [`AIR_EVALUATED`] to allocate at compile time, which is impossible.
+    /// It doesn't harm normal operation because the point of having this is to compare
+    /// block shapes, which is trivial if the block is invisible.)
+    #[inline]
+    pub fn voxel_opacity_mask(&self) -> &Option<Vol<Arc<[OpacityCategory]>>> {
+        &self.voxel_opacity_mask
+    }
+
+    // --- Non-cached computed properties ---
 
     /// Returns whether [`Self::visible`] is true (the block has some visible color/voxels)
     /// or [`BlockAttributes::animation_hint`] indicates that the block might _become_

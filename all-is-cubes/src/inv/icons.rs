@@ -84,7 +84,7 @@ impl Icons {
         BlockProvider::new(p, |key| {
             Ok(match key {
                 Icons::EmptySlot => Block::builder()
-                    .attributes(AIR_EVALUATED.attributes)
+                    .attributes(AIR_EVALUATED.attributes().clone())
                     .display_name("")
                     .color(Rgba::TRANSPARENT)
                     .build(),

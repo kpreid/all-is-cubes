@@ -186,8 +186,8 @@ fn solid_block_equivalent_at_any_resolution() {
         // Check that they are identical except for the voxel data
         assert_eq!(
             EvaluatedBlock {
-                voxels: ev_one.voxels.clone(),
-                voxel_opacity_mask: ev_one.voxel_opacity_mask.clone(),
+                voxels: ev_one.voxels().clone(),
+                voxel_opacity_mask: ev_one.voxel_opacity_mask().clone(),
                 ..ev_many
             },
             ev_one,

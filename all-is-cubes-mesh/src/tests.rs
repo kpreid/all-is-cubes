@@ -515,7 +515,7 @@ fn invisible_voxel_block() {
         })
         .build();
     assert_eq!(
-        block.evaluate().unwrap().voxels.bounds(),
+        block.evaluate().unwrap().voxels().bounds(),
         GridAab::for_block(R8),
         "sanity check test data"
     );
@@ -566,7 +566,7 @@ fn handling_allocation_failure() {
         })
         .unwrap()
         .build_into(&mut u);
-    let block_derived_color = complex_block.evaluate().unwrap().color;
+    let block_derived_color = complex_block.evaluate().unwrap().color();
 
     let space = Space::builder(GridAab::ORIGIN_CUBE)
         .filled_with(complex_block)

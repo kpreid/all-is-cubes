@@ -951,7 +951,7 @@ fn universe_success() {
         .unwrap();
 
     let a_block_def_ev = Block::from(a_block_def).evaluate().unwrap();
-    assert_eq!(a_block_def_ev.attributes.display_name, "0");
+    assert_eq!(a_block_def_ev.attributes().display_name, "0");
 
     assert_eq!(
         a_space.read().unwrap().get_evaluated([0, 0, 0]),

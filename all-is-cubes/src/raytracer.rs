@@ -488,7 +488,7 @@ impl<D: RtBlockData> TracingBlock<D> {
     ) -> Self {
         TracingBlock {
             block_data: D::from_block(options, space_block_data),
-            voxels: space_block_data.evaluated().voxels.clone(),
+            voxels: space_block_data.evaluated().voxels().clone(),
         }
     }
 }

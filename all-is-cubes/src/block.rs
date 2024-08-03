@@ -623,7 +623,7 @@ impl Block {
                                 #[inline(always)]
                                 |extract| {
                                     let ev = extract.block_data().evaluated();
-                                    voxels_animation_hint |= ev.attributes.animation_hint;
+                                    voxels_animation_hint |= ev.attributes().animation_hint;
                                     Evoxel::from_block(ev)
                                 },
                             )
@@ -676,7 +676,7 @@ impl Block {
     pub fn color(&self) -> Rgba {
         match *self.primitive() {
             Primitive::Atom(Atom { color, .. }) => color,
-            Primitive::Air => AIR_EVALUATED.color,
+            Primitive::Air => AIR_EVALUATED.color(),
             Primitive::Indirect(_) | Primitive::Recur { .. } | Primitive::Text { .. } => {
                 panic!("Block::color not defined for non-atom blocks")
             }

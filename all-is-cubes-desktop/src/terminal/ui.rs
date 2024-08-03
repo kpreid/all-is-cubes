@@ -492,7 +492,7 @@ impl TerminalState {
                         "{:?} {:?} : {}",
                         cursor.cube(),
                         cursor.face_selected(),
-                        cursor.hit().evaluated.attributes.display_name
+                        cursor.hit().evaluated.attributes().display_name
                     ))
                 } else {
                     Paragraph::new("")

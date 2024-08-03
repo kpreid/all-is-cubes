@@ -423,7 +423,7 @@ impl Space {
     ) {
         let evaluated = &ctx.palette.entry(new_block_index).evaluated;
 
-        if evaluated.attributes.tick_action.is_some() {
+        if evaluated.attributes().tick_action.is_some() {
             ctx.cubes_wanting_ticks.insert(cube);
         }
 
@@ -656,7 +656,7 @@ impl Space {
                 if let Some(TickAction {
                     operation: _,
                     schedule,
-                }) = self.get_evaluated(cube).attributes.tick_action
+                }) = self.get_evaluated(cube).attributes().tick_action
                 {
                     if schedule.contains(tick) {
                         // Don't tick yet.
@@ -684,7 +684,7 @@ impl Space {
             let Some(TickAction {
                 operation,
                 schedule: _,
-            }) = self.get_evaluated(cube).attributes.tick_action.as_ref()
+            }) = self.get_evaluated(cube).attributes().tick_action.as_ref()
             else {
                 continue;
             };

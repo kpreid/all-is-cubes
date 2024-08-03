@@ -313,7 +313,7 @@ mod tests {
             let ev = slab.evaluate().unwrap();
             let analysis = analyze(
                 ev.resolution(),
-                ev.voxels.as_vol_ref(),
+                ev.voxels().as_vol_ref(),
                 &mut Viz::disabled(),
             );
 

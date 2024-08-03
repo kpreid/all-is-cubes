@@ -35,8 +35,8 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
     // * the block has any light emission, which we do not support via vertex coloring.
     //   (TODO: This isn't quite the right condition, because a block might e.g. have emissive
     //   voxels only on its interior or something.)
-    let prefer_textures = block.attributes.animation_hint.redefinition != AnimationChange::None
-        || block.light_emission != Rgb::ZERO;
+    let prefer_textures = block.attributes().animation_hint.redefinition != AnimationChange::None
+        || block.light_emission() != Rgb::ZERO;
 
     let flaws = &mut output.flaws;
 
@@ -46,10 +46,10 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
     // actual voxels.
     let tmp_block_color_voxel: Evoxels;
     let voxels: &Evoxels = if options.ignore_voxels {
-        tmp_block_color_voxel = Evoxels::One(Evoxel::from_color(block.color));
+        tmp_block_color_voxel = Evoxels::One(Evoxel::from_color(block.color()));
         &tmp_block_color_voxel
     } else {
-        &block.voxels
+        block.voxels()
     };
 
     // Short-circuit case: if we have a single voxel a.k.a. resolution 1, then we generate a
@@ -325,7 +325,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                                 //   geometry as needed.
                                 *flaws |= Flaws::MISSING_TEXTURES;
                                 QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(
-                                    options.transparency.limit_alpha(block.color),
+                                    options.transparency.limit_alpha(block.color()),
                                 )
                             }
                         };
@@ -358,7 +358,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
         output.voxel_opacity_mask = if used_any_vertex_colors {
             None
         } else {
-            block.voxel_opacity_mask.clone()
+            block.voxel_opacity_mask().clone()
         };
     }
 }
