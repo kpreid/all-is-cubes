@@ -197,23 +197,9 @@ impl Tool {
                 }
 
                 let velocity = 8;
-                let [move_out, move_in] = block::Move::new(direction, 0, velocity).to_paired();
-                let leaving = input.set_cube(
-                    cursor.cube(),
-                    cursor.hit().block.clone(),
-                    cursor.hit().block.clone().with_modifier(move_out),
-                )?;
-                let entering = input.set_cube(
-                    cursor.cube() + direction.normal_vector(),
-                    AIR,
-                    cursor.hit().block.clone().with_modifier(move_in),
-                )?;
-                Ok((
-                    Some(self),
-                    entering
-                        .merge(leaving)
-                        .expect("Push transactions conflicted???"),
-                ))
+                let op = Operation::StartMove(block::Move::new(direction, 0, velocity));
+
+                input.apply_operation(self.clone(), &op)
             }
             Self::Jetpack { active } => Ok((
                 Some(Self::Jetpack { active: !active }),
