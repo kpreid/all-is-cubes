@@ -204,7 +204,11 @@ fn main() -> Result<(), ActionError> {
             // libraries with docs elsewhere.
             if config.scope.includes_main_workspace() {
                 let _t = CaptureTime::new(&mut time_log, "doc");
-                cargo().env("RUSTDOCFLAGS", "-Dwarnings").arg("doc").run()?;
+                cargo()
+                    .env("RUSTDOCFLAGS", "-Dwarnings")
+                    .arg("doc")
+                    .args(config.cargo_build_args())
+                    .run()?;
             }
         }
         XtaskCommand::Fmt => {
