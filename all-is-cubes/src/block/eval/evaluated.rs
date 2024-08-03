@@ -345,15 +345,7 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     },
     attributes: AIR_ATTRIBUTES,
     voxels: Evoxels::One(Evoxel::AIR),
-    derived: Derived {
-        color: Rgba::TRANSPARENT,
-        face_colors: FaceMap::repeat_copy(Rgba::TRANSPARENT),
-        light_emission: Rgb::ZERO,
-        opaque: FaceMap::repeat_copy(false),
-        visible: false,
-        uniform_collision: Some(BlockCollision::None),
-        voxel_opacity_mask: None,
-    },
+    derived: AIR_DERIVED,
 };
 
 /// This separate item is needed to convince the compiler that `AIR_ATTRIBUTES.display_name`
@@ -363,6 +355,7 @@ pub(crate) const AIR_EVALUATED_REF: &EvaluatedBlock = &AIR_EVALUATED;
 pub(in crate::block) const AIR_EVALUATED_MIN: MinEval = MinEval {
     attributes: AIR_ATTRIBUTES,
     voxels: Evoxels::One(Evoxel::AIR),
+    derived: Some(AIR_DERIVED),
 };
 
 /// Used only by [`AIR_EVALUATED`].
@@ -376,18 +369,29 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
     animation_hint: block::AnimationHint::UNCHANGING,
 };
 
-/// A minimal version of [`EvaluatedBlock`] which contains all the fundamental data, but
-/// none of the computed data.
+const AIR_DERIVED: Derived = Derived {
+    color: Rgba::TRANSPARENT,
+    face_colors: FaceMap::repeat_copy(Rgba::TRANSPARENT),
+    light_emission: Rgb::ZERO,
+    opaque: FaceMap::repeat_copy(false),
+    visible: false,
+    uniform_collision: Some(BlockCollision::None),
+    voxel_opacity_mask: None,
+};
+
+/// Alternate form of [`EvaluatedBlock`] which may omit the derived information.
 ///
 /// This type is used as the intermediate type inside block modifier evaluation, so as to
-/// avoid computing any derived data that will be discarded anyway, or possibly
-/// mis-computing some of the derived data as an attempted optimization.
+/// avoid computing [`Derived`] data until necessary. It may carry derived data anyway
+/// as an optimization.
 /// This type is never exposed as part of the public API; only [`EvaluatedBlock`] is.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+///
+/// TODO: Needs a new name since it isn't necessarily minimal.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct MinEval {
-    pub(crate) attributes: BlockAttributes,
-    pub(crate) voxels: Evoxels,
+    attributes: BlockAttributes,
+    voxels: Evoxels,
+    derived: Option<Derived>,
 }
 
 impl From<&EvaluatedBlock> for MinEval {
@@ -395,6 +399,7 @@ impl From<&EvaluatedBlock> for MinEval {
         Self {
             attributes: value.attributes.clone(),
             voxels: value.voxels.clone(),
+            derived: Some(value.derived.clone()),
         }
     }
 }
@@ -403,33 +408,92 @@ impl From<EvaluatedBlock> for MinEval {
         Self {
             attributes: value.attributes,
             voxels: value.voxels,
+            derived: Some(value.derived),
         }
     }
 }
 
 impl MinEval {
-    /// Converts this into an [`EvaluatedBlock`], computing the derived values.
+    pub fn new(attributes: BlockAttributes, voxels: Evoxels) -> Self {
+        Self {
+            attributes,
+            voxels,
+            derived: None,
+        }
+    }
+
+    /// Converts this into an [`EvaluatedBlock`], computing the derived values if needed.
     ///
     /// Note: This is not the complete algorithm for processing the end of block evaluation,
     /// only for handling the conversion of a `MinEval` value.
     /// Use [`crate::block::finish_evaluation`] to include error processing.
     pub(in crate::block) fn finish(self, block: Block, cost: Cost) -> EvaluatedBlock {
-        let MinEval { attributes, voxels } = self;
-        EvaluatedBlock::from_voxels(block, attributes, voxels, cost)
+        let MinEval {
+            attributes,
+            voxels,
+            derived,
+        } = self;
+        match derived {
+            Some(derived) => EvaluatedBlock {
+                block,
+                cost,
+                attributes,
+                voxels,
+                derived,
+            },
+            None => EvaluatedBlock::from_voxels(block, attributes, voxels, cost),
+        }
+    }
+
+    pub fn attributes(&self) -> &BlockAttributes {
+        &self.attributes
+    }
+
+    pub fn voxels(&self) -> &Evoxels {
+        &self.voxels
+    }
+
+    #[cfg(test)]
+    pub(crate) fn has_derived(&self) -> bool {
+        self.derived.is_some()
+    }
+
+    /// Disassembles this [`MinEval`] into *all* of its parts,
+    /// except for the derived/cached ones.
+    ///
+    /// Use this during block evaluation to get ingredients for a modified block.
+    pub(in crate::block) fn into_parts(self) -> (BlockAttributes, Evoxels) {
+        let MinEval {
+            attributes,
+            voxels,
+            derived: _,
+        } = self;
+        (attributes, voxels)
     }
 
     pub fn resolution(&self) -> Resolution {
-        self.voxels.resolution()
+        self.voxels().resolution()
     }
 
     pub(crate) fn rotationally_symmetric(&self) -> bool {
-        let Self { attributes, voxels } = self;
-        attributes.rotationally_symmetric() && voxels.resolution() == R1
+        self.attributes().rotationally_symmetric() && self.voxels().resolution() == R1
     }
 
     #[cfg(debug_assertions)]
     pub(crate) fn consistency_check(&self) {
-        self.voxels.consistency_check();
+        self.voxels().consistency_check();
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+#[mutants::skip]
+impl<'a> arbitrary::Arbitrary<'a> for MinEval {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(MinEval::new(u.arbitrary()?, u.arbitrary()?))
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::and(BlockAttributes::size_hint(depth), Evoxels::size_hint(depth))
     }
 }
 

@@ -21,20 +21,21 @@ impl Quote {
 
     pub(in crate::block) fn evaluate(
         &self,
-        mut value: block::MinEval,
+        value: block::MinEval,
         filter: &block::EvalFilter,
     ) -> Result<block::MinEval, block::InEvalError> {
         let &Quote { suppress_ambient } = self;
+        let (mut attributes, mut voxels) = value.into_parts();
 
-        value.attributes.tick_action = None;
+        attributes.tick_action = None;
         if suppress_ambient && !filter.skip_eval {
-            block::Budget::decrement_voxels(&filter.budget, value.voxels.count())?;
-            for voxel in value.voxels.as_vol_mut().as_linear_mut().iter_mut() {
+            block::Budget::decrement_voxels(&filter.budget, voxels.count())?;
+            for voxel in voxels.as_vol_mut().as_linear_mut().iter_mut() {
                 voxel.emission = Rgb::ZERO;
             }
         }
 
-        Ok(value)
+        Ok(block::MinEval::new(attributes, voxels))
     }
 
     // The evaluation implementation is simple enough that it's in `Modifier::evaluate`

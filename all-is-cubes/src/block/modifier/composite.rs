@@ -171,14 +171,8 @@ fn evaluate_composition(
     filter: &block::EvalFilter,
 ) -> Result<MinEval, block::InEvalError> {
     // Unpack blocks.
-    let MinEval {
-        attributes: dst_att,
-        voxels: dst_voxels,
-    } = dst_evaluated;
-    let MinEval {
-        attributes: src_att,
-        voxels: src_voxels,
-    } = src_evaluated;
+    let (dst_att, dst_voxels) = dst_evaluated.into_parts();
+    let (src_att, src_voxels) = src_evaluated.into_parts();
 
     let src_resolution = src_voxels.resolution();
     let dst_resolution = dst_voxels.resolution();
@@ -234,7 +228,7 @@ fn evaluate_composition(
         )
     };
 
-    Ok(MinEval { attributes, voxels })
+    Ok(MinEval::new(attributes, voxels))
 }
 
 /// Rescale the bounds of the input to the resolution of the output, but also, if the voxels are
@@ -450,7 +444,7 @@ pub(in crate::block) fn render_inventory(
     }
 
     // TODO(inventory): clone necessary to avoid a borrow conflict
-    let config = input.attributes.inventory.clone();
+    let config = input.attributes().inventory.clone();
 
     for (slot_index, icon_position) in config.icon_positions() {
         let Some(placed_icon_bounds) = GridAab::from_lower_size(

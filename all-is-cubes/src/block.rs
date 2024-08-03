@@ -553,15 +553,15 @@ impl Block {
                 color,
                 emission,
                 collision,
-            }) => MinEval {
-                attributes: attributes.clone(),
-                voxels: Evoxels::One(Evoxel {
+            }) => MinEval::new(
+                attributes.clone(),
+                Evoxels::One(Evoxel {
                     color,
                     emission,
                     selectable: attributes.selectable,
                     collision,
                 }),
-            },
+            ),
 
             Primitive::Air => AIR_EVALUATED_MIN,
 
@@ -638,8 +638,8 @@ impl Block {
                     }
                 };
 
-                MinEval {
-                    attributes: BlockAttributes {
+                MinEval::new(
+                    BlockAttributes {
                         // Translate the voxels' animation hints into their effect on
                         // the outer block.
                         animation_hint: attributes.animation_hint
@@ -650,8 +650,8 @@ impl Block {
                             },
                         ..attributes.clone()
                     },
-                    voxels: Evoxels::Many(resolution, voxels),
-                }
+                    Evoxels::Many(resolution, voxels),
+                )
             }
 
             Primitive::Text { ref text, offset } => text.evaluate(offset, filter)?,

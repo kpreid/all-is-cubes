@@ -102,11 +102,15 @@ impl Modifier {
             Modifier::Quote(ref quote) => quote.evaluate(value, filter)?,
 
             Modifier::Rotate(rotation) => {
-                if filter.skip_eval || value.rotationally_symmetric() {
+                if filter.skip_eval
+                    || rotation == GridRotation::IDENTITY
+                    || value.rotationally_symmetric()
+                {
                     // Skip computation of transforms
                     value
                 } else {
-                    block::Budget::decrement_voxels(&filter.budget, value.voxels.count())?;
+                    let (attributes, voxels) = value.into_parts();
+                    block::Budget::decrement_voxels(&filter.budget, voxels.count())?;
 
                     // It'd be nice if this rotation operation were in-place, but I've read that
                     // it's actually quite difficult to implement a 3D array rotation in-place.
@@ -115,27 +119,22 @@ impl Modifier {
                     // TODO: But check if we can make the arithmetic simpler by using incrementing
                     // instead of running a general transform on every Cube.
 
-                    let resolution = value.resolution();
+                    let resolution = voxels.resolution();
                     let inner_to_outer = rotation.to_positive_octant_transform(resolution.into());
                     let outer_to_inner = rotation
                         .inverse()
                         .to_positive_octant_transform(resolution.into());
 
-                    MinEval {
-                        voxels: Evoxels::Many(
+                    MinEval::new(
+                        attributes.rotate(rotation),
+                        Evoxels::Many(
                             resolution,
                             Vol::from_fn(
-                                value.voxels.bounds().transform(inner_to_outer).unwrap(),
-                                |cube| {
-                                    value
-                                        .voxels
-                                        .get(outer_to_inner.transform_cube(cube))
-                                        .unwrap()
-                                },
+                                voxels.bounds().transform(inner_to_outer).unwrap(),
+                                |cube| voxels.get(outer_to_inner.transform_cube(cube)).unwrap(),
                             ),
                         ),
-                        attributes: value.attributes.rotate(rotation),
-                    }
+                    )
                 }
             }
 

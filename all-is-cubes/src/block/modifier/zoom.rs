@@ -73,20 +73,20 @@ impl Zoom {
         // of the primitive voxels are evaluated. (Modifier::Move will also benefit.)
 
         let original_resolution = input.resolution();
-        let MinEval { attributes, voxels } = input;
 
         // TODO: write test cases for what happens if the division fails
         // (this is probably wrong in that we need to duplicate voxels if it happens)
         let zoom_resolution = (original_resolution / scale).unwrap_or(R1);
 
-        Ok(match voxels.single_voxel() {
+        Ok(match input.voxels().single_voxel() {
             Some(_) => {
                 // Block has resolution 1.
                 // Zoom::new() checks that the region is not outside the block's unit cube,
                 // so we can just unconditionally return the original color.
-                MinEval { attributes, voxels }
+                input
             }
             None => {
+                let (attributes, voxels) = input.into_parts();
                 let voxels = voxels.as_vol_ref();
                 let voxel_offset = offset_in_zoomed_blocks
                     .map(GridCoordinate::from)
@@ -97,22 +97,19 @@ impl Zoom {
                 {
                     // This case occurs when the voxels' actual bounds (which may be smaller
                     // than the block bounding box) don't intersect the zoom region.
-                    None => MinEval {
-                        attributes,
-                        voxels: Evoxels::One(Evoxel::AIR),
-                    },
+                    None => MinEval::new(attributes, Evoxels::One(Evoxel::AIR)),
                     Some(intersected_bounds) => {
                         block::Budget::decrement_voxels(
                             &filter.budget,
                             intersected_bounds.volume().unwrap(),
                         )?;
-                        MinEval {
+                        MinEval::new(
                             attributes,
-                            voxels: Evoxels::Many(
+                            Evoxels::Many(
                                 zoom_resolution,
                                 Vol::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
                             ),
-                        }
+                        )
                     }
                 }
             }

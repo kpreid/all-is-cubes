@@ -277,13 +277,13 @@ impl Text {
                         }),
                     };
 
-                Ok(MinEval {
-                    voxels,
-                    attributes: BlockAttributes {
+                Ok(MinEval::new(
+                    BlockAttributes {
                         display_name: self.string.clone(),
                         ..BlockAttributes::default()
                     },
-                })
+                    voxels,
+                ))
             },
         )
     }

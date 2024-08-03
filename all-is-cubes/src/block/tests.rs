@@ -85,7 +85,7 @@ fn block_debug_with_modifiers() {
 }
 
 mod eval {
-    use crate::block::{Cost, EvaluatedBlock};
+    use crate::block::{Cost, EvKey, EvaluatedBlock};
 
     use super::{assert_eq, *};
 
@@ -514,7 +514,7 @@ mod eval {
             eval_def,
             EvaluatedBlock {
                 cost: eval_def.cost,
-                block: indirect_block,
+                block: indirect_block.clone(),
                 ..eval_bare.clone()
             }
         );
@@ -525,7 +525,27 @@ mod eval {
                 voxels: 0, // zero because the voxels were _already_ evaluated
                 recursion: 0
             }
-        )
+        );
+
+        // While we're here, test that we benefit from the `BlockDef`’s evaluation cache by
+        // getting identical `EvKey`s out of separate evaluations. (`EvKey` compares voxels
+        // by pointer insteed of value, as long as the resolution is not 1.)
+        assert_eq!(
+            EvKey::new(&eval_def),
+            EvKey::new(&indirect_block.evaluate().unwrap())
+        );
+    }
+
+    /// Check that the derived values from a `BlockDef` evaluation are getting propagated
+    /// out of the cache.
+    #[test]
+    fn indirect_has_derived_value_cache_internally() {
+        let mut universe = Universe::new();
+        let block = Block::from(universe.insert_anonymous(BlockDef::new(AIR)));
+        assert!(block
+            .evaluate_impl(&block::EvalFilter::default())
+            .unwrap()
+            .has_derived());
     }
 
     /// Fuzz-discovered test case for panic during evaluation,

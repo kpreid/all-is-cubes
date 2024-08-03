@@ -106,8 +106,11 @@ impl Move {
         // but that will involve some sort of predicate and transformation on tick actions.)
         input = block::Quote::default().evaluate(input, filter)?;
 
-        let (original_bounds, effective_resolution) = match input.voxels.single_voxel() {
-            None => (input.voxels.bounds(), input.resolution()),
+        // TODO: short-circuit case when distance is 0
+
+        let (input_attributes, input_voxels) = input.into_parts();
+        let (original_bounds, effective_resolution) = match input_voxels.single_voxel() {
+            None => (input_voxels.bounds(), input_voxels.resolution()),
             // Treat atom blocks as having a resolution of 16. TODO: Improve on this hardcoded constant
             Some(_) => (GridAab::for_block(R16), R16),
         };
@@ -159,10 +162,10 @@ impl Move {
         };
 
         let animation_hint = if animation_op.is_some() {
-            input.attributes.animation_hint
+            input_attributes.animation_hint
                 | block::AnimationHint::replacement(block::AnimationChange::Shape)
         } else {
-            input.attributes.animation_hint
+            input_attributes.animation_hint
         };
 
         let attributes = BlockAttributes {
@@ -171,7 +174,7 @@ impl Move {
                 operation,
                 schedule,
             }),
-            ..input.attributes
+            ..input_attributes
         };
 
         Ok(match displaced_bounds {
@@ -181,9 +184,9 @@ impl Move {
                     displaced_bounds.volume().unwrap(),
                 )?;
 
-                let displaced_voxels = match input.voxels.single_voxel() {
+                let displaced_voxels = match input_voxels.single_voxel() {
                     None => {
-                        let voxels = input.voxels.as_vol_ref();
+                        let voxels = input_voxels.as_vol_ref();
                         Evoxels::Many(
                             effective_resolution,
                             Vol::from_fn(displaced_bounds, |cube| {
@@ -201,15 +204,9 @@ impl Move {
                         )
                     }
                 };
-                MinEval {
-                    attributes,
-                    voxels: displaced_voxels,
-                }
+                MinEval::new(attributes, displaced_voxels)
             }
-            None => MinEval {
-                attributes,
-                voxels: Evoxels::One(Evoxel::AIR),
-            },
+            None => MinEval::new(attributes, Evoxels::One(Evoxel::AIR)),
         })
     }
 }
