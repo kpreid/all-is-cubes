@@ -16,6 +16,7 @@ mod derived;
 use derived::compute_derived;
 #[cfg(test)]
 pub(super) use derived::Derived;
+pub use derived::VoxelOpacityMask;
 
 mod evaluated;
 pub(crate) use evaluated::AIR_EVALUATED_REF;

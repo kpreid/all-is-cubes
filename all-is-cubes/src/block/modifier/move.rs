@@ -231,7 +231,7 @@ impl universe::VisitHandles for Move {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Composite, EvaluatedBlock, Resolution::*};
+    use crate::block::{Composite, EvaluatedBlock, Resolution::*, VoxelOpacityMask};
     use crate::content::make_some_blocks;
     use crate::math::{notnan, rgba_const, FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
     use crate::space::Space;
@@ -281,7 +281,10 @@ mod tests {
                     opaque: FaceMap::repeat(false).with(Face6::PY, true),
                     visible: true,
                     uniform_collision: None,
-                    voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
+                    voxel_opacity_mask: VoxelOpacityMask::new_raw(
+                        R16,
+                        Vol::repeat(expected_bounds, OpacityCategory::Opaque)
+                    ),
                 }
             }
         );
@@ -335,7 +338,10 @@ mod tests {
                     opaque: FaceMap::repeat(false).with(Face6::PY, true),
                     visible: true,
                     uniform_collision: None,
-                    voxel_opacity_mask: Some(Vol::repeat(expected_bounds, OpacityCategory::Opaque)),
+                    voxel_opacity_mask: VoxelOpacityMask::new_raw(
+                        resolution,
+                        Vol::repeat(expected_bounds, OpacityCategory::Opaque)
+                    ),
                 }
             }
         );

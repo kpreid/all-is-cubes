@@ -305,13 +305,16 @@ mod tests {
                     opaque: FaceMap::repeat(false).with(rotation.transform(Face6::NY), true),
                     visible: true,
                     uniform_collision: Some(BlockCollision::Hard),
-                    voxel_opacity_mask: Some(Vol::from_fn(block_bounds, |cube| {
-                        if cube.x == 0 {
-                            OpacityCategory::Opaque
-                        } else {
-                            OpacityCategory::Invisible
-                        }
-                    })),
+                    voxel_opacity_mask: block::VoxelOpacityMask::new_raw(
+                        resolution,
+                        Vol::from_fn(block_bounds, |cube| {
+                            if cube.x == 0 {
+                                OpacityCategory::Opaque
+                            } else {
+                                OpacityCategory::Invisible
+                            }
+                        })
+                    ),
                 },
             }
         );

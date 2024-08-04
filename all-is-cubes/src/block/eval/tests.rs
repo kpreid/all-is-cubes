@@ -35,7 +35,11 @@ fn evaluated_block_debug_simple() {
                     selectable: true,
                     collision: Hard,
                 },
-                voxel_opacity_mask: Some(GridAab(0..1, 0..1, 0..1)),
+                voxel_opacity_mask: VoxelOpacityMask {
+                    resolution: 1,
+                    bounds: GridAab(0..1, 0..1, 0..1),
+                    opacity: Opaque,
+                },
                 cost: Cost {
                     components: 1,
                     voxels: 0,
@@ -95,7 +99,11 @@ fn evaluated_block_debug_complex() {
                 uniform_collision: None,
                 resolution: 2,
                 voxels: GridAab(0..2, 0..2, 0..2),
-                voxel_opacity_mask: Some(GridAab(0..2, 0..2, 0..2)),
+                voxel_opacity_mask: VoxelOpacityMask {
+                    resolution: 2,
+                    bounds: GridAab(0..2, 0..2, 0..2),
+                    ..
+                },
                 cost: Cost {
                     components: 1,
                     voxels: 8,
@@ -140,18 +148,18 @@ fn from_voxels_zero_bounds() {
     let attributes = BlockAttributes::default();
     let resolution = R4;
     let bounds = GridAab::from_lower_size([1, 2, 3], [0, 0, 0]);
+    let voxels = Evoxels::from_many(resolution, Vol::from_fn(bounds, |_| unreachable!()));
     assert_eq!(
         EvaluatedBlock::from_voxels(
             AIR, // caution: incorrect placeholder value
             attributes.clone(),
-            Evoxels::from_many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
+            voxels.clone(),
             Cost::ZERO
         ),
         EvaluatedBlock {
             block: AIR,       // caution: incorrect placeholder value
             cost: Cost::ZERO, // TODO wrong
             attributes,
-            voxels: Evoxels::from_many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
             derived: Derived {
                 color: Rgba::TRANSPARENT,
                 face_colors: FaceMap::repeat(Rgba::TRANSPARENT),
@@ -159,8 +167,9 @@ fn from_voxels_zero_bounds() {
                 opaque: FaceMap::repeat(false),
                 visible: false,
                 uniform_collision: Some(BlockCollision::None),
-                voxel_opacity_mask: None,
-            }
+                voxel_opacity_mask: block::VoxelOpacityMask::new(resolution, voxels.as_vol_ref()),
+            },
+            voxels,
         }
     );
 }

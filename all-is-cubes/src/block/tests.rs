@@ -85,7 +85,7 @@ fn block_debug_with_modifiers() {
 }
 
 mod eval {
-    use crate::block::{Cost, EvKey, EvaluatedBlock};
+    use crate::block::{Cost, EvKey, EvaluatedBlock, VoxelOpacityMask};
 
     use super::{assert_eq, *};
 
@@ -156,7 +156,7 @@ mod eval {
         assert_eq!(e.visible(), true);
         assert_eq!(
             *e.voxel_opacity_mask(),
-            Some(Vol::from_element(OpacityCategory::Opaque))
+            VoxelOpacityMask::new_raw(R1, Vol::from_element(OpacityCategory::Opaque))
         )
     }
 
@@ -172,7 +172,7 @@ mod eval {
         assert_eq!(e.visible(), true);
         assert_eq!(
             *e.voxel_opacity_mask(),
-            Some(Vol::from_element(OpacityCategory::Partial))
+            VoxelOpacityMask::new_raw(R1, Vol::from_element(OpacityCategory::Partial))
         )
     }
 
@@ -185,7 +185,10 @@ mod eval {
         assert!(e.voxels.single_voxel().is_some());
         assert_eq!(e.opaque(), FaceMap::repeat(false));
         assert_eq!(e.visible(), false);
-        assert_eq!(*e.voxel_opacity_mask(), None)
+        assert_eq!(
+            *e.voxel_opacity_mask(),
+            VoxelOpacityMask::new_raw(R1, Vol::from_element(OpacityCategory::Invisible))
+        );
     }
 
     #[test]
@@ -240,10 +243,10 @@ mod eval {
         assert_eq!(e.visible(), true);
         assert_eq!(
             *e.voxel_opacity_mask(),
-            Some(Vol::repeat(
-                GridAab::for_block(resolution),
-                OpacityCategory::Opaque,
-            ))
+            VoxelOpacityMask::new_raw(
+                resolution,
+                Vol::repeat(GridAab::for_block(resolution), OpacityCategory::Opaque,)
+            )
         );
         assert_eq!(
             e.cost,

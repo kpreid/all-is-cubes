@@ -358,7 +358,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
         output.voxel_opacity_mask = if used_any_vertex_colors {
             None
         } else {
-            block.voxel_opacity_mask().clone()
+            Some(block.voxel_opacity_mask().clone())
         };
     }
 }

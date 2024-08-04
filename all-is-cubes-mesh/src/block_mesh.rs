@@ -5,10 +5,9 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
-use std::sync::Arc;
 
-use all_is_cubes::block::EvaluatedBlock;
-use all_is_cubes::math::{Face7, FaceMap, OpacityCategory, Vol};
+use all_is_cubes::block::{EvaluatedBlock, VoxelOpacityMask};
+use all_is_cubes::math::{Face7, FaceMap};
 use all_is_cubes::space::Space;
 use all_is_cubes_render::Flaws;
 
@@ -55,7 +54,7 @@ pub struct BlockMesh<M: MeshTypes> {
     /// colors have been embedded in the mesh vertices, making a mesh update required.
     /// (TODO: We could be more precise about which voxels are so frozen -- revisit
     /// whether that's worthwhile.)
-    pub(super) voxel_opacity_mask: Option<Vol<Arc<[OpacityCategory]>>>,
+    pub(super) voxel_opacity_mask: Option<VoxelOpacityMask>,
 
     /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
     flaws: Flaws,
@@ -168,14 +167,9 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
             return false;
         }
 
-        // Need to deref the Vec in self.textures_used before matching
-        match (
-            &self.voxel_opacity_mask,
-            &mut self.texture_used,
-            block.voxel_opacity_mask(),
-        ) {
-            (Some(old_mask), Some(existing_texture), Some(new_mask))
-                if old_mask == new_mask
+        match (&self.voxel_opacity_mask, &mut self.texture_used) {
+            (Some(old_mask), Some(existing_texture))
+                if old_mask == block.voxel_opacity_mask()
                     && existing_texture
                         .channels()
                         .is_superset_of(texture::needed_channels(block.voxels())) =>

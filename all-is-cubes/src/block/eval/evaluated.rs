@@ -1,7 +1,6 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
 use alloc::boxed::Box;
-use alloc::sync::Arc;
 use core::{fmt, ptr};
 
 /// Acts as polyfill for float methods
@@ -13,9 +12,10 @@ use crate::block::eval::derived::Derived;
 use crate::block::{
     self, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels, Modifier,
     Resolution::{self, R1},
+    VoxelOpacityMask,
 };
 use crate::inv;
-use crate::math::{Face6, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba, Vol};
+use crate::math::{Face6, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
@@ -93,10 +93,7 @@ impl fmt::Debug for EvaluatedBlock {
                 ds.field("voxels", &format_args!("{:?}", voxels.bounds()));
             }
         }
-        ds.field(
-            "voxel_opacity_mask",
-            &format_args!("{:?}", voxel_opacity_mask.as_ref().map(Vol::bounds)),
-        );
+        ds.field("voxel_opacity_mask", &voxel_opacity_mask);
         ds.field("cost", cost);
         ds.finish()
     }
@@ -209,16 +206,13 @@ impl EvaluatedBlock {
         self.derived.uniform_collision
     }
 
-    /// The opacity of all voxels. This is redundant with the main data, [`Self::voxels()`],
-    /// and is provided as a pre-computed convenience that can be cheaply compared with
-    /// other values of the same type.
+    /// The opacity of all voxels.
     ///
-    /// May be [`None`] if the block is fully invisible. (TODO: This is a kludge to avoid
-    /// obligating [`AIR_EVALUATED`] to allocate at compile time, which is impossible.
-    /// It doesn't harm normal operation because the point of having this is to compare
-    /// block shapes, which is trivial if the block is invisible.)
+    /// This is redundant with the main data, [`Self::voxels()`],
+    /// and is provided as a pre-computed convenience for comparing blocks’ shapes.
+    /// See [`VoxelOpacityMask`]’s documentation for more information.
     #[inline]
-    pub fn voxel_opacity_mask(&self) -> &Option<Vol<Arc<[OpacityCategory]>>> {
+    pub fn voxel_opacity_mask(&self) -> &VoxelOpacityMask {
         &self.derived.voxel_opacity_mask
     }
 
@@ -376,7 +370,7 @@ const AIR_DERIVED: Derived = Derived {
     opaque: FaceMap::repeat_copy(false),
     visible: false,
     uniform_collision: Some(BlockCollision::None),
-    voxel_opacity_mask: None,
+    voxel_opacity_mask: VoxelOpacityMask::R1_INVISIBLE,
 };
 
 /// Alternate form of [`EvaluatedBlock`] which may omit the derived information.

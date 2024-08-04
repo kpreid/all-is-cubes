@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 use core::ops;
+use itertools::Itertools;
 
 use euclid::Vector3D;
 use ordered_float::NotNan;
@@ -9,9 +10,15 @@ use ordered_float::NotNan;
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
-use crate::block;
+use crate::block::{
+    self,
+    Resolution::{self, R1},
+};
 use crate::math::{Cube, Face6, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol};
 use crate::raytracer;
+
+#[cfg(doc)]
+use crate::block::EvaluatedBlock;
 
 /// Derived properties of an evaluated block.
 ///
@@ -59,15 +66,8 @@ pub(in crate::block) struct Derived {
     // make this its own enum, or a bitmask of all seen values, or something.
     pub(in crate::block) uniform_collision: Option<block::BlockCollision>,
 
-    /// The opacity of all voxels. This is redundant with the main data, [`Self::voxels`],
-    /// and is provided as a pre-computed convenience that can be cheaply compared with
-    /// other values of the same type.
-    ///
-    /// May be [`None`] if the block is fully invisible. (TODO: This is a kludge to avoid
-    /// obligating [`AIR_EVALUATED`] to allocate at compile time, which is impossible.
-    /// It doesn't harm normal operation because the point of having this is to compare
-    /// block shapes, which is trivial if the block is invisible.)
-    pub(in crate::block) voxel_opacity_mask: Option<Vol<Arc<[OpacityCategory]>>>,
+    /// See [`VoxelOpacityMask`]'s documentation for the use of this.
+    pub(in crate::block) voxel_opacity_mask: VoxelOpacityMask,
 }
 
 /// Compute the derived properties of block voxels
@@ -82,14 +82,18 @@ pub(in crate::block::eval) fn compute_derived(
     // but this is likely to change.
     _ = attributes;
 
+    let resolution = voxels.resolution();
+
     // Optimization for single voxels:
     // don't allocate any `Vol`s or perform any generalized scans.
-    if let Some(block::Evoxel {
-        color,
-        emission,
-        selectable: _,
-        collision,
-    }) = voxels.single_voxel()
+    if let Some(
+        voxel @ block::Evoxel {
+            color,
+            emission,
+            selectable: _,
+            collision,
+        },
+    ) = voxels.single_voxel()
     {
         let visible = !color.fully_transparent();
         return Derived {
@@ -99,20 +103,10 @@ pub(in crate::block::eval) fn compute_derived(
             opaque: FaceMap::repeat(color.fully_opaque()),
             visible,
             uniform_collision: Some(collision),
-            // Note an edge case shenanigan:
-            // `AIR_EVALUATED` cannot allocate a mask, and we want this to match the
-            // output of that so that `EvaluatedBlock::consistency_check()` will agree.)
-            // It's also useful to skip the mask when the block is invisible, but
-            // that's not the motivation of doing this this way.
-            voxel_opacity_mask: if !visible {
-                None
-            } else {
-                Some(Vol::from_element(color.opacity_category()))
-            },
+            voxel_opacity_mask: VoxelOpacityMask::new_r1(voxel),
         };
     }
 
-    let resolution = voxels.resolution();
     let full_block_bounds = GridAab::for_block(resolution);
     let data_bounds = voxels.bounds();
     let less_than_full = full_block_bounds != data_bounds;
@@ -185,24 +179,7 @@ pub(in crate::block::eval) fn compute_derived(
         collision
     };
 
-    let visible = voxels.as_vol_ref().as_linear().iter().any(
-        #[inline(always)]
-        |voxel| !voxel.color.fully_transparent(),
-    );
-
-    // Generate mask only if the block is not invisible, because it will never be
-    // useful for invisible blocks. (The purpose of the mask is to allow re-texturing
-    // a mesh of the appropriate shape, and invisible blocks have no mesh.)
-    let voxel_opacity_mask = if !visible {
-        None
-    } else {
-        Some(voxels.as_vol_ref().map_container(|voxels| {
-            voxels
-                .iter()
-                .map(|voxel| voxel.color.opacity_category())
-                .collect()
-        }))
-    };
+    let voxel_opacity_mask = VoxelOpacityMask::new(resolution, voxels.as_vol_ref());
 
     Derived {
         color,
@@ -222,7 +199,7 @@ pub(in crate::block::eval) fn compute_derived(
                 false
             }
         }),
-        visible,
+        visible: voxel_opacity_mask.visible(),
         uniform_collision,
         voxel_opacity_mask,
     }
@@ -302,6 +279,151 @@ impl ops::AddAssign for VoxSum {
     }
 }
 
+/// The visual shape of an [`EvaluatedBlock`].
+///
+/// This data type stores the block's [`Resolution`], every voxel’s [`OpacityCategory`], and no
+/// other information.
+/// It may be used, when rendering blocks, to decide whether a change in a block
+/// affects the geometry of the scene, or just the colors to be drawn.
+///
+/// It does not currently allow retrieving the per-voxel information, just comparing the whole
+/// using the `==` operator.
+/// For individual voxels, consult [`EvaluatedBlock::voxels()`] instead.
+///
+/// This type stores the voxel data inline or reference-counted, and is therefore cheap to clone.
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct VoxelOpacityMask(MaskInner);
+
+/// This enum allows us to create the mask for `block::AIR` without heap allocation.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(in crate::block::eval) enum MaskInner {
+    /// The entire voxel data has this category.
+    Uniform(Resolution, GridAab, OpacityCategory),
+
+    /// Invariant: this variant is used only if the categories are not all equal.
+    ///
+    /// TODO: Compress this representation by storing it bit-packed instead.
+    Irregular(Resolution, Vol<Arc<[OpacityCategory]>>),
+}
+
+/// Caution: for consistency of equality, all these constructors must use the same choice of
+/// variant.
+impl VoxelOpacityMask {
+    pub(crate) const R1_INVISIBLE: Self = Self(MaskInner::Uniform(
+        R1,
+        GridAab::for_block(R1),
+        OpacityCategory::Invisible,
+    ));
+
+    #[inline]
+    pub(crate) fn new_r1(voxel: block::Evoxel) -> Self {
+        Self(MaskInner::Uniform(
+            R1,
+            GridAab::for_block(R1),
+            voxel.color.opacity_category(),
+        ))
+    }
+
+    pub(crate) fn new(resolution: Resolution, voxels: Vol<&[block::Evoxel]>) -> Self {
+        let uniform_opacity: Option<OpacityCategory> = match voxels
+            .as_linear()
+            .iter()
+            .map(
+                // TODO: We also need to check the emission color for being nonzero.
+                // That isn't exactly properly “opacity” but it will align with the purposes
+                // this is used for.
+                #[inline(always)]
+                |voxel| voxel.color.opacity_category(),
+            )
+            .all_equal_value()
+        {
+            Ok(cat) => Some(cat),
+            Err(None) => Some(OpacityCategory::Invisible),
+            Err(Some(_)) => None,
+        };
+
+        if let Some(uniform_opacity) = uniform_opacity {
+            // If the block is invisible (or has any other uniform opacity), avoid allocating.
+            // This serves multiple purposes:
+            //
+            // * The purpose of the mask is to allow re-texturing a mesh of the appropriate shape,
+            //   and invisible blocks need no mesh, so it will not be useful.
+            // * It means that this can match the mask of the *constant* [`block::AIR`],
+            //   even though that cannot allocate.
+            // * It is more efficient to allocate in fewer cases, of course.
+
+            VoxelOpacityMask(MaskInner::Uniform(
+                resolution,
+                voxels.bounds(),
+                uniform_opacity,
+            ))
+        } else {
+            debug_assert_ne!(resolution, R1, "impossible: R1 and irregular opacity");
+
+            VoxelOpacityMask(MaskInner::Irregular(
+                resolution,
+                voxels.map_container(|voxels| {
+                    voxels
+                        .iter()
+                        .map(|voxel| voxel.color.opacity_category())
+                        .collect()
+                }),
+            ))
+        }
+    }
+
+    /// Accepts raw category data.
+    /// Used for tests only.
+    #[cfg(test)]
+    pub(crate) fn new_raw(resolution: Resolution, voxels: Vol<Arc<[OpacityCategory]>>) -> Self {
+        let uniform_opacity: Option<OpacityCategory> =
+            match voxels.as_linear().iter().all_equal_value() {
+                Ok(&cat) => Some(cat),
+                Err(None) => Some(OpacityCategory::Invisible),
+                Err(Some(_)) => None,
+            };
+
+        if let Some(uniform_opacity) = uniform_opacity {
+            VoxelOpacityMask(MaskInner::Uniform(
+                resolution,
+                voxels.bounds(),
+                uniform_opacity,
+            ))
+        } else {
+            debug_assert_ne!(resolution, R1, "impossible: R1 and irregular opacity");
+
+            VoxelOpacityMask(MaskInner::Irregular(resolution, voxels))
+        }
+    }
+
+    pub(crate) fn visible(&self) -> bool {
+        match self.0 {
+            MaskInner::Uniform(_, _, category) => category != OpacityCategory::Invisible,
+            // `Irregular` is never used unless there is at least one non-invisible voxel.
+            MaskInner::Irregular(_, _) => true,
+        }
+    }
+}
+
+impl core::fmt::Debug for VoxelOpacityMask {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self.0 {
+            MaskInner::Uniform(resolution, bounds, opacity) => f
+                .debug_struct("VoxelOpacityMask")
+                .field("resolution", &resolution)
+                .field("bounds", &format_args!("{bounds:?}"))
+                .field("opacity", &opacity)
+                .finish(),
+            // mask data is likely to be too large to be useful to print
+            MaskInner::Irregular(resolution, ref voxels) => f
+                .debug_struct("VoxelOpacityMask")
+                .field("resolution", &resolution)
+                .field("bounds", &format_args!("{:?}", voxels.bounds()))
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -376,5 +498,20 @@ mod tests {
         };
         assert_eq!(v.color(2.), Rgba::new(0.25, 0.75, 0., 0.5));
         assert_eq!(v.emission(2.), Rgb::new(0., 0., 1.));
+    }
+
+    #[test]
+    fn opacity_mask_constructor_consistency() {
+        assert_eq!(
+            VoxelOpacityMask::R1_INVISIBLE,
+            VoxelOpacityMask::new(
+                R1,
+                Vol::from_elements(GridAab::ORIGIN_CUBE, [Evoxel::AIR].as_slice()).unwrap()
+            )
+        );
+        assert_eq!(
+            VoxelOpacityMask::R1_INVISIBLE,
+            VoxelOpacityMask::new_r1(Evoxel::AIR)
+        );
     }
 }
