@@ -5,6 +5,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::{fmt, mem};
+use euclid::Vector3D;
 
 use manyfmt::Fmt;
 
@@ -14,8 +15,7 @@ use rayon::iter::{IntoParallelRefMutIterator as _, ParallelIterator as _};
 use super::debug::LightComputeOutput;
 use crate::block::{self, EvaluatedBlock};
 use crate::math::{
-    Cube, CubeFace, Face6, Face7, FaceMap, FreeCoordinate, Geometry, NotNan, OpacityCategory, Rgb,
-    Rgba, Vol,
+    Cube, CubeFace, Face6, Face7, FaceMap, Geometry, NotNan, OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::raycast::Ray;
 use crate::space::light::{
@@ -400,7 +400,7 @@ impl LightStorage {
                     continue;
                 }
                 let mut ray_state =
-                    LightRayState::new(cube, ray_info.ray.into(), ray_weight_by_faces);
+                    LightRayState::new(cube, ray_info.direction.into(), ray_weight_by_faces);
 
                 // Stores the light value that might have been fetched, if it was, from the previous
                 // step's cube_ahead, which is the current step's cube_behind.
@@ -644,13 +644,8 @@ impl LightRayState {
     /// * `abstract_ray`: ray as if we were lighting the [0, 0, 0] cube
     /// * `ray_weight_by_faces`: how much influence this ray should have on the
     ///   total illumination
-    fn new(origin_cube: Cube, abstract_ray: Ray, ray_weight_by_faces: f32) -> Self {
-        let translated_ray = abstract_ray.translate(
-            origin_cube
-                .lower_bounds()
-                .map(FreeCoordinate::from)
-                .to_vector(),
-        );
+    fn new(origin_cube: Cube, direction: Vector3D<f32, Cube>, ray_weight_by_faces: f32) -> Self {
+        let translated_ray = Ray::new(origin_cube.midpoint(), direction.map(f64::from));
         LightRayState {
             alpha: 1.0,
             ray_weight_by_faces,

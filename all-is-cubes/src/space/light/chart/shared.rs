@@ -14,12 +14,14 @@ use super::TargetEndian;
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct OneRay {
-    /// Ray whose origin is within the [0,0,0]..[1,1,1] cube and direction
-    /// is a unit vector in the direction of this light ray.
-    pub ray: Ray,
+    /// Unit direction vector specifying the ray direction.
+    pub direction: [TargetEndian<f32>; 3],
+
     /// `FaceMap` data which stores the cosine (rescaled to 0-255)
     /// between each face normal and this ray.
     pub face_cosines: [u8; 6],
+
+    /// Guaranteed zero padding to make up a multiple of 4 bytes.
     pub _padding: [u8; 2],
 }
 

@@ -15,7 +15,7 @@ impl chart::OneRay {
             py,
             pz,
         }
-        .map(|_, byte| byte as f32 / 255.0f32)
+        .map(|_, byte| f32::from(byte) / 255.0f32)
     }
 }
 

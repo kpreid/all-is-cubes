@@ -8,6 +8,8 @@ extern crate alloc;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
+use euclid::Vector3D;
+
 use all_is_cubes_base::math::{self, Face6, FaceMap, FreePoint, FreeVector};
 use all_is_cubes_base::raycast::Ray;
 
@@ -24,8 +26,6 @@ const RAY_DIRECTION_STEP: isize = 5;
 // TODO: Use more rays once we have a more efficient chart format that
 // deduplicates work of near-parallel rays.
 fn generate_light_ray_pattern() -> Vec<OneRay> {
-    let origin = FreePoint::new(0.5, 0.5, 0.5);
-
     let mut rays = Vec::new();
 
     // TODO: octahedron instead of cube
@@ -36,7 +36,7 @@ fn generate_light_ray_pattern() -> Vec<OneRay> {
                     || y.abs() == RAY_DIRECTION_STEP
                     || z.abs() == RAY_DIRECTION_STEP
                 {
-                    let direction = FreeVector::new(x as f64, y as f64, z as f64).normalize();
+                    let direction = Vector3D::new(x as f32, y as f32, z as f32).normalize();
 
                     let mut cosines = FaceMap::repeat(0.0f32);
                     for face in Face6::ALL {
@@ -45,7 +45,7 @@ fn generate_light_ray_pattern() -> Vec<OneRay> {
                         cosines[face] = cosine;
                     }
 
-                    rays.push(OneRay::new(Ray::new(origin, direction), cosines))
+                    rays.push(OneRay::new(direction, cosines))
                 }
             }
         }
@@ -59,7 +59,10 @@ fn generate_light_propagation_chart(rays: &[OneRay]) -> Vec<chart_schema::Steps>
     let maximum_distance = 127.0;
     rays.iter()
         .map(|&info| {
-            let ray: Ray = info.ray.into();
+            let ray: Ray = Ray::new(
+                FreePoint::splat(0.5),
+                Vector3D::from(info.direction).map(|c| f64::from(f32::from(c))),
+            );
             chart_schema::Steps {
                 info,
                 relative_cube_sequence: ray
@@ -128,8 +131,10 @@ use chart_schema::{OneRay, TargetEndian};
 #[path = "src/space/light/chart/"]
 mod chart_schema {
     use crate::math::FaceMap;
+    use all_is_cubes_base::math::Cube;
     use all_is_cubes_base::raycast::Ray;
     use core::fmt;
+    use euclid::Vector3D;
     use num_traits::{FromBytes, ToBytes};
     use std::env;
 
@@ -138,10 +143,10 @@ mod chart_schema {
     pub(crate) use shared::{IndirectSteps, OneRay, Step, Steps};
 
     impl OneRay {
-        pub fn new(ray: Ray, face_cosines: FaceMap<f32>) -> Self {
+        pub fn new(direction: Vector3D<f32, Cube>, face_cosines: FaceMap<f32>) -> Self {
             let face_cosines = face_cosines.map(|_, cosine| (cosine * 255.0).round() as u8);
             Self {
-                ray: ray.into(),
+                direction: direction.map(TargetEndian::from).into(),
                 face_cosines: [
                     face_cosines.nx,
                     face_cosines.ny,
