@@ -17,8 +17,10 @@ pub(crate) struct OneRay {
     /// Ray whose origin is within the [0,0,0]..[1,1,1] cube and direction
     /// is a unit vector in the direction of this light ray.
     pub ray: Ray,
-    /// `FaceMap` data which stores the cosine between each face normal and this ray.
-    pub face_cosines: [TargetEndian<f32>; 6],
+    /// `FaceMap` data which stores the cosine (rescaled to 0-255)
+    /// between each face normal and this ray.
+    pub face_cosines: [u8; 6],
+    pub _padding: [u8; 2],
 }
 
 /// The pre-computed sequence of cubes which is traversed by a [`OneRay`].

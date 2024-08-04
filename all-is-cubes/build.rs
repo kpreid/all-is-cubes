@@ -21,7 +21,7 @@ fn main() {
 
 const RAY_DIRECTION_STEP: isize = 5;
 
-// TODO: Use morerays once we have a more efficient chart format that
+// TODO: Use more rays once we have a more efficient chart format that
 // deduplicates work of near-parallel rays.
 fn generate_light_ray_pattern() -> Vec<OneRay> {
     let origin = FreePoint::new(0.5, 0.5, 0.5);
@@ -139,7 +139,7 @@ mod chart_schema {
 
     impl OneRay {
         pub fn new(ray: Ray, face_cosines: FaceMap<f32>) -> Self {
-            let face_cosines = face_cosines.map(|_, c| TargetEndian::from(c));
+            let face_cosines = face_cosines.map(|_, cosine| (cosine * 255.0).round() as u8);
             Self {
                 ray: ray.into(),
                 face_cosines: [
@@ -150,6 +150,7 @@ mod chart_schema {
                     face_cosines.py,
                     face_cosines.pz,
                 ],
+                _padding: [0; 2],
             }
         }
     }
