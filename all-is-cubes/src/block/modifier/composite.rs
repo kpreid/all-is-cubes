@@ -170,6 +170,14 @@ fn evaluate_composition(
     operator: CompositeOperator,
     filter: &block::EvalFilter,
 ) -> Result<MinEval, block::InEvalError> {
+    // Short-circuit cases where we can return a block unchanged.
+    // TODO: We currently cannot do *any* cases where we return `src_evaluated`, because
+    // block attributes are not yet merged in a symmetric way such that this would be consistent
+    // with the non-short-circuit case, and the asymmetry is always in the “keep dst” direction.
+    if operator == CompositeOperator::Over && src_evaluated == block::AIR_EVALUATED_MIN {
+        return Ok(dst_evaluated);
+    }
+
     // Unpack blocks.
     let (dst_att, dst_voxels) = dst_evaluated.into_parts();
     let (src_att, src_voxels) = src_evaluated.into_parts();
@@ -207,7 +215,7 @@ fn evaluate_composition(
         src_voxels.single_voxel(),
         dst_voxels.single_voxel(),
     ) {
-        // The output is nonempty
+        // The output is nonempty and has resolution 1. No allocation needed.
         // TODO: Do we need the `output_bounds == ORIGIN_CUBE` test?
         // It skips this branch to keep the bounds empty, but is that good?
         Evoxels::One(operator.blend_evoxel(src_voxel, dst_voxel))
@@ -433,7 +441,7 @@ impl CompositeOperator {
     }
 }
 
-// Inventories are rendered by compositing their icon blocks in.
+/// Inventories are rendered by compositing their icon blocks in.
 pub(in crate::block) fn render_inventory(
     mut input: MinEval,
     inventory: &crate::inv::Inventory,
@@ -500,7 +508,7 @@ pub(in crate::block) fn render_inventory(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{EvaluatedBlock, Resolution::*};
+    use crate::block::{EvKey, EvaluatedBlock, Resolution::*};
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::Rgba;
     use crate::space::Space;
@@ -620,6 +628,48 @@ mod tests {
             eval_compose(&AIR, Atop, &slab).voxels_bounds(),
             slab_bounds,
             "AIR Atop",
+        );
+    }
+
+    /// Test that when we composite with `AIR`, the result skips unnecessary evaluation.
+    ///
+    /// TODO: Expand this test to AIR-like blocks that aren't exactly AIR.
+    #[test]
+    fn composite_with_air_is_short_circuit_noop() {
+        let universe = &mut Universe::new();
+
+        // Construct a voxel block with BlockDef.
+        // By using the BlockDef, we get a cache that we can use to confirm
+        // by pointer identity that the composition didn't needlessly build a new
+        // voxel allocation.
+        let base_block = Block::builder()
+            .voxels_fn(R4, |_| color_block!(1.0, 0.0, 0.0, 1.0))
+            .unwrap()
+            .build_into(universe);
+        let base_block = Block::from(universe.insert_anonymous(block::BlockDef::new(base_block)));
+        let base_key = EvKey::new(&base_block.evaluate().unwrap());
+        assert_eq!(
+            base_key,
+            EvKey::new(&base_block.evaluate().unwrap()),
+            "test assumption failed"
+        );
+
+        let air_src_block = base_block.clone().with_modifier(Composite::new(AIR, Over));
+        assert_eq!(
+            base_key,
+            EvKey::new(&air_src_block.evaluate().unwrap()),
+            "src"
+        );
+
+        // TODO: This assertion should be of equality, not inequality.
+        // It is currently reversed, not because the short circuit logic is broken,
+        // but because attribute merges aren't symmetric and the evaluation
+        // result has the display name `"<air>"`.
+        let air_dst_block = base_block.with_modifier(Composite::new(AIR, Over).reversed());
+        assert_ne!(
+            base_key,
+            EvKey::new(&air_dst_block.evaluate().unwrap()),
+            "dst"
         );
     }
 
