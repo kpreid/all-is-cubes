@@ -92,18 +92,18 @@ impl Evoxel {
 /// The logical bounds are always the cube computed by [`GridAab::for_block`].
 ///
 /// This improves on a `Vol<Arc<[Evoxel]>>` by avoiding heap allocation and indirection
-/// for the case of a single element, and by returning voxels by value rather than
-/// reference.
-///
-/// TODO: Make this opaque instead of an enum; replace all matching on `One` vs. `Many`
-/// with calls to [`Self::single_voxel()`] or similar. This will:
-///
-/// * allow ensuring consistent input (no out-of-bounds data, not using `Many` for one)
-/// * allow more compact representations (e.g. when all voxels are solid+selectable)
-/// * ensure there is no inappropriate dependence on the representation
+/// for the case of a single element, returning voxels by value rather than
+/// reference, automatically returning [`Evoxel::AIR`] when appropriate, and
+/// enforcing that the `Vol` has no wasted data outside the block bounds.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum Evoxels {
+pub struct Evoxels(EvoxelsInner);
+
+// TODO: implement Eq and Hash with by-value rather than by-structure comparisons
+// TODO: Consider switching to struct-of-arrays layout that allows uniform properties
+// (e.g. all zero light emission) to not be stored.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum EvoxelsInner {
     /// Compact representation of exactly one voxel. The resolution is implicitly 1.
     One(Evoxel),
     /// The [`Vol`] should not have any data outside of the expected bounds
@@ -115,7 +115,7 @@ impl Evoxels {
     /// Construct an [`Evoxels`] of resolution 1, completely filled with the given voxel.
     #[inline]
     pub const fn from_one(voxel: Evoxel) -> Self {
-        Evoxels::One(voxel)
+        Evoxels(EvoxelsInner::One(voxel))
     }
 
     /// Construct an [`Evoxels`] storing the given voxels.
@@ -130,57 +130,58 @@ impl Evoxels {
             "Evoxels data bounds {bounds:?} exceeds specified resolution {resolution}"
         );
 
-        // TODO: Should this check if the resolution is 1 and switch to `Evoxels::One`?
-        Evoxels::Many(resolution, voxels)
+        // TODO: Should this check if the resolution is 1 and switch to `Evoxels::One`,
+        // or is sharing of the `Arc` desirable since it already exists?
+        Evoxels(EvoxelsInner::Many(resolution, voxels))
     }
 
     /// Returns the resolution (scale factor) of this set of voxels.
     /// See [`Resolution`] for more information.
     #[inline]
     pub fn resolution(&self) -> Resolution {
-        match *self {
-            Evoxels::One(_) => R1,
-            Evoxels::Many(resolution, _) => resolution,
+        match self.0 {
+            EvoxelsInner::One(_) => R1,
+            EvoxelsInner::Many(resolution, _) => resolution,
         }
     }
 
     /// Returns the count of voxels, aka [`Vol::volume()`] at the resolution.
     pub fn count(&self) -> usize {
-        match self {
-            Evoxels::One(_) => 1,
-            Evoxels::Many(_, voxels) => voxels.volume(),
+        match self.0 {
+            EvoxelsInner::One(_) => 1,
+            EvoxelsInner::Many(_, ref voxels) => voxels.volume(),
         }
     }
 
     /// If this has a resolution of 1, then return that single voxel.
     #[inline]
     pub fn single_voxel(&self) -> Option<Evoxel> {
-        match *self {
-            Evoxels::One(v) => Some(v),
-            Evoxels::Many(R1, ref voxels) => {
+        match self.0 {
+            EvoxelsInner::One(v) => Some(v),
+            EvoxelsInner::Many(R1, ref voxels) => {
                 Some(voxels.get([0, 0, 0]).copied().unwrap_or(Evoxel::AIR))
             }
-            Evoxels::Many(_, _) => None,
+            EvoxelsInner::Many(_, _) => None,
         }
     }
 
     /// Returns a [`Vol`] borrowing these voxels.
     pub fn as_vol_ref(&self) -> Vol<&[Evoxel]> {
-        match self {
-            Evoxels::One(voxel) => {
+        match self.0 {
+            EvoxelsInner::One(ref voxel) => {
                 Vol::from_elements(GridAab::ORIGIN_CUBE, core::slice::from_ref(voxel)).unwrap()
             }
-            Evoxels::Many(_, voxels) => voxels.as_ref(),
+            EvoxelsInner::Many(_, ref voxels) => voxels.as_ref(),
         }
     }
 
     /// Returns a [`Vol`] mutably borrowing these voxels.
     pub fn as_vol_mut(&mut self) -> Vol<&mut [Evoxel]> {
-        match self {
-            Evoxels::One(voxel) => {
+        match self.0 {
+            EvoxelsInner::One(ref mut voxel) => {
                 Vol::from_elements(GridAab::ORIGIN_CUBE, core::slice::from_mut(voxel)).unwrap()
             }
-            Evoxels::Many(_, voxels) => {
+            EvoxelsInner::Many(_, ref mut voxels) => {
                 Vol::from_elements(voxels.bounds(), voxels.make_linear_mut()).unwrap()
             }
         }
@@ -195,19 +196,19 @@ impl Evoxels {
     /// TODO: Should we inherently return AIR instead of None?
     #[inline]
     pub fn get(&self, position: Cube) -> Option<Evoxel> {
-        match (self, position) {
-            (&Evoxels::One(voxel), Cube::ORIGIN) => Some(voxel),
-            (Evoxels::One(_), _) => None,
-            (Evoxels::Many(_, ref voxels), position) => voxels.get(position).copied(),
+        match (&self.0, position) {
+            (&EvoxelsInner::One(voxel), Cube::ORIGIN) => Some(voxel),
+            (EvoxelsInner::One(_), _) => None,
+            (EvoxelsInner::Many(_, ref voxels), position) => voxels.get(position).copied(),
         }
     }
 
     /// Returns the bounds of the voxel data.
     #[inline]
     pub fn bounds(&self) -> GridAab {
-        match *self {
-            Evoxels::One(_) => GridAab::ORIGIN_CUBE,
-            Evoxels::Many(_, ref voxels) => voxels.bounds(),
+        match self.0 {
+            EvoxelsInner::One(_) => GridAab::ORIGIN_CUBE,
+            EvoxelsInner::Many(_, ref voxels) => voxels.bounds(),
         }
     }
 
@@ -265,10 +266,10 @@ impl ops::Index<Cube> for Evoxels {
     #[inline]
     #[track_caller]
     fn index(&self, position: Cube) -> &Self::Output {
-        match (self, position) {
-            (Evoxels::One(voxel), Cube::ORIGIN) => voxel,
-            (Evoxels::One(_), _) => panic!("out of bounds of Evoxels::One"),
-            (Evoxels::Many(_, voxels), position) => &voxels[position],
+        match (&self.0, position) {
+            (EvoxelsInner::One(voxel), Cube::ORIGIN) => voxel,
+            (EvoxelsInner::One(_), _) => panic!("out of bounds of Evoxels::One"),
+            (EvoxelsInner::Many(_, voxels), position) => &voxels[position],
         }
     }
 }
@@ -277,12 +278,37 @@ impl ops::Index<Cube> for Evoxels {
 #[mutants::skip]
 impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        use crate::math::GridCoordinate;
+        use euclid::point3;
+
         let resolution = Resolution::arbitrary(u)?;
         Ok(if resolution == R1 {
-            Evoxels::One(u.arbitrary()?)
+            Evoxels::from_one(u.arbitrary()?)
         } else {
-            // TODO: limit array bounds to the resolution
-            Evoxels::Many(resolution, Vol::arbitrary(u)?)
+            let limit = GridCoordinate::from(resolution) - 1;
+            let lower_bounds = point3(
+                u.int_in_range(0..=limit)?,
+                u.int_in_range(0..=limit)?,
+                u.int_in_range(0..=limit)?,
+            );
+            let upper_bounds = point3(
+                u.int_in_range(lower_bounds.x..=limit)?,
+                u.int_in_range(lower_bounds.y..=limit)?,
+                u.int_in_range(lower_bounds.z..=limit)?,
+            );
+            let bounds = GridAab::from_lower_upper(lower_bounds, upper_bounds)
+                .to_vol()
+                .unwrap();
+            let contents = u
+                .arbitrary_iter()?
+                .take(bounds.volume())
+                .collect::<Result<Arc<[Evoxel]>, _>>()?;
+            Evoxels::from_many(
+                resolution,
+                bounds
+                    .with_elements(contents)
+                    .map_err(|_wrong_length| arbitrary::Error::NotEnoughData)?,
+            )
         })
     }
 
@@ -316,19 +342,19 @@ mod tests {
         let samples = [
             // We need multiple Evoxels::One to prove we're not incorrectly using the address
             // of the direct value.
-            (0, Evoxels::One(vox1)),
-            (0, Evoxels::One(vox1)),
-            (1, Evoxels::One(vox2)),
+            (0, Evoxels::from_one(vox1)),
+            (0, Evoxels::from_one(vox1)),
+            (1, Evoxels::from_one(vox2)),
             // these clones should ve equal
-            (2, Evoxels::Many(R2, vol_of_vox1.clone())),
-            (2, Evoxels::Many(R2, vol_of_vox1.clone())),
+            (2, Evoxels::from_many(R2, vol_of_vox1.clone())),
+            (2, Evoxels::from_many(R2, vol_of_vox1.clone())),
             // these two will be unequal since they are separate allocations for the same values,
-            (3, Evoxels::Many(R2, Vol::from_element(vox2))),
-            (4, Evoxels::Many(R2, Vol::from_element(vox2))),
+            (3, Evoxels::from_many(R2, Vol::from_element(vox2))),
+            (4, Evoxels::from_many(R2, Vol::from_element(vox2))),
             // Different resolution makes this different from group 2
-            (5, Evoxels::Many(R4, vol_of_vox1.clone())),
+            (5, Evoxels::from_many(R4, vol_of_vox1.clone())),
             // Different bounds makes this different from vol_of_vox1
-            (6, Evoxels::Many(R2, vol_of_vox1.translate([1, 0, 0]))),
+            (6, Evoxels::from_many(R2, vol_of_vox1.translate([1, 0, 0]))),
         ];
 
         let hasher = std::hash::BuildHasherDefault::<std::hash::DefaultHasher>::default();

@@ -84,13 +84,13 @@ impl fmt::Debug for EvaluatedBlock {
         ds.field("visible", visible);
         ds.field("uniform_collision", &format_args!("{uniform_collision:?}"));
         ds.field("resolution", &self.resolution());
-        match voxels {
-            Evoxels::One(evoxel) => {
-                ds.field("voxel", evoxel);
+        match voxels.single_voxel() {
+            Some(evoxel) => {
+                ds.field("voxel", &evoxel);
             }
-            Evoxels::Many(_, array) => {
+            None => {
                 // Not printing the entire array which could be huge.
-                ds.field("voxels", &format_args!("{:?}", array.bounds()));
+                ds.field("voxels", &format_args!("{:?}", voxels.bounds()));
             }
         }
         ds.field(
