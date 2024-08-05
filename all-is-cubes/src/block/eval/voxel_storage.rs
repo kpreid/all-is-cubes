@@ -313,13 +313,21 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        arbitrary::size_hint::and_all(&[
+        use crate::math::GridCoordinate;
+
+        let max_data_size = GridAab::for_block(Resolution::MAX).volume().unwrap()
+            * Evoxel::size_hint(depth).1.unwrap();
+
+        arbitrary::size_hint::and(
             Resolution::size_hint(depth),
             arbitrary::size_hint::or(
-                Evoxel::size_hint(depth),
-                Vol::<Arc<[Evoxel]>>::size_hint(depth),
+                Evoxel::size_hint(depth), // single-voxel case
+                arbitrary::size_hint::and(
+                    (3, Some(size_of::<GridCoordinate>() * 6)), // variable size of bounds choice
+                    (0, Some(max_data_size)),                   // data
+                ),
             ),
-        ])
+        )
     }
 }
 
