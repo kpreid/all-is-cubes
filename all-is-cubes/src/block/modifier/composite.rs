@@ -454,7 +454,7 @@ pub(in crate::block) fn render_inventory(
     // TODO(inventory): clone necessary to avoid a borrow conflict
     let config = input.attributes().inventory.clone();
 
-    for (slot_index, icon_position) in config.icon_positions() {
+    for (slot_index, icon_position) in config.icon_positions(inventory.slots.len()) {
         let Some(placed_icon_bounds) = GridAab::from_lower_size(
             icon_position,
             GridSize::splat(

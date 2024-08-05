@@ -87,10 +87,20 @@ impl InvInBlock {
 
     /// Returns which inventory slots should be rendered as icons, and the lower corners
     /// of the icons.
-    pub(crate) fn icon_positions(&self) -> impl Iterator<Item = (usize, GridPoint)> + '_ {
-        self.icon_rows.iter().flat_map(|row| {
+    ///
+    /// `inventory_size` should be the size of the inventory to be rendered, which will be used
+    /// to filter out nonexistent slots and limit the amount of computation performed to match
+    /// the inventory.
+    pub(crate) fn icon_positions(
+        &self,
+        inventory_size: usize,
+    ) -> impl Iterator<Item = (usize, GridPoint)> + '_ {
+        self.icon_rows.iter().flat_map(move |row| {
             (0..row.count).map_while(move |sub_index| {
                 let slot_index = row.first_slot.checked_add(sub_index)?;
+                if slot_index >= inventory_size {
+                    return None;
+                }
                 let index_coord = GridCoordinate::try_from(sub_index).ok()?;
                 let position: GridPoint = transpose_point_option(
                     row.origin
@@ -219,10 +229,10 @@ mod tests {
 
     #[test]
     fn icon_positions_output() {
-        // TODO: this test should be revised to create a specific `InvInBlock` value for testingg
+        // TODO: this test should be revised to create a specific `InvInBlock` value for testing
         let iib = InvInBlock::new_placeholder();
         assert_eq!(
-            iib.icon_positions().take(10).collect::<Vec<_>>(),
+            iib.icon_positions(999).take(100).collect::<Vec<_>>(),
             vec![
                 (0, point3(1, 1, 1)),
                 (1, point3(6, 1, 1)),
@@ -233,6 +243,39 @@ mod tests {
                 (6, point3(1, 1, 11)),
                 (7, point3(6, 1, 11)),
                 (8, point3(11, 1, 11)),
+            ]
+        );
+    }
+
+    #[test]
+    fn icon_positions_are_truncated_to_inventory_size() {
+        let iib = InvInBlock {
+            size: 1,
+            icon_scale: Resolution::R4,
+            icon_resolution: Resolution::R16,
+            icon_rows: vec![
+                IconRow {
+                    first_slot: 0,
+                    count: 100,
+                    origin: GridPoint::new(0, 0, 0),
+                    stride: GridVector::new(5, 0, 0),
+                },
+                IconRow {
+                    first_slot: 1,
+                    count: 100,
+                    origin: GridPoint::new(0, 0, 5),
+                    stride: GridVector::new(5, 0, 0),
+                },
+            ],
+        };
+        assert_eq!(
+            iib.icon_positions(3).take(100).collect::<Vec<_>>(),
+            vec![
+                (0, point3(0, 0, 0)),
+                (1, point3(5, 0, 0)),
+                (2, point3(10, 0, 0)),
+                (1, point3(0, 0, 5)),
+                (2, point3(5, 0, 5)),
             ]
         );
     }
