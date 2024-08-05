@@ -1,6 +1,7 @@
 //! Configuration of inventories owned by blocks ([`Modifier::Inventory`]).
 
 use alloc::vec::Vec;
+use euclid::Point3D;
 
 use crate::block::Resolution;
 use crate::math::{GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid};
@@ -90,11 +91,16 @@ impl InvInBlock {
         self.icon_rows.iter().flat_map(|row| {
             (0..row.count).map_while(move |sub_index| {
                 let slot_index = row.first_slot.checked_add(sub_index)?;
-                Some((
-                    slot_index,
-                    // TODO: this should be checked arithmetic
-                    row.origin + row.stride * GridCoordinate::try_from(sub_index).ok()?,
-                ))
+                let index_coord = GridCoordinate::try_from(sub_index).ok()?;
+                let position: GridPoint = transpose_point_option(
+                    row.origin
+                        .to_vector()
+                        .zip(row.stride, |origin_c, stride_c| {
+                            origin_c.checked_add(stride_c.checked_mul(index_coord)?)
+                        })
+                        .to_point(),
+                )?;
+                Some((slot_index, position))
             })
         })
     }
@@ -144,6 +150,10 @@ impl InvInBlock {
             }
         }
     }
+}
+
+fn transpose_point_option<T, U>(v: Point3D<Option<T>, U>) -> Option<Point3D<T, U>> {
+    Some(Point3D::new(v.x?, v.y?, v.z?))
 }
 
 impl Default for InvInBlock {
