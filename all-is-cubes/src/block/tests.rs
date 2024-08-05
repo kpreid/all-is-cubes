@@ -144,7 +144,7 @@ mod eval {
         assert_eq!(e.face_colors(), FaceMap::repeat(color));
         assert_eq!(
             e.voxels,
-            Evoxels::One(Evoxel {
+            Evoxels::from_one(Evoxel {
                 color,
                 emission: Rgb::ONE,
                 selectable: false,
@@ -167,7 +167,7 @@ mod eval {
         let e = block.evaluate().unwrap();
         assert_eq!(e.color(), color);
         assert_eq!(e.face_colors(), FaceMap::repeat(color));
-        assert!(matches!(e.voxels, Evoxels::One(_)));
+        assert!(e.voxels.single_voxel().is_some());
         assert_eq!(e.opaque(), FaceMap::repeat(false));
         assert_eq!(e.visible(), true);
         assert_eq!(
@@ -182,7 +182,7 @@ mod eval {
         let e = block.evaluate().unwrap();
         assert_eq!(e.color(), Rgba::TRANSPARENT);
         assert_eq!(e.face_colors(), FaceMap::repeat(Rgba::TRANSPARENT));
-        assert!(matches!(e.voxels, Evoxels::One(_)));
+        assert!(e.voxels.single_voxel().is_some());
         assert_eq!(e.opaque(), FaceMap::repeat(false));
         assert_eq!(e.visible(), false);
         assert_eq!(*e.voxel_opacity_mask(), None)
@@ -210,7 +210,7 @@ mod eval {
         assert_eq!(e.attributes, attributes);
         assert_eq!(
             e.voxels,
-            Evoxels::Many(
+            Evoxels::from_many(
                 resolution,
                 Vol::from_fn(GridAab::for_block(resolution), |point| {
                     let point = point.lower_bounds().cast::<f32>();
@@ -424,7 +424,7 @@ mod eval {
         let e = block_at_offset.evaluate().unwrap();
         assert_eq!(
             e.voxels,
-            Evoxels::Many(
+            Evoxels::from_many(
                 resolution,
                 Vol::from_fn(GridAab::for_block(resolution), |point| {
                     let point = (point.lower_bounds() + offset).cast::<f32>();

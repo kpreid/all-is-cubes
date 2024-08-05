@@ -112,6 +112,28 @@ pub enum Evoxels {
 }
 
 impl Evoxels {
+    /// Construct an [`Evoxels`] of resolution 1, completely filled with the given voxel.
+    #[inline]
+    pub const fn from_one(voxel: Evoxel) -> Self {
+        Evoxels::One(voxel)
+    }
+
+    /// Construct an [`Evoxels`] storing the given voxels.
+    ///
+    /// Panics if `voxels` contains any data outside the block bounds.
+    /// Such data would at best be ignored, and at worst would confuse block
+    /// processing algorithms, and is therefore rejected.
+    pub fn from_many(resolution: Resolution, voxels: Vol<Arc<[Evoxel]>>) -> Self {
+        let bounds = voxels.bounds();
+        assert!(
+            GridAab::for_block(resolution).contains_box(bounds),
+            "Evoxels data bounds {bounds:?} exceeds specified resolution {resolution}"
+        );
+
+        // TODO: Should this check if the resolution is 1 and switch to `Evoxels::One`?
+        Evoxels::Many(resolution, voxels)
+    }
+
     /// Returns the resolution (scale factor) of this set of voxels.
     /// See [`Resolution`] for more information.
     #[inline]

@@ -144,14 +144,14 @@ fn from_voxels_zero_bounds() {
         EvaluatedBlock::from_voxels(
             AIR, // caution: incorrect placeholder value
             attributes.clone(),
-            Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
+            Evoxels::from_many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
             Cost::ZERO
         ),
         EvaluatedBlock {
             block: AIR,       // caution: incorrect placeholder value
             cost: Cost::ZERO, // TODO wrong
             attributes,
-            voxels: Evoxels::Many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
+            voxels: Evoxels::from_many(resolution, Vol::from_fn(bounds, |_| unreachable!())),
             derived: Derived {
                 color: Rgba::TRANSPARENT,
                 face_colors: FaceMap::repeat(Rgba::TRANSPARENT),
@@ -177,7 +177,7 @@ fn overall_color_ignores_interior() {
     let inner_bounds = outer_bounds.expand(FaceMap::repeat(-1));
     let outer_color = Rgba::new(1.0, 0.0, 0.0, 1.0);
     let inner_color = Rgba::new(0.0, 1.0, 0.0, 1.0);
-    let voxels = Evoxels::Many(
+    let voxels = Evoxels::from_many(
         resolution,
         Vol::from_fn(outer_bounds, |p| {
             Evoxel::from_color(if inner_bounds.contains_cube(p) {

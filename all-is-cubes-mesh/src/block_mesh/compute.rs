@@ -46,7 +46,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
     // actual voxels.
     let tmp_block_color_voxel: Evoxels;
     let voxels: &Evoxels = if options.ignore_voxels {
-        tmp_block_color_voxel = Evoxels::One(Evoxel::from_color(block.color()));
+        tmp_block_color_voxel = Evoxels::from_one(Evoxel::from_color(block.color()));
         &tmp_block_color_voxel
     } else {
         block.voxels()

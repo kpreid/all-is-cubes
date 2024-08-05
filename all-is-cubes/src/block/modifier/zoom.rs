@@ -97,7 +97,7 @@ impl Zoom {
                 {
                     // This case occurs when the voxels' actual bounds (which may be smaller
                     // than the block bounding box) don't intersect the zoom region.
-                    None => MinEval::new(attributes, Evoxels::One(Evoxel::AIR)),
+                    None => MinEval::new(attributes, Evoxels::from_one(Evoxel::AIR)),
                     Some(intersected_bounds) => {
                         block::Budget::decrement_voxels(
                             &filter.budget,
@@ -105,7 +105,7 @@ impl Zoom {
                         )?;
                         MinEval::new(
                             attributes,
-                            Evoxels::Many(
+                            Evoxels::from_many(
                                 zoom_resolution,
                                 Vol::from_fn(intersected_bounds, |p| voxels[p + voxel_offset]),
                             ),
@@ -214,7 +214,7 @@ mod tests {
                     EvaluatedBlock::from_voxels(
                         zoomed,
                         ev_original.attributes.clone(),
-                        Evoxels::One(Evoxel::from_color(Rgba::TRANSPARENT)),
+                        Evoxels::from_one(Evoxel::from_color(Rgba::TRANSPARENT)),
                         block::Cost {
                             components: 2,
                             voxels: 16u32.pow(3), // counts evaluation of Recur
@@ -225,7 +225,7 @@ mod tests {
                     EvaluatedBlock::from_voxels(
                         zoomed,
                         ev_original.attributes.clone(),
-                        Evoxels::Many(
+                        Evoxels::from_many(
                             zoom_resolution,
                             Vol::from_fn(GridAab::for_block(zoom_resolution), |p| {
                                 original_voxels[p + GridVector::new(

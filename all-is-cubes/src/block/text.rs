@@ -267,10 +267,10 @@ impl Text {
                                 .draw(&mut DrawingPlane::new(&mut voxels, drawing_transform))
                                 .unwrap();
 
-                            Evoxels::Many(self.resolution, voxels.map_container(Into::into))
+                            Evoxels::from_many(self.resolution, voxels.map_container(Into::into))
                         }
 
-                        None => Evoxels::One(if self.debug {
+                        None => Evoxels::from_one(if self.debug {
                             DEBUG_NO_INTERSECTION_VOXEL
                         } else {
                             Evoxel::AIR

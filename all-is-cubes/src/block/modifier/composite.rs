@@ -218,9 +218,9 @@ fn evaluate_composition(
         // The output is nonempty and has resolution 1. No allocation needed.
         // TODO: Do we need the `output_bounds == ORIGIN_CUBE` test?
         // It skips this branch to keep the bounds empty, but is that good?
-        Evoxels::One(operator.blend_evoxel(src_voxel, dst_voxel))
+        Evoxels::from_one(operator.blend_evoxel(src_voxel, dst_voxel))
     } else {
-        Evoxels::Many(
+        Evoxels::from_many(
             effective_resolution,
             Vol::from_fn(output_bounds, |cube| {
                 let p = cube.lower_bounds();
@@ -489,7 +489,7 @@ pub(in crate::block) fn render_inventory(
         // asking evaluation to generate a lower resolution as per `config.icon_resolution`).
         // For now, we just always generate the resolution-1 form.
         let icon_voxel = Evoxel::from_block(&icon_evaluated);
-        icon_evaluated.voxels = Evoxels::Many(
+        icon_evaluated.voxels = Evoxels::from_many(
             config.icon_resolution,
             Vol::repeat(placed_icon_bounds, icon_voxel),
         );

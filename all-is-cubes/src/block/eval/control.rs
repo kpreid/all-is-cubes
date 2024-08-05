@@ -368,7 +368,7 @@ impl EvalBlockError {
                 selectable: false, // TODO: make this selectable but immutable
                 ..Default::default()
             },
-            Evoxels::Many(
+            Evoxels::from_many(
                 resolution,
                 Vol::from_fn(GridAab::for_block(resolution), |cube| {
                     pattern[((cube.x + cube.y + cube.z).rem_euclid(2)) as usize]

@@ -187,7 +187,7 @@ impl Move {
                 let displaced_voxels = match input_voxels.single_voxel() {
                     None => {
                         let voxels = input_voxels.as_vol_ref();
-                        Evoxels::Many(
+                        Evoxels::from_many(
                             effective_resolution,
                             Vol::from_fn(displaced_bounds, |cube| {
                                 voxels[cube - translation_in_res]
@@ -198,7 +198,7 @@ impl Move {
                         // Input block is a solid color; synthesize voxels.
                         // TODO: Also synthesize if the resolution is merely low
                         // compared to the velocity.
-                        Evoxels::Many(
+                        Evoxels::from_many(
                             effective_resolution,
                             Vol::from_fn(displaced_bounds, |_| voxel),
                         )
@@ -206,7 +206,7 @@ impl Move {
                 };
                 MinEval::new(attributes, displaced_voxels)
             }
-            None => MinEval::new(attributes, Evoxels::One(Evoxel::AIR)),
+            None => MinEval::new(attributes, Evoxels::from_one(Evoxel::AIR)),
         })
     }
 }
@@ -258,7 +258,7 @@ mod tests {
             EvaluatedBlock {
                 block: moved,
                 attributes: ev_original.attributes.clone(),
-                voxels: Evoxels::Many(
+                voxels: Evoxels::from_many(
                     R16,
                     Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
                 ),
@@ -317,7 +317,7 @@ mod tests {
                     voxels: 2u32.pow(3) * 3 / 2, // original recur + 1/2 block of Move
                     recursion: 0
                 },
-                voxels: Evoxels::Many(
+                voxels: Evoxels::from_many(
                     resolution,
                     Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
                 ),

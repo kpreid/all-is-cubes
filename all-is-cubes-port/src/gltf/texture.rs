@@ -448,7 +448,8 @@ mod tests {
             .allocate(GridAab::ORIGIN_CUBE, Channels::Reflectance)
             .expect("allocation");
         tile.write(
-            block::Evoxels::One(Evoxel::from_color(Rgba::from_srgb8([1, 2, 3, 4]))).as_vol_ref(),
+            block::Evoxels::from_one(Evoxel::from_color(Rgba::from_srgb8([1, 2, 3, 4])))
+                .as_vol_ref(),
         );
         drop(tile);
 

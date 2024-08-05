@@ -322,10 +322,10 @@ mod tests {
             Rgba::new(0.0, 0.5, 1.0, 0.5),
         ] {
             let voxel = Evoxel::from_color(color);
-            let ev_one = compute_derived(&attributes, &Evoxels::One(voxel));
+            let ev_one = compute_derived(&attributes, &Evoxels::from_one(voxel));
             let ev_many = compute_derived(
                 &attributes,
-                &Evoxels::Many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
+                &Evoxels::from_many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
             );
 
             // Check that the derived attributes are all identical (except for the opacity mask),

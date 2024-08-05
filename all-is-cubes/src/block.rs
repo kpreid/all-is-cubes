@@ -555,7 +555,7 @@ impl Block {
                 collision,
             }) => MinEval::new(
                 attributes.clone(),
-                Evoxels::One(Evoxel {
+                Evoxels::from_one(Evoxel {
                     color,
                     emission,
                     selectable: attributes.selectable,
@@ -650,7 +650,7 @@ impl Block {
                             },
                         ..attributes.clone()
                     },
-                    Evoxels::Many(resolution, voxels),
+                    Evoxels::from_many(resolution, voxels),
                 )
             }
 

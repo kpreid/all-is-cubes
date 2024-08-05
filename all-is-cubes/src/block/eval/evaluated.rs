@@ -344,7 +344,7 @@ pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
         recursion: 0,
     },
     attributes: AIR_ATTRIBUTES,
-    voxels: Evoxels::One(Evoxel::AIR),
+    voxels: Evoxels::from_one(Evoxel::AIR),
     derived: AIR_DERIVED,
 };
 
@@ -354,7 +354,7 @@ pub(crate) const AIR_EVALUATED_REF: &EvaluatedBlock = &AIR_EVALUATED;
 
 pub(in crate::block) const AIR_EVALUATED_MIN: MinEval = MinEval {
     attributes: AIR_ATTRIBUTES,
-    voxels: Evoxels::One(Evoxel::AIR),
+    voxels: Evoxels::from_one(Evoxel::AIR),
     derived: Some(AIR_DERIVED),
 };
 

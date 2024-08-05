@@ -127,7 +127,7 @@ impl Modifier {
 
                     MinEval::new(
                         attributes.rotate(rotation),
-                        Evoxels::Many(
+                        Evoxels::from_many(
                             resolution,
                             Vol::from_fn(
                                 voxels.bounds().transform(inner_to_outer).unwrap(),
@@ -274,7 +274,7 @@ mod tests {
             re,
             EvaluatedBlock {
                 block: rotated.clone(),
-                voxels: Evoxels::Many(
+                voxels: Evoxels::from_many(
                     R2,
                     Vol::from_fn(block_bounds, |cube| {
                         Evoxel {
