@@ -764,7 +764,7 @@ impl From<Rgba> for Block {
 #[cfg(feature = "arbitrary")]
 mod arbitrary_block {
     use super::*;
-    use arbitrary::{size_hint, Arbitrary, Unstructured};
+    use arbitrary::{Arbitrary, Unstructured};
 
     // Manual impl to skip past BlockPtr etc.
     // This means we're not exercising the `&'static` case, but that's not possible
@@ -776,11 +776,13 @@ mod arbitrary_block {
             Ok(block)
         }
 
-        fn size_hint(depth: usize) -> (usize, Option<usize>) {
-            size_hint::and(
-                Primitive::size_hint(depth),
-                Vec::<Modifier>::size_hint(depth),
-            )
+        fn size_hint(_depth: usize) -> (usize, Option<usize>) {
+            // Both `Primitive` and `Modifier` are arbitrarily recursive because they can
+            // contain `Block`s. Therefore, the size hint calculation will always hit the depth
+            // limit, and we should skip it for efficiency.
+            // The lower bound is 2 because `Primitive` and `Modifiers` will each require
+            // at least one byte to make a choice.
+            (2, None)
         }
     }
 
@@ -811,28 +813,12 @@ mod arbitrary_block {
             })
         }
 
-        fn size_hint(depth: usize) -> (usize, Option<usize>) {
-            size_hint::recursion_guard(depth, |depth| {
-                size_hint::or_all(&[
-                    size_hint::and_all(&[
-                        BlockAttributes::size_hint(depth),
-                        Rgba::size_hint(depth),
-                        Rgb::size_hint(depth),
-                        BlockCollision::size_hint(depth),
-                    ]),
-                    Handle::<BlockDef>::size_hint(depth),
-                    size_hint::and_all(&[
-                        BlockAttributes::size_hint(depth),
-                        <[i32; 3]>::size_hint(depth),
-                        Resolution::size_hint(depth),
-                        Handle::<Space>::size_hint(depth),
-                    ]),
-                    size_hint::and_all(&[
-                        text::Text::size_hint(depth),
-                        <[i16; 3]>::size_hint(depth),
-                    ]),
-                ])
-            })
+        fn size_hint(_depth: usize) -> (usize, Option<usize>) {
+            // `Primitive` is arbitrarily recursive because it can contain `Block`s
+            // (via `Indirect` and `Text`). Therefore, the size hint calculation will always hit
+            // the depth limit, and we should skip it for efficiency.
+            // The lower bound is 2 because we need at least one byte to make a choice of primitive.
+            (1, None)
         }
     }
 }
