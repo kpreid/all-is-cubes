@@ -114,7 +114,8 @@ pub(in crate::block::eval) fn compute_derived(
 
     let resolution = voxels.resolution();
     let full_block_bounds = GridAab::for_block(resolution);
-    let less_than_full = full_block_bounds != voxels.bounds();
+    let data_bounds = voxels.bounds();
+    let less_than_full = full_block_bounds != data_bounds;
 
     // Compute color sum from voxels.
     // This is actually a sort of mini-raytracer, in that it computes the appearance
@@ -128,7 +129,7 @@ pub(in crate::block::eval) fn compute_derived(
         for face in Face6::ALL {
             let mut face_sum = VoxSum::default();
             let transform = face.face_transform(resolution.into());
-            let rotated_voxel_range = voxels.bounds().transform(transform.inverse()).unwrap();
+            let rotated_voxel_range = data_bounds.transform(transform.inverse()).unwrap();
 
             for v in rotated_voxel_range.y_range() {
                 for u in rotated_voxel_range.x_range() {
@@ -137,7 +138,10 @@ pub(in crate::block::eval) fn compute_derived(
                         v,
                         rotated_voxel_range.z_range().start,
                     ));
-                    debug_assert!(voxels.bounds().contains_cube(cube));
+                    debug_assert!(
+                        data_bounds.contains_cube(cube) || data_bounds.is_empty(),
+                        "bad transform; bounds {data_bounds:?} cube {cube:?}",
+                    );
 
                     face_sum +=
                         raytracer::trace_for_eval(voxels, cube, face.opposite(), resolution);
