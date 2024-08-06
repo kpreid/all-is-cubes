@@ -150,8 +150,7 @@ jobs:
       # about caching the builds of them.
       # cargo-mutants is not used in this step but it will be cached for later use.
       run: |
-        cargo install --locked wasm-pack@0.13.0 cargo-about@0.6.1
-        cargo install cargo-mutants@24.5.0
+        cargo install --locked wasm-pack@0.13.0 cargo-about@0.6.1 cargo-mutants@24.7.1
 
 
     - run: df -h .
@@ -405,7 +404,7 @@ jobs:
 
       # Install cargo-mutants
       # This should usually be already installed, but is present in case of cache miss
-      - run: cargo install cargo-mutants@24.5.0
+      - run: cargo install --locked cargo-mutants@24.7.1
 
       - name: Relative diff
         run: |
