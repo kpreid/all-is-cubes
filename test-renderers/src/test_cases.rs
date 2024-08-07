@@ -57,6 +57,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
     c.insert("emission", None, emission);
+    c.insert_variants("emission_only", &None, emission_only, ["surf", "vol"]);
     c.insert("error_character_gone", None, error_character_gone);
     c.insert(
         "error_character_unavailable",
@@ -241,7 +242,7 @@ async fn cursor_basic(mut context: RenderTestContext) {
         .await;
 }
 
-/// Test rendering of emitted light.
+/// Test rendering of emitted light from opaque voxels.
 async fn emission(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut space = one_cube_space(); // TODO: also test with surrounding light
@@ -293,6 +294,54 @@ async fn emission(mut context: RenderTestContext) {
     context
         .render_comparison_test(1, cameras, Overlays::NONE)
         .await;
+}
+
+/// Test rendering of emitted light from a block that is otherwise invisible.
+async fn emission_only(mut context: RenderTestContext, transparency_option: &str) {
+    let mut universe = Universe::new();
+    let emissive_atom = Block::builder()
+        .color(Rgba::TRANSPARENT)
+        .light_emission(Rgb::from_srgb8([0, 200, 0]))
+        .build();
+    let emissive_voxels = Block::builder()
+        .voxels_fn(R2, |cube| {
+            if cube.x == 0 || cube.y == 0 || cube.z == 0 {
+                &emissive_atom
+            } else {
+                &AIR
+            }
+        })
+        .unwrap()
+        .build_into(&mut universe);
+    let bounds = GridAab::from_lower_upper([-1, 0, 0], [3, 1, 1]);
+    let mut space = Space::builder(bounds)
+        // Single-channel sky color so we can distinguish it from the contribution of the emission
+        .sky_color(Rgb::from_srgb8([0, 0, 127]))
+        .spawn(looking_at_one_cube_spawn(bounds))
+        .build();
+    space.set([-1, 0, 0], emissive_atom).unwrap();
+    space.set([1, 0, 0], emissive_voxels).unwrap();
+
+    finish_universe_from_space(&mut universe, space);
+
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
+    options.transparency = match transparency_option {
+        "surf" => TransparencyOption::Surface,
+        "vol" => TransparencyOption::Volumetric,
+        _ => unreachable!(),
+    };
+    let cameras = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
+
+    // TODO: This test doesn't currently work yet. In order to be able to run it and
+    // investigate its output, we mark the image as flawed so that comparison failures
+    // don't count.
+    {
+        let mut renderer = context.renderer(cameras);
+        renderer.update(None).await.unwrap();
+        let mut image = renderer.draw("").await.unwrap();
+        image.flaws.insert(Flaws::OTHER);
+        context.compare_image(1, image);
+    }
 }
 
 /// Test what happens when the renderer's character goes away *after* the first frame.
