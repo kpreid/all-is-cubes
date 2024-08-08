@@ -137,6 +137,10 @@ fn visible_or_animated() {
     assert!(va(Block::builder().color(Rgba::WHITE).build()));
     assert!(va(Block::builder()
         .color(Rgba::TRANSPARENT)
+        .light_emission(Rgb::ONE)
+        .build()));
+    assert!(va(Block::builder()
+        .color(Rgba::TRANSPARENT)
         .animation_hint(block::AnimationHint::replacement(
             block::AnimationChange::Shape,
         ))

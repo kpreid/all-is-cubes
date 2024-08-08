@@ -18,7 +18,7 @@ use crate::math::{Cube, Face6, FaceMap, GridAab, Intensity, OpacityCategory, Rgb
 use crate::raytracer;
 
 #[cfg(doc)]
-use crate::block::EvaluatedBlock;
+use crate::block::{EvaluatedBlock, Evoxel};
 
 /// Derived properties of an evaluated block.
 ///
@@ -95,7 +95,7 @@ pub(in crate::block::eval) fn compute_derived(
         },
     ) = voxels.single_voxel()
     {
-        let visible = !color.fully_transparent();
+        let visible = !color.fully_transparent() || emission != Rgb::ZERO;
         return Derived {
             color,
             face_colors: FaceMap::repeat(color),
@@ -281,8 +281,8 @@ impl ops::AddAssign for VoxSum {
 
 /// The visual shape of an [`EvaluatedBlock`].
 ///
-/// This data type stores the block's [`Resolution`], every voxel’s [`OpacityCategory`], and no
-/// other information.
+/// This data type stores the block's [`Resolution`], every voxel’s [`Evoxel::opacity_category()`],
+/// and no other information.
 /// It may be used, when rendering blocks, to decide whether a change in a block
 /// affects the geometry of the scene, or just the colors to be drawn.
 ///
@@ -320,7 +320,7 @@ impl VoxelOpacityMask {
         Self(MaskInner::Uniform(
             R1,
             GridAab::for_block(R1),
-            voxel.color.opacity_category(),
+            voxel.opacity_category(),
         ))
     }
 
@@ -329,11 +329,8 @@ impl VoxelOpacityMask {
             .as_linear()
             .iter()
             .map(
-                // TODO: We also need to check the emission color for being nonzero.
-                // That isn't exactly properly “opacity” but it will align with the purposes
-                // this is used for.
                 #[inline(always)]
-                |voxel| voxel.color.opacity_category(),
+                |voxel| voxel.opacity_category(),
             )
             .all_equal_value()
         {
@@ -365,7 +362,7 @@ impl VoxelOpacityMask {
                 voxels.map_container(|voxels| {
                     voxels
                         .iter()
-                        .map(|voxel| voxel.color.opacity_category())
+                        .map(|voxel| voxel.opacity_category())
                         .collect()
                 }),
             ))
@@ -512,6 +509,31 @@ mod tests {
         assert_eq!(
             VoxelOpacityMask::R1_INVISIBLE,
             VoxelOpacityMask::new_r1(Evoxel::AIR)
+        );
+    }
+
+    #[test]
+    fn opacity_mask_counts_emission_as_visible() {
+        let bounds = GridAab::for_block(R2);
+        let voxel = Evoxel {
+            emission: Rgb::ONE,
+            ..Evoxel::from_color(Rgba::TRANSPARENT)
+        };
+        assert_eq!(
+            VoxelOpacityMask::new(
+                R2,
+                Vol::from_elements(bounds, [voxel; 8].as_slice()).unwrap()
+            ),
+            VoxelOpacityMask::new_raw(R2, Vol::repeat(bounds, OpacityCategory::Partial))
+        );
+
+        // test R1 case
+        assert_eq!(
+            VoxelOpacityMask::new_r1(voxel),
+            VoxelOpacityMask::new_raw(
+                R1,
+                Vol::repeat(GridAab::for_block(R1), OpacityCategory::Partial)
+            )
         );
     }
 }

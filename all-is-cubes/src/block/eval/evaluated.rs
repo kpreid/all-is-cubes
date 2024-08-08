@@ -190,8 +190,10 @@ impl EvaluatedBlock {
         self.derived.opaque
     }
 
-    /// Whether the block has any voxels/color at all that make it visible; that is, this
-    /// is false if the block is completely transparent.
+    /// Whether the block has any properties that make it visible; that is, this
+    /// is false only if the block is completely transparent and non-emissive.
+    ///
+    /// This value is suitable for deciding whether to skip rendering a block.
     #[inline]
     pub fn visible(&self) -> bool {
         self.derived.visible
@@ -218,7 +220,7 @@ impl EvaluatedBlock {
 
     // --- Non-cached computed properties ---
 
-    /// Returns whether [`Self::visible`] is true (the block has some visible color/voxels)
+    /// Returns whether [`Self::visible()`] is true (the block has some visible color/voxels)
     /// or [`BlockAttributes::animation_hint`] indicates that the block might _become_
     /// visible (by change of evaluation result rather than by being replaced).
     #[inline]
@@ -244,11 +246,12 @@ impl EvaluatedBlock {
         }
     }
 
-    /// Expresses the opacity of the block as an [`OpacityCategory`].
+    /// Expresses the visibility of the block as an [`OpacityCategory`].
     ///
     /// If the return value is [`OpacityCategory::Partial`], this does not necessarily mean
     /// that the block contains semitransparent voxels, but only that the block as a whole
     /// does not fully pass light, and has not been confirmed to fully obstruct light.
+    /// It may also emit light but be otherwise invisible.
     ///
     /// TODO: Review uses of .opaque and .visible and see if they can be usefully replaced
     /// by this.

@@ -10,7 +10,7 @@ use crate::block::{
     BlockAttributes, BlockCollision, EvaluatedBlock,
     Resolution::{self, R1},
 };
-use crate::math::{Cube, GridAab, Rgb, Rgba, Vol};
+use crate::math::{Cube, GridAab, OpacityCategory, Rgb, Rgba, Vol};
 
 /// Properties of an individual voxel within [`EvaluatedBlock`].
 ///
@@ -82,6 +82,24 @@ impl Evoxel {
             selectable: BlockAttributes::DEFAULT_REF.selectable,
             collision: BlockCollision::DEFAULT_FOR_FROM_COLOR,
         }
+    }
+
+    /// Reports whether this voxel is invisible, fully opaque, or neither.
+    ///
+    /// This differs from `self.color.opacity_category()` in that it accounts for emission
+    /// making a voxel visible.
+    pub fn opacity_category(&self) -> OpacityCategory {
+        let &Self {
+            color,
+            emission,
+            selectable: _,
+            collision: _,
+        } = self;
+        let mut category = color.opacity_category();
+        if emission != Rgb::ZERO && category == OpacityCategory::Invisible {
+            category = OpacityCategory::Partial;
+        }
+        category
     }
 }
 

@@ -142,6 +142,7 @@ mod eval {
         assert_eq!(e.attributes, attributes);
         assert_eq!(e.color(), color);
         assert_eq!(e.face_colors(), FaceMap::repeat(color));
+        assert_eq!(e.light_emission(), Rgb::ONE);
         assert_eq!(
             e.voxels,
             Evoxels::from_one(Evoxel {
@@ -167,6 +168,27 @@ mod eval {
         let e = block.evaluate().unwrap();
         assert_eq!(e.color(), color);
         assert_eq!(e.face_colors(), FaceMap::repeat(color));
+        assert_eq!(e.light_emission(), Rgb::ZERO);
+        assert!(e.voxels.single_voxel().is_some());
+        assert_eq!(e.opaque(), FaceMap::repeat(false));
+        assert_eq!(e.visible(), true);
+        assert_eq!(
+            *e.voxel_opacity_mask(),
+            VoxelOpacityMask::new_raw(R1, Vol::from_element(OpacityCategory::Partial))
+        )
+    }
+
+    #[test]
+    fn emissive_only_atom() {
+        let emissive_color = Rgb::new(1.0, 2.0, 3.0);
+        let block = Block::builder()
+            .color(Rgba::TRANSPARENT)
+            .light_emission(emissive_color)
+            .build();
+        let e = block.evaluate().unwrap();
+        assert_eq!(e.color(), Rgba::TRANSPARENT);
+        assert_eq!(e.face_colors(), FaceMap::repeat(Rgba::TRANSPARENT));
+        assert_eq!(e.light_emission(), emissive_color);
         assert!(e.voxels.single_voxel().is_some());
         assert_eq!(e.opaque(), FaceMap::repeat(false));
         assert_eq!(e.visible(), true);
