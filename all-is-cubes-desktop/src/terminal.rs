@@ -363,18 +363,20 @@ impl Accumulate for ColorCharacterBuf {
     }
 
     #[inline]
-    fn add(&mut self, surface_color: Rgba, text: &Self::BlockData) {
+    fn add(&mut self, surface: ColorBuf, text: &Self::BlockData) {
         if self.override_color {
             return;
         }
 
-        self.color.add(surface_color, &());
-        self.text.add(surface_color, text);
+        self.color.add(surface, &());
+        self.text.add(surface, text);
     }
 
     fn hit_nothing(&mut self) {
-        self.text
-            .add(Rgba::TRANSPARENT, &CharacterRtData(literal_substr!(" ")));
+        self.text.add(
+            Rgba::TRANSPARENT.into(),
+            &CharacterRtData(literal_substr!(" ")),
+        );
         self.override_color = true;
     }
 

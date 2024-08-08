@@ -4,7 +4,7 @@ use crate::block::Evoxel;
 use crate::camera::LightingOption;
 use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, Vol};
 use crate::raycast::{RayIsh as _, RaycasterIsh};
-use crate::raytracer::{RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
+use crate::raytracer::{ColorBuf, RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
 
 /// Description of a surface the ray passes through (or from the volumetric perspective,
 /// a transition from one material to another).
@@ -44,13 +44,17 @@ impl<D: RtBlockData> Surface<'_, D> {
         !diffuse_color.fully_transparent() || emission != Rgb::ZERO
     }
 
-    /// Convert the surface and its lighting to a single RGBA value as determined by
-    /// the given graphics options, or [`None`] if it is invisible.
+    /// Combine the surface properties, lighting, and graphics options to produce
+    /// a light intensity and a transmittance value for light arriving from behind the surface;
+    /// or [`None`] if it is invisible.
+    ///
+    /// Note that the result is “premultiplied alpha”; the returned color should *not*
+    /// be modified in any way by the returned transmittance.
     ///
     /// Note that this is completely unaware of volume/thickness; that is handled by
     /// `TracingState::trace_through_span()` tweaking the data before this is called.
     #[inline]
-    pub(crate) fn to_lit_color(&self, rt: &SpaceRaytracer<D>) -> Option<Rgba> {
+    pub(crate) fn to_light(&self, rt: &SpaceRaytracer<D>) -> Option<ColorBuf> {
         let diffuse_color = rt
             .graphics_options
             .transparency
@@ -62,9 +66,13 @@ impl<D: RtBlockData> Surface<'_, D> {
 
         let illumination = self.compute_illumination(rt);
         // Combine reflected and emitted light to produce the outgoing light.
-        let outgoing_rgb = diffuse_color.to_rgb() * illumination + self.emission;
+        let outgoing_rgb =
+            diffuse_color.to_rgb() * illumination * diffuse_color.alpha() + self.emission;
 
-        Some(outgoing_rgb.with_alpha(diffuse_color.alpha()))
+        Some(ColorBuf::from_light_and_transmittance(
+            outgoing_rgb,
+            1.0 - diffuse_color.alpha().into_inner(),
+        ))
     }
 
     fn compute_illumination(&self, rt: &SpaceRaytracer<D>) -> Rgb {

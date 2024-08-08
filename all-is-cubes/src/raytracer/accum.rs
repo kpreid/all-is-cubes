@@ -62,14 +62,17 @@ pub trait Accumulate: Default {
     /// be affected by future calls to [`Self::add`].
     fn opaque(&self) -> bool;
 
-    /// Adds the color of a surface to the buffer. The provided color should already
-    /// have the effect of lighting applied.
+    /// Adds the light from a surface, and the opacity of that surface, to the accumulator.
+    /// This surface is positioned behind/beyond all previous `add()`ed surfaces.
     ///
-    /// You should probably give this method the `#[inline]` attribute.
+    /// The given [`ColorBuf`] represents the opacity and the camera-ward light output of the
+    /// encountered surface.
+    /// Implementations are responsible for reducing it according to the transmittance (inverse
+    /// opacity) of previously encountered surfaces which obscure it.
     ///
-    /// TODO: this interface might want even more information; generalize it to be
+    /// TODO: this interface might want even more information (e.g. depth); generalize it to be
     /// more future-proof.
-    fn add(&mut self, surface_color: Rgba, block_data: &Self::BlockData);
+    fn add(&mut self, surface: ColorBuf, block_data: &Self::BlockData);
 
     /// Called before the ray traverses any surfaces found in a block; that is,
     /// before all [`add()`](Self::add) calls pertaining to that block.
@@ -96,7 +99,7 @@ pub trait Accumulate: Default {
         let mut result = Self::default();
         // TODO: Should give RtBlockData a dedicated method for this, but we haven't
         // yet had a use case where it matters.
-        result.add(color, &Self::BlockData::sky(options));
+        result.add(color.into(), &Self::BlockData::sky(options));
         result
     }
 
@@ -157,6 +160,9 @@ impl RtBlockData for Resolution {
 
 /// Implements [`Accumulate`] for RGB(A) color with [`f32`] components,
 /// and conversion to [`Rgba`].
+///
+/// In addition to its use in constructing images, this type is also used as an intermediate
+/// format for surface colors presented to any other [`Accumulate`] implementation.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ColorBuf {
     /// Color buffer.
@@ -166,11 +172,23 @@ pub struct ColorBuf {
     /// display supposing that everything not already traced is black.
     ///
     /// Note: Not using the [`Rgb`](crate::math::Rgb) type so as to skip NaN checks.
-    color_accumulator: Vector3D<f32, Intensity>,
+    /// This should never end up NaN, but we don't assert that property.
+    light: Vector3D<f32, Intensity>,
 
     /// Fraction of the color value that is to be determined by future, rather than past,
     /// tracing; starts at 1.0 and decreases as surfaces are encountered.
-    pub(super) ray_alpha: f32,
+    ///
+    /// The range of this value is between 1.0 and 0.0, inclusive.
+    pub(super) transmittance: f32,
+}
+
+impl ColorBuf {
+    pub(crate) fn from_light_and_transmittance(light: Rgb, transmittance: f32) -> ColorBuf {
+        Self {
+            light: light.into(),
+            transmittance,
+        }
+    }
 }
 
 impl Accumulate for ColorBuf {
@@ -180,27 +198,26 @@ impl Accumulate for ColorBuf {
     fn opaque(&self) -> bool {
         // Let's suppose that we don't care about differences that can't be represented
         // in 8-bit color...not considering gamma.
-        self.ray_alpha < 1.0 / 256.0
+        self.transmittance < 1.0 / 256.0
     }
 
     #[inline]
-    fn add(&mut self, surface_color: Rgba, _block_data: &Self::BlockData) {
-        let color_vector: Vector3D<f32, Intensity> = surface_color.to_rgb().into();
-        let surface_alpha = surface_color.alpha().into_inner();
-        let alpha_for_add = surface_alpha * self.ray_alpha;
-        self.ray_alpha *= 1.0 - surface_alpha;
-        self.color_accumulator += color_vector * alpha_for_add;
+    fn add(&mut self, surface: ColorBuf, _block_data: &Self::BlockData) {
+        // Note that the order of these assignments matters.
+        // surface.transmittance is only applied to surfaces *after* this one.
+        self.light += surface.light * self.transmittance;
+        self.transmittance *= surface.transmittance;
     }
 
     #[inline]
     fn mean<const N: usize>(items: [Self; N]) -> Self {
         Self {
-            color_accumulator: items
+            light: items
                 .iter()
-                .map(|cb| cb.color_accumulator)
+                .map(|cb| cb.light)
                 .sum::<Vector3D<f32, Intensity>>()
                 / (N as f32),
-            ray_alpha: items.iter().map(|cb| cb.ray_alpha).sum::<f32>() / (N as f32),
+            transmittance: items.iter().map(|cb| cb.transmittance).sum::<f32>() / (N as f32),
         }
     }
 }
@@ -209,8 +226,8 @@ impl Default for ColorBuf {
     #[inline]
     fn default() -> Self {
         Self {
-            color_accumulator: Vector3D::zero(),
-            ray_alpha: 1.0,
+            light: Vector3D::zero(),
+            transmittance: 1.0,
         }
     }
 }
@@ -221,16 +238,37 @@ impl From<ColorBuf> for Rgba {
     /// Not tone mapped; consider using [`Camera::post_process_color()`] for that.
     ///
     /// [`Camera::post_process_color()`]: crate::camera::Camera::post_process_color()
+    //---
+    // TODO: Converting arbitrary HDR+opacity colors to non-premultiplied RGBA is incorrect
+    // in the general case. We should allow for tone-mapping in premultiplied form, either by
+    // replacing this conversion with a custom method, or changing the [`Rgba`] type to be
+    // premultiplied.
     fn from(buf: ColorBuf) -> Rgba {
-        if buf.ray_alpha >= 1.0 {
+        if buf.transmittance >= 1.0 {
             // Special case to avoid dividing by zero
             Rgba::TRANSPARENT
         } else {
-            let color_alpha = 1.0 - buf.ray_alpha;
-            let non_premultiplied_color = buf.color_accumulator / color_alpha;
+            let color_alpha = 1.0 - buf.transmittance;
+            let non_premultiplied_color = buf.light / color_alpha;
             Rgb::try_from(non_premultiplied_color)
                 .unwrap_or_else(|_| rgb_const!(1.0, 0.0, 0.0))
                 .with_alpha(NotNan::new(color_alpha).unwrap_or(notnan!(1.0)))
+        }
+    }
+}
+
+impl From<Rgba> for ColorBuf {
+    /// Converts the given [`Rgba`] color value, interpreted as the reflectance and opacity of
+    /// a surface lit by white light with luminance 1.0, into a [`ColorBuf`].
+    fn from(value: Rgba) -> Self {
+        let alpha = value.alpha().into_inner();
+        Self {
+            light: Vector3D::new(
+                value.red().into_inner() * alpha,
+                value.green().into_inner() * alpha,
+                value.blue().into_inner() * alpha,
+            ),
+            transmittance: 1.0 - alpha,
         }
     }
 }
@@ -241,6 +279,11 @@ mod tests {
 
     #[test]
     fn color_buf() {
+        // TODO: This entire test should be revisited with our new understanding about
+        // premultiplied alpha’s role in color accumulation.
+        // Maybe we can fix the failing assertions.
+        // <https://github.com/kpreid/all-is-cubes/issues/504>
+
         let color_1 = Rgba::new(1.0, 0.0, 0.0, 0.75);
         let color_2 = Rgba::new(0.0, 1.0, 0.0, 0.5);
         let color_3 = Rgba::new(0.0, 0.0, 1.0, 1.0);
@@ -249,11 +292,11 @@ mod tests {
         assert_eq!(Rgba::from(buf), Rgba::TRANSPARENT);
         assert!(!buf.opaque());
 
-        buf.add(color_1, &());
+        buf.add(color_1.into(), &());
         assert_eq!(Rgba::from(buf), color_1);
         assert!(!buf.opaque());
 
-        buf.add(color_2, &());
+        buf.add(color_2.into(), &());
         // TODO: this is not the right assertion because it's the premultiplied form.
         // assert_eq!(
         //     buf.result(),
@@ -262,7 +305,7 @@ mod tests {
         // );
         assert!(!buf.opaque());
 
-        buf.add(color_3, &());
+        buf.add(color_3.into(), &());
         assert!(Rgba::from(buf).fully_opaque());
         //assert_eq!(
         //    buf.result(),

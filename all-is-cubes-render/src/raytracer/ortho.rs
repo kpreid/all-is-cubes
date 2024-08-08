@@ -296,8 +296,8 @@ impl raytracer::Accumulate for OrthoBuf {
         self.color.opaque()
     }
 
-    fn add(&mut self, surface_color: Rgba, &resolution: &Self::BlockData) {
-        self.color.add(surface_color, &());
+    fn add(&mut self, surface: raytracer::ColorBuf, &resolution: &Self::BlockData) {
+        self.color.add(surface, &());
         self.max_resolution = self.max_resolution.max(resolution);
     }
 

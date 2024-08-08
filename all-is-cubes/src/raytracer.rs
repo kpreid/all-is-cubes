@@ -518,7 +518,7 @@ impl<P: Accumulate> TracingState<P> {
             // Abort excessively long traces.
             self.accumulator = Default::default();
             self.accumulator
-                .add(Rgba::new(1.0, 1.0, 1.0, 1.0), &P::BlockData::error(options));
+                .add(Rgba::WHITE.into(), &P::BlockData::error(options));
             true
         } else {
             self.accumulator.opaque()
@@ -532,7 +532,7 @@ impl<P: Accumulate> TracingState<P> {
             self.accumulator.hit_nothing();
         }
 
-        self.accumulator.add(sky_color, sky_data);
+        self.accumulator.add(sky_color.into(), sky_data);
 
         // Debug visualization of number of raytracing steps.
         // TODO: Make this togglable and less of a kludge — we'd like to be able to mix with
@@ -541,7 +541,9 @@ impl<P: Accumulate> TracingState<P> {
         if DEBUG_STEPS && self.accumulator.opaque() {
             self.accumulator = Default::default();
             self.accumulator.add(
-                (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32).with_alpha_one(),
+                (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32)
+                    .with_alpha_one()
+                    .into(),
                 sky_data,
             );
         }
@@ -561,8 +563,8 @@ impl<P: Accumulate> TracingState<P> {
         surface: &Surface<'_, P::BlockData>,
         rt: &SpaceRaytracer<P::BlockData>,
     ) {
-        if let Some(color) = surface.to_lit_color(rt) {
-            self.accumulator.add(color, surface.block_data);
+        if let Some(light) = surface.to_light(rt) {
+            self.accumulator.add(light, surface.block_data);
         }
     }
 
@@ -629,8 +631,8 @@ pub(crate) fn trace_for_eval(
     let mut emission = Vector3D::zero();
 
     while let Some(voxel) = voxels.get(cube) {
-        emission += Vector3D::from(voxel.emission) * color_buf.ray_alpha;
-        color_buf.add(apply_transmittance(voxel.color, thickness), &());
+        emission += Vector3D::from(voxel.emission) * color_buf.transmittance;
+        color_buf.add(apply_transmittance(voxel.color, thickness).into(), &());
 
         if color_buf.opaque() {
             break;
@@ -700,7 +702,7 @@ mod tests {
             let modified_color = apply_transmittance(color, (count as f32).recip());
             let mut color_buf = ColorBuf::default();
             for _ in 0..count {
-                color_buf.add(modified_color, &());
+                color_buf.add(modified_color.into(), &());
             }
             let actual = Rgba::from(color_buf);
             let error: Vec<f32> = <[f32; 4]>::from(actual)

@@ -652,7 +652,7 @@ mod tests {
             fn opaque(&self) -> bool {
                 self.custom_options.is_empty()
             }
-            fn add(&mut self, _: Rgba, block_data: &Self::BlockData) {
+            fn add(&mut self, _: ColorBuf, block_data: &Self::BlockData) {
                 if self.custom_options.is_empty() {
                     *self = *block_data;
                 }

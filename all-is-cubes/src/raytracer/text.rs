@@ -10,7 +10,7 @@ use euclid::size2;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
-use crate::math::{FreeVector, Rgba};
+use crate::math::FreeVector;
 use crate::raytracer::{Accumulate, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
 
@@ -59,7 +59,7 @@ impl Accumulate for CharacterBuf {
     }
 
     #[inline]
-    fn add(&mut self, _surface_color: Rgba, d: &Self::BlockData) {
+    fn add(&mut self, _surface: super::ColorBuf, d: &Self::BlockData) {
         if self.hit_text.is_none() {
             self.hit_text = Some(d.0.clone());
         }
@@ -148,6 +148,7 @@ mod tests {
     use crate::block::{Block, Resolution::R4};
     use crate::color_block;
     use crate::content::make_some_blocks;
+    use crate::math::Rgba;
     use crate::universe::Universe;
     use euclid::vec3;
     use std::string::ToString;
