@@ -155,7 +155,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                             // Side effect: called count_step_should_stop.
                         }
                         DepthStep::Span(span) => {
-                            debug_assert!(!span.surface.diffuse_color.fully_transparent());
+                            debug_assert!(span.surface.visible());
                             state.trace_through_span(span, self);
                         }
                         DepthStep::EnterBlock {
@@ -181,7 +181,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                             block_data,
                         } => state.accumulator.enter_block(block_data),
                         EnterSurface(surface) => {
-                            debug_assert!(!surface.diffuse_color.fully_transparent());
+                            debug_assert!(surface.visible());
                             state.trace_through_surface(&surface, self);
                         }
                     }

@@ -31,6 +31,19 @@ pub(crate) struct Surface<'a, D> {
 }
 
 impl<D: RtBlockData> Surface<'_, D> {
+    pub(crate) fn visible(&self) -> bool {
+        let &Self {
+            block_data: _,
+            diffuse_color,
+            emission,
+            cube: _,
+            t_distance: _,
+            intersection_point: _,
+            normal: _,
+        } = self;
+        !diffuse_color.fully_transparent() || emission != Rgb::ZERO
+    }
+
     /// Convert the surface and its lighting to a single RGBA value as determined by
     /// the given graphics options, or [`None`] if it is invisible.
     ///
@@ -42,7 +55,7 @@ impl<D: RtBlockData> Surface<'_, D> {
             .graphics_options
             .transparency
             .limit_alpha(self.diffuse_color);
-        if diffuse_color.fully_transparent() {
+        if diffuse_color.fully_transparent() && self.emission == Rgb::ZERO {
             // Short-circuit if the surface has no effect.
             return None;
         }
@@ -212,7 +225,7 @@ where
             Some(Evoxel {
                 color, emission, ..
             }) => {
-                if color.fully_transparent() {
+                if color.fully_transparent() && emission == Rgb::ZERO {
                     // The caller could generically skip transparent, but if we do it then
                     // we can skip some math too.
                     TraceStep::Invisible {
@@ -285,7 +298,7 @@ where
         let rc_step = self.voxel_raycaster.next()?;
         let voxel = self.array.get(rc_step.cube_ahead())?;
 
-        if voxel.color.fully_transparent() {
+        if voxel.color.fully_transparent() && voxel.emission == Rgb::ZERO {
             return Some(TraceStep::Invisible {
                 t_distance: rc_step.t_distance() * self.antiscale,
             });
