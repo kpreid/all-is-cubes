@@ -462,73 +462,79 @@ fn apply_fog_and_exposure(
     return exposed_color;
 }
 
-fn volumetric_transparency(in: BlockFragmentInput, starting_alpha: f32) -> f32 {
-    if starting_alpha < 1.0 {
-        // Apply volumetric opacity.
-        //
-        // This is a very crude approximation of future support for more general
-        // volumetric/raytraced blocks.
-        
-        // Run a minimal version of the same raycasting algorithm we use on the CPU side.
-        let t_delta = vec3<f32>(
-            partial_scale_to_integer_step(in.position_in_cube.x, in.camera_ray_direction.x),
-            partial_scale_to_integer_step(in.position_in_cube.y, in.camera_ray_direction.y),
-            partial_scale_to_integer_step(in.position_in_cube.z, in.camera_ray_direction.z)
-        );
-        // t_delta now represents the distance, in units of
-        // length(in.camera_ray_direction), to the next cube face. Normalize this
-        // to obtain a length through the volume.
-        let exit_t = min(t_delta.x, min(t_delta.y, t_delta.z));
-        let thickness = exit_t * length(in.camera_ray_direction);
-
-        // Convert alpha to transmittance (light transmitted / light received).
-        let transmittance = 1.0 - starting_alpha;
-        // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
-        let adj_transmittance = pow(transmittance, thickness);
-        // Convert back to alpha.
-        return 1.0 - adj_transmittance;
-    } else {
-        return 1.0;
-    }
+fn volumetric_thickness(in: BlockFragmentInput) -> f32 {
+    // This is a very crude approximation of future support for more general
+    // volumetric/raytraced blocks, which assumes that the block is a full cube with
+    // no interior detail.
+    
+    // Run a minimal version of the same raycasting algorithm we use on the CPU side.
+    let t_delta = vec3<f32>(
+        partial_scale_to_integer_step(in.position_in_cube.x, in.camera_ray_direction.x),
+        partial_scale_to_integer_step(in.position_in_cube.y, in.camera_ray_direction.y),
+        partial_scale_to_integer_step(in.position_in_cube.z, in.camera_ray_direction.z)
+    );
+    // t_delta now represents the distance, in units of
+    // length(in.camera_ray_direction), to the next cube face. Normalize this
+    // to obtain a length through the volume.
+    let exit_t = min(t_delta.x, min(t_delta.y, t_delta.z));
+    return exit_t * length(in.camera_ray_direction);
 }
 
 // Entry point for opaque geometry.
+//
+// Always returns alpha = 1.
 @fragment
 fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     let material = get_material(in);
-    let lit_color: vec3<f32> = material.reflectance.rgb * lighting(in) + material.emission;
+    let light_from_lit_surface: vec3f = material.reflectance.rgb * lighting(in) + material.emission;
     return vec4<f32>(
-        apply_fog_and_exposure(lit_color, in.fog_mix, in.camera_ray_direction),
-        1.0,
+        apply_fog_and_exposure(light_from_lit_surface, in.fog_mix, in.camera_ray_direction),
+        1.0, // material alpha is ignored
     );
 }
 
 // Entry point for transparency under TransparencyOption::Surface.
+//
+// Returns premultiplied alpha.
 @fragment
 fn block_fragment_transparent_surface(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     let material = get_material(in);
-    let lit_color = material.reflectance * vec4(lighting(in), 1.0) + vec4(material.emission, 0.0);
-    let exposed_color = vec4<f32>(
-        apply_fog_and_exposure(lit_color.rgb, in.fog_mix, in.camera_ray_direction),
-        lit_color.a,
-    );
-    return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
+    let light_from_lit_surface: vec3f =
+        material.reflectance.rgb * lighting(in) * material.reflectance.a + material.emission;
+    let exposed =
+        apply_fog_and_exposure(light_from_lit_surface, in.fog_mix, in.camera_ray_direction);
+    return vec4f(exposed.rgb, material.reflectance.a);
 }
 
 // Entry point for transparency under TransparencyOption::Volumetric.
+//
+// Returns premultiplied alpha.
 @fragment
 fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     var material = get_material(in);
 
-    // Apply volumetric adjustment
-    material.reflectance.a = volumetric_transparency(in, material.reflectance.a);
+    let thickness = volumetric_thickness(in);
 
-    let lit_color = material.reflectance * vec4(lighting(in), 1.0) + vec4(material.emission, 0.0);
-    let exposed_color = vec4<f32>(
-        apply_fog_and_exposure(lit_color.rgb, in.fog_mix, in.camera_ray_direction),
-        lit_color.a,
-    );
-    return vec4<f32>(exposed_color.rgb * exposed_color.a, exposed_color.a);
+    if material.reflectance.a < 1.0 {
+        // Apply volumetric opacity adjusgment.
+        // Convert alpha to transmittance (light transmitted / light received).
+        let transmittance = 1.0 - material.reflectance.a;
+        // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
+        let adj_transmittance = pow(transmittance, thickness);
+        // Convert back to alpha.
+        material.reflectance.a = 1.0 - adj_transmittance;
+
+        // Also scale the emission based on depth.
+        // TODO: This abrupt change is not actually appropriate, but it's not clear what is.
+        // Define rules for volumetric emission that apply to all materials and all complex blocks.
+        material.emission = material.emission * thickness;
+    }
+
+    let light_from_lit_surface: vec3f =
+        material.reflectance.rgb * lighting(in) * material.reflectance.a + material.emission;
+    let exposed =
+        apply_fog_and_exposure(light_from_lit_surface, in.fog_mix, in.camera_ray_direction);
+    return vec4f(exposed.rgb, material.reflectance.a);
 }
 
 // --- Lines shader ------------------------------------------------------------
