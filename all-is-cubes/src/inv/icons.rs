@@ -209,7 +209,7 @@ impl Icons {
                     let exhaust = if active {
                         Block::builder()
                             .color(rgba_const!(1.0, 1.0, 1.0, 0.1))
-                            .light_emission(rgb_const!(1.0, 0.8, 0.8) * 10.0)
+                            .light_emission(rgb_const!(1.0, 0.8, 0.8) * 1.0)
                             .build()
                     } else {
                         AIR
