@@ -418,6 +418,17 @@ where
 }
 
 impl<'a, V> Vol<&'a [V], ZMaj> {
+    /// Returns the element at `position` of this volume data, or [`None`] if `position` is out
+    /// of bounds.
+    ///
+    /// This differs from [`Self::get()`] in that it inherits the lifetime of the container
+    /// reference, rather than reborrowing. It is therefore only available for `Vol<&'a [V]>`.
+    #[inline]
+    pub fn get_ref(&self, position: impl Into<Cube>) -> Option<&'a V> {
+        let index = self.index(position.into())?;
+        Some(&self.contents[index])
+    }
+
     /// Divide `self` into two approximately equal-sized parts,
     /// each of which refers to the appropriate sub-slice of elements.
     ///

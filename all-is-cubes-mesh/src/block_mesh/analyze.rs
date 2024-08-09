@@ -3,7 +3,8 @@ use itertools::Itertools;
 use all_is_cubes::block::{Evoxel, Resolution};
 use all_is_cubes::euclid::{point3, Point2D};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridCoordinate, GridPoint, OctantMap, OctantMask, Rgba, Vol,
+    Axis, Cube, Face6, FaceMap, GridCoordinate, GridPoint, OctantMap, OctantMask, OpacityCategory,
+    Vol,
 };
 
 #[cfg(feature = "rerun")]
@@ -159,9 +160,9 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
     // and then avoid scanning the interior volume. EvaluatedBlock.opaque
     // is not quite that because it is defined to allow concavities.
 
-    for (center, colors) in windows(voxels) {
+    for (center, window_voxels) in windows(voxels) {
         viz.window(center, voxels);
-        analyze_one_window(&mut analysis, center, colors);
+        analyze_one_window(&mut analysis, center, window_voxels);
         viz.analysis_in_progress(&analysis);
     }
     viz.clear_window();
@@ -171,13 +172,14 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
 
 /// Take one of the outputs of [`windows()`] and compute its contribution to [`analysis`].
 #[inline]
-fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: OctantMap<Rgba>) {
+fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, window: OctantMap<&Evoxel>) {
     use Face6::*;
     const ALL: OctantMask = OctantMask::ALL;
     const NONE: OctantMask = OctantMask::NONE;
 
-    let opaque = bitmask(colors, Rgba::fully_opaque);
-    let semitransparent = !(opaque | bitmask(colors, Rgba::fully_transparent));
+    let opaque = window.to_mask(|voxel| voxel.opacity_category() == OpacityCategory::Opaque);
+    let semitransparent =
+        window.to_mask(|voxel| voxel.opacity_category() == OpacityCategory::Partial);
     let renderable = opaque | semitransparent;
 
     // First, quickly check if there are any visible surfaces at all here.
@@ -186,9 +188,11 @@ fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: Octant
 
         // TODO: false positives — look only at visible cubes on each axis, instead of all cubes
         analysis.needs_texture = analysis.needs_texture
-            || !colors
+            || !window
                 .values()
-                .filter(|color| !color.fully_transparent())
+                .filter(|voxel| voxel.opacity_category() != OpacityCategory::Invisible)
+                // TODO: this is fragile if we expose more visual properties
+                .map(|voxel| (voxel.color, voxel.emission))
                 .all_equal();
 
         // For each direction, check if any of the voxels in the deeper side are visible
@@ -226,7 +230,9 @@ fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, colors: Octant
 /// * `colors[0b001] = voxels[[low, low, high]]`
 /// * `colors[0b010] = voxels[[low, high, low]]`
 /// * ...
-fn windows(voxels: Vol<&[Evoxel]>) -> impl Iterator<Item = (GridPoint, OctantMap<Rgba>)> + '_ {
+fn windows<'a>(
+    voxels: Vol<&'a [Evoxel]>,
+) -> impl Iterator<Item = (GridPoint, OctantMap<&'a Evoxel>)> + 'a {
     // For 2³ windows that spill 1 voxel outside, expand by 1 to get the lower cubes.
     let window_lb_bounds = voxels.bounds().expand(FaceMap {
         nx: 1,
@@ -237,27 +243,23 @@ fn windows(voxels: Vol<&[Evoxel]>) -> impl Iterator<Item = (GridPoint, OctantMap
         pz: 0,
     });
 
-    window_lb_bounds.interior_iter().map(move |window_lb| {
-        let colors: OctantMap<Rgba> = OctantMap::from_fn(|octant| {
-            voxels
-                .get(window_lb + octant.to_positive_cube().lower_bounds().to_vector())
-                .unwrap_or(&Evoxel::AIR)
-                .color
-        });
-        (window_lb.upper_bounds(), colors)
-    })
-}
-
-/// Given a group of colors produced by [`windows()`], map it to a bitmask.
-fn bitmask(v: OctantMap<Rgba>, f: impl Fn(Rgba) -> bool) -> OctantMask {
-    v.to_mask(|&color| f(color))
+    window_lb_bounds
+        .interior_iter()
+        .map(move |window_lb| -> (GridPoint, OctantMap<&'a Evoxel>) {
+            let oct_voxels: OctantMap<&'a Evoxel> = OctantMap::from_fn(|octant| {
+                voxels
+                    .get_ref(window_lb + octant.to_positive_cube().lower_bounds().to_vector())
+                    .unwrap_or(const { &Evoxel::AIR })
+            });
+            (window_lb.upper_bounds(), oct_voxels)
+        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use all_is_cubes::euclid::{point2, size2};
-    use all_is_cubes::math::{rgba_const, GridAab, ZMaj};
+    use all_is_cubes::math::{rgba_const, GridAab, Rgb, Rgba, ZMaj};
 
     use all_is_cubes::universe::Universe;
     use alloc::sync::Arc;
@@ -274,7 +276,7 @@ mod tests {
             Vol::from_elements(GridAab::ORIGIN_CUBE, vec![Evoxel::from_color(red)]).unwrap();
         assert_eq!(
             windows(vol.as_ref())
-                .map(|(point, colors)| (point, colors.into_zmaj_array()))
+                .map(|(point, colors)| (point, colors.into_zmaj_array().map(|voxel| voxel.color)))
                 .collect::<Vec<(GridPoint, [Rgba; 8])>>(),
             vec![
                 (GridPoint::new(0, 0, 0), [tr, tr, tr, tr, tr, tr, tr, red]),
@@ -362,5 +364,22 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Check that emission-only voxels are counted as visible.
+    ///
+    /// TODO: We also want to know that `needs_texture` is set when applicable.
+    #[test]
+    fn analyze_emission_only() {
+        let mut voxel = Evoxel::from_color(Rgba::TRANSPARENT);
+        voxel.emission = Rgb::ONE;
+
+        let analysis = analyze(
+            Resolution::R1,
+            Vol::from_elements(GridAab::for_block(Resolution::R1), [voxel].as_slice()).unwrap(),
+            &mut Viz::disabled(),
+        );
+
+        assert!(analysis.occupied_planes(Face6::NX).next().is_some());
     }
 }
