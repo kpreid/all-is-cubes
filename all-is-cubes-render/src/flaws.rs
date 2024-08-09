@@ -19,10 +19,8 @@ bitflags::bitflags! {
         /// time to finish initialization or catch up to changes.
         const UNFINISHED = 1 << 0;
 
-        // TODO:
-        // /// The rendering is incomplete due to insufficient resources to
-        // /// support the full complexity of the scene.
-        // const TOO_MUCH = 1 << 1;
+        /// The rendering has a flaw not otherwise classified.
+        const OTHER = 1 << 1;
 
         /// Antialiasing has not been used,
         /// despite being requested by the graphics options.
@@ -44,6 +42,12 @@ bitflags::bitflags! {
         /// Surfaces that should have textures rather than a solid color don't.
         // TODO: Should this just be one of the things TOO_MUCH means?
         const MISSING_TEXTURES = 1 << 6;
+
+        // TODO:
+        // /// The rendering is incomplete due to insufficient resources to
+        // /// support the full complexity of the scene.
+        // const TOO_MUCH = 1 << ;
+
     }
 }
 

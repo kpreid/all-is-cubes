@@ -159,10 +159,19 @@ impl RenderTestContext {
         let mut outcome = crate::compare_rendered_image(combo, &allowed_difference.into(), image);
 
         if flaws.contains(Flaws::UNFINISHED) {
+            // Special rule: Flaws::UNFINISHED shouldn't happen, so it is counted as a special
+            // kind of failure, rather than counted as “known comparison failure”.
             outcome.outcome = ComparisonOutcome::Unfinished;
-        } else if matches!(outcome.outcome, ComparisonOutcome::Different { .. })
-            && flaws != Flaws::empty()
+        } else if matches!(
+            outcome.outcome,
+            ComparisonOutcome::Different { .. } | ComparisonOutcome::NoExpected
+        ) && flaws != Flaws::empty()
         {
+            // If the image is flawed, this is a special case which is a “warning” not an error.
+            //
+            // As an additional kludge-feature building on this, missing expected image is also
+            // ignored, as a means to skip comparisons that don't have any meaningful expected
+            // image yet. (We should have a more explicit feature for this.)
             outcome.outcome = ComparisonOutcome::Flawed(format!("{flaws:?}"));
         }
 
