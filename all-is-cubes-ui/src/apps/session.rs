@@ -1390,7 +1390,7 @@ mod tests {
         let mut cameras = session.create_cameras(listen::constant(Viewport::ARBITRARY));
         session.set_main_task({
             let noticed_step = noticed_step.clone();
-            move |mut ctx| async move {
+            async move |mut ctx: MainTaskContext| {
                 eprintln!("main task: waiting for new universe");
                 let new_universe = recv.await.unwrap();
                 ctx.set_universe(new_universe);

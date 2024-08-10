@@ -29,7 +29,7 @@ async fn main() -> test_renderers::HarnessResult {
         RendererId::Wgpu,
         test_renderers::SuiteId::Renderers,
         test_renderers::test_cases::all_tests,
-        move |label| async move { get_factory(label).await.unwrap() },
+        async move |label| get_factory(label).await.unwrap(),
         parallelism,
     )
     .await
