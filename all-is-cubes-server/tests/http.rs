@@ -1,13 +1,14 @@
+#![feature(async_closure)]
+
 //! Test starting and contacting the web server, externally.
 
 use std::process::Stdio;
 
-use async_fn_traits::AsyncFnOnce1;
 use reqwest::header::HeaderValue;
 use reqwest::Url;
 use tokio::io::AsyncBufReadExt;
 
-async fn with_server<F: AsyncFnOnce1<Url, Output = ()>>(client_source: &'static str, f: F) {
+async fn with_server<F: async FnOnce(Url)>(client_source: &'static str, f: F) {
     let mut server = tokio::process::Command::new(env!("CARGO_BIN_EXE_aic-server"))
         .arg("--client-source")
         .arg(client_source)

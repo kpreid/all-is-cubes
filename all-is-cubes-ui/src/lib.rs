@@ -1,3 +1,4 @@
+#![feature(async_closure)]
 #![feature(never_type)]
 #![feature(noop_waker)]
 
