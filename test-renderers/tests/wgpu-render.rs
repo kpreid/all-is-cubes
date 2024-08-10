@@ -1,5 +1,7 @@
 //! Runs [`test_renderers::harness_main`] against [`all_is_cubes_gpu::in_wgpu`].
 
+#![feature(async_closure)]
+
 use clap::Parser as _;
 use tokio::sync::OnceCell;
 
@@ -29,6 +31,9 @@ async fn main() -> test_renderers::HarnessResult {
         RendererId::Wgpu,
         test_renderers::SuiteId::Renderers,
         test_renderers::test_cases::all_tests,
+        // TODO: Change this to
+        //   async move |label| { ... },
+        // when <https://github.com/rust-lang/rust/issues/129811> is fixed.
         move |label| async move { get_factory(label).await.unwrap() },
         parallelism,
     )

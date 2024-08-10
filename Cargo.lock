@@ -285,7 +285,6 @@ name = "all-is-cubes-server"
 version = "0.8.0"
 dependencies = [
  "anyhow",
- "async_fn_traits",
  "axum",
  "clap",
  "include_dir",
