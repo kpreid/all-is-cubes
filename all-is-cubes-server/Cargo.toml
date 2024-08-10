@@ -43,7 +43,6 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tower-http = { version = "0.6.2", features = ["fs"] }
 
 [dev-dependencies]
-async_fn_traits = { workspace = true }
 # Note that with default features disabled, reqwest has no TLS/SSL support.
 # This is usable because we are only using it to talk to the local server.
 reqwest = { version = "0.12.2", default-features = false }
