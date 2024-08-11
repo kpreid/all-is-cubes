@@ -12,8 +12,40 @@ use all_is_cubes::math::{
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
 use crate::{BlockVertex, Coloring, IndexVec, Viz};
 
+/// This is the subset of `Evoxel` which is processed by the [`greedy_mesh()`] planar mesh
+/// generator. It does not distinguish emission other than “has some”, because we always
+/// send emission to textures rather than vertex attributes.
+///
+/// The important property of this type is that it contains every property that might determine
+/// *whether* we generate a mesh surface for a given voxel.
+///
+/// TODO: It would probably be better if we could just stop copying out the voxels and have all
+/// phases of mesh generation consult `Evoxels` directly.
+#[derive(Clone, Copy, PartialEq)]
+pub(super) struct VisualVoxel {
+    pub reflectance: Rgba,
+    pub emission: bool,
+}
+
+impl VisualVoxel {
+    pub const INVISIBLE: Self = Self {
+        reflectance: Rgba::TRANSPARENT,
+        emission: false,
+    };
+    pub fn visible(&self) -> bool {
+        *self != Self::INVISIBLE
+    }
+    pub fn to_reflectance_only(self) -> Option<Rgba> {
+        if !self.emission {
+            Some(self.reflectance)
+        } else {
+            None
+        }
+    }
+}
+
 pub(super) fn greedy_mesh(
-    visible_image: Vec<Rgba>,
+    visible_image: Vec<VisualVoxel>,
     image_s_range: Range<GridCoordinate>,
     image_t_range: Range<GridCoordinate>,
 ) -> impl Iterator<Item = GmRect> {
@@ -21,7 +53,7 @@ pub(super) fn greedy_mesh(
         visible_image,
         image_s_range,
         image_t_range,
-        single_color: None,
+        single_reflectance: None,
         rect_has_alpha: false,
     }
     .run()
@@ -30,12 +62,12 @@ pub(super) fn greedy_mesh(
 /// Data structure for the state and components of the "greedy meshing" algorithm.
 /// <https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/>
 struct GreedyMesher {
-    visible_image: Vec<Rgba>,
+    visible_image: Vec<VisualVoxel>,
     // Logical bounding rectangle of the data in `visible_image`.
     image_s_range: Range<GridCoordinate>,
     image_t_range: Range<GridCoordinate>,
-    /// Contains a color if all voxels examined so far have that color.
-    single_color: Option<Rgba>,
+    /// Contains a color if all voxels examined so far have that reflectance and no emission.
+    single_reflectance: Option<Rgba>,
     rect_has_alpha: bool,
 }
 impl GreedyMesher {
@@ -87,7 +119,7 @@ impl GreedyMesher {
             Some(GmRect {
                 low_corner: Point2D::new(sl, tl),
                 high_corner: Point2D::new(sh, th),
-                single_color: self.single_color,
+                single_color: self.single_reflectance,
                 has_alpha: self.rect_has_alpha,
             })
         })
@@ -107,12 +139,12 @@ impl GreedyMesher {
     /// returns false if not, and updates `single_color`.
     #[inline]
     fn add_seed(&mut self, s: GridCoordinate, t: GridCoordinate) -> bool {
-        let color = self.visible_image[self.index(s, t)];
-        if color.fully_transparent() {
+        let voxel = self.visible_image[self.index(s, t)];
+        if !voxel.visible() {
             return false;
         }
-        self.rect_has_alpha = !color.fully_opaque();
-        self.single_color = Some(color);
+        self.rect_has_alpha = !voxel.reflectance.fully_opaque();
+        self.single_reflectance = voxel.to_reflectance_only();
         true
     }
 
@@ -124,14 +156,14 @@ impl GreedyMesher {
         if !self.image_s_range.contains(&s) || !self.image_t_range.contains(&t) {
             return false;
         }
-        let color = self.visible_image[self.index(s, t)];
-        if color.fully_transparent() {
+        let voxel = self.visible_image[self.index(s, t)];
+        if !voxel.visible() {
             return false;
         }
-        if Some(color) != self.single_color {
-            self.single_color = None; // Not a uniform color
+        if voxel.to_reflectance_only() != self.single_reflectance {
+            self.single_reflectance = None; // Not uniform
         }
-        if !color.fully_opaque() {
+        if !voxel.reflectance.fully_opaque() {
             self.rect_has_alpha = true;
         }
         true
@@ -140,7 +172,7 @@ impl GreedyMesher {
     #[inline]
     fn erase(&mut self, s: GridCoordinate, t: GridCoordinate) {
         let index = self.index(s, t);
-        self.visible_image[index] = Rgba::TRANSPARENT;
+        self.visible_image[index] = VisualVoxel::INVISIBLE;
     }
 }
 

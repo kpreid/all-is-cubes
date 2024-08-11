@@ -7,11 +7,13 @@ use itertools::Itertools as _;
 use all_is_cubes::block::{AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::euclid::point2;
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb, Rgba,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb, Vol,
 };
 use all_is_cubes_render::Flaws;
 
-use crate::block_mesh::planar::{greedy_mesh, push_quad, GmRect, QuadColoring, QuadTransform};
+use crate::block_mesh::planar::{
+    greedy_mesh, push_quad, GmRect, QuadColoring, QuadTransform, VisualVoxel,
+};
 use crate::block_mesh::{analyze::analyze, BlockFaceMesh};
 use crate::texture::{self, Tile as _};
 use crate::{BlockMesh, MeshOptions, MeshTypes, Viz};
@@ -188,7 +190,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                 // That is, it excludes all obscured interior volume.
                 // First, we traverse the block and fill this with non-obscured voxels,
                 // then we erase it as we convert contiguous rectangles of it to quads.
-                let mut visible_image: Vec<Rgba> =
+                let mut visible_image: Vec<VisualVoxel> =
                     Vec::with_capacity(usize::try_from(occupied_rect.area()).unwrap_or(0));
 
                 let texture_plane_if_needed: Option<<M::Tile as texture::Tile>::Plane> =
@@ -214,12 +216,9 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                     .cartesian_product(occupied_rect.x_range())
                 {
                     let cube: Cube = voxel_transform.transform_cube(Cube::new(s, t, layer));
+                    let evoxel = get_voxel_with_limit(voxels_array, cube, options);
 
-                    let color = options
-                        .transparency
-                        .limit_alpha(voxels_array.get(cube).unwrap_or(&Evoxel::AIR).color);
-
-                    if layer == 0 && !color.fully_opaque() {
+                    if layer == 0 && !evoxel.color.fully_opaque() {
                         // If the first layer is transparent in any cube at all, then the face is
                         // not fully opaque
                         face_mesh.fully_opaque = false;
@@ -227,19 +226,17 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 
                     let voxel_is_visible = {
                         use OpacityCategory::{Invisible, Opaque, Partial};
-                        let this_cat = color.opacity_category();
+                        let this_cat = evoxel.opacity_category();
                         if this_cat == Invisible {
                             false
                         } else {
                             // Compute whether this voxel is not hidden behind another
-                            let obscuring_cat = voxels_array
-                                .get(cube + face.normal_vector())
-                                .map_or(Invisible, |ev| {
-                                    options
-                                        .transparency
-                                        .limit_alpha(ev.color)
-                                        .opacity_category()
-                                });
+                            let obscuring_cat = get_voxel_with_limit(
+                                voxels_array,
+                                cube + face.normal_vector(),
+                                options,
+                            )
+                            .opacity_category();
                             match (this_cat, obscuring_cat) {
                                 // Nothing to draw no matter what
                                 (Invisible, _) => false,
@@ -264,11 +261,14 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                     };
                     if voxel_is_visible {
                         layer_is_visible_somewhere = true;
-                        visible_image.push(color);
+                        visible_image.push(VisualVoxel {
+                            reflectance: evoxel.color,
+                            emission: evoxel.emission != Rgb::ZERO,
+                        });
                     } else {
                         // All obscured voxels are treated as transparent ones, in that we don't
                         // generate geometry for them.
-                        visible_image.push(Rgba::TRANSPARENT);
+                        visible_image.push(VisualVoxel::INVISIBLE);
                     }
                 }
 
@@ -361,4 +361,10 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             Some(block.voxel_opacity_mask().clone())
         };
     }
+}
+
+fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOptions) -> Evoxel {
+    let mut evoxel = *voxels.get(cube).unwrap_or(&Evoxel::AIR);
+    evoxel.color = options.transparency.limit_alpha(evoxel.color);
+    evoxel
 }
