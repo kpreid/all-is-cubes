@@ -56,11 +56,8 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 
     // Short-circuit case: if we have a single voxel a.k.a. resolution 1, then we generate a
     // mesh without going through all the conversion steps.
-    if let Some(Evoxel {
-        color: block_color, ..
-    }) = voxels.single_voxel()
-    {
-        let block_color = options.transparency.limit_alpha(block_color);
+    if let Some(mut voxel) = voxels.single_voxel() {
+        voxel.color = options.transparency.limit_alpha(voxel.color);
 
         // TODO: Use `EvaluatedBlock::face_colors` to color each face separately.
         // (We'll need to map the faces into a texture if prefer_textures)
@@ -77,15 +74,18 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             texture_plane = tile.slice(GridAab::ORIGIN_CUBE);
             QuadColoring::Texture(&texture_plane)
         } else {
-            QuadColoring::Solid(block_color)
+            // Note: we can't reach here unless there is no emission or allocation failed,
+            // so it's okay that we are not checking voxel.emission.
+            QuadColoring::Solid(voxel.color)
         };
 
+        let is_fully_opaque = voxel.color.fully_opaque();
         for (face, face_mesh) in output.face_vertices.iter_mut() {
-            if !block_color.fully_transparent() {
+            if voxel.opacity_category() != OpacityCategory::Invisible {
                 face_mesh.vertices.reserve_exact(4);
                 push_quad(
                     &mut face_mesh.vertices,
-                    if block_color.fully_opaque() {
+                    if is_fully_opaque {
                         face_mesh.indices_opaque.reserve_exact(6);
                         &mut face_mesh.indices_opaque
                     } else {
@@ -100,7 +100,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                     &mut viz,
                 );
             }
-            face_mesh.fully_opaque = block_color.fully_opaque();
+            face_mesh.fully_opaque = is_fully_opaque;
         }
     } else {
         viz.voxels(voxels);

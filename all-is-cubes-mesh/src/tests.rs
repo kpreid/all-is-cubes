@@ -192,6 +192,8 @@ fn animated_atom_uses_texture() {
 
 /// We don't encode light emission in vertex colors (because that would lead to bloated vertices),
 /// so a block with light emission will use a texture, even for resolution 1.
+///
+/// TODO: That should be the choice of the caller, not hardcoded.
 #[test]
 fn emissive_atom_uses_texture() {
     let atom_block = Block::builder()
@@ -208,6 +210,34 @@ fn emissive_atom_uses_texture() {
     assert_eq!(allocator.count_allocated(), 1);
     assert_eq!(
         mesh.vertices()[0].coloring,
+        Coloring::Texture {
+            pos: point3(0.5, 0., 0.),
+            clamp_min: point3(0.5, 0.5, 0.5),
+            clamp_max: point3(0.5, 0.5, 0.5)
+        }
+    )
+}
+
+/// Test handling of the case where `color` is transparent and `light_emission` is nonzero;
+/// it should have a nonempty mesh.
+#[test]
+fn emissive_only_atom() {
+    let atom_block = Block::builder()
+        .color(Rgba::TRANSPARENT)
+        .light_emission(Rgb::ONE)
+        .build();
+
+    let (allocator, block_meshes, space_mesh) = mesh_blocks_and_space(
+        &Space::builder(GridAab::ORIGIN_CUBE)
+            .filled_with(atom_block)
+            .build(),
+    );
+
+    assert!(!block_meshes[0].is_empty());
+    assert!(!space_mesh.is_empty());
+    assert_eq!(allocator.count_allocated(), 1);
+    assert_eq!(
+        space_mesh.vertices()[0].coloring,
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
             clamp_min: point3(0.5, 0.5, 0.5),
