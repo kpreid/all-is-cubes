@@ -11,6 +11,7 @@ repository.workspace = true
 license = "MIT OR Apache-2.0"
 # TODO: revisit categories once it's more settled what's in this package
 categories = ["games", "rendering"]
+keywords = ["all-is-cubes"]
 exclude = ["*.app", "*.desktop"]
 
 [package.metadata.docs.rs]

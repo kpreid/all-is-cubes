@@ -9,6 +9,7 @@ description = "Raytracer and rendering abstractions for the all-is-cubes engine.
 repository.workspace = true
 license = "MIT OR Apache-2.0"
 categories = ["games", "graphics", "rendering"]
+keywords = ["all-is-cubes", "voxel", "raytracing"]
 
 [package.metadata.docs.rs]
 all-features = true

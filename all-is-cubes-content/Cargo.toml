@@ -9,6 +9,7 @@ description = "Demo/default game content for the all-is-cubes engine."
 repository.workspace = true
 license = "MIT OR Apache-2.0"
 categories = ["games"]
+keywords = ["all-is-cubes"]
 
 [package.metadata.docs.rs]
 features = ["arbitrary"]

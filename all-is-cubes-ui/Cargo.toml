@@ -9,6 +9,7 @@ description = "User interface subsystem for the all-is-cubes engine."
 repository.workspace = true
 license = "MIT OR Apache-2.0"
 categories = ["games", "gui"]
+keywords = ["all-is-cubes", "voxel"]
 
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.

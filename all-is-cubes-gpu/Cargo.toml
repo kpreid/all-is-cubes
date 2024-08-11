@@ -10,6 +10,7 @@ repository.workspace = true
 license = "MIT OR Apache-2.0"
 # TODO: revisit categories once it's more settled how useful this is as an engine
 categories = ["games", "graphics", "rendering", "rendering::engine"]
+keywords = ["all-is-cubes", "voxel", "wgpu"]
 
 [package.metadata.docs.rs]
 all-features = true

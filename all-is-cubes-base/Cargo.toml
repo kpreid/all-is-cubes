@@ -7,6 +7,8 @@ rust-version.workspace = true
 description = "Helper library for all-is-cubes. Do not use directly."
 repository.workspace = true
 license = "MIT OR Apache-2.0"
+categories = [] # not for general use
+keywords = ["all-is-cubes"] # but we'll at least label it as being part of the family
 
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.

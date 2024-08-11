@@ -9,6 +9,7 @@ description = "Data import/export for the all-is-cubes engine."
 repository.workspace = true
 license = "MIT OR Apache-2.0"
 categories = ["games", "rendering::data-formats"]
+keywords = ["all-is-cubes", "voxel"]
 
 [package.metadata.docs.rs]
 features = []
