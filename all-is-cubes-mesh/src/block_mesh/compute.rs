@@ -134,7 +134,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
         }
         let output_interior = &mut output.interior_vertices;
 
-        let texture_if_needed: Option<M::Tile> = if analysis.needs_texture {
+        let texture_if_needed: Option<M::Tile> = if prefer_textures || analysis.needs_texture {
             texture::copy_voxels_to_new_texture(texture_allocator, voxels)
         } else {
             None

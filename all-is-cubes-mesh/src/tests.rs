@@ -190,6 +190,36 @@ fn animated_atom_uses_texture() {
     )
 }
 
+/// For relevantly animated blocks we always prefer textures, even if the voxels are currently all
+/// identical.
+#[test]
+fn animated_voxels_uses_texture() {
+    let mut u = Universe::new();
+    let block = Block::builder()
+        .voxels_fn(R2, |_| const { &color_block!(Rgba::WHITE) })
+        .unwrap()
+        .animation_hint(block::AnimationHint::redefinition(
+            block::AnimationChange::ColorSameCategory,
+        ))
+        .build_into(&mut u);
+
+    let (allocator, _, mesh) = mesh_blocks_and_space(
+        &Space::builder(GridAab::ORIGIN_CUBE)
+            .filled_with(block)
+            .build(),
+    );
+
+    assert_eq!(allocator.count_allocated(), 1);
+    assert_eq!(
+        mesh.vertices()[0].coloring,
+        Coloring::Texture {
+            pos: point3(0.5, 0., 0.),
+            clamp_min: point3(0.5, 0.5, 0.5),
+            clamp_max: point3(0.5, 1.5, 1.5)
+        }
+    )
+}
+
 /// We don't encode light emission in vertex colors (because that would lead to bloated vertices),
 /// so a block with light emission will use a texture, even for resolution 1.
 ///
@@ -219,7 +249,7 @@ fn emissive_atom_uses_texture() {
 }
 
 /// Test handling of the case where `color` is transparent and `light_emission` is nonzero;
-/// it should have a nonempty mesh.
+/// for an atom (resolution-1) block; it should have a nonempty mesh.
 #[test]
 fn emissive_only_atom() {
     let atom_block = Block::builder()
@@ -244,6 +274,36 @@ fn emissive_only_atom() {
             clamp_max: point3(0.5, 0.5, 0.5)
         }
     )
+}
+
+/// Test handling of the case where `color` is transparent and `light_emission` is nonzero,
+/// for a non-atom (non-resolution-1) block; it should have a nonempty mesh.
+#[test]
+fn emissive_only_voxels() {
+    let mut u = Universe::new();
+    let atom_block = Block::builder()
+        .color(Rgba::TRANSPARENT)
+        .light_emission(Rgb::ONE)
+        .build();
+    let voxel_block = Block::builder()
+        .voxels_fn(R2, |cube| {
+            if cube == Cube::ORIGIN {
+                &atom_block
+            } else {
+                &AIR
+            }
+        })
+        .unwrap()
+        .build_into(&mut u);
+    let (allocator, block_meshes, space_mesh) = mesh_blocks_and_space(
+        &Space::builder(GridAab::ORIGIN_CUBE)
+            .filled_with(voxel_block)
+            .build(),
+    );
+
+    assert!(!block_meshes[0].is_empty());
+    assert!(!space_mesh.is_empty());
+    assert_eq!(allocator.count_allocated(), 1);
 }
 
 /// [`SpaceMesh`] of a 1×1×1 space has the same geometry as the contents.

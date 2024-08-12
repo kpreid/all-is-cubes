@@ -332,16 +332,9 @@ async fn emission_only(mut context: RenderTestContext, transparency_option: &str
     };
     let cameras = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
 
-    // TODO: This test doesn't currently work yet. In order to be able to run it and
-    // investigate its output, we mark the image as flawed so that comparison failures
-    // don't count.
-    {
-        let mut renderer = context.renderer(cameras);
-        renderer.update(None).await.unwrap();
-        let mut image = renderer.draw("").await.unwrap();
-        image.flaws.insert(Flaws::OTHER);
-        context.compare_image(1, image);
-    }
+    context
+        .render_comparison_test(1, cameras, Overlays::NONE)
+        .await;
 }
 
 /// Test what happens when the renderer's character goes away *after* the first frame.
