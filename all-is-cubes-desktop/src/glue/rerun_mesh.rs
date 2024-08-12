@@ -4,7 +4,6 @@ use std::time::Instant;
 
 use itertools::Itertools as _;
 
-use all_is_cubes_render::camera::Camera;
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{Cube, GridCoordinate};
 use all_is_cubes::rerun_glue as rg;
@@ -12,6 +11,7 @@ use all_is_cubes::space::Space;
 use all_is_cubes::time::DeadlineStd;
 use all_is_cubes::universe::Handle;
 use all_is_cubes_mesh as mesh;
+use all_is_cubes_render::camera::Camera;
 
 use mesh::dynamic::ChunkedSpaceMesh;
 use mesh::texture::NoTexture;
@@ -49,6 +49,7 @@ impl From<mesh::BlockVertex<NoTexture>> for Vertex {
             position: v.position.to_f32().to_array().into(),
             color: match v.coloring {
                 mesh::Coloring::Solid(color) => color.to_srgb8().into(),
+                #[allow(unreachable_patterns)] // TODO: Remove this arm after Rust 1.81
                 mesh::Coloring::Texture { .. } => unreachable!(),
             },
         }
