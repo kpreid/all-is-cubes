@@ -3,9 +3,10 @@
 //! Note: This is *not* a code sample to be imitated, as it uses unstable/pseudo-private APIs.
 //! It is listed as an “example” because it is a program that only makes sense to run manually.
 
+use all_is_cubes::math::{Face6, FaceMap, GridAab, Rgb, Rgba};
 use pollster::block_on;
 
-use all_is_cubes::block::{EvaluatedBlock, Resolution};
+use all_is_cubes::block::{self, Block, EvaluatedBlock, Resolution};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
@@ -16,7 +17,7 @@ use all_is_cubes_render::camera::GraphicsOptions;
 use content::DemoBlocks;
 
 /// Private — do not use.
-use all_is_cubes::rerun_glue as rg;
+use all_is_cubes::{color_block, rerun_glue as rg};
 
 fn main() {
     let destination = rg::Destination {
@@ -48,6 +49,7 @@ fn main() {
         demo_blocks[DemoBlocks::LamppostBase].clone(),
         demo_blocks[DemoBlocks::Arrow].clone(),
         demo_blocks[DemoBlocks::Pedestal].clone(),
+        make_transparent_block(&mut universe),
     ];
 
     std::thread::scope(|scope| {
@@ -78,4 +80,32 @@ fn show(destination: rg::Destination, x: f32, evaluated: &EvaluatedBlock) {
         &mesh::MeshOptions::new(&GraphicsOptions::default()),
         mesh::Viz::new(destination),
     );
+}
+
+/// A block containing transparent and emissive surfaces, that also meet opaque ones.
+fn make_transparent_block(universe: &mut Universe) -> Block {
+    let opaque_voxel = color_block!(content::palette::LOGO_FILL);
+    let transparent_voxel = color_block!(0.7, 0.7, 0.2, 0.25);
+    let emissive_voxel = Block::builder()
+        .color(Rgba::TRANSPARENT)
+        .light_emission(Rgb::new(0.0, 1.0, 1.0))
+        .build();
+    let resolution = Resolution::R16;
+    let solid_box = GridAab::for_block(resolution).expand(FaceMap::repeat(-2));
+    let transparent_box = GridAab::for_block(resolution).abut(Face6::PX, -4).unwrap();
+    let emissive_box = GridAab::for_block(resolution).abut(Face6::NX, -4).unwrap();
+    Block::builder()
+        .voxels_fn(resolution, |cube| {
+            if solid_box.contains_cube(cube) {
+                &opaque_voxel
+            } else if transparent_box.contains_cube(cube) {
+                &transparent_voxel
+            } else if emissive_box.contains_cube(cube) {
+                &emissive_voxel
+            } else {
+                &block::AIR
+            }
+        })
+        .unwrap()
+        .build_into(universe)
 }
