@@ -49,6 +49,7 @@ mod behavior {
                 schema::BehaviorSetSer::BehaviorSetV1 { behaviors } => {
                     let mut set = BehaviorSet::new();
                     set.transact(|txn, _| {
+                        #[allow(unreachable_patterns)] // remove this when BehaviorV1Ser is nonempty
                         for schema::BehaviorSetEntryV1Ser {
                             behavior,
                             attachment,
