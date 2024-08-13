@@ -111,7 +111,7 @@ macro_rules! hashmap_merge {
         where
             K: Clone + Eq + Hash + fmt::Debug + 'static,
             V: Default + Merge,
-            S: core::hash::BuildHasher + Clone + 'static,
+            S: core::hash::BuildHasher + Default + 'static,
         {
             type MergeCheck = $module::HashMap<K, <V as Merge>::MergeCheck, S>;
             type Conflict = MapConflict<K, <V as Merge>::Conflict>;
@@ -126,7 +126,7 @@ macro_rules! hashmap_merge {
                     // the smaller map rather than the larger.
                     mem::swap(&mut map1, &mut map2);
                 }
-                let mut checks = $module::HashMap::with_hasher(map1.hasher().clone());
+                let mut checks = $module::HashMap::default();
                 for (k, v1) in map1.iter() {
                     if let Some(v2) = map2.get(k) {
                         checks.insert(
