@@ -33,7 +33,7 @@ itertools = { workspace = true }
 # TODO: replace logging with explicit reporting data flow
 log = { workspace = true }
 rectangle-pack = { workspace = true }
-stl_io = { version = "0.7.0" }
+stl_io = { version = "0.8.1" }
 # json is used for native and glTF
 serde_json = { workspace = true }
 thiserror = { workspace = true }
