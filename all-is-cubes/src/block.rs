@@ -218,19 +218,39 @@ pub struct Atom {
 
     /// The color exhibited by diffuse reflection from this block.
     ///
-    /// If the alpha component is neither 0 nor 1, then this is interpreted as the
-    /// opacity of a unit thickness of the material.
+    /// The RGB components of this color are the *[reflectance]:* the fraction of incoming light
+    /// that is reflected rather than absorbed.
+    ///
+    /// The alpha component of this color specifies the opacity of this block, that is, the fraction
+    /// of light that is reflected or absorbed rather than transmitted.
+    ///
+    /// More precisely, when alpha is less than 1 and greater than 0, the reflectance and opacity
+    /// should be interpreted as being of **a unit thickness of** this material. Thus, they may be
+    /// modified by the length of material through which a light ray passes, either due to
+    /// viewing angle or due to using this block as a voxel in a [`Primitive::Recur`].
+    ///
+    /// [reflectance]: https://en.wikipedia.org/wiki/Reflectance
     pub color: Rgba,
 
     /// Light emitted (not reflected) by the block.
     ///
-    /// This quantity is the [_luminous emittance_](https://en.wikipedia.org/wiki/Luminous_emittance)
-    /// (the emitted portion of luminance) of the block surface, in unspecified units where 1.0 is
-    /// the display white level (except for the effects of tone mapping).
+    /// This quantity is the *[luminous emittance]* of this material, in unspecified units
+    /// where 1.0 is the display white level (except for the effects of tone mapping).
     /// In the future this may be redefined in terms of a physical unit, but with the same
     /// dimensions.
     ///
-    /// TODO: Define the interpretation for non-opaque blocks.
+    /// Note that because we are describing a volume, not a surface, the physical
+    /// interpretation of this value depends on the opacity of the material.
+    /// If `self.color.alpha()` is 1.0, then this light escaping a surface must have been emitted at
+    /// the surface; if the alpha is 0.0, then it must have been emitted throughout the volume; and
+    /// in intermediate cases, then the light emitted within the volume must be greater per unit
+    /// volume to compensate for internal absorption. Still, these are not distinct cases but form
+    /// a continuum.
+    ///
+    /// TODO: Give the formulas for this interpretation at varying depth and opacity
+    /// (i.e. how renderers should perform it).
+    ///
+    /// [luminous emittance]: https://en.wikipedia.org/wiki/Luminous_emittance
     pub emission: Rgb,
 
     /// The effect on a [`Body`](crate::physics::Body) of colliding with this block.
