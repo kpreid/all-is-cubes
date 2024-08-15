@@ -53,8 +53,6 @@ pub(super) fn new_paused_page(
             // TODO: quit_fn should be an async function, but we don't have a way to
             // kick off a “Quitting...” task yet.
             move || match quit_fn() {
-                #[allow(unreachable_patterns, reason = "TODO: Remove this arm after Rust 1.82")]
-                Ok(s) => match s {},
                 Err(_cancelled) => {
 
                     // TODO: display message indicating failure
