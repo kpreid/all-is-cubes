@@ -1,3 +1,5 @@
+cargo-features = ["edition2024"]
+
 [workspace]
 # Excludes this from containing workspace; see top-level Cargo.toml for explanation
 
@@ -5,7 +7,7 @@
 name = "all-is-cubes-wasm"
 version = "0.8.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
-edition = "2021"
+edition = "2021" # wasm-bindgen doesn't support 2024 yet
 rust-version = "1.81"
 description = "Web client for the recursive voxel game All is Cubes."
 # TODO: add homepage = "..." when we have one

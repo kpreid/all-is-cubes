@@ -672,7 +672,7 @@ impl Shuttle {
         // TODO: Need to sync FrameClock's schedule with the universe in case it is different
     }
 
-    fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
+    fn quit(&self) -> impl Future<Output = QuitResult> + Send + use<> + 'static {
         let fut: BoxFuture<'static, QuitResult> = match (&self.ui, &self.quit_fn) {
             (Some(ui), _) => Box::pin(ui.quit()),
             (None, Some(quit_fn)) => Box::pin(std::future::ready(quit_fn())),

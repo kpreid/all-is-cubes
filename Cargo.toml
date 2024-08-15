@@ -1,3 +1,5 @@
+cargo-features = ["edition2024"]
+
 [workspace]
 members = [
   "all-is-cubes",
@@ -42,7 +44,7 @@ resolver = "2"
 [workspace.package]
 # When changing any of these values, be sure to also update the non-workspace packages
 # as listed above, if applicable.
-edition = "2021"
+edition = "2024"
 rust-version = "1.81"
 license = "MIT OR Apache-2.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
