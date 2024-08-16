@@ -42,7 +42,7 @@ impl<'a> PngAdapter<'a> {
         // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
         pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'brush>,
     ) -> Self {
-        // Group into whole pixels
+        // Group into whole pixels.
         let rgba_image_data = bytemuck::cast_slice::<u8, [u8; 4]>(data);
 
         let mut color_map: HashMap<Srgba, VoxelBrush<'a>> = HashMap::new();

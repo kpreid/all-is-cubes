@@ -30,7 +30,7 @@ where
         return None;
     }
 
-    let vertex_bytes = bytemuck::cast_slice::<GltfVertex, u8>(mesh.vertices());
+    let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(mesh.vertices());
     let index_type = match mesh.indices() {
         IndexSlice::U16(_) => gltf_json::accessor::ComponentType::U16,
         IndexSlice::U32(_) => gltf_json::accessor::ComponentType::U32,

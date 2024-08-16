@@ -117,7 +117,7 @@ fn write_light_propagation_chart(chart: Vec<chart_schema::Steps>) {
 fn writemuck<T: bytemuck::NoUninit>(out_relative_path: &Path, data: &[T]) {
     assert!(out_relative_path.is_relative());
     let path = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join(out_relative_path);
-    if let Err(e) = fs::write(&path, bytemuck::cast_slice::<T, u8>(data)) {
+    if let Err(e) = fs::write(&path, bytemuck::must_cast_slice::<T, u8>(data)) {
         panic!(
             "failed to write generated data to {path}: {e}",
             path = path.display()

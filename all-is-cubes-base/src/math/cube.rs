@@ -271,25 +271,25 @@ mod conversion {
     impl AsRef<[GridCoordinate; 3]> for Cube {
         #[inline]
         fn as_ref(&self) -> &[GridCoordinate; 3] {
-            bytemuck::cast_ref(self)
+            bytemuck::must_cast_ref(self)
         }
     }
     impl AsMut<[GridCoordinate; 3]> for Cube {
         #[inline]
         fn as_mut(&mut self) -> &mut [GridCoordinate; 3] {
-            bytemuck::cast_mut(self)
+            bytemuck::must_cast_mut(self)
         }
     }
     impl core::borrow::Borrow<[GridCoordinate; 3]> for Cube {
         #[inline]
         fn borrow(&self) -> &[GridCoordinate; 3] {
-            bytemuck::cast_ref(self)
+            bytemuck::must_cast_ref(self)
         }
     }
     impl core::borrow::BorrowMut<[GridCoordinate; 3]> for Cube {
         #[inline]
         fn borrow_mut(&mut self) -> &mut [GridCoordinate; 3] {
-            bytemuck::cast_mut(self)
+            bytemuck::must_cast_mut(self)
         }
     }
 

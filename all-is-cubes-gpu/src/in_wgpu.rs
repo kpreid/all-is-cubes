@@ -644,7 +644,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 bwp.reborrow(),
                 &wgpu::util::BufferInitDescriptor {
                     label: Some("EverythingRenderer::lines_buffer"),
-                    contents: bytemuck::cast_slice::<WgpuLinesVertex, u8>(&v),
+                    contents: bytemuck::must_cast_slice::<WgpuLinesVertex, u8>(&v),
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 },
             );

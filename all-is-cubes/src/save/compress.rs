@@ -24,7 +24,7 @@ impl<'a, T: bytemuck::NoUninit> serde::Serialize for GzSerde<'a, T> {
     where
         S: serde::Serializer,
     {
-        let uncompressed_bytes = bytemuck::cast_slice::<T, u8>(self.0.as_ref());
+        let uncompressed_bytes = bytemuck::must_cast_slice::<T, u8>(self.0.as_ref());
 
         let compression = flate2::Compression::fast();
 

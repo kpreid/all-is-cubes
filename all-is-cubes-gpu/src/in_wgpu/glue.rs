@@ -60,7 +60,7 @@ pub fn write_texture_by_aab<T: Pod, U>(
             origin: point_to_origin(region.min),
             aspect: wgpu::TextureAspect::All,
         },
-        bytemuck::cast_slice::<T, u8>(data),
+        bytemuck::must_cast_slice::<T, u8>(data),
         wgpu::ImageDataLayout {
             offset: 0,
             bytes_per_row: Some(size_of::<T>() as u32 * size.width),

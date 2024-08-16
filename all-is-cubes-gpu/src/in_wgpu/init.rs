@@ -246,6 +246,7 @@ where
         let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
         for row in 0..dimensions.height {
             let byte_start_of_row = padded_bytes_per_row * row;
+            // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.
             texel_vector.extend(bytemuck::cast_slice::<u8, C>(
                 &mapped[byte_start_of_row as usize..][..dense_bytes_per_row as usize],
             ));

@@ -106,7 +106,7 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
                         },
                         aspect: wgpu::TextureAspect::All,
                     },
-                    bytemuck::cast_slice(
+                    bytemuck::must_cast_slice::<Out, u8>(
                         &self.local_buffer.data()[full_width as usize
                             * dirty_rect.top_left.y as usize
                             + dirty_rect.top_left.x as usize..],

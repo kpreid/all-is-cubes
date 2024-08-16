@@ -112,8 +112,8 @@ impl<'a> IndexSlice<'a> {
     #[inline]
     pub fn as_bytes(&self) -> &'a [u8] {
         match self {
-            IndexSlice::U16(slice) => bytemuck::cast_slice::<u16, u8>(slice),
-            IndexSlice::U32(slice) => bytemuck::cast_slice::<u32, u8>(slice),
+            IndexSlice::U16(slice) => bytemuck::must_cast_slice::<u16, u8>(slice),
+            IndexSlice::U32(slice) => bytemuck::must_cast_slice::<u32, u8>(slice),
         }
     }
 

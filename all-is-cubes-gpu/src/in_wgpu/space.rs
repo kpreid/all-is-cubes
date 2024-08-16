@@ -666,7 +666,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 queue.write_buffer(
                     buffer,
                     0,
-                    bytemuck::cast_slice::<WgpuInstanceData, u8>(instance_data),
+                    bytemuck::must_cast_slice::<WgpuInstanceData, u8>(instance_data),
                 );
             }
         }
@@ -919,7 +919,7 @@ fn update_chunk_buffers<I: time::Instant>(
     }
 
     let new_vertices_data: &[u8] =
-        bytemuck::cast_slice::<WgpuBlockVertex, u8>(update.mesh.vertices());
+        bytemuck::must_cast_slice::<WgpuBlockVertex, u8>(update.mesh.vertices());
     // TODO: assert INDEX_FORMAT matches this type
     let new_indices: IndexSlice<'_> = update.mesh.indices();
 
