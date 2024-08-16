@@ -41,7 +41,7 @@ dependencies = [
  "futures-core",
  "hashbrown",
  "indoc",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "manyfmt",
  "mutants",
@@ -87,7 +87,7 @@ dependencies = [
  "exhaust",
  "futures-core",
  "hashbrown",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "macro_rules_attribute",
  "noise",
@@ -113,7 +113,7 @@ dependencies = [
  "futures-util",
  "gloo-timers",
  "half",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "num-traits",
  "pollster",
@@ -142,7 +142,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "indoc",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "mutants",
  "num-traits",
@@ -162,7 +162,7 @@ dependencies = [
  "futures-core",
  "gltf-json",
  "image",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "log",
  "rectangle-pack",
  "serde_json",
@@ -985,9 +985,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.12.1"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
