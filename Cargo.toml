@@ -107,7 +107,7 @@ mutants = "0.0.3"
 noise = { version = "0.9.0", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 ordered-float = { version = "4.2.0", default-features = false }
-paste = "1.0.12"
+paste = "1.0.15"
 petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
 png-decoder = "0.1.1" # used by all-is-cubes for no_std-compatible reading pngs
 png = "0.17.6" # used by all-is-cubes-desktop for writing pngs
@@ -138,7 +138,7 @@ time = { version = "0.3.36", default-features = false }
 tokio = { version = "1.28.0", default-features = false }
 trycmd = "0.15.4" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
-unicode-width = { version = "0.1.9", default-features = false }
+unicode-width = { version = "0.1.13", default-features = false }
 wasm-bindgen-futures = "0.4.42"
 web-time = "1.0.0"
 wgpu = { version = "22.1.0", default-features = false, features = ["wgsl"] }
