@@ -82,105 +82,106 @@ features = [
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 
-[lints]
+[lints.rust]
 # rustc lints that are set to deny
-rust.rust_2018_idioms = { level = "deny", priority = -1 }
-rust.unsafe_op_in_unsafe_fn = "deny"
+rust_2018_idioms = { level = "deny", priority = -1 }
+unsafe_op_in_unsafe_fn = "deny"
 
 # rustc lints that are set to warn
-rust.explicit_outlives_requirements = "warn"
-rust.missing_debug_implementations = "warn"
-rust.missing_docs = "warn"
-rust.noop_method_call = "warn"
-rust.redundant_lifetimes = "warn"
-rust.trivial_casts = "warn"
-rust.trivial_numeric_casts = "warn"
-rust.unnameable_types = "warn"
-rust.unused_extern_crates = "warn"
-rust.unused_lifetimes = "warn"
-rust.unused_qualifications = "warn"
+explicit_outlives_requirements = "warn"
+missing_debug_implementations = "warn"
+missing_docs = "warn"
+noop_method_call = "warn"
+redundant_lifetimes = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unnameable_types = "warn"
+unused_extern_crates = "warn"
+unused_lifetimes = "warn"
+unused_qualifications = "warn"
 # This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
 # rust.unused_crate_dependencies = "warn"
 
+[lints.clippy]
 # clippy default lints that are set to allow
-clippy.collapsible_else_if = "allow"
-clippy.collapsible_if = "allow"
-clippy.match_ref_pats = "allow"
-clippy.needless_update = "allow"
-clippy.single_match = "allow"
+collapsible_else_if = "allow"
+collapsible_if = "allow"
+match_ref_pats = "allow"
+needless_update = "allow"
+single_match = "allow"
 
 # clippy::pedantic lints that are set to allow
-clippy.cast_possible_truncation = "allow" # we would need an alternative for intentional from-float saturation and to-float precision loss
-clippy.cast_precision_loss = "allow" # consider enabling
-clippy.cast_sign_loss = "allow" # consider enabling
-clippy.default_trait_access = "allow"
-clippy.empty_enum = "allow"
-clippy.enum_glob_use = "allow"
-clippy.explicit_iter_loop = "allow" # I prefer the opposite style
-clippy.float_cmp = "allow"
-clippy.from_iter_instead_of_collect = "allow" # <https://github.com/rust-lang/rust-clippy/issues/7213>
-clippy.if_not_else = "allow"
-clippy.inline_always = "allow"
-clippy.items_after_statements = "allow" # we use this sparingly
-clippy.manual_assert = "allow"
-clippy.many_single_char_names = "allow"
-clippy.match_bool = "allow"
-clippy.match_same_arms = "allow"
-clippy.missing_errors_doc = "allow" # consider enabling
-clippy.missing_panics_doc = "allow" # consider enabling
-clippy.module_name_repetitions = "allow" # would use except for <https://github.com/rust-lang/rust-clippy/issues/8524>
-clippy.must_use_candidate = "allow" # consider enabling
-clippy.no_effect_underscore_binding = "allow"
-clippy.range_plus_one = "allow" # https://github.com/rust-lang/rust-clippy/issues/3307
-clippy.redundant_closure_for_method_calls = "allow" # consider enabling
-clippy.redundant_else = "allow"
-clippy.semicolon_if_nothing_returned = "allow"
-clippy.similar_names = "allow"
-clippy.single_match_else = "allow"
-clippy.struct_excessive_bools = "allow"
-clippy.too_many_lines = "allow"
-clippy.unreadable_literal = "allow"
-clippy.wildcard_imports = "allow" # we use this sparingly
+cast_possible_truncation = "allow" # we would need an alternative for intentional from-float saturation and to-float precision loss
+cast_precision_loss = "allow" # consider enabling
+cast_sign_loss = "allow" # consider enabling
+default_trait_access = "allow"
+empty_enum = "allow"
+enum_glob_use = "allow"
+explicit_iter_loop = "allow" # I prefer the opposite style
+float_cmp = "allow"
+from_iter_instead_of_collect = "allow" # <https://github.com/rust-lang/rust-clippy/issues/7213>
+if_not_else = "allow"
+inline_always = "allow"
+items_after_statements = "allow" # we use this sparingly
+manual_assert = "allow"
+many_single_char_names = "allow"
+match_bool = "allow"
+match_same_arms = "allow"
+missing_errors_doc = "allow" # consider enabling
+missing_panics_doc = "allow" # consider enabling
+module_name_repetitions = "allow" # would use except for <https://github.com/rust-lang/rust-clippy/issues/8524>
+must_use_candidate = "allow" # consider enabling
+no_effect_underscore_binding = "allow"
+range_plus_one = "allow" # https://github.com/rust-lang/rust-clippy/issues/3307
+redundant_closure_for_method_calls = "allow" # consider enabling
+redundant_else = "allow"
+semicolon_if_nothing_returned = "allow"
+similar_names = "allow"
+single_match_else = "allow"
+struct_excessive_bools = "allow"
+too_many_lines = "allow"
+unreadable_literal = "allow"
+wildcard_imports = "allow" # we use this sparingly
 
 # clippy::restriction lints that are set to allow (to note why we aren't using them)
-clippy.shadow_unrelated = "allow" # would use except for <https://github.com/rust-lang/rust-clippy/issues/10780>
+shadow_unrelated = "allow" # would use except for <https://github.com/rust-lang/rust-clippy/issues/10780>
 
 # clippy lints that are set to deny
-clippy.should_panic_without_expect = "deny"
+should_panic_without_expect = "deny"
 
 # clippy lints that are set to warn
-clippy.pedantic = { level = "warn", priority = -1 }
-clippy.assigning_clones = "warn"
-clippy.cast_lossless = "warn"
-clippy.cast_possible_wrap = "warn"
-clippy.doc_markdown = "warn"
-clippy.exhaustive_enums = "warn"
-clippy.exhaustive_structs = "warn"
-clippy.into_iter_without_iter = "warn"
-clippy.inconsistent_struct_constructor = "warn"
-clippy.infinite_loop = "warn"
-clippy.iter_without_into_iter = "warn"
-clippy.large_futures = "warn"
-clippy.large_stack_frames = "warn"
-clippy.manual_let_else = "warn"
-clippy.map_unwrap_or = "warn"
-clippy.missing_fields_in_debug = "warn"
-clippy.modulo_arithmetic = "warn"
-clippy.needless_pass_by_value = "warn"
-clippy.option_as_ref_cloned = "warn"
-clippy.pub_without_shorthand = "warn"
-clippy.return_self_not_must_use = "warn"
-clippy.suboptimal_flops = "warn"
-clippy.trivially_copy_pass_by_ref = "warn"
-clippy.undocumented_unsafe_blocks = "warn"
-clippy.uninlined_format_args = "warn"
-clippy.unnecessary_self_imports = "warn"
-clippy.unnecessary_wraps = "warn"
-clippy.unused_async = "warn"
-clippy.wrong_self_convention = "warn"
+pedantic = { level = "warn", priority = -1 }
+assigning_clones = "warn"
+cast_lossless = "warn"
+cast_possible_wrap = "warn"
+doc_markdown = "warn"
+exhaustive_enums = "warn"
+exhaustive_structs = "warn"
+into_iter_without_iter = "warn"
+inconsistent_struct_constructor = "warn"
+infinite_loop = "warn"
+iter_without_into_iter = "warn"
+large_futures = "warn"
+large_stack_frames = "warn"
+manual_let_else = "warn"
+map_unwrap_or = "warn"
+missing_fields_in_debug = "warn"
+modulo_arithmetic = "warn"
+needless_pass_by_value = "warn"
+option_as_ref_cloned = "warn"
+pub_without_shorthand = "warn"
+return_self_not_must_use = "warn"
+suboptimal_flops = "warn"
+trivially_copy_pass_by_ref = "warn"
+undocumented_unsafe_blocks = "warn"
+uninlined_format_args = "warn"
+unnecessary_self_imports = "warn"
+unnecessary_wraps = "warn"
+unused_async = "warn"
+wrong_self_convention = "warn"
 
 # wasm-specific config
-clippy.arc_with_non_send_sync = "allow"
+arc_with_non_send_sync = "allow"
 
 [profile.dev]
 # Enable some optimization to improve interactive performance in manual testing/experimenting.
