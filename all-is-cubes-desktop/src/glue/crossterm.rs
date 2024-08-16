@@ -1,6 +1,6 @@
 use all_is_cubes_ui::apps::Key;
 
-use crossterm::event::{Event, KeyCode, KeyModifiers, MouseButton};
+use ratatui::crossterm::event::{Event, KeyCode, KeyModifiers, MouseButton};
 
 /// Converts [`Event`] to [`Key`].
 ///

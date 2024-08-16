@@ -8,6 +8,7 @@ use crossterm::cursor::{self, MoveTo};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
 use crossterm::QueueableCommand as _;
 use ratatui::backend::CrosstermBackend;
+use ratatui::crossterm;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color as TuiColor, Modifier, Style};
 use ratatui::text::Span;
@@ -368,7 +369,7 @@ impl TerminalState {
                         Constraint::Length(2),
                         Constraint::Length(3),
                     ])
-                    .split(f.size())
+                    .split(f.area())
             else {
                 unreachable!()
             };

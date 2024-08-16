@@ -3,9 +3,10 @@
 use std::collections::HashMap;
 use std::io;
 
-use crossterm::style::{Color, Colors, SetColors};
-use crossterm::QueueableCommand as _;
 use ratatui::backend::Backend;
+use ratatui::crossterm::style::{Color, Colors, SetColors};
+use ratatui::crossterm::QueueableCommand as _;
+use ratatui::layout::Position;
 
 use all_is_cubes::euclid::Vector2D;
 use all_is_cubes::math::{Rgb, Rgba};
@@ -238,13 +239,22 @@ fn write_and_measure<B: Backend + io::Write>(
         backend.write_all(text.as_bytes())?;
         Ok(fallback_measure_str(text))
     } else {
-        let before = backend.get_cursor();
+        let before = backend.get_cursor_position();
         backend.write_all(text.as_bytes())?;
-        let after = backend.get_cursor();
+        let after = backend.get_cursor_position();
 
         // Compute width from cursor position, if available.
         match (before, after) {
-            (Ok((before_x, before_y)), Ok((after_x, after_y))) => {
+            (
+                Ok(Position {
+                    x: before_x,
+                    y: before_y,
+                }),
+                Ok(Position {
+                    x: after_x,
+                    y: after_y,
+                }),
+            ) => {
                 if before_y == after_y {
                     match after_x.checked_sub(before_x) {
                         Some(width) => {

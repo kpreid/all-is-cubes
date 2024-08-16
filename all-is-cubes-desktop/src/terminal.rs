@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use ratatui::crossterm;
 use ratatui::layout::Rect;
 
 use all_is_cubes::arcstr::literal_substr;
