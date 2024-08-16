@@ -58,7 +58,7 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
         frames: (0..2205)
             .map(|i| {
                 let wave = (i as f32 / 44.1 * 4.0).sin() * 0.1;
-                kira::dsp::Frame {
+                kira::Frame {
                     left: wave,
                     right: wave,
                 }
@@ -66,13 +66,14 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
             .collect(),
 
         settings: kira::sound::static_sound::StaticSoundSettings::default(),
+        slice: None,
     };
     let happened = StaticSoundData {
         sample_rate: 44100,
         frames: (0..220)
             .map(|i| {
                 let wave = (i as f32 / 44.1 * 2.0).sin() * 0.1;
-                kira::dsp::Frame {
+                kira::Frame {
                     left: wave,
                     right: wave,
                 }
@@ -80,6 +81,7 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
             .collect(),
 
         settings: kira::sound::static_sound::StaticSoundSettings::default(),
+        slice: None,
     };
     let thump = StaticSoundData {
         sample_rate: 44100,
@@ -87,7 +89,7 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
             .map(|i| {
                 let envelope = ((i as f32 / 440. * PI).sin() + 1.0) / 2.0;
                 let wave = (i as f32 / 44.1 * 0.25).sin() * envelope;
-                kira::dsp::Frame {
+                kira::Frame {
                     left: wave,
                     right: wave,
                 }
@@ -95,6 +97,7 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
             .collect(),
 
         settings: kira::sound::static_sound::StaticSoundSettings::default(),
+        slice: None,
     };
 
     while let Ok(message) = receiver.recv() {
