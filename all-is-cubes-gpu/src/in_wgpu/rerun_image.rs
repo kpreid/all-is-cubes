@@ -8,8 +8,6 @@ use futures_core::future::BoxFuture;
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes_render::camera::{Camera, ImageSize, Viewport};
 
-use rg::datatypes::TensorDimension;
-
 use crate::in_wgpu::camera::ShaderSpaceCamera;
 use crate::in_wgpu::init;
 use crate::in_wgpu::pipelines::Pipelines;
@@ -261,35 +259,25 @@ fn perform_image_copy(
         let color_data: Vec<u8> = color_future.await;
         let depth_data: Vec<f32> = depth_future.await;
 
-        // Convert color texture data format.
-        const CHANNELS: usize = 4;
-        let color_data = rg::datatypes::TensorData {
-            shape: vec![
-                TensorDimension::height(size.height.into()),
-                TensorDimension::width(size.width.into()),
-                TensorDimension::depth(CHANNELS as u64),
-            ],
-            buffer: rg::datatypes::TensorBuffer::U8(color_data.into()),
-        }
-        .into();
-
-        let depth_data = rg::datatypes::TensorData {
-            shape: vec![
-                TensorDimension::height(size.height.into()),
-                TensorDimension::width(size.width.into()),
-            ],
-            buffer: rg::datatypes::TensorBuffer::F32(depth_data.into()),
-        }
-        .into();
-
         (
             rg::archetypes::Image {
-                data: color_data,
+                buffer: color_data.into(),
+                format: rg::datatypes::ImageFormat::rgba8([size.width, size.height]).into(),
                 draw_order: None,
                 opacity: None,
             },
             rg::archetypes::DepthImage {
-                data: depth_data,
+                buffer: depth_data
+                    .into_iter()
+                    .map(f32::to_ne_bytes)
+                    .collect::<Vec<[u8; 4]>>()
+                    .into_flattened()
+                    .into(),
+                format: rg::datatypes::ImageFormat::depth(
+                    [size.width, size.height],
+                    rg::datatypes::ChannelDatatype::F32,
+                )
+                .into(),
                 meter: Some(1f32.into()),
                 draw_order: None,
                 colormap: None,

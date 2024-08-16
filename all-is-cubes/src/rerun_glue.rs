@@ -195,31 +195,29 @@ where
 
 pub fn convert_transform<S, Src, Dst>(
     t: euclid::RigidTransform3D<S, Src, Dst>,
-    from_parent: bool,
-) -> datatypes::Transform3D
+) -> archetypes::Transform3D
 where
     S: num_traits::NumCast + Copy,
 {
-    datatypes::Transform3D::TranslationRotationScale(datatypes::TranslationRotationScale3D {
-        translation: Some(convert_vec(t.translation)),
-        rotation: Some(datatypes::Rotation3D::Quaternion(convert_quaternion(
-            t.rotation,
-        ))),
-        scale: None,
-        from_parent,
-    })
+    archetypes::Transform3D::from_translation_rotation(
+        convert_vec(t.translation),
+        convert_quaternion(t.rotation),
+    )
 }
 
 pub fn convert_aabs(
     aabs: impl IntoIterator<Item = math::Aab>,
     offset: math::FreeVector,
 ) -> archetypes::Boxes3D {
-    let (half_sizes, centers): (Vec<components::HalfSize3D>, Vec<components::Position3D>) = aabs
+    let (half_sizes, centers): (
+        Vec<components::HalfSize3D>,
+        Vec<components::PoseTranslation3D>,
+    ) = aabs
         .into_iter()
         .map(|aab| {
             (
                 convert_half_sizes(aab.size()),
-                convert_point(aab.center() + offset),
+                components::PoseTranslation3D::from(convert_vec(aab.center().to_vector() + offset)),
             )
         })
         .unzip();
@@ -255,11 +253,9 @@ pub fn convert_camera_to_pinhole(
             camera_xyz: Some(OUR_VIEW_COORDINATES),
             image_plane_distance: Some((2.0f32).into()),
         },
-        archetypes::Transform3D {
-            // TODO: shouldn't from_parent be true?
-            transform: convert_transform(camera.view_transform(), false).into(),
-            axis_length: Some((1.0f32).into()),
-        },
+        convert_transform(camera.view_transform())
+            .with_relation(components::TransformRelation::ParentFromChild)
+            .with_axis_length(1.0f32),
     )
 }
 
