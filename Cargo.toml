@@ -70,7 +70,7 @@ base64 = { version = "0.22.1", default-features = false }
 bitflags = { version = "2.6.0", default-features = false }
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
 # Note that this excludes the "derive" feature but some crates need it.
-bytemuck = { version = "1.13.1", default-features = false }
+bytemuck = { version = "1.17.0", default-features = false }
 cfg-if = { version = "1.0.0" }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.2.4", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
