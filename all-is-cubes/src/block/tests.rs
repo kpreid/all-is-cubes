@@ -7,6 +7,7 @@
 
 #![allow(clippy::bool_assert_comparison)]
 
+use euclid::Vector3D;
 use pretty_assertions::assert_eq;
 
 use crate::block::{
@@ -17,7 +18,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
 use crate::math::{
-    notnan, Cube, Face6, FaceMap, GridAab, GridPoint, GridRotation, GridVector, NotNan,
+    notnan, Cube, Face6, FaceMap, GridAab, GridPoint, GridRotation, GridVector, Intensity, NotNan,
     OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::space::{Space, SpaceTransaction};
@@ -278,6 +279,38 @@ mod eval {
                 recursion: 0
             }
         );
+    }
+
+    /// Test that light emission from voxels doesn't depend on resolution, or rather, the emission
+    /// is taken as an intensive property rather than an extensive property.
+    #[test]
+    fn voxels_emission_equivalence() {
+        let mut universe = Universe::new();
+
+        let atom_emission = Rgb::new(1.0, 2.0, 3.0);
+        for reflectance in [Rgba::TRANSPARENT, Rgba::new(0.0, 0.5, 1.0, 0.5)] {
+            let atom = Block::builder()
+                .color(reflectance)
+                .light_emission(atom_emission)
+                .build();
+
+            for resolution in [R1, R2, R4, R32] {
+                let voxel_block = Block::builder()
+                    .voxels_fn(resolution, |_| &atom)
+                    .unwrap()
+                    .build_into(&mut universe);
+
+                let total_emission = voxel_block.evaluate().unwrap().light_emission();
+                let difference: Vector3D<f32, Intensity> = (total_emission - atom_emission).into();
+                assert!(
+                    difference.length() < 0.0001,
+                    "reflectance = {reflectance:?}\n\
+                    resolution = {resolution}\n\
+                    expected = {atom_emission:?}\n\
+                    actual = {total_emission:?}"
+                );
+            }
+        }
     }
 
     #[test]

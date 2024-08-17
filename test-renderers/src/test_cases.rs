@@ -58,6 +58,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("cursor_basic", None, cursor_basic);
     c.insert("emission", None, emission);
     c.insert_variants("emission_only", &None, emission_only, ["surf", "vol"]);
+    c.insert_variants("emission_semi", &None, emission_semi, ["surf", "vol"]);
     c.insert("error_character_gone", None, error_character_gone);
     c.insert(
         "error_character_unavailable",
@@ -296,17 +297,37 @@ async fn emission(mut context: RenderTestContext) {
         .await;
 }
 
-/// Test rendering of emitted light from a block that is otherwise invisible.
-async fn emission_only(mut context: RenderTestContext, transparency_option: &str) {
-    let mut universe = Universe::new();
-    let emissive_atom = Block::builder()
+/// Test rendering of emitted light from atoms that are otherwise invisible.
+async fn emission_only(context: RenderTestContext, transparency_option: &str) {
+    let atom = Block::builder()
         .color(Rgba::TRANSPARENT)
         .light_emission(Rgb::from_srgb8([0, 200, 0]))
         .build();
-    let emissive_voxels = Block::builder()
+    voxel_shape_test(context, atom, transparency_option).await;
+}
+
+/// Test rendering of emitted light from atoms that are also semi-transparent.
+async fn emission_semi(context: RenderTestContext, transparency_option: &str) {
+    let atom = Block::builder()
+        // pure black means we're dealing with only absorption, not reflection, which is simplifying
+        .color(Rgba::new(0.0, 0.0, 0.0, 1.0 - 2.0f32.powi(-3)))
+        .light_emission(Rgb::from_srgb8([0, 200, 0]))
+        .build();
+    voxel_shape_test(context, atom, transparency_option).await;
+}
+
+/// Test rendering of a specific atom in different shapes.
+/// Used for testing emission rendering.
+async fn voxel_shape_test(
+    mut context: RenderTestContext,
+    atom_block: Block,
+    transparency_option: &str,
+) {
+    let mut universe = Universe::new();
+    let voxel_block = Block::builder()
         .voxels_fn(R2, |cube| {
             if cube.x == 0 || cube.y == 0 || cube.z == 0 {
-                &emissive_atom
+                &atom_block
             } else {
                 &AIR
             }
@@ -319,8 +340,8 @@ async fn emission_only(mut context: RenderTestContext, transparency_option: &str
         .sky_color(Rgb::from_srgb8([0, 0, 127]))
         .spawn(looking_at_one_cube_spawn(bounds))
         .build();
-    space.set([-1, 0, 0], emissive_atom).unwrap();
-    space.set([1, 0, 0], emissive_voxels).unwrap();
+    space.set([-1, 0, 0], atom_block).unwrap();
+    space.set([1, 0, 0], voxel_block).unwrap();
 
     finish_universe_from_space(&mut universe, space);
 
