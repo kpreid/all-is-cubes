@@ -210,6 +210,10 @@ pub enum Primitive {
 
 /// Data of [`Primitive::Atom`]. The definition of a single [block](Block) that has uniform
 /// material properties rather than spatially varying ones; a single voxel.
+///
+/// All properties of an atom are [intensive properties].
+///
+/// [intensive properties]: https://en.wikipedia.org/wiki/Intensive_and_extensive_properties
 #[derive(Clone, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct Atom {
@@ -221,13 +225,31 @@ pub struct Atom {
     /// The RGB components of this color are the *[reflectance]:* the fraction of incoming light
     /// that is reflected rather than absorbed.
     ///
-    /// The alpha component of this color specifies the opacity of this block, that is, the fraction
-    /// of light that is reflected or absorbed rather than transmitted.
+    /// The alpha (<var>α</var>) component of this color specifies the opacity of this block,
+    /// that is, the fraction of light that is reflected or absorbed rather than transmitted.
     ///
-    /// More precisely, when alpha is less than 1 and greater than 0, the reflectance and opacity
+    /// Whenever <var>α</var> is neither 1 nor 0 (and, trivially, in those cases too),
+    /// the reflectance and opacity
     /// should be interpreted as being of **a unit thickness of** this material. Thus, they may be
     /// modified by the length of material through which a light ray passes, either due to
     /// viewing angle or due to using this block as a voxel in a [`Primitive::Recur`].
+    ///
+    /// This transformation is best understood in terms of _transmittance_ <var>T</var>,
+    /// defined as 1 &minus; <var>α</var>.
+    /// The transmittance of a given thickness of material, <var>T</var><sub><var>d</var></sub>,
+    /// is defined in terms of the transmittance of a unit thickness,
+    /// <var>T</var><sub><var>1</var></sub>, as:
+    ///
+    /// <p style="text-align: center">
+    /// <var>T</var><sub><var>d</var></sub> = (<var>T</var><sub>1</sub>)<sup><var>d</var></sup>.
+    /// </p>
+    ///
+    /// Therefore,
+    ///
+    /// <p style="text-align: center">
+    /// <var>α</var><sub>d</sub> =
+    /// 1 &minus; (1 &minus; <var>α</var><sub>1</sub>)<sup><var>d</var></sup>.
+    /// </p>
     ///
     /// [reflectance]: https://en.wikipedia.org/wiki/Reflectance
     pub color: Rgba,
@@ -239,7 +261,7 @@ pub struct Atom {
     /// In the future this may be redefined in terms of a physical unit, but with the same
     /// dimensions.
     ///
-    /// Note that because we are describing a volume, not a surface, the physical
+    /// Because we are describing a volume, not a surface, the physical
     /// interpretation of this value depends on the opacity of the material.
     /// If `self.color.alpha()` is 1.0, then this light escaping a surface must have been emitted at
     /// the surface; if the alpha is 0.0, then it must have been emitted throughout the volume; and
@@ -247,8 +269,32 @@ pub struct Atom {
     /// volume to compensate for internal absorption. Still, these are not distinct cases but form
     /// a continuum.
     ///
-    /// TODO: Give the formulas for this interpretation at varying depth and opacity
-    /// (i.e. how renderers should perform it).
+    /// The emission <var>E</var><sub><var>d</var></sub> of a particular thickness <var>d</var>
+    /// of this material is
+    ///
+    /// <p style="text-align: center">
+    /// <var>E</var><sub><var>d</var></sub> = <var>E</var><sub>1</sub> ·
+    ///     ∫<sub>0</sub><sup><var>d</var></sup>
+    ///         (<var>T</var><sub>1</sub>)<sup><var>x</var></sup>
+    ///     <var>dx</var>
+    /// </p>
+    ///
+    /// where <var>E</var><sub>1</sub> = `self.emission` and
+    /// <var>T</var><sub>1</sub> = `1.0 - self.color.alpha()`.
+    /// When integrated, this becomes
+    ///
+    /// <p style="text-align: center">
+    /// <var>E</var><sub><var>d</var></sub> = <var>E</var><sub>1</sub> · <var>d</var>
+    /// </p>
+    ///
+    /// when <var>α</var> = 0 (<var>T</var> = 1) and
+    ///
+    /// <p style="text-align: center">
+    /// <var>E</var><sub><var>d</var></sub> = <var>E</var><sub>1</sub> ·
+    /// (<var>T</var><sub><var>d</var></sub> - 1) / (<var>T</var><sub>1</sub> - 1)
+    /// </p>
+    ///
+    /// otherwise.
     ///
     /// [luminous emittance]: https://en.wikipedia.org/wiki/Luminous_emittance
     pub emission: Rgb,
