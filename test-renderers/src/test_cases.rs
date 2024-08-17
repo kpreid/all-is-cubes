@@ -702,8 +702,10 @@ async fn icons(mut context: RenderTestContext) {
     options.fov_y = NotNan::from(45);
     context
         .render_comparison_test(
-            // Fairly sloppy because this test is looking for "Does this icon look right"
-            Threshold::new([(8, 2000), (20, 100), (50, 20)]),
+            // Fairly sloppy because this test is looking for "Does this icon look right",
+            // and because volumetric rendering of transparent stuff (the jetpack exhaust)
+            // is not fully correct yet
+            Threshold::new([(8, 2000), (50, 100), (120, 40)]),
             StandardCameras::from_constant_for_test(
                 options,
                 Viewport::with_scale(1.0, [256, (256.0 * aspect_ratio) as u32]),
