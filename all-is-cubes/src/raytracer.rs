@@ -583,21 +583,20 @@ impl<P: Accumulate> TracingState<P> {
             ((exit_t_distance - surface.t_distance) * self.t_to_absolute_distance) as f32;
 
         // Adjust colors for the thickness
-        surface.diffuse_color = apply_transmittance(surface.diffuse_color, thickness);
-        // TODO: This abrupt change is not actually appropriate, but it's not clear what is.
-        // Define rules for volumetric emission.
-        if surface.diffuse_color.alpha() != 1.0 {
-            surface.emission = surface.emission * thickness;
-        }
+        let (adjusted_color, emission_coeff) =
+            apply_transmittance(surface.diffuse_color, thickness);
+        surface.diffuse_color = adjusted_color;
+        surface.emission = surface.emission * emission_coeff;
 
         self.trace_through_surface(&surface, rt);
     }
 }
 
-/// Given the alpha of a voxel color, and the thickness of that material passed through,
-/// return the alpha that should be used for blending.
+/// Given an `Atom`/`Evoxel` color, and the thickness of that material passed through,
+/// return the effective alpha that should replace the original, and the coefficient for
+/// scaling the light emission.
 #[inline]
-fn apply_transmittance(color: Rgba, thickness: f32) -> Rgba {
+fn apply_transmittance(color: Rgba, thickness: f32) -> (Rgba, f32) {
     // Convert alpha to transmittance (light transmitted / light received).
     let unit_transmittance = 1.0 - color.clamp().alpha().into_inner();
     // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
@@ -606,8 +605,26 @@ fn apply_transmittance(color: Rgba, thickness: f32) -> Rgba {
     // TODO: skip NaN check ... this may require refactoring Surface usage.
     // We might also benefit from an "UncheckedRgba" concept.
     let alpha = NotNan::new(1.0 - depth_transmittance).unwrap();
+    let modified_color = color.to_rgb().with_alpha(alpha);
 
-    color.to_rgb().with_alpha(alpha)
+    // Compute how the emission should be scaled to account for internal absorption and thickness.
+    // Since voxel emission is defined as “emitted from the surface of a unit-thickness layer”,
+    // the emission per length must be *greater* the more opaque the material is,
+    // and yet also it is reduced the deeper we go.
+    // This formula is the integral of that process.
+    let emission_coeff = if unit_transmittance == 1.0 {
+        // This is the integral
+        //     ∫{0..thickness} unit_transmittance^x dx
+        //   = ∫{0..thickness} 1 dx
+        thickness
+    } else {
+        // This is the integral
+        //     ∫{0..thickness} unit_transmittance^x dx
+        // in the case where `unit_transmittance` is not equal to 1.
+        (depth_transmittance - 1.) / (unit_transmittance - 1.)
+    };
+
+    (modified_color, emission_coeff)
 }
 
 /// Minimal raytracing helper used by block evaluation to compute aggregate properties
@@ -631,8 +648,9 @@ pub(crate) fn trace_for_eval(
     let mut emission = Vector3D::zero();
 
     while let Some(voxel) = voxels.get(cube) {
-        emission += Vector3D::from(voxel.emission) * color_buf.transmittance;
-        color_buf.add(apply_transmittance(voxel.color, thickness).into(), &());
+        let (adjusted_color, emission_coeff) = apply_transmittance(voxel.color, thickness);
+        emission += Vector3D::from(voxel.emission * emission_coeff) * color_buf.transmittance;
+        color_buf.add(adjusted_color.into(), &());
 
         if color_buf.opaque() {
             break;
@@ -691,15 +709,18 @@ mod tests {
     #[test]
     fn apply_transmittance_identity() {
         let color = rgba_const!(1.0, 0.5, 0.0, 0.5);
-        assert_eq!(apply_transmittance(color, 1.0), color);
+        assert_eq!(apply_transmittance(color, 1.0), (color, 1.0));
     }
 
     /// `apply_transmittance` + `ColorBuf` accumulation should add up to the identity function for
     /// any unit thickness (except for rounding error, which we are avoiding for this test case).
+    ///
+    /// TODO: test emission equivalence too
     #[test]
     fn apply_transmittance_equivalence() {
         fn case(color: Rgba, count: usize) {
-            let modified_color = apply_transmittance(color, (count as f32).recip());
+            let (modified_color, _emission_coeff) =
+                apply_transmittance(color, (count as f32).recip());
             let mut color_buf = ColorBuf::default();
             for _ in 0..count {
                 color_buf.add(modified_color.into(), &());

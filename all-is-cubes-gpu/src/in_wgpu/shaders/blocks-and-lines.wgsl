@@ -518,16 +518,28 @@ fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0)
     if material.reflectance.a < 1.0 {
         // Apply volumetric opacity adjusgment.
         // Convert alpha to transmittance (light transmitted / light received).
-        let transmittance = 1.0 - material.reflectance.a;
+        let unit_transmittance = 1.0 - material.reflectance.a;
         // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
-        let adj_transmittance = pow(transmittance, thickness);
+        let depth_transmittance = pow(unit_transmittance, thickness);
         // Convert back to alpha.
-        material.reflectance.a = 1.0 - adj_transmittance;
+        material.reflectance.a = 1.0 - depth_transmittance;
 
-        // Also scale the emission based on depth.
-        // TODO: This abrupt change is not actually appropriate, but it's not clear what is.
-        // Define rules for volumetric emission that apply to all materials and all complex blocks.
-        material.emission = material.emission * thickness;
+        // Compute how the emission should be scaled to account for internal absorption and thickness.
+        // Since voxel emission is defined as “emitted from the surface of a unit-thickness layer”,
+        // the emission per length must be *greater* the more opaque the material is,
+        // and yet also it is reduced the deeper we go.
+        // This formula is the integral of that process.
+        if unit_transmittance == 1.0 {
+            // This is the integral
+            //     ∫{0..thickness} unit_transmittance^x dx
+            //   = ∫{0..thickness} 1 dx
+            material.emission *= thickness;
+        } else {
+            // This is the integral
+            //     ∫{0..thickness} unit_transmittance^x dx
+            // in the case where `unit_transmittance` is not equal to 1.
+            material.emission *= (depth_transmittance - 1.0) / (unit_transmittance - 1.0);
+        }
     }
 
     let light_from_lit_surface: vec3f =
