@@ -157,8 +157,13 @@ impl ResizingBuffer {
             // Explicitly destroy the old buffer, because we know it will not be used any more
             // and don't need the memory it occupies. This ensures that the old memory will be
             // deallocated promptly before the new allocation is created, keeping peak usage lower.
-            if let Some(buffer) = self.buffer.as_ref() {
-                buffer.destroy();
+            //
+            // TODO: This is disabled because it sometimes results in a “buffer has been destroyed”
+            // error, in certain rendering test cases. I don't understand why yet.
+            if false {
+                if let Some(buffer) = self.buffer.as_ref() {
+                    buffer.destroy();
+                }
             }
 
             self.buffer = Some(bwp.device.create_buffer_init(descriptor));
@@ -181,8 +186,13 @@ impl ResizingBuffer {
             // Explicitly destroy the old buffer, because we know it will not be used any more
             // and don't need the memory it occupies. This ensures that the old memory will be
             // deallocated promptly before the new allocation is created, keeping peak usage lower.
-            if let Some(buffer) = self.buffer.as_ref() {
-                buffer.destroy();
+            //
+            // TODO: This is disabled because it sometimes results in a “buffer has been destroyed”
+            // error, in certain rendering test cases. I don't understand why yet.
+            if false {
+                if let Some(buffer) = self.buffer.as_ref() {
+                    buffer.destroy();
+                }
             }
 
             self.buffer = Some(device.create_buffer(descriptor));
