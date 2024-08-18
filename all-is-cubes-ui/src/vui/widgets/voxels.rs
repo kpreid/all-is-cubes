@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use all_is_cubes::block::{Block, BlockAttributes, Primitive, Resolution};
+use all_is_cubes::block::{self, Block, Primitive, Resolution};
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::math::{GridAab, GridMatrix, GridPoint, GridSizeCoord, GridVector};
 use all_is_cubes::space::{Space, SpaceTransaction};
@@ -17,7 +17,7 @@ pub struct Voxels {
     space: Handle<Space>,
     region: GridAab,
     scale: Resolution,
-    block_attributes: BlockAttributes,
+    modifiers: Vec<block::Modifier>,
 }
 
 impl Voxels {
@@ -26,11 +26,11 @@ impl Voxels {
     /// When the `region`'s dimensions are not multiples of `scale`, their alignment within the
     /// block grid will be determined by the layout gravity. Note that areas of `space` outside of
     /// `region` may be displayed in that case.
-    pub const fn new(
+    pub fn new(
         region: GridAab,
         space: Handle<Space>,
         scale: Resolution,
-        block_attributes: BlockAttributes,
+        modifiers: impl IntoIterator<Item = block::Modifier>,
     ) -> Self {
         // Design note: We could take `region` from `space` but that'd require locking it,
         // and the caller is very likely to already have that information.
@@ -38,7 +38,7 @@ impl Voxels {
             space,
             region,
             scale,
-            block_attributes,
+            modifiers: modifiers.into_iter().collect(),
         }
     }
 }
@@ -92,15 +92,15 @@ impl vui::Widget for Voxels {
 
         let mut txn = SpaceTransaction::default();
         for cube in position.bounds.interior_iter() {
-            txn.at(cube)
-                .overwrite(Block::from_primitive(Primitive::Recur {
-                    attributes: self.block_attributes.clone(),
-                    offset: block_to_voxels_transform
-                        .transform_cube(cube)
-                        .lower_bounds(),
-                    resolution: self.scale,
-                    space: self.space.clone(),
-                }));
+            let mut block = Block::from_primitive(Primitive::Recur {
+                offset: block_to_voxels_transform
+                    .transform_cube(cube)
+                    .lower_bounds(),
+                resolution: self.scale,
+                space: self.space.clone(),
+            });
+            block.modifiers_mut().clone_from(&self.modifiers);
+            txn.at(cube).overwrite(block);
         }
         super::OneshotController::new(txn)
     }
@@ -119,7 +119,6 @@ mod tests {
     fn test_voxels_widget(
         voxel_space_bounds: GridAab,
         grant: vui::LayoutGrant,
-        attributes: BlockAttributes,
     ) -> (Option<GridAab>, Space) {
         let mut universe = Universe::new();
         instantiate_widget(
@@ -128,7 +127,7 @@ mod tests {
                 voxel_space_bounds,
                 universe.insert_anonymous(Space::builder(voxel_space_bounds).build()),
                 R8,
-                attributes,
+                [],
             ),
         )
     }
@@ -141,7 +140,6 @@ mod tests {
         let _output = test_voxels_widget(
             v_space_bounds,
             vui::LayoutGrant::new(GridAab::single_cube(output_origin)),
-            BlockAttributes::default(),
         );
         // TODO assertions about resulting blocks
     }
@@ -158,8 +156,7 @@ mod tests {
             bounds: GridAab::from_lower_size(output_origin, [3, 3, 3]),
             gravity: Vector3D::new(Align::Low, Align::Center, Align::High),
         };
-        let (output_bounds, output) =
-            test_voxels_widget(v_space_bounds, grant, BlockAttributes::default());
+        let (output_bounds, output) = test_voxels_widget(v_space_bounds, grant);
         assert_eq!(
             output_bounds.unwrap(),
             GridAab::from_lower_size([100, 101, 101], [1, 1, 2])
@@ -167,7 +164,6 @@ mod tests {
         // Expect two adjacent recursive blocks
         match *output[[100, 101, 101]].primitive() {
             Primitive::Recur {
-                attributes: _,
                 offset,
                 resolution,
                 space: _,
@@ -179,7 +175,6 @@ mod tests {
         }
         match *output[[100, 101, 102]].primitive() {
             Primitive::Recur {
-                attributes: _,
                 offset,
                 resolution,
                 space: _,

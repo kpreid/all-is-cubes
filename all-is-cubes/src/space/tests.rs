@@ -10,9 +10,7 @@ use core::num::NonZeroU16;
 use euclid::Vector3D;
 use indoc::indoc;
 
-use crate::block::{
-    self, Atom, Block, BlockDef, BlockDefTransaction, Primitive, Resolution::*, TickAction, AIR,
-};
+use crate::block::{self, Block, BlockDef, BlockDefTransaction, Resolution::*, TickAction, AIR};
 use crate::color_block;
 use crate::content::make_some_blocks;
 use crate::fluff::{self, Fluff};
@@ -606,14 +604,10 @@ fn block_tick_action_timing() {
 
     // Hook them up to turn into each other
     fn connect(from: &mut Block, to: &Block) {
-        if let Primitive::Atom(Atom { attributes, .. }) = from.primitive_mut() {
-            attributes.tick_action = Some(TickAction {
-                operation: Operation::Become(to.clone()),
-                schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
-            });
-        } else {
-            panic!();
-        }
+        from.freezing_get_attributes_mut().tick_action = Some(TickAction {
+            operation: Operation::Become(to.clone()),
+            schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
+        });
     }
     connect(&mut block2, &block3);
     connect(&mut block1, &block2);
@@ -656,24 +650,18 @@ fn block_tick_action_conflict() {
     // Create an active block.
     let [mut modifies_px_neighbor, output1, mut modifies_nx_neighbor, output2] = make_some_blocks();
     fn connect(from: &mut Block, to: &Block, face: Face6) {
-        if let Primitive::Atom(Atom { attributes, .. }) = from.primitive_mut() {
-            attributes.tick_action = Some({
-                TickAction {
-                    // TODO: replace this with a better-behaved neighbor-modifying operation,
-                    // once we have one
-                    operation: Operation::Neighbors(
-                        [(
-                            Cube::from(face.normal_vector().to_point()),
-                            Operation::Become(to.clone()),
-                        )]
-                        .into(),
-                    ),
-                    schedule: time::Schedule::from_period(NonZeroU16::new(1).unwrap()),
-                }
-            });
-        } else {
-            panic!();
-        }
+        from.freezing_get_attributes_mut().tick_action = Some(TickAction {
+            // TODO: replace this with a better-behaved neighbor-modifying operation,
+            // once we have one
+            operation: Operation::Neighbors(
+                [(
+                    Cube::from(face.normal_vector().to_point()),
+                    Operation::Become(to.clone()),
+                )]
+                .into(),
+            ),
+            schedule: time::Schedule::from_period(NonZeroU16::new(1).unwrap()),
+        });
     }
     connect(&mut modifies_px_neighbor, &output1, Face6::PX);
     connect(&mut modifies_nx_neighbor, &output2, Face6::NX);

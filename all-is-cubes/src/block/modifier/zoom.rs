@@ -216,7 +216,7 @@ mod tests {
                         ev_original.attributes.clone(),
                         Evoxels::from_one(Evoxel::from_color(Rgba::TRANSPARENT)),
                         block::Cost {
-                            components: 2,
+                            components: 3,        // Primitive + display_name + Zoom
                             voxels: 16u32.pow(3), // counts evaluation of Recur
                             recursion: 0,
                         },
@@ -236,7 +236,7 @@ mod tests {
                             }),
                         ),
                         block::Cost {
-                            components: 2,
+                            components: 3,
                             voxels: 16u32.pow(3) + 8u32.pow(3), // Recur + Zoom
                             recursion: 0,
                         },

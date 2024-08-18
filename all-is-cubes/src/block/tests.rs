@@ -128,19 +128,13 @@ mod eval {
     #[test]
     fn opaque_atom_and_attributes() {
         let color = Rgba::new(1.0, 2.0, 3.0, 1.0);
-        let attributes = BlockAttributes {
-            display_name: arcstr::literal!("hello world"),
-            selectable: false,
-            ..BlockAttributes::default()
-        };
         let block = Block::from(Atom {
-            attributes: attributes.clone(),
             color,
             emission: Rgb::ONE,
             collision: BlockCollision::None,
         });
         let e = block.evaluate().unwrap();
-        assert_eq!(e.attributes, attributes);
+        assert_eq!(e.attributes(), BlockAttributes::DEFAULT_REF);
         assert_eq!(e.color(), color);
         assert_eq!(e.face_colors(), FaceMap::repeat(color));
         assert_eq!(e.light_emission(), Rgb::ONE);
@@ -149,7 +143,7 @@ mod eval {
             Evoxels::from_one(Evoxel {
                 color,
                 emission: Rgb::ONE,
-                selectable: false,
+                selectable: true,
                 collision: BlockCollision::None,
             })
         );
@@ -274,7 +268,7 @@ mod eval {
         assert_eq!(
             e.cost,
             Cost {
-                components: 1,
+                components: 2,
                 voxels: 8,
                 recursion: 0
             }
@@ -473,7 +467,6 @@ mod eval {
             .unwrap();
         let space_handle = universe.insert_anonymous(space);
         let block_at_offset = Block::from_primitive(Primitive::Recur {
-            attributes: BlockAttributes::default(),
             offset: offset.to_point(),
             resolution,
             space: space_handle.clone(),
@@ -507,7 +500,6 @@ mod eval {
         ))
         .build();
         let block_at_offset = Block::from_primitive(Primitive::Recur {
-            attributes: BlockAttributes::default(),
             offset: GridPoint::new(-414232629, -2147483648, -13697025),
             resolution: R128,
             space: universe.insert_anonymous(space),

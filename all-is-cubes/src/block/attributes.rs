@@ -8,15 +8,16 @@ use crate::inv::InvInBlock;
 use crate::math::{Face6, GridRotation};
 use crate::op::Operation;
 
+use crate::block::Modifier;
 use crate::time;
 #[cfg(doc)]
 use crate::{
-    block::{Block, BlockDef, Modifier, Primitive},
+    block::{Block, BlockDef, Primitive},
     space::Space,
     time::TickSchedule,
 };
 
-/// Collection of miscellaneous attribute data for blocks that doesn't come in variants.
+/// Miscellaneous properties of blocks that are not the block’s voxels.
 ///
 /// `BlockAttributes::default()` will produce a reasonable set of defaults for “ordinary”
 /// blocks.
@@ -234,6 +235,13 @@ impl crate::universe::VisitHandles for BlockAttributes {
         inventory.visit_handles(visitor);
         tick_action.visit_handles(visitor);
         activation_action.visit_handles(visitor);
+    }
+}
+
+impl From<BlockAttributes> for Modifier {
+    /// Converts [`BlockAttributes`] to a modifier that applies them to a block.
+    fn from(value: BlockAttributes) -> Self {
+        Modifier::Attributes(alloc::sync::Arc::new(value))
     }
 }
 

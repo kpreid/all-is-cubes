@@ -9,7 +9,7 @@ use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{
-    self, AnimationHint, Atom, Block, BlockCollision, BlockDefTransaction, Primitive,
+    self, AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive,
     Resolution::*, RotationPlacementRule, TickAction, AIR,
 };
 use all_is_cubes::color_block;
@@ -500,10 +500,7 @@ pub async fn install_demo_blocks(
     // Join up blinker blocks
     for state in bool::exhaust() {
         modify_def(&provider_for_patch[BecomeBlinker(state)], |block| {
-            let Primitive::Atom(Atom { attributes, .. }) = block.primitive_mut() else {
-                panic!("blinker not atom");
-            };
-            attributes.tick_action = Some(TickAction {
+            block.freezing_get_attributes_mut().tick_action = Some(TickAction {
                 operation: Operation::Become(provider_for_patch[BecomeBlinker(!state)].clone()),
                 schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
             });
@@ -514,10 +511,7 @@ pub async fn install_demo_blocks(
     for state in bool::exhaust() {
         for ctor in [Lamp, Sconce] {
             modify_def(&provider_for_patch[ctor(state)], |block| {
-                let Primitive::Recur { attributes, .. } = block.primitive_mut() else {
-                    panic!("lamp not recur");
-                };
-                attributes.activation_action =
+                block.freezing_get_attributes_mut().activation_action =
                     Some(Operation::Become(provider_for_patch[ctor(!state)].clone()));
             });
         }
@@ -526,9 +520,6 @@ pub async fn install_demo_blocks(
     // Join up explosion blocks
     for i in i8::exhaust() {
         modify_def(&provider_for_patch[Explosion(i)], |block| {
-            let Primitive::Recur { attributes, .. } = block.primitive_mut() else {
-                panic!("explosion not atom");
-            };
             let neighbor_ops: Arc<[(Cube, Operation)]> = if i > 22 {
                 // Expire because we're invisible by now
                 [(Cube::ORIGIN, Operation::Become(AIR))].into()
@@ -574,7 +565,7 @@ pub async fn install_demo_blocks(
                     [(Cube::ORIGIN, next.clone())].into()
                 }
             };
-            attributes.tick_action = Some(TickAction {
+            block.freezing_get_attributes_mut().tick_action = Some(TickAction {
                 operation: Operation::Neighbors(neighbor_ops),
                 schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
             });

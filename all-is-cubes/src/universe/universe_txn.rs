@@ -1037,7 +1037,7 @@ mod tests {
         println!("{transaction:#?}");
         pretty_assertions::assert_str_eq!(
             format!("{transaction:#?}\n"),
-            indoc! {"
+            indoc! {r#"
             UniverseTransaction {
                 [anonymous #0]: SpaceTransaction {
                     (+0, +0, +0): CubeTransaction {
@@ -1045,12 +1045,14 @@ mod tests {
                         new: Some(
                             Block {
                                 primitive: Atom {
-                                    attributes: BlockAttributes {
-                                        display_name: \"0\",
-                                    },
                                     color: Rgba(0.5, 0.5, 0.5, 1.0),
                                     collision: Hard,
                                 },
+                                modifiers: [
+                                    BlockAttributes {
+                                        display_name: "0",
+                                    },
+                                ],
                             },
                         ),
                         conserved: true,
@@ -1076,7 +1078,7 @@ mod tests {
                     ],
                 },
             }
-            "}
+            "#}
             .to_string()
         );
     }

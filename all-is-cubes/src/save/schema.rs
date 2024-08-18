@@ -79,12 +79,14 @@ pub(crate) enum PrimitiveSer<'a> {
         color: RgbaSer,
         #[serde(default, skip_serializing_if = "is_default")]
         light_emission: RgbSer,
+        /// Note: Attributes stored on the primitive are no longer used, and supported only for deserialization.
         #[serde(flatten)]
         attributes: BlockAttributesV1Ser<'a>,
         #[serde(default, skip_serializing_if = "is_default")]
         collision: BlockCollisionSer,
     },
     RecurV1 {
+        /// Note: Attributes stored on the primitive are no longer used, and supported only for deserialization.
         #[serde(flatten)]
         attributes: BlockAttributesV1Ser<'a>,
         space: Handle<space::Space>,
@@ -101,7 +103,7 @@ pub(crate) enum PrimitiveSer<'a> {
     },
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct BlockAttributesV1Ser<'a> {
     #[serde(default, skip_serializing_if = "str::is_empty")]
     pub display_name: ArcStr,
@@ -136,7 +138,7 @@ pub(crate) enum BlockCollisionSer {
     NoneV1,
 }
 
-#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum RotationPlacementRuleSer {
     #[default]
@@ -147,7 +149,7 @@ pub(crate) enum RotationPlacementRuleSer {
 }
 
 /// Unversioned because it's versioned by the parent struct
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct TickActionSer<'a> {
     pub operation: Cow<'a, op::Operation>,
     pub schedule: Schedule,
@@ -179,6 +181,10 @@ pub(crate) enum AnimationChangeV1Ser {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum ModifierSer<'a> {
+    AttributesV1 {
+        #[serde(flatten)]
+        attributes: BlockAttributesV1Ser<'a>,
+    },
     QuoteV1 {
         suppress_ambient: bool,
     },
@@ -333,7 +339,7 @@ pub(crate) enum ToolSer {
     CustomV1 { op: op::Operation, icon: Block },
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "type")]
 pub(crate) enum InvInBlockSer {
     InvInBlockV1 {

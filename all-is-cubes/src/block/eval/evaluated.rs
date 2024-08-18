@@ -450,6 +450,11 @@ impl MinEval {
         &self.voxels
     }
 
+    pub(crate) fn set_attributes(&mut self, attributes: BlockAttributes) {
+        self.derived = None;
+        self.attributes = attributes;
+    }
+
     #[cfg(test)]
     pub(crate) fn has_derived(&self) -> bool {
         self.derived.is_some()

@@ -870,14 +870,12 @@ mod tests {
 
         // Make a block with a rotation rule
         let [mut tool_block] = make_some_voxel_blocks(&mut tester.universe);
-        if let Primitive::Recur {
-            ref mut attributes, ..
-        } = tool_block.primitive_mut()
-        {
-            attributes.rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
-        } else {
-            unreachable!();
-        }
+        tool_block
+            .modifiers_mut()
+            .push(block::Modifier::from(block::BlockAttributes {
+                rotation_rule: RotationPlacementRule::Attach { by: Face6::NZ },
+                ..block::BlockAttributes::default()
+            }));
 
         // TODO: For more thorough testing, we need to be able to control ToolTester's choice of ray
         let transaction = tester

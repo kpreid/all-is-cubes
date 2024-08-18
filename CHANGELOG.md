@@ -7,7 +7,8 @@
 - `all-is-cubes` library:
     - Block inventories are now more functional.
         - `block::Block::with_inventory` attaches inventory to a block.
-        - `inv::InvInBlock`, stored in `block::BlockAtributes::inventory`, describes the size and rendering such inventories should have.
+        - `inv::InvInBlock`, stored in `block::BlockAttributes::inventory`, describes the size and rendering such inventories should have.
+    - `block::Modifier::Attributes` allows overriding block attributes.
 
 ### Changed
 
@@ -21,6 +22,10 @@
     - The trait method `raytracer::Accumulate::add()` now accepts the surface color via a `ColorBuf` (which acts essentially as a form of premultiplied alpha) rather than `Rgba`. This enables more consistent handling of emissive materials. See the method documentation for details.
 
 ### Removed
+
+- `all-is-cubes` library:
+    - `block::Primitive` no longer contains `BlockAttributes` in any of its variants.
+      The new means of specifying attributes is `block::Modifier::Attributes`.
 
 ## 0.8.0 (2024-07-08)
 

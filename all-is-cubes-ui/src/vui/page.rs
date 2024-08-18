@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::{text, AIR};
-use all_is_cubes::block::{Block, BlockAttributes, Resolution};
+use all_is_cubes::block::{Block, Resolution};
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{size2, Size2D};
@@ -312,7 +312,7 @@ pub(crate) mod parts {
             space.bounds(),
             universe.insert_anonymous(space),
             resolution,
-            BlockAttributes::default(),
+            [],
         )))
     }
 

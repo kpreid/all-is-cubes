@@ -189,59 +189,64 @@ fn block_atom_with_all_attributes() {
             "primitive": {
                 "type": "AtomV1",
                 "color": [1.0, 0.5, 0.0, 0.5],
-                "collision": "NoneV1",
-                "display_name": "foo",
-                "selectable": false,
-                "inventory": {
-                    "type": "InvInBlockV1",
-                        "size": 1,
-                        "icon_scale": 4,
-                        "icon_resolution": 16,
-                        "icon_rows": [
-                            {
-                                "count": 3,
-                                "first_slot": 0,
-                                "origin": [1, 1, 1],
-                                "stride": [5, 0, 0],
-                            },
-                            {
-                                "count": 3,
-                                "first_slot": 3,
-                                "origin": [1, 1, 6],
-                                "stride": [5, 0, 0],
-                            },
-                            {
-                                "count": 3,
-                                "first_slot": 6,
-                                "origin": [1, 1, 11],
-                                "stride": [5, 0, 0],
-                            },
-                        ],
-                    },
-                                    "rotation_rule": {
-                    "type": "AttachV1",
-                    "by": "PX",
-                },
-                "tick_action": {
-                    "schedule": {
-                        "type": "ScheduleV1",
-                        "period": 3,
-                    },
-                    "operation": {
-                        "type": "BecomeV1",
-                        "block": {
-                            "type": "BlockV1",
-                            "primitive": {"type": "AirV1"},
-                        }
-                    }
-                },
                 "light_emission": [1.0, 0.0, 10.0],
-                "animation_hint": {
-                    "type": "AnimationHintV1",
-                    "redefinition": "ColorSameCategory",
-                    "replacement": "Shape",
-                },
+                "collision": "NoneV1",
             },
+            "modifiers": [
+                {
+                    "type": "AttributesV1",
+                    "display_name": "foo",
+                    "selectable": false,
+                    "inventory": {
+                        "type": "InvInBlockV1",
+                            "size": 1,
+                            "icon_scale": 4,
+                            "icon_resolution": 16,
+                            "icon_rows": [
+                                {
+                                    "count": 3,
+                                    "first_slot": 0,
+                                    "origin": [1, 1, 1],
+                                    "stride": [5, 0, 0],
+                                },
+                                {
+                                    "count": 3,
+                                    "first_slot": 3,
+                                    "origin": [1, 1, 6],
+                                    "stride": [5, 0, 0],
+                                },
+                                {
+                                    "count": 3,
+                                    "first_slot": 6,
+                                    "origin": [1, 1, 11],
+                                    "stride": [5, 0, 0],
+                                },
+                            ],
+                        },
+                                        "rotation_rule": {
+                        "type": "AttachV1",
+                        "by": "PX",
+                    },
+                    "tick_action": {
+                        "schedule": {
+                            "type": "ScheduleV1",
+                            "period": 3,
+                        },
+                        "operation": {
+                            "type": "BecomeV1",
+                            "block": {
+                                "type": "BlockV1",
+                                "primitive": {"type": "AirV1"},
+                            }
+                        }
+                    },
+                    "animation_hint": {
+                        "type": "AnimationHintV1",
+                        "redefinition": "ColorSameCategory",
+                        "replacement": "Shape",
+                    },
+                }
+            ]
         }),
     );
 }
@@ -674,9 +679,14 @@ fn space_success() {
                     "type": "BlockV1",
                     "primitive": {
                         "type": "AtomV1",
-                        "color": [0.5, 0.5, 0.5, 1.0],
-                        "display_name": "0",
+                        "color": [0.5, 0.5, 0.5, 1.0]
                     },
+                    "modifiers": [
+                        {
+                            "type": "AttributesV1",
+                            "display_name": "0"
+                        }
+                    ]
                 },
             ],
             "contents": space_contents_json([
@@ -837,8 +847,13 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                     "primitive": {
                         "type": "AtomV1",
                         "color": [0.5, 0.5, 0.5, 1.0],
-                        "display_name": "0",
-                    }
+                    },
+                    "modifiers": [
+                        {
+                            "type": "AttributesV1",
+                            "display_name": "0",
+                        }
+                    ]
                 }
             },
             {

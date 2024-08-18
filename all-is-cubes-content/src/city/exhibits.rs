@@ -284,11 +284,13 @@ fn KNOT(ctx: Context<'_>) {
     })?;
     let space = space_to_blocks(
         resolution,
-        BlockAttributes {
-            display_name: ctx.exhibit.name.into(),
-            ..BlockAttributes::default()
-        },
         txn.insert_anonymous(drawing_space),
+        &mut |block| {
+            block.with_modifier(BlockAttributes {
+                display_name: ctx.exhibit.name.into(),
+                ..BlockAttributes::default()
+            })
+        },
     )?;
     Ok((space, txn))
 }

@@ -77,9 +77,6 @@ fn evaluated_block_debug_complex() {
             EvaluatedBlock {
                 block: Block {
                     primitive: Recur {
-                        attributes: BlockAttributes {
-                            display_name: "hello",
-                        },
                         space: Handle([anonymous #0]),
                         offset: (
                             0,
@@ -88,6 +85,11 @@ fn evaluated_block_debug_complex() {
                         ),
                         resolution: 2,
                     },
+                    modifiers: [
+                        BlockAttributes {
+                            display_name: "hello",
+                        },
+                    ],
                 },
                 attributes: BlockAttributes {
                     display_name: "hello",
@@ -105,7 +107,7 @@ fn evaluated_block_debug_complex() {
                     ..
                 },
                 cost: Cost {
-                    components: 1,
+                    components: 2,
                     voxels: 8,
                     recursion: 0,
                 },

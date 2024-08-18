@@ -60,7 +60,6 @@ fn inspect_primitive(primitive: &block::Primitive) -> vui::WidgetTree {
     let (name, details): (ArcStr, vui::WidgetTree) = match primitive {
         block::Primitive::Indirect(block_def) => (literal!("Indirect"), inspect_handle(block_def)),
         block::Primitive::Atom(block::Atom {
-            attributes,
             color,
             emission,
             collision,
@@ -72,14 +71,12 @@ fn inspect_primitive(primitive: &block::Primitive) -> vui::WidgetTree {
                     "\
                         Color: {color:?}\n\
                         Emission: {emission:?}\n\
-                        Collision: {collision:?}\n\
-                        Attributes: {attributes:#?}\
+                        Collision: {collision:?}\
                         "
                 ))],
             }),
         ),
         block::Primitive::Recur {
-            attributes,
             space,
             offset,
             resolution,
@@ -92,8 +89,7 @@ fn inspect_primitive(primitive: &block::Primitive) -> vui::WidgetTree {
                     paragraph(arcstr::format!(
                         "\
                         Resolution: {resolution}\n\
-                        Offset: {offset:?}\n\
-                        Attributes: {attributes:#?}\
+                        Offset: {offset:?}\
                         "
                     )),
                 ],
@@ -142,6 +138,9 @@ fn inspect_modifier(block: &Block, modifier_index: usize) -> vui::WidgetTree {
         .truncate(modifier_index + 1);
 
     let (name, details) = match modifier {
+        block::Modifier::Attributes(a) => {
+            (literal!("Attributes"), paragraph(arcstr::format!("{a:?}")))
+        }
         block::Modifier::Quote(q) => (literal!("Quote"), paragraph(arcstr::format!("{q:?}"))),
         block::Modifier::Rotate(rotation) => (
             literal!("Rotate"),

@@ -1,10 +1,8 @@
-use all_is_cubes_base::math::GridRotation;
-
 use crate::block::TickAction;
 use crate::block::{
     self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16, AIR,
 };
-use crate::math::{Face6, GridAab, GridCoordinate, GridVector, Vol};
+use crate::math::{Face6, GridAab, GridCoordinate, GridRotation, GridVector, Vol};
 use crate::op::Operation;
 use crate::time;
 use crate::universe;

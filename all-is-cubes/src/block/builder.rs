@@ -257,17 +257,29 @@ impl<P, Txn> BlockBuilder<P, Txn> {
     where
         P: BuildPrimitive,
     {
-        let primitive = self.primitive_builder.build_primitive(self.attributes);
-        let block = if matches!(primitive, Primitive::Air) && self.modifiers.is_empty() {
+        let Self {
+            attributes,
+            primitive_builder,
+            mut modifiers,
+            transaction,
+        } = self;
+        let primitive = primitive_builder.build_primitive();
+
+        if attributes != BlockAttributes::default() {
+            modifiers.insert(0, Modifier::Attributes(Arc::new(attributes)));
+        }
+
+        let block = if matches!(primitive, Primitive::Air) && modifiers.is_empty() {
             // Avoid allocating an Arc.
             AIR
         } else {
             Block(BlockPtr::Owned(Arc::new(BlockParts {
                 primitive,
-                modifiers: self.modifiers,
+                modifiers,
             })))
         };
-        (block, self.transaction)
+
+        (block, transaction)
     }
 }
 
@@ -370,9 +382,12 @@ impl From<Rgb> for BlockBuilder<BlockBuilderAtom, ()> {
 pub struct NeedsPrimitive;
 
 /// Something that a parameterized [`BlockBuilder`] can use to construct a block's primitive.
+///
+/// TODO: This is not currently necessary; we can replace the BuildPrimitive types with the
+/// primitive itself. (But will that remain true?)
 #[doc(hidden)]
 pub trait BuildPrimitive {
-    fn build_primitive(self, attributes: BlockAttributes) -> Primitive;
+    fn build_primitive(self) -> Primitive;
 }
 
 /// Parameter type for [`BlockBuilder::color`], building [`Primitive::Atom`].
@@ -383,9 +398,8 @@ pub struct BlockBuilderAtom {
     collision: BlockCollision,
 }
 impl BuildPrimitive for BlockBuilderAtom {
-    fn build_primitive(self, attributes: BlockAttributes) -> Primitive {
+    fn build_primitive(self) -> Primitive {
         Primitive::Atom(Atom {
-            attributes,
             color: self.color,
             emission: self.emission,
             collision: self.collision,
@@ -402,9 +416,8 @@ pub struct BlockBuilderVoxels {
     offset: GridPoint,
 }
 impl BuildPrimitive for BlockBuilderVoxels {
-    fn build_primitive(self, attributes: BlockAttributes) -> Primitive {
+    fn build_primitive(self) -> Primitive {
         Primitive::Recur {
-            attributes,
             offset: self.offset,
             resolution: self.resolution,
             space: self.space,
@@ -418,7 +431,7 @@ mod tests {
 
     use crate::block::{self, Resolution::*, TickAction};
     use crate::content::palette;
-    use crate::math::{Face6, Vol};
+    use crate::math::{Face6, GridRotation, Vol};
     use crate::op::Operation;
     use crate::space::SpacePhysics;
     use crate::transaction::Transactional as _;
@@ -431,7 +444,6 @@ mod tests {
         assert_eq!(
             Block::builder().color(color).build(),
             Block::from(Atom {
-                attributes: BlockAttributes::default(),
                 color,
                 emission: Rgb::ZERO,
                 collision: BlockCollision::Hard,
@@ -467,21 +479,23 @@ mod tests {
                 .tick_action(tick_action.clone())
                 .activation_action(activation_action.clone())
                 .animation_hint(AnimationHint::replacement(block::AnimationChange::Shape))
+                .modifier(Modifier::Rotate(GridRotation::CLOCKWISE))
                 .build(),
             Block::from(Atom {
-                attributes: BlockAttributes {
-                    display_name: "hello world".into(),
-                    selectable: false,
-                    inventory,
-                    rotation_rule,
-                    tick_action,
-                    activation_action,
-                    animation_hint: AnimationHint::replacement(block::AnimationChange::Shape),
-                },
                 color,
                 emission,
                 collision: BlockCollision::None,
-            }),
+            })
+            .with_modifier(BlockAttributes {
+                display_name: "hello world".into(),
+                selectable: false,
+                inventory,
+                rotation_rule,
+                tick_action,
+                activation_action,
+                animation_hint: AnimationHint::replacement(block::AnimationChange::Shape),
+            })
+            .with_modifier(Modifier::Rotate(GridRotation::CLOCKWISE))
         );
     }
 
@@ -496,14 +510,14 @@ mod tests {
                 .voxels_handle(R2, space_handle.clone())
                 .build(),
             Block::from_primitive(Primitive::Recur {
-                attributes: BlockAttributes {
-                    display_name: "hello world".into(),
-                    ..BlockAttributes::default()
-                },
                 offset: GridPoint::origin(),
                 resolution: R2, // not same as space size
                 space: space_handle
-            }),
+            })
+            .with_modifier(Modifier::Attributes(Arc::new(BlockAttributes {
+                display_name: "hello world".into(),
+                ..BlockAttributes::default()
+            }))),
         );
     }
 
@@ -530,13 +544,13 @@ mod tests {
         assert_eq!(
             block,
             Block::from_primitive(Primitive::Recur {
-                attributes: BlockAttributes {
-                    display_name: "hello world".into(),
-                    ..BlockAttributes::default()
-                },
                 offset: GridPoint::origin(),
                 resolution,
                 space: space_handle.clone()
+            })
+            .with_modifier(BlockAttributes {
+                display_name: "hello world".into(),
+                ..BlockAttributes::default()
             }),
         );
 

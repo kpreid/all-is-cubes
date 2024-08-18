@@ -534,10 +534,11 @@ fn place_one_exhibit<I: Instant>(
                     bounds_for_info_voxels,
                     universe.insert_anonymous(exhibit_info_space),
                     info_resolution,
-                    BlockAttributes {
+                    [BlockAttributes {
                         display_name: "Exhibit Name".into(),
                         ..Default::default()
-                    },
+                    }
+                    .into()],
                 ))),
             ],
         });

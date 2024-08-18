@@ -102,10 +102,18 @@ mod block {
                     primitive,
                     modifiers,
                 } => {
-                    let mut block = Block::from_primitive(primitive.into());
+                    let (primitive, attributes) = primitive_from_schema(primitive);
+                    let mut block = Block::from_primitive(primitive);
+
+                    let attr_mod_iter = attributes
+                        .filter(|a| a != BlockAttributes::DEFAULT_REF)
+                        .map(Modifier::from)
+                        .into_iter();
+                    let general_mod_iter = modifiers.into_iter().map(Modifier::from);
+
                     block
                         .modifiers_mut()
-                        .extend(modifiers.into_iter().map(Modifier::from));
+                        .extend(attr_mod_iter.chain(general_mod_iter));
                     block
                 }
             })
@@ -119,23 +127,25 @@ mod block {
                     definition: definition.clone(),
                 },
                 &Primitive::Atom(Atom {
-                    ref attributes,
                     color,
                     emission,
                     collision,
                 }) => schema::PrimitiveSer::AtomV1 {
+                    // attributes on the primitive are no longer used, but still supported
+                    // by deserialization.
+                    attributes: BlockAttributes::DEFAULT_REF.into(),
                     color: color.into(),
                     light_emission: emission.into(),
-                    attributes: attributes.into(),
                     collision: collision.into(),
                 },
                 &Primitive::Recur {
-                    ref attributes,
                     ref space,
                     offset,
                     resolution,
                 } => schema::PrimitiveSer::RecurV1 {
-                    attributes: attributes.into(),
+                    // attributes on the primitive are no longer used, but still supported
+                    // by deserialization.
+                    attributes: BlockAttributes::DEFAULT_REF.into(),
                     space: space.clone(),
                     offset: offset.into(),
                     resolution,
@@ -149,38 +159,47 @@ mod block {
         }
     }
 
-    impl<'a> From<schema::PrimitiveSer<'a>> for Primitive {
-        fn from(value: schema::PrimitiveSer<'a>) -> Self {
-            match value {
-                schema::PrimitiveSer::IndirectV1 { definition } => Primitive::Indirect(definition),
-                schema::PrimitiveSer::AtomV1 {
-                    attributes,
-                    color,
-                    light_emission: emission,
-                    collision,
-                } => Primitive::Atom(Atom {
-                    attributes: BlockAttributes::from(attributes),
+    fn primitive_from_schema(
+        value: schema::PrimitiveSer<'_>,
+    ) -> (Primitive, Option<BlockAttributes>) {
+        match value {
+            schema::PrimitiveSer::IndirectV1 { definition } => {
+                (Primitive::Indirect(definition), None)
+            }
+            schema::PrimitiveSer::AtomV1 {
+                attributes,
+                color,
+                light_emission: emission,
+                collision,
+            } => (
+                Primitive::Atom(Atom {
                     color: Rgba::from(color),
                     emission: Rgb::from(emission),
                     collision: collision.into(),
                 }),
-                schema::PrimitiveSer::RecurV1 {
-                    attributes,
-                    space,
-                    offset,
-                    resolution,
-                } => Primitive::Recur {
-                    attributes: attributes.into(),
+                Some(attributes.into()),
+            ),
+            schema::PrimitiveSer::RecurV1 {
+                attributes,
+                space,
+                offset,
+                resolution,
+            } => (
+                Primitive::Recur {
                     space,
                     offset: offset.into(),
                     resolution,
                 },
-                schema::PrimitiveSer::AirV1 => Primitive::Air,
-                schema::PrimitiveSer::TextPrimitiveV1 { text, offset } => Primitive::Text {
+                Some(attributes.into()),
+            ),
+            schema::PrimitiveSer::AirV1 => (Primitive::Air, None),
+            schema::PrimitiveSer::TextPrimitiveV1 { text, offset } => (
+                Primitive::Text {
                     text: text.into(),
                     offset: offset.into(),
                 },
-            }
+                None,
+            ),
         }
     }
 
@@ -341,6 +360,9 @@ mod block {
     impl<'a> From<&'a Modifier> for ModifierSer<'a> {
         fn from(value: &'a Modifier) -> Self {
             match *value {
+                Modifier::Attributes(ref attributes) => ModifierSer::AttributesV1 {
+                    attributes: (&**attributes).into(),
+                },
                 Modifier::Quote(Quote { suppress_ambient }) => {
                     ModifierSer::QuoteV1 { suppress_ambient }
                 }
@@ -368,6 +390,9 @@ mod block {
     impl From<ModifierSer<'_>> for Modifier {
         fn from(value: ModifierSer<'_>) -> Self {
             match value {
+                ModifierSer::AttributesV1 { attributes } => {
+                    Modifier::Attributes(Arc::new(attributes.into()))
+                }
                 ModifierSer::QuoteV1 { suppress_ambient } => {
                     Modifier::Quote(Quote { suppress_ambient })
                 }

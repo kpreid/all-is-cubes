@@ -16,7 +16,7 @@ use crate::math::{GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, 
 use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::{Handle, HandleVisitor, VisitHandles};
 
-/// Construct a [`Block`] with the given reflectance color, and default attributes.
+/// Construct a [`Block`] with the given reflectance color.
 ///
 /// This is equivalent to calling `Block::from()`, except that:
 ///
@@ -168,9 +168,6 @@ pub enum Primitive {
 
     /// A block that is composed of smaller blocks, defined by the referenced [`Space`].
     Recur {
-        #[allow(missing_docs)]
-        attributes: BlockAttributes,
-
         /// The space from which voxels are taken.
         space: Handle<Space>,
 
@@ -217,9 +214,6 @@ pub enum Primitive {
 #[derive(Clone, Eq, Hash, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct Atom {
-    #[allow(missing_docs)]
-    pub attributes: BlockAttributes,
-
     /// The color exhibited by diffuse reflection from this block.
     ///
     /// The RGB components of this color are the *[reflectance]:* the fraction of incoming light
@@ -438,6 +432,24 @@ impl Block {
                 .all(|m| m.does_not_introduce_asymmetry())
     }
 
+    /// Add a [`Modifier::Attributes`] if there isn't one already.
+    /// Evaluates the block if needed to get existing attributes.
+    ///
+    /// TODO: bad API probably, because it overwrites/freezes attributes; this was added in a hurry
+    /// to tidy up the attributes-is-a-modifer refactor. The proper API is more like with_modifier()
+    /// for a single attribute, but we don't have single attribute override modifiers yet.
+    #[doc(hidden)]
+    pub fn freezing_get_attributes_mut(&mut self) -> &mut BlockAttributes {
+        if !matches!(self.modifiers().last(), Some(Modifier::Attributes(_))) {
+            let attr_modifier = self.evaluate().unwrap().attributes.into();
+            self.modifiers_mut().push(attr_modifier);
+        }
+        let Some(Modifier::Attributes(a)) = self.modifiers_mut().last_mut() else {
+            unreachable!();
+        };
+        Arc::make_mut(a)
+    }
+
     /// Rotates this block by the specified rotation.
     ///
     /// Compared to direct use of [`Modifier::Rotate`], this will:
@@ -456,7 +468,8 @@ impl Block {
     /// use all_is_cubes::universe::Universe;
     ///
     /// let mut universe = Universe::new();
-    /// let [block] = make_some_voxel_blocks(&mut universe);
+    /// let [mut block] = make_some_voxel_blocks(&mut universe);
+    /// block.modifiers_mut().clear();
     /// let clockwise = GridRotation::CLOCKWISE;
     ///
     /// // Basic rotation
@@ -628,16 +641,15 @@ impl Block {
             Primitive::Indirect(ref def_handle) => def_handle.read()?.evaluate_impl(filter)?,
 
             Primitive::Atom(Atom {
-                ref attributes,
                 color,
                 emission,
                 collision,
             }) => MinEval::new(
-                attributes.clone(),
+                BlockAttributes::default(),
                 Evoxels::from_one(Evoxel {
                     color,
                     emission,
-                    selectable: attributes.selectable,
+                    selectable: true,
                     collision,
                 }),
             ),
@@ -645,7 +657,6 @@ impl Block {
             Primitive::Air => AIR_EVALUATED_MIN,
 
             Primitive::Recur {
-                ref attributes,
                 offset,
                 resolution,
                 space: ref space_handle,
@@ -721,13 +732,12 @@ impl Block {
                     BlockAttributes {
                         // Translate the voxels' animation hints into their effect on
                         // the outer block.
-                        animation_hint: attributes.animation_hint
-                            | AnimationHint {
-                                redefinition: voxels_animation_hint.redefinition
-                                    | voxels_animation_hint.replacement,
-                                replacement: AnimationChange::None,
-                            },
-                        ..attributes.clone()
+                        animation_hint: AnimationHint {
+                            redefinition: voxels_animation_hint.redefinition
+                                | voxels_animation_hint.replacement,
+                            replacement: AnimationChange::None,
+                        },
+                        ..BlockAttributes::default()
                     },
                     Evoxels::from_many(resolution, voxels),
                 )
@@ -871,14 +881,12 @@ mod arbitrary_block {
             Ok(match u.int_in_range(0..=4)? {
                 0 => Primitive::Air,
                 1 => Primitive::Atom(Atom {
-                    attributes: BlockAttributes::arbitrary(u)?,
                     color: Rgba::arbitrary(u)?,
                     emission: Rgb::arbitrary(u)?,
                     collision: BlockCollision::arbitrary(u)?,
                 }),
                 2 => Primitive::Indirect(Handle::arbitrary(u)?),
                 3 => Primitive::Recur {
-                    attributes: BlockAttributes::arbitrary(u)?,
                     offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
                     resolution: Resolution::arbitrary(u)?,
                     space: Handle::arbitrary(u)?,
@@ -896,7 +904,8 @@ mod arbitrary_block {
             // `Primitive` is arbitrarily recursive because it can contain `Block`s
             // (via `Indirect` and `Text`). Therefore, the size hint calculation will always hit
             // the depth limit, and we should skip it for efficiency.
-            // The lower bound is 2 because we need at least one byte to make a choice of primitive.
+            // The lower bound is 1 because we need at least one byte to make a choice of primitive,
+            // but if that primitive is `AIR` then we need no more bytes.
             (1, None)
         }
     }
@@ -926,17 +935,26 @@ impl Primitive {
     /// under all possible conditions of the rest of the universe.
     pub(in crate::block) fn rotationally_symmetric(&self) -> bool {
         match self {
-            Primitive::Indirect(_) => false,
-            Primitive::Atom(Atom {
-                attributes,
-                color: _,
-                emission: _,
-                collision: _,
-            }) => attributes.rotationally_symmetric(),
-            Primitive::Recur { .. } => false,
+            Primitive::Indirect(_) => false, // could point to anything
+            Primitive::Atom(atom) => atom.rotationally_symmetric(),
+            Primitive::Recur { .. } => false, // could point to anything
             Primitive::Air => true,
-            Primitive::Text { .. } => false,
+            Primitive::Text { .. } => false, // always asymmetric unless it's trivial
         }
+    }
+}
+
+impl Atom {
+    fn rotationally_symmetric(&self) -> bool {
+        let Self {
+            color: _,
+            emission: _,
+            collision: _,
+        } = self;
+        // I'm planning to eventually have non-uniform collision behaviors
+        // or visual effects such as normal mapping,
+        // at which point this will be sometimes false.
+        true
     }
 }
 
@@ -946,13 +964,11 @@ impl fmt::Debug for Primitive {
             Self::Indirect(def) => f.debug_tuple("Indirect").field(def).finish(),
             Self::Atom(atom) => atom.fmt(f),
             Self::Recur {
-                attributes,
                 space,
                 offset,
                 resolution,
             } => f
                 .debug_struct("Recur")
-                .field("attributes", attributes)
                 .field("space", space)
                 .field("offset", offset)
                 .field("resolution", resolution)
@@ -970,15 +986,11 @@ impl fmt::Debug for Primitive {
 impl fmt::Debug for Atom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let &Self {
-            ref attributes,
             color,
             emission,
             collision,
         } = self;
         let mut s = f.debug_struct("Atom");
-        if attributes != &BlockAttributes::default() {
-            s.field("attributes", &attributes);
-        }
         s.field("color", &color);
         if emission != Rgb::ZERO {
             s.field("emission", &emission);
@@ -996,12 +1008,10 @@ impl VisitHandles for Primitive {
             Primitive::Air => {}
             Primitive::Recur {
                 space,
-                attributes,
                 offset: _,
                 resolution: _,
             } => {
                 visitor.visit(space);
-                attributes.visit_handles(visitor);
             }
             Primitive::Text { text, offset: _ } => text.visit_handles(visitor),
         }
@@ -1009,14 +1019,12 @@ impl VisitHandles for Primitive {
 }
 
 impl VisitHandles for Atom {
-    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {
         let Self {
-            attributes,
             color: _,
             emission: _,
             collision: _,
         } = self;
-        attributes.visit_handles(visitor);
     }
 }
 
@@ -1024,13 +1032,12 @@ mod conversions_for_atom {
     use super::*;
 
     impl Atom {
-        /// Construct an [`Atom`] with the given reflectance color, and default attributes.
+        /// Construct an [`Atom`] with the given reflectance color.
         ///
         /// This is identical to `From<Rgba>::from()` except that it is a `const fn`.
         // TODO: public API?
         pub(crate) const fn from_color(color: Rgba) -> Self {
             Atom {
-                attributes: BlockAttributes::default(),
                 color,
                 emission: Rgb::ZERO,
                 collision: BlockCollision::DEFAULT_FOR_FROM_COLOR,
@@ -1108,12 +1115,13 @@ impl BlockChange {
 ///
 /// Panics if the `Space` cannot be accessed, and returns
 /// [`SetCubeError::TooManyBlocks`] if the space volume is too large.
-///
-/// TODO: add doc test for this
+//---
+// TODO: add doc test for this
+// TODO: This is only used once ... is it really a good public API?
 pub fn space_to_blocks(
     resolution: Resolution,
-    attributes: BlockAttributes,
     space_handle: Handle<Space>,
+    block_transform: &mut dyn FnMut(Block) -> Block,
 ) -> Result<Space, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();
     let source_bounds = space_handle
@@ -1124,12 +1132,11 @@ pub fn space_to_blocks(
 
     let mut destination_space = Space::empty(destination_bounds);
     destination_space.fill(destination_bounds, move |cube| {
-        Some(Block::from_primitive(Primitive::Recur {
-            attributes: attributes.clone(),
+        Some(block_transform(Block::from_primitive(Primitive::Recur {
             offset: (cube.lower_bounds().to_vector() * resolution_g).to_point(),
             resolution,
             space: space_handle.clone(),
-        }))
+        })))
     })?;
     Ok(destination_space)
 }

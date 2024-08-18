@@ -1,10 +1,12 @@
-use crate::block::{self, Block, Evoxels, MinEval};
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+
+use crate::block::{self, Block, BlockAttributes, Evoxels, MinEval};
 use crate::inv;
 use crate::math::{GridRotation, Vol};
 use crate::universe::{HandleVisitor, VisitHandles};
 
 mod composite;
-use alloc::vec::Vec;
 pub use composite::*;
 mod r#move;
 pub use r#move::*;
@@ -53,6 +55,12 @@ pub use zoom::*;
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Modifier {
+    /// Sets or overrides the [attributes](BlockAttributes) of the block.
+    //---
+    // Design note: Indirection is used here to keep `Modifier` small.
+    // `Arc` specifically is used so cloning does not allocate.
+    Attributes(Arc<BlockAttributes>),
+
     /// Suppresses all behaviors of the [`Block`] that might affect the space around it,
     /// (or itself).
     Quote(Quote),
@@ -84,6 +92,7 @@ impl core::fmt::Debug for Modifier {
         // Print most modifiers’ data without the enum variant, because their struct names
         // are identifying enough.
         match self {
+            Self::Attributes(a) => a.fmt(f),
             Self::Quote(q) => q.fmt(f),
             Self::Rotate(r) => write!(f, "Rotate({r:?})"),
             Self::Composite(c) => c.fmt(f),
@@ -108,12 +117,19 @@ impl Modifier {
         &self,
         block: &Block,
         this_modifier_index: usize,
-        value: MinEval,
+        mut value: MinEval,
         filter: &block::EvalFilter,
     ) -> Result<MinEval, block::InEvalError> {
         block::Budget::decrement_components(&filter.budget)?;
 
         Ok(match *self {
+            // TODO: Eventually, we want to be able to override individual attributes.
+            // We will need a new schema (possibly a set of individual modifiers) for that.
+            Modifier::Attributes(ref attributes) => {
+                value.set_attributes(BlockAttributes::clone(attributes));
+                value
+            }
+
             Modifier::Quote(ref quote) => quote.evaluate(value, filter)?,
 
             Modifier::Rotate(rotation) => {
@@ -169,6 +185,8 @@ impl Modifier {
     pub(crate) fn unspecialize(&self, block: &Block) -> ModifierUnspecialize {
         // When modifying this match, update the public documentation of `Block::unspecialize` too.
         match self {
+            Modifier::Attributes(_) => ModifierUnspecialize::Keep,
+
             Modifier::Quote(_) => ModifierUnspecialize::Keep,
 
             Modifier::Rotate(_) => ModifierUnspecialize::Pop,
@@ -203,6 +221,7 @@ impl Modifier {
     /// had none”.
     pub(crate) fn does_not_introduce_asymmetry(&self) -> bool {
         match self {
+            Modifier::Attributes(attr) => attr.rotationally_symmetric(),
             // Quote has no asymmetry
             Modifier::Quote(_) => true,
             // Rotate may change existing asymmetry but does not introduce it
@@ -223,6 +242,7 @@ impl Modifier {
 impl VisitHandles for Modifier {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         match self {
+            Modifier::Attributes(a) => a.visit_handles(visitor),
             Modifier::Quote(m) => m.visit_handles(visitor),
             Modifier::Rotate(_) => {}
             Modifier::Composite(m) => m.visit_handles(visitor),
@@ -273,6 +293,11 @@ mod tests {
     #[test]
     fn modifier_debug() {
         let modifiers: Vec<Modifier> = vec![
+            BlockAttributes {
+                display_name: arcstr::literal!("hello"),
+                ..Default::default()
+            }
+            .into(),
             Modifier::Quote(Quote::new()),
             Modifier::Rotate(GridRotation::RXyZ),
             Modifier::Composite(Composite::new(block::AIR, CompositeOperator::Over)),
@@ -281,7 +306,10 @@ mod tests {
         assert_eq!(
             format!("{modifiers:#?}"),
             indoc::indoc! {
-                r"[
+                r#"[
+                    BlockAttributes {
+                        display_name: "hello",
+                    },
                     Quote {
                         suppress_ambient: false,
                     },
@@ -297,7 +325,7 @@ mod tests {
                     Inventory {
                         slots: [],
                     },
-                ]"
+                ]"#
             }
         );
     }
@@ -365,7 +393,7 @@ mod tests {
                     ..BlockAttributes::default()
                 },
                 cost: block::Cost {
-                    components: 2,
+                    components: 3,           // Primitive + display_name + Rotate
                     voxels: 2u32.pow(3) * 2, // original + rotation
                     recursion: 0
                 },

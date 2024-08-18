@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use strum::IntoEnumIterator;
 
 use all_is_cubes::arcstr;
-use all_is_cubes::block::{BlockAttributes, Resolution};
+use all_is_cubes::block::Resolution;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::Vector3D;
@@ -39,7 +39,7 @@ pub(crate) async fn template_menu(
         logo_text_space.bounds(),
         universe.insert_anonymous(logo_text_space),
         Resolution::R8,
-        BlockAttributes::default(),
+        [],
     );
 
     let mut vertical_widgets: Vec<vui::WidgetTree> = Vec::with_capacity(10);

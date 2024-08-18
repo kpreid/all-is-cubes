@@ -270,13 +270,13 @@ mod tests {
         assert_eq!(
             make_some_blocks::<1>(),
             [Block::from(Atom {
-                attributes: BlockAttributes {
-                    display_name: "0".into(),
-                    ..BlockAttributes::default()
-                },
                 color: Rgba::new(0.5, 0.5, 0.5, 1.0),
                 emission: Rgb::ZERO,
                 collision: BlockCollision::Hard,
+            })
+            .with_modifier(BlockAttributes {
+                display_name: "0".into(),
+                ..BlockAttributes::default()
             })]
         );
     }
@@ -287,22 +287,22 @@ mod tests {
             make_some_blocks::<2>(),
             [
                 Block::from(Atom {
-                    attributes: BlockAttributes {
-                        display_name: "0".into(),
-                        ..BlockAttributes::default()
-                    },
                     color: Rgba::new(0.0, 0.0, 0.0, 1.0),
                     emission: Rgb::ZERO,
                     collision: BlockCollision::Hard,
+                })
+                .with_modifier(BlockAttributes {
+                    display_name: "0".into(),
+                    ..BlockAttributes::default()
                 }),
                 Block::from(Atom {
-                    attributes: BlockAttributes {
-                        display_name: "1".into(),
-                        ..BlockAttributes::default()
-                    },
                     color: Rgba::new(1.0, 1.0, 1.0, 1.0),
                     emission: Rgb::ZERO,
                     collision: BlockCollision::Hard,
+                })
+                .with_modifier(BlockAttributes {
+                    display_name: "1".into(),
+                    ..BlockAttributes::default()
                 })
             ]
         );
