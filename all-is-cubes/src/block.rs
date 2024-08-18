@@ -418,6 +418,26 @@ impl Block {
         self
     }
 
+    /// Returns whether this block’s evaluation would be affected at all by adding
+    /// or removing a [`Modifier::Rotate`].
+    ///
+    /// Note that this does not account for symmetry of the block’s evaluation; it only checks
+    /// the primitive’s own data, and so answers whether this primitive is *always* symmetric
+    /// under all possible conditions of the rest of the universe.
+    pub(in crate::block) fn rotationally_symmetric(&self) -> bool {
+        // TODO: Just checking the definitions does not reveal sufficient information.
+        // In particular, `Primitive::Indirect` is opaque. Therefore, for some applications,
+        // we want a version that operates on `EvaluatedBlock` which can consult whether the
+        // block is symmetric accounting for all parts of its definition. On the other hand,
+        // other applications might care not whether it is *currently* symmetric but whether
+        // it can ever change to be asymmetric, for which this is the actual right answer.
+        self.primitive().rotationally_symmetric()
+            && self
+                .modifiers()
+                .iter()
+                .all(|m| m.does_not_introduce_asymmetry())
+    }
+
     /// Rotates this block by the specified rotation.
     ///
     /// Compared to direct use of [`Modifier::Rotate`], this will:
@@ -460,26 +480,19 @@ impl Block {
             return self;
         }
 
-        match (self.primitive(), self.modifiers().is_empty()) {
-            (Primitive::Atom(_) | Primitive::Air, true) => {
-                // TODO: Just checking for Primitive::Atom doesn't help when the atom
-                // is hidden behind Primitive::Indirect. In general, we need to evaluate()
-                // (which suggests that this perhaps should be at least available
-                // as a function that takes Block + EvaluatedBlock).
-                self
-            }
-            _ => {
-                let parts = self.make_parts_mut();
-                match parts.modifiers.last_mut() {
-                    // TODO: If the combined rotation is the identity, discard the modifier
-                    Some(Modifier::Rotate(existing_rotation)) => {
-                        *existing_rotation = rotation * *existing_rotation;
-                    }
-                    None | Some(_) => parts.modifiers.push(Modifier::Rotate(rotation)),
-                }
-                self
-            }
+        if self.rotationally_symmetric() {
+            return self;
         }
+
+        let parts = self.make_parts_mut();
+        match parts.modifiers.last_mut() {
+            // TODO: If the combined rotation is the identity, discard the modifier
+            Some(Modifier::Rotate(existing_rotation)) => {
+                *existing_rotation = rotation * *existing_rotation;
+            }
+            None | Some(_) => parts.modifiers.push(Modifier::Rotate(rotation)),
+        }
+        self
     }
 
     /// Standardizes any characteristics of this block which may be presumed to be
@@ -904,6 +917,26 @@ impl Primitive {
     /// This function is equivalent to `Block::from(color)` but it can be used in const contexts.
     pub const fn from_color(color: Rgba) -> Primitive {
         Primitive::Atom(Atom::from_color(color))
+    }
+
+    /// Returns whether this primitive would be changed at all by a [`Modifier::Rotate`].
+    ///
+    /// Note that this does not account for symmetry of the block’s evaluation; it only checks
+    /// the primitive’s own data, and so answers whether this primitive is *always* symmetric
+    /// under all possible conditions of the rest of the universe.
+    pub(in crate::block) fn rotationally_symmetric(&self) -> bool {
+        match self {
+            Primitive::Indirect(_) => false,
+            Primitive::Atom(Atom {
+                attributes,
+                color: _,
+                emission: _,
+                collision: _,
+            }) => attributes.rotationally_symmetric(),
+            Primitive::Recur { .. } => false,
+            Primitive::Air => true,
+            Primitive::Text { .. } => false,
+        }
     }
 }
 

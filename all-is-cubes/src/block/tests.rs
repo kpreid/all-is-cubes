@@ -774,6 +774,25 @@ fn self_referential_block(universe: &mut Universe) -> Block {
     indirect
 }
 
+/// Tests for the behavior of `with_modifier()` and `rotate()` and such.
+mod modify {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    pub fn rotate_atom_is_identity() {
+        let block = color_block!(1.0, 0.0, 0.0);
+        assert_eq!(block.clone().rotate(GridRotation::CLOCKWISE), block);
+    }
+
+    #[test]
+    fn rotate_atom_with_symmetric_modifier_is_identity() {
+        // Quote is an example of a modifer that doesn't add asymmetry.
+        let block = color_block!(1.0, 0.0, 0.0).with_modifier(block::Quote::new());
+        assert_eq!(block.clone().rotate(GridRotation::CLOCKWISE), block);
+    }
+}
+
 mod txn {
     use super::*;
     use crate::transaction::{Merge, TransactionTester};

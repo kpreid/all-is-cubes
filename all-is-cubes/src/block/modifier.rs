@@ -181,6 +181,28 @@ impl Modifier {
             }
         }
     }
+
+    /// This is like `rotationally_symmetric()` on other modifiers, except that it doesn't
+    /// describe whether it _affects_ rotations — in particular, it does not mean “this modifier
+    /// commutes with `Rotate` modifiers”, but rather “will it introduce asymmetry to a block that
+    /// had none”.
+    pub(crate) fn does_not_introduce_asymmetry(&self) -> bool {
+        match self {
+            // Quote has no asymmetry
+            Modifier::Quote(_) => true,
+            // Rotate may change existing asymmetry but does not introduce it
+            Modifier::Rotate(_) => true,
+            Modifier::Composite(c) => c.rotationally_symmetric(),
+            // Technically, Zoom on a resolution-1 block is symmetric but that case is
+            // hard to calculate without knowing something about the primitive.
+            Modifier::Zoom(_) => false,
+
+            Modifier::Move(_) => false,
+            // This requires knowing the `InvInBlock` to answer true, and hence requires evaluation.
+            // So don't try.
+            Modifier::Inventory(_) => false,
+        }
+    }
 }
 
 impl VisitHandles for Modifier {

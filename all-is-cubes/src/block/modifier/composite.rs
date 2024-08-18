@@ -160,6 +160,16 @@ impl Composite {
             block::ModifierUnspecialize::Keep
         }
     }
+
+    pub(crate) fn rotationally_symmetric(&self) -> bool {
+        let Self {
+            source,
+            operator,
+            reverse: _,
+            disassemblable: _,
+        } = self;
+        source.rotationally_symmetric() && operator.rotationally_symmetric()
+    }
 }
 
 /// Implementation of [`Composite::evaluate()`], without the requirement that the source
@@ -438,6 +448,13 @@ impl CompositeOperator {
             Self::Out => source,
             Self::Atop => destination,
         }
+    }
+
+    /// Returns whether this operator’s effects are independent of how the input blocks are
+    /// rotated.
+    #[allow(clippy::unused_self)]
+    fn rotationally_symmetric(self) -> bool {
+        true
     }
 }
 
