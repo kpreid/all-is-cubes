@@ -55,6 +55,7 @@ pub enum DemoBlocks {
     Clock,
     BecomeBlinker(bool),
     Explosion(i8),
+    Projectile,
 }
 impl BlockModule for DemoBlocks {
     fn namespace() -> &'static str {
@@ -492,6 +493,30 @@ pub async fn install_demo_blocks(
                     })?
                     .build_txn(txn)
             }
+
+            Projectile => Block::builder()
+                .display_name("Projectile")
+                .voxels_fn(resolution, |cube| {
+                    let [r, _] = square_radius(resolution, cube);
+                    if r * 4 < resolution_g {
+                        &lamppost_metal
+                    } else {
+                        &AIR
+                    }
+                })?
+                .animation_hint(AnimationHint::replacement(block::AnimationChange::Shape))
+                .tick_action(TickAction {
+                    operation: Operation::Alt(
+                        [
+                            Operation::StartMove(block::Move::new(Face6::PY, 0, 32)),
+                            // if we can't move, vanish
+                            Operation::Become(AIR),
+                        ]
+                        .into(),
+                    ),
+                    schedule: time::Schedule::EVERY_TICK,
+                })
+                .build_txn(txn),
         })
     })
     .await?

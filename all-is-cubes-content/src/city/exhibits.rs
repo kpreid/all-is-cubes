@@ -29,7 +29,7 @@ use all_is_cubes::inv;
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::math::{
-    rgb_const, rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate,
+    notnan, rgb_const, rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate,
     GridPoint, GridRotation, GridSize, GridVector, Gridgid, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::op::Operation;
@@ -55,6 +55,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[Exhibit] = &[
     TRANSPARENCY_SMALL,
     COLLISION,
     RESOLUTIONS,
+    PROJECTILE,
     ANIMATION,
     MAKE_SOME_BLOCKS,
     DASHED_BOXES,
@@ -863,6 +864,48 @@ fn MOVED_BLOCKS(_: Context<'_>) {
             space.set([i, 0, -1], block.clone().with_modifier(move_in))?;
         }
     }
+    Ok((space, txn))
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Projectile",
+    subtitle: "click me to launch",
+    placement: Placement::Surface,
+)]
+fn PROJECTILE(ctx: Context<'_>) {
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
+    let txn = ExhibitTransaction::default();
+
+    let projectile = &demo_blocks[DemoBlocks::Projectile];
+
+    let moving_in = projectile
+        .clone()
+        .with_modifier(Move::new(Face6::NY, 256, -32));
+
+    // TODO: make the launcher block visibly contain and launch the projectile.
+    // This will require getting `Move` tick actions to cooperate with `Composite`.
+    let launcher = Block::builder()
+        .display_name(literal!("Launcher"))
+        .color(Rgb::UNIFORM_LUMINANCE_RED.with_alpha(notnan!(1.0)))
+        .animation_hint(block::AnimationHint::replacement(
+            block::AnimationChange::Shape,
+        ))
+        .activation_action(Operation::Neighbors(
+            [
+                // TODO: Instead of `DestroyTo`, we should have an operation that only
+                // succeeds if there is room to enter empty space here (if the destination
+                // is AIR, for now).
+                (Cube::new(0, 1, 0), Operation::DestroyTo(moving_in)),
+            ]
+            .into(),
+        ))
+        .build();
+
+    let space = Space::builder(GridAab::ORIGIN_CUBE)
+        .filled_with(launcher)
+        .build();
+
     Ok((space, txn))
 }
 
