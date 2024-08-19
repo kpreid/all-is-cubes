@@ -49,7 +49,7 @@ pub use zoom::*;
 /// exists, so no rules are currently enforceable).
 ///
 /// [`Rotate`]: Self::Rotate
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Modifier {
@@ -77,6 +77,21 @@ pub enum Modifier {
     /// TODO(inventory): Define means for a block definition to specify the properties the inventory
     /// should have (its size, at least), and how it is rendered into the block.
     Inventory(inv::Inventory),
+}
+
+impl core::fmt::Debug for Modifier {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // Print most modifiers’ data without the enum variant, because their struct names
+        // are identifying enough.
+        match self {
+            Self::Quote(q) => q.fmt(f),
+            Self::Rotate(r) => write!(f, "Rotate({r:?})"),
+            Self::Composite(c) => c.fmt(f),
+            Self::Zoom(z) => z.fmt(f),
+            Self::Move(m) => m.fmt(f),
+            Self::Inventory(i) => i.fmt(f),
+        }
+    }
 }
 
 impl Modifier {
@@ -233,8 +248,10 @@ pub(crate) enum ModifierUnspecialize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{BlockAttributes, TickAction};
-    use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2};
+    use crate::block::{
+        BlockAttributes, BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2,
+        TickAction,
+    };
     use crate::content::make_some_voxel_blocks;
     use crate::math::{Cube, Face6, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
     use crate::op::Operation;
@@ -251,6 +268,38 @@ mod tests {
         // 64-bit systems, the size will be rounded up to three pointers
         // (unless the alignment of pointers is less than their size).
         assert_eq!(size_of::<Modifier>(), 3 * size_of::<*const ()>());
+    }
+
+    #[test]
+    fn modifier_debug() {
+        let modifiers: Vec<Modifier> = vec![
+            Modifier::Quote(Quote::new()),
+            Modifier::Rotate(GridRotation::RXyZ),
+            Modifier::Composite(Composite::new(block::AIR, CompositeOperator::Over)),
+            Modifier::Inventory(inv::Inventory::from_slots([])),
+        ];
+        assert_eq!(
+            format!("{modifiers:#?}"),
+            indoc::indoc! {
+                r"[
+                    Quote {
+                        suppress_ambient: false,
+                    },
+                    Rotate(RXyZ),
+                    Composite {
+                        source: Block {
+                            primitive: Air,
+                        },
+                        operator: Over,
+                        reverse: false,
+                        disassemblable: false,
+                    },
+                    Inventory {
+                        slots: [],
+                    },
+                ]"
+            }
+        );
     }
 
     #[test]
