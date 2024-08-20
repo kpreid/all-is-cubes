@@ -9,9 +9,9 @@ use std::time::{Duration, Instant};
 use anyhow::Context;
 use clap::{CommandFactory as _, Parser as _};
 
-use all_is_cubes_render::camera::{GraphicsOptions, Viewport};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::ListenableCell;
+use all_is_cubes_render::camera::{GraphicsOptions, Viewport};
 use all_is_cubes_ui::notification;
 use all_is_cubes_ui::vui::widgets::ProgressBarState;
 
@@ -26,9 +26,7 @@ use all_is_cubes_desktop::{
 };
 
 mod command_options;
-use command_options::{
-    determine_record_format, parse_universe_source, AicDesktopArgs, DisplaySizeArg, GraphicsType,
-};
+use command_options::{parse_universe_source, AicDesktopArgs, DisplaySizeArg, GraphicsType};
 
 static TITLE: &str = "All is Cubes";
 fn title_and_version() -> String {
@@ -50,10 +48,10 @@ fn main() -> Result<(), anyhow::Error> {
         template,
         template_size,
         seed,
-        precompute_light,
+        mut precompute_light,
         input_file,
-        output_file,
-        save_all: _, // used in RecordOptions
+        output_file: _, // used in RecordOptions
+        save_all: _,    // used in RecordOptions
         duration,
         logging: logging_args,
         no_config_files,
@@ -70,6 +68,15 @@ fn main() -> Result<(), anyhow::Error> {
     // (will need a wrapper type)
     let record_options: Option<record::RecordOptions> = options
         .record_options()
+        .inspect(|optropt| {
+            if graphics_type == GraphicsType::Record
+                && optropt
+                    .as_ref()
+                    .is_some_and(|options| options.output_format.includes_light())
+            {
+                precompute_light = true;
+            }
+        })
         .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
 
     let graphics_options = if no_config_files {
@@ -83,13 +90,6 @@ fn main() -> Result<(), anyhow::Error> {
     // Kick off constructing the universe in the background.
     let (universe_future, universe_notif_tx) = {
         let (n_tx, n_rx) = tokio::sync::oneshot::channel();
-        // TODO: refactor this to access fewer deep details
-        let precompute_light = precompute_light
-            || (graphics_type == GraphicsType::Record
-                && output_file.as_ref().map_or(false, |file| {
-                    determine_record_format(file).map_or(false, |fmt| fmt.includes_light())
-                }));
-
         (
             runtime.spawn(input_source.create_universe(precompute_light, n_rx)),
             n_tx,
