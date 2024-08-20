@@ -509,6 +509,7 @@ impl From<op::OperationError> for ToolError {
             // need more custom user-facing error processing.
             op::OperationError::InternalConflict(c) => ToolError::Internal(c.to_string()),
             op::OperationError::Unmatching => ToolError::NotUsable,
+            op::OperationError::OutOfBounds { .. } => ToolError::Obstacle,
         }
     }
 }

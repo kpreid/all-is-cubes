@@ -1,5 +1,6 @@
 //! [`Operation`]s that modify the world due to player or world actions.
 
+use all_is_cubes_base::math::GridAab;
 use alloc::sync::Arc;
 use core::mem;
 
@@ -165,6 +166,17 @@ impl Operation {
                     transform.transform_cube(Cube::ORIGIN + move_modifier.direction);
                 let target_block = space[target_cube].clone();
 
+                if !space.bounds().contains_cube(adjacent_cube) {
+                    return Err(OperationError::OutOfBounds {
+                        operation: adjacent_cube.grid_aab(),
+                        space: space.bounds(),
+                    });
+                }
+                if space[adjacent_cube] != AIR {
+                    // TODO: more detail
+                    return Err(OperationError::Unmatching);
+                }
+
                 let new_adjacent = target_block
                     .clone()
                     .with_modifier(move_modifier.complement().rotate(transform.rotation));
@@ -263,6 +275,9 @@ pub(crate) enum OperationError {
     /// no rule of this operation matched
     // TODO: include at least one nested error
     Unmatching,
+
+    /// operation would exit the bounds of the space, {space:?}
+    OutOfBounds { operation: GridAab, space: GridAab },
 }
 
 crate::util::cfg_should_impl_error! {
@@ -270,7 +285,8 @@ crate::util::cfg_should_impl_error! {
         fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
             match self {
                 Self::InternalConflict(e) => Some(e),
-                OperationError::Unmatching => None,
+                Self::Unmatching => None,
+                Self::OutOfBounds {..} => None,
             }
         }
     }
