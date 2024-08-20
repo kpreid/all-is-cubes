@@ -26,14 +26,29 @@ doc = false # Do not overwrite library crate's documentation just because of the
 bench = false
 
 [features]
+# Each of these features is default, and exists primarily to be disabled for faster development
+# builds.
+default = ["audio", "record", "terminal"]
+# Producing image or video recording.
+record = ["dep:png"]
+# Required for `--graphics=terminal` and `--graphics=print`;
+# rendering scenes to colored text and interactive terminal sessions.
+terminal = ["dep:ratatui", "dep:unicode-width"]
+# Game audio output support.
+audio = ["dep:kira"]
+# Adds rerun logging support. Intended mainly for development of All is Cubes itself.
 rerun = ["dep:re_sdk", "all-is-cubes/rerun", "all-is-cubes-gpu/rerun"]
+# TODO: Define a feature with which to turn off windowing & GPU support.
 
 [dependencies]
 all-is-cubes = { workspace = true, features = ["auto-threads", "save"] }
+# TODO: make template support an optional feature, and this dependency with it
 all-is-cubes-content = { workspace = true }
 all-is-cubes-gpu = { workspace = true, features = ["auto-threads", "wgpu"] }
-all-is-cubes-mesh = { workspace = true }
+all-is-cubes-mesh = { workspace = true } 
+# TODO: make all file access an optional feature, and this dependency with it
 all-is-cubes-port = { workspace = true }
+# TODO: make raytracer optional
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 all-is-cubes-ui = { workspace = true }
 anyhow = { workspace = true }
@@ -44,9 +59,9 @@ futures-core = { workspace = true }
 gilrs = { workspace = true }
 indicatif = { version = "0.17.0", default-features = false }
 itertools = { workspace = true }
-kira = { version = "0.9.4", default-features = false, features = ["cpal"] }
+kira = { version = "0.9.4", optional = true, default-features = false, features = ["cpal"] }
 log = { workspace = true }
-png = { workspace = true }
+png = { workspace = true, optional = true }
 rand = { workspace = true, features = ["std", "std_rng"] }
 # re_sdk is a data-logging and visualization tool; we are currently using it _only_ for
 # development of All is Cubes itself.
@@ -56,8 +71,8 @@ serde_json = { workspace = true }
 simplelog = { workspace = true }
 strum = { workspace = true, features = ["derive", "std"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync"] }
-ratatui = { version = "0.28.0", default-features = false, features = ["crossterm"] }
-unicode-width = { workspace = true }
+ratatui = { version = "0.28.0", optional = true, default-features = false, features = ["crossterm"] }
+unicode-width = { workspace = true, optional = true }
 # We have no true direct dependency on wgpu, but do need to select backends.
 # (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
 wgpu = { workspace = true, features = ["dx12", "metal"] }

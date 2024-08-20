@@ -17,18 +17,20 @@ use std::time::{Duration, Instant};
 use anyhow::Context as _;
 
 use all_is_cubes::euclid::{size2, Size2D};
-use all_is_cubes::listen::ListenableSource;
 use all_is_cubes::universe::Universe;
 use all_is_cubes_render::camera;
 use all_is_cubes_ui::apps::{ExitMainTask, MainTaskContext};
 
+#[cfg(feature = "audio")]
 mod audio;
 mod config_files;
 mod glue;
 pub use glue::{Executor, Renderer, Window};
 pub mod logging;
+#[cfg(feature = "record")]
 pub mod record;
 mod session;
+#[cfg(feature = "terminal")]
 pub mod terminal;
 mod universe_source;
 pub mod winit;
@@ -66,6 +68,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         task_done_signal,
     } = params;
 
+    #[cfg_attr(not(feature = "record"), allow(unused_variables))]
     let executor = Executor::new(runtime.handle().clone());
 
     // At this point we have just finished whatever the GraphicsType did before calling
@@ -81,6 +84,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
     dsession.set_fixed_title(application_title);
 
     if !headless {
+        #[cfg(feature = "audio")]
         match audio::init_sound(&dsession.session) {
             Ok(audio_out) => dsession.audio = Some(audio_out),
             Err(e) => log::error!(
@@ -88,15 +92,21 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
                 // chain printing
                 "Failed to initialize audio. Will proceed without.\n{e:#}",
             ),
-        };
+        }
     }
 
     // we'd do this inside the main task, except that that'd be circular borrowing
     logging.attach_to_renderer(&mut dsession.renderer);
 
     if let Some(options) = &recording {
-        record::configure_session_for_recording(&mut dsession, options)
-            .context("failed to configure session for recording")?;
+        #[cfg(feature = "record")]
+        {
+            record::configure_session_for_recording(&mut dsession, options)
+                .context("failed to configure session for recording")?;
+        }
+
+        #[cfg(not(feature = "record"))]
+        match *options {}
     }
 
     dsession.session.set_main_task(|mut ctx| async move {
@@ -119,12 +129,14 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         ctx.set_universe(universe);
         _ = universe_ready_signal.send(Ok(()));
 
+        #[cfg(feature = "record")]
         if let Some(record_options) = recording {
             // Note that this does NOT use the session's viewport_cell, so that the recording can
             // have a consistent, as-requested size, regardless of what other rendering might be
             // doing. (Of course, the UI will fail to adapt, but there isn't much to do about that.)
-            let recording_cameras =
-                ctx.create_cameras(ListenableSource::constant(record_options.viewport()));
+            let recording_cameras = ctx.create_cameras(
+                all_is_cubes::listen::ListenableSource::constant(record_options.viewport()),
+            );
 
             let recorder = ctx.with_universe(|universe| {
                 record::configure_universe_for_recording(
@@ -209,8 +221,12 @@ pub struct InnerMainParams {
     pub headless: bool,
     /// Result of calling [`logging::install()`], which should be done as early as feasible.
     pub logging: logging::LateLogging,
+    #[cfg(feature = "record")]
     /// If present, start writing frames to disk as part of the session main task.
     pub recording: Option<record::RecordOptions>,
+    #[cfg(not(feature = "record"))]
+    /// Only available with `features = ["record"]`.
+    pub recording: Option<std::convert::Infallible>,
     /// Will send a message when the `universe_future` completes and its result has been installed.
     pub universe_ready_signal: tokio::sync::oneshot::Sender<Result<(), anyhow::Error>>,
     /// Will send a message when the main task completes.

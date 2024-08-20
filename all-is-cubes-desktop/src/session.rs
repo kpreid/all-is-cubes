@@ -47,7 +47,10 @@ pub struct DesktopSession<Ren, Win> {
 
     /// If present, connection to system audio output.
     /// If absent, sound is not produced
+    #[cfg(feature = "audio")]
     pub(crate) audio: Option<crate::audio::AudioOut>,
+    #[cfg(not(feature = "audio"))]
+    pub(crate) audio: Option<std::convert::Infallible>,
 
     /// Portion of window title that describes the application rather than the session's current
     /// universe.
@@ -194,6 +197,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         );
     }
 
+    #[cfg_attr(not(feature = "terminal"), allow(dead_code))]
     pub(crate) fn into_renderer_and_window(self) -> (DesktopSession<(), ()>, Ren, Win) {
         (
             DesktopSession {

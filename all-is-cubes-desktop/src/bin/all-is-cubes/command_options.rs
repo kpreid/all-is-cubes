@@ -1,22 +1,23 @@
 //! Command line option parsing.
 
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::LazyLock;
+#[allow(unused_imports)]
 use std::time::Duration;
 
-use clap::builder::{PathBufValueParser, PossibleValue, PossibleValuesParser};
-use clap::{builder::TypedValueParser, Parser, ValueEnum};
+use clap::builder::{PossibleValue, PossibleValuesParser, TypedValueParser};
+use clap::{Parser, ValueEnum};
 use strum::IntoEnumIterator;
 
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::math::{GridSize, GridSizeCoord};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_desktop::logging::LoggingArgs;
-use all_is_cubes_port::ExportFormat;
 use all_is_cubes_render::camera;
 
+#[cfg(feature = "record")]
 use all_is_cubes_desktop::record::{RecordAnimationOptions, RecordFormat, RecordOptions};
 use all_is_cubes_desktop::UniverseSource;
 
@@ -104,12 +105,13 @@ pub(crate) struct AicDesktopArgs {
     /// * “.gltf” — export scene as meshes in glTF format
     ///   (has accompanying “.glbin” data files).
     /// * “.vox” — export world to MagicaVoxel .vox format.
+    #[cfg(feature = "record")]
     #[arg(
         long = "output",
         short = 'o',
         required_if_eq("graphics", "record"),
         value_name = "FILE",
-        value_parser = PathBufValueParser::new().try_map(|value| {
+        value_parser = clap::builder::PathBufValueParser::new().try_map(|value| {
             let _format = determine_record_format(&value)?;
             Ok::<PathBuf, &str>(value)
         }),
@@ -118,6 +120,7 @@ pub(crate) struct AicDesktopArgs {
     pub(crate) output_file: Option<PathBuf>,
 
     /// Whether to record/export everything, rather than just the displayed scene.
+    #[cfg(feature = "record")]
     #[arg(long, requires = "output_file")]
     pub(crate) save_all: bool,
 
@@ -160,6 +163,7 @@ impl AicDesktopArgs {
     /// Returns `Ok(None)` if recording was not requested (`output_file` not set).
     ///
     /// Panics if `output_path` is not validated (this should have been checked at parse time).
+    #[cfg(feature = "record")]
     #[allow(clippy::unnecessary_wraps)] // *currently* no error can happen
     pub fn record_options(&self) -> clap::error::Result<Option<RecordOptions>> {
         let Some(output_path) = self.output_file.clone() else {
@@ -195,15 +199,7 @@ impl AicDesktopArgs {
     ///
     /// Concretely, this is expected to imply not contacting audio or display devices.
     pub(crate) fn is_headless(&self) -> bool {
-        match self.graphics {
-            GraphicsType::Window => false,
-            GraphicsType::WindowRt => false,
-            GraphicsType::Terminal => false,
-
-            GraphicsType::Headless => true,
-            GraphicsType::Record => true,
-            GraphicsType::Print => true,
-        }
+        self.graphics.is_headless()
     }
 }
 
@@ -246,14 +242,52 @@ pub(crate) enum GraphicsType {
     Window,
     #[value(help = "EXPERIMENTAL: Open a window (uses CPU raytracing)")]
     WindowRt,
+
+    #[cfg(feature = "terminal")]
     #[value(help = "Colored text in this terminal (uses raytracing)")]
     Terminal,
+
     #[value(help = "Non-interactive; don't draw anything but only simulates")]
     Headless,
+
     #[value(help = "Non-interactive; save an image or video (uses raytracing)")]
+    #[cfg(feature = "record")]
     Record,
+
+    #[cfg(feature = "terminal")]
     #[value(help = "Non-interactive; print one frame like 'terminal' mode then exit")]
     Print,
+}
+
+impl GraphicsType {
+    /// Whether this graphics type implies “headless” (no real-time UI) operation.
+    ///
+    /// Concretely, this is expected to imply not contacting display devices,
+    /// including the terminal.
+    pub(crate) fn is_headless(self) -> bool {
+        match self {
+            GraphicsType::Window => false,
+            GraphicsType::WindowRt => false,
+            #[cfg(feature = "terminal")]
+            GraphicsType::Terminal => false,
+
+            GraphicsType::Headless => true,
+            #[cfg(feature = "record")]
+            GraphicsType::Record => true,
+            #[cfg(feature = "terminal")]
+            GraphicsType::Print => true,
+        }
+    }
+
+    /// Whether this graphics type makes use of stdin/stdout/stderr in a way
+    /// which is incompatible with other subsystems printing to stderr.
+    pub(crate) fn uses_terminal(self) -> bool {
+        match self {
+            #[cfg(feature = "terminal")]
+            GraphicsType::Terminal => true,
+            _ => false,
+        }
+    }
 }
 
 /// Window/image size, parseable in a variety of formats, and with `None` referring to
@@ -310,7 +344,12 @@ impl FromStr for SpaceSizeArg {
     }
 }
 
-pub fn determine_record_format(output_path: &Path) -> Result<RecordFormat, &'static str> {
+#[cfg(feature = "record")]
+pub fn determine_record_format(
+    output_path: &std::path::Path,
+) -> Result<RecordFormat, &'static str> {
+    use all_is_cubes_port::ExportFormat;
+
     if let Some(extension) = output_path.extension() {
         match extension.to_str() {
             // When updating this match, also update the docs for output_file!
@@ -367,6 +406,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "record")]
     fn record_options_image() {
         assert_eq!(
             parse(&["-g", "record", "-o", "output.png"])
@@ -383,7 +423,9 @@ mod tests {
             },
         );
     }
+
     #[test]
+    #[cfg(feature = "record")]
     fn record_options_animation() {
         assert_eq!(
             parse(&["-g", "record", "-o", "fancy.png", "--duration", "3"])
@@ -407,6 +449,7 @@ mod tests {
     // TODO: exercise record display size
 
     #[test]
+    #[cfg(feature = "record")]
     fn record_options_missing_file() {
         let e = parse(&["-g", "record"]).unwrap_err();
         assert_eq!(e.kind(), ErrorKind::MissingRequiredArgument);
@@ -419,6 +462,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "record")]
     fn record_options_missing_extension() {
         let e = parse(&["-g", "record", "-o", "foo"]).unwrap_err();
         assert_eq!(e.kind(), ErrorKind::ValueValidation);

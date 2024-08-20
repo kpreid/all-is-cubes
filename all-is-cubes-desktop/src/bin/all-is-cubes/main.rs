@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
+#[allow(unused)] // may be unused with some features
 use clap::{CommandFactory as _, Parser as _};
 
 use all_is_cubes::euclid::Size2D;
@@ -15,6 +16,9 @@ use all_is_cubes_render::camera::{GraphicsOptions, Viewport};
 use all_is_cubes_ui::notification;
 use all_is_cubes_ui::vui::widgets::ProgressBarState;
 
+#[cfg(feature = "record")]
+use all_is_cubes_desktop::record;
+#[cfg(feature = "terminal")]
 use all_is_cubes_desktop::terminal::{
     create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
 };
@@ -22,7 +26,7 @@ use all_is_cubes_desktop::winit::{
     self as aic_winit, create_winit_wgpu_desktop_session, winit_main_loop_and_init,
 };
 use all_is_cubes_desktop::{
-    inner_main, load_config, logging, record, DesktopSession, InnerMainParams, Session,
+    inner_main, load_config, logging, DesktopSession, InnerMainParams, Session,
 };
 
 mod command_options;
@@ -41,6 +45,7 @@ fn main() -> Result<(), anyhow::Error> {
     // Parse and transform command-line arguments.
     let options = AicDesktopArgs::parse();
     // Destructure as a check that we're using/skipping all the args
+    #[cfg_attr(not(feature = "record"), allow(unused_mut))]
     let AicDesktopArgs {
         graphics: graphics_type,
         display_size: DisplaySizeArg(display_size),
@@ -50,15 +55,17 @@ fn main() -> Result<(), anyhow::Error> {
         seed,
         mut precompute_light,
         input_file,
-        output_file: _, // used in RecordOptions
-        save_all: _,    // used in RecordOptions
+        #[cfg(feature = "record")]
+            output_file: _, // used in RecordOptions
+        #[cfg(feature = "record")]
+            save_all: _, // used in RecordOptions
         duration,
         logging: logging_args,
         no_config_files,
     } = options.clone();
 
     // Initialize logging -- telling it to suppress actual output in terminal mode.
-    let late_logging = logging::install(&logging_args, graphics_type == GraphicsType::Terminal)?;
+    let late_logging = logging::install(&logging_args, graphics_type.uses_terminal())?;
 
     // After setting up logging, do other option interpretation steps.
 
@@ -66,6 +73,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // TODO: record_options validation should just be part of the regular arg parsing
     // (will need a wrapper type)
+    #[cfg(feature = "record")]
     let record_options: Option<record::RecordOptions> = options
         .record_options()
         .inspect(|optropt| {
@@ -133,7 +141,9 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over
     // the kind of window system we're using.
+    #[cfg_attr(not(feature = "record"), allow(unused_variables, unused_mut))]
     let (universe_ready_tx, mut universe_ready_rx) = tokio::sync::oneshot::channel();
+    #[cfg_attr(not(feature = "terminal"), allow(unused_variables, unused_mut))]
     let (task_done_tx, mut task_done_rx) = tokio::sync::oneshot::channel();
     let inner_params = InnerMainParams {
         application_title: title_and_version(),
@@ -142,7 +152,10 @@ fn main() -> Result<(), anyhow::Error> {
         universe_future,
         headless: options.is_headless(),
         logging: late_logging,
+        #[cfg(feature = "record")]
         recording: record_options,
+        #[cfg(not(feature = "record"))]
+        recording: None,
         universe_ready_signal: universe_ready_tx,
         task_done_signal: task_done_tx,
     };
@@ -191,6 +204,7 @@ fn main() -> Result<(), anyhow::Error> {
                 inner_params,
             )
         }
+        #[cfg(feature = "terminal")]
         GraphicsType::Terminal => {
             let dsession = create_terminal_session(
                 executor,
@@ -205,6 +219,7 @@ fn main() -> Result<(), anyhow::Error> {
                 dsession,
             )
         }
+        #[cfg(feature = "terminal")]
         GraphicsType::Print => {
             // TODO: Replace having a special mode with this being a kind of record/export running
             // under the headless main loop. We're not doing that yet because, currently, "renderer"
@@ -250,7 +265,22 @@ fn main() -> Result<(), anyhow::Error> {
                 dsession,
             )
         }
+
+        // TODO: remove these identical arms by getting rid of Record as a distinct type
+        #[cfg(feature = "record")]
         GraphicsType::Record | GraphicsType::Headless => inner_main(
+            inner_params,
+            |dsession| {
+                all_is_cubes_desktop::headless_main_loop(
+                    dsession,
+                    duration.map(Duration::from_secs_f64),
+                )
+            },
+            DesktopSession::new(executor, (), (), session, viewport_cell, false),
+        ),
+
+        #[cfg(not(feature = "record"))]
+        GraphicsType::Headless => inner_main(
             inner_params,
             |dsession| {
                 all_is_cubes_desktop::headless_main_loop(

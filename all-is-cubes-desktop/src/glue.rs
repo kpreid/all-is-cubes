@@ -13,6 +13,7 @@ use all_is_cubes::rerun_glue as rg;
 #[cfg(feature = "rerun")]
 use all_is_cubes_gpu::RerunFilter as GpuRerunFilter;
 
+#[cfg(feature = "terminal")]
 pub(crate) mod crossterm;
 pub(crate) mod gilrs;
 #[cfg(feature = "rerun")]
