@@ -4,7 +4,6 @@ use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
-use core::mem;
 use core::ops;
 use core::time::Duration;
 
@@ -426,6 +425,9 @@ impl Space {
         if evaluated.attributes().tick_action.is_some() {
             ctx.cubes_wanting_ticks.insert(cube);
         }
+        // We could also *remove* the cube from `cubes_wanting_ticks` if it has no action,
+        // but that would be frequently wasted. Instead, let the tick come around and remove
+        // it then.
 
         ctx.light.modified_cube_needs_update(
             light::UpdateCtx {
@@ -646,12 +648,15 @@ impl Space {
 
     /// Process the block `tick_action` part of a [`Self::step()`].
     fn execute_tick_actions(&mut self, tick: time::Tick) -> usize {
-        // Take contents of self.cubes_wanting_ticks, and filter out actions that shouldn't
+        // Review self.cubes_wanting_ticks, and filter out actions that shouldn't
         // happen this tick.
-        // TODO: Use a queue structure for cubes_wanting_ticks that knows this so we can
-        // evaluate fewer cubes.
-        let mut cubes_to_tick: Vec<Cube> = mem::take(&mut self.cubes_wanting_ticks)
-            .into_iter()
+        // TODO: Use a schedule-aware structure for cubes_wanting_ticks so we can iterate over
+        // fewer cubes.
+        let mut to_remove: Vec<Cube> = Vec::new();
+        let mut cubes_to_tick: Vec<Cube> = self
+            .cubes_wanting_ticks
+            .iter()
+            .copied()
             .filter(|&cube| {
                 if let Some(TickAction {
                     operation: _,
@@ -660,14 +665,13 @@ impl Space {
                 {
                     if schedule.contains(tick) {
                         // Don't tick yet.
-                        // TODO: Use a more efficient queue structure
-                        self.cubes_wanting_ticks.insert(cube);
                         false
                     } else {
                         true
                     }
                 } else {
                     // Doesn't actually have an action.
+                    to_remove.push(cube);
                     false
                 }
             })
@@ -676,6 +680,11 @@ impl Space {
         // emitted `Fluff`).
         // TODO: Maybe it would be more efficient to use a `BTreeMap` for storage? Benchmark.
         cubes_to_tick.sort_unstable_by_key(|&cube| <[GridCoordinate; 3]>::from(cube));
+
+        // Remove cubes that don't actually need ticks now or later.
+        for cube in to_remove {
+            self.cubes_wanting_ticks.remove(&cube);
+        }
 
         let mut first_pass_txn = SpaceTransaction::default();
         let mut first_pass_cubes = HbHashSet::new();
@@ -758,9 +767,6 @@ impl Space {
                 // TODO: this logging should use util::ErrorChain, but that's only available
                 // with the std feature.
                 log::error!("cube tick transaction could not be executed: {e:#?}");
-
-                // Re-register to not forget these are active cubes.
-                self.cubes_wanting_ticks.extend(cubes_to_tick);
             }
             first_pass_cubes.len()
         } else {
@@ -787,9 +793,6 @@ impl Space {
                     )),
                 });
             }
-
-            // Re-register to not forget these are active cubes.
-            self.cubes_wanting_ticks.extend(cubes_to_tick);
 
             0
         }

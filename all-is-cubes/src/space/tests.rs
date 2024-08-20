@@ -713,3 +713,32 @@ fn block_tick_action_conflict() {
         "expecting change"
     );
 }
+
+/// Test that a block tick action spontaneously repeats even if it doesn't replace the block
+/// itself.
+#[test]
+fn block_tick_action_repeats() {
+    let ticker = Block::builder()
+        .color(Rgba::WHITE)
+        .tick_action(TickAction {
+            // This is an operation that *doesn't change the block that has it*.
+            // AddModifiers is convenient because we can count how many times it was applied.
+            operation: Operation::Neighbors(
+                [(
+                    Cube::new(0, 1, 0),
+                    Operation::AddModifiers([block::Modifier::from(block::Quote::new())].into()),
+                )]
+                .into(),
+            ),
+            schedule: time::Schedule::EVERY_TICK,
+        })
+        .build();
+    let mut space = Space::empty_positive(1, 2, 1);
+    space.set([0, 0, 0], &ticker).unwrap();
+    let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
+
+    for t in 0..2 {
+        _ = space.step(None, clock.advance(false), time::DeadlineNt::Whenever);
+        assert_eq!(space[[0, 1, 0]].modifiers().len(), t + 1);
+    }
+}
