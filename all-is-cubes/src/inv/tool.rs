@@ -182,22 +182,27 @@ impl Tool {
                 }
             }
             Self::PushPull => {
+                // TODO: this tool is just a demonstration piece, and so we should
+                // make it possible to express as just a `Tool::Custom`.
+
                 let cursor = input.cursor()?;
-                let mut direction: Face6 = cursor
+                let direction: Face6 = cursor
                     .face_selected()
                     .opposite()
                     .try_into()
                     .map_err(|_| ToolError::NotUsable)?;
 
-                // If we can't push, then try pulling.
-                // TODO: Tool should have user-controllable modes
-                if cursor.space().read().unwrap()[cursor.cube() + direction.normal_vector()] != AIR
-                {
-                    direction = direction.opposite();
-                }
+                // TODO: Tool should have user-controllable modes for push vs. pull when the
+                // choice is free
 
                 let velocity = 8;
-                let op = Operation::StartMove(block::Move::new(direction, 0, velocity));
+                let op = Operation::Alt(
+                    [
+                        Operation::StartMove(block::Move::new(direction, 0, velocity)),
+                        Operation::StartMove(block::Move::new(direction.opposite(), 0, velocity)),
+                    ]
+                    .into(),
+                );
 
                 input.apply_operation(self.clone(), &op)
             }
