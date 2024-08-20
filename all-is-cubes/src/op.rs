@@ -308,6 +308,38 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
+    fn alt() {
+        let move_x = Operation::StartMove(block::Move::new(Face6::PX, 1, 1));
+        let move_y = Operation::StartMove(block::Move::new(Face6::PY, 1, 1));
+        let move_z = Operation::StartMove(block::Move::new(Face6::PZ, 1, 1));
+        let op = Operation::Alt([move_x.clone(), move_y.clone(), move_z.clone()].into());
+
+        // Control which `StartMove` succeeds by changing the size of the space.
+        assert_eq!(
+            op.apply(&Space::empty_positive(1, 1, 1), None, Gridgid::IDENTITY),
+            Err(OperationError::Unmatching),
+        );
+        assert_eq!(
+            op.apply(&Space::empty_positive(2, 1, 1), None, Gridgid::IDENTITY),
+            Ok(move_x
+                .apply(&Space::empty_positive(2, 1, 1), None, Gridgid::IDENTITY)
+                .unwrap()),
+        );
+        assert_eq!(
+            op.apply(&Space::empty_positive(1, 2, 1), None, Gridgid::IDENTITY),
+            Ok(move_y
+                .apply(&Space::empty_positive(1, 2, 1), None, Gridgid::IDENTITY)
+                .unwrap()),
+        );
+        assert_eq!(
+            op.apply(&Space::empty_positive(1, 1, 2), None, Gridgid::IDENTITY),
+            Ok(move_z
+                .apply(&Space::empty_positive(1, 1, 2), None, Gridgid::IDENTITY)
+                .unwrap()),
+        );
+    }
+
+    #[test]
     fn rotated_become_atom() {
         let [atom] = make_some_blocks();
         let op = Operation::Become(atom);
