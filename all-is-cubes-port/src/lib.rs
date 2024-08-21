@@ -45,9 +45,6 @@ mod stl;
 #[cfg(test)]
 mod tests;
 
-// TODO: Remove this type alias.
-pub type ExportFormat = Format;
-
 /// File formats that All is Cubes data can be exported to or imported from.
 ///
 /// Note that if some feature flags are disabled, this library may not be in fact able to

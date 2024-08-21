@@ -10,7 +10,7 @@ use anyhow::Context;
 use all_is_cubes::listen::{self, Listen as _, ListenableSource};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
-use all_is_cubes_port::{ExportFormat, ExportSet};
+use all_is_cubes_port::{ExportSet, Format};
 use all_is_cubes_render::camera::StandardCameras;
 use all_is_cubes_render::raytracer::RtRenderer;
 use all_is_cubes_render::Flaws;
@@ -48,7 +48,7 @@ enum RecorderInner {
     Mesh(write_gltf::MeshRecorder),
     Export {
         executor: Arc<crate::Executor>,
-        export_format: ExportFormat,
+        export_format: Format,
         /// Becomes `None` when export has been performed
         export_set: Option<ExportSet>,
         options: RecordOptions,
@@ -159,7 +159,7 @@ impl Recorder {
                 // TODO: better rule than this special case. AicJson doesn't strictly require
                 // all of the universe, but it does require the transitive closure, and this is the
                 // easiest way to proceed for now.
-                let export_set = if options.save_all || export_format == ExportFormat::AicJson {
+                let export_set = if options.save_all || export_format == Format::AicJson {
                     ExportSet::all_of_universe(universe)
                 } else {
                     ExportSet::from_spaces(vec![cameras.world_space().snapshot().ok_or_else(
