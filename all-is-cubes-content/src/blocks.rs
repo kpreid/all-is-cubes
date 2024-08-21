@@ -9,8 +9,8 @@ use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{
-    self, AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive,
-    Resolution::*, RotationPlacementRule, TickAction, AIR,
+    self, AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution::*,
+    RotationPlacementRule, TickAction, AIR,
 };
 use all_is_cubes::color_block;
 use all_is_cubes::drawing::embedded_graphics::{

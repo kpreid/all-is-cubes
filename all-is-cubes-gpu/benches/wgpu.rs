@@ -14,8 +14,8 @@ use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{self, Universe};
 use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
-use all_is_cubes_render::HeadlessRenderer;
 use all_is_cubes_render::Flaws;
+use all_is_cubes_render::HeadlessRenderer;
 
 use all_is_cubes_gpu::in_wgpu::{headless, init};
 use tokio::runtime::Runtime;

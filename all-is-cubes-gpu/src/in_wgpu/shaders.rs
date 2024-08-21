@@ -2,8 +2,8 @@
 
 use std::borrow::Cow;
 use std::sync::Arc;
-use std::task;
 use std::sync::LazyLock as Lazy;
+use std::task;
 
 use futures_core::future::BoxFuture;
 use futures_util::task::noop_waker_ref;

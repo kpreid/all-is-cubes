@@ -7,11 +7,11 @@ use core::marker::PhantomData;
 use core::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 
 use all_is_cubes::block::Evoxel;
-use all_is_cubes_render::camera::GraphicsOptions;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{GridAab, Vol};
 use all_is_cubes::space::Space;
 use all_is_cubes::util::{ConciseDebug, Fmt};
+use all_is_cubes_render::camera::GraphicsOptions;
 
 use crate::dynamic::DynamicMeshTypes;
 use crate::{block_meshes_for_space, texture, BlockMeshes, BlockVertex, MeshTypes, SpaceMesh};

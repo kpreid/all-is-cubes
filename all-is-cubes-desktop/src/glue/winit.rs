@@ -1,8 +1,8 @@
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::monitor::MonitorHandle;
 
-use all_is_cubes_render::camera::{self, Viewport};
 use all_is_cubes::euclid::Size2D;
+use all_is_cubes_render::camera::{self, Viewport};
 
 pub fn physical_size_to_viewport(scale_factor: f64, size: PhysicalSize<u32>) -> Viewport {
     let size: camera::ImageSize = <[u32; 2]>::from(size).into();
