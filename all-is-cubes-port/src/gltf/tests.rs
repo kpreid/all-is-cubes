@@ -15,7 +15,7 @@ use all_is_cubes_mesh::{block_meshes_for_space, MeshOptions, SpaceMesh};
 use all_is_cubes_render::camera::GraphicsOptions;
 
 use crate::gltf::{GltfDataDestination, GltfMt, GltfWriter, MeshInstance};
-use crate::{ExportError, ExportFormat, ExportSet};
+use crate::{ExportError, ExportSet, Format};
 
 /// Test helper to insert one mesh
 pub(crate) fn gltf_mesh(
@@ -78,7 +78,7 @@ async fn export_snapshot_test(test_name: &'static str, export_set: ExportSet) {
 
     crate::export_to_path(
         yield_progress_for_testing(),
-        ExportFormat::Gltf,
+        Format::Gltf,
         export_set,
         PathBuf::from(&destination),
     )
@@ -140,7 +140,7 @@ async fn export_character_not_supported() {
 
     let error = crate::export_to_path(
         yield_progress_for_testing(),
-        ExportFormat::Gltf,
+        Format::Gltf,
         ExportSet::all_of_universe(&universe),
         destination,
     )

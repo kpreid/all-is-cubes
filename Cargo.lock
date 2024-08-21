@@ -247,6 +247,7 @@ dependencies = [
  "all-is-cubes-render",
  "base64 0.22.1",
  "bytemuck",
+ "cfg-if",
  "dot_vox",
  "either",
  "futures-core",

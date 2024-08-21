@@ -35,7 +35,7 @@ pub use texture::{GltfAtlasPoint, GltfTextureAllocator, GltfTexturePlane, GltfTi
 mod vertex;
 pub use vertex::GltfVertex;
 
-use crate::{ExportError, ExportSet};
+use crate::{ExportError, ExportSet, Format};
 #[cfg(test)]
 mod tests;
 
@@ -370,6 +370,7 @@ pub(crate) async fn export_gltf(
     // If unsupported list is nonempty, fail.
     if let Some(first) = characters.first() {
         return Err(ExportError::NotRepresentable {
+            format: Format::Gltf,
             name: Some(first.name()),
             reason: "Exporting characters to glTF is not yet supported".into(),
         });
@@ -394,6 +395,7 @@ pub(crate) async fn export_gltf(
                 &block_def
                     .evaluate()
                     .map_err(|eve| ExportError::NotRepresentable {
+                        format: Format::Gltf,
                         name: Some(name.clone()),
                         reason: format!("block evaluation failed: {eve}"),
                     })?,

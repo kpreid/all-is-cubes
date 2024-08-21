@@ -51,7 +51,8 @@ auto-threads = [
     "all-is-cubes-render/auto-threads",
 ]
 gltf = [
-    "dep:all-is-cubes-port",
+    "all-is-cubes-port/export",
+    "all-is-cubes-port/gltf",
     "dep:rend3",
     "dep:rend3-gltf",
     "dep:rend3-routine",
@@ -64,7 +65,7 @@ gltf = [
 all-is-cubes = { workspace = true, features = ["save"] }
 all-is-cubes-content = { workspace = true }
 all-is-cubes-gpu = { workspace = true, features = ["wgpu"] }
-all-is-cubes-port = { workspace = true, optional = true, features = [] }
+all-is-cubes-port = { workspace = true, optional = true }
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
 all-is-cubes-ui = { workspace = true }
 async_fn_traits = { workspace = true }

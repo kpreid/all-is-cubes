@@ -19,30 +19,69 @@ features = []
 bench = false
 
 [features]
-# TODO: Add features to make each format optional so that single-purpose importers or exporters are possible.
+default = ["all-formats", "export", "import"]
+# Importing all selected formats
+import = []
+# Exporting all selected formats
+export = []
+# Enable all supported formats
+all-formats = ["native", "gltf", "stl", "dot-vox"]
+# Reading and writing native All is Cubes universe files.
+native = [
+    "all-is-cubes/save",
+    "dep:serde_json",
+]
+# Writing glTF 2.0 files.
+gltf = [
+    "dep:all-is-cubes-mesh",
+    "dep:all-is-cubes-render",
+    "dep:base64", # inline buffer data URL encoding
+    "dep:bytemuck", # buffer creation
+    "dep:gltf-json",
+    "dep:image", # texture writing
+    "dep:rectangle-pack", # texture atlas creation
+    "dep:serde_json",
+]
+# Writing STL (triangle mesh) files.
+stl = [
+    "dep:all-is-cubes-mesh",
+    "dep:all-is-cubes-render",
+    "dep:stl_io",
+]
+# Reading and writing MagicaVoxel .vox files.
+dot-vox = [
+    "dep:all-is-cubes-mesh",
+    "dep:all-is-cubes-render",
+    "dep:dot_vox",
+]
 
 [dependencies]
-all-is-cubes = { workspace = true, features = ["save"] }
-all-is-cubes-mesh = { workspace = true }
-all-is-cubes-render = { workspace = true }
-dot_vox = { version = "5.1.1" }
+# Non-optional generally required dependencies
+# need all-is-cubes/std because we have boxed Send futures
+all-is-cubes = { workspace = true, features = ["std"] }
+cfg-if = { workspace = true }
 futures-core = { workspace = true }
-# Used to write glTF textures
-image = { workspace = true, features = ["png"] }
 itertools = { workspace = true }
 # TODO: replace logging with explicit reporting data flow
 log = { workspace = true }
-rectangle-pack = { workspace = true }
-stl_io = { version = "0.8.1" }
-# json is used for native and glTF
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 
+# Dependencies related to formats
+all-is-cubes-mesh = { workspace = true, optional = true }
+all-is-cubes-render = { workspace = true, optional = true }
+dot_vox = { version = "5.1.1", optional = true }
+stl_io = { version = "0.8.1", optional = true }
+# json is used for native and glTF
+serde_json = { workspace = true, optional = true }
+
 # glTF related dependencies
-base64 = { workspace = true }
-bytemuck = { workspace = true, features = ["derive"] }
+base64 = { workspace = true, optional = true }
+bytemuck = { workspace = true, optional = true, features = ["derive"] }
 # gltf-json often has semver-incompatible changes, so pin it
-gltf-json = { version = ">=1.4.1, <1.5.0", default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
+gltf-json = { version = ">=1.4.1, <1.5.0", optional = true, default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
+# Used to write glTF textures
+image = { workspace = true, optional = true, features = ["png"] }
+rectangle-pack = { workspace = true, optional = true }
 
 [dev-dependencies]
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }

@@ -34,7 +34,7 @@ async fn import_export_native_format() {
     let destination: PathBuf = destination_dir.path().join("foo.alliscubesjson");
     export_to_path(
         yield_progress_for_testing(),
-        crate::ExportFormat::AicJson,
+        crate::Format::AicJson,
         ExportSet::all_of_universe(&universe),
         destination.clone(),
     )
