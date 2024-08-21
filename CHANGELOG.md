@@ -19,6 +19,10 @@
     - `block::EvalBlockError` is now a `struct` with an inner `ErrorKind` enum, instead of an enum, and contains more information.
     - `block::Move`’s means of construction have been changed to be more systematic and orthogonal. In particular, paired moves are constructed from unpaired ones.
 
+- `all-is-cubes-port` library:
+    - All functionality is now conditional on feature flags, to allow omitting unneeded formats and operations.
+    - `ExportFormat` is now named `Format`.
+
 - `all-is-cubes-render` library:
     - The trait method `raytracer::Accumulate::add()` now accepts the surface color via a `ColorBuf` (which acts essentially as a form of premultiplied alpha) rather than `Rgba`. This enables more consistent handling of emissive materials. See the method documentation for details.
 

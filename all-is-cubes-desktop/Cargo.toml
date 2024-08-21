@@ -36,9 +36,11 @@ required-features = ["record"]
 [features]
 # Each of these features is default, and exists primarily to be disabled for faster development
 # builds.
-default = ["audio", "record", "terminal"]
-# Producing image or video recording.
-record = ["dep:png"]
+default = ["audio", "import", "record", "terminal"]
+# Producing image or video recording, or any exported/saved data.
+record = ["dep:png", "all-is-cubes-port/export", "all-is-cubes-port/all-formats"]
+# Importing non-native data formats.
+import = ["all-is-cubes-port/import", "all-is-cubes-port/all-formats"]
 # Required for `--graphics=terminal` and `--graphics=print`;
 # rendering scenes to colored text and interactive terminal sessions.
 terminal = ["dep:ratatui", "dep:unicode-width"]
@@ -54,8 +56,8 @@ all-is-cubes = { workspace = true, features = ["auto-threads", "save"] }
 all-is-cubes-content = { workspace = true }
 all-is-cubes-gpu = { workspace = true, features = ["auto-threads", "wgpu"] }
 all-is-cubes-mesh = { workspace = true } 
-# TODO: make all file access an optional feature, and this dependency with it
-all-is-cubes-port = { workspace = true }
+# TODO: make all file access an optional feature
+all-is-cubes-port = { workspace = true, features = ["import", "native"] }
 # TODO: make raytracer optional
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 all-is-cubes-ui = { workspace = true }

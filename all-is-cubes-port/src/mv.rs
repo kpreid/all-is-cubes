@@ -1,5 +1,10 @@
 //! Import and export of MagicaVoxel `.vox` files.
 
+#![cfg_attr(
+    not(all(feature = "import", feature = "export")),
+    allow(unused_imports)
+)]
+
 use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
@@ -12,8 +17,10 @@ use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
 use all_is_cubes::universe::{self, Name, PartialUniverse, Universe};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 
-use crate::{ExportError, ExportSet};
+#[cfg(feature = "export")]
+use crate::{ExportError, ExportSet, Format};
 
+#[cfg(feature = "import")]
 pub(crate) async fn load_dot_vox(
     p: YieldProgress,
     bytes: &[u8],
@@ -25,6 +32,7 @@ pub(crate) async fn load_dot_vox(
     .await
 }
 
+#[cfg(feature = "export")]
 pub(crate) async fn export_dot_vox(
     p: YieldProgress,
     source: ExportSet,
@@ -35,7 +43,8 @@ pub(crate) async fn export_dot_vox(
     Ok(())
 }
 
-pub(crate) async fn dot_vox_data_to_universe(
+#[cfg(feature = "import")]
+async fn dot_vox_data_to_universe(
     p: YieldProgress,
     data: &dot_vox::DotVoxData,
 ) -> Result<Universe, DotVoxConversionError> {
@@ -91,7 +100,8 @@ pub(crate) async fn dot_vox_data_to_universe(
 ///
 /// TODO: report export flaws (space too big, too many blocks)
 ///
-pub(crate) async fn export_to_dot_vox_data(
+#[cfg(feature = "export")]
+async fn export_to_dot_vox_data(
     p: YieldProgress,
     source: ExportSet,
 ) -> Result<dot_vox::DotVoxData, ExportError> {
@@ -107,6 +117,7 @@ pub(crate) async fn export_to_dot_vox_data(
     // If block def list is nonempty, fail.
     if let Some(first) = block_defs.first() {
         return Err(ExportError::NotRepresentable {
+            format: Format::DotVox,
             name: Some(first.name()),
             reason: "Exporting BlockDefs to .vox is not yet supported".into(),
         });
@@ -131,6 +142,7 @@ pub(crate) async fn export_to_dot_vox_data(
     })
 }
 
+#[cfg(feature = "import")]
 fn dot_vox_palette_to_blocks(palette: &[dot_vox::Color]) -> Vec<Block> {
     palette
         .iter()
@@ -143,6 +155,7 @@ fn dot_vox_palette_to_blocks(palette: &[dot_vox::Color]) -> Vec<Block> {
         })
         .collect()
 }
+#[cfg(feature = "export")]
 fn block_to_dot_vox_palette_entry(evaluated: &block::EvaluatedBlock) -> Option<dot_vox::Color> {
     // TODO: should we compare identity or color?
     if *evaluated == block::AIR_EVALUATED {
@@ -155,6 +168,7 @@ fn block_to_dot_vox_palette_entry(evaluated: &block::EvaluatedBlock) -> Option<d
 
 /// TODO: Document and allow control over the metadata choices like spawn and physics,
 /// and the choice of coordinate transform.
+#[cfg(feature = "import")]
 fn dot_vox_model_to_space(
     palette_blocks: &[Block],
     model: &dot_vox::Model,
@@ -196,6 +210,7 @@ fn dot_vox_model_to_space(
 
     Ok(space)
 }
+#[cfg(feature = "export")]
 fn space_to_dot_vox_model(
     space_handle: &universe::Handle<Space>,
     palette: &mut Vec<dot_vox::Color>,
@@ -204,6 +219,7 @@ fn space_to_dot_vox_model(
     let bounds = space.bounds();
     if bounds.size().width > 256 || bounds.size().height > 256 || bounds.size().depth > 256 {
         return Err(ExportError::NotRepresentable {
+            format: Format::DotVox,
             name: Some(space_handle.name()),
             reason: format!(
                 "space of size {} is too large to export to .vox; must be 256 or less in each axis",
@@ -259,6 +275,7 @@ fn space_to_dot_vox_model(
 }
 
 /// Note: This is not a well-designed error enum (yet)
+#[cfg(feature = "import")]
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub(crate) enum DotVoxConversionError {
@@ -272,6 +289,7 @@ pub(crate) enum DotVoxConversionError {
     Unexpected(#[source] InGenError),
 }
 
+#[cfg(feature = "import")]
 impl From<DotVoxConversionError> for InGenError {
     fn from(error: DotVoxConversionError) -> Self {
         InGenError::other(error)
@@ -301,6 +319,7 @@ fn mv_to_aic_coordinate_transform(mv_size: dot_vox::Size) -> Gridgid {
 ///
 /// Also translates coordinates so that the lower bounds are zero, since the dot-vox format
 /// does not support arbitrary lower bounds.
+#[cfg(feature = "export")]
 fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
     let rotated_size = MV_TO_AIC_ROTATION
         .inverse()
@@ -355,6 +374,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "import")]
     #[tokio::test]
     async fn invalid_file_error() {
         let error = load_dot_vox(yield_progress_for_testing(), &[])
@@ -369,6 +389,7 @@ mod tests {
         );
     }
 
+    #[cfg(all(feature = "export", feature = "import"))]
     async fn roundtrip(
         export_universe: &Universe,
     ) -> Result<Universe, Either<ExportError, DotVoxConversionError>> {
@@ -384,6 +405,7 @@ mod tests {
             .map_err(Either::Right)
     }
 
+    #[cfg(all(feature = "export", feature = "import"))]
     #[tokio::test]
     async fn export_import_space() {
         // Data expected to be preserved:
@@ -439,6 +461,7 @@ mod tests {
     }
 
     /// [`dot_vox`] only supports coordinates from 0-255
+    #[cfg(feature = "export")]
     #[tokio::test]
     async fn export_too_large_space() {
         let mut universe = Universe::new();
@@ -455,6 +478,7 @@ mod tests {
         assert!(matches!(error, ExportError::NotRepresentable { .. }));
     }
 
+    #[cfg(feature = "export")]
     #[tokio::test]
     async fn export_block_def() {
         let mut universe = Universe::new();

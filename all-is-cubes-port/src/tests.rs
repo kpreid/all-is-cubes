@@ -1,87 +1,27 @@
-use std::error::Error as _;
-use std::fs;
-use std::sync::Arc;
-
-use pretty_assertions::assert_eq;
-use serde_json::json;
-
-use all_is_cubes::block::AIR;
-use all_is_cubes::util::{assert_send_sync, yield_progress_for_testing};
-
-use crate::file::NonDiskFile;
-use crate::{
-    export_to_path, load_universe_from_file, BlockDef, ExportError, ExportFormat, ExportSet,
-    ImportError, Path, PathBuf, Universe,
-};
-
-#[test]
-fn errors_are_send_sync() {
-    assert_send_sync::<ImportError>();
-    assert_send_sync::<ExportError>();
-}
-
-/// This function won't compile if `load_universe_from_file`'s future isn't Send
-fn _load_universe_from_file_future_is_send() {
-    #![allow(unreachable_code, clippy::diverging_sub_expression)]
-    tokio::spawn(load_universe_from_file(unreachable!(), unreachable!()));
-}
-
-#[tokio::test]
-async fn import_unknown_format() {
-    let error = load_universe_from_file(
-        yield_progress_for_testing(),
-        Arc::new(NonDiskFile::from_name_and_data_source("foo".into(), || {
-            Ok(b"nonsense".to_vec())
-        })),
-    )
-    .await
-    .unwrap_err();
-
-    assert_eq!(error.to_string(), "failed to import 'foo'");
-    assert_eq!(
-        error.source().unwrap().to_string(),
-        "the data is not in a recognized format"
-    );
-}
-
-/// This function won't compile if `export_to_path`'s future isn't Send
-fn _export_to_path_future_is_send() {
-    #![allow(unreachable_code, clippy::diverging_sub_expression)]
-    tokio::spawn(export_to_path(
-        unreachable!(),
-        unreachable!(),
-        unreachable!(),
-        unreachable!(),
-    ));
-}
-
-#[test]
-fn member_export_path() {
-    let mut universe = Universe::new();
-    let foo = universe.insert("foo".into(), BlockDef::new(AIR)).unwrap();
-    let _bar = universe.insert("bar".into(), BlockDef::new(AIR)).unwrap();
-
-    assert_eq!(
-        ExportSet::all_of_universe(&universe)
-            .member_export_path(Path::new("/export/data.ext"), &foo),
-        PathBuf::from("/export/data-foo.ext"),
-    );
-    assert_eq!(
-        ExportSet::from_block_defs(vec![foo.clone()])
-            .member_export_path(Path::new("/export/data.ext"), &foo),
-        PathBuf::from("/export/data.ext"),
-    );
-}
-
+#[cfg(all(feature = "import", feature = "export", feature = "native"))]
 #[tokio::test]
 async fn port_whence_load_then_save() {
+    use std::fs;
+    use std::sync::Arc;
+
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+
+    use all_is_cubes::block::BlockDef;
+    use all_is_cubes::block::AIR;
+    use all_is_cubes::universe::Universe;
+    use all_is_cubes::util::yield_progress_for_testing;
+
+    use crate::{export_to_path, load_universe_from_file, ExportSet, Format};
+    use std::path::PathBuf;
+
     let tmp_dir = tempfile::tempdir().unwrap();
     let path: PathBuf = tmp_dir.path().join("foo.alliscubesjson");
 
     // Write initial state.
     export_to_path(
         yield_progress_for_testing(),
-        ExportFormat::AicJson,
+        Format::AicJson,
         ExportSet::all_of_universe(&Universe::new()),
         path.clone(),
     )

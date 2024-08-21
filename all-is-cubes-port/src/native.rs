@@ -4,11 +4,15 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
 use crate::file::Fileish;
-use crate::{ExportError, ExportSet, ImportError, ImportErrorKind};
+#[cfg(feature = "export")]
+use crate::{ExportError, ExportSet};
+#[cfg(feature = "import")]
+use crate::{ImportError, ImportErrorKind};
 
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "import")]
 pub(crate) fn import_native_json(
     progress: YieldProgress,
     bytes: &[u8],
@@ -29,6 +33,7 @@ pub(crate) fn import_native_json(
 }
 
 /// The `destination` should be buffered for efficiency.
+#[cfg(feature = "export")]
 pub(crate) async fn export_native_json(
     progress: YieldProgress,
     source: ExportSet,
@@ -44,6 +49,7 @@ pub(crate) async fn export_native_json(
     Ok(())
 }
 
+#[cfg(feature = "import")]
 struct ReadProgressAdapter<'a> {
     progress: YieldProgress,
     original_length: usize,
@@ -51,6 +57,7 @@ struct ReadProgressAdapter<'a> {
     source: &'a [u8],
 }
 
+#[cfg(feature = "import")]
 impl<'a> ReadProgressAdapter<'a> {
     pub fn new(progress: YieldProgress, source: &'a [u8]) -> Self {
         progress.progress_without_yield(0.0);
@@ -68,6 +75,7 @@ impl<'a> ReadProgressAdapter<'a> {
     }
 }
 
+#[cfg(feature = "import")]
 impl io::Read for ReadProgressAdapter<'_> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let result = self.source.read(buf);
@@ -82,6 +90,7 @@ impl io::Read for ReadProgressAdapter<'_> {
     }
 }
 
+#[cfg(feature = "import")]
 impl Drop for ReadProgressAdapter<'_> {
     fn drop(&mut self) {
         self.report()
