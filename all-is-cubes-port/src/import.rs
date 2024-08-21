@@ -119,7 +119,7 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
         universe: &Universe,
         progress: YieldProgress,
     ) -> BoxFuture<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>> {
-        use crate::{ExportSet};
+        use crate::ExportSet;
 
         let source = ExportSet::all_of_universe(universe);
         let save_format = self.format;

@@ -236,7 +236,7 @@ impl HeadlessRenderer for GltfRend3Renderer {
             let progress = all_is_cubes::util::yield_progress_for_testing();
             port::export_to_path(
                 progress,
-                port::ExportFormat::Gltf,
+                port::Format::Gltf,
                 port::ExportSet::from_spaces(
                     world_space
                         .into_iter()

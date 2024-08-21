@@ -348,20 +348,20 @@ impl FromStr for SpaceSizeArg {
 pub fn determine_record_format(
     output_path: &std::path::Path,
 ) -> Result<RecordFormat, &'static str> {
-    use all_is_cubes_port::ExportFormat;
+    use all_is_cubes_port::Format;
 
     if let Some(extension) = output_path.extension() {
         match extension.to_str() {
             // When updating this match, also update the docs for output_file!
-            // TODO: RecordFormat and ExportFormat should be merged?
+            // TODO: RecordFormat and port::Format should be merged?
             Some("alliscubesjson" | "ALLISCUBESJSON") => {
-                return Ok(RecordFormat::Export(ExportFormat::AicJson))
+                return Ok(RecordFormat::Export(Format::AicJson))
             }
             Some("png" | "PNG") => return Ok(RecordFormat::PngOrApng),
             Some("apng" | "APNG") => return Ok(RecordFormat::PngOrApng),
             Some("gltf" | "GLTF") => return Ok(RecordFormat::Gltf),
-            Some("stl" | "STL") => return Ok(RecordFormat::Export(ExportFormat::Stl)),
-            Some("vox" | "VOX") => return Ok(RecordFormat::Export(ExportFormat::DotVox)),
+            Some("stl" | "STL") => return Ok(RecordFormat::Export(Format::Stl)),
+            Some("vox" | "VOX") => return Ok(RecordFormat::Export(Format::DotVox)),
             _ => {}
         }
     }

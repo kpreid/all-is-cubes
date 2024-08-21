@@ -39,7 +39,7 @@ pub enum RecordFormat {
     Gltf,
 
     /// Any [`all_is_cubes_port`] export format may be written via the recording feature.
-    Export(all_is_cubes_port::ExportFormat),
+    Export(all_is_cubes_port::Format),
 }
 
 impl RecordOptions {
