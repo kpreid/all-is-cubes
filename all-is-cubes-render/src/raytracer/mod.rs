@@ -12,9 +12,9 @@
 // we list some items explicitly even though they should be redundant with
 // the glob re-exports.
 
-pub use all_is_cubes::raytracer::{
-    print_space, Accumulate, SpaceRaytracer, UpdatingSpaceRaytracer, *,
-};
+#[cfg(feature = "std")]
+pub use all_is_cubes::raytracer::print_space;
+pub use all_is_cubes::raytracer::{Accumulate, SpaceRaytracer, UpdatingSpaceRaytracer, *};
 
 mod renderer;
 pub use renderer::{RtRenderer, RtScene};
