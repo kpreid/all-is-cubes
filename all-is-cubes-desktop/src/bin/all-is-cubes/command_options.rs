@@ -396,6 +396,7 @@ mod tests {
         AicDesktopArgs::try_parse_from(std::iter::once("all-is-cubes").chain(args.iter().copied()))
     }
 
+    #[cfg(feature = "record")]
     fn error_context(
         error: &clap::Error,
         wanted_kind: clap::error::ContextKind,
@@ -478,6 +479,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "record")]
     fn record_options_invalid_duration() {
         let e = parse(&["-g", "record", "-o", "o.png", "--duration", "X"]).unwrap_err();
         assert_eq!(e.kind(), ErrorKind::ValueValidation);
