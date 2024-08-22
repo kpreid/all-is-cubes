@@ -56,7 +56,7 @@ fn main() -> Result<(), anyhow::Error> {
         mut precompute_light,
         input_file,
         #[cfg(feature = "record")]
-            output_file: _, // used in RecordOptions
+            output_file_and_format: _, // used in RecordOptions
         #[cfg(feature = "record")]
             save_all: _, // used in RecordOptions
         duration,
@@ -71,12 +71,9 @@ fn main() -> Result<(), anyhow::Error> {
 
     let input_source = parse_universe_source(input_file, template, template_size, seed);
 
-    // TODO: record_options validation should just be part of the regular arg parsing
-    // (will need a wrapper type)
     #[cfg(feature = "record")]
-    let record_options: Option<record::RecordOptions> = options
-        .record_options()
-        .inspect(|optropt| {
+    let record_options: Option<record::RecordOptions> =
+        options.record_options().inspect(|optropt| {
             if graphics_type == GraphicsType::Record
                 && optropt
                     .as_ref()
@@ -84,8 +81,7 @@ fn main() -> Result<(), anyhow::Error> {
             {
                 precompute_light = true;
             }
-        })
-        .map_err(|e| e.format(&mut AicDesktopArgs::command()))?;
+        })?;
 
     let graphics_options = if no_config_files {
         GraphicsOptions::default()

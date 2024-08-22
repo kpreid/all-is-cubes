@@ -112,16 +112,16 @@ pub(crate) struct AicDesktopArgs {
         required_if_eq("graphics", "record"),
         value_name = "FILE",
         value_parser = clap::builder::PathBufValueParser::new().try_map(|value| {
-            let _format = determine_record_format(&value)?;
-            Ok::<PathBuf, &str>(value)
+            let format = determine_record_format(&value)?;
+            Ok::<(PathBuf, RecordFormat), &str>((value, format))
         }),
         verbatim_doc_comment,
     )]
-    pub(crate) output_file: Option<PathBuf>,
+    pub(crate) output_file_and_format: Option<(PathBuf, RecordFormat)>,
 
     /// Whether to record/export everything, rather than just the displayed scene.
     #[cfg(feature = "record")]
-    #[arg(long, requires = "output_file")]
+    #[arg(long, requires = "output_file_and_format")]
     pub(crate) save_all: bool,
 
     // TODO: Generalize this to "exit after this much time has passed".
@@ -160,19 +160,17 @@ impl AicDesktopArgs {
     ///
     /// Returns an error if options were inconsistent with each other.
     ///
-    /// Returns `Ok(None)` if recording was not requested (`output_file` not set).
+    /// Returns `Ok(None)` if recording was not requested (`output_file_and_format` not set).
     ///
     /// Panics if `output_path` is not validated (this should have been checked at parse time).
     #[cfg(feature = "record")]
     #[allow(clippy::unnecessary_wraps)] // *currently* no error can happen
-    pub fn record_options(&self) -> clap::error::Result<Option<RecordOptions>> {
-        let Some(output_path) = self.output_file.clone() else {
+    pub fn record_options(&self) -> Result<Option<RecordOptions>, anyhow::Error> {
+        let Some((output_path, output_format)) = self.output_file_and_format.clone() else {
             return Ok(None);
         };
-        let output_format = determine_record_format(&output_path)
-            .expect("output_file should have been validated to specify a format");
         let options = RecordOptions {
-            output_path: self.output_file.clone().unwrap(),
+            output_path,
             output_format,
             image_size: self
                 .display_size
