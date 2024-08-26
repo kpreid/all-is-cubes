@@ -540,6 +540,12 @@ impl<T: ?Sized> EphemeralOpaque<T> {
         Self(Some(contents))
     }
 
+    /// Constructs an [`EphemeralOpaque`] that is already defunct
+    /// (holds no value).
+    pub fn defunct() -> Self {
+        Self(None)
+    }
+
     /// Get a reference to the value if it still exists.
     pub fn try_ref(&self) -> Option<&T> {
         self.0.as_deref()
