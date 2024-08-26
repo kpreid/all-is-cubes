@@ -11,7 +11,9 @@ use all_is_cubes_ui::notification;
 use all_is_cubes_ui::vui::widgets::ProgressBarState;
 
 use crate::glue::{Executor, Renderer, Window};
-use crate::{logging, record};
+use crate::logging;
+#[cfg(feature = "record")]
+use crate::record;
 use crate::{ClockSource, DesktopSession};
 
 /// Given a [`DesktopSession`] and an event loop type already decided, run the remainder
