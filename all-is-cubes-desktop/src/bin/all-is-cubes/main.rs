@@ -13,8 +13,6 @@ use clap::{CommandFactory as _, Parser as _};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::ListenableCell;
 use all_is_cubes_render::camera::{GraphicsOptions, Viewport};
-use all_is_cubes_ui::notification;
-use all_is_cubes_ui::vui::widgets::ProgressBarState;
 
 #[cfg(feature = "record")]
 use all_is_cubes_desktop::record;
@@ -26,7 +24,7 @@ use all_is_cubes_desktop::winit::{
     self as aic_winit, create_winit_wgpu_desktop_session, winit_main_loop_and_init,
 };
 use all_is_cubes_desktop::{
-    inner_main, load_config, logging, DesktopSession, InnerMainParams, Session,
+    inner_main, load_config, logging, DesktopSession, InnerMainParams, Session, UniverseTask,
 };
 
 mod command_options;
@@ -91,14 +89,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Done with options; now start creating the session.
 
-    // Kick off constructing the universe in the background.
-    let (universe_future, universe_notif_tx) = {
-        let (n_tx, n_rx) = tokio::sync::oneshot::channel();
-        (
-            runtime.spawn(input_source.create_universe(precompute_light, n_rx)),
-            n_tx,
-        )
-    };
+    let mut universe_task = UniverseTask::new(&executor, input_source, precompute_light);
 
     // This cell will be moved into the session after (possibly) being reset to the actual
     // window size. This is a kludge because the `Session`'s `Vui` wants to be able to track
@@ -121,12 +112,7 @@ fn main() -> Result<(), anyhow::Error> {
     );
     // TODO: this code should live in the lib
     session.graphics_options_mut().set(graphics_options);
-    if let Ok(n) = session.show_notification(notification::NotificationContent::Progress(
-        ProgressBarState::new(0.0),
-    )) {
-        // Ignore send error because the process might have finished and dropped the receiver.
-        _ = universe_notif_tx.send(n);
-    }
+    universe_task.attach_to_session(&mut session);
     let session_done_time = Instant::now();
     log::debug!(
         "Initialized session ({:.3} s)",
@@ -145,7 +131,7 @@ fn main() -> Result<(), anyhow::Error> {
         application_title: title_and_version(),
         runtime,
         before_loop_time: Instant::now(),
-        universe_future,
+        universe_task,
         headless: options.is_headless(),
         logging: late_logging,
         #[cfg(feature = "record")]

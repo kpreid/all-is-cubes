@@ -7,6 +7,8 @@ use anyhow::Context as _;
 
 use all_is_cubes::universe::Universe;
 use all_is_cubes_ui::apps::{ExitMainTask, MainTaskContext};
+use all_is_cubes_ui::notification;
+use all_is_cubes_ui::vui::widgets::ProgressBarState;
 
 use crate::glue::{Executor, Renderer, Window};
 use crate::{logging, record};
@@ -28,7 +30,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         application_title,
         runtime,
         before_loop_time,
-        universe_future,
+        universe_task,
         headless,
         logging,
         recording,
@@ -78,7 +80,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
     }
 
     dsession.session.set_main_task(|mut ctx| async move {
-        let universe_result: Result<Universe, anyhow::Error> = match universe_future.await {
+        let universe_result: Result<Universe, anyhow::Error> = match universe_task.future.await {
             Ok(Ok(u)) => Ok(u),
             Ok(Err(e)) => {
                 Err(e).context("failed to create universe from requested template or file")
@@ -185,7 +187,7 @@ pub struct InnerMainParams {
     pub application_title: String,
     pub runtime: tokio::runtime::Runtime,
     pub before_loop_time: Instant,
-    pub universe_future: tokio::task::JoinHandle<Result<Universe, anyhow::Error>>,
+    pub universe_task: UniverseTask,
     pub headless: bool,
     /// Result of calling [`logging::install()`], which should be done as early as feasible.
     pub logging: logging::LateLogging,
@@ -199,6 +201,43 @@ pub struct InnerMainParams {
     pub universe_ready_signal: tokio::sync::oneshot::Sender<Result<(), anyhow::Error>>,
     /// Will send a message when the main task completes.
     pub task_done_signal: tokio::sync::oneshot::Sender<()>,
+}
+
+/// An async task that constructs a [`Universe`] that will belong to a [`DesktopSession`],
+/// delivered via [`InnerMainParams`].
+#[derive(Debug)]
+pub struct UniverseTask {
+    future: tokio::task::JoinHandle<Result<Universe, anyhow::Error>>,
+    progress_notification_handoff_tx:
+        Option<tokio::sync::oneshot::Sender<notification::Notification>>,
+}
+
+#[allow(missing_docs)] // sloppy API anyway
+impl UniverseTask {
+    pub fn new(executor: &Executor, source: crate::UniverseSource, precompute_light: bool) -> Self {
+        // Kick off constructing the universe in the background.
+        let (n_tx, n_rx) = tokio::sync::oneshot::channel();
+        let future = executor
+            .tokio()
+            .spawn(source.create_universe(precompute_light, n_rx));
+        Self {
+            future,
+            progress_notification_handoff_tx: Some(n_tx),
+        }
+    }
+
+    pub fn attach_to_session(&mut self, session: &mut crate::Session) {
+        if let Ok(n) = session.show_notification(notification::NotificationContent::Progress(
+            ProgressBarState::new(0.0),
+        )) {
+            // Ignore send error because the process might have finished and dropped the receiver.
+            _ = self
+                .progress_notification_handoff_tx
+                .take()
+                .expect("attach_to_session() must be called only once")
+                .send(n);
+        }
+    }
 }
 
 #[allow(clippy::needless_pass_by_value)]
