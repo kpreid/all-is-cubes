@@ -72,6 +72,9 @@ pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: Gri
     // way, since it is precisely about identifying the volume occupied by drawing a
     // 2D-pixel.
 
+    #![allow(unknown_lints)] // TODO: remove after Rust 1.81 is released
+    #![allow(clippy::too_long_first_doc_paragraph)] // TODO: find better phrasing
+
     // TODO: propagate numeric overflow cases
     #![allow(clippy::cast_possible_wrap)]
 

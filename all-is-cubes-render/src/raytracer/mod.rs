@@ -1,12 +1,9 @@
 //! CPU raytracer for All is Cubes content.
 //!
-//! ## Why?
-//!
-//! The original reason this exists is that I thought “we have [`all_is_cubes::raycast`],
-//! and that's nearly all the work, so why not?” Secondarily, it was written before
-//! the mesh-based renderer, and was useful as a cross-check since
-//! it is much simpler. It continues to serve as a “reference implementation”, and is used
-//! by the terminal UI and in unit tests via [`print_space`].
+//! While not fast enough for serious interactive use,
+//! this raytracer serves as the reference implementation of rendering.
+//! Some of its components are also used in areas like computing derived properties of blocks.
+//! It may also be used for visual output in tests via [`print_space()`].
 
 // As a workaround for <https://github.com/rust-lang/rust/issues/127445>,
 // we list some items explicitly even though they should be redundant with
@@ -14,7 +11,9 @@
 
 #[cfg(feature = "std")]
 pub use all_is_cubes::raytracer::print_space;
-pub use all_is_cubes::raytracer::{Accumulate, SpaceRaytracer, UpdatingSpaceRaytracer, *};
+pub use all_is_cubes::raytracer::{
+    Accumulate, CharacterBuf, RtBlockData, SpaceRaytracer, UpdatingSpaceRaytracer, *,
+};
 
 mod renderer;
 pub use renderer::{RtRenderer, RtScene};

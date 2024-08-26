@@ -832,7 +832,9 @@ pub(crate) struct DeserializeHandlesError {
     to: Name,
 }
 
-/// Performance data returned by [`Universe::step`]. The exact contents of this structure
+/// Performance data returned by [`Universe::step`].
+///
+/// The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
 #[derive(Clone, Debug, Default, PartialEq)]

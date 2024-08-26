@@ -114,6 +114,7 @@
 //! `all_is_cubes` depends on and re-exports the following crates as part of its public
 //! API:
 //!
+//! * [`arcstr`] for string data (as `all_is_cubes::arcstr`).
 //! * [`euclid`] for vector math (as `all_is_cubes::euclid`).
 //! * [`ordered_float`] (as `all_is_cubes::math::NotNan`).
 //! * [`embedded_graphics`] (as `all_is_cubes::drawing::embedded_graphics`).

@@ -16,15 +16,18 @@ mod tester;
 #[cfg(test)]
 pub use tester::*;
 
+/// A mutation that is to be performed atomically.
+///
 /// A `Transaction` is a description of a mutation to an object or collection thereof that
 /// should occur in a logically atomic fashion (all or nothing), with a set of
-/// preconditions for it to happen at all.
+/// preconditions for it to happen at all. (Here we mean [“atomic” in the database sense][atomic],
+/// not in the CPU instruction sense.)
 ///
 /// Transactions are used:
 ///
 /// * to enable game objects to have effects on their containers in a way compatible
 ///   with Rust's ownership rules,
-/// * to avoid “item duplication” type bugs by checking all preconditions before making
+/// * to avoid bugs of the “item duplication” sort, by checking all preconditions before making
 ///   any changes, and
 /// * to avoid update-order-dependent game mechanics by applying effects in batches.
 ///
@@ -33,6 +36,8 @@ pub use tester::*;
 ///
 /// If a transaction implements [`Default`], then the default value should be a
 /// transaction which has no effects and always succeeds, and is cheap to create.
+///
+/// [atomic]: https://en.wikipedia.org/wiki/Atomicity_(database_systems)
 #[must_use]
 pub trait Transaction: Merge {
     /// Type of the transaction’s target (what it can be used to mutate).
@@ -133,8 +138,14 @@ pub trait Transaction: Merge {
     }
 }
 
-/// Merging two transactions (or, in principle, other values) to produce one result “with
-/// the effect of both”. Merging is a commutative, fallible operation.
+/// Merging two transactions (or other values) to produce one result “with
+/// the effect of both”.
+///
+/// Merging is a commutative, fallible operation.
+/// The exact conditions under which it fails are up to the specific type, but generally,
+/// it will fail whenever there is no outcome which reasonably corresponds to
+/// the pair of transactions being executed “simultaneously”, and it will succeed when
+/// the pair of transactions modify independent parts of their target.
 ///
 /// This is a separate trait from [`Transaction`] because some components of transactions
 /// are mergeable but not executable in isolation.

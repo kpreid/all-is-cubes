@@ -1258,7 +1258,9 @@ pub struct SpaceFluff {
     pub fluff: Fluff,
 }
 
-/// Performance data returned by [`Space::step`]. The exact contents of this structure
+/// Performance data returned by [`Space::step`].
+///
+/// The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have
 /// a specific need for one of the values.
 #[derive(Clone, Debug, Default, PartialEq)]

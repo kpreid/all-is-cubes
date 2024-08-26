@@ -53,10 +53,11 @@ where
     }
 }
 
-/// Controls a [`Listener`] chain by discarding messages when this gate is dropped.
+/// Breaks a [`Listener`] connection when dropped.
 ///
-/// Construct this using [`Listener::gate`], or if a placeholder instance with no
-/// effect is required, [`Gate::default`].
+/// Construct this using [`Listener::gate()`], or if a placeholder instance with no
+/// effect is required, [`Gate::default()`]. Then, drop the [`Gate`] when no more messages
+/// should be delivered.
 #[derive(Clone, Default)]
 pub struct Gate {
     /// By owning this we keep its [`Weak`] peers alive, and thus the [`GateListener`] active.
@@ -83,8 +84,10 @@ impl Gate {
     }
 }
 
-/// [`Listener`] implementation which discards messages when the corresponding [`Gate`]
-/// is dropped. Construct this using [`Listener::gate()`].
+/// A [`Listener`] which forwards messages to another,
+/// until the corresponding [`Gate`] is dropped.
+///
+/// Construct this using [`Listener::gate()`].
 #[derive(Clone, Debug)]
 pub struct GateListener<T> {
     weak: Weak<()>,

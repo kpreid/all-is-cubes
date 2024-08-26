@@ -57,15 +57,17 @@ impl<T: Listen> Listen for Arc<T> {
     }
 }
 
-/// Mechanism for observing changes to objects. A [`Notifier`] delivers messages
-/// of type `M` to a set of listeners, each of which usually holds a weak reference
-/// to allow it to be removed when the actual recipient is gone or uninterested.
+/// Message broadcaster, usually used for change notifications.
 ///
-/// TODO: Currently, each message is [`Clone`]d for each recipient. This is fine for
-/// most cases, but in some cases it would be cheaper to pass a reference. We could
-/// make Notifier and Listener always take `&M`, but it's not clear how to use
-/// references *some* of the time — making `M` be a reference type can't have a
-/// satisfactory lifetime.
+/// A `Notifier<M>` delivers messages of type `M` to a dynamic set of [`Listener`]s.
+///
+/// The `Notifier` is usually owned by some entity which emits messages when it changes,
+/// such as a [`ListenableCell`].
+/// Each `Listener` usually holds a weak reference to allow it to be removed when the
+/// actual recipient is gone or uninterested.
+///
+/// [`Listener`]s may be added using the [`Listen`] implementation, and are removed when
+/// they report themselves as dead.
 pub struct Notifier<M> {
     listeners: RwLock<Vec<NotifierEntry<M>>>,
 }

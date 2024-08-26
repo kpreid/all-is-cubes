@@ -446,11 +446,13 @@ pub enum NominalPixel {}
 #[derive(Debug, Eq, PartialEq)]
 pub enum ImagePixel {}
 
-/// Unit-of-measure type for points/vectors in “normalized device coordinates”:
-/// screen-space *x* and *y* have the range -1 to 1;
+/// Unit-of-measure type for points/vectors in “normalized device coordinates”.
+///
+/// In this coordinate system,
+/// screen-space <var>x</var> and <var>y</var> have the range -1 to 1;
 /// zero is the center of the screen;
-/// and *z* has the range 0 (nearest) to 1 (farthest) and is image depth rather than an equivalent
-/// third spatial axis.
+/// and <var>z</var> has the range 0 (nearest) to 1 (farthest),
+/// and is image depth rather than an equivalent third spatial axis.
 #[allow(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum Ndc {}

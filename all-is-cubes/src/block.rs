@@ -1110,6 +1110,7 @@ impl BlockChange {
 }
 
 /// Construct a set of [`Primitive::Recur`] blocks that form a miniature of the given `space`.
+///
 /// The returned [`Space`] contains each of the blocks; its coordinates will correspond to
 /// those of the input, scaled down by `resolution`.
 ///

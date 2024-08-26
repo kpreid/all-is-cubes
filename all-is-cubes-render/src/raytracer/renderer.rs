@@ -310,11 +310,14 @@ impl HeadlessRenderer for RtRenderer<()> {
     }
 }
 
-/// Bundle of references to the current scene data in a [`RtRenderer`],
-/// used to implement tracing individual rays independent of how they
-/// are assembled into an image. Differs from [`SpaceRaytracer::trace_ray()`]
-/// in that it includes the cameras (thus accepting screen-space coordinates
-/// rather than a ray) and [`Layers`] rather than one space.
+/// Scene to be raytraced.
+///
+/// This may be obtained from [`RtRenderer::scene()`] and used to trace individual rays,
+/// rather than an entire image.
+///
+/// Differs from [`SpaceRaytracer`]
+/// in that it includes the [`Camera`]s (thus accepting screen-space coordinates
+/// rather than a world-space ray) and [`Layers`] rather than one space.
 ///
 /// Obtain this by calling [`RtRenderer::scene()`].
 pub struct RtScene<'a, P: Accumulate> {

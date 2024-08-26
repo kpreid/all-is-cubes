@@ -14,9 +14,11 @@ use crate::math::FreeVector;
 use crate::raytracer::{Accumulate, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
 
-/// TODO: better name, docs
+/// If you are using [`CharacterBuf`], use this [`RtBlockData`] implementation.
+// TODO: better name
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
+// TODO: field would ideally be private
 pub struct CharacterRtData(pub Substr);
 
 impl RtBlockData for CharacterRtData {

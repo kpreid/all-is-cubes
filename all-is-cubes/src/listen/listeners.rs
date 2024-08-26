@@ -10,8 +10,9 @@ use manyfmt::Refmt as _;
 use crate::listen::{Listen, Listener};
 use crate::util::maybe_sync::{RwLock, SendSyncIfStd};
 
-/// A [`Listener`] which discards all messages and is suitable for filling
-/// listener parameters when no listener is needed.
+/// A [`Listener`] which discards all messages.
+///
+/// Use this when a [`Listener`] is demanded, but there is nothing it should do.
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NullListener;

@@ -311,9 +311,15 @@ crate::util::cfg_should_impl_error! {
     impl ErrorIfStd for ProviderError {}
 }
 
-/// An error resulting from “world generation”: failure to calculate/create/place objects
-/// (due to bad parameters or unforeseen edge cases), failure to successfully store them
-/// in or retrieve them from a [`Universe`], et cetera.
+/// An error resulting from “world generation”.
+///
+/// May be failure to calculate/create/place objects
+/// (due to bad parameters or unforeseen edge cases),
+/// failure to successfully store them in or retrieve them from a [`Universe`],
+/// et cetera.
+///
+/// A [`GenError`] contains an [`InGenError`] and additionally specifies which universe
+/// member was to be generated but failed.
 #[derive(Debug)]
 pub struct GenError {
     #[cfg_attr(not(feature = "std"), allow(dead_code))]
