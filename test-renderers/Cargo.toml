@@ -52,11 +52,14 @@ auto-threads = [
 ]
 gltf = [
     "dep:all-is-cubes-port",
+    "dep:bytemuck",
+    "dep:futures-channel",
     "dep:rend3",
     "dep:rend3-gltf",
     "dep:rend3-routine",
     "dep:glam", # activates mint feature for interop
     "dep:mint",
+    "dep:wgpu_for_rend3",
     "tokio/fs",
 ]
 
@@ -69,10 +72,12 @@ all-is-cubes-port = { workspace = true, optional = true, features = ["export", "
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
 all-is-cubes-ui = { workspace = true }
 async_fn_traits = { workspace = true }
+bytemuck = { workspace = true, optional = true }
 # Using clap for parsing test command-line arguments
 clap = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
+futures-channel = { workspace = true, optional = true }
 futures-util = { workspace = true, features = ["std"] }
 # Must be the same version of glam as rend3 uses
 glam = { version = "0.24", optional = true, features = ["mint"] }
@@ -99,6 +104,7 @@ tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "park
 # In addition to depending on wgpu directly, we also need to select backends to be enabled in our binary.
 # (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
 wgpu = { workspace = true, features = ["dx12", "metal"] }
+wgpu_for_rend3 = { package = "wgpu", version = "0.19", optional = true, features = ["dx12", "metal"] }
 
 [lints]
 workspace = true

@@ -5955,8 +5955,10 @@ dependencies = [
  "all-is-cubes-render",
  "all-is-cubes-ui",
  "async_fn_traits",
+ "bytemuck",
  "clap",
  "exhaust",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "glam 0.24.2",
@@ -5977,6 +5979,7 @@ dependencies = [
  "time",
  "tinytemplate",
  "tokio",
+ "wgpu 0.19.4",
  "wgpu 22.1.0",
 ]
 
