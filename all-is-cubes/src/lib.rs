@@ -96,7 +96,6 @@
 //!   * [`Listener`](crate::listen::Listener) callbacks are no longer required to be `Send + Sync`,
 //!     **which makes this feature non-additive**. Proceed with care.
 //!   * Certain data calculations are not memoized.
-//!   * Error types do not implement [`std::error::Error`].
 //!
 //! ## Platform compatibility
 //!

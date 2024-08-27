@@ -14,7 +14,6 @@
 //! * `"std"` (enabled by default):
 //!   If disabled, the library becomes `no_std` compatible, at this cost:
 //!   * [`raytracer::RtRenderer`] does not implement [`headless::HeadlessRenderer`].
-//!   * Error types do not implement [`std::error::Error`].
 
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)

@@ -893,7 +893,6 @@ pub enum MemberMismatch {
     Modify(ModifyMemberMismatch),
 }
 
-#[cfg(feature = "std")]
 impl crate::util::ErrorIfStd for MemberMismatch {
     fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
         match self {

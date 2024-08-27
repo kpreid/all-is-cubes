@@ -9,7 +9,6 @@ pub use manyfmt::{refmt, Fmt, Refmt};
 // Unfortunately, we can't use a glob re-export here or `ErrorIfStd` ends up visible when it
 // shouldn't be, mysteriously. So, explicit everything instead, with their various visibilities
 // and cfgs.
-#[cfg(feature = "std")]
 #[doc(hidden)]
 pub use all_is_cubes_base::util::ErrorChain;
 #[doc(hidden)]
