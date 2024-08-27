@@ -211,7 +211,6 @@ impl<G> LockError<G> {
     // }
 }
 
-#[cfg(feature = "std")]
 impl<G> crate::util::ErrorIfStd for LockError<G> {}
 
 impl<G> fmt::Display for LockError<G> {
@@ -236,7 +235,6 @@ pub(crate) enum TryLockError<G> {
     WouldBlock,
 }
 
-#[cfg(feature = "std")]
 impl<G> crate::util::ErrorIfStd for TryLockError<G> {}
 
 impl<G> fmt::Display for TryLockError<G> {

@@ -579,7 +579,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "std")] // Error::source only exists on std
     fn gen_error_message() {
         use alloc::string::ToString;
 

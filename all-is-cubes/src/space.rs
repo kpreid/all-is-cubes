@@ -764,8 +764,7 @@ impl Space {
             if let Err(e) = first_pass_txn.execute(self, &mut transaction::no_outputs) {
                 // This really shouldn't happen, because we already check()ed every part of
                 // first_pass_txn, but we don't want it to be fatal.
-                // TODO: this logging should use util::ErrorChain, but that's only available
-                // with the std feature.
+                // TODO: this logging should use util::ErrorChain
                 log::error!("cube tick transaction could not be executed: {e:#?}");
             }
             first_pass_cubes.len()
