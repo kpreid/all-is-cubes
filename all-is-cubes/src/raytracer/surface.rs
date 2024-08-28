@@ -442,15 +442,12 @@ mod tests {
     type SurfaceIterR<'a> = SurfaceIter<'a, (), raycast::Raycaster>;
 
     #[test]
-    fn surface_iter_smoke_test() {
-        let universe = &mut Universe::new();
-
-        let mut space = Space::empty(GridAab::from_lower_size([0, 0, 0], [1, 3, 1]));
-
+    fn surface_and_depth_iter_basic() {
         let solid_test_color = rgba_const!(1., 0., 0., 1.);
         let slab_test_color = rgba_const!(1., 1., 0., 1.);
         let slab_test_color_block = Block::from(slab_test_color);
 
+        let universe = &mut Universe::new();
         // This block has some AIR in it that the iterator will traverse
         let slab_with_extra_space = Block::builder()
             .voxels_fn(R4, |cube| {
@@ -463,15 +460,18 @@ mod tests {
             })
             .unwrap()
             .build_into(universe);
-
-        space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
-        space.set([0, 2, 0], slab_with_extra_space).unwrap();
+        let space = {
+            let mut space = Space::empty(GridAab::from_lower_size([0, 0, 0], [1, 3, 1]));
+            space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
+            space.set([0, 2, 0], slab_with_extra_space).unwrap();
+            space
+        };
 
         let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
+        let ray = Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]);
 
         assert_eq!(
-            SurfaceIterR::new(&rt, Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]))
-                .collect::<Vec<TraceStep<'_, ()>>>(),
+            SurfaceIterR::new(&rt, ray).collect::<Vec<TraceStep<'_, ()>>>(),
             vec![
                 Invisible { t_distance: 0.5 }, // Cube [0, 0, 0] is empty
                 EnterSurface(Surface {
@@ -513,6 +513,58 @@ mod tests {
                 // t_distance of the _exit_ point is known, for the benefit of volumetric
                 // rendering.
                 Invisible { t_distance: 3.5 },
+            ]
+        );
+
+        // DepthIter is built on SurfaceIter, so it makes sense to test together and second
+        assert_eq!(
+            DepthIter::new(SurfaceIterR::new(&rt, ray)).collect::<Vec<DepthStep<'_, ()>>>(),
+            vec![
+                DepthStep::Invisible,
+                DepthStep::Invisible,
+                DepthStep::Span(Span {
+                    surface: Surface {
+                        block_data: &(),
+                        diffuse_color: solid_test_color,
+                        emission: Rgb::ZERO,
+                        cube: Cube::new(0, 1, 0),
+                        t_distance: 1.5,
+                        intersection_point: point3(0.25, 1.0, 0.25),
+                        normal: Face7::NY,
+                    },
+                    exit_t_distance: 2.5,
+                }),
+                DepthStep::EnterBlock {
+                    t_distance: 2.5,
+                    block_data: &(),
+                },
+                DepthStep::Invisible,
+                DepthStep::Span(Span {
+                    surface: Surface {
+                        block_data: &(),
+                        diffuse_color: rgba_const!(1., 1., 0., 1.),
+                        emission: Rgb::ZERO,
+                        cube: Cube::new(0, 2, 0),
+                        t_distance: 2.5,
+                        intersection_point: point3(0.25, 2.0, 0.25),
+                        normal: Face7::NY,
+                    },
+                    exit_t_distance: 2.75,
+                }),
+                DepthStep::Span(Span {
+                    surface: Surface {
+                        block_data: &(),
+                        diffuse_color: rgba_const!(1., 1., 0., 1.),
+                        emission: Rgb::ZERO,
+                        cube: Cube::new(0, 2, 0),
+                        t_distance: 2.75,
+                        intersection_point: point3(0.25, 2.25, 0.25),
+                        normal: Face7::NY,
+                    },
+                    exit_t_distance: 3.0,
+                }),
+                DepthStep::Invisible,
+                DepthStep::Invisible,
             ]
         );
     }
