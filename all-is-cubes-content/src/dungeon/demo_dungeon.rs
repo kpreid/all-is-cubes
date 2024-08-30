@@ -1,5 +1,6 @@
 #![expect(unused_qualifications)] // macro false positive
 
+use alloc::vec::Vec;
 use core::f64::consts::TAU;
 use core::mem;
 
@@ -7,7 +8,7 @@ use exhaust::Exhaust;
 use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
-use all_is_cubes::block::{Block, Resolution::*, RotationPlacementRule, AIR};
+use all_is_cubes::block::{self, Block, Resolution::*, RotationPlacementRule, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::space_from_image;
 use all_is_cubes::content::palette;
@@ -85,6 +86,8 @@ struct DemoTheme {
     blocks: BlockProvider<DungeonBlocks>,
     wall_block: Block,
     lamp_block: Block,
+    // TODO: ought to be part of the BlockProvider
+    locked_gate_block: Block,
     /// TODO: replace window glass with openings that are too small to pass through
     window_glass_block: Block,
     item_pedestal: Block,
@@ -184,6 +187,17 @@ impl DemoTheme {
             let gate_side_2 = gate_box
                 .abut(wall_parallel, if blocked { -2 } else { -1 })
                 .unwrap();
+            let lock_box = if blocked {
+                gate_side_1
+                    .abut(Face6::NY, -1) // one cube up from bottom
+                    .unwrap()
+                    .abut(Face6::PY, 1) // one cube high
+                    .unwrap()
+                    .abut(wall_parallel, 1) // one cube adjacent to the pocket (centered on 3x3)
+                    .unwrap()
+            } else {
+                GridAab::ORIGIN_EMPTY
+            };
             space.fill_uniform(
                 gate_side_2,
                 &self.blocks[Gate].clone().rotate(rotate_nz_to_face),
@@ -192,7 +206,10 @@ impl DemoTheme {
                 gate_side_1,
                 &self.blocks[GatePocket].clone().rotate(rotate_nz_to_face),
             )?;
-            // TODO: add opening/closing mechanism and make some of these outright blocked
+            space.fill_uniform(
+                lock_box,
+                &self.locked_gate_block.clone().rotate(rotate_nz_to_face),
+            )?;
         } else if blocked {
             // TODO: either implement this or change the schema so it can't happen
             panic!("can't block gateless passage");
@@ -432,15 +449,22 @@ pub(crate) async fn demo_dungeon(
 
     let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+    let dungeon_blocks = BlockProvider::<DungeonBlocks>::using(universe)?;
     let theme = DemoTheme {
         dungeon_grid: dungeon_grid.clone(),
         corridor_box: GridAab::from_lower_size([3, 0, 3], [3, 3, 3]),
-        blocks: BlockProvider::using(universe)?,
+        locked_gate_block: dungeon_blocks[Gate]
+            .clone()
+            .with_modifier(block::Composite::new(
+                dungeon_blocks[GateLock].clone(),
+                block::CompositeOperator::Over,
+            )),
         // TODO: use more appropriate blocks
         wall_block: landscape_blocks[LandscapeBlocks::Stone].clone(),
         lamp_block: demo_blocks[DemoBlocks::Lamp(true)].clone(),
         window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
         item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
+        blocks: dungeon_blocks,
     };
     // Random assortment of blocks to provide
     // TODO: make this things like keys for doors
@@ -619,6 +643,8 @@ pub(crate) enum DungeonBlocks {
     Gate,
     /// Receptacle for a moved `Gate`.
     GatePocket,
+    /// Lock to be composited on a `Gate` block.
+    GateLock,
 }
 impl BlockModule for DungeonBlocks {
     fn namespace() -> &'static str {
@@ -699,7 +725,6 @@ pub async fn install_dungeon_blocks(
                     .build()
             }
 
-            // TODO: improve this appearance
             GatePocket => {
                 let space = space_from_image(
                     include_image!("fence-pocket.png"),
@@ -711,6 +736,30 @@ pub async fn install_dungeon_blocks(
                 )?;
                 Block::builder()
                     .display_name("Gate Pocket")
+                    .voxels_handle(R16, txn.insert_anonymous(space))
+                    .build()
+            }
+
+            GateLock => {
+                let space = space_from_image(
+                    include_image!("gate-lock.png"),
+                    GridRotation::RXyZ,
+                    &|pixel| {
+                        let pixel = Rgba::from_srgb8(pixel);
+                        let block = if pixel.fully_transparent() {
+                            AIR
+                        } else {
+                            Block::builder().color(pixel).build()
+                        };
+                        VoxelBrush::new(
+                            (5..11)
+                                .map(|z| ([0, 0, z], block.clone()))
+                                .collect::<Vec<_>>(),
+                        )
+                    },
+                )?;
+                Block::builder()
+                    .display_name("Keyhole")
                     .voxels_handle(R16, txn.insert_anonymous(space))
                     .build()
             }
