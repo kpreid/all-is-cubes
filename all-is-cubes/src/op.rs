@@ -269,7 +269,9 @@ impl Operation {
         }
     }
 
-    pub(crate) fn rotate(self, rotation: GridRotation) -> Self {
+    #[doc(hidden)] // TODO: unsure if good public api
+    #[must_use]
+    pub fn rotate(self, rotation: GridRotation) -> Self {
         if rotation == GridRotation::IDENTITY {
             return self;
         }

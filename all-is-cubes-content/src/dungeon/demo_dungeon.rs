@@ -1,5 +1,6 @@
 #![expect(unused_qualifications)] // macro false positive
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::f64::consts::TAU;
 use core::mem;
@@ -21,11 +22,11 @@ use all_is_cubes::math::{
     GridVector, Rgb, Rgba, Vol,
 };
 use all_is_cubes::space::{LightPhysics, Space};
-use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{color_block, include_image};
+use all_is_cubes::{op, time};
 
 use crate::alg::four_walls;
 use crate::dungeon::{build_dungeon, generate_maze, DungeonGrid, MazeRoomKind, Theme};
@@ -65,9 +66,19 @@ enum WallFeature {
     /// Blank wall.
     Blank,
     /// Opening to a corridor.
-    Passage { gate: bool, blocked: bool },
+    Passage(Door),
     /// Window to the outside world.
     Window,
+}
+
+/// A possible obstruction in a passage.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Door {
+    None,
+    Open,
+    Locked,
+    /// Can be seen through but cannot be unlocked.
+    Permanent,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -121,8 +132,7 @@ impl DemoTheme {
         map: Vol<&[Option<DemoRoom>]>,
         room_position: Cube,
         face: Face6,
-        has_gate: bool,
-        blocked: bool,
+        door: Door,
     ) -> Result<(), InGenError> {
         let passage_axis = face.axis();
 
@@ -178,16 +188,26 @@ impl DemoTheme {
         )?;
         space.fill_uniform(doorway_box.abut(Face6::PY, 1).unwrap(), &self.wall_block)?; // TODO: ceiling block
 
-        // Gate
-        if has_gate {
+        // * If !gate_present, we don't generate a gate at all.
+        // * If gate_movable, we generate a GatePocket for it to slide into; otherwise it is
+        //   entirely fixed flat bars.
+        // * If gate_movable && !gate_open, we generate a lock which allows the gate to be
+        //   opened with a key.
+        let (gate_present, gate_movable, gate_open) = match door {
+            Door::None => (false, false, false),
+            Door::Open => (true, true, true),
+            Door::Locked => (true, true, false),
+            Door::Permanent => (true, false, false),
+        };
+        if gate_present {
             let gate_box = doorway_box.abut(face, -1).unwrap().translate(
                 face.opposite().normal_vector() * doorway_box.size().to_i32()[face.axis()] / 2,
             );
             let gate_side_1 = gate_box.abut(wall_parallel.opposite(), -1).unwrap();
             let gate_side_2 = gate_box
-                .abut(wall_parallel, if blocked { -2 } else { -1 })
+                .abut(wall_parallel, if gate_open { -1 } else { -2 })
                 .unwrap();
-            let lock_box = if blocked {
+            let lock_box = if gate_movable && !gate_open {
                 gate_side_1
                     .abut(Face6::NY, -1) // one cube up from bottom
                     .unwrap()
@@ -204,15 +224,14 @@ impl DemoTheme {
             )?;
             space.fill_uniform(
                 gate_side_1,
-                &self.blocks[GatePocket].clone().rotate(rotate_nz_to_face),
+                &self.blocks[if gate_movable { GatePocket } else { Gate }]
+                    .clone()
+                    .rotate(rotate_nz_to_face),
             )?;
             space.fill_uniform(
                 lock_box,
                 &self.locked_gate_block.clone().rotate(rotate_nz_to_face),
             )?;
-        } else if blocked {
-            // TODO: either implement this or change the schema so it can't happen
-            panic!("can't block gateless passage");
         }
 
         Ok(())
@@ -232,6 +251,48 @@ impl DemoTheme {
                 .union_box(self.dungeon_grid.room_box_at(
                     room_position + eb.upper_bounds().to_vector() - GridVector::new(1, 1, 1),
                 ))
+        }
+    }
+
+    // TODO: This should be a definition in the universe, but there's no way to do that with `Tool`
+    // yet.
+    fn make_key_tool(&self) -> Tool {
+        let move_modifier = block::Modifier::Move(block::Move::new(Face6::NX, 0, 16));
+        let move_gate = op::Operation::AddModifiers([move_modifier.clone()].into());
+        let unlock_unrotated = op::Operation::Neighbors(
+            [
+                (
+                    Cube::new(0, 0, 0),
+                    op::Operation::Replace {
+                        old: self.locked_gate_block.clone(),
+                        new: self.blocks[DungeonBlocks::Gate]
+                            .clone()
+                            .with_modifier(move_modifier),
+                        conserved: true,
+                        optional: false,
+                    },
+                ),
+                // TODO: this should be a paired move + composite
+                // that slides the gate into the pocket, but that isn't
+                // supported by Composite yet
+                (Cube::new(0, -1, 0), move_gate.clone()),
+                (Cube::new(0, 1, 0), move_gate.clone()),
+            ]
+            .into(),
+        );
+        // TODO: there should be an operation-modifier that means "match this against any rotation"
+        // instead of this approach of making rotated copies of the operation
+        let unlock = op::Operation::Alt(
+            GridRotation::CLOCKWISE
+                .iterate()
+                .map(|r| unlock_unrotated.clone().rotate(r))
+                .collect::<Arc<_>>(),
+        );
+
+        Tool::Custom {
+            op: unlock,
+
+            icon: self.blocks[DungeonBlocks::Key].clone(),
         }
     }
 }
@@ -363,8 +424,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
             }
             1 => {
                 for face in [Face6::PX, Face6::PZ] {
-                    if let WallFeature::Passage { gate, blocked } = room_data.wall_features[face] {
-                        self.inside_doorway(space, map, room_position, face, gate, blocked)?;
+                    if let WallFeature::Passage(door) = room_data.wall_features[face] {
+                        self.inside_doorway(space, map, room_position, face, door)?;
                     }
                 }
 
@@ -382,12 +443,15 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Set spawn.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
                 if matches!(room_data.maze_kind, MazeRoomKind::Start) {
+                    let key_tool = self.make_key_tool();
+
                     let mut spawn = Spawn::default_for_new_space(space.bounds());
                     spawn.set_bounds(interior);
                     spawn.set_inventory(vec![
                         Tool::Activate.into(),
                         Tool::RemoveBlock { keep: true }.into(),
                         Tool::Jetpack { active: false }.into(),
+                        key_tool.into(),
                     ]);
 
                     // Orient towards the first room's exit.
@@ -583,16 +647,30 @@ fn generate_dungeon_map(
                 let neighbor_in_bounds = maze.bounds().contains_cube(neighbor);
 
                 if maze_room.has_passage(face) {
-                    let gate = rng.gen_bool(0.25);
-                    return WallFeature::Passage {
-                        gate,
-                        // TODO: generate gates that are actual puzzles with keys, rather than
-                        // only permanently open or shut
-                        blocked: gate
-                            && (maze_room.kind == MazeRoomKind::OffPath
-                                || maze[neighbor].kind == MazeRoomKind::OffPath)
-                            && rng.gen_bool(0.5),
-                    };
+                    // If the two rooms are both on the path, then the path passes between them.
+                    let must_be_passable = !(maze_room.kind == MazeRoomKind::OffPath
+                        || maze[neighbor].kind == MazeRoomKind::OffPath);
+
+                    let door = *if must_be_passable {
+                        // If the rooms are on the path, generate no door or a door that
+                        // is or can be opened.
+                        //
+                        // TODO: Add keys found inside the dungeon, so there can be
+                        // puzzles of actually finding the key and then the door.
+                        &[
+                            Door::None,
+                            Door::None,
+                            Door::Open,
+                            Door::Locked,
+                            Door::Locked,
+                        ][..]
+                    } else {
+                        // If the rooms are not on the path, make it possibly entirely closed off.
+                        &[Door::None, Door::Open, Door::Locked, Door::Permanent][..]
+                    }
+                    .choose(&mut rng)
+                    .unwrap();
+                    return WallFeature::Passage(door);
                 }
 
                 // Create windows only if they look into space outside the maze
@@ -645,6 +723,8 @@ pub(crate) enum DungeonBlocks {
     GatePocket,
     /// Lock to be composited on a `Gate` block.
     GateLock,
+    /// Icon of a tool which can unlock `GateLock`s.
+    Key,
 }
 impl BlockModule for DungeonBlocks {
     fn namespace() -> &'static str {
@@ -760,6 +840,22 @@ pub async fn install_dungeon_blocks(
                 )?;
                 Block::builder()
                     .display_name("Keyhole")
+                    .voxels_handle(R16, txn.insert_anonymous(space))
+                    .build()
+            }
+
+            Key => {
+                let space =
+                    space_from_image(include_image!("key.png"), GridRotation::RXyZ, &|pixel| {
+                        let block = if pixel[3] == 0 {
+                            AIR
+                        } else {
+                            Block::builder().color(Rgba::from_srgb8(pixel)).build()
+                        };
+                        VoxelBrush::with_thickness(block, 7..9)
+                    })?;
+                Block::builder()
+                    .display_name("Key")
                     .voxels_handle(R16, txn.insert_anonymous(space))
                     .build()
             }
