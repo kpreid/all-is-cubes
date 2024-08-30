@@ -768,6 +768,18 @@ mod op {
                 op::Operation::DestroyTo(block) => schema::OperationSer::DestroyToV1 {
                     block: block.clone(),
                 },
+                &op::Operation::Replace {
+                    ref old,
+                    ref new,
+                    conserved,
+                    optional,
+                } => schema::OperationSer::ReplaceV1 {
+                    old: old.clone(),
+                    new: new.clone(),
+                    conserved,
+                    optional,
+                },
+
                 op::Operation::AddModifiers(modifiers) => schema::OperationSer::AddModifiersV1 {
                     modifiers: modifiers.iter().map(schema::ModifierSer::from).collect(),
                 },
@@ -797,6 +809,18 @@ mod op {
                 schema::OperationSer::AltV1 { ops } => op::Operation::Alt(ops.into()),
                 schema::OperationSer::BecomeV1 { block } => op::Operation::Become(block),
                 schema::OperationSer::DestroyToV1 { block } => op::Operation::DestroyTo(block),
+                schema::OperationSer::ReplaceV1 {
+                    old,
+                    new,
+                    conserved,
+                    optional,
+                } => op::Operation::Replace {
+                    old,
+                    new,
+                    conserved,
+                    optional,
+                },
+
                 schema::OperationSer::AddModifiersV1 { modifiers } => op::Operation::AddModifiers(
                     cow_into_iter(modifiers)
                         .map(crate::block::Modifier::from)

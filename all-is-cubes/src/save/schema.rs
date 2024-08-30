@@ -398,6 +398,12 @@ pub(crate) enum OperationSer<'a> {
     DestroyToV1 {
         block: Block,
     },
+    ReplaceV1 {
+        old: Block,
+        new: Block,
+        conserved: bool,
+        optional: bool,
+    },
     AddModifiersV1 {
         modifiers: Cow<'a, [ModifierSer<'a>]>,
     },

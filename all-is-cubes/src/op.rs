@@ -59,6 +59,22 @@ pub enum Operation {
     /// TODO: Better name
     DestroyTo(Block),
 
+    /// Replace a specific existing block with a new one.
+    ///
+    /// TODO: Define the reaction to rotated forms of the block.
+    Replace {
+        /// The block that must already be present at the target cube.
+        old: Block,
+        /// The block to replace `old` with.
+        new: Block,
+        /// Whether execution of the operation’s transaction should fail if another
+        /// transaction performs the same replacement simultaneously.
+        conserved: bool,
+        /// Whether the operation should succeed (and do nothing) if the target cube
+        /// does not contain `old`.
+        optional: bool,
+    },
+
     /// Attach the given modifier to the cube's block.
     ///
     /// This operation will not necessarily apply the modifier unaltered,
@@ -131,6 +147,36 @@ impl Operation {
                 )
                 .at(target_cube)
                 .nonconserved();
+
+                Ok((space_txn, InventoryTransaction::default()))
+            }
+            &Operation::Replace {
+                ref old,
+                ref new,
+                conserved,
+                optional,
+            } => {
+                let target_cube = transform.transform_cube(Cube::ORIGIN);
+                let target_block = &space[target_cube];
+
+                let new = &new.clone().rotate(transform.rotation);
+                let old = &old.clone().rotate(transform.rotation);
+
+                if target_block != old {
+                    if optional {
+                        return Ok(Default::default());
+                    } else {
+                        return Err(OperationError::Unmatching);
+                    }
+                }
+
+                let mut space_txn =
+                    CubeTransaction::replacing(Some(old.clone()), Some(new.clone()))
+                        .at(target_cube);
+
+                if !conserved {
+                    space_txn = space_txn.nonconserved();
+                }
 
                 Ok((space_txn, InventoryTransaction::default()))
             }
@@ -216,6 +262,7 @@ impl Operation {
             Operation::Alt(ops) => ops.iter().all(Operation::rotationally_symmetric),
             Operation::Become(_) => false,
             Operation::DestroyTo(_) => false,
+            Operation::Replace { .. } => false,
             Operation::AddModifiers(_) => true, // TODO: there is not a general notion of rotating a modifier, but probably there should be
             Operation::StartMove(_) => true,    // all moves are directional
             Operation::Neighbors(_) => false,
@@ -240,6 +287,17 @@ impl Operation {
                     .map(|modifier| modifier.rotate(rotation))
                     .collect(),
             ),
+            Operation::Replace {
+                old,
+                new,
+                conserved,
+                optional,
+            } => Operation::Replace {
+                old: old.rotate(rotation),
+                new: new.rotate(rotation),
+                conserved,
+                optional,
+            },
             Operation::StartMove(m) => Operation::StartMove(m.rotate(rotation)),
             Operation::Neighbors(mut neighbors) => {
                 // TODO: cheaper placeholder value, like an Operation::Nop
@@ -263,6 +321,15 @@ impl VisitHandles for Operation {
         match self {
             Operation::Alt(ops) => ops[..].visit_handles(visitor),
             Operation::Become(block) | Operation::DestroyTo(block) => block.visit_handles(visitor),
+            Operation::Replace {
+                old,
+                new,
+                conserved: _,
+                optional: _,
+            } => {
+                old.visit_handles(visitor);
+                new.visit_handles(visitor);
+            }
             Operation::AddModifiers(modifier) => modifier.visit_handles(visitor),
             Operation::StartMove(modifier) => modifier.visit_handles(visitor),
             Operation::Neighbors(neighbors) => {
