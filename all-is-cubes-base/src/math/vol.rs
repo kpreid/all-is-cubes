@@ -508,7 +508,7 @@ where
 
     /// Iterates over all the cubes and values in this volume data, in the ordering specified
     /// by the `O` type parameter.
-    pub fn iter<'s>(&'s self) -> impl Iterator<Item = (Cube, &V)> + Clone
+    pub fn iter<'s>(&'s self) -> impl Iterator<Item = (Cube, &'s V)> + Clone
     where
         V: 's,
     {
@@ -517,7 +517,7 @@ where
 
     /// Iterates by mutable reference over all the cubes and values in this volume data,
     /// in the ordering specified by the `O` type parameter.
-    pub fn iter_mut<'s>(&'s mut self) -> impl Iterator<Item = (Cube, &mut V)>
+    pub fn iter_mut<'s>(&'s mut self) -> impl Iterator<Item = (Cube, &'s mut V)>
     where
         C: DerefMut,
         V: 's,
