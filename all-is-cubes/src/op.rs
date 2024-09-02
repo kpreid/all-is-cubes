@@ -139,13 +139,16 @@ impl Operation {
                 let target_block = space[target_cube].clone();
 
                 let mut replacement = target_block.clone();
-                for modifier in modifiers.iter() {
+                for mut modifier in modifiers.iter().cloned() {
+                    if transform.rotation != GridRotation::IDENTITY {
+                        modifier = modifier.rotate(transform.rotation);
+                    }
                     // TODO: We should not have a special case for `Rotate` *here alone*;
                     // there should be a general function to do this job.
-                    replacement = if let &block::Modifier::Rotate(r) = modifier {
+                    replacement = if let block::Modifier::Rotate(r) = modifier {
                         replacement.rotate(r)
                     } else {
-                        replacement.with_modifier(modifier.clone())
+                        replacement.with_modifier(modifier)
                     };
                 }
 
@@ -230,8 +233,13 @@ impl Operation {
             }
             Operation::Become(block) => Operation::Become(block.rotate(rotation)),
             Operation::DestroyTo(block) => Operation::DestroyTo(block.rotate(rotation)),
-            // TODO: there is not a general notion of rotating a modifier, but probably there should be
-            op @ Operation::AddModifiers(_) => op,
+            Operation::AddModifiers(modifiers) => Operation::AddModifiers(
+                modifiers
+                    .iter()
+                    .cloned()
+                    .map(|modifier| modifier.rotate(rotation))
+                    .collect(),
+            ),
             Operation::StartMove(m) => Operation::StartMove(m.rotate(rotation)),
             Operation::Neighbors(mut neighbors) => {
                 // TODO: cheaper placeholder value, like an Operation::Nop
