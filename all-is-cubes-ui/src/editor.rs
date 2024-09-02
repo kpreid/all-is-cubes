@@ -201,7 +201,7 @@ fn inspect_modifier(block: &Block, modifier_index: usize) -> vui::WidgetTree {
             Arc::new(vui::LayoutTree::Stack {
                 direction: Face6::PX,
                 children: vec![
-                    vui::leaf_widget(block_up_to_this),
+                    vui::leaf_widget(block_up_to_this.with_modifier(block::Quote::new())),
                     vui::leaf_widget(widgets::Label::new(name)),
                 ],
             }),
