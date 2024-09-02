@@ -170,6 +170,22 @@ impl Composite {
         } = self;
         source.rotationally_symmetric() && operator.rotationally_symmetric()
     }
+
+    #[must_use]
+    pub(crate) fn rotate(self, rotation: GridRotation) -> Self {
+        let Self {
+            source,
+            operator,
+            reverse,
+            disassemblable,
+        } = self;
+        Self {
+            source: source.rotate(rotation),
+            operator,
+            reverse,
+            disassemblable,
+        }
+    }
 }
 
 /// Implementation of [`Composite::evaluate()`], without the requirement that the source

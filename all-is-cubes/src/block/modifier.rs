@@ -237,6 +237,19 @@ impl Modifier {
             Modifier::Inventory(_) => false,
         }
     }
+
+    pub(crate) fn rotate(self, rotation: GridRotation) -> Self {
+        match self {
+            Modifier::Attributes(a) => {
+                Modifier::Attributes(Arc::new((*a).clone().rotate(rotation)))
+            }
+            Modifier::Rotate(r) => Modifier::Rotate(rotation * r * rotation.inverse()), // TODO: no test this is correct yet
+            Modifier::Composite(c) => Modifier::Composite(c.rotate(rotation)),
+            Modifier::Zoom(z) => Modifier::Zoom(z.rotate(rotation)),
+            Modifier::Move(m) => Modifier::Move(m.rotate(rotation)),
+            m @ (Modifier::Inventory(_) | Modifier::Quote(_)) => m,
+        }
+    }
 }
 
 impl VisitHandles for Modifier {

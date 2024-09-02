@@ -4,7 +4,7 @@ use crate::block::{
     self, Evoxel, Evoxels, MinEval, Modifier,
     Resolution::{self, R1},
 };
-use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, Vol};
+use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, GridRotation, Vol};
 use crate::universe;
 
 /// Data for [`Modifier::Zoom`], describing a portion of the original block that is scaled
@@ -126,6 +126,16 @@ impl Zoom {
     /// and `scale - 1`).
     pub fn offset(&self) -> GridPoint {
         self.offset.map(i32::from)
+    }
+
+    pub(crate) fn rotate(self, rotation: GridRotation) -> Self {
+        Self {
+            scale: self.scale,
+            offset: rotation
+                .to_positive_octant_transform(self.scale.into())
+                .transform_point(self.offset())
+                .cast(),
+        }
     }
 }
 
