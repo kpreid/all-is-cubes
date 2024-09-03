@@ -122,7 +122,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     pub async fn new(
         cameras: StandardCameras,
         surface: wgpu::Surface<'static>,
-        adapter: &wgpu::Adapter,
+        adapter: wgpu::Adapter,
         executor: Arc<dyn Executor>,
     ) -> Result<Self, wgpu::RequestDeviceError> {
         let (device, queue) = adapter
@@ -142,8 +142,8 @@ impl<I: time::Instant> SurfaceRenderer<I> {
             executor,
             device.clone(),
             cameras,
-            choose_surface_format(&surface.get_capabilities(adapter)),
-            adapter,
+            choose_surface_format(&surface.get_capabilities(&adapter)),
+            &adapter,
         );
 
         Ok(Self {

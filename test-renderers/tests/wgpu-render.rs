@@ -42,9 +42,6 @@ static WGPU_INSTANCE: OnceCell<wgpu::Instance> = OnceCell::const_new();
 async fn get_factory(
     label: String,
 ) -> Result<WgpuFactory, Box<dyn std::error::Error + Send + Sync>> {
-    // Temporary workaround for <https://github.com/gfx-rs/wgpu/issues/3498>:
-    // Create a new adapter every time, rather than sharing one.
-    // TODO: Either remove this or keep it and remove WGPU_ADAPTER.
     let adapter =
         init::create_adapter_for_test(WGPU_INSTANCE.get().expect("instance not initialized")).await;
 

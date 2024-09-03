@@ -136,7 +136,7 @@ async fn start_game_with_dom(
             let renderer = in_wgpu::SurfaceRenderer::new(
                 cameras,
                 surface,
-                &adapter,
+                adapter,
                 Arc::new(crate::web_glue::Executor),
             )
             .await?;

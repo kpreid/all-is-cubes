@@ -208,7 +208,7 @@ pub async fn create_winit_wgpu_desktop_session(
     let renderer = SurfaceRenderer::new(
         session.create_cameras(viewport_cell.as_source()),
         surface,
-        &adapter,
+        adapter,
         executor.clone(),
     )
     .await?;

@@ -33,7 +33,7 @@ use crate::in_wgpu::{
 // TODO: T is bad abstraction since it silently has to be f16
 pub async fn run_shader_test<T>(
     device_label: &str,
-    adapter: &wgpu::Adapter,
+    adapter: wgpu::Adapter,
     output_viewport: Viewport,
     test_wgsl: &str,
 ) -> Vec<T>
@@ -42,7 +42,10 @@ where
 {
     let (device, queue) = adapter
         .request_device(
-            &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(device_label, adapter.limits()),
+            &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(
+                device_label,
+                adapter.limits(),
+            ),
             None,
         )
         .await
@@ -69,7 +72,7 @@ where
                 desired_maximum_frame_latency: 2,
                 alpha_mode: wgpu::CompositeAlphaMode::Auto,
             },
-            FbtFeatures::new(adapter),
+            FbtFeatures::new(&adapter),
             &GraphicsOptions::default(),
             true,
         ),

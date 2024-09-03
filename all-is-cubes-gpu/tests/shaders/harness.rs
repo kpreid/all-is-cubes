@@ -24,7 +24,7 @@ pub(crate) async fn run_shader_test(device_label: &str, test_wgsl: &str) -> imag
     let output_viewport = camera::Viewport::with_scale(1.0, [32, 32]);
 
     let f16_pixels: Vec<f16> =
-        shader_testing::run_shader_test(device_label, &adapter, output_viewport, test_wgsl).await;
+        shader_testing::run_shader_test(device_label, adapter, output_viewport, test_wgsl).await;
 
     // Convert f16 pixels to f32
     image::ImageBuffer::from_raw(

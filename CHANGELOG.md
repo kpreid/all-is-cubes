@@ -19,6 +19,9 @@
     - `block::EvalBlockError` is now a `struct` with an inner `ErrorKind` enum, instead of an enum, and contains more information.
     - `block::Move`’s means of construction have been changed to be more systematic and orthogonal. In particular, paired moves are constructed from unpaired ones.
 
+- `all-is-cubes-gpu` library:
+    - `in_wgpu::SurfaceRenderer::new()` requires `wgpu::Adapter` instead of `&wgpu::Adapter`.
+
 - `all-is-cubes-port` library:
     - All functionality is now conditional on feature flags, to allow omitting unneeded formats and operations.
     - `ExportFormat` is now named `Format`.
