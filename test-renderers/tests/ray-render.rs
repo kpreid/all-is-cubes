@@ -12,7 +12,7 @@ async fn main() -> test_renderers::HarnessResult {
         test_renderers::RendererId::Raytracer,
         test_renderers::SuiteId::Renderers,
         test_renderers::test_cases::all_tests,
-        || std::future::ready(test_renderers::RtFactory),
+        |_| std::future::ready(test_renderers::RtFactory),
         None,
     )
     .await

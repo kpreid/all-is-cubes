@@ -88,8 +88,20 @@ impl<I: time::Instant> all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt<I
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = 400;
 }
 
+/// Returns a [`wgpu::DeviceDescriptor`] suitable for creating devices that can be used with
+/// all code in `all_is_cubes_gpu`.
+#[doc(hidden)] // currently, we never let the caller supply a device except in tests
+pub fn device_descriptor(
+    label: &str,
+    available_limits: wgpu::Limits,
+) -> wgpu::DeviceDescriptor<'_> {
+    EverythingRenderer::<time::NoTime>::device_descriptor(label, available_limits)
+}
+
 /// Entry point for [`wgpu`] rendering. Construct this and hand it the [`wgpu::Surface`]
 /// to draw on.
+///
+/// If you wish to render to an image rather than a surface, use [`headless`] instead.
 #[derive(Debug)]
 pub struct SurfaceRenderer<I: time::Instant> {
     surface: wgpu::Surface<'static>,
@@ -115,7 +127,10 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     ) -> Result<Self, wgpu::RequestDeviceError> {
         let (device, queue) = adapter
             .request_device(
-                &EverythingRenderer::<I>::device_descriptor(adapter.limits()),
+                &EverythingRenderer::<I>::device_descriptor(
+                    "SurfaceRenderer::device",
+                    adapter.limits(),
+                ),
                 None,
             )
             .await?;
@@ -337,9 +352,12 @@ impl<I: time::Instant> fmt::Debug for EverythingRenderer<I> {
 
 impl<I: time::Instant> EverythingRenderer<I> {
     /// A device descriptor suitable for the expectations of [`EverythingRenderer`].
-    pub fn device_descriptor(available_limits: wgpu::Limits) -> wgpu::DeviceDescriptor<'static> {
+    pub fn device_descriptor(
+        label: &str,
+        available_limits: wgpu::Limits,
+    ) -> wgpu::DeviceDescriptor<'_> {
         wgpu::DeviceDescriptor {
-            label: None,
+            label: Some(label),
             required_features: wgpu::Features::empty(),
             required_limits: wgpu::Limits {
                 max_inter_stage_shader_components: 32, // number used by blocks-and-lines shader

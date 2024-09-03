@@ -16,7 +16,7 @@ pub(crate) async fn instance() -> &'static wgpu::Instance {
 }
 
 /// TODO: image probably isn't the best output format, just what I prototyped with
-pub(crate) async fn run_shader_test(test_wgsl: &str) -> image::Rgba32FImage {
+pub(crate) async fn run_shader_test(device_label: &str, test_wgsl: &str) -> image::Rgba32FImage {
     let instance = instance().await;
     let adapter = init::create_adapter_for_test(instance).await;
 
@@ -24,7 +24,7 @@ pub(crate) async fn run_shader_test(test_wgsl: &str) -> image::Rgba32FImage {
     let output_viewport = camera::Viewport::with_scale(1.0, [32, 32]);
 
     let f16_pixels: Vec<f16> =
-        shader_testing::run_shader_test(&adapter, output_viewport, test_wgsl).await;
+        shader_testing::run_shader_test(device_label, &adapter, output_viewport, test_wgsl).await;
 
     // Convert f16 pixels to f32
     image::ImageBuffer::from_raw(

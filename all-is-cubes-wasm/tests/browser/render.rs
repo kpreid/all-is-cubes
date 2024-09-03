@@ -47,10 +47,11 @@ async fn renderer_test() {
     );
     let world_space = cameras.world_space().snapshot().unwrap();
 
-    let mut renderer = all_is_cubes_gpu::in_wgpu::headless::Builder::from_adapter(adapter)
-        .await
-        .unwrap()
-        .build(cameras.clone());
+    let mut renderer =
+        all_is_cubes_gpu::in_wgpu::headless::Builder::from_adapter("renderer_test", adapter)
+            .await
+            .unwrap()
+            .build(cameras.clone());
     renderer.update(None).await.unwrap();
     let image = renderer.draw("").await.unwrap();
 

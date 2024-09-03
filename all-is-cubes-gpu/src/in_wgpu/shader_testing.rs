@@ -32,6 +32,7 @@ use crate::in_wgpu::{
 
 // TODO: T is bad abstraction since it silently has to be f16
 pub async fn run_shader_test<T>(
+    device_label: &str,
     adapter: &wgpu::Adapter,
     output_viewport: Viewport,
     test_wgsl: &str,
@@ -41,7 +42,7 @@ where
 {
     let (device, queue) = adapter
         .request_device(
-            &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(adapter.limits()),
+            &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(device_label, adapter.limits()),
             None,
         )
         .await

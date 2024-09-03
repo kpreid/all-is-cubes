@@ -29,7 +29,7 @@ async fn main() -> test_renderers::HarnessResult {
         RendererId::Wgpu,
         test_renderers::SuiteId::Renderers,
         test_renderers::test_cases::all_tests,
-        move || async move { get_factory().await.unwrap() },
+        move |label| async move { get_factory(label).await.unwrap() },
         parallelism,
     )
     .await
@@ -39,14 +39,16 @@ async fn main() -> test_renderers::HarnessResult {
 /// but we can use just one [`wgpu::Instance`] to create all of them.
 static WGPU_INSTANCE: OnceCell<wgpu::Instance> = OnceCell::const_new();
 
-async fn get_factory() -> Result<WgpuFactory, Box<dyn std::error::Error + Send + Sync>> {
+async fn get_factory(
+    label: String,
+) -> Result<WgpuFactory, Box<dyn std::error::Error + Send + Sync>> {
     // Temporary workaround for <https://github.com/gfx-rs/wgpu/issues/3498>:
     // Create a new adapter every time, rather than sharing one.
     // TODO: Either remove this or keep it and remove WGPU_ADAPTER.
     let adapter =
         init::create_adapter_for_test(WGPU_INSTANCE.get().expect("instance not initialized")).await;
 
-    let builder = headless::Builder::from_adapter(adapter).await?;
+    let builder = headless::Builder::from_adapter(&label, adapter).await?;
     Ok(WgpuFactory { builder })
 }
 

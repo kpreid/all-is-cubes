@@ -40,7 +40,8 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
     // Benchmark for running update() only. Insofar as this touches the GPU it will
     // naturally fill up the pipeline as Criterion iterates it.
     g.bench_function("update-only", |b| {
-        let (mut universe, space, renderer) = runtime.block_on(create_updated_renderer(instance));
+        let (mut universe, space, renderer) =
+            runtime.block_on(create_updated_renderer("update-only", instance));
 
         let [block] = make_some_blocks();
         let txn1 =
@@ -61,7 +62,8 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
     // latency since it must wait for the image to be fetched. TODO: Figure out how to
     // improve that.
     g.bench_function("draw-only", |b| {
-        let (_universe, _space, renderer) = runtime.block_on(create_updated_renderer(instance));
+        let (_universe, _space, renderer) =
+            runtime.block_on(create_updated_renderer("draw-only", instance));
 
         b.to_async(runtime).iter_with_large_drop(move || {
             let renderer = renderer.clone();
@@ -80,6 +82,7 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
 }
 
 async fn create_updated_renderer(
+    device_label: &str,
     instance: &wgpu::Instance,
 ) -> (
     Universe,
@@ -100,7 +103,7 @@ async fn create_updated_renderer(
         .unwrap();
 
     let adapter = init::create_adapter_for_test(instance).await;
-    let mut renderer = headless::Builder::from_adapter(adapter)
+    let mut renderer = headless::Builder::from_adapter(device_label, adapter)
         .await
         .unwrap()
         .build(StandardCameras::from_constant_for_test(
@@ -125,7 +128,13 @@ fn module_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
         .block_on(async {
             let adapter = init::create_adapter_for_test(instance).await;
             adapter
-                .request_device(&wgpu::DeviceDescriptor::default(), None)
+                .request_device(
+                    &all_is_cubes_gpu::in_wgpu::device_descriptor(
+                        "module_benches",
+                        adapter.limits(),
+                    ),
+                    None,
+                )
                 .await
         })
         .unwrap();

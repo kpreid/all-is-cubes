@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::{fs, io};
 
-use async_fn_traits::{AsyncFn0, AsyncFn1, AsyncFn2};
+use async_fn_traits::{AsyncFn1, AsyncFn2};
 use futures_core::future::BoxFuture;
 use futures_util::future::Shared;
 use futures_util::stream;
@@ -256,7 +256,7 @@ pub async fn harness_main<Factory, Ff>(
 ) -> HarnessResult
 where
     Factory: RendererFactory + 'static,
-    Ff: AsyncFn0<Output = Factory, OutputFuture: Send> + Send + Sync + 'static,
+    Ff: AsyncFn1<String, Output = Factory, OutputFuture: Send> + Send + Sync + 'static,
 {
     let HarnessArgs {
         ignored,
@@ -350,7 +350,7 @@ where
                 test: test_name.clone(),
             };
             let comparison_log: Arc<Mutex<Vec<ComparisonRecord>>> = Default::default();
-            let factory_future = factory_factory();
+            let factory_future = factory_factory(test_id.to_string());
             let universe_future = test_case.universe_source.clone();
             async {
                 let test_id_tc = test_id.clone();
