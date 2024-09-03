@@ -572,9 +572,7 @@ pub enum PaletteError {
     },
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for PaletteError {}
-}
+    impl core::error::Error for PaletteError {}
 
 impl fmt::Display for PaletteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

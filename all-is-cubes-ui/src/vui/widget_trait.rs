@@ -3,7 +3,7 @@
 use all_is_cubes::time::Tick;
 use alloc::sync::Arc;
 use core::fmt::Debug;
-use std::error::Error;
+use core::error::Error;
 use std::sync::Mutex;
 
 use all_is_cubes::behavior::{self, Behavior};

@@ -741,9 +741,7 @@ pub struct VolLengthError {
     bounds: GridAab,
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for VolLengthError {}
-}
+impl core::error::Error for VolLengthError {}
 
 impl fmt::Display for VolLengthError {
     #[allow(clippy::missing_inline_in_public_items)]

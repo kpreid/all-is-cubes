@@ -1179,9 +1179,7 @@ pub enum SetCubeError {
     TooManyBlocks(),
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for SetCubeError {}
-}
+    impl core::error::Error for SetCubeError {}
 
 impl fmt::Display for SetCubeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

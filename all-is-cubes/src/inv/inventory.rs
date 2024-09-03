@@ -493,10 +493,8 @@ pub enum InventoryConflict {
     ReplaceSameSlot { slot: usize },
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for InventoryMismatch {}
-    impl crate::util::ErrorIfStd for InventoryConflict {}
-}
+    impl core::error::Error for InventoryMismatch {}
+    impl core::error::Error for InventoryConflict {}
 
 /// Description of a change to an [`Inventory`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

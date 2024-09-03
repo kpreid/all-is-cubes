@@ -790,10 +790,8 @@ pub struct BehaviorTransactionConflict {
     key: Key,
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for BehaviorTransactionMismatch {}
-    impl crate::util::ErrorIfStd for BehaviorTransactionConflict {}
-}
+    impl core::error::Error for BehaviorTransactionMismatch {}
+    impl core::error::Error for BehaviorTransactionConflict {}
 
 impl fmt::Display for BehaviorTransactionMismatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

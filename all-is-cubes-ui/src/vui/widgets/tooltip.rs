@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use std::error::Error;
+use core::error::Error;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr::{literal, ArcStr};

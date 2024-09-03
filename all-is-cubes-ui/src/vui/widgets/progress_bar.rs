@@ -178,7 +178,7 @@ impl vui::WidgetController for ProgressBarController {
     fn step(
         &mut self,
         _context: &vui::WidgetContext<'_>,
-    ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn core::error::Error + Send + Sync>> {
         if !self.todo.get_and_clear() {
             return Ok((SpaceTransaction::default(), vui::Then::Step));
         }

@@ -750,14 +750,12 @@ impl transaction::Merge for BodyTransaction {
 #[non_exhaustive]
 pub enum BodyMismatch {}
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for BodyMismatch {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl core::error::Error for BodyMismatch {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             match *self {
             }
         }
     }
-}
 
 /// Note: Tests which involve both body and collision code are currently in the parent module.
 #[cfg(test)]

@@ -57,9 +57,8 @@ pub enum RenderError {
 }
 
 #[cfg(feature = "std")]
-#[allow(clippy::std_instead_of_core)]
-impl std::error::Error for RenderError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for RenderError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             RenderError::Read(e) => Some(e),
         }

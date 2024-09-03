@@ -85,7 +85,7 @@ async fn start_game_with_dom(
     document: Document,
     gui_helpers: GuiHelpers,
     static_dom: &StaticDom,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn core::error::Error>> {
     let progress = yield_progress::Builder::new()
         .yield_using(|_| yield_to_event_loop())
         .progress_using({
@@ -189,7 +189,7 @@ async fn start_game_with_dom(
 async fn init_wgpu(
     canvas: &web_sys::HtmlCanvasElement,
     backends: wgpu::Backends,
-) -> Result<(wgpu::Surface<'static>, wgpu::Adapter), Box<dyn std::error::Error>> {
+) -> Result<(wgpu::Surface<'static>, wgpu::Adapter), Box<dyn core::error::Error>> {
     let wgpu_instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends,
         ..Default::default()

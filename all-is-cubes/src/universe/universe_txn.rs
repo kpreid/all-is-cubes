@@ -258,9 +258,8 @@ pub enum UniverseConflict {
     Behaviors(behavior::BehaviorTransactionConflict),
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for UniverseMismatch {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl core::error::Error for UniverseMismatch {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             match self {
                 UniverseMismatch::DifferentUniverse {..} => None,
                 UniverseMismatch::Member(mc) => Some(&mc.mismatch),
@@ -268,8 +267,8 @@ crate::util::cfg_should_impl_error! {
                 UniverseMismatch::InvalidPending => None,
             }
         }
-    } impl crate::util::ErrorIfStd for UniverseConflict {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    } impl core::error::Error for UniverseConflict {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             match self {
                 UniverseConflict::DifferentUniverse(_, _) => None,
                 UniverseConflict::Member(mc) => Some(&mc.conflict),
@@ -277,7 +276,6 @@ crate::util::cfg_should_impl_error! {
             }
         }
     }
-}
 
 impl fmt::Display for UniverseMismatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -863,9 +861,8 @@ pub enum MemberConflict {
     Modify(ModifyMemberConflict),
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for MemberConflict {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl core::error::Error for MemberConflict {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             match self {
                 MemberConflict::InsertVsOther => None,
                 MemberConflict::DeleteVsOther => None,
@@ -873,7 +870,6 @@ crate::util::cfg_should_impl_error! {
             }
         }
     }
-}
 
 /// Transaction precondition error type for a single member in a [`UniverseTransaction`].
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
@@ -893,8 +889,8 @@ pub enum MemberMismatch {
     Modify(ModifyMemberMismatch),
 }
 
-impl crate::util::ErrorIfStd for MemberMismatch {
-    fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+impl core::error::Error for MemberMismatch {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             MemberMismatch::Insert(e) => e.source(),
             MemberMismatch::DeleteNonexistent(_) => None,
@@ -922,18 +918,16 @@ pub struct ModifyMemberMismatch(AnyTransactionMismatch);
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModifyMemberConflict(AnyTransactionConflict);
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for ModifyMemberMismatch {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl core::error::Error for ModifyMemberMismatch {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             self.0.source()
         }
     }
-    impl crate::util::ErrorIfStd for ModifyMemberConflict {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl core::error::Error for ModifyMemberConflict {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             self.0.source()
         }
     }
-}
 
 impl fmt::Display for ModifyMemberMismatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

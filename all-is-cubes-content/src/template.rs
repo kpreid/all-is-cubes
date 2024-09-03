@@ -3,6 +3,7 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString as _};
 use alloc::sync::Arc;
+use core::error::Error;
 
 use macro_rules_attribute::macro_rules_derive;
 use paste::paste;
@@ -19,7 +20,7 @@ use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
-use all_is_cubes::util::{ErrorIfStd, YieldProgress};
+use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{time, transaction};
 
 use crate::fractal::menger_sponge;
@@ -283,7 +284,7 @@ impl WhenceUniverse for TemplateAndParameters {
     fn load(
         &self,
         progress: YieldProgress,
-    ) -> futures_core::future::BoxFuture<'static, Result<Universe, Box<dyn ErrorIfStd + Send + Sync>>>
+    ) -> futures_core::future::BoxFuture<'static, Result<Universe, Box<dyn Error + Send + Sync>>>
     {
         let ingredients = self.clone();
         Box::pin(async move {
@@ -304,8 +305,7 @@ impl WhenceUniverse for TemplateAndParameters {
         &self,
         universe: &Universe,
         progress: YieldProgress,
-    ) -> futures_core::future::BoxFuture<'static, Result<(), Box<dyn ErrorIfStd + Send + Sync>>>
-    {
+    ) -> futures_core::future::BoxFuture<'static, Result<(), Box<dyn Error + Send + Sync>>> {
         // Delegate to the same error as () would produce. TODO: Have an error enum instead
         <() as WhenceUniverse>::save(&(), universe, progress)
     }

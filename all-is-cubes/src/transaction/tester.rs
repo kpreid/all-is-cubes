@@ -1,4 +1,4 @@
-use crate::util::ErrorIfStd as Error;
+use core::error::Error as Error;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec::Vec;

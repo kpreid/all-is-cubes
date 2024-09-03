@@ -3,10 +3,10 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::any::type_name;
+use core::error::Error;
 use core::{fmt, mem};
 
 use crate::universe::{Handle, HandleError, UTransactional, UniverseTransaction};
-use crate::util::ErrorIfStd;
 
 mod generic;
 pub use generic::*;
@@ -66,7 +66,7 @@ pub trait Transaction: Merge {
     /// Accordingly, it might not describe the _entire_ set of unmet preconditions,
     /// but only one example from it, so as to avoid needing to allocate a
     /// data structure of arbitrary size.
-    type Mismatch: core::error::Error + 'static;
+    type Mismatch: Error + 'static;
 
     /// Checks whether the target's current state meets the preconditions and returns
     /// [`Err`] if it does not.
@@ -164,7 +164,7 @@ pub trait Merge: Sized {
     /// Accordingly, it might not describe the _entire_ area of the conflict
     /// but only one example from it, so as to avoid needing to allocate a
     /// data structure of arbitrary size.
-    type Conflict: core::error::Error + 'static;
+    type Conflict: Error + 'static;
 
     /// Checks whether two transactions can be merged into a single transaction.
     /// If so, returns [`Ok`] containing data which may be passed to [`Self::commit_merge()`].
@@ -255,18 +255,16 @@ where
     }
 }
 
-crate::util::cfg_should_impl_error! {
-    impl<Txn> ErrorIfStd for ExecuteError<Txn>
-    where
-        Txn: Transaction<Mismatch: ErrorIfStd + 'static> + Merge<Conflict: ErrorIfStd + 'static>,
-    {
-        fn source(&self) -> Option<&(dyn ErrorIfStd + 'static)> {
-            match self {
-                ExecuteError::Merge(e) => e.source(),
-                ExecuteError::Check(e) => e.source(),
-                ExecuteError::Commit(e) => e.source(),
-                ExecuteError::Handle(e) => e.source(),
-            }
+impl<Txn> Error for ExecuteError<Txn>
+where
+    Txn: Transaction<Mismatch: Error + 'static> + Merge<Conflict: Error + 'static>,
+{
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ExecuteError::Merge(e) => e.source(),
+            ExecuteError::Check(e) => e.source(),
+            ExecuteError::Commit(e) => e.source(),
+            ExecuteError::Handle(e) => e.source(),
         }
     }
 }
@@ -332,7 +330,7 @@ enum CommitErrorKind {
     #[displaydoc("{transaction_type}::commit() failed")]
     Leaf {
         transaction_type: &'static str,
-        error: Arc<dyn ErrorIfStd + Send + Sync>,
+        error: Arc<dyn Error + Send + Sync>,
     },
     #[displaydoc("{transaction_type}::commit() failed: {message}")]
     LeafMessage {
@@ -351,7 +349,7 @@ impl CommitError {
     /// Wrap an arbitrary unexpected error as a [`CommitError`].
     /// `T` should be the type of the transaction that caught it.
     #[must_use]
-    pub fn catch<T, E: ErrorIfStd + Send + Sync + 'static>(error: E) -> Self {
+    pub fn catch<T, E: Error + Send + Sync + 'static>(error: E) -> Self {
         CommitError(CommitErrorKind::Leaf {
             transaction_type: type_name::<T>(),
             error: Arc::new(error),
@@ -380,14 +378,12 @@ impl CommitError {
     }
 }
 
-crate::util::cfg_should_impl_error! {
-    impl ErrorIfStd for CommitError {
-        fn source(&self) -> Option<&(dyn ErrorIfStd + 'static)> {
-            match &self.0 {
-                CommitErrorKind::Leaf { error, .. } => Some(error),
-                CommitErrorKind::LeafMessage { .. } => None,
-                CommitErrorKind::Context { error, .. } => Some(error),
-            }
+impl Error for CommitError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match &self.0 {
+            CommitErrorKind::Leaf { error, .. } => Some(error),
+            CommitErrorKind::LeafMessage { .. } => None,
+            CommitErrorKind::Context { error, .. } => Some(error),
         }
     }
 }

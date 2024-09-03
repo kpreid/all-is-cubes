@@ -211,7 +211,7 @@ impl<G> LockError<G> {
     // }
 }
 
-impl<G> crate::util::ErrorIfStd for LockError<G> {}
+impl<G> core::error::Error for LockError<G> {}
 
 impl<G> fmt::Display for LockError<G> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -235,7 +235,7 @@ pub(crate) enum TryLockError<G> {
     WouldBlock,
 }
 
-impl<G> crate::util::ErrorIfStd for TryLockError<G> {}
+impl<G> core::error::Error for TryLockError<G> {}
 
 impl<G> fmt::Display for TryLockError<G> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

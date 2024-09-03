@@ -117,20 +117,6 @@ mod error_chain {
     }
 }
 
-/// TODO: Remove this no-longer-needed alias
-#[doc(hidden)]
-pub use core::error::Error as ErrorIfStd;
-
-/// TODO: Remove this no-longer-needed macro
-#[macro_export]
-#[doc(hidden)]
-macro_rules! cfg_should_impl_error {
-    ($($body:tt)*) => {
-        $($body)*
-    }
-}
-pub(crate) use cfg_should_impl_error;
-
 /// Equivalent of [`Iterator::map`] but applied to an [`Extend`] instead, transforming
 /// the incoming elements.
 ///
