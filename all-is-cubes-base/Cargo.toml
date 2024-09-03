@@ -22,7 +22,9 @@ arbitrary = [
     "euclid/arbitrary",
     "ordered-float/arbitrary"
 ]
-rerun = ["dep:re_types"]
+rerun = [
+    "dep:re_types"
+]
 serde = [
     "dep:serde",
     "ordered-float/serde",
