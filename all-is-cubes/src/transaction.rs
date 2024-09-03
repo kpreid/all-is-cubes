@@ -66,9 +66,7 @@ pub trait Transaction: Merge {
     /// Accordingly, it might not describe the _entire_ set of unmet preconditions,
     /// but only one example from it, so as to avoid needing to allocate a
     /// data structure of arbitrary size.
-    ///
-    /// This type should implement [`std::error::Error`] when possible.
-    type Mismatch: fmt::Debug + fmt::Display + 'static;
+    type Mismatch: core::error::Error + 'static;
 
     /// Checks whether the target's current state meets the preconditions and returns
     /// [`Err`] if it does not.
@@ -166,9 +164,7 @@ pub trait Merge: Sized {
     /// Accordingly, it might not describe the _entire_ area of the conflict
     /// but only one example from it, so as to avoid needing to allocate a
     /// data structure of arbitrary size.
-    ///
-    /// This type should implement [`std::error::Error`] when possible.
-    type Conflict: fmt::Debug + fmt::Display + 'static;
+    type Conflict: core::error::Error + 'static;
 
     /// Checks whether two transactions can be merged into a single transaction.
     /// If so, returns [`Ok`] containing data which may be passed to [`Self::commit_merge()`].
