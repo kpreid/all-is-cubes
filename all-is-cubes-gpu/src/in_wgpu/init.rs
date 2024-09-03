@@ -239,24 +239,30 @@ where
             .await
             .expect("communication failed")
             .expect("buffer reading failed");
-        let mapped: &[u8] = &temp_buffer.slice(..).get_mapped_range();
 
-        let element_count = camera::area_usize(dimensions).unwrap() * components;
+        {
+            let element_count = camera::area_usize(dimensions).unwrap() * components;
 
-        // Copy the mapped buffer data into a Rust vector, removing row padding if present
-        // by copying it one row at a time.
-        let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
-        for row in 0..dimensions.height {
-            let byte_start_of_row = padded_bytes_per_row * row;
-            // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.
-            texel_vector.extend(bytemuck::cast_slice::<u8, C>(
-                &mapped[byte_start_of_row as usize..][..dense_bytes_per_row as usize],
-            ));
+            // Copy the mapped buffer data into a Rust vector, removing row padding if present
+            // by copying it one row at a time.
+            let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
+            {
+                let mapped: &[u8] = &temp_buffer.slice(..).get_mapped_range();
+                for row in 0..dimensions.height {
+                    let byte_start_of_row = padded_bytes_per_row * row;
+                    // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.
+                    texel_vector.extend(bytemuck::cast_slice::<u8, C>(
+                        &mapped[byte_start_of_row as usize..][..dense_bytes_per_row as usize],
+                    ));
+                }
+                debug_assert_eq!(texel_vector.len(), element_count);
+            }
+
+            // Note: We do this after the get_mapped_range() has been dropped, due to the
+            // WebGPU backend otherwise crashing: <https://github.com/gfx-rs/wgpu/issues/6202>.
+            temp_buffer.destroy();
+
+            texel_vector
         }
-        debug_assert_eq!(texel_vector.len(), element_count);
-
-        temp_buffer.destroy();
-
-        texel_vector
     }
 }
