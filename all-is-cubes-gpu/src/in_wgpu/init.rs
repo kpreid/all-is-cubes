@@ -122,6 +122,8 @@ pub async fn try_create_adapter_for_test(
             "Using: {}",
             shortened_adapter_info(&adapter.get_info())
         ));
+    } else {
+        log(format_args!("Failed to obtain any wgpu adapter."))
     }
 
     adapter

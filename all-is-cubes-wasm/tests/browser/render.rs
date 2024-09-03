@@ -5,6 +5,7 @@
 
 use core::time::Duration;
 
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use all_is_cubes::euclid::vec3;
@@ -19,7 +20,10 @@ use all_is_cubes_wasm::AdaptedInstant as Instant;
 #[wasm_bindgen_test]
 async fn renderer_test() {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
-    let adapter = init::try_create_adapter_for_test(&instance, |msg| eprintln!("{msg}")).await;
+    let adapter = init::try_create_adapter_for_test(&instance, |msg| {
+        web_sys::console::log_1(&JsValue::from_str(&format!("{msg}")))
+    })
+    .await;
 
     // Skip this test if no adapter available
     let Some(adapter) = adapter else { return };
