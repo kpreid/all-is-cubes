@@ -47,7 +47,7 @@ terminal = ["dep:ratatui", "dep:unicode-width"]
 # Game audio output support.
 audio = ["dep:kira"]
 # Adds rerun logging support. Intended mainly for development of All is Cubes itself.
-rerun = ["dep:re_sdk", "all-is-cubes/rerun", "all-is-cubes-gpu/rerun"]
+rerun = ["all-is-cubes/rerun", "all-is-cubes-gpu/rerun"]
 # TODO: Define a feature with which to turn off windowing & GPU support.
 
 [dependencies]
