@@ -14,8 +14,7 @@ pub use manyfmt::{refmt, Fmt, Refmt};
 pub use all_is_cubes_base::util::ErrorChain;
 #[doc(hidden)]
 pub use all_is_cubes_base::util::{
-    arc_make_mut_slice, assert_conditional_send_sync, assert_send_sync, ErrorIfStd, MapExtend,
-    TypeName,
+    assert_conditional_send_sync, assert_send_sync, ErrorIfStd, MapExtend, TypeName,
 };
 pub use all_is_cubes_base::util::{ConciseDebug, Executor, TimeStats};
 

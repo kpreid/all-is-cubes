@@ -239,25 +239,6 @@ where
     }
 }
 
-/// As [`Arc::make_mut()`], but for slices, `Arc<[_]>`.
-///
-/// TODO: When Rust 1.81 is stable, remove this function since `make_mut()` will work.
-/// <https://github.com/rust-lang/rust/pull/116113>
-#[doc(hidden)] // internal helper function
-#[inline]
-pub fn arc_make_mut_slice<T: Clone>(mut arc: &mut Arc<[T]>) -> &mut [T] {
-    // Use `get_mut()` to emulate `make_mut()`.
-    // And since this is a "maybe return a mutable borrow" pattern, we have to appease
-    // the borrow checker about it, hence `polonius_the_crab` getting involved.
-    polonius_the_crab::polonius!(|arc| -> &'polonius mut [T] {
-        if let Some(slice) = Arc::get_mut(arc) {
-            polonius_the_crab::polonius_return!(slice);
-        }
-    });
-    *arc = Arc::from_iter(arc.iter().cloned());
-    Arc::get_mut(arc).unwrap()
-}
-
 /// Aggregation of the time taken by a set of events.
 ///
 /// TODO: Consider including an identifier for the longest.
