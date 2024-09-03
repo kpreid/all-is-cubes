@@ -24,19 +24,17 @@ pub struct MapConflict<K, C> {
     pub conflict: C,
 }
 
-crate::util::cfg_should_impl_error! {
-    impl<K: fmt::Debug, E: crate::util::ErrorIfStd + 'static> crate::util::ErrorIfStd for MapMismatch<K, E> {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl<K: fmt::Debug, E: core::error::Error + 'static> core::error::Error for MapMismatch<K, E> {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             Some(&self.mismatch)
         }
     }
 
-    impl<K: fmt::Debug, C: crate::util::ErrorIfStd + 'static> crate::util::ErrorIfStd for MapConflict<K, C> {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl<K: fmt::Debug, C: core::error::Error + 'static> core::error::Error for MapConflict<K, C> {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             Some(&self.conflict)
         }
     }
-}
 
 impl<K: fmt::Debug, E> fmt::Display for MapMismatch<K, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -275,25 +273,23 @@ macro_rules! impl_transaction_for_tuple {
 
             // TODO: TupleConflict should have its own message to report the position,
             // instead of delegating.
-            crate::util::cfg_should_impl_error! {
-                impl<$( [<E $name>]: crate::util::ErrorIfStd, )*> crate::util::ErrorIfStd for
+                impl<$( [<E $name>]: core::error::Error, )*> core::error::Error for
                         [< TupleError $count >]<$( [<E $name>], )*> {
-                    fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+                    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
                         match *self {
                             $( Self::[<At $name>](ref [<e $name>]) => [<e $name>].source(), )*
                         }
                     }
                 }
-
-                impl<$( [<C $name>]: crate::util::ErrorIfStd, )*> crate::util::ErrorIfStd for
+                impl<$( [<C $name>]: core::error::Error, )*> core::error::Error for
                         [< TupleConflict $count >]<$( [<C $name>], )*> {
-                    fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+                    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
                         match *self {
                             $( Self::[<At $name>](ref [<c $name>]) => [<c $name>].source(), )*
                         }
                     }
                 }
-            }
+            
 
             impl<$( [<E $name>]: fmt::Display, )*> fmt::Display for
                     [< TupleError $count >]<$( [<E $name>], )*> {

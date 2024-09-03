@@ -193,9 +193,7 @@ impl<'de> serde::Deserialize<'de> for Resolution {
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub struct IntoResolutionError<N>(N);
 
-crate::util::cfg_should_impl_error! {
-    impl<N: fmt::Display + fmt::Debug> crate::util::ErrorIfStd for IntoResolutionError<N> {}
-}
+impl<N: fmt::Display + fmt::Debug> core::error::Error for IntoResolutionError<N> {}
 
 impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {
     #[allow(clippy::missing_inline_in_public_items)]

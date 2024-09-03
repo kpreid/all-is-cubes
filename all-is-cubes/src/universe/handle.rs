@@ -526,9 +526,8 @@ pub enum HandleError {
     NotReady(Name),
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for HandleError {}
-}
+
+    impl core::error::Error for HandleError {}
 
 /// Read access to the referent of a [`Handle`].
 ///

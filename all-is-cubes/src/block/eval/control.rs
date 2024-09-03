@@ -285,9 +285,8 @@ impl fmt::Display for EvalBlockError {
     }
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for EvalBlockError {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl core::error::Error for EvalBlockError {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             match &self.kind {
                 ErrorKind::BudgetExceeded { .. } => None,
                 ErrorKind::PriorBudgetExceeded { .. } => None,
@@ -295,7 +294,6 @@ crate::util::cfg_should_impl_error! {
             }
         }
     }
-}
 
 impl From<HandleError> for InEvalError {
     fn from(value: HandleError) -> Self {

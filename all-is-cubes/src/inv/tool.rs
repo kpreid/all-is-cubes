@@ -482,9 +482,8 @@ pub enum ToolError {
     Internal(String),
 }
 
-crate::util::cfg_should_impl_error! {
-impl crate::util::ErrorIfStd for ToolError {
-    fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+impl core::error::Error for ToolError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             ToolError::NoTool => None,
             ToolError::NotUsable => None,
@@ -494,7 +493,6 @@ impl crate::util::ErrorIfStd for ToolError {
             ToolError::Internal(_) => None,
         }
     }
-}
 }
 
 impl ToolError {

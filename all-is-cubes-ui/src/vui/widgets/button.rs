@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use core::fmt;
 use core::hash::Hash;
 use core::sync::atomic::{AtomicU8, Ordering::Relaxed};
-use std::error::Error;
+use core::error::Error;
 
 use exhaust::Exhaust;
 

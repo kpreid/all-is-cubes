@@ -793,9 +793,7 @@ pub enum InsertErrorKind {
     Poisoned,
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for InsertError {}
-}
+    impl core::error::Error for InsertError {}
 
 impl fmt::Display for InsertError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

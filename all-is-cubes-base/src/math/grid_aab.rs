@@ -1013,9 +1013,7 @@ impl fmt::Display for OverflowKind {
     }
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for GridOverflowError {}
-}
+impl core::error::Error for GridOverflowError {}
 
 /// `Debug`-formatting helper
 struct RangeWithLength(Range<GridCoordinate>);

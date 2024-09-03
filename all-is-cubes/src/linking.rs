@@ -10,6 +10,7 @@
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use core::error::Error;
 use core::fmt;
 use core::hash::Hash;
 use core::ops::Index;
@@ -21,7 +22,7 @@ use crate::block::{Block, BlockDef};
 use crate::space::{SetCubeError, SpaceTransaction};
 use crate::transaction::ExecuteError;
 use crate::universe::{Handle, InsertError, Name, Universe, UniverseTransaction};
-use crate::util::{ErrorIfStd, YieldProgress};
+use crate::util::YieldProgress;
 
 #[cfg(doc)]
 use crate::block::Primitive;
@@ -307,9 +308,7 @@ pub struct ProviderError {
     missing: Box<[Name]>,
 }
 
-crate::util::cfg_should_impl_error! {
-    impl ErrorIfStd for ProviderError {}
-}
+impl Error for ProviderError {}
 
 /// An error resulting from “world generation”.
 ///
@@ -327,11 +326,9 @@ pub struct GenError {
     for_object: Option<Name>,
 }
 
-crate::util::cfg_should_impl_error! {
-    impl ErrorIfStd for GenError {
-        fn source(&self) -> Option<&(dyn ErrorIfStd + 'static)> {
-            Some(&self.detail)
-        }
+impl Error for GenError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.detail)
     }
 }
 
@@ -397,7 +394,7 @@ impl From<ExecuteError<UniverseTransaction>> for GenError {
 #[non_exhaustive]
 pub enum InGenError {
     /// Generic error container for unusual situations.
-    Other(Box<dyn ErrorIfStd + Send + Sync>),
+    Other(Box<dyn Error + Send + Sync>),
 
     /// Something else needed to be generated and that failed.
     Gen(Box<GenError>),
@@ -422,23 +419,21 @@ pub enum InGenError {
 impl InGenError {
     /// Convert an arbitrary error to `InGenError`.
     #[cfg_attr(not(feature = "std"), doc(hidden))]
-    pub fn other<E: ErrorIfStd + Send + Sync + 'static>(error: E) -> Self {
+    pub fn other<E: Error + Send + Sync + 'static>(error: E) -> Self {
         Self::Other(Box::new(error))
     }
 }
 
-crate::util::cfg_should_impl_error! {
-    impl ErrorIfStd for InGenError {
-        fn source(&self) -> Option<&(dyn ErrorIfStd + 'static)> {
-            match self {
-                InGenError::Other(e) => e.source(),
-                InGenError::Gen(e) => e.source(),
-                InGenError::Insert(e) => e.source(),
-                InGenError::Provider(e) => e.source(),
-                InGenError::SetCube(e) => e.source(),
-                InGenError::UniverseTransaction(e) => e.source(),
-                InGenError::SpaceTransaction(e) => e.source(),
-            }
+impl Error for InGenError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            InGenError::Other(e) => e.source(),
+            InGenError::Gen(e) => e.source(),
+            InGenError::Insert(e) => e.source(),
+            InGenError::Provider(e) => e.source(),
+            InGenError::SetCube(e) => e.source(),
+            InGenError::UniverseTransaction(e) => e.source(),
+            InGenError::SpaceTransaction(e) => e.source(),
         }
     }
 }
@@ -591,7 +586,7 @@ mod tests {
             e.to_string(),
             "An error occurred while generating object 'x'",
         );
-        let source = ErrorIfStd::source(&e)
+        let source = Error::source(&e)
             .expect("has source")
             .downcast_ref::<InGenError>()
             .expect("is InGenError");

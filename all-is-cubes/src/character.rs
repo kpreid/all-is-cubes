@@ -848,9 +848,8 @@ pub enum CharacterTransactionConflict {
     Behaviors(behavior::BehaviorTransactionConflict),
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for CharacterTransactionMismatch {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl core::error::Error for CharacterTransactionMismatch {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             match self {
                 CharacterTransactionMismatch::Body(e) => Some(e),
                 CharacterTransactionMismatch::Inventory(e) => Some(e),
@@ -859,8 +858,8 @@ crate::util::cfg_should_impl_error! {
         }
     }
 
-    impl crate::util::ErrorIfStd for CharacterTransactionConflict {
-        fn source(&self) -> Option<&(dyn crate::util::ErrorIfStd + 'static)> {
+    impl core::error::Error for CharacterTransactionConflict {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
             match self {
                 CharacterTransactionConflict::SetSpace => None,
                 CharacterTransactionConflict::Body(_) => None,
@@ -869,7 +868,6 @@ crate::util::cfg_should_impl_error! {
             }
         }
     }
-}
 
 /// Description of a change to a [`Character`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use std::error::Error;
+use core::error::Error;
 
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::euclid::size3;

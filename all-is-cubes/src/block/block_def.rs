@@ -393,10 +393,8 @@ pub struct BlockDefConflict {
     pub(crate) new: bool,
 }
 
-crate::util::cfg_should_impl_error! {
-    impl crate::util::ErrorIfStd for BlockDefMismatch {}
-    impl crate::util::ErrorIfStd for BlockDefConflict {}
-}
+    impl core::error::Error for BlockDefMismatch {}
+    impl core::error::Error for BlockDefConflict {}
 
 impl fmt::Display for BlockDefConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

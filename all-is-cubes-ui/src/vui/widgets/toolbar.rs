@@ -1,6 +1,6 @@
 use alloc::sync::{Arc, Weak};
-use std::error::Error;
-use std::fmt;
+use core::error::Error;
+use core::fmt;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr;
