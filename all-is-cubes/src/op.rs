@@ -244,7 +244,7 @@ impl Operation {
             Operation::Neighbors(mut neighbors) => {
                 // TODO: cheaper placeholder value, like an Operation::Nop
                 let mut placeholder = Operation::Become(AIR);
-                for (cube_ref, op_ref) in crate::util::arc_make_mut_slice(&mut neighbors) {
+                for (cube_ref, op_ref) in Arc::make_mut(&mut neighbors) {
                     *cube_ref = rotation
                         .transform_vector(cube_ref.lower_bounds().to_vector())
                         .to_point()

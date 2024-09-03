@@ -475,7 +475,7 @@ impl<V: Clone, O> Vol<Arc<[V]>, O> {
     #[doc(hidden)] // TODO: good public API?
     #[allow(clippy::missing_inline_in_public_items)]
     pub fn make_linear_mut(&mut self) -> &mut [V] {
-        let slice: &mut [V] = crate::util::arc_make_mut_slice(&mut self.contents);
+        let slice: &mut [V] = Arc::make_mut(&mut self.contents);
         debug_assert_eq!(slice.len(), self.bounds.volume().unwrap());
         slice
     }
