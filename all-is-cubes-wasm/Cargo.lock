@@ -1129,8 +1129,7 @@ checksum = "bc0287524726960e07b119cebd01678f852f147742ae0d925e6a520dca956126"
 [[package]]
 name = "naga"
 version = "24.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e380993072e52eef724eddfcde0ed013b0c023c3f0417336ed041aa9f076994e"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#779261e64daa6cf76c826532b7a1561d8ec203fd"
 dependencies = [
  "arrayvec",
  "bit-set",
@@ -1852,8 +1851,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "24.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e41253fc7b660735e2a2d9a58c563f2a047d3cc3445293d8f4095538c9e8afbe"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#779261e64daa6cf76c826532b7a1561d8ec203fd"
 dependencies = [
  "arrayvec",
  "bitflags 2.8.0",
@@ -1878,8 +1876,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "24.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82a39b8842dc9ffcbe34346e3ab6d496b32a47f6497e119d762c97fcaae3cb37"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#779261e64daa6cf76c826532b7a1561d8ec203fd"
 dependencies = [
  "arrayvec",
  "bit-vec",
@@ -1903,8 +1900,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "24.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a782e5056b060b0b4010881d1decddd059e44f2ecd01e2db2971b48ad3627e5"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#779261e64daa6cf76c826532b7a1561d8ec203fd"
 dependencies = [
  "android_system_properties",
  "arrayvec",
@@ -1944,8 +1940,7 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "24.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50ac044c0e76c03a0378e7786ac505d010a873665e2d51383dcff8dd227dc69c"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#779261e64daa6cf76c826532b7a1561d8ec203fd"
 dependencies = [
  "bitflags 2.8.0",
  "js-sys",
