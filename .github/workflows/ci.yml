@@ -364,6 +364,14 @@ jobs:
 
   deny:
     runs-on: ubuntu-latest
+    
+    # next/* branches are expected to have git dependencies or otherwise break cargo-deny rules,
+    # so don't run cargo-deny on them. We still want to do so in pull requests, but that doesn't
+    # need a special rule because according to the GitHub docs, this will not be the branch name:
+    # “For pull requests, the format is `<pr_number>/merge`.”
+    # -- <https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/accessing-contextual-information-about-workflow-runs#github-context>
+    if: ${{ !startsWith(github.ref, 'refs/heads/next/') }}
+    
     steps:
     - uses: actions/checkout@v4
 
