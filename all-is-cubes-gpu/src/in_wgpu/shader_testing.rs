@@ -96,13 +96,13 @@ where
         layout: Some(&pipelines.block_render_pipeline_layout),
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: "block_vertex_main",
+            entry_point: Some("block_vertex_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: &[WgpuBlockVertex::desc(), WgpuInstanceData::desc()],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: "test_entry_point",
+            entry_point: Some("test_entry_point"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format: fbt.linear_scene_texture_format(),

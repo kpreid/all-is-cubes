@@ -186,13 +186,13 @@ impl Pipelines {
                 layout: Some(&block_render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: shaders.blocks_and_lines.get(),
-                    entry_point: "block_vertex_main",
+                    entry_point: Some("block_vertex_main"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
-                    entry_point: "block_fragment_opaque",
+                    entry_point: Some("block_fragment_opaque"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
@@ -219,19 +219,19 @@ impl Pipelines {
                 layout: Some(&block_render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: shaders.blocks_and_lines.get(),
-                    entry_point: "block_vertex_main",
+                    entry_point: Some("block_vertex_main"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: vertex_buffers,
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
-                    entry_point: match current_graphics_options.transparency {
+                    entry_point: Some(match current_graphics_options.transparency {
                         TransparencyOption::Volumetric => "block_fragment_transparent_volumetric",
                         TransparencyOption::Surface | TransparencyOption::Threshold(_) => {
                             "block_fragment_transparent_surface"
                         }
                         ref t => panic!("unimplemented transparency option {t:?}"),
-                    },
+                    }),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
@@ -274,13 +274,13 @@ impl Pipelines {
                 // uses the skybox texture too.
                 vertex: wgpu::VertexState {
                     module: shaders.blocks_and_lines.get(),
-                    entry_point: "skybox_vertex",
+                    entry_point: Some("skybox_vertex"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
-                    entry_point: "skybox_fragment",
+                    entry_point: Some("skybox_fragment"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
@@ -315,13 +315,13 @@ impl Pipelines {
                 layout: Some(&lines_render_pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: shaders.blocks_and_lines.get(),
-                    entry_point: "lines_vertex",
+                    entry_point: Some("lines_vertex"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[WgpuLinesVertex::desc()],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
-                    entry_point: "lines_fragment",
+                    entry_point: Some("lines_fragment"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: fb.linear_scene_texture_format(),
@@ -378,13 +378,13 @@ impl Pipelines {
             ),
             vertex: wgpu::VertexState {
                 module: shaders.frame_copy.get(),
-                entry_point: "frame_copy_vertex",
+                entry_point: Some("frame_copy_vertex"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shaders.frame_copy.get(),
-                entry_point: "frame_copy_fragment",
+                entry_point: Some("frame_copy_fragment"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: wgpu::TextureFormat::Rgba16Float,
@@ -459,13 +459,13 @@ impl Pipelines {
             ),
             vertex: wgpu::VertexState {
                 module: shaders.rerun_copy.get(),
-                entry_point: "rerun_frame_copy_vertex",
+                entry_point: Some("rerun_frame_copy_vertex"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shaders.rerun_copy.get(),
-                entry_point: "rerun_frame_copy_fragment",
+                entry_point: Some("rerun_frame_copy_fragment"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[
                     Some(wgpu::ColorTargetState {

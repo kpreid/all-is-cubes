@@ -90,13 +90,13 @@ pub(crate) fn create_postprocess_pipeline(
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: shaders.postprocess.get(),
-            entry_point: "postprocess_vertex",
+            entry_point: Some("postprocess_vertex"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: &[],
         },
         fragment: Some(wgpu::FragmentState {
             module: shaders.postprocess.get(),
-            entry_point: "postprocess_fragment",
+            entry_point: Some("postprocess_fragment"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             targets: &[Some(wgpu::ColorTargetState {
                 format: super::surface_view_format(surface_format),
