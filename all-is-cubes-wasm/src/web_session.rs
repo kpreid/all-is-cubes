@@ -114,8 +114,8 @@ impl WebSession {
             .canvas()
             .owner_document()
             .unwrap();
-        let mut options_passive_true = AddEventListenerOptions::new();
-        options_passive_true.passive(true);
+        let options_passive_true = AddEventListenerOptions::new();
+        options_passive_true.set_passive(true);
 
         self.add_canvas_to_self_event_listener(
             "keydown",
@@ -342,7 +342,11 @@ impl WebSession {
                     callback(this, inner, event)
                 })
             },
-            AddEventListenerOptions::new().passive(passive),
+            &{
+                let options = AddEventListenerOptions::new();
+                options.set_passive(passive);
+                options
+            },
         );
     }
 
