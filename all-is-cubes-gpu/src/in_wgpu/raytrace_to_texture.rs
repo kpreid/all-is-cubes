@@ -24,12 +24,12 @@ use all_is_cubes_render::RenderError;
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
 use crate::in_wgpu::pipelines::Pipelines;
-use crate::{Memo, ToTexel};
+use crate::{Identified, Memo, ToTexel};
 
 #[derive(Debug)]
 pub(crate) struct RaytraceToTexture {
     inner: Arc<Mutex<Inner>>,
-    frame_copy_bind_group: Memo<wgpu::Id<wgpu::TextureView>, wgpu::BindGroup>,
+    frame_copy_bind_group: Memo<crate::Id<wgpu::TextureView>, wgpu::BindGroup>,
 }
 
 /// State for the possibly-asynchronous tracing job.
@@ -102,7 +102,7 @@ impl RaytraceToTexture {
         inner.set_viewport(device, raytracer_size_policy(camera.viewport()));
 
         // Update bind group if needed
-        let rt_texture_view: &wgpu::TextureView = inner.render_target.view().unwrap();
+        let rt_texture_view: &Identified<wgpu::TextureView> = inner.render_target.view().unwrap();
         self.frame_copy_bind_group
             .get_or_insert(rt_texture_view.global_id(), || {
                 device.create_bind_group(&wgpu::BindGroupDescriptor {

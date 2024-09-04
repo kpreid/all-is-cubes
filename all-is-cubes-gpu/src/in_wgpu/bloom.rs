@@ -8,7 +8,7 @@ pub(crate) struct BloomPipelines {
     linear_sampler: wgpu::Sampler,
     downsample_pipeline: wgpu::RenderPipeline,
     upsample_pipeline: wgpu::RenderPipeline,
-    bloom_shader_id: wgpu::Id<wgpu::ShaderModule>,
+    bloom_shader_id: crate::Id<wgpu::ShaderModule>,
 }
 
 impl BloomPipelines {
@@ -167,7 +167,7 @@ pub(crate) struct BloomResources {
 
     pub bloom_output_texture_view: wgpu::TextureView,
 
-    bloom_shader_id: wgpu::Id<wgpu::ShaderModule>,
+    bloom_shader_id: crate::Id<wgpu::ShaderModule>,
 }
 
 impl BloomResources {
@@ -281,7 +281,7 @@ impl BloomResources {
     }
 
     /// For determinig whether this is outdated
-    pub(crate) fn bloom_shader_id(&self) -> wgpu::Id<wgpu::ShaderModule> {
+    pub(crate) fn bloom_shader_id(&self) -> crate::Id<wgpu::ShaderModule> {
         self.bloom_shader_id
     }
 }

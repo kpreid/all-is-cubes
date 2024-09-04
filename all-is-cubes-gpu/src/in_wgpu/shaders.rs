@@ -11,6 +11,7 @@ use futures_util::task::noop_waker_ref;
 use all_is_cubes::listen;
 
 use crate::reloadable::{reloadable_str, Reloadable};
+use crate::Identified;
 
 /// All shaders that are built into the source code of this crate.
 pub(crate) struct Shaders {
@@ -100,7 +101,7 @@ pub(crate) struct ReloadableShader {
     label: String,
     source: listen::ListenableSource<Arc<str>>,
     dirty: listen::DirtyFlag,
-    current_module: wgpu::ShaderModule,
+    current_module: Identified<wgpu::ShaderModule>,
     next_module: Option<BoxFuture<'static, Result<wgpu::ShaderModule, wgpu::Error>>>,
 }
 
@@ -111,10 +112,11 @@ impl ReloadableShader {
         wgsl_source: listen::ListenableSource<Arc<str>>,
     ) -> Self {
         let dirty = listen::DirtyFlag::listening(false, &wgsl_source);
-        let current_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some(&label),
-            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*wgsl_source.get())),
-        });
+        let current_module =
+            Identified::new(device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some(&label),
+                source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*wgsl_source.get())),
+            }));
 
         Self {
             label,
@@ -125,7 +127,7 @@ impl ReloadableShader {
         }
     }
 
-    pub fn get(&self) -> &wgpu::ShaderModule {
+    pub fn get(&self) -> &Identified<wgpu::ShaderModule> {
         &self.current_module
     }
 
@@ -166,7 +168,7 @@ impl ReloadableShader {
                 self.next_module = None;
                 match result {
                     Ok(new_module) => {
-                        self.current_module = new_module;
+                        self.current_module = Identified::new(new_module);
                         true
                     }
                     Err(e) => {

@@ -24,6 +24,7 @@ use all_is_cubes::util::Executor;
 
 use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
 use crate::in_wgpu::shaders::Shaders;
+use crate::Id;
 #[cfg(feature = "rerun")]
 use crate::RerunFilter;
 use crate::{
@@ -297,10 +298,9 @@ struct EverythingRenderer<I: time::Instant> {
     lines_vertex_count: u32,
 
     /// Pipeline for the color postprocessing + info text layer drawing.
-    postprocess_render_pipeline: Memo<wgpu::Id<wgpu::ShaderModule>, wgpu::RenderPipeline>,
+    postprocess_render_pipeline: Memo<Id<wgpu::ShaderModule>, wgpu::RenderPipeline>,
     #[allow(clippy::type_complexity)]
-    postprocess_bind_group:
-        Memo<(wgpu::Id<wgpu::TextureView>, frame_texture::FbtId), wgpu::BindGroup>,
+    postprocess_bind_group: Memo<(Id<wgpu::TextureView>, frame_texture::FbtId), wgpu::BindGroup>,
     postprocess_bind_group_layout: wgpu::BindGroupLayout,
     postprocess_camera_buffer: wgpu::Buffer,
 

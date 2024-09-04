@@ -78,7 +78,7 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
 
     /// Bind group containing our block texture and light texture,
     #[allow(clippy::type_complexity)]
-    space_bind_group: Memo<[wgpu::Id<wgpu::TextureView>; 4], wgpu::BindGroup>,
+    space_bind_group: Memo<[crate::Id<wgpu::TextureView>; 4], wgpu::BindGroup>,
 
     /// Mesh generator and updater.
     ///

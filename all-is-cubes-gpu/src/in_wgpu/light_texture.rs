@@ -12,8 +12,9 @@ use all_is_cubes::math::{
 use all_is_cubes::space::Space;
 use all_is_cubes_render::camera::Camera;
 
-use crate::in_wgpu::glue::{
-    extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab,
+use crate::{
+    in_wgpu::glue::{extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab},
+    Identified,
 };
 
 type Texel = [u8; LightTexture::COMPONENTS];
@@ -63,7 +64,7 @@ fn visible_light_volume(space_bounds: GridAab, camera: &Camera) -> GridAab {
 #[doc(hidden)] // public for benchmark
 pub struct LightTexture {
     texture: wgpu::Texture,
-    texture_view: wgpu::TextureView,
+    texture_view: Identified<wgpu::TextureView>,
 
     /// Temporary storage for updated light texels to be copied into the texture.
     copy_buffer: wgpu::Buffer,
@@ -116,7 +117,9 @@ impl LightTexture {
             label: Some(&format!("{label_prefix} space light")),
         });
         Self {
-            texture_view: texture.create_view(&wgpu::TextureViewDescriptor::default()),
+            texture_view: Identified::new(
+                texture.create_view(&wgpu::TextureViewDescriptor::default()),
+            ),
             texture,
             copy_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(&format!("{label_prefix} space light copy buffer")),
@@ -392,7 +395,7 @@ impl LightTexture {
         total_count
     }
 
-    pub fn texture_view(&self) -> &wgpu::TextureView {
+    pub(crate) fn texture_view(&self) -> &Identified<wgpu::TextureView> {
         &self.texture_view
     }
 }

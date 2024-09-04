@@ -15,7 +15,7 @@ use all_is_cubes_mesh::texture::{self, Channels};
 use crate::in_wgpu::glue::{size3d_to_extent, write_texture_by_aab};
 use crate::in_wgpu::vertex::{AtlasTexel, FixTexCoord, TexPoint};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
-use crate::{BlockTextureInfo, Msw};
+use crate::{BlockTextureInfo, Identified, Msw};
 
 //------------------------------------------------------------------------------------------------//
 // Types
@@ -56,9 +56,9 @@ pub struct AtlasTile {
 }
 
 pub(crate) struct BlockTextureViews {
-    pub g0_reflectance: Arc<wgpu::TextureView>,
-    pub g1_reflectance: Arc<wgpu::TextureView>,
-    pub g1_emission: Arc<wgpu::TextureView>,
+    pub g0_reflectance: Arc<Identified<wgpu::TextureView>>,
+    pub g1_reflectance: Arc<Identified<wgpu::TextureView>>,
+    pub g1_emission: Arc<Identified<wgpu::TextureView>>,
 }
 
 /// Internal, weak-referencing version of [`AtlasTile`].
@@ -137,7 +137,7 @@ struct GpuTexture {
     texture: wgpu::Texture,
     /// The texture view is wrapped in [`Arc`] so that it can be used by drawing code
     /// without holding the lock around this.
-    texture_view: Arc<wgpu::TextureView>,
+    texture_view: Arc<Identified<wgpu::TextureView>>,
 }
 
 //------------------------------------------------------------------------------------------------//
@@ -298,7 +298,7 @@ impl AllocatorBacking {
         backing_mutex: &Mutex<Self>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-    ) -> (Group<Arc<wgpu::TextureView>>, BlockTextureInfo) {
+    ) -> (Group<Arc<Identified<wgpu::TextureView>>>, BlockTextureInfo) {
         let mut backing_lock_guard = backing_mutex.lock().unwrap();
         let backing = &mut *backing_lock_guard;
 
@@ -492,7 +492,9 @@ impl GpuTexture {
                 | wgpu::TextureUsages::COPY_DST,
             label: Some(label),
         });
-        let texture_view = Arc::new(texture.create_view(&wgpu::TextureViewDescriptor::default()));
+        let texture_view = Arc::new(Identified::new(
+            texture.create_view(&wgpu::TextureViewDescriptor::default()),
+        ));
         Self {
             texture,
             texture_view,

@@ -1,13 +1,16 @@
+use half::f16;
+
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::space::Sky;
-use half::f16;
+
+use crate::Identified;
 
 /// GPU resources to render a [`Sky`].
 #[derive(Debug)]
 pub(in crate::in_wgpu) struct Skybox {
     texture_label: String,
     texture: wgpu::Texture,
-    texture_view: wgpu::TextureView,
+    texture_view: Identified<wgpu::TextureView>,
 }
 
 impl Skybox {
@@ -37,7 +40,7 @@ impl Skybox {
         self.texture.width()
     }
 
-    pub(crate) fn texture_view(&self) -> &wgpu::TextureView {
+    pub(crate) fn texture_view(&self) -> &Identified<wgpu::TextureView> {
         &self.texture_view
     }
 }
@@ -77,12 +80,15 @@ pub(in crate::in_wgpu) fn create_skybox_texture(
     })
 }
 
-fn create_skybox_texture_view(label: &str, texture: &wgpu::Texture) -> wgpu::TextureView {
-    texture.create_view(&wgpu::TextureViewDescriptor {
+fn create_skybox_texture_view(
+    label: &str,
+    texture: &wgpu::Texture,
+) -> Identified<wgpu::TextureView> {
+    Identified::new(texture.create_view(&wgpu::TextureViewDescriptor {
         label: Some(label),
         dimension: Some(wgpu::TextureViewDimension::Cube),
         ..Default::default()
-    })
+    }))
 }
 
 // texture format must be HDR supporting

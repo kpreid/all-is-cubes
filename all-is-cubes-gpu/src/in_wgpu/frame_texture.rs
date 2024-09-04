@@ -8,13 +8,13 @@ use all_is_cubes_render::Flaws;
 
 use super::bloom;
 use crate::in_wgpu::shaders::Shaders;
-use crate::EgFramebuffer;
+use crate::{EgFramebuffer, Identified};
 
 /// A RGBA [`wgpu::Texture`] with a CPU-side buffer that can be drawn on.
 pub(crate) struct DrawableTexture<In, Out> {
     texture_format: wgpu::TextureFormat,
     texture: Option<wgpu::Texture>,
-    texture_view: Option<wgpu::TextureView>,
+    texture_view: Option<Identified<wgpu::TextureView>>,
     size: wgpu::Extent3d,
     local_buffer: EgFramebuffer<In, Out>,
 }
@@ -72,7 +72,9 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
                 width: new_extent.width,
                 height: new_extent.height,
             }),
-            texture_view: Some(texture.create_view(&wgpu::TextureViewDescriptor::default())),
+            texture_view: Some(Identified::new(
+                texture.create_view(&wgpu::TextureViewDescriptor::default()),
+            )),
             texture: Some(texture),
             size: new_extent,
         };
@@ -82,7 +84,7 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
         &mut self.local_buffer
     }
 
-    pub fn view(&self) -> Option<&wgpu::TextureView> {
+    pub fn view(&self) -> Option<&Identified<wgpu::TextureView>> {
         self.texture_view.as_ref()
     }
 
@@ -166,7 +168,7 @@ pub(crate) struct FramebufferTextures {
     linear_scene_tex: wgpu::Texture,
     /// View for writing into [`Self::linear_scene_texture`], and reading if multisampling
     /// is not enabled.
-    linear_scene_view: wgpu::TextureView,
+    linear_scene_view: Identified<wgpu::TextureView>,
 
     /// If multisampling is enabled, provides the “resolve target” companion to
     /// `linear_scene_texture`. This texture has a `sample_count` of 1, is
@@ -175,7 +177,7 @@ pub(crate) struct FramebufferTextures {
     /// `linear_scene_texture` directly as input to postprocessing.
     linear_scene_resolved_tex: Option<wgpu::Texture>,
     /// View for reading [`Self::linear_scene_resolved_tex`].
-    linear_scene_resolved_view: Option<wgpu::TextureView>,
+    linear_scene_resolved_view: Option<Identified<wgpu::TextureView>>,
 
     /// Depth texture to pair with `linear_scene_texture`.
     depth_texture_view: wgpu::TextureView,
@@ -256,10 +258,10 @@ impl FramebufferTextures {
             None
         };
 
-        let linear_scene_view = linear_scene_tex.create_view(&Default::default());
+        let linear_scene_view = Identified::new(linear_scene_tex.create_view(&Default::default()));
         let linear_scene_resolved_view = linear_scene_resolved_tex
             .as_ref()
-            .map(|t| t.create_view(&Default::default()));
+            .map(|t| Identified::new(t.create_view(&Default::default())));
 
         // TODO: duplicative with scene_for_postprocessing_input
         let bloom_input_view = if let Some(resolved) = &linear_scene_resolved_view {
@@ -296,7 +298,7 @@ impl FramebufferTextures {
     ) -> wgpu::RenderPassColorAttachment<'_> {
         wgpu::RenderPassColorAttachment {
             view: &self.linear_scene_view,
-            resolve_target: self.linear_scene_resolved_view.as_ref(),
+            resolve_target: self.linear_scene_resolved_view.as_deref(),
             ops: wgpu::Operations {
                 load: color_load_op,
                 store: wgpu::StoreOp::Store,
@@ -324,7 +326,7 @@ impl FramebufferTextures {
             stencil_ops: None,
         }
     }
-    pub(crate) fn scene_for_postprocessing_input(&self) -> &wgpu::TextureView {
+    pub(crate) fn scene_for_postprocessing_input(&self) -> &Identified<wgpu::TextureView> {
         if let Some(resolved) = &self.linear_scene_resolved_view {
             resolved
         } else {
@@ -416,7 +418,7 @@ impl FramebufferTextures {
 /// has the same GPU resources or not, for [`common::Memo`] purposes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct FbtId {
-    scene_id: wgpu::Id<wgpu::TextureView>,
+    scene_id: crate::Id<wgpu::TextureView>,
 }
 
 /// Pure-data inputs to [`FramebufferTextures`]'s choice of texture format and size.

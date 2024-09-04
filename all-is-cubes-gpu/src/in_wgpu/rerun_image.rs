@@ -22,7 +22,7 @@ pub(crate) struct RerunImageExport {
     /// Intermediate textures used for format conversions.
     /// The texture ID is of the scene color texture we need to read.
     /// The image size is our intermediate texture size, which may be different.
-    resources: Memo<(wgpu::Id<wgpu::TextureView>, ImageSize), Resources>,
+    resources: Memo<(crate::Id<wgpu::TextureView>, ImageSize), Resources>,
 }
 
 struct Resources {
