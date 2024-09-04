@@ -7,8 +7,13 @@ on:
   workflow_dispatch:
   push:
     branches:
+      # Test everything that goes on on main.
       - main
+      # The special branch “ci” is used for testing CI behaviors even without a PR.
       - ci
+      # next/* branches are used for testing with future versions of dependencies,
+      # usually by way of `[patch]`ing a dependency, thus won’t have outstanding PRs.
+      - next/*
 
 env:
   CARGO_TERM_COLOR: always
