@@ -848,26 +848,26 @@ pub enum CharacterTransactionConflict {
     Behaviors(behavior::BehaviorTransactionConflict),
 }
 
-    impl core::error::Error for CharacterTransactionMismatch {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            match self {
-                CharacterTransactionMismatch::Body(e) => Some(e),
-                CharacterTransactionMismatch::Inventory(e) => Some(e),
-                CharacterTransactionMismatch::Behaviors(e) => Some(e),
-            }
+impl core::error::Error for CharacterTransactionMismatch {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            CharacterTransactionMismatch::Body(e) => Some(e),
+            CharacterTransactionMismatch::Inventory(e) => Some(e),
+            CharacterTransactionMismatch::Behaviors(e) => Some(e),
         }
     }
+}
 
-    impl core::error::Error for CharacterTransactionConflict {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            match self {
-                CharacterTransactionConflict::SetSpace => None,
-                CharacterTransactionConflict::Body(_) => None,
-                CharacterTransactionConflict::Inventory(e) => Some(e),
-                CharacterTransactionConflict::Behaviors(e) => Some(e),
-            }
+impl core::error::Error for CharacterTransactionConflict {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            CharacterTransactionConflict::SetSpace => None,
+            CharacterTransactionConflict::Body(_) => None,
+            CharacterTransactionConflict::Inventory(e) => Some(e),
+            CharacterTransactionConflict::Behaviors(e) => Some(e),
         }
     }
+}
 
 /// Description of a change to a [`Character`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

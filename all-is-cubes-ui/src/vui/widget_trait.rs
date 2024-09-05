@@ -2,8 +2,8 @@
 
 use all_is_cubes::time::Tick;
 use alloc::sync::Arc;
-use core::fmt::Debug;
 use core::error::Error;
+use core::fmt::Debug;
 use std::sync::Mutex;
 
 use all_is_cubes::behavior::{self, Behavior};

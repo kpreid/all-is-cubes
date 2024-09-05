@@ -526,8 +526,7 @@ pub enum HandleError {
     NotReady(Name),
 }
 
-
-    impl core::error::Error for HandleError {}
+impl core::error::Error for HandleError {}
 
 /// Read access to the referent of a [`Handle`].
 ///

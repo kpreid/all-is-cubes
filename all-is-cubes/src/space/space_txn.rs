@@ -398,24 +398,23 @@ pub enum SpaceTransactionConflict {
     Behaviors(behavior::BehaviorTransactionConflict),
 }
 
-    impl core::error::Error for SpaceTransactionMismatch {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            match self {
-                SpaceTransactionMismatch::Cube(_) => None,
-                SpaceTransactionMismatch::OutOfBounds {.. } => None,
-                SpaceTransactionMismatch::Behaviors(mismatch) => Some(mismatch),
-            }
+impl core::error::Error for SpaceTransactionMismatch {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            SpaceTransactionMismatch::Cube(_) => None,
+            SpaceTransactionMismatch::OutOfBounds { .. } => None,
+            SpaceTransactionMismatch::Behaviors(mismatch) => Some(mismatch),
         }
     }
-    impl core::error::Error for SpaceTransactionConflict {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            match self {
-                SpaceTransactionConflict::Cube { conflict, .. } => Some(conflict),
-                SpaceTransactionConflict::Behaviors(conflict) => Some(conflict),
-            }
+}
+impl core::error::Error for SpaceTransactionConflict {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            SpaceTransactionConflict::Cube { conflict, .. } => Some(conflict),
+            SpaceTransactionConflict::Behaviors(conflict) => Some(conflict),
         }
     }
-
+}
 
 impl fmt::Display for SpaceTransactionMismatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

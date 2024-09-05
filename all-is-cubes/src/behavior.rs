@@ -790,8 +790,8 @@ pub struct BehaviorTransactionConflict {
     key: Key,
 }
 
-    impl core::error::Error for BehaviorTransactionMismatch {}
-    impl core::error::Error for BehaviorTransactionConflict {}
+impl core::error::Error for BehaviorTransactionMismatch {}
+impl core::error::Error for BehaviorTransactionConflict {}
 
 impl fmt::Display for BehaviorTransactionMismatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

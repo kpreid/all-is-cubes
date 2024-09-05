@@ -288,15 +288,15 @@ pub(crate) enum OperationError {
     OutOfBounds { operation: GridAab, space: GridAab },
 }
 
-    impl core::error::Error for OperationError {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            match self {
-                Self::InternalConflict(e) => Some(e),
-                Self::Unmatching => None,
-                Self::OutOfBounds {..} => None,
-            }
+impl core::error::Error for OperationError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            Self::InternalConflict(e) => Some(e),
+            Self::Unmatching => None,
+            Self::OutOfBounds { .. } => None,
         }
     }
+}
 
 #[cfg(test)]
 mod tests {

@@ -493,8 +493,8 @@ pub enum InventoryConflict {
     ReplaceSameSlot { slot: usize },
 }
 
-    impl core::error::Error for InventoryMismatch {}
-    impl core::error::Error for InventoryConflict {}
+impl core::error::Error for InventoryMismatch {}
+impl core::error::Error for InventoryConflict {}
 
 /// Description of a change to an [`Inventory`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

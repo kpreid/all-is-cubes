@@ -750,12 +750,11 @@ impl transaction::Merge for BodyTransaction {
 #[non_exhaustive]
 pub enum BodyMismatch {}
 
-    impl core::error::Error for BodyMismatch {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            match *self {
-            }
-        }
+impl core::error::Error for BodyMismatch {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match *self {}
     }
+}
 
 /// Note: Tests which involve both body and collision code are currently in the parent module.
 #[cfg(test)]

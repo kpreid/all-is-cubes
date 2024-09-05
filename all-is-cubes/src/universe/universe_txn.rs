@@ -258,24 +258,25 @@ pub enum UniverseConflict {
     Behaviors(behavior::BehaviorTransactionConflict),
 }
 
-    impl core::error::Error for UniverseMismatch {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            match self {
-                UniverseMismatch::DifferentUniverse {..} => None,
-                UniverseMismatch::Member(mc) => Some(&mc.mismatch),
-                UniverseMismatch::Behaviors(c) => Some(c),
-                UniverseMismatch::InvalidPending => None,
-            }
-        }
-    } impl core::error::Error for UniverseConflict {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            match self {
-                UniverseConflict::DifferentUniverse(_, _) => None,
-                UniverseConflict::Member(mc) => Some(&mc.conflict),
-                UniverseConflict::Behaviors(c) => Some(c),
-            }
+impl core::error::Error for UniverseMismatch {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            UniverseMismatch::DifferentUniverse { .. } => None,
+            UniverseMismatch::Member(mc) => Some(&mc.mismatch),
+            UniverseMismatch::Behaviors(c) => Some(c),
+            UniverseMismatch::InvalidPending => None,
         }
     }
+}
+impl core::error::Error for UniverseConflict {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            UniverseConflict::DifferentUniverse(_, _) => None,
+            UniverseConflict::Member(mc) => Some(&mc.conflict),
+            UniverseConflict::Behaviors(c) => Some(c),
+        }
+    }
+}
 
 impl fmt::Display for UniverseMismatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -861,15 +862,15 @@ pub enum MemberConflict {
     Modify(ModifyMemberConflict),
 }
 
-    impl core::error::Error for MemberConflict {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            match self {
-                MemberConflict::InsertVsOther => None,
-                MemberConflict::DeleteVsOther => None,
-                MemberConflict::Modify(e) => e.source(),
-            }
+impl core::error::Error for MemberConflict {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            MemberConflict::InsertVsOther => None,
+            MemberConflict::DeleteVsOther => None,
+            MemberConflict::Modify(e) => e.source(),
         }
     }
+}
 
 /// Transaction precondition error type for a single member in a [`UniverseTransaction`].
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
@@ -918,16 +919,16 @@ pub struct ModifyMemberMismatch(AnyTransactionMismatch);
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModifyMemberConflict(AnyTransactionConflict);
 
-    impl core::error::Error for ModifyMemberMismatch {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            self.0.source()
-        }
+impl core::error::Error for ModifyMemberMismatch {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        self.0.source()
     }
-    impl core::error::Error for ModifyMemberConflict {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            self.0.source()
-        }
+}
+impl core::error::Error for ModifyMemberConflict {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        self.0.source()
     }
+}
 
 impl fmt::Display for ModifyMemberMismatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
