@@ -75,7 +75,7 @@ stl_io = { version = "0.8.1", optional = true }
 serde_json = { workspace = true, optional = true }
 
 # glTF related dependencies
-base64 = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true, features = ["alloc"] }
 bytemuck = { workspace = true, optional = true, features = ["derive"] }
 # gltf-json often has semver-incompatible changes, so pin it
 gltf-json = { version = ">=1.4.1, <1.5.0", optional = true, default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }

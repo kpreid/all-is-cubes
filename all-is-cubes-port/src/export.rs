@@ -1,4 +1,4 @@
-use std::ffi::OsString;
+#[allow(unused_imports)]
 use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
 use std::{fs, io};
@@ -91,6 +91,7 @@ impl ExportSet {
     /// This has a suffix added for uniqueness (after the name but preserving the existing
     /// extension), based on the item's [`Handle::name()`], if the [`ExportSet`] contains more
     /// than one item. If it contains only one item, then `base_path` is returned unchanged.
+    #[cfg(feature = "stl")] // stl is the only exporter that does multi-file
     pub(crate) fn member_export_path(
         &self,
         base_path: &Path,
@@ -98,7 +99,7 @@ impl ExportSet {
     ) -> PathBuf {
         let mut path: PathBuf = base_path.to_owned();
         if self.contents.count() > 1 {
-            let mut new_file_name: OsString =
+            let mut new_file_name: std::ffi::OsString =
                 base_path.file_stem().expect("file name missing").to_owned();
             new_file_name.push("-");
             match member.name() {
