@@ -446,7 +446,7 @@ impl ops::BitOr for AnimationChange {
 /// Stored in [`BlockAttributes`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[allow(clippy::exhaustive_structs)] // will deliberately break
+#[allow(clippy::exhaustive_structs, reason = "will deliberately break")]
 pub struct TickAction {
     /// Operation to perform on the schedule.
     pub operation: Operation,

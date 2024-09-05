@@ -338,7 +338,10 @@ impl FramebufferTextures {
         self.config.enable_copy_out
     }
 
-    #[allow(unused)] // Used only in special cases such as cfg(test) and cfg(feature = "rerun")
+    #[allow(
+        unused,
+        reason = "Used only in special cases such as cfg(test) and cfg(feature = \"rerun\")"
+    )]
     pub(crate) fn scene_for_test_copy(&self) -> &wgpu::Texture {
         debug_assert!(self.config.enable_copy_out);
         if let Some(resolved) = &self.linear_scene_resolved_tex {

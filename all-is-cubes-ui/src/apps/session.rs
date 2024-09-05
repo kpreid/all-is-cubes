@@ -939,7 +939,7 @@ struct SpaceWatchState {
     space: Option<Handle<Space>>,
 
     /// Gates the message forwarding from the `space` to `Session::fluff_notifier`.
-    #[allow(dead_code)] // acts upon being dropped
+    #[allow(dead_code, reason = "acts upon being dropped")]
     fluff_gate: listen::Gate,
     // /// Camera state copied from the character, for use by fluff forwarder.
     // camera: Camera,

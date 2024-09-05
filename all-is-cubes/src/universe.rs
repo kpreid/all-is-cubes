@@ -163,7 +163,7 @@ cfg_if::cfg_if! {
 
 impl UniverseId {
     fn new() -> Self {
-        #![allow(clippy::useless_conversion)] // useless on pointer_width=64
+        #![allow(clippy::useless_conversion, reason = "useless on pointer_width=64")]
 
         let id = UNIVERSE_ID_COUNTER
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |counter| {
@@ -793,7 +793,7 @@ pub enum InsertErrorKind {
     Poisoned,
 }
 
-    impl core::error::Error for InsertError {}
+impl core::error::Error for InsertError {}
 
 impl fmt::Display for InsertError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

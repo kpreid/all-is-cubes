@@ -129,7 +129,7 @@ pub async fn try_create_adapter_for_test(
     adapter
 }
 
-#[allow(dead_code)] // conditionally used
+#[allow(dead_code, reason = "conditionally used")]
 fn shortened_adapter_info(info: &wgpu::AdapterInfo) -> String {
     // Make the string more concise by deleting empty-valued fields.
     // TODO: maybe just destructure and do our own formatting

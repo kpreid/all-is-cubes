@@ -132,7 +132,10 @@ impl<A> Alloctree<A> {
     ///
     /// If the handle does not exactly match a previous allocation from this allocator,
     /// may panic or deallocate something else.
-    #[allow(clippy::needless_pass_by_value)] // deliberately taking handle ownership
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "deliberately taking handle ownership"
+    )]
     pub fn free(&mut self, handle: AlloctreeHandle<A>) {
         self.root.free(self.size_exponent, handle.allocation.min);
         self.occupied_volume -= handle.allocation.map(usize::from).volume();

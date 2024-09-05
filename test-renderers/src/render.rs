@@ -37,7 +37,10 @@ impl Scene for &Universe {
 /// Dynamic overlay content passed to the [`HeadlessRenderer`] per-frame.
 /// This is a combination of the parameters of `update()` and `draw()`.
 #[derive(Clone, Debug, PartialEq)]
-#[allow(clippy::exhaustive_structs)] // will very likely go through incompatible changes anyway
+#[allow(
+    clippy::exhaustive_structs,
+    reason = "will very likely go through incompatible changes anyway"
+)]
 pub struct Overlays<'a> {
     /// The player's cursor, or [`None`] to draw nothing.
     pub cursor: Option<&'a Cursor>,

@@ -120,7 +120,7 @@ impl Raycaster {
     /// assert_eq!(next().cube_ahead(), Cube::new(2, 1, 0));
     /// ```
     #[must_use]
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn new(origin: impl Into<FreePoint>, direction: impl Into<FreeVector>) -> Self {
         Self::new_impl(origin.into(), direction.into())
     }

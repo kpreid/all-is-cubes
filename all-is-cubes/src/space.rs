@@ -301,7 +301,7 @@ impl Space {
         self.light.get(cube.into())
     }
 
-    #[allow(unused)] // currently only used on feature=save and tests
+    #[allow(unused, reason = "currently only used on feature=save and tests")]
     pub(crate) fn in_light_update_queue(&self, cube: Cube) -> bool {
         self.light.in_light_update_queue(cube)
     }
@@ -1179,7 +1179,7 @@ pub enum SetCubeError {
     TooManyBlocks(),
 }
 
-    impl core::error::Error for SetCubeError {}
+impl core::error::Error for SetCubeError {}
 
 impl fmt::Display for SetCubeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1202,7 +1202,10 @@ impl fmt::Display for SetCubeError {
 
 /// Description of a change to a [`Space`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway
+#[allow(
+    clippy::exhaustive_enums,
+    reason = "any change will probably be breaking anyway"
+)]
 pub enum SpaceChange {
     /// The block occupying the specified cube was replaced.
     CubeBlock {
@@ -1403,7 +1406,7 @@ pub struct Extract<'s> {
 
 impl<'s> Extract<'s> {
     /// Returns the cube being processed.
-    #[allow(unused)] // currently only used on feature=save
+    #[allow(unused, reason = "currently only used on feature=save")]
     pub(crate) fn cube(&self) -> Cube {
         self.cube
     }

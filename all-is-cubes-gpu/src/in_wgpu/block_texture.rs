@@ -1,7 +1,7 @@
 //! Block texture atlas management: provides [`AtlasAllocator`], the
 //! [`texture::Allocator`] implementation for use with [`wgpu`].
 
-#![allow(clippy::arc_with_non_send_sync)] // wgpu on wasm
+#![allow(clippy::arc_with_non_send_sync, reason = "wgpu on wasm")]
 
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 

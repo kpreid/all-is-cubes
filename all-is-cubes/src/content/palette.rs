@@ -15,7 +15,7 @@
 // 0xBB is the sRGB value approximating linear value 0.5.
 
 #![allow(unknown_lints)] // TODO: remove after Rust 1.81 is released
-#![allow(clippy::too_long_first_doc_paragraph)] // false positive on SVG
+#![allow(clippy::too_long_first_doc_paragraph, reason = "false positive on SVG")]
 
 use crate::math::{rgb_const, Rgb};
 

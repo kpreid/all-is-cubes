@@ -324,7 +324,7 @@ async fn islands(
     let size = size.unwrap_or(GridSize::new(1000, 400, 1000));
 
     // Set up dimensions
-    #[allow(clippy::cast_possible_wrap)] // big numbers will break anyway
+    #[allow(clippy::cast_possible_wrap, reason = "big numbers will break anyway")]
     let bounds = GridAab::checked_from_lower_size(
         [
             -((size.width / 2) as i32),

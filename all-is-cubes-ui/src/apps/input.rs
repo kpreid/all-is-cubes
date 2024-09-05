@@ -68,7 +68,10 @@ impl InputProcessor {
     /// Constructs a new [`InputProcessor`].
     ///
     /// Consider using [`Session`](crate::apps::Session) instead of directly calling this.
-    #[allow(clippy::new_without_default)] // I expect it'll grow some parameters
+    #[allow(
+        clippy::new_without_default,
+        reason = "I expect it'll grow some parameters"
+    )]
     pub fn new() -> Self {
         Self {
             keys_held: HashSet::new(),

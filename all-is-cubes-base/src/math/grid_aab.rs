@@ -14,7 +14,7 @@ use crate::math::{
 use crate::resolution::Resolution;
 use crate::util::ConciseDebug;
 
-#[allow(missing_docs)] // documented in its all-is-cubes reexport
+#[allow(missing_docs, reason = "documented in its all-is-cubes reexport")]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct GridAab {
     lower_bounds: GridPoint,
@@ -83,7 +83,7 @@ impl GridAab {
     // and other such alternate numeric types. There would be no disadvantage since this is a
     // range-checked operation anyway. However, we'd need a custom conversion trait to handle that.
     #[track_caller]
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn from_lower_size(lower_bounds: impl Into<GridPoint>, sizes: impl Into<GridSize>) -> Self {
         Self::checked_from_lower_size(lower_bounds.into(), sizes.into())
             .expect("GridAab::from_lower_size")
@@ -97,7 +97,7 @@ impl GridAab {
     /// rather than discrete coordinates) spans 5 to 10.
     ///
     /// Returns [`Err`] if any of the `upper_bounds` are less than the `lower_bounds`.
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn checked_from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
         upper_bounds: impl Into<GridPoint>,
@@ -137,7 +137,7 @@ impl GridAab {
     ///
     /// Panics if any of the `upper_bounds` are less than the `lower_bounds`.
     #[track_caller]
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn from_lower_upper(
         lower_bounds: impl Into<GridPoint>,
         upper_bounds: impl Into<GridPoint>,
@@ -149,7 +149,7 @@ impl GridAab {
     /// Constructs a [`GridAab`] from [`Range`]s.
     ///
     /// This is identical to [`GridAab::from_lower_upper()`] except for the input type.
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     #[track_caller]
     pub fn from_ranges(ranges: impl Into<Vector3D<Range<GridCoordinate>, Cube>>) -> GridAab {
         let ranges = ranges.into();
@@ -163,7 +163,7 @@ impl GridAab {
     ///
     /// Returns [`Err`] if the `size` is negative or adding it to `lower_bounds` overflows.
     #[track_caller]
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn checked_from_lower_size(
         lower_bounds: impl Into<GridPoint>,
         size: impl Into<GridSize>,
@@ -670,7 +670,7 @@ impl GridAab {
     /// );
     /// ```
     #[must_use]
-    #[allow(clippy::missing_inline_in_public_items)] // already generic
+    #[allow(clippy::missing_inline_in_public_items, reason = "already generic")]
     pub fn translate(&self, offset: impl Into<GridVector>) -> Self {
         fn inner(this: &GridAab, offset: GridVector) -> GridAab {
             let offset = offset.to_point();

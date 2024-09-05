@@ -68,7 +68,7 @@ impl<O> Vol<(), O> {
     ///
     /// Returns a [`VolLengthError`] if the number of elements does not match
     /// [`bounds.volume()`](GridAab::volume).
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn with_elements<C, V>(self, elements: C) -> Result<Vol<C, O>, VolLengthError>
     where
         C: Deref<Target = [V]>,
@@ -120,7 +120,7 @@ where
     /// [`bounds.volume()`](GridAab::volume).
     //---
     // TODO: Remove this in favor of with_elements()?
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn from_elements(bounds: GridAab, elements: impl Into<C>) -> Result<Self, VolLengthError> {
         let elements = elements.into();
         if Some(elements.len()) == bounds.volume() {
@@ -141,7 +141,7 @@ where
 /// Constructors from elements.
 //---
 // TODO: This should be `O: Ordering` instead of `ZMaj` once we have alternative orderings
-#[allow(clippy::missing_inline_in_public_items)] // is generic already
+#[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
 impl<C, V> Vol<C, ZMaj>
 where
     // Note that the Deref bound is necessary to give this a unique `V`.
@@ -372,7 +372,7 @@ impl<C> Vol<C, ZMaj> {
 }
 
 /// Linear data access.
-#[allow(clippy::missing_inline_in_public_items)] // is generic already
+#[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
 impl<C, O, V> Vol<C, O>
 where
     C: Deref<Target = [V]>,
@@ -482,7 +482,7 @@ impl<V: Clone, O> Vol<Arc<[V]>, O> {
 }
 
 /// Element lookup operations by 3D coordinates.
-#[allow(clippy::missing_inline_in_public_items)] // is generic already
+#[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
 impl<C, V> Vol<C, ZMaj>
 where
     C: Deref<Target = [V]>,
@@ -526,7 +526,7 @@ where
     }
 }
 
-#[allow(clippy::missing_inline_in_public_items)] // is generic already
+#[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
 impl<V, O> Vol<Box<[V]>, O> {
     /// Apply `f` to each element and collect the results into the same shape and ordering.
     pub fn map<T, F>(self, f: F) -> Vol<Box<[T]>, O>
@@ -544,7 +544,7 @@ impl<V, O> Vol<Box<[V]>, O> {
     }
 }
 
-#[allow(clippy::missing_inline_in_public_items)] // is generic already
+#[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
 impl<C: fmt::Debug, O: fmt::Debug> fmt::Debug for Vol<C, O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Note: If specialization was available we'd like to use it to print the elements under
@@ -785,7 +785,7 @@ fn find_zmaj_subdivision(bounds: GridAab) -> Option<(GridAab, GridAab, usize)> {
         let axis_range = bounds.axis_range(axis);
         let size: u32 = bounds.size()[axis];
         if size >= 2 {
-            #[allow(clippy::cast_possible_wrap)] // known to fit
+            #[allow(clippy::cast_possible_wrap, reason = "known to fit")]
             let split_coordinate = axis_range.start + (size / 2) as i32;
 
             let mut lower_half_ub = bounds.upper_bounds();

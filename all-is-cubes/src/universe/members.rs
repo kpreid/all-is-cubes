@@ -195,7 +195,7 @@ macro_rules! member_enums_and_impls {
         /// trait does.
         #[derive(Clone, Debug, Eq, Hash, PartialEq)]
         #[non_exhaustive]
-        #[allow(missing_docs)] // variant meanings are obvious from name
+        #[allow(missing_docs, reason = "variant meanings are obvious from name")]
         pub enum AnyHandle {
             $( $member_type(Handle<$member_type>), )*
         }

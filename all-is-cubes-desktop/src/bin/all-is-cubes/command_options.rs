@@ -164,7 +164,7 @@ impl AicDesktopArgs {
     ///
     /// Panics if `output_path` is not validated (this should have been checked at parse time).
     #[cfg(feature = "record")]
-    #[allow(clippy::unnecessary_wraps)] // *currently* no error can happen
+    #[allow(clippy::unnecessary_wraps, reason = "*currently* no error can happen")]
     pub fn record_options(&self) -> Result<Option<RecordOptions>, anyhow::Error> {
         let Some((output_path, output_format)) = self.output_file_and_format.clone() else {
             return Ok(None);

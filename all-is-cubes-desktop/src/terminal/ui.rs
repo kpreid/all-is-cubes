@@ -171,7 +171,7 @@ impl TerminalWindow {
     }
 
     fn update(&mut self) {
-        #[allow(clippy::while_let_loop)] // this is clearer about its behavior
+        #[allow(clippy::while_let_loop, reason = "this is clearer about its behavior")]
         loop {
             match self.in_receiver.try_recv() {
                 Ok(InMsg::Viewport(v)) => self.viewport_position = v,

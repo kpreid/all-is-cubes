@@ -45,7 +45,7 @@ pub(super) struct UBorrowImpl<T: 'static> {
 
     /// [`Arc`] that keeps the data pointer alive as long as `guard` is in use.
     /// This field is never read, only dropped to decrement the reference count appropriately.
-    #[allow(dead_code)] // used for drop effect
+    #[allow(dead_code, reason = "used for drop effect")]
     strong: Strong<T>,
 }
 
@@ -58,7 +58,7 @@ pub(super) struct UBorrowMutImpl<T: 'static> {
 
     /// [`Arc`] that keeps the data pointer alive as long as `guard` is in use.
     /// This field is never read, only dropped to decrement the reference count appropriately.
-    #[allow(dead_code)] // used for drop effect
+    #[allow(dead_code, reason = "used for drop effect")]
     strong: Strong<T>,
 }
 

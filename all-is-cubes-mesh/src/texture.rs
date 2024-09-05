@@ -243,7 +243,10 @@ pub(super) fn needed_channels(voxels: &Evoxels) -> Channels {
 /// Helper function to implement the typical case of copying voxels into an X-major, sRGB, RGBA
 /// texture.
 #[doc(hidden)]
-#[allow(clippy::needless_pass_by_value)] // <https://github.com/rust-lang/rust-clippy/issues/7456>
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "<https://github.com/rust-lang/rust-clippy/issues/7456>"
+)]
 pub fn copy_voxels_into_xmaj_texture(
     voxels: Vol<&[Evoxel]>,
     reflectance_texture: &mut [[u8; 4]],

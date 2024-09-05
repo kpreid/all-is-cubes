@@ -1,7 +1,7 @@
-use core::error::Error as Error;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
+use core::error::Error;
 use core::fmt::Debug;
 
 use super::Transaction;
@@ -131,7 +131,10 @@ pub type PredicateRes = Result<(), Box<dyn Error>>;
 
 struct TransactionAndPredicate<'a, Tr: Transaction> {
     transaction: Tr,
-    #[allow(clippy::type_complexity)] // https://github.com/rust-lang/rust-clippy/issues/9299
+    #[allow(
+        clippy::type_complexity,
+        reason = "https://github.com/rust-lang/rust-clippy/issues/9299"
+    )]
     predicate: Rc<dyn Fn(&Tr::Target, &Tr::Target) -> PredicateRes + 'a>,
 }
 

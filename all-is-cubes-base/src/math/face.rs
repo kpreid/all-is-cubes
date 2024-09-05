@@ -645,7 +645,10 @@ pub struct FaceMap<V> {
     pub pz: V,
 }
 
-#[allow(clippy::missing_inline_in_public_items)] // all methods are generic code
+#[allow(
+    clippy::missing_inline_in_public_items,
+    reason = "all methods are generic code"
+)]
 impl<V> FaceMap<V> {
     /// Constructs a [`FaceMap`] by using the provided function to compute
     /// a value for each [`Face6`] enum variant.

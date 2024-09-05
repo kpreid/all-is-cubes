@@ -26,7 +26,6 @@ pub(crate) struct Context<'a> {
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Placement {
     Surface,
-    #[allow(unused)] // TODO: polish this and then use it
     Underground,
 }
 

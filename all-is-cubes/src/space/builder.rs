@@ -84,7 +84,7 @@ impl<B> SpaceBuilder<B> {
     }
 
     /// TODO: not sure if this is good public API
-    #[allow(unused)] // currently only used on feature=save
+    #[allow(unused, reason = "currently only used on feature=save")]
     pub(crate) fn behaviors(mut self, behaviors: BehaviorSet<Space>) -> Self {
         self.behaviors = behaviors;
         self

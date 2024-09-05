@@ -1,7 +1,10 @@
 //! Rotations which exchange axes (thus not leaving the integer grid).
 //! This module is private but reexported by its parent.
 
-#![allow(clippy::large_stack_arrays)] // effectively-false positive on Arbitrary derive
+#![allow(
+    clippy::large_stack_arrays,
+    reason = "effectively-false positive on Arbitrary derive"
+)]
 
 use core::marker::PhantomData;
 use core::ops::Mul;

@@ -59,7 +59,7 @@ struct BlockDefState {
     listeners_ok: bool,
 
     /// Gate with which to interrupt previous listening to a contained block.
-    #[allow(unused)] // used only for its `Drop` behavior
+    #[allow(unused, reason = "used only for its `Drop` behavior")]
     block_listen_gate: Gate,
 }
 
@@ -393,8 +393,8 @@ pub struct BlockDefConflict {
     pub(crate) new: bool,
 }
 
-    impl core::error::Error for BlockDefMismatch {}
-    impl core::error::Error for BlockDefConflict {}
+impl core::error::Error for BlockDefMismatch {}
+impl core::error::Error for BlockDefConflict {}
 
 impl fmt::Display for BlockDefConflict {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

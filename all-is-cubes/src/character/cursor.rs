@@ -136,7 +136,7 @@ pub struct Cursor {
 /// TODO: Can we find a cleaner name for this class?
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
-#[allow(missing_docs)] // TODO
+#[allow(missing_docs, reason = "TODO")]
 pub struct CubeSnapshot {
     pub position: Cube,
     pub block: Block,

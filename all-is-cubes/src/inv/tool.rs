@@ -314,7 +314,7 @@ impl VisitHandles for Tool {
 /// This is intended to provide future extensibility compared to having a complex
 /// parameter list for `Tool::use_tool`.
 #[derive(Debug)]
-#[allow(clippy::exhaustive_structs)] // TODO: should be non_exhaustive
+#[allow(clippy::exhaustive_structs, reason = "TODO: should be non_exhaustive")]
 pub struct ToolInput {
     /// Cursor identifying block(s) to act on. If [`None`] then the tool was used while
     /// pointing at nothing or by an agent without an ability to aim.
@@ -700,7 +700,7 @@ mod tests {
     }
 
     #[derive(Clone, Debug)]
-    #[allow(dead_code)] // fields only used in Debug if an expect() fails
+    #[allow(dead_code, reason = "fields only used in Debug if an expect() fails")]
     enum EucError {
         Use(ToolError),
         Commit(transaction::ExecuteError<UniverseTransaction>),

@@ -16,7 +16,7 @@ use all_is_cubes_render::raytracer::RtRenderer;
 
 /// Non-mutated test data shared between benches
 struct TestData {
-    #[allow(dead_code)] // must not be dropped
+    #[allow(dead_code, reason = "must not be dropped")]
     universe: Universe,
     character: Handle<Character>,
 }

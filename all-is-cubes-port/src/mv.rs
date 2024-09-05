@@ -195,7 +195,7 @@ fn dot_vox_model_to_space(
         let converted_cube: Cube = Cube::from(Point3D::new(v.x, v.y, v.z).map(i32::from));
         let transformed_cube = transform.transform_cube(converted_cube);
 
-        #[allow(clippy::unnecessary_lazy_evaluations)] // dubious positive
+        #[allow(clippy::unnecessary_lazy_evaluations, reason = "dubious positive")]
         let block = palette_blocks.get(v.i as usize).ok_or_else(|| {
             DotVoxConversionError::PaletteTooShort {
                 len: palette_blocks.len(),

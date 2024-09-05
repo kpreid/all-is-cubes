@@ -618,7 +618,10 @@ impl universe::VisitHandles for Font {
 /// How a [`Text`] is to be positioned within a block.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[allow(clippy::exhaustive_structs)] // TODO: probably want to do something else
+#[allow(
+    clippy::exhaustive_structs,
+    reason = "TODO: probably want to do something else"
+)]
 pub struct Positioning {
     /// How to place the text horizontally relative to the anchor point.
     pub x: PositioningX,

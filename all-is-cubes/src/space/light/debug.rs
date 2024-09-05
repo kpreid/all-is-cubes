@@ -13,7 +13,7 @@ use crate::util::MapExtend;
 
 /// Trait used to encourage the generation of with-debug-info and without-info versions
 /// of the lighting algorithm.
-#[allow(unnameable_types)] // sealed trait
+#[allow(unnameable_types, reason = "sealed trait")]
 pub trait LightComputeOutput {
     type RayInfoBuffer: Default;
     fn new(cube: Cube, result: PackedLight, rays: Self::RayInfoBuffer) -> Self;
@@ -41,7 +41,7 @@ impl LightComputeOutput for LightUpdateCubeInfo {
 /// Diagnostic data describing the details of the light calculation for one cube.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
-#[allow(dead_code)] // fields used for Debug printing
+#[allow(dead_code, reason = "fields used for Debug printing")]
 pub struct LightUpdateCubeInfo {
     pub(crate) cube: Cube,
     pub(crate) result: PackedLight,
@@ -72,7 +72,10 @@ impl Geometry for LightUpdateCubeInfo {
 #[allow(unnameable_types)] //
 pub struct LightUpdateRayInfo {
     pub(crate) ray: Ray,
-    #[allow(dead_code)] // field used for Debug printing but not visualized yet
+    #[allow(
+        dead_code,
+        reason = "field used for Debug printing but not visualized yet"
+    )]
     pub(crate) trigger_cube: Cube,
     pub(crate) value_cube: Cube,
     pub(crate) value: PackedLight,

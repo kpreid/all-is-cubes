@@ -17,7 +17,10 @@ use crate::LandscapeBlocks::{self, Leaves, Log};
 /// TODO: make the public version of this a struct with private contents
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
 #[allow(clippy::exhaustive_enums)]
-#[allow(unnameable_types)] // TODO: this should be public with an opaque struct wrapper
+#[allow(
+    unnameable_types,
+    reason = "TODO: this should be public with an opaque struct wrapper"
+)]
 pub enum TreeGrowth {
     Sapling = 1, // radius = 1
     G2,          // radius = 2

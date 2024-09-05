@@ -485,7 +485,7 @@ pub struct Viewport {
 }
 
 impl Viewport {
-    #![allow(clippy::cast_lossless)] // lossiness depends on size of usize
+    #![allow(clippy::cast_lossless, reason = "lossiness depends on size of usize")]
 
     /// Construct a Viewport from a pixel count and a scale factor.
     ///

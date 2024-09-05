@@ -24,17 +24,17 @@ pub struct MapConflict<K, C> {
     pub conflict: C,
 }
 
-    impl<K: fmt::Debug, E: core::error::Error + 'static> core::error::Error for MapMismatch<K, E> {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            Some(&self.mismatch)
-        }
+impl<K: fmt::Debug, E: core::error::Error + 'static> core::error::Error for MapMismatch<K, E> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        Some(&self.mismatch)
     }
+}
 
-    impl<K: fmt::Debug, C: core::error::Error + 'static> core::error::Error for MapConflict<K, C> {
-        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-            Some(&self.conflict)
-        }
+impl<K: fmt::Debug, C: core::error::Error + 'static> core::error::Error for MapConflict<K, C> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        Some(&self.conflict)
     }
+}
 
 impl<K: fmt::Debug, E> fmt::Display for MapMismatch<K, E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -194,7 +194,7 @@ macro_rules! impl_transaction_for_tuple {
 
                 fn check(
                     &self,
-                    #[allow(unused_variables)] // empty tuple case
+                    #[allow(unused_variables, reason = "empty tuple case")]
                     target: &($( [<Tr $name>]::Target, )*),
                 ) -> Result<Self::CommitCheck, Self::Mismatch> {
                     let ($( [<txn_ $name>], )*) = self;
@@ -209,7 +209,7 @@ macro_rules! impl_transaction_for_tuple {
 
                 fn commit(
                     &self,
-                    #[allow(unused_variables)] // empty tuple case
+                    #[allow(unused_variables, reason = "empty tuple case")]
                     target: &mut ($( [<Tr $name>]::Target, )*),
                     check: Self::CommitCheck,
                     outputs: &mut dyn FnMut(Self::Output),
@@ -289,7 +289,7 @@ macro_rules! impl_transaction_for_tuple {
                         }
                     }
                 }
-            
+
 
             impl<$( [<E $name>]: fmt::Display, )*> fmt::Display for
                     [< TupleError $count >]<$( [<E $name>], )*> {

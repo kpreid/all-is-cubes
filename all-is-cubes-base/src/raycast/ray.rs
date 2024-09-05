@@ -50,7 +50,7 @@ impl Ray {
     ///     }
     /// );
     /// ```
-    #[allow(clippy::missing_inline_in_public_items)] // is generic already
+    #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn new(origin: impl Into<FreePoint>, direction: impl Into<FreeVector>) -> Self {
         Self {
             origin: origin.into(),

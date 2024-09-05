@@ -105,7 +105,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         self.block_indices_used.iter_ones().map(|i| i as BlockIndex)
     }
 
-    #[allow(dead_code)] // used conditionally
+    #[allow(dead_code, reason = "used conditionally")]
     fn consistency_check(&self) {
         assert_eq!(self.opaque_range().start, 0);
         let len_transparent = self.transparent_range(DepthOrdering::Any).len();

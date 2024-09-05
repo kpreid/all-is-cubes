@@ -161,7 +161,7 @@ impl Inner {
 
         let render_viewport = self.render_viewport;
 
-        #[allow(clippy::needless_collect)] // needed with rayon and not without
+        #[allow(clippy::needless_collect, reason = "needed with rayon and not without")]
         let this_frame_pixels: Vec<Point> = (0..self.rays_per_frame)
             .map(|_i| self.pixel_picker.next().unwrap())
             .collect();
@@ -212,7 +212,10 @@ impl Inner {
 
 #[cfg(feature = "auto-threads")]
 /// Runs raytracing, periodically releasing the lock to allow updating input and retrieving output.
-#[allow(clippy::needless_pass_by_value)] // let thread function own its state
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "let thread function own its state"
+)]
 fn background_tracing_task(weak_inner: Weak<Mutex<Inner>>) {
     // By using a weak reference, we arrange for this task to stop itself when it is no longer
     // relevant.

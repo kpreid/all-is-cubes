@@ -882,7 +882,10 @@ impl<I: time::Instant> EverythingRenderer<I> {
             info_text_texture.upload(queue);
         }
 
-        #[allow(clippy::let_and_return)] // <https://github.com/rust-lang/rust-clippy/issues/9150>
+        #[allow(
+            clippy::let_and_return,
+            reason = "<https://github.com/rust-lang/rust-clippy/issues/9150>"
+        )]
         let flaws = postprocess::postprocess(self, queue, output);
 
         #[cfg(feature = "rerun")]

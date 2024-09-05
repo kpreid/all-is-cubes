@@ -54,7 +54,7 @@ impl State {
     }
 
     pub(crate) fn step(&mut self, space: &Space, vt: camera::ViewTransform, dt: f64) {
-        #![allow(clippy::cast_lossless)] // lossiness depends on size of usize
+        #![allow(clippy::cast_lossless, reason = "lossiness depends on size of usize")]
 
         if dt == 0. {
             return;

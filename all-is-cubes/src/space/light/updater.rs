@@ -168,7 +168,7 @@ impl LightStorage {
         }
     }
 
-    #[allow(unused)] // currently only used on feature=save and tests
+    #[allow(unused, reason = "currently only used on feature=save and tests")]
     pub(crate) fn in_light_update_queue(&self, cube: Cube) -> bool {
         self.light_update_queue.contains(cube)
     }

@@ -343,7 +343,7 @@ mod state {
             }
         }
 
-        #[allow(dead_code)] // conditionally used
+        #[allow(dead_code, reason = "conditionally used")]
         pub fn has_any_not_completed(&self) -> bool {
             let counters = &*self.counters.lock().unwrap();
             counters.taken > 0 || counters.queued > 0

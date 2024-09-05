@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
-#[allow(unused)] // may be unused with some features
+#[allow(unused, reason = "may be unused with some features")]
 use clap::{CommandFactory as _, Parser as _};
 
 use all_is_cubes::euclid::Size2D;

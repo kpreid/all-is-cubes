@@ -1,8 +1,8 @@
 use alloc::sync::Arc;
+use core::error::Error;
 use core::fmt;
 use core::hash::Hash;
 use core::sync::atomic::{AtomicU8, Ordering::Relaxed};
-use core::error::Error;
 
 use exhaust::Exhaust;
 
@@ -494,7 +494,7 @@ pub(crate) enum ButtonIcon<'a> {
 }
 
 /// TODO: document, refine, and make public
-#[allow(clippy::needless_pass_by_value)] // convenience
+#[allow(clippy::needless_pass_by_value, reason = "convenience")]
 pub(crate) fn make_button_label_block(
     txn: &mut UniverseTransaction,
     name: &str,

@@ -38,7 +38,10 @@ macro_rules! println_escape_debug {
 ///
 /// This type is designed to be comparable/hashable to deduplicate contacts.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway
+#[allow(
+    clippy::exhaustive_enums,
+    reason = "any change will probably be breaking anyway"
+)]
 pub enum Contact {
     /// Contact with a fully solid block; the [`CubeFace`] specifies the block position
     /// and the side of it that was collided with (hence also the contact normal).
@@ -802,7 +805,7 @@ mod tests {
         );
     }
 
-    #[allow(clippy::needless_pass_by_value)] // convenience
+    #[allow(clippy::needless_pass_by_value, reason = "convenience")]
     fn collide_along_ray_tester(
         initial_y: FreeCoordinate,
         block_gen: fn(&mut Universe) -> [Block; 2],
@@ -968,7 +971,7 @@ mod tests {
         );
     }
 
-    #[allow(clippy::needless_pass_by_value)] // convenience
+    #[allow(clippy::needless_pass_by_value, reason = "convenience")]
     fn escape_along_ray_tester(
         ray: Ray,
         block_gen: fn(&mut Universe) -> [Block; 2],

@@ -149,7 +149,10 @@ fn todo_ignores_absent_chunks() {
 
 #[derive(Debug)]
 struct CsmTester<const MBM: usize> {
-    #[allow(dead_code)] // Universe must be kept alive but is not read after construction
+    #[allow(
+        dead_code,
+        reason = "Universe must be kept alive but is not read after construction"
+    )]
     universe: Universe,
     space: Handle<Space>,
     camera: Camera,
