@@ -123,10 +123,36 @@ pub(crate) fn make_tree(
     // Establish the root.
     *graph.edge_mut(root, Face6::NY).unwrap() = Some(TreeGrowth::Sapling);
 
+    let not_on_surface = bounds
+        .shrink(FaceMap::splat(1))
+        .unwrap_or(GridAab::ORIGIN_EMPTY);
+
+    let max_leaves_height_for_size = (i32::try_from(bounds.size().height).unwrap_or(1) / 3) + 1;
+    let leaves_height = rng.gen_range(1..=max_leaves_height_for_size);
+
     // Generate foliage (before the branches that lead to it)
-    for cube in bounds.abut(Face6::PY, -1).unwrap().interior_iter() {
+    for cube in bounds
+        .abut(Face6::PY, -leaves_height)
+        .unwrap()
+        .interior_iter()
+    {
+        if not_on_surface.contains_cube(cube) {
+            // leaves don't hide behind other leaves
+            continue;
+        }
+        if !rng.gen_bool(0.99) {
+            // chance of entirely missing cube
+            continue;
+        }
         if let Some(l) = graph.leaves_mut(cube) {
-            *l = Some(TreeGrowth::Block);
+            let distance_from_top = (bounds.upper_bounds().y - cube.y) as f32 - 1.0;
+            let max_growth = 8.5f32;
+            let min_growth =
+                max_growth * (1.0 - (distance_from_top / (leaves_height as f32 - 0.99)));
+
+            *l = Some(TreeGrowth::from_radius(
+                rng.gen_range(min_growth..=8.5).floor() as i32,
+            ));
         }
     }
 
