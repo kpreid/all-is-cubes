@@ -31,24 +31,24 @@ serde = [
 ]
 
 [dependencies]
-arbitrary = { workspace = true, optional = true }
+arbitrary = { workspace = true, optional = true, public = true }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }
 displaydoc = { workspace = true }
-embedded-graphics-core = { workspace = true }
+embedded-graphics-core = { workspace = true, public = true }
 # libm feature to guarantee compilability and compatibility with no_std
-euclid = { workspace = true, features = ["libm"] }
+euclid = { workspace = true, public = true, features = ["libm"] }
 exhaust = { workspace = true, default-features = false }
 futures-core = { workspace = true }
 futures-util = { workspace = true }
 libm = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
-num-traits = { workspace = true }
-ordered-float = { workspace = true }
-rand = { workspace = true }
-re_types = { workspace = true, optional = true }
-serde = { workspace = true, optional = true, features = ["derive"] }
+num-traits = { workspace = true, public = true }
+ordered-float = { workspace = true, public = true }
+rand = { workspace = true, public = true }
+re_types = { workspace = true, optional = true, public = true }
+serde = { workspace = true, optional = true, public = true, features = ["derive"] }
 
 [dev-dependencies]
 indoc = { workspace = true }
