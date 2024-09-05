@@ -40,13 +40,13 @@ auto-threads = ["std", "dep:rayon"]
 raytracer = []
 
 [dependencies]
-all-is-cubes = { workspace = true }
+all-is-cubes = { workspace = true, public = true }
 bitflags = { workspace = true }
 displaydoc = { workspace = true }
 # Used to render overlay info text.
 embedded-graphics = { workspace = true }
 futures-core = { workspace = true }
-imgref = { workspace = true }
+imgref = { workspace = true, public = true }
 indoc = { workspace = true }
 rayon = { workspace = true, optional = true }
 

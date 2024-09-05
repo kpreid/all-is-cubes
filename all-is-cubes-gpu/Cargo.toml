@@ -52,9 +52,10 @@ auto-threads = [
 
 [dependencies]
 all-is-cubes = { workspace = true, features = ["std"] }
-all-is-cubes-mesh = { workspace = true, features = ["dynamic"] }
-all-is-cubes-render = { workspace = true, features = ["raytracer"] }
-bytemuck = { workspace = true, features = ["derive"] }
+all-is-cubes-mesh = { workspace = true, public = true, features = ["dynamic"] }
+all-is-cubes-render = { workspace = true, public = true, features = ["raytracer"] }
+# Public when used in shader tests
+bytemuck = { workspace = true, public = true, features = ["derive"] }
 cfg-if = { workspace = true }
 # Used to implement ensure_polled(). Also a `wgpu` dependency already.
 flume = { workspace = true }
@@ -82,7 +83,7 @@ wasm-bindgen-futures = { workspace = true }
 # For initializing tests on web. (This is not a dev-dependency because some of said tests are not in this package.)
 web-sys = { version = "0.3.69", features = ["OffscreenCanvas"] }
 web-time = { workspace = true }
-wgpu = { workspace = true, optional = true }
+wgpu = { workspace = true, optional = true, public = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 # Used in the `poll` module to implement timeout
@@ -90,7 +91,6 @@ gloo-timers = { version = "0.3.0", default-features = false, features = ["future
 # If we don't set this feature, it will try to access files at run time and fail
 # since web wasm has no std::fs.
 resource = { version = "0.5.0", features = ["force-static"] }
-wgpu = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_tokio"] }

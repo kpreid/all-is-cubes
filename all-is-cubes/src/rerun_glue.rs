@@ -63,10 +63,18 @@ impl Destination {
         }
     }
 
+    #[allow(
+        exported_private_dependencies,
+        reason = "false positive on indirect use of re_types"
+    )]
     pub fn log(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
         self.catch(|| self.stream.log(self.path.join(path_suffix), data))
     }
 
+    #[allow(
+        exported_private_dependencies,
+        reason = "false positive on indirect use of re_types"
+    )]
     pub fn log_static(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
         self.catch(|| self.stream.log_static(self.path.join(path_suffix), data))
     }

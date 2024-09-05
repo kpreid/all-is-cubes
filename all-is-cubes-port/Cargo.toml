@@ -60,16 +60,16 @@ dot-vox = [
 [dependencies]
 # Non-optional generally required dependencies
 # need all-is-cubes/std because we have boxed Send futures and errors
-all-is-cubes = { workspace = true, features = ["std"] }
+all-is-cubes = { workspace = true, public = true, features = ["std"] }
 cfg-if = { workspace = true }
 futures-core = { workspace = true }
 itertools = { workspace = true }
 # TODO: replace logging with explicit reporting data flow
-log = { workspace = true }
+log = { workspace = true, public = true }
 thiserror = { workspace = true }
 
 # Dependencies related to formats
-all-is-cubes-mesh = { workspace = true, optional = true }
+all-is-cubes-mesh = { workspace = true, optional = true, public = true }
 all-is-cubes-render = { workspace = true, optional = true }
 dot_vox = { version = "5.1.1", optional = true }
 stl_io = { version = "0.8.1", optional = true }
@@ -80,7 +80,7 @@ serde_json = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true, features = ["alloc"] }
 bytemuck = { workspace = true, optional = true, features = ["derive"] }
 # gltf-json often has semver-incompatible changes, so pin it
-gltf-json = { version = ">=1.4.1, <1.5.0", optional = true, default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
+gltf-json = { version = ">=1.4.1, <1.5.0", optional = true, public = true, default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
 # Used to write glTF textures
 image = { workspace = true, optional = true, features = ["png"] }
 rectangle-pack = { workspace = true, optional = true }
