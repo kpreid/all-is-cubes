@@ -49,7 +49,7 @@ impl From<mesh::BlockVertex<NoTexture>> for Vertex {
             position: v.position.to_f32().to_array().into(),
             color: match v.coloring {
                 mesh::Coloring::Solid(color) => color.to_srgb8().into(),
-                #[allow(unreachable_patterns)] // TODO: Remove this arm after Rust 1.81
+                #[allow(unreachable_patterns)] // TODO: Remove this arm after Rust 1.82
                 mesh::Coloring::Texture { .. } => unreachable!(),
             },
         }
