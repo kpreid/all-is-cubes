@@ -17,9 +17,13 @@ use crate::drawing::{rectangle_to_aab, VoxelBrush};
 use crate::math::{GridAab, GridCoordinate, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
 
-/// Return type of `png_decoder::decode`.
-#[doc(hidden)] // still experimental API — we probably want to newtype it
-pub type DecodedPng = (PngHeader, Vec<u8>);
+/// Data type produced by [`include_image`].
+#[doc(hidden)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct DecodedPng {
+    header: PngHeader,
+    data: Vec<u8>,
+}
 
 /// Pixel type.
 type Srgba = [u8; 4];
@@ -38,10 +42,12 @@ pub struct PngAdapter<'a> {
 impl<'a> PngAdapter<'a> {
     #[inline(never)]
     pub fn adapt<'png: 'a, 'brush: 'a>(
-        (header, data): &'png DecodedPng,
+        png: &'png DecodedPng,
         // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
         pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'brush>,
     ) -> Self {
+        let DecodedPng { header, data } = png;
+
         // Group into whole pixels.
         let rgba_image_data = bytemuck::cast_slice::<u8, [u8; 4]>(data);
 
@@ -139,7 +145,7 @@ pub fn space_from_image<'b>(
     // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
     pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'b>,
 ) -> Result<Space, SetCubeError> {
-    let header = &png.0;
+    let header = &png.header;
 
     // TODO: let caller control the transform offsets (not necessarily positive-octant)
     let transform = rotation.to_positive_octant_transform(
@@ -182,7 +188,7 @@ pub fn default_srgb(pixel: Srgba) -> VoxelBrush<'static> {
 #[inline(never)]
 pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
     match png_decoder::decode(bytes) {
-        Ok(i) => i,
+        Ok((header, data)) => DecodedPng { header, data },
         Err(error) => panic!("Error loading image asset {name:?}: {error:?}",),
     }
 }
@@ -224,8 +230,8 @@ mod tests {
     use crate::color_block;
 
     fn test_image() -> DecodedPng {
-        (
-            PngHeader {
+        DecodedPng {
+            header: PngHeader {
                 width: 2,
                 height: 2,
                 bit_depth: png_decoder::BitDepth::Eight,
@@ -234,13 +240,13 @@ mod tests {
                 filter_method: png_decoder::FilterMethod::Adaptive,
                 interlace_method: png_decoder::InterlaceMethod::None,
             },
-            alloc::vec![
+            data: alloc::vec![
                 0, 0, 0, 255, //
                 255, 0, 0, 255, //
                 0, 255, 0, 255, //
                 255, 255, 0, 255, //
             ],
-        )
+        }
     }
 
     #[test]
