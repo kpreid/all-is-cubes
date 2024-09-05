@@ -4,6 +4,7 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![allow(
     missing_docs,
+    exported_private_dependencies,
     clippy::module_name_repetitions,
     reason = "library for internal use only"
 )]
