@@ -13,7 +13,7 @@ on:
       - ci
       # next/* branches are used for testing with future versions of dependencies,
       # usually by way of `[patch]`ing a dependency, thus won’t have outstanding PRs.
-      - next/*
+      - "next/*"
 
 env:
   CARGO_TERM_COLOR: always
