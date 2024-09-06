@@ -168,6 +168,7 @@ unused_qualifications = "warn"
 # clippy default lints that are set to allow
 collapsible_else_if = "allow"
 collapsible_if = "allow"
+duplicated_attributes = "allow" # false positive prone <https://github.com/rust-lang/rust-clippy/issues/13355>
 match_ref_pats = "allow"
 needless_update = "allow"
 single_match = "allow"
