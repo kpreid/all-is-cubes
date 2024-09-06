@@ -1,7 +1,8 @@
 //! Configuration of inventories owned by blocks ([`Modifier::Inventory`]).
 
 use alloc::vec::Vec;
-use euclid::Point3D;
+
+use euclid::{Point3D, Vector3D};
 
 use crate::block::Resolution;
 use crate::math::{GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid};
@@ -192,7 +193,10 @@ impl IconRow {
             first_slot: self.first_slot,
             count: self.count,
             origin: transform.transform_point(self.origin), // TODO: does not account for size of icon
-            stride: transform.rotation.transform_vector(self.stride),
+            stride: transform.rotation.transform_vector(
+                // Kludge: clamped to avoid numeric overflow of `i32::MIN`
+                self.stride.max(Vector3D::splat(-i32::MAX)),
+            ),
         }
     }
 }

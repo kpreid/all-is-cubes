@@ -374,6 +374,7 @@ impl GridRotation {
     ///
     /// May panic or wrap if `vector` has any components equal to [`GridCoordinate::MIN`].
     #[inline]
+    #[track_caller]
     pub fn transform_vector(self, vector: GridVector) -> GridVector {
         #[inline(always)]
         fn inner(rotation: GridRotation, vector: GridVector) -> Option<GridVector> {
