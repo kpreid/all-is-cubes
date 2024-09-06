@@ -28,6 +28,7 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
 use crate::alg::{space_to_space_copy, walk};
+use crate::TemplateParameters;
 use crate::{clouds::clouds, wavy_landscape, DemoBlocks, LandscapeBlocks};
 
 mod exhibit;
@@ -38,13 +39,10 @@ use exhibits::DEMO_CITY_EXHIBITS;
 pub(crate) async fn demo_city<I: Instant>(
     universe: &mut Universe,
     mut p: YieldProgress,
-    params: crate::TemplateParameters,
+    params: TemplateParameters,
 ) -> Result<Space, InGenError> {
     let start_city_time = I::now();
 
-    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
-    use DemoBlocks::*;
     use LandscapeBlocks::*;
 
     // Also install blocks some exhibits want.
@@ -67,157 +65,27 @@ pub(crate) async fn demo_city<I: Instant>(
         .unwrap();
     install_txn.execute(universe, &mut transaction::no_outputs)?;
 
-    // Layout parameters
-    // TODO: move to CityPlanner
-    let road_directions = [Face6::PX, Face6::NX, Face6::PZ, Face6::NZ];
-    let road_radius = CityPlanner::ROAD_RADIUS;
-    let lamp_position_radius = CityPlanner::LAMP_POSITION_RADIUS;
-    let exhibit_front_radius = CityPlanner::PLOT_FRONT_RADIUS;
-    let lamp_spacing = 20;
-    let sky_height = 30;
-    let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
-    let space_size = params
-        .size
-        .unwrap_or(GridSize::new(160, 60, 160))
-        .map(|size| i32::try_from(size).unwrap_or(i32::MAX));
-    let bounds = GridAab::from_lower_upper(
-        [-space_size.width / 2, -ground_depth, -space_size.depth / 2],
-        [space_size.width / 2, sky_height, space_size.depth / 2],
-    );
-
-    let mut planner = CityPlanner::new(bounds);
-
-    // Construct space.
-    let mut space = Space::builder(bounds)
-        .sky(crate::landscape::sky_with_grass(palette::DAY_SKY_COLOR))
-        .light_physics(LightPhysics::None) // disable until we are done with bulk updates
-        .spawn({
-            // TODO: Add incremental spawn configuration to SpaceBuilder?
-            let mut spawn = Spawn::default_for_new_space(bounds);
-            spawn.set_bounds(GridAab::from_lower_upper(
-                [-road_radius, 1, 0],
-                [road_radius + 1, sky_height, 17],
-            ));
-            //spawn.set_eye_position(bounds.center() + Vector3::new(0.5, 2.91, 8.5));
-            // Initial inventory contents. TODO: Make a better list.
-            let mut inventory: Vec<Slot> = Vec::new();
-            inventory.extend(
-                [
-                    Tool::RemoveBlock { keep: true },
-                    Tool::Activate,
-                    Tool::Jetpack { active: false },
-                    Tool::PushPull,
-                    Tool::Custom {
-                        op: Operation::AddModifiers(
-                            [block::Modifier::Rotate(GridRotation::CLOCKWISE)].into(),
-                        ),
-                        icon: block::Block::builder()
-                            .color(rgba_const!(0.0, 0.5, 0.0, 1.0))
-                            .display_name("Rotate")
-                            .build(),
-                    },
-                ]
-                .into_iter()
-                .map(Slot::from),
-            );
-            for block in [&landscape_blocks[Stone], &demo_blocks[Lamp(true)]] {
-                inventory.push(Slot::stack(40, Tool::Block(block.clone())));
-            }
-            inventory.push(Slot::stack(
-                1,
-                Tool::InfiniteBlocks(demo_blocks[Explosion(-10)].clone()),
-            ));
-            spawn.set_inventory(inventory);
-            spawn
-        })
-        .build();
+    let mut state = State::new(universe, params)?;
 
     // Fill basic layers, underground and top
-    space.fill_uniform(planner.y_range(-ground_depth, 0), &landscape_blocks[Stone])?;
+    state.space.fill_uniform(
+        state
+            .planner
+            .y_range(state.space.bounds().lower_bounds().y, 0),
+        &state.landscape_blocks[Stone],
+    )?;
     p.progress(0.1).await;
-    space.fill_uniform(planner.y_range(0, 1), &landscape_blocks[Grass])?;
+    state
+        .space
+        .fill_uniform(state.planner.y_range(0, 1), &state.landscape_blocks[Grass])?;
     p.progress(0.2).await;
 
     // Stray grass
-    {
-        let grass_at = crate::landscape::grass_placement_function(0x21b5cc6b);
-        space.fill(planner.y_range(1, 2), |cube| {
-            if cube.x.abs() <= road_radius || cube.z.abs() <= road_radius {
-                return None;
-            }
-            grass_at(cube).map(|height| &landscape_blocks[GrassBlades { height }])
-        })?;
-    }
+    state.plant_grass()?;
     p.progress(0.3).await;
 
     // Roads and lamps
-    for face in road_directions {
-        let perpendicular: GridVector = GridRotation::CLOCKWISE.transform(face).normal_vector();
-        let road_aligned_rotation = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
-        let other_side_of_road =
-            GridRotation::from_basis([Face6::NX, Face6::PY, Face6::NZ]) * road_aligned_rotation;
-        let rotations = [other_side_of_road, road_aligned_rotation];
-        let raycaster = all_is_cubes::raycast::AaRay::new(Cube::ORIGIN, face.into())
-            .cast()
-            .within(space.bounds());
-        let curb_y = GridVector::new(0, 1, 0);
-        for (i, step) in raycaster.enumerate() {
-            let i = i as GridCoordinate;
-            // Road surface
-            for p in -road_radius..=road_radius {
-                space.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
-            }
-
-            // Curbs
-            if i >= road_radius {
-                for (side, p) in [(1, -road_radius), (0, road_radius)] {
-                    let position = step.cube_ahead() + perpendicular * p + curb_y;
-
-                    // Place curb and combine it with other curb blocks .
-                    let mut to_compose_with = space[position].clone();
-                    // TODO: .unspecialize() is a maybe expensive way to make this test, and
-                    // this isn't the first time this has come up. Benchmark a "block view"
-                    // to cheaply filter out modifiers.
-                    if to_compose_with.clone().unspecialize() != vec![demo_blocks[Curb].clone()] {
-                        to_compose_with = AIR;
-                    }
-                    space.set(
-                        position,
-                        block::Composite::new(
-                            demo_blocks[Curb].clone().rotate(rotations[side]),
-                            block::CompositeOperator::In,
-                        )
-                        .with_disassemblable()
-                        .compose_or_replace(to_compose_with),
-                    )?;
-                }
-            }
-
-            // Dig underground passages
-            // TODO: They need a connection to the surface
-            for p in -road_radius..=road_radius {
-                for y in CityPlanner::UNDERGROUND_FLOOR_Y..0 {
-                    space.set(
-                        step.cube_ahead() + perpendicular * p + GridVector::new(0, y, 0),
-                        &AIR,
-                    )?;
-                }
-            }
-
-            // Underground lighting
-            if (i - lamp_position_radius).rem_euclid(7) == 0 {
-                // Underground lamps
-                for (side, &p) in [-road_radius, road_radius].iter().enumerate() {
-                    space.set(
-                        step.cube_ahead() + GridVector::new(0, -2, 0) + perpendicular * p,
-                        demo_blocks[Sconce(true)]
-                            .clone()
-                            .rotate(GridRotation::CLOCKWISE * rotations[side]),
-                    )?;
-                }
-            }
-        }
-    }
+    place_roads_and_tunnels(&mut state.space, &state.demo_blocks)?;
     p.progress(0.4).await;
 
     let blank_city_time = I::now();
@@ -231,24 +99,31 @@ pub(crate) async fn demo_city<I: Instant>(
     // Landscape filling one quadrant
     let landscape_progress = p.start_and_cut(0.4, "Landscape").await;
     landscape_progress.progress(0.0).await;
-    let landscape_region = GridAab::from_lower_upper(
-        [
-            bounds.lower_bounds().x,
-            -ground_depth * 8 / 10,
-            bounds.lower_bounds().z,
-        ],
-        [-exhibit_front_radius, sky_height, -exhibit_front_radius],
-    );
-    space.fill_uniform(landscape_region, &AIR)?;
+    state
+        .space
+        .fill_uniform(state.planner.landscape_region(), &AIR)?;
     landscape_progress.progress(0.5).await;
-    wavy_landscape(landscape_region, &mut space, &landscape_blocks, 1.0)?;
-    planner.occupied_plots.push(landscape_region);
+    wavy_landscape(
+        state.planner.landscape_region(),
+        &mut state.space,
+        &state.landscape_blocks,
+        1.0,
+    )?;
+    state
+        .planner
+        .occupied_plots
+        .push(state.planner.landscape_region());
     landscape_progress.finish().await;
 
     // Clouds (needs to be done after landscape to not be overwritten)
     // TODO: Enable this once transparency rendering is better.
     if false {
-        clouds(planner.y_range(sky_height - 2, sky_height), &mut space, 0.1)?;
+        let sky_height = state.space.bounds().upper_bounds().y;
+        clouds(
+            state.planner.y_range(sky_height - 2, sky_height),
+            &mut state.space,
+            0.1,
+        )?;
     }
 
     // TODO: Integrate logging and YieldProgress
@@ -261,78 +136,221 @@ pub(crate) async fn demo_city<I: Instant>(
     );
     let [exhibits_progress, mut final_progress] = p.split(0.8);
 
-    // All is Cubes logo
-    let logo_location = space
-        .bounds()
-        .abut(Face6::NZ, -3)
-        .unwrap()
-        .abut(Face6::PY, -(sky_height - 12))
-        .unwrap();
-    vui::install_widgets(
-        vui::LayoutGrant::new(logo_location),
-        &vui::leaf_widget(logo_text()),
-    )?
-    .execute(&mut space, &mut transaction::no_outputs)?;
-    planner.occupied_plots.push(logo_location);
+    state.place_logo()?;
 
     // Exhibits
     place_exhibits_in_city::<I>(
         exhibits_progress,
         universe,
         &widget_theme,
-        &mut planner,
-        &mut space,
+        &mut state.planner,
+        &mut state.space,
     )
     .await?;
 
-    // Lampposts
-    'directions: for direction in road_directions {
-        let perpendicular: GridVector =
-            GridRotation::CLOCKWISE.transform(direction).normal_vector();
-        for distance in (lamp_position_radius..).step_by(lamp_spacing) {
-            for side_of_road in [-1, 1] {
-                let globe_cube = Cube::new(0, 4, 0)
-                    + direction.normal_vector() * distance
-                    + perpendicular * (side_of_road * lamp_position_radius);
-                if !bounds.contains_cube(globe_cube) {
-                    continue 'directions;
-                }
-
-                let Some(base_cube) = planner.find_cube_near(
-                    globe_cube - GridVector::new(0, 3, 0),
-                    &[direction, direction.opposite()],
-                ) else {
-                    continue;
-                };
-                place_lamppost(base_cube, globe_cube, &mut space, &demo_blocks)?;
-            }
-        }
-    }
+    state.place_lampposts()?;
 
     final_progress.progress(0.0).await;
 
     // Sprinkle some trees around in the remaining space.
-    plant_trees(
-        final_progress.start_and_cut(0.5, "Trees").await,
-        params,
-        &mut planner,
-        &mut space,
-        universe,
-    )
-    .await?;
+    state
+        .plant_trees(final_progress.start_and_cut(0.5, "Trees").await)
+        .await?;
 
     // Enable light computation
-    space.set_physics({
-        let mut p = space.physics().clone();
+    state.space.set_physics({
+        let mut p = state.space.physics().clone();
         p.light = SpacePhysics::default().light;
         p
     });
     final_progress.finish().await;
 
-    Ok(space)
+    Ok(state.space)
 }
 
 type ExhibitResult = Result<(Space, UniverseTransaction, core::time::Duration), InGenError>;
+
+/// In-progress state of a `demo_city()` build, separated out from the `async`.
+///
+/// rustc has some sub-optimal handling of `async` functions and blocks, so
+/// separating out code and variables that don't need to interact with the asyncness helps
+/// keep the compiled code size, and in-memory size of the `Future`s, smaller.
+struct State {
+    params: TemplateParameters,
+    space: Space,
+    planner: CityPlanner,
+    demo_blocks: BlockProvider<DemoBlocks>,
+    landscape_blocks: BlockProvider<LandscapeBlocks>,
+}
+
+impl State {
+    fn new(universe: &mut Universe, params: TemplateParameters) -> Result<Self, InGenError> {
+        let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
+        let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+
+        let bounds = {
+            let sky_height = 30;
+            let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
+            let space_size = params
+                .size
+                .unwrap_or(GridSize::new(160, 60, 160))
+                .map(|size| i32::try_from(size).unwrap_or(i32::MAX));
+
+            GridAab::from_lower_upper(
+                [-space_size.width / 2, -ground_depth, -space_size.depth / 2],
+                [space_size.width / 2, sky_height, space_size.depth / 2],
+            )
+        };
+
+        let planner = CityPlanner::new(bounds);
+
+        let space = Space::builder(bounds)
+            .sky(crate::landscape::sky_with_grass(palette::DAY_SKY_COLOR))
+            .light_physics(LightPhysics::None) // disable until we are done with bulk updates
+            .spawn(Self::spawn(bounds, &demo_blocks, &landscape_blocks))
+            .build();
+
+        Ok(Self {
+            params,
+            space,
+            planner,
+            demo_blocks,
+            landscape_blocks,
+        })
+    }
+
+    #[inline(never)]
+    fn place_logo(&mut self) -> Result<(), InGenError> {
+        let logo_location = self
+            .space
+            .bounds()
+            .abut(Face6::NZ, -3)
+            .unwrap()
+            .abut(Face6::PY, -(self.space.bounds().upper_bounds().y - 12))
+            .unwrap();
+        vui::install_widgets(
+            vui::LayoutGrant::new(logo_location),
+            &vui::leaf_widget(logo_text()),
+        )?
+        .execute(&mut self.space, &mut transaction::no_outputs)?;
+        self.planner.occupied_plots.push(logo_location);
+        Ok(())
+    }
+
+    fn plant_grass(&mut self) -> Result<(), InGenError> {
+        let grass_at = crate::landscape::grass_placement_function(0x21b5cc6b);
+        self.space.fill(self.planner.y_range(1, 2), |cube| {
+            if cube.x.abs() <= CityPlanner::ROAD_RADIUS || cube.z.abs() <= CityPlanner::ROAD_RADIUS
+            {
+                return None;
+            }
+            grass_at(cube)
+                .map(|height| &self.landscape_blocks[LandscapeBlocks::GrassBlades { height }])
+        })?;
+        Ok(())
+    }
+
+    async fn plant_trees(&mut self, progress: YieldProgress) -> Result<(), InGenError> {
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(self.params.seed.unwrap_or(0));
+        let possible_tree_origins: GridAab = self.planner.y_range(1, 2);
+
+        for progress in progress.split_evenly(60) {
+            // won't get this many trees, because some will be blocked
+            let tree_origin = possible_tree_origins.random_cube(&mut rng).unwrap();
+            let height = rng.gen_range(1..8);
+            let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
+                nx: height / 3,
+                ny: 0,
+                nz: height / 3,
+                px: height / 3,
+                py: height - 1,
+                pz: height / 3,
+            });
+            if self.space.bounds().contains_box(tree_bounds)
+                && !self.planner.is_occupied(tree_bounds)
+            {
+                crate::tree::make_tree(&self.landscape_blocks, &mut rng, tree_origin, tree_bounds)
+                    .execute(&mut self.space, &mut transaction::no_outputs)?;
+            }
+            progress.finish().await;
+        }
+        Ok(())
+    }
+
+    fn place_lampposts(&mut self) -> Result<(), InGenError> {
+        let bounds = self.planner.space_bounds;
+        'directions: for direction in CityPlanner::ROAD_DIRECTIONS {
+            let lamp_spacing = 20;
+            let perpendicular: GridVector =
+                GridRotation::CLOCKWISE.transform(direction).normal_vector();
+            for distance in (CityPlanner::LAMP_POSITION_RADIUS..).step_by(lamp_spacing) {
+                for side_of_road in [-1, 1] {
+                    let globe_cube = Cube::new(0, 4, 0)
+                        + direction.normal_vector() * distance
+                        + perpendicular * (side_of_road * CityPlanner::LAMP_POSITION_RADIUS);
+                    if !bounds.contains_cube(globe_cube) {
+                        continue 'directions;
+                    }
+
+                    let Some(base_cube) = self.planner.find_cube_near(
+                        globe_cube - GridVector::new(0, 3, 0),
+                        &[direction, direction.opposite()],
+                    ) else {
+                        continue;
+                    };
+                    place_lamppost(base_cube, globe_cube, &mut self.space, &self.demo_blocks)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn spawn(
+        bounds: GridAab,
+        demo_blocks: &BlockProvider<DemoBlocks>,
+        landscape_blocks: &BlockProvider<LandscapeBlocks>,
+    ) -> Spawn {
+        let mut spawn = Spawn::default_for_new_space(bounds);
+        spawn.set_bounds(GridAab::from_lower_upper(
+            [-CityPlanner::ROAD_RADIUS, 1, 0],
+            [CityPlanner::ROAD_RADIUS + 1, bounds.upper_bounds().y, 17],
+        ));
+        //spawn.set_eye_position(bounds.center() + Vector3::new(0.5, 2.91, 8.5));
+        // Initial inventory contents. TODO: Make a better list.
+        let mut inventory: Vec<Slot> = Vec::new();
+        inventory.extend(
+            [
+                Tool::RemoveBlock { keep: true },
+                Tool::Activate,
+                Tool::Jetpack { active: false },
+                Tool::PushPull,
+                Tool::Custom {
+                    op: Operation::AddModifiers(
+                        [block::Modifier::Rotate(GridRotation::CLOCKWISE)].into(),
+                    ),
+                    icon: block::Block::builder()
+                        .color(rgba_const!(0.0, 0.5, 0.0, 1.0))
+                        .display_name("Rotate")
+                        .build(),
+                },
+            ]
+            .into_iter()
+            .map(Slot::from),
+        );
+        for block in [
+            &landscape_blocks[LandscapeBlocks::Stone],
+            &demo_blocks[DemoBlocks::Lamp(true)],
+        ] {
+            inventory.push(Slot::stack(40, Tool::Block(block.clone())));
+        }
+        inventory.push(Slot::stack(
+            1,
+            Tool::InfiniteBlocks(demo_blocks[DemoBlocks::Explosion(-10)].clone()),
+        ));
+        spawn.set_inventory(inventory);
+        spawn
+    }
+}
 
 async fn place_exhibits_in_city<I: Instant>(
     progress: YieldProgress,
@@ -622,35 +640,85 @@ fn place_one_exhibit<I: Instant>(
     Ok(())
 }
 
-async fn plant_trees(
-    progress: YieldProgress,
-    params: crate::TemplateParameters,
-    planner: &mut CityPlanner,
+fn place_roads_and_tunnels(
     space: &mut Space,
-    universe: &Universe,
+    demo_blocks: &BlockProvider<DemoBlocks>,
 ) -> Result<(), InGenError> {
-    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
-    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(params.seed.unwrap_or(0));
-    let possible_tree_origins: GridAab = planner.y_range(1, 2);
+    use DemoBlocks::*;
 
-    for progress in progress.split_evenly(60) {
-        // won't get this many trees, because some will be blocked
-        let tree_origin = possible_tree_origins.random_cube(&mut rng).unwrap();
-        let height = rng.gen_range(1..8);
-        let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
-            nx: height / 3,
-            ny: 0,
-            nz: height / 3,
-            px: height / 3,
-            py: height - 1,
-            pz: height / 3,
-        });
-        if space.bounds().contains_box(tree_bounds) && !planner.is_occupied(tree_bounds) {
-            crate::tree::make_tree(&landscape_blocks, &mut rng, tree_origin, tree_bounds)
-                .execute(space, &mut transaction::no_outputs)?;
+    for face in CityPlanner::ROAD_DIRECTIONS {
+        let perpendicular: GridVector = GridRotation::CLOCKWISE.transform(face).normal_vector();
+        let road_aligned_rotation = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
+        let other_side_of_road =
+            GridRotation::from_basis([Face6::NX, Face6::PY, Face6::NZ]) * road_aligned_rotation;
+        let rotations = [other_side_of_road, road_aligned_rotation];
+        let raycaster = all_is_cubes::raycast::AaRay::new(Cube::ORIGIN, face.into())
+            .cast()
+            .within(space.bounds());
+        let curb_y = GridVector::new(0, 1, 0);
+        for (i, step) in raycaster.enumerate() {
+            let i = i as GridCoordinate;
+            // Road surface
+            for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
+                space.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
+            }
+
+            // Curbs
+            if i >= CityPlanner::ROAD_RADIUS {
+                for (side, p) in [
+                    (1, -CityPlanner::ROAD_RADIUS),
+                    (0, CityPlanner::ROAD_RADIUS),
+                ] {
+                    let position = step.cube_ahead() + perpendicular * p + curb_y;
+
+                    // Place curb and combine it with other curb blocks .
+                    let mut to_compose_with = space[position].clone();
+                    // TODO: .unspecialize() is a maybe expensive way to make this test, and
+                    // this isn't the first time this has come up. Benchmark a "block view"
+                    // to cheaply filter out modifiers.
+                    if to_compose_with.clone().unspecialize() != *vec![demo_blocks[Curb].clone()] {
+                        to_compose_with = AIR;
+                    }
+                    space.set(
+                        position,
+                        block::Composite::new(
+                            demo_blocks[Curb].clone().rotate(rotations[side]),
+                            block::CompositeOperator::In,
+                        )
+                        .with_disassemblable()
+                        .compose_or_replace(to_compose_with),
+                    )?;
+                }
+            }
+
+            // Dig underground passages
+            for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
+                for y in CityPlanner::UNDERGROUND_FLOOR_Y..0 {
+                    space.set(
+                        step.cube_ahead() + perpendicular * p + GridVector::new(0, y, 0),
+                        &AIR,
+                    )?;
+                }
+            }
+
+            // Underground lighting
+            if (i - CityPlanner::LAMP_POSITION_RADIUS).rem_euclid(7) == 0 {
+                // Underground lamps
+                for (side, &p) in [-CityPlanner::ROAD_RADIUS, CityPlanner::ROAD_RADIUS]
+                    .iter()
+                    .enumerate()
+                {
+                    space.set(
+                        step.cube_ahead() + GridVector::new(0, -2, 0) + perpendicular * p,
+                        demo_blocks[Sconce(true)]
+                            .clone()
+                            .rotate(GridRotation::CLOCKWISE * rotations[side]),
+                    )?;
+                }
+            }
         }
-        progress.finish().await;
     }
+
     Ok(())
 }
 
@@ -764,6 +832,7 @@ struct CityPlanner {
 }
 
 impl CityPlanner {
+    const ROAD_DIRECTIONS: [Face6; 4] = [Face6::PX, Face6::NX, Face6::PZ, Face6::NZ];
     const ROAD_RADIUS: GridCoordinate = 2;
     /// Distance from the center cube to the line of cubes where lampposts are placed.
     const LAMP_POSITION_RADIUS: GridCoordinate = Self::ROAD_RADIUS + 1;
@@ -889,5 +958,22 @@ impl CityPlanner {
             lower_y..upper_y,
             self.space_bounds.z_range(),
         ])
+    }
+
+    #[inline(never)]
+    pub fn landscape_region(&self) -> GridAab {
+        let bounds = self.space_bounds;
+        GridAab::from_lower_upper(
+            [
+                bounds.lower_bounds().x,
+                bounds.lower_bounds().y * 8 / 10,
+                bounds.lower_bounds().z,
+            ],
+            [
+                -CityPlanner::PLOT_FRONT_RADIUS,
+                bounds.upper_bounds().y,
+                -CityPlanner::PLOT_FRONT_RADIUS,
+            ],
+        )
     }
 }
