@@ -19,6 +19,7 @@
     - `block::EvalBlockError` is now a `struct` with an inner `ErrorKind` enum, instead of an enum, and contains more information.
     - `block::Move`’s means of construction have been changed to be more systematic and orthogonal. In particular, paired moves are constructed from unpaired ones.
 
+    - `math::FaceMap::repeat()` has been renamed to `splat()`, for consistency with the same concept in the `euclid` vector types which we use.
     - `math::GridAab::expand()` now takes unsigned values; use `GridAab::shrink()` instead of negative ones. This allows both versions to never panic.
 
 - `all-is-cubes-gpu` library:

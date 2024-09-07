@@ -276,7 +276,7 @@ mod tests {
                         pz: color.to_rgb().with_alpha(notnan!(0.5)),
                     },
                     light_emission: Rgb::ZERO,
-                    opaque: FaceMap::repeat(false).with(Face6::PY, true),
+                    opaque: FaceMap::splat(false).with(Face6::PY, true),
                     visible: true,
                     uniform_collision: None,
                     voxel_opacity_mask: VoxelOpacityMask::new_raw(
@@ -333,7 +333,7 @@ mod tests {
                         pz: color.to_rgb().with_alpha(notnan!(0.5)),
                     },
                     light_emission: Rgb::ZERO,
-                    opaque: FaceMap::repeat(false).with(Face6::PY, true),
+                    opaque: FaceMap::splat(false).with(Face6::PY, true),
                     visible: true,
                     uniform_collision: None,
                     voxel_opacity_mask: VoxelOpacityMask::new_raw(

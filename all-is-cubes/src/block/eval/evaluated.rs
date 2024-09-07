@@ -73,7 +73,7 @@ impl fmt::Debug for EvaluatedBlock {
             ds.field("attributes", attributes);
         }
         ds.field("color", color);
-        if *face_colors != FaceMap::repeat(*color) {
+        if *face_colors != FaceMap::splat(*color) {
             ds.field("face_colors", face_colors);
         }
         if *light_emission != Rgb::ZERO {
@@ -256,7 +256,7 @@ impl EvaluatedBlock {
     /// TODO: Review uses of .opaque and .visible and see if they can be usefully replaced
     /// by this.
     pub(crate) fn opacity_as_category(&self) -> OpacityCategory {
-        if self.derived.opaque == FaceMap::repeat(true) {
+        if self.derived.opaque == FaceMap::splat(true) {
             OpacityCategory::Opaque
         } else if !self.derived.visible {
             OpacityCategory::Invisible
@@ -368,9 +368,9 @@ const AIR_ATTRIBUTES: BlockAttributes = BlockAttributes {
 
 const AIR_DERIVED: Derived = Derived {
     color: Rgba::TRANSPARENT,
-    face_colors: FaceMap::repeat_copy(Rgba::TRANSPARENT),
+    face_colors: FaceMap::splat_copy(Rgba::TRANSPARENT),
     light_emission: Rgb::ZERO,
-    opaque: FaceMap::repeat_copy(false),
+    opaque: FaceMap::splat_copy(false),
     visible: false,
     uniform_collision: Some(BlockCollision::None),
     voxel_opacity_mask: VoxelOpacityMask::R1_INVISIBLE,

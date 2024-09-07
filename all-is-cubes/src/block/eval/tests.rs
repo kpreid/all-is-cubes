@@ -168,9 +168,9 @@ fn from_voxels_zero_bounds() {
             attributes,
             derived: Derived {
                 color: Rgba::TRANSPARENT,
-                face_colors: FaceMap::repeat(Rgba::TRANSPARENT),
+                face_colors: FaceMap::splat(Rgba::TRANSPARENT),
                 light_emission: Rgb::ZERO,
-                opaque: FaceMap::repeat(false),
+                opaque: FaceMap::splat(false),
                 visible: false,
                 uniform_collision: Some(BlockCollision::None),
                 voxel_opacity_mask: block::VoxelOpacityMask::new(resolution, voxels.as_vol_ref()),
@@ -189,7 +189,7 @@ fn from_voxels_zero_bounds() {
 fn overall_color_ignores_interior() {
     let resolution = R8;
     let outer_bounds = GridAab::for_block(resolution);
-    let inner_bounds = outer_bounds.shrink(FaceMap::repeat(1)).unwrap();
+    let inner_bounds = outer_bounds.shrink(FaceMap::splat(1)).unwrap();
     let outer_color = Rgba::new(1.0, 0.0, 0.0, 1.0);
     let inner_color = Rgba::new(0.0, 1.0, 0.0, 1.0);
     let voxels = Evoxels::from_many(

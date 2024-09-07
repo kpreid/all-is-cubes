@@ -70,7 +70,7 @@ fn unflatten(
 impl Analysis {
     pub fn empty() -> Self {
         Analysis {
-            occupied_planes: FaceMap::repeat([EMPTY_PLANE_BOX; MAX_PLANES]),
+            occupied_planes: FaceMap::splat([EMPTY_PLANE_BOX; MAX_PLANES]),
             needs_texture: false,
             resolution: Resolution::R1,
         }

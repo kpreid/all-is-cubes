@@ -136,7 +136,7 @@ mod eval {
         let e = block.evaluate().unwrap();
         assert_eq!(e.attributes(), BlockAttributes::DEFAULT_REF);
         assert_eq!(e.color(), color);
-        assert_eq!(e.face_colors(), FaceMap::repeat(color));
+        assert_eq!(e.face_colors(), FaceMap::splat(color));
         assert_eq!(e.light_emission(), Rgb::ONE);
         assert_eq!(
             e.voxels,
@@ -148,7 +148,7 @@ mod eval {
             })
         );
         assert_eq!(e.resolution(), R1);
-        assert_eq!(e.opaque(), FaceMap::repeat(true));
+        assert_eq!(e.opaque(), FaceMap::splat(true));
         assert_eq!(e.visible(), true);
         assert_eq!(
             *e.voxel_opacity_mask(),
@@ -162,10 +162,10 @@ mod eval {
         let block = Block::from(color);
         let e = block.evaluate().unwrap();
         assert_eq!(e.color(), color);
-        assert_eq!(e.face_colors(), FaceMap::repeat(color));
+        assert_eq!(e.face_colors(), FaceMap::splat(color));
         assert_eq!(e.light_emission(), Rgb::ZERO);
         assert!(e.voxels.single_voxel().is_some());
-        assert_eq!(e.opaque(), FaceMap::repeat(false));
+        assert_eq!(e.opaque(), FaceMap::splat(false));
         assert_eq!(e.visible(), true);
         assert_eq!(
             *e.voxel_opacity_mask(),
@@ -182,10 +182,10 @@ mod eval {
             .build();
         let e = block.evaluate().unwrap();
         assert_eq!(e.color(), Rgba::TRANSPARENT);
-        assert_eq!(e.face_colors(), FaceMap::repeat(Rgba::TRANSPARENT));
+        assert_eq!(e.face_colors(), FaceMap::splat(Rgba::TRANSPARENT));
         assert_eq!(e.light_emission(), emissive_color);
         assert!(e.voxels.single_voxel().is_some());
-        assert_eq!(e.opaque(), FaceMap::repeat(false));
+        assert_eq!(e.opaque(), FaceMap::splat(false));
         assert_eq!(e.visible(), true);
         assert_eq!(
             *e.voxel_opacity_mask(),
@@ -198,9 +198,9 @@ mod eval {
         let block = color_block!(Rgba::TRANSPARENT);
         let e = block.evaluate().unwrap();
         assert_eq!(e.color(), Rgba::TRANSPARENT);
-        assert_eq!(e.face_colors(), FaceMap::repeat(Rgba::TRANSPARENT));
+        assert_eq!(e.face_colors(), FaceMap::splat(Rgba::TRANSPARENT));
         assert!(e.voxels.single_voxel().is_some());
-        assert_eq!(e.opaque(), FaceMap::repeat(false));
+        assert_eq!(e.opaque(), FaceMap::splat(false));
         assert_eq!(e.visible(), false);
         assert_eq!(
             *e.voxel_opacity_mask(),
@@ -256,7 +256,7 @@ mod eval {
             }
         );
         assert_eq!(e.resolution(), resolution);
-        assert_eq!(e.opaque(), FaceMap::repeat(true));
+        assert_eq!(e.opaque(), FaceMap::splat(true));
         assert_eq!(e.visible(), true);
         assert_eq!(
             *e.voxel_opacity_mask(),
@@ -424,7 +424,7 @@ mod eval {
             Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(2))
         );
         assert_eq!(e.resolution(), resolution);
-        assert_eq!(e.opaque(), FaceMap::repeat(false));
+        assert_eq!(e.opaque(), FaceMap::splat(false));
         assert_eq!(e.visible(), true);
     }
 
@@ -447,7 +447,7 @@ mod eval {
         // of 6 faces, 2 are opaque and 2 are half-transparent, thus there are 8 opaque half-faces.
         assert_eq!(e.color(), Rgba::new(1.0, 1.0, 1.0, 8. / 12.));
         assert_eq!(e.resolution(), resolution);
-        assert_eq!(e.opaque(), FaceMap::repeat(false).with(Face6::NX, true));
+        assert_eq!(e.opaque(), FaceMap::splat(false).with(Face6::NX, true));
         assert_eq!(e.visible(), true);
     }
 

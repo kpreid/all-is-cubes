@@ -182,7 +182,7 @@ mod tests {
 
             // space.fill_uniform(space.bounds(), light_block).unwrap();
             // space
-            //     .fill_uniform(space.bounds().expand(FaceMap::repeat(-1)), AIR)
+            //     .fill_uniform(space.bounds().shrink(FaceMap::splat(1)), AIR)
             //     .unwrap();
 
             space.evaluate_light::<crate::time::NoTime>(0, |_| {});

@@ -106,7 +106,7 @@ impl DemoTheme {
             None,
         )
         .with_interior(Some(AIR))
-        .create_box(interior.expand(FaceMap::repeat(1)))
+        .create_box(interior.expand(FaceMap::splat(1)))
         .execute(space, &mut transaction::no_outputs)?;
 
         Ok(())
@@ -309,7 +309,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     .y
                     + 1;
                 four_walls(
-                    interior.expand(FaceMap::repeat(1)),
+                    interior.expand(FaceMap::splat(1)),
                     |origin, along_wall, length, wall_excluding_corners_box| {
                         let wall = GridRotation::CLOCKWISE.transform(along_wall); // TODO: make four_walls provide this in a nice name
                         if let WallFeature::Window = room_data.wall_features[wall] {
@@ -411,7 +411,7 @@ pub(crate) async fn demo_dungeon(
 
     let dungeon_grid = DungeonGrid {
         room_box: GridAab::from_lower_size([0, 0, 0], [9, 5, 9]),
-        room_wall_thickness: FaceMap::repeat(1),
+        room_wall_thickness: FaceMap::splat(1),
         gap_between_walls: Size3D::new(1, 1, 1),
     };
     let perimeter_margin: GridSizeCoord = 30;

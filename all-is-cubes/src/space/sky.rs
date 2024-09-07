@@ -53,7 +53,7 @@ impl Sky {
     pub(crate) fn for_blocks(&self) -> BlockSky {
         BlockSky {
             faces: match *self {
-                Sky::Uniform(color) => FaceMap::repeat(PackedLight::from(color)),
+                Sky::Uniform(color) => FaceMap::splat(PackedLight::from(color)),
                 Sky::Octants(_) => FaceMap::from_fn(|face| {
                     let transform = face.face_transform(0);
                     // Take four samples from rays into the correct octants.

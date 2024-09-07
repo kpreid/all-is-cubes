@@ -414,7 +414,7 @@ mod tests {
                     color: be.color(),
                     face_colors: be.face_colors().rotate(rotation),
                     light_emission: Rgb::ZERO,
-                    opaque: FaceMap::repeat(false).with(rotation.transform(Face6::NY), true),
+                    opaque: FaceMap::splat(false).with(rotation.transform(Face6::NY), true),
                     visible: true,
                     uniform_collision: Some(BlockCollision::Hard),
                     voxel_opacity_mask: block::VoxelOpacityMask::new_raw(

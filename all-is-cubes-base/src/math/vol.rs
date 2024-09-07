@@ -164,9 +164,6 @@ where
     }
 
     /// Constructs a `Vol<C>` by cloning the provided value for each point.
-    ///
-    /// TODO: This feels like it should be called 'filled' or 'cloned', but if so,
-    /// maybe [`FaceMap::repeat`](crate::math::FaceMap::repeat) should also change?
     #[inline]
     pub fn repeat(bounds: GridAab, value: V) -> Self
     where

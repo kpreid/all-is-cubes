@@ -98,9 +98,9 @@ pub(in crate::block::eval) fn compute_derived(
         let visible = !color.fully_transparent() || emission != Rgb::ZERO;
         return Derived {
             color,
-            face_colors: FaceMap::repeat(color),
+            face_colors: FaceMap::splat(color),
             light_emission: emission,
-            opaque: FaceMap::repeat(color.fully_opaque()),
+            opaque: FaceMap::splat(color.fully_opaque()),
             visible,
             uniform_collision: Some(collision),
             voxel_opacity_mask: VoxelOpacityMask::new_r1(voxel),
@@ -116,7 +116,7 @@ pub(in crate::block::eval) fn compute_derived(
     // of all six faces by tracing in from the edges, and then averages them.
     let (color, face_colors, emission): (Rgba, FaceMap<Rgba>, Rgb) = {
         let mut all_faces_sum = VoxSum::default();
-        let mut face_colors = FaceMap::repeat(Rgba::TRANSPARENT);
+        let mut face_colors = FaceMap::splat(Rgba::TRANSPARENT);
 
         // Loop over all face voxels.
         // (This is a similar structure to the algorithm we use for mesh generation.)

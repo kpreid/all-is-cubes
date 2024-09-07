@@ -370,7 +370,7 @@ async fn islands(
             && cell_bounds.size().depth >= margin * 2
         {
             let occupied_bounds = cell_bounds
-                .shrink(FaceMap::repeat(10).with(Face6::PY, 25))
+                .shrink(FaceMap::splat(10).with(Face6::PY, 25))
                 .unwrap();
             wavy_landscape(occupied_bounds, &mut space, &landscape_blocks, 0.5)?;
         }
@@ -464,7 +464,7 @@ async fn arbitrary_space(
                 // Patch spawn position to be reasonable
                 let bounds = space.bounds();
                 let mut spawn = space.spawn().clone();
-                spawn.set_bounds(bounds.expand(FaceMap::repeat(20)));
+                spawn.set_bounds(bounds.expand(FaceMap::splat(20)));
                 spawn.set_eye_position(bounds.center());
                 space.set_spawn(spawn);
 

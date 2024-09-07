@@ -47,7 +47,7 @@ pub fn generate_maze(seed: u64, requested_rooms: GridSize) -> Maze {
         GridAab::from_lower_size([0, 0, 0], requested_rooms),
         MazeRoom {
             kind: MazeRoomKind::Unoccupied,
-            passages: FaceMap::repeat(false),
+            passages: FaceMap::splat(false),
         },
     );
 

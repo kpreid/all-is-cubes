@@ -204,7 +204,7 @@ where
                         // Do this by expanding the raycast bounds by one cube.
                         self.block_raycaster.remove_bounds();
                         self.block_raycaster
-                            .add_bounds(self.array.bounds().expand(FaceMap::repeat(1)));
+                            .add_bounds(self.array.bounds().expand(FaceMap::splat(1)));
 
                         self.state = SurfaceIterState::EnteredSpace;
                     }

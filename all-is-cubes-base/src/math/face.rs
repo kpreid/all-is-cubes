@@ -794,7 +794,7 @@ impl<V> FaceMap<V> {
 impl<V: Clone> FaceMap<V> {
     /// Constructs a [`FaceMap`] containing clones of the provided value.
     #[inline]
-    pub fn repeat(value: V) -> Self {
+    pub fn splat(value: V) -> Self {
         Self {
             nx: value.clone(),
             ny: value.clone(),
@@ -809,11 +809,11 @@ impl<V: Clone> FaceMap<V> {
 impl<V: Copy> FaceMap<V> {
     /// Constructs a [`FaceMap`] containing copies of the provided value.
     ///
-    /// This is practically identical to [`FaceMap::repeat()`] except that it is a
+    /// This is practically identical to [`FaceMap::splat()`] except that it is a
     /// `const fn`. It may be removed from future major versions once Rust supports const
     /// trait function calls.
     #[inline]
-    pub const fn repeat_copy(value: V) -> Self {
+    pub const fn splat_copy(value: V) -> Self {
         Self {
             nx: value,
             ny: value,

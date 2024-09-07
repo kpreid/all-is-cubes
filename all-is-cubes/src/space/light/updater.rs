@@ -322,7 +322,7 @@ impl LightStorage {
                         if *neighbor_light == new_light_value {
                             continue;
                         }
-                        if uc.get_evaluated(neighbor_cube).opaque() == FaceMap::repeat(true) {
+                        if uc.get_evaluated(neighbor_cube).opaque() == FaceMap::splat(true) {
                             // neighbor is fully opaque — don't light it
                             continue;
                         }
@@ -376,7 +376,7 @@ impl LightStorage {
         };
 
         let ev_origin = uc.get_evaluated(cube);
-        let origin_is_opaque = ev_origin.opaque() == FaceMap::repeat(true);
+        let origin_is_opaque = ev_origin.opaque() == FaceMap::splat(true);
         if origin_is_opaque {
             // Opaque blocks are always dark inside — unless they are light sources.
             if !opaque_for_light_computation(ev_origin) {
@@ -592,7 +592,7 @@ fn directions_to_seek_light(
 ) -> FaceMap<f32> {
     if origin.visible_or_animated() {
         // Non-opaque blocks should work the same as blocks which have all six adjacent faces present.
-        FaceMap::repeat(1.0)
+        FaceMap::splat(1.0)
     } else {
         FaceMap::from_fn(|face| {
             // We want directions that either face away from visible faces, or towards light sources.
@@ -703,7 +703,7 @@ impl LightBuffer {
         let face_opacity = ev_hit.opaque();
         let hit_opaque_face: bool = match Face6::try_from(hit.face) {
             Ok(face) => face_opacity[face],
-            Err(_) => face_opacity == FaceMap::repeat(true),
+            Err(_) => face_opacity == FaceMap::splat(true),
         };
 
         if hit_opaque_face && hit.face == Face7::Within {
@@ -906,5 +906,5 @@ impl Fmt<StatusText> for LightUpdatesInfo {
 /// This function is fairly straightforward; it exists for purposes of *documenting
 /// the places that care about this* rather than for code reduction.
 pub(crate) fn opaque_for_light_computation(block: &EvaluatedBlock) -> bool {
-    block.opaque() == FaceMap::repeat(true) && block.light_emission() == Rgb::ZERO
+    block.opaque() == FaceMap::splat(true) && block.light_emission() == Rgb::ZERO
 }

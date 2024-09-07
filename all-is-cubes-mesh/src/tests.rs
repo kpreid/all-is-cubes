@@ -504,15 +504,15 @@ fn opacities<M: MeshTypes>(mesh: &BlockMesh<M>) -> FaceMap<bool> {
 fn atom_transparency() {
     assert_eq!(
         opacities(&test_block_mesh(color_block!(Rgba::WHITE))),
-        FaceMap::repeat(true)
+        FaceMap::splat(true)
     );
     assert_eq!(
         opacities(&test_block_mesh(color_block!(Rgba::TRANSPARENT))),
-        FaceMap::repeat(false)
+        FaceMap::splat(false)
     );
     assert_eq!(
         opacities(&test_block_mesh(color_block!(1.0, 1.0, 1.0, 0.5))),
-        FaceMap::repeat(false)
+        FaceMap::splat(false)
     );
 }
 
@@ -610,7 +610,7 @@ fn invisible_voxel_block() {
         "sanity check test data"
     );
 
-    assert_eq!(opacities(&test_block_mesh(block)), FaceMap::repeat(false));
+    assert_eq!(opacities(&test_block_mesh(block)), FaceMap::splat(false));
 }
 
 #[test]

@@ -973,7 +973,7 @@ fn COLOR_LIGHTS(_: Context<'_>) {
         [0, 0, 0],
         Size3D::new(room_width, room_height, room_length).to_u32(),
     );
-    let mut space = Space::empty(interior.expand(FaceMap::repeat(1)));
+    let mut space = Space::empty(interior.expand(FaceMap::splat(1)));
 
     fn normalize(color: Rgb) -> Rgb {
         color * color.luminance().recip()
@@ -1054,7 +1054,7 @@ fn COLOR_LIGHTS(_: Context<'_>) {
         Some(wall_block.clone()),
         Some(corner.rotate(GridRotation::RxYz)),
     )
-    .create_box(interior.expand(FaceMap::repeat(1)))
+    .create_box(interior.expand(FaceMap::splat(1)))
     .execute(&mut space, &mut transaction::no_outputs)?;
 
     // Separators between floors
@@ -1159,7 +1159,7 @@ fn COLORED_BOUNCE(_: Context<'_>) {
         GridPoint::splat(-interior_radius),
         GridSize::splat(u32::try_from(interior_radius).unwrap() * 2 + 1),
     );
-    let mut space = Space::empty(interior.expand(FaceMap::repeat(wall_thickness)));
+    let mut space = Space::empty(interior.expand(FaceMap::splat(wall_thickness)));
 
     // Thick walls + interior cavity
     space.fill_uniform(space.bounds(), &wall_block).unwrap();
@@ -1176,7 +1176,7 @@ fn COLORED_BOUNCE(_: Context<'_>) {
 
     // Central reflecting block
     space.fill_uniform(
-        GridAab::ORIGIN_CUBE.expand(FaceMap::repeat(1)),
+        GridAab::ORIGIN_CUBE.expand(FaceMap::splat(1)),
         &reflecting_block,
     )?;
 

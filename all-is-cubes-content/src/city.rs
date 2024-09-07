@@ -450,10 +450,10 @@ fn place_one_exhibit<I: Instant>(
     // Amount by which the exhibit's own size is expanded to form walls and empty space
     // for displaying it and allowing players to move around it.
     let enclosure_thickness = match exhibit.placement {
-        Placement::Surface => FaceMap::repeat(1),
+        Placement::Surface => FaceMap::splat(1),
         // Underground exhibits get no enclosure; they are expected to play nicely with being
         // buried in stone except for the entranceway.
-        Placement::Underground => FaceMap::repeat(0),
+        Placement::Underground => FaceMap::splat(0),
     };
 
     // Now that we know the size of the exhibit, find a place for it that fits its bounds.
@@ -902,7 +902,7 @@ impl CityPlanner {
                     }
 
                     let for_occupancy_check =
-                        transformed.expand(FaceMap::repeat(Self::GAP_BETWEEN_PLOTS));
+                        transformed.expand(FaceMap::splat(Self::GAP_BETWEEN_PLOTS));
 
                     if self.is_occupied(for_occupancy_check) {
                         continue 'search;

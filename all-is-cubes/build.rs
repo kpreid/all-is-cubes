@@ -38,7 +38,7 @@ fn generate_light_ray_pattern() -> Vec<OneRay> {
                 {
                     let direction = Vector3D::new(x as f32, y as f32, z as f32).normalize();
 
-                    let mut cosines = FaceMap::repeat(0.0f32);
+                    let mut cosines = FaceMap::splat(0.0f32);
                     for face in Face6::ALL {
                         let unit_vector: FreeVector = face.normal_vector();
                         let cosine = unit_vector.to_f32().dot(direction.to_f32()).max(0.0);
