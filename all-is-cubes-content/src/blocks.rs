@@ -529,41 +529,48 @@ pub async fn install_demo_blocks(
                     // Expand at first out to ~5 blocks
                     if i.rem_euclid(2) == 0 {
                         if i.rem_euclid(4) == 0 {
-                            [
-                                (Cube::new(0, 0, 0), next.clone()),
-                                (Cube::new(1, 0, 0), next.clone()),
-                                (Cube::new(-1, 0, 0), next.clone()),
-                                (Cube::new(0, 1, 0), next.clone()),
-                                (Cube::new(0, -1, 0), next.clone()),
-                                (Cube::new(0, 0, 1), next.clone()),
-                                (Cube::new(0, 0, -1), next.clone()),
-                            ]
-                            .into()
+                            const {
+                                [
+                                    Cube::new(0, 0, 0),
+                                    Cube::new(1, 0, 0),
+                                    Cube::new(-1, 0, 0),
+                                    Cube::new(0, 1, 0),
+                                    Cube::new(0, -1, 0),
+                                    Cube::new(0, 0, 1),
+                                    Cube::new(0, 0, -1),
+                                ]
+                            }
+                            .as_slice()
                         } else {
-                            [
-                                (Cube::new(0, 0, 0), next.clone()),
-                                (Cube::new(1, 1, 0), next.clone()),
-                                (Cube::new(-1, 1, 0), next.clone()),
-                                (Cube::new(0, 1, 1), next.clone()),
-                                (Cube::new(0, -1, 1), next.clone()),
-                                (Cube::new(1, 0, 1), next.clone()),
-                                (Cube::new(1, 0, -1), next.clone()),
-                                (Cube::new(1, -1, 0), next.clone()),
-                                (Cube::new(-1, -1, 0), next.clone()),
-                                (Cube::new(0, 1, -1), next.clone()),
-                                (Cube::new(0, -1, -1), next.clone()),
-                                (Cube::new(-1, 0, 1), next.clone()),
-                                (Cube::new(-1, 0, -1), next.clone()),
-                            ]
-                            .into()
+                            const {
+                                [
+                                    Cube::new(0, 0, 0),
+                                    Cube::new(1, 1, 0),
+                                    Cube::new(-1, 1, 0),
+                                    Cube::new(0, 1, 1),
+                                    Cube::new(0, -1, 1),
+                                    Cube::new(1, 0, 1),
+                                    Cube::new(1, 0, -1),
+                                    Cube::new(1, -1, 0),
+                                    Cube::new(-1, -1, 0),
+                                    Cube::new(0, 1, -1),
+                                    Cube::new(0, -1, -1),
+                                    Cube::new(-1, 0, 1),
+                                    Cube::new(-1, 0, -1),
+                                ]
+                            }
+                            .as_slice()
                         }
                     } else {
-                        [(Cube::ORIGIN, next.clone())].into()
+                        [Cube::ORIGIN].as_slice()
                     }
                 } else {
                     // Just tick or fade
-                    [(Cube::ORIGIN, next.clone())].into()
+                    [Cube::ORIGIN].as_slice()
                 }
+                .iter()
+                .map(|&cube| (cube, next.clone()))
+                .collect()
             };
             block.freezing_get_attributes_mut().tick_action = Some(TickAction {
                 operation: Operation::Neighbors(neighbor_ops),
