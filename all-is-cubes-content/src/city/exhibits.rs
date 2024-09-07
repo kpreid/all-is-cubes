@@ -1126,9 +1126,9 @@ fn COLOR_LIGHTS(_: Context<'_>) {
 fn COLORED_BOUNCE(_: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
-    let interior_radius = 3;
-    let wall_thickness = 3;
-    let total_radius = interior_radius + wall_thickness;
+    let interior_radius = 3i32;
+    let wall_thickness = 3u32;
+    let total_radius = interior_radius.saturating_add_unsigned(wall_thickness);
     let brightness = 50.0;
 
     // --- Blocks ---
@@ -1505,7 +1505,7 @@ fn TREES(ctx: Context<'_>) {
                     ny: 0,
                     nz: 2,
                     px: 2,
-                    py: ix + iz * 2,
+                    py: u32::try_from(ix + iz * 2).unwrap(),
                     pz: 2,
                 }),
             )

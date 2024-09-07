@@ -3,9 +3,7 @@ use alloc::sync::Arc;
 use core::fmt;
 
 use all_is_cubes::euclid::{self, size3, Size3D, Vector3D};
-use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridSize,
-};
+use all_is_cubes::math::{Axis, Cube, Face6, FaceMap, GridAab, GridPoint, GridSize};
 use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
 use all_is_cubes::util::{ConciseDebug, Fmt};
@@ -322,9 +320,11 @@ impl<W: Layoutable + Clone> LayoutTree<W> {
             LayoutTree::Margin { margin, ref child } => LayoutTree::Margin {
                 margin,
                 child: child.perform_layout(LayoutGrant {
+                    // TODO: more gradual too-small behavior than this unwrap_or() provides
                     bounds: grant
                         .bounds
-                        .expand(margin.map(|_, m| -GridCoordinate::from(m))),
+                        .shrink(margin.map(|_, m| m.into()))
+                        .unwrap_or(grant.bounds),
                     gravity: grant.gravity,
                 })?,
             },

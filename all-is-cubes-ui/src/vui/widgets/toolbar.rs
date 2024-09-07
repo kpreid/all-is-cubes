@@ -9,7 +9,7 @@ use all_is_cubes::character::Character;
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{Listen as _, ListenableSource, Listener};
 use all_is_cubes::math::{
-    Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridSize, GridSizeCoord, GridVector,
+    Cube, GridAab, GridCoordinate, GridPoint, GridSize, GridSizeCoord, GridVector,
 };
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
@@ -220,15 +220,18 @@ impl WidgetController for ToolbarController {
         let mut txn = SpaceTransaction::default();
 
         // Compute the volume in which the slot frame graphics land.
-        let frame_region = GridAab::single_cube(self.first_slot_position).expand(FaceMap {
-            nx: 1,
-            ny: 1,
-            nz: 1,
-            px: GridCoordinate::from(slot_count) * 2 - 1, // TODO: magic number for spacing
-            py: -1,
-            pz: 1,
-            ..Default::default()
-        });
+        let frame_region = GridAab::from_lower_upper(
+            [
+                self.first_slot_position.x - 1,
+                self.first_slot_position.y - 1,
+                self.first_slot_position.z - 1,
+            ],
+            [
+                self.first_slot_position.x + GridCoordinate::from(slot_count) * 2,
+                self.first_slot_position.y,
+                self.first_slot_position.z + 2,
+            ],
+        );
 
         /// TODO: figure out how to express this as a general helper
         fn zoom(block: &Block, pos: GridPoint) -> Block {

@@ -11,7 +11,7 @@ use all_is_cubes::block::{Atom, Block, Primitive, Resolution, AIR};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
     Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
-    GridVector, Gridgid, NotNan, Vol,
+    GridSizeCoord, GridVector, Gridgid, NotNan, Vol,
 };
 use all_is_cubes::space::{CubeTransaction, SetCubeError, Space, SpaceTransaction};
 
@@ -102,12 +102,12 @@ pub(crate) fn voronoi_pattern<'a>(
 /// TODO: Change the callback value to a struct
 pub(crate) fn four_walls<F, E>(bounding_box: GridAab, mut f: F) -> Result<(), E>
 where
-    F: FnMut(GridPoint, Face6, GridCoordinate, GridAab) -> Result<(), E>,
+    F: FnMut(GridPoint, Face6, GridSizeCoord, GridAab) -> Result<(), E>,
 {
-    let interior = bounding_box.expand(FaceMap::symmetric([-1, 0, -1]));
+    let interior = bounding_box.shrink(FaceMap::symmetric([1, 0, 1])).unwrap();
     let low = bounding_box.lower_bounds();
     let high = bounding_box.upper_bounds() - GridVector::new(1, 1, 1);
-    let size = bounding_box.size().to_i32();
+    let size = bounding_box.size();
     f(
         low,
         Face6::PZ,

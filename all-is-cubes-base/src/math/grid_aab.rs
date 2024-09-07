@@ -772,10 +772,9 @@ impl GridAab {
         Self::from_lower_upper(self.lower_bounds * scale, self.upper_bounds * scale)
     }
 
-    /// Moves all bounds outward or inward by the specified distances.
+    /// Moves all bounds outward by the specified distances.
     ///
-    /// TODO: Currently this will panic if the result is empty. Make it return Option
-    /// instead.
+    /// If the result’s coordinates would overflow, they are as large as possible instead.
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
@@ -791,16 +790,59 @@ impl GridAab {
     /// );
     /// ```
     #[inline]
-    #[track_caller] // TODO: better error reporting
     #[must_use]
-    pub fn expand(self, deltas: FaceMap<GridCoordinate>) -> Self {
-        use Face6::*;
+    pub fn expand(self, deltas: FaceMap<GridSizeCoord>) -> Self {
         let l = self.lower_bounds();
         let u = self.upper_bounds();
         Self::from_lower_upper(
-            [l.x - deltas[NX], l.y - deltas[NY], l.z - deltas[NZ]],
-            [u.x + deltas[PX], u.y + deltas[PY], u.z + deltas[PZ]],
+            [
+                l.x.saturating_sub_unsigned(deltas.nx),
+                l.y.saturating_sub_unsigned(deltas.ny),
+                l.z.saturating_sub_unsigned(deltas.nz),
+            ],
+            [
+                u.x.saturating_add_unsigned(deltas.px),
+                u.y.saturating_add_unsigned(deltas.py),
+                u.z.saturating_add_unsigned(deltas.pz),
+            ],
         )
+    }
+
+    /// Moves all bounds inward by the specified distances.
+    ///
+    /// Returns `None` if the result would have less than zero size.
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{GridAab, FaceMap};
+    ///
+    /// assert_eq!(
+    ///     GridAab::from_lower_upper([10, 10, 10], [20, 20, 20])
+    ///         .shrink(FaceMap {
+    ///             nx: 1, ny: 2, nz: 3,
+    ///             px: 4, py: 5, pz: 6,
+    ///         }),
+    ///     Some(GridAab::from_lower_upper([11, 12, 13], [16, 15, 14])),
+    /// );
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn shrink(self, deltas: FaceMap<GridSizeCoord>) -> Option<Self> {
+        let l = self.lower_bounds();
+        let u = self.upper_bounds();
+        Self::checked_from_lower_upper(
+            [
+                l.x.checked_add_unsigned(deltas.nx)?,
+                l.y.checked_add_unsigned(deltas.ny)?,
+                l.z.checked_add_unsigned(deltas.nz)?,
+            ],
+            [
+                u.x.checked_sub_unsigned(deltas.px)?,
+                u.y.checked_sub_unsigned(deltas.py)?,
+                u.z.checked_sub_unsigned(deltas.pz)?,
+            ],
+        )
+        .ok()
     }
 
     /// Returns a [`GridAab`] which includes the volume between the given `face` rectangle

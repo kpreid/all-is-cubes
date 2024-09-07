@@ -16,8 +16,8 @@ use all_is_cubes::euclid::Size3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Rgb,
-    Rgba, Vol,
+    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
+    GridVector, Rgb, Rgba, Vol,
 };
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::time;
@@ -313,7 +313,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     |origin, along_wall, length, wall_excluding_corners_box| {
                         let wall = GridRotation::CLOCKWISE.transform(along_wall); // TODO: make four_walls provide this in a nice name
                         if let WallFeature::Window = room_data.wall_features[wall] {
-                            let midpoint = length / 2;
+                            let midpoint = (length / 2) as GridCoordinate;
                             for step in WINDOW_PATTERN {
                                 let mut window_pos =
                                     origin + along_wall.normal_vector() * (midpoint + step);
@@ -414,11 +414,11 @@ pub(crate) async fn demo_dungeon(
         room_wall_thickness: FaceMap::repeat(1),
         gap_between_walls: Size3D::new(1, 1, 1),
     };
-    let perimeter_margin: GridCoordinate = 30;
+    let perimeter_margin: GridSizeCoord = 30;
 
     let mut requested_rooms = Size3D::from(
         (requested_size.unwrap_or(Size3D::new(135, 40, 135))
-            - Size3D::new(perimeter_margin, 0, perimeter_margin).to_u32())
+            - Size3D::new(perimeter_margin, 0, perimeter_margin))
         .to_vector()
         .component_div(dungeon_grid.room_spacing().to_vector()),
     );

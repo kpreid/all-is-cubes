@@ -8,7 +8,7 @@ use crate::character::Spawn;
 use crate::color_block;
 use crate::content::{free_editing_starter_inventory, palette};
 use crate::linking::InGenError;
-use crate::math::{Face6, FaceMap, GridAab, GridCoordinate, GridSize, Rgba};
+use crate::math::{Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba};
 use crate::space::{LightPhysics, Space, SpacePhysics};
 use crate::universe::Universe;
 use crate::util::YieldProgress;
@@ -45,7 +45,8 @@ pub async fn lighting_bench_space(
             .fill_uniform(
                 space
                     .bounds()
-                    .expand(FaceMap::default().with(Face6::PY, -layout.yup())),
+                    .shrink(FaceMap::default().with(Face6::PY, layout.yup()))
+                    .unwrap(),
                 &color_block!(0.5, 0.5, 0.5),
             )
             .unwrap();
@@ -83,20 +84,23 @@ pub async fn lighting_bench_space(
                     space
                         .fill_uniform(
                             section_bounds
-                                .expand(FaceMap::default().with(Face6::PY, -layout.yup())),
+                                .shrink(FaceMap::default().with(Face6::PY, layout.yup()))
+                                .unwrap(),
                             &color,
                         )
                         .unwrap();
                     space
                         .fill_uniform(
-                            section_bounds.expand(FaceMap {
-                                nx: -1,
-                                ny: 0,
-                                nz: -1,
-                                px: -1,
-                                py: 0,
-                                pz: -1,
-                            }),
+                            section_bounds
+                                .shrink(FaceMap {
+                                    nx: 1,
+                                    ny: 0,
+                                    nz: 1,
+                                    px: 1,
+                                    py: 0,
+                                    pz: 1,
+                                })
+                                .unwrap(),
                             &AIR,
                         )
                         .unwrap();
@@ -181,7 +185,7 @@ impl LightingBenchLayout {
             [
                 i32::from(Self::SECTION_SPACING) * i32::from(self.array_side_lengths.x)
                     + i32::from(Self::MARGIN),
-                self.yup() + 1,
+                1i32.saturating_add_unsigned(self.yup()),
                 i32::from(Self::SECTION_SPACING) * i32::from(self.array_side_lengths.y)
                     + i32::from(Self::MARGIN),
             ],
@@ -194,12 +198,12 @@ impl LightingBenchLayout {
     }
 
     /// Height above y=0 (ground) that the sections extend.
-    fn yup(&self) -> GridCoordinate {
-        GridCoordinate::from(self.section_height()) * 4 / 14
+    fn yup(&self) -> GridSizeCoord {
+        GridSizeCoord::from(self.section_height()) * 4 / 14
     }
     /// Depth below y=0 (ground) that the sections extend.
     fn ydown(&self) -> GridCoordinate {
-        GridCoordinate::from(self.section_height()) - self.yup()
+        GridCoordinate::from(self.section_height()).saturating_sub_unsigned(self.yup())
     }
 
     fn section_iter(&self) -> impl ExactSizeIterator<Item = (GridCoordinate, GridCoordinate)> {

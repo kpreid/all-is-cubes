@@ -15,8 +15,8 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    rgba_const, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridVector,
-    Gridgid, VectorOps,
+    rgba_const, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize,
+    GridSizeCoord, GridVector, Gridgid, VectorOps,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
@@ -491,18 +491,16 @@ fn place_one_exhibit<I: Instant>(
         let front_face = plot_transform.rotation.transform(Face6::PZ);
         // Compute the surface that needs to be clear for walking
         let entrance_plane = enclosure_lower
-            .expand(
-                FaceMap {
-                    // don't alter y
-                    ny: 0,
-                    py: 0,
-                    ..enclosure_thickness
-                }
-                .map(|_, thick| -thick),
-            )
+            .shrink(FaceMap {
+                // don't alter y
+                ny: 0,
+                py: 0,
+                ..enclosure_thickness
+            })
+            .unwrap()
             .abut(Face6::PY, 0)
             .unwrap()
-            .abut(front_face, enclosure_thickness.pz) // re-add enclosure bounds
+            .abut(front_face, enclosure_thickness.pz as GridCoordinate) // re-add enclosure bounds
             .unwrap()
             .abut(
                 front_face,
@@ -839,7 +837,7 @@ impl CityPlanner {
     /// Distance from the center cube to the line of the front of each placed exhibit.
     /// TODO: The units of this isn't being consistent, since it is actually + 1 from the lamps
     const PLOT_FRONT_RADIUS: GridCoordinate = Self::LAMP_POSITION_RADIUS;
-    const GAP_BETWEEN_PLOTS: GridCoordinate = 1;
+    const GAP_BETWEEN_PLOTS: GridSizeCoord = 1;
 
     const SURFACE_Y: GridCoordinate = 1;
     const UNDERGROUND_FLOOR_Y: GridCoordinate = -10;

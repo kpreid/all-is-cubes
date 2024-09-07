@@ -49,7 +49,7 @@ impl DungeonGrid {
 
     pub fn room_box_including_walls(&self) -> GridAab {
         self.room_box
-            .expand(self.room_wall_thickness.map(|_, c| GridCoordinate::from(c)))
+            .expand(self.room_wall_thickness.map(|_, c| c.into()))
     }
 
     pub fn room_box_at(&self, room_position: Cube) -> GridAab {

@@ -227,9 +227,9 @@ impl<Container, Color> Dimensions for DrawingPlane<'_, Vol<Container>, Color> {
 fn rectangle_from_bounds(transform: Gridgid, bounds: GridAab) -> Rectangle {
     // Invert our coordinate transform to bring the bounds into the drawing
     // coordinate system.
-    // TODO: duplicated code with the `Space` impl
     let bounds = bounds
-        .expand(FaceMap::from_fn(|f| if f.is_positive() { -1 } else { 0 }))
+        .shrink(FaceMap::from_fn(|f| f.is_positive().into()))
+        .unwrap()
         .transform(transform.inverse())
         .unwrap_or(GridAab::ORIGIN_CUBE);
 

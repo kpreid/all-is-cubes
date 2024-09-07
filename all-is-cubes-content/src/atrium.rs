@@ -15,7 +15,7 @@ use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     rgb_const, Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Gridgid, Rgb, Rgba, Vol,
+    GridRotation, GridSizeCoord, GridVector, Gridgid, Rgb, Rgba, Vol,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -26,7 +26,8 @@ use crate::alg::{array_of_noise, four_walls, scale_color};
 use crate::Fire;
 
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
-const WALL: GridCoordinate = 1;
+const IWALL: GridCoordinate = 1;
+const UWALL: GridSizeCoord = 1;
 
 pub(crate) async fn atrium(
     universe: &mut Universe,
@@ -40,8 +41,8 @@ pub(crate) async fn atrium(
         blocks
     };
 
-    let ceiling_height = 6;
-    let between_small_arches = 3;
+    let ceiling_height = 6u32;
+    let between_small_arches = 3u32;
     let between_large_arches = between_small_arches * 2 + 1;
     let balcony_radius = 4;
     let large_arch_count_x = 1;
@@ -49,22 +50,22 @@ pub(crate) async fn atrium(
     let floor_count = 4;
     let sun_height = 10;
 
-    let origin = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
+    let origin = GridAab::ORIGIN_CUBE;
     let atrium_footprint = origin.expand(FaceMap::symmetric([
-        ((between_large_arches + WALL) * large_arch_count_x) / 2 - WALL,
+        ((between_large_arches + UWALL) * large_arch_count_x) / 2 - UWALL,
         0,
-        ((between_large_arches + WALL) * large_arch_count_z) / 2 - WALL,
+        ((between_large_arches + UWALL) * large_arch_count_z) / 2 - UWALL,
     ]));
-    let arches_footprint = atrium_footprint.expand(FaceMap::symmetric([WALL, 0, WALL]));
+    let arches_footprint = atrium_footprint.expand(FaceMap::symmetric([UWALL, 0, UWALL]));
     let balconies_footprint =
         arches_footprint.expand(FaceMap::symmetric([balcony_radius, 0, balcony_radius]));
-    let outer_walls_footprint = balconies_footprint.expand(FaceMap::symmetric([WALL, 0, WALL]));
+    let outer_walls_footprint = balconies_footprint.expand(FaceMap::symmetric([UWALL, 0, UWALL]));
 
-    let balcony_floor_pos = GridVector::new(0, ceiling_height + WALL, 0);
-    let top_floor_pos = GridVector::new(0, (ceiling_height + WALL) * 2, 0);
+    let balcony_floor_pos = GridVector::new(0, (ceiling_height + UWALL) as i32, 0);
+    let top_floor_pos = GridVector::new(0, (ceiling_height + UWALL) as i32 * 2, 0);
 
     let space_bounds = outer_walls_footprint
-        .expand(FaceMap::default().with(Face6::PY, ceiling_height * floor_count + sun_height));
+        .expand(FaceMap::default().with(Face6::PY, sun_height + ceiling_height * floor_count));
 
     let floor_with_cutout = |mut cube: Cube| {
         cube.y = 0;
@@ -134,7 +135,7 @@ pub(crate) async fn atrium(
         outer_walls_footprint
             .translate(top_floor_pos)
             .expand(FaceMap::from_fn(|f| {
-                GridCoordinate::from(f == Face6::PY) * ceiling_height
+                GridSizeCoord::from(f == Face6::PY) * ceiling_height
             })),
         floor_with_cutout,
     )?;
@@ -206,14 +207,14 @@ pub(crate) async fn atrium(
         *br"        ",
     ]]);
     four_walls(
-        arches_footprint.translate([0, WALL, 0]),
+        arches_footprint.translate([0, IWALL, 0]),
         |origin, direction, length, _box| {
             arch_row(
                 &mut space,
                 &blocks,
                 origin,
-                between_large_arches + WALL,
-                length / (between_large_arches + WALL),
+                between_large_arches + UWALL,
+                length / (between_large_arches + UWALL),
                 direction,
                 arches_pattern.as_ref(),
             )
@@ -331,14 +332,14 @@ fn arch_row(
     space: &mut Space,
     blocks: &BlockProvider<AtriumBlocks>,
     first_column_base: GridPoint,
-    section_length: GridCoordinate,
-    section_count: GridCoordinate,
+    section_length: GridSizeCoord,
+    section_count: GridSizeCoord,
     parallel: Face6,
     pattern: Vol<&[u8]>,
 ) -> Result<(), InGenError> {
-    let offset = parallel.normal_vector() * section_length;
+    let offset = parallel.normal_vector() * section_length as GridCoordinate;
     let rotation = GridRotation::from_to(Face6::NX, parallel, Face6::PY).unwrap();
-    for i in 0..section_count {
+    for i in 0..(section_count as GridCoordinate) {
         let column_base = first_column_base + offset * (i + 1);
 
         let banner_color = if parallel.axis() == Axis::Z {

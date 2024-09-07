@@ -91,7 +91,9 @@ fn make_transparent_block(universe: &mut Universe) -> Block {
         .light_emission(Rgb::new(0.0, 1.0, 1.0))
         .build();
     let resolution = Resolution::R16;
-    let solid_box = GridAab::for_block(resolution).expand(FaceMap::repeat(-2));
+    let solid_box = GridAab::for_block(resolution)
+        .shrink(FaceMap::repeat(2))
+        .unwrap();
     let transparent_box = GridAab::for_block(resolution).abut(Face6::PX, -4).unwrap();
     let emissive_box = GridAab::for_block(resolution).abut(Face6::NX, -4).unwrap();
     Block::builder()
