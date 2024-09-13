@@ -278,7 +278,7 @@ impl SpaceBuilderBounds for Vol<()> {
 mod sbb {
     use super::*;
     #[doc(hidden)]
-    #[allow(unnameable_types)]
+    #[expect(unnameable_types)]
     pub trait SbbSealed {}
     impl SbbSealed for () {}
     impl SbbSealed for Vol<()> {}
@@ -300,7 +300,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
 
         // Generate some blocks to put in the space
         let mut blocks = alloc::vec::Vec::from(make_some_blocks::<2>()); // TODO: generate arbitrary blocks with attributes
-        #[allow(clippy::same_item_push)]
+        #[expect(clippy::same_item_push)]
         for _ in 0..6 {
             // Make it probable that blocks are AIR
             blocks.push(AIR);

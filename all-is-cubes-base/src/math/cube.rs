@@ -162,7 +162,7 @@ impl Cube {
     /// Apply a function to each coordinate independently.
     ///
     /// If a different return type is desired, use `.lower_bounds().map(f)` instead.
-    #[allow(clippy::return_self_not_must_use)]
+    #[expect(clippy::return_self_not_must_use)]
     #[inline]
     pub fn map(self, mut f: impl FnMut(GridCoordinate) -> GridCoordinate) -> Self {
         Self {

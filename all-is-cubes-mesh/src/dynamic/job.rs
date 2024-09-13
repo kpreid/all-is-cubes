@@ -275,7 +275,7 @@ struct CompletedJobShell<T> {
 
     /// Own this to signal that a completed job exists to be retrieved.
     /// It is dropped when the completed job is retrieved.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     counter_ticket: state::Ticket,
 }
 

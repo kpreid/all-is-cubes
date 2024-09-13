@@ -22,7 +22,7 @@ use crate::{
 /// `BlockAttributes::default()` will produce a reasonable set of defaults for “ordinary”
 /// blocks.
 #[derive(Clone, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_structs)] // TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via BlockBuilder.
+#[expect(clippy::exhaustive_structs)] // TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via BlockBuilder.
 pub struct BlockAttributes {
     /// The name that should be displayed to players.
     ///
@@ -446,7 +446,7 @@ impl ops::BitOr for AnimationChange {
 /// Stored in [`BlockAttributes`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[allow(clippy::exhaustive_structs, reason = "will deliberately break")]
+#[expect(clippy::exhaustive_structs, reason = "will deliberately break")]
 pub struct TickAction {
     /// Operation to perform on the schedule.
     pub operation: Operation,
@@ -519,7 +519,7 @@ mod tests {
     #[test]
     fn debug() {
         let default = BlockAttributes::default;
-        #[allow(clippy::needless_pass_by_value)]
+        #[expect(clippy::needless_pass_by_value)]
         fn debug(a: BlockAttributes) -> String {
             format!("{a:?}")
         }

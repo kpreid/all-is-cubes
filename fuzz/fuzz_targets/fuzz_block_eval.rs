@@ -1,5 +1,4 @@
 #![no_main]
-#![allow(clippy::single_match)]
 
 use libfuzzer_sys::fuzz_target;
 

@@ -12,7 +12,7 @@ use crate::math::{GridAab, GridCoordinate};
 /// These transformations are always invertible except in the case of numeric overflow.
 ///
 /// [rigid transformation]: https://en.wikipedia.org/wiki/Rigid_transformation
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Gridgid {
     /// Rotation component. Applied before the translation.

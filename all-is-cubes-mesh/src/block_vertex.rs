@@ -16,7 +16,7 @@ use crate::MeshTypes;
 /// should identify one point in the block's 3D texture, such as `T = Point3<f32>`).
 ///
 /// [`BlockMesh`]: super::BlockMesh
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct BlockVertex<T> {
     /// Vertex position.
@@ -51,7 +51,7 @@ impl<T: Clone> BlockVertex<T> {
 ///
 /// `T` is the type of texture-coordinate points being used. That is, one `T` value
 /// should identify one point in the block's 3D texture, such as `T = Point3<f32>`).
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Coloring<T> {
     /// Solid color.

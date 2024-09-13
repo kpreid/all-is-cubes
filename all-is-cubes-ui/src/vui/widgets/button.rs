@@ -494,7 +494,7 @@ pub(crate) enum ButtonIcon<'a> {
 }
 
 /// TODO: document, refine, and make public
-#[allow(clippy::needless_pass_by_value, reason = "convenience")]
+#[expect(clippy::needless_pass_by_value, reason = "convenience")]
 pub(crate) fn make_button_label_block(
     txn: &mut UniverseTransaction,
     name: &str,

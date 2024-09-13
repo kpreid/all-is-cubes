@@ -50,7 +50,7 @@ pub trait HeadlessRenderer {
 // TODO: This is not very compatible with future changes, but it's not clear how to
 // improve extensibility. We would also like to have renderer-specific performance info.
 #[derive(Clone, Debug)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct Rendering {
     /// Width and height of the image.
     pub size: ImageSize,

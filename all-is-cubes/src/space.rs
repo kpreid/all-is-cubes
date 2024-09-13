@@ -1202,7 +1202,7 @@ impl fmt::Display for SetCubeError {
 
 /// Description of a change to a [`Space`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[allow(
+#[expect(
     clippy::exhaustive_enums,
     reason = "any change will probably be breaking anyway"
 )]
@@ -1356,7 +1356,7 @@ impl Fmt<StatusText> for SpaceStepInfo {
 ///
 /// [`Tool::Activate`]: crate::inv::Tool::Activate
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct ActivatableRegion {
     /// The function to call when this region is activated.
     pub effect: EphemeralOpaque<dyn Fn() + Send + Sync>,

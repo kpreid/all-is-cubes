@@ -1,4 +1,4 @@
-#![allow(unused_qualifications)] // macro false positive
+#![expect(unused_qualifications)] // macro false positive
 
 use core::f64::consts::TAU;
 use core::mem;

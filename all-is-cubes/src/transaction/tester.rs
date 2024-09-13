@@ -16,7 +16,6 @@ use super::Transaction;
 /// This test utility follows the builder pattern: call methods to add test data, then
 /// finish with [`Self::test`].
 #[must_use]
-#[allow(missing_debug_implementations)]
 pub struct TransactionTester<'a, Tr>
 where
     Tr: Transaction + Clone + Debug + 'a,
@@ -31,7 +30,6 @@ where
     Tr: Transaction + Clone + Debug + 'a,
     Tr::Target: Debug + 'a,
 {
-    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             transactions: Vec::new(),
@@ -131,7 +129,7 @@ pub type PredicateRes = Result<(), Box<dyn Error>>;
 
 struct TransactionAndPredicate<'a, Tr: Transaction> {
     transaction: Tr,
-    #[allow(
+    #[expect(
         clippy::type_complexity,
         reason = "https://github.com/rust-lang/rust-clippy/issues/9299"
     )]

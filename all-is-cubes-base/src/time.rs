@@ -40,7 +40,7 @@ impl Instant for std::time::Instant {
 /// is available **and it's okay for all time measurements to be recorded as zero**.
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct NoTime;
 
 impl Instant for NoTime {

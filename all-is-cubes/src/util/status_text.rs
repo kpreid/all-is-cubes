@@ -9,7 +9,7 @@ use all_is_cubes_base::util::ConciseDebug;
 ///
 /// This format does not follow Rust [`fmt::Debug`] syntax, and when implemented
 /// for standard Rust types may have quirks. Values may have multiple lines.
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StatusText {
     /// Types of information to include or exclude.

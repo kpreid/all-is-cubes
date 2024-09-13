@@ -60,7 +60,7 @@ mod tests;
 /// Internally uses [`Arc`] to be cheap to clone. Might be interned in future versions.
 ///
 #[doc = include_str!("save/serde-warning.md")]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Name {
     /// An explicitly set name.
@@ -695,9 +695,10 @@ impl Universe {
     }
 
     #[allow(clippy::unused_self)]
+    #[mutants::skip]
     fn log_rerun_time(&self) {
         #[cfg(feature = "rerun")]
-        #[allow(clippy::cast_possible_wrap)]
+        #[expect(clippy::cast_possible_wrap)]
         self.rerun_destination
             .stream
             .set_time_sequence("session_step_time", self.session_step_time as i64);
@@ -911,7 +912,7 @@ fn gc_members<T>(table: &mut Storage<T>) {
 /// `all_is_cubes_port::ExportSet` and doesn't play a role in the API itself.
 #[doc(hidden)]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct PartialUniverse {
     // TODO: design API that doesn't rely on making these public, but still allows
     // exports to be statically exhaustive.

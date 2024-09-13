@@ -182,7 +182,7 @@ impl<T> ListenableCellWithLocal<T> {
         self.value = value;
     }
 
-    #[allow(clippy::should_implement_trait)] // TODO: consider renaming
+    #[expect(clippy::should_implement_trait)] // TODO: consider renaming
     pub fn borrow(&self) -> &T {
         &self.value
     }

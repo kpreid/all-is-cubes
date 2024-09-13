@@ -377,7 +377,7 @@ impl From<Rgb> for BlockBuilder<BlockBuilderAtom, ()> {
 
 /// Placeholder type for an incomplete [`BlockBuilder`]'s content. The builder
 /// cannot create an actual block until this is replaced.
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct NeedsPrimitive;
 

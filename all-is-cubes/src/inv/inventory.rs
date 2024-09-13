@@ -326,7 +326,7 @@ impl StackLimit {
 /// The output type is the change notification which should be passed on after commit,
 /// if any change is made.
 #[derive(Clone, Debug, Default, PartialEq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
+#[expect(clippy::derive_partial_eq_without_eq)]
 #[must_use]
 pub struct InventoryTransaction {
     replace: BTreeMap<usize, (Slot, Slot)>,

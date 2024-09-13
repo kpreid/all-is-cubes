@@ -3,7 +3,7 @@
 //! TODO: This cache is not yet used, but I expect to integrate it with `ChunkedSpaceMesh`
 //! eventually, replacing part or all of the `MeshJobQueue`.
 //! See <https://github.com/kpreid/all-is-cubes/issues/494> for project details.
-#![allow(dead_code)]
+#![expect(dead_code)]
 
 use core::ops::Deref;
 use std::collections::HashMap;

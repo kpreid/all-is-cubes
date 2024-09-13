@@ -65,7 +65,7 @@ pub async fn template_menu_space(
     Ok(space)
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 fn template_menu_widget_tree(
     widget_theme: &widgets::WidgetTheme,
     action: Arc<dyn Fn(&UniverseTemplate) + Send + Sync>,

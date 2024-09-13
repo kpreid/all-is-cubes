@@ -15,7 +15,7 @@ use crate::camera::{Camera, GraphicsOptions, NdcPoint2, ViewTransform, Viewport}
 /// [`HeadlessRenderer`]: crate::HeadlessRenderer
 // Exhaustive: Changing this will probably be breaking anyway, until we make it a
 // more thorough abstraction.
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Layers<T> {
     /// The game world.
@@ -361,7 +361,7 @@ impl Clone for StandardCameras {
 /// Note that we may wish to revise this bundle if we start having continuously changing
 /// `view_transform`.
 #[derive(Clone, Debug)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct UiViewState {
     /// The [`Space`] to render as the UI.
     pub space: Option<Handle<Space>>,

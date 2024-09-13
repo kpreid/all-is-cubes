@@ -197,7 +197,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         );
     }
 
-    #[cfg_attr(not(feature = "terminal"), allow(dead_code))]
+    #[cfg_attr(not(feature = "terminal"), expect(dead_code))]
     pub(crate) fn into_renderer_and_window(self) -> (DesktopSession<(), ()>, Ren, Win) {
         (
             DesktopSession {

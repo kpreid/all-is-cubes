@@ -58,7 +58,7 @@ impl DungeonGrid {
     }
 
     /// Returns the volume which lies between two rooms and meets their adjoining faces.
-    #[allow(dead_code)] // TODO: superseded in use by theme-specific sizes; review if should keep
+    #[expect(dead_code)] // TODO: superseded in use by theme-specific sizes; review if should keep
     pub fn shared_wall_at(&self, room_position: Cube, face: Face6) -> GridAab {
         self.room_box_at(room_position)
             .abut(

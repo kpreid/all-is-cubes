@@ -68,7 +68,7 @@ impl InputProcessor {
     /// Constructs a new [`InputProcessor`].
     ///
     /// Consider using [`Session`](crate::apps::Session) instead of directly calling this.
-    #[allow(
+    #[expect(
         clippy::new_without_default,
         reason = "I expect it'll grow some parameters"
     )]
@@ -116,7 +116,6 @@ impl InputProcessor {
 
     /// Returns true if the key should go in `command_buffer`.
     fn is_command(key: Key) -> bool {
-        #[allow(clippy::match_like_matches_macro)]
         match key {
             Key::Escape => true,
             Key::Character(d) if d.is_ascii_digit() => true,

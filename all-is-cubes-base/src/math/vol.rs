@@ -20,7 +20,7 @@ use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, Grid
 ///
 /// Use this type with [`Vol`] to store volume data in this order.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct ZMaj;
 
 /// Type for volume data stored in a slice, or for generating linear indexing.
@@ -191,7 +191,7 @@ where
     // TODO: Reimplement this in terms of adopting the elements as a linear array.
     // TODO: Test.
     #[doc(hidden)] // used by all-is-cubes-content
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub fn from_y_flipped_array<const DX: usize, const DY: usize, const DZ: usize>(
         array: [[[V; DX]; DY]; DZ],
     ) -> Self
@@ -782,7 +782,7 @@ fn find_zmaj_subdivision(bounds: GridAab) -> Option<(GridAab, GridAab, usize)> {
         let axis_range = bounds.axis_range(axis);
         let size: u32 = bounds.size()[axis];
         if size >= 2 {
-            #[allow(clippy::cast_possible_wrap, reason = "known to fit")]
+            #[expect(clippy::cast_possible_wrap, reason = "known to fit")]
             let split_coordinate = axis_range.start + (size / 2) as i32;
 
             let mut lower_half_ub = bounds.upper_bounds();

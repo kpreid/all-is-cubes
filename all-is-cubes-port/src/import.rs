@@ -86,7 +86,7 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
     }
 
     fn can_save(&self) -> bool {
-        #![allow(clippy::match_like_matches_macro)]
+        #![expect(clippy::match_like_matches_macro)]
         cfg!(feature = "export")
             && match self.format {
                 Format::AicJson => cfg!(feature = "native"),
@@ -220,7 +220,7 @@ mod tests {
 
     /// This function won't compile if `load_universe_from_file`'s future isn't Send
     fn _load_universe_from_file_future_is_send() {
-        #![allow(unreachable_code, clippy::diverging_sub_expression)]
+        #![expect(unreachable_code, clippy::diverging_sub_expression)]
         tokio::spawn(load_universe_from_file(unreachable!(), unreachable!()));
     }
 

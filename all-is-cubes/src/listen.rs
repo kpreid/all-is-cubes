@@ -399,7 +399,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(ambiguous_wide_pointer_comparisons)]
     fn erased_listener() {
         let sink = Sink::new();
         let listener: DynListener<&str> = sink.listener().erased();

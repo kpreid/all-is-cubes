@@ -5,8 +5,6 @@
 //! * [`super::builder`]
 //! * [`super::modifier`]
 
-#![allow(clippy::bool_assert_comparison)]
-
 use euclid::Vector3D;
 use pretty_assertions::assert_eq;
 

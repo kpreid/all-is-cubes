@@ -75,7 +75,6 @@ pub struct Camera {
 }
 
 /// Basic creation and mutation.
-#[allow(clippy::cast_lossless)]
 impl Camera {
     /// Create a camera which has
     ///
@@ -143,7 +142,6 @@ impl Camera {
     /// Besides controlling rendering, this is used to determine world coordinates for purposes
     /// of [`view_position()`](Self::view_position) and
     /// [`project_ndc_into_world()`](Self::project_ndc_into_world).
-    #[allow(clippy::float_cmp)]
     pub fn set_view_transform(&mut self, eye_to_world_transform: ViewTransform) {
         if eye_to_world_transform.to_untyped() == self.eye_to_world_transform.to_untyped() {
             return;
@@ -429,20 +427,20 @@ impl Camera {
 /// the space of camera-relative coordinates that are *not* perspective-projected.
 ///
 /// +X is right, +Y is up, +Z is towards-the-viewer (right-handed coordinates).
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum Eye {}
 
 /// Unit-of-measure type for vectors representing the on-screen dimensions of a [`Viewport`],
 /// which may be different from the “physical” pixels of the image rendered to it.
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum NominalPixel {}
 
 /// Unit-of-measure type for vectors representing the width and height of an image.
 ///
 /// Used in [`Viewport::framebuffer_size`].
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum ImagePixel {}
 
@@ -453,7 +451,7 @@ pub enum ImagePixel {}
 /// zero is the center of the screen;
 /// and <var>z</var> has the range 0 (nearest) to 1 (farthest),
 /// and is image depth rather than an equivalent third spatial axis.
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum Ndc {}
 
@@ -472,7 +470,7 @@ pub type ImageSize = Size2D<u32, ImagePixel>;
 
 /// Viewport dimensions for rendering and UI layout with the correct resolution and
 /// aspect ratio.
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Viewport {

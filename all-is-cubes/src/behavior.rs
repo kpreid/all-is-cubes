@@ -407,7 +407,6 @@ impl<H: BehaviorHost> fmt::Debug for BehaviorSetEntry<H> {
 }
 
 impl<H: BehaviorHost> PartialEq for BehaviorSetEntry<H> {
-    #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
     fn eq(&self, other: &Self) -> bool {
         self.attachment == other.attachment && Arc::ptr_eq(&self.behavior, &other.behavior)
     }
@@ -579,7 +578,6 @@ impl<H: BehaviorHost> Transaction for BehaviorSetTransaction<H> {
     type Output = transaction::NoOutput;
     type Mismatch = BehaviorTransactionMismatch;
 
-    #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
     fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, Self::Mismatch> {
         let Self { replace, insert } = self;
         // TODO: need to compare replacement preconditions
@@ -734,7 +732,6 @@ impl<H: BehaviorHost> PartialEq for BehaviorSetTransaction<H> {
 }
 impl<H: BehaviorHost> PartialEq for Replace<H> {
     // Manual implementation to avoid bounds on `H` and to implement the partiality (comparing pointers instead of values).
-    #[allow(ambiguous_wide_pointer_comparisons)] // The hazards should be okay for this use case
     fn eq(&self, other: &Self) -> bool {
         let Self {
             old: old1,
@@ -1028,8 +1025,6 @@ mod tests {
 
     #[test]
     fn query() {
-        #![allow(trivial_casts)]
-
         #[derive(Debug, Eq, PartialEq)]
         struct Expected;
         #[derive(Debug, Eq, PartialEq)]

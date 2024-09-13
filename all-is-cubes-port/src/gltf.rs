@@ -41,7 +41,7 @@ mod tests;
 
 /// [`MeshTypes`] implementation for glTF output.
 #[derive(Debug)]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 pub enum GltfMt {}
 impl MeshTypes for GltfMt {
     type Vertex = GltfVertex;
@@ -55,7 +55,7 @@ impl MeshTypes for GltfMt {
 /// These are then converted into [`gltf_json::Node`]s with animations controlling when they
 /// are visible.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct MeshInstance {
     /// The mesh to display.
     pub mesh: Index<gltf_json::Mesh>,

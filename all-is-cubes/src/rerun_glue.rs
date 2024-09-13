@@ -13,7 +13,7 @@ pub use re_types::{archetypes, components, view_coordinates};
 /// Information that an entity or parent of entities can store in order to know where to
 /// send their Rerun logging data.
 #[derive(Clone)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct Destination {
     pub stream: RecordingStream,
     pub path: EntityPath,
@@ -55,7 +55,7 @@ impl Destination {
         self.stream.is_enabled()
     }
 
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     fn catch(&self, f: impl FnOnce() -> RecordingStreamResult<()>) {
         match f() {
             Ok(()) => (),

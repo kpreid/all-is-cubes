@@ -26,12 +26,11 @@ use crate::math::{
 };
 
 /// Unit-of-measure type for chunk positions *not* tracking the chunk size in the type.
-#[allow(clippy::exhaustive_enums)]
 #[derive(Debug)]
 enum WholeChunk {}
 
 /// Unit-of-measure/coordinate-system type for cubes within a chunk (range `0..CHUNK_SIZE`)
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Debug)]
 pub enum ChunkRelative {}
 
@@ -48,7 +47,7 @@ type Ccv = Vector3D<i32, WholeChunk>;
 ///
 /// The consequences are unspecified if `CHUNK_SIZE` is not positive.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct ChunkPos<const CHUNK_SIZE: GridCoordinate>(pub Cube);
 
 impl<const CHUNK_SIZE: GridCoordinate> fmt::Debug for ChunkPos<CHUNK_SIZE> {

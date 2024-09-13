@@ -30,7 +30,7 @@ type Srgba = [u8; 4];
 
 /// Adapter from [`png_decoder`] decoded images to [`embedded_graphics::Drawable`].
 #[doc(hidden)] // still experimental API
-#[allow(missing_debug_implementations)]
+#[expect(missing_debug_implementations)]
 pub struct PngAdapter<'a> {
     width: i32,
     height: i32,

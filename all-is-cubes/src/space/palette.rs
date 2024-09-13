@@ -414,7 +414,7 @@ pub struct SpaceBlockData {
     /// Number of uses of this block in the space.
     count: usize,
     pub(super) evaluated: EvaluatedBlock,
-    #[allow(dead_code, reason = "Used only for its `Drop`")]
+    #[expect(dead_code, reason = "Used only for its `Drop`")]
     block_listen_gate: Option<listen::Gate>,
 }
 

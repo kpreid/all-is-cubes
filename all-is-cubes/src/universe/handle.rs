@@ -747,7 +747,7 @@ mod private {
     /// Private type making it impossible to call [`ErasedHandle::connect_deserialized`] outside
     /// the crate.
     #[derive(Debug)]
-    #[allow(unnameable_types)]
+    #[expect(unnameable_types)]
     pub struct ErasedHandleInternalToken;
 }
 #[cfg(feature = "save")]
@@ -887,7 +887,6 @@ mod tests {
     /// Handles are compared by pointer (each `Handle::new_pending()` is a new identity),
     /// not by name or member-value.
     #[test]
-    #[allow(clippy::eq_op)]
     fn handle_equality_is_pointer_equality() {
         let handle_a_1 = Handle::new_pending("space".into(), Space::empty_positive(1, 1, 1));
         let handle_a_2 = handle_a_1.clone();

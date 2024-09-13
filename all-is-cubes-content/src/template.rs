@@ -246,7 +246,7 @@ fn insert_generated_space(
 ///
 /// Pass this structure to [`UniverseTemplate::build()`].
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct TemplateParameters {
     /// Seed for any randomization which the template performs.
     /// Not all templates have random elements.
@@ -324,7 +324,7 @@ async fn islands(
     let size = size.unwrap_or(GridSize::new(1000, 400, 1000));
 
     // Set up dimensions
-    #[allow(clippy::cast_possible_wrap, reason = "big numbers will break anyway")]
+    #[expect(clippy::cast_possible_wrap, reason = "big numbers will break anyway")]
     let bounds = GridAab::checked_from_lower_size(
         [
             -((size.width / 2) as i32),
@@ -494,7 +494,7 @@ mod tests {
     use all_is_cubes::util::yield_progress_for_testing;
     use futures_core::future::BoxFuture;
 
-    #[allow(clippy::let_underscore_future)]
+    #[expect(clippy::let_underscore_future)]
     fn _test_build_future_is_send() {
         let _: BoxFuture<'_, _> = Box::pin(UniverseTemplate::Atrium.build::<std::time::Instant>(
             yield_progress_for_testing(),

@@ -672,7 +672,7 @@ impl LightBuffer {
     /// Note: to avoid redundant lookups as a ray proceeds, `current_light` is used only to fill
     /// `light_ahead_cache` or `light_behind_cache`.
     #[inline]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn traverse<D>(
         &mut self,
         ray_state: &mut LightRayState,
@@ -839,7 +839,7 @@ impl LightBuffer {
 /// TODO: better name
 #[derive(Clone, Debug)]
 #[doc(hidden)] // used for debug rendering
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub struct ComputedLight<D> {
     pub cube: Cube,
 

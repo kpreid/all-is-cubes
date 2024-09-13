@@ -327,7 +327,6 @@ fn map_text_block(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn arch_row(
     space: &mut Space,
     blocks: &BlockProvider<AtriumBlocks>,

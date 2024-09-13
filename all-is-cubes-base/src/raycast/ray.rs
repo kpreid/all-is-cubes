@@ -19,7 +19,7 @@ use crate::math::GridAab;
 
 /// A ray; a half-infinite line segment (sometimes used as finite by the length of the
 /// direction vector).
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ray {
     // TODO(euclid migration): should we expose the coordinate unit generic?

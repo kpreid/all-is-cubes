@@ -1,4 +1,4 @@
-#![allow(clippy::identity_op)]
+#![expect(clippy::identity_op)]
 
 use alloc::vec::Vec;
 use std::sync::{Arc, Mutex};
@@ -149,7 +149,7 @@ fn todo_ignores_absent_chunks() {
 
 #[derive(Debug)]
 struct CsmTester<const MBM: usize> {
-    #[allow(
+    #[expect(
         dead_code,
         reason = "Universe must be kept alive but is not read after construction"
     )]

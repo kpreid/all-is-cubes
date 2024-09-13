@@ -59,7 +59,7 @@ struct BlockDefState {
     listeners_ok: bool,
 
     /// Gate with which to interrupt previous listening to a contained block.
-    #[allow(unused, reason = "used only for its `Drop` behavior")]
+    #[expect(unused, reason = "used only for its `Drop` behavior")]
     block_listen_gate: Gate,
 }
 

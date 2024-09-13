@@ -131,7 +131,7 @@ impl<K: Eq, V> Memo<K, V> {
     }
 
     /// Drop the stored value, if any.
-    #[cfg_attr(not(feature = "rerun"), allow(unused))] // currently not otherwise used
+    #[cfg_attr(not(feature = "rerun"), expect(unused))] // currently not otherwise used
     pub fn clear(&mut self) {
         self.data = None;
     }

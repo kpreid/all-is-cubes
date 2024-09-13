@@ -2,7 +2,7 @@
 //! Intended to be used to validate that the intermediate steps are proceeding correctly,
 //! and just to be cool to look at.
 
-#![allow(clippy::unused_self)]
+#![cfg_attr(not(feature = "rerun"), expect(clippy::unused_self))]
 
 use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::math::{Face6, FreePoint, GridCoordinate, GridPoint, Rgba, Vol};
@@ -24,7 +24,7 @@ use {
 /// Encapsulates all the stuff we want to *not* do if recording is disabled, and in particular,
 /// compiles to nothing if the "rerun" feature is not enabled.
 #[doc(hidden)]
-#[allow(missing_debug_implementations)]
+#[expect(missing_debug_implementations)]
 #[non_exhaustive]
 pub enum Viz {
     Disabled,
@@ -36,8 +36,8 @@ pub enum Viz {
 /// Use [`Viz::new()`] instead of constructing this directly.
 #[cfg(feature = "rerun")]
 #[doc(hidden)]
-#[allow(unnameable_types)]
-#[allow(missing_debug_implementations)]
+#[expect(unnameable_types)]
+#[expect(missing_debug_implementations)]
 pub struct Inner {
     // Info captured from the `Evoxels` to give context to later data
     resolution: Option<Resolution>,

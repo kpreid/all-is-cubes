@@ -47,7 +47,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         task_done_signal,
     } = params;
 
-    #[cfg_attr(not(feature = "record"), allow(unused_variables))]
+    #[cfg_attr(not(feature = "record"), expect(unused_variables))]
     let executor = Executor::new(runtime.handle().clone());
 
     // At this point we have just finished whatever the GraphicsType did before calling
@@ -211,7 +211,7 @@ pub fn headless_main_loop(
 /// Ad-hoc struct of arguments to [`inner_main`] that can be constructed before choosing an
 /// event loop type.
 #[derive(Debug)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[allow(missing_docs)] // TODO: give this an API-design pass too
 pub struct InnerMainParams {
     pub application_title: String,
@@ -278,7 +278,7 @@ impl UniverseTask {
     }
 }
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 fn report_error_and_exit(_ctx: &MainTaskContext, error: anyhow::Error) -> ! {
     // TODO: if we are a GUI-no-terminal session, log this instead of printing and create a dialog
     // instead of exiting.

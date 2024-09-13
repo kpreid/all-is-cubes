@@ -204,7 +204,7 @@ impl<T> Clone for QuadColoring<'_, T> {
 ///
 /// `depth`, `low_corner`, and `high_corner` are in units of 1 texel.
 #[inline]
-#[allow(clippy::too_many_arguments)] // TODO: Figure out how to simplify
+#[expect(clippy::too_many_arguments)] // TODO: Figure out how to simplify
 pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
     vertices: &mut Vec<V>,
     indices: &mut IndexVec,

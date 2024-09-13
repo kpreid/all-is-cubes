@@ -13,7 +13,7 @@ use crate::Session;
 
 /// Fills the audio slot in a `DesktopSession` to actually produce audio.
 pub(crate) struct AudioOut {
-    #[allow(
+    #[expect(
         dead_code,
         reason = "eventually we're going to need this for volume control etc."
     )]
@@ -53,7 +53,7 @@ pub(crate) fn init_sound(session: &Session) -> Result<AudioOut, anyhow::Error> {
 }
 
 /// Thread function for receiving commands and executing them on `&mut AudioManager`.
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: AudioManager) {
     // TODO: better sound and more sounds
     let beep = StaticSoundData {

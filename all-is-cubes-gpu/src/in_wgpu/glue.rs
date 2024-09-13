@@ -21,7 +21,7 @@ pub fn to_wgpu_color(color: Rgba) -> wgpu::Color {
     }
 }
 
-#[allow(
+#[expect(
     clippy::needless_pass_by_value,
     reason = "the value is nearly a reference itself"
 )]

@@ -12,7 +12,7 @@ use crate::{SuiteId, TestId};
 /// between different expected/actual pairs.
 // TODO: better name
 #[derive(Clone, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct ImageId {
     pub test_id: TestId,
     pub renderer: RendererId,
@@ -33,7 +33,7 @@ impl fmt::Debug for ImageId {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 pub enum RendererId {
     /// A single expected output expected to be equal for all renderers.
     /// No renderer uses this value.
@@ -76,7 +76,7 @@ impl fmt::Display for RendererId {
     }
 }
 
-#[allow(rustdoc::private_intra_doc_links)]
+#[expect(rustdoc::private_intra_doc_links)]
 /// Selector of which image role is wanted from [`image_path`] and [`test_data_dir_path`].
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]

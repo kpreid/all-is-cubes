@@ -101,7 +101,6 @@ impl<T> RwLock<T> {
         Self(InnerRwLock::new(value))
     }
 
-    #[allow(dead_code)] // happens to be unused
     pub fn read(&self) -> Result<RwLockReadGuard<'_, T>, LockError<RwLockReadGuard<'_, T>>> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "std")] {
@@ -198,7 +197,6 @@ impl<'a, T> ops::DerefMut for RwLockWriteGuard<'a, T> {
 }
 
 pub(crate) enum LockError<G> {
-    #[allow(dead_code)]
     Poisoned(G),
 }
 
@@ -230,7 +228,6 @@ impl<G> fmt::Debug for LockError<G> {
 }
 
 pub(crate) enum TryLockError<G> {
-    #[allow(dead_code)]
     Poisoned(G),
     WouldBlock,
 }

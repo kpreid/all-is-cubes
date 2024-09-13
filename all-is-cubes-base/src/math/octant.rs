@@ -11,7 +11,7 @@ use crate::math::{Cube, Face6, FreeVector, GridCoordinate, GridPoint};
 /// This enum's discriminants are not currently to be considered stable; they may be reordered.
 //---
 // TODO: Replace this with an enum.
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Eq, Hash, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(u8)]

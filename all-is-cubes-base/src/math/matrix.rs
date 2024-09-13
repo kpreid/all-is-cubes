@@ -22,7 +22,7 @@ use crate::math::{
 /// TODO: The operators implemented for this are very incomplete.
 ///
 /// TODO(euclid migration): Can we dispose of this type now?
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct GridMatrix {
     /// First column
@@ -55,7 +55,7 @@ impl GridMatrix {
 
     /// Note: This takes the elements in a column-major ordering, so the argument order
     /// is transposed relative to a conventional textual display of a matrix.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     #[inline]
     pub const fn new(
         x0: GridCoordinate,
@@ -297,7 +297,7 @@ impl GridMatrix {
         const INVERSE_EPSILON: FreeCoordinate = 0.25 / (GridCoordinate::MAX as FreeCoordinate);
         fn try_round(v: [FreeCoordinate; 4], expected_w: FreeCoordinate) -> Option<GridVector> {
             let mut result = Vector3D::zero();
-            #[allow(clippy::needless_range_loop)]
+            #[expect(clippy::needless_range_loop)]
             for axis in 0..4 {
                 let rounded = v[axis].round();
                 let remainder = v[axis] - rounded;
@@ -312,7 +312,7 @@ impl GridMatrix {
                     2 => result.z = rounded as GridCoordinate,
                     3 =>
                     {
-                        #[allow(clippy::float_cmp)]
+                        #[expect(clippy::float_cmp)]
                         if rounded != expected_w {
                             return None;
                         }
@@ -334,7 +334,6 @@ impl GridMatrix {
 }
 
 /// Mini 4D vector for matrix rows.
-#[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct MVector4<T> {
     x: T,
