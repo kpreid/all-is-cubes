@@ -14,7 +14,7 @@ pub use generic::*;
 #[cfg(test)]
 mod tester;
 #[cfg(test)]
-pub use tester::*;
+pub(crate) use tester::*;
 
 /// A mutation that is to be performed atomically.
 ///

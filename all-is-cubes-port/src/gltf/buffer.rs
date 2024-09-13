@@ -44,7 +44,7 @@ struct Inner {
 
 impl GltfDataDestination {
     #[cfg(test)]
-    pub fn null() -> GltfDataDestination {
+    pub(crate) fn null() -> GltfDataDestination {
         Self(Arc::new(Inner {
             discard: true,
             maximum_inline_length: 0,

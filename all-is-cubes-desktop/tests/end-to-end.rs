@@ -1,3 +1,5 @@
+//! Tests which execute the `all-is-cubes` binary.
+
 #[test]
 fn trycmd_tests() {
     let tc = trycmd::TestCases::new();
