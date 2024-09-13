@@ -722,7 +722,6 @@ impl CharacterTransaction {
     }
 }
 
-#[allow(clippy::type_complexity)]
 impl Transaction for CharacterTransaction {
     type Target = Character;
     type CommitCheck = (
@@ -871,7 +870,7 @@ impl core::error::Error for CharacterTransactionConflict {
 
 /// Description of a change to a [`Character`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_enums)] // any change will probably be breaking anyway
+#[expect(clippy::exhaustive_enums)] // any change will probably be breaking anyway
 pub enum CharacterChange {
     /// Inventory contents.
     Inventory(inv::InventoryChange),

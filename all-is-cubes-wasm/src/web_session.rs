@@ -29,7 +29,6 @@ use crate::web_glue::{
 
 pub(crate) type Session = all_is_cubes_ui::apps::Session<crate::AdaptedInstant>;
 
-#[allow(clippy::large_enum_variant)]
 pub(crate) enum WebRenderer {
     Wgpu(in_wgpu::SurfaceRenderer<crate::AdaptedInstant>),
 }

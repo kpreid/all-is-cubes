@@ -96,7 +96,7 @@ impl Operation {
     ///
     /// Note that lack of error does not guarantee that the returned transaction will
     /// succeed. TODO: Explain how the two kinds of errors should be reported.
-    #[allow(clippy::only_used_in_recursion)] // TODO: Inventory not used *yet*.
+    #[expect(clippy::only_used_in_recursion)] // TODO: Inventory not used *yet*.
     pub(crate) fn apply(
         &self,
         space: &Space,

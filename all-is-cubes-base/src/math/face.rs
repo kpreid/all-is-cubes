@@ -24,8 +24,7 @@ use crate::math::{
 /// variant. The two enums use the same discriminant numbering.
 ///
 #[doc = include_str!("../serde-warning.md")]
-#[allow(clippy::upper_case_acronyms)]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -52,8 +51,7 @@ pub enum Face6 {
 /// provided. The two enums use the same discriminant numbering.
 ///
 #[doc = include_str!("../serde-warning.md")]
-#[allow(clippy::upper_case_acronyms)]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -108,7 +106,10 @@ impl Face6 {
     /// *   If all magnitudes are zero, the Z axis's sign is used. (Remember that floating-point
     ///     numbers include distinct positive and negative zeroes).
     /// *   If any coordinate is NaN, returns [`None`].
-    #[allow(unused)] // TODO: I expect to use this in block placement
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "TODO: I expect to use this in block placement")
+    )]
     fn from_snapped_vector(vector: FreeVector) -> Option<Self> {
         let Vector3D { x, y, z, _unit } = vector;
 
@@ -589,7 +590,7 @@ impl TryFrom<GridVector> for Face7 {
 /// is needed, such as converting to a [`Face6`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[displaydoc("Face7::Within does not have a direction or axis")]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct Faceless;
 
 #[cfg(feature = "rerun")]
@@ -627,7 +628,7 @@ impl From<Face6> for re_types::view_coordinates::SignedAxis3 {
 }
 
 /// Container for values keyed by [`Face6`]s. Always holds exactly six elements.
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Default, Hash, PartialEq, Eq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct FaceMap<V> {
@@ -919,7 +920,7 @@ impl_binary_operator_for_facemap!(Rem::rem);
 /// The combination of a [`Cube`] and [`Face7`] identifying one face of it or the interior.
 /// This pattern appears in cursor selection and collision detection.
 #[derive(Clone, Copy, Hash, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[allow(missing_docs)]
 pub struct CubeFace {
     pub cube: Cube,

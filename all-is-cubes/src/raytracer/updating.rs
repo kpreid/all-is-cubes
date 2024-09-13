@@ -285,7 +285,7 @@ mod tests {
                 .get()
                 .to_text::<CharacterBuf>(&self.camera, "\n")
                 .to_string();
-            #[allow(clippy::unit_arg)]
+            #[expect(clippy::unit_arg)]
             let image_fresh = SpaceRaytracer::<CharacterRtData>::new(
                 &self.space.read().unwrap(),
                 self.graphics_options.snapshot(),

@@ -209,7 +209,7 @@ pub trait Merge: Sized {
 }
 
 /// Error type from [`Transaction::execute()`] and [`Transactional::transact()`].
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 pub enum ExecuteError<Txn: Transaction = UniverseTransaction> {
     /// A conflict was discovered between parts that were to be assembled into the transaction.
     ///
@@ -450,7 +450,7 @@ pub(crate) fn merge_option<T>(this: &mut Option<T>, other: Option<T>, if_both: f
 
 /// For use with `merge_option()`.
 #[track_caller]
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 pub(crate) fn panic_if_not_equal<T: fmt::Debug + PartialEq>(a: T, b: T) -> T {
     if a == b {
         a

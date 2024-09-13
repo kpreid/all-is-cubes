@@ -44,7 +44,6 @@ impl fmt::Debug for HudInputs {
     }
 }
 
-#[allow(clippy::redundant_clone)]
 pub(super) fn new_hud_page(
     // TODO: mess of tightly coupled parameters
     character_source: ListenableSource<Option<Handle<Character>>>,

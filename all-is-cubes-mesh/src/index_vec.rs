@@ -6,7 +6,6 @@ use either::Either;
 /// Data storage for meshes’ index lists, automatically choosing an element type which is
 /// large enough for the index values.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_enums)]
 pub(crate) enum IndexVec {
     /// 16-bit indices.
     U16(Vec<u16>),
@@ -90,7 +89,7 @@ impl IndexVec {
 
 /// Data for meshes’ index lists, which may use either 16 or 32-bit values.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 pub enum IndexSlice<'a> {
     /// 16-bit indices.
     U16(&'a [u16]),

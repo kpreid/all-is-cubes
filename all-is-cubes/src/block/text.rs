@@ -618,7 +618,7 @@ impl universe::VisitHandles for Font {
 /// How a [`Text`] is to be positioned within a block.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[allow(
+#[expect(
     clippy::exhaustive_structs,
     reason = "TODO: probably want to do something else"
 )]

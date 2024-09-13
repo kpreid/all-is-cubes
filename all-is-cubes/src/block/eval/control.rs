@@ -15,7 +15,6 @@ use crate::universe::Handle;
 use crate::universe::HandleError;
 
 /// Parameters to [`Block::evaluate2()`] to choose which information to compute.
-#[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Debug)]
 pub(crate) struct EvalFilter {
     /// If true, don't actually evaluate, but return a placeholder value and do listen.

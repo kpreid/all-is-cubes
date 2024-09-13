@@ -14,11 +14,11 @@ mod tests;
 pub(crate) const POSITION_EPSILON: FreeCoordinate = 1e-6 * 1e-6;
 
 /// Unit-of-measure type for vectors that are velocity in cubes/s.
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum Velocity {}
 
 /// Unit-of-measure type for vectors that are acceleration in cubes/s².
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum Acceleration {}

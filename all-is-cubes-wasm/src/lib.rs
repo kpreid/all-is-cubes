@@ -16,7 +16,7 @@ mod init;
 pub mod js_bindings;
 #[cfg(any(target_family = "wasm", test))]
 mod url_params;
-#[cfg_attr(not(target_family = "wasm"), allow(unused))]
+#[cfg_attr(not(target_family = "wasm"), expect(unused))]
 mod web_glue;
 #[cfg(target_family = "wasm")]
 mod web_session;

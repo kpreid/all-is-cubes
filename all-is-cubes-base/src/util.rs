@@ -92,7 +92,7 @@ mod error_chain {
     /// which interferes with this one for [`Error`].
     #[doc(hidden)] // not something we wish to be stable public API
     #[derive(Clone, Copy, Debug)]
-    #[allow(clippy::exhaustive_structs)]
+    #[expect(clippy::exhaustive_structs)]
     pub struct ErrorChain<'a>(pub &'a (dyn Error + 'a));
 
     impl fmt::Display for ErrorChain<'_> {

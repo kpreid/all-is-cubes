@@ -35,13 +35,13 @@ pub use all_is_cubes::content::BoxStyle;
 
 /// Generic widget controller that only does something on `initialize()`.
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct OneshotController(pub Option<vui::WidgetTransaction>);
 
 impl OneshotController {
     /// Creates a [`OneshotController`] that will execute the given transaction once,
     /// then do nothing.
-    #[allow(clippy::new_ret_no_self)]
+    #[expect(clippy::new_ret_no_self)]
     pub fn new(transaction: vui::WidgetTransaction) -> Box<dyn vui::WidgetController> {
         Box::new(Self(Some(transaction)))
     }

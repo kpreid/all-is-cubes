@@ -13,7 +13,7 @@ use crate::util::maybe_sync::{RwLock, SendSyncIfStd};
 /// A [`Listener`] which discards all messages.
 ///
 /// Use this when a [`Listener`] is demanded, but there is nothing it should do.
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NullListener;
 

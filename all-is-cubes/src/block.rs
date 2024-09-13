@@ -212,7 +212,7 @@ pub enum Primitive {
 ///
 /// [intensive properties]: https://en.wikipedia.org/wiki/Intensive_and_extensive_properties
 #[derive(Clone, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct Atom {
     /// The color exhibited by diffuse reflection from this block.
     ///
@@ -1102,7 +1102,7 @@ pub struct BlockChange {
 }
 
 impl BlockChange {
-    #[allow(clippy::new_without_default)]
+    #[expect(clippy::new_without_default)]
     #[allow(missing_docs)] // TODO: why is this public, anyway?
     pub fn new() -> BlockChange {
         BlockChange { _not_public: () }

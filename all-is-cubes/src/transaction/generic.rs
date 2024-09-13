@@ -254,7 +254,7 @@ macro_rules! impl_transaction_for_tuple {
 
             #[doc = concat!("Transaction precondition error type for tuples of length ", $count, ".")]
             #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-            #[allow(clippy::exhaustive_enums)]
+            #[expect(clippy::exhaustive_enums)]
             pub enum [< TupleError $count >]<$( [<E $name>], )*> {
                 $(
                     #[doc = concat!("Error at tuple element ", $name, ".")]
@@ -263,7 +263,7 @@ macro_rules! impl_transaction_for_tuple {
             }
             #[doc = concat!("Transaction conflict error type for tuples of length ", $count, ".")]
             #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-            #[allow(clippy::exhaustive_enums)]
+            #[expect(clippy::exhaustive_enums)]
             pub enum [< TupleConflict $count >]<$( [<C $name>], )*> {
                 $(
                     #[doc = concat!("Conflict at tuple element ", $name, ".")]

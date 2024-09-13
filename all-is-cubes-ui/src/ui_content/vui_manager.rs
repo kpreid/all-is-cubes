@@ -53,7 +53,6 @@ pub(crate) struct Vui {
     viewport_source: ListenableSource<Viewport>,
     /// Size computed from `viewport_source` and compared with `PageInst`.
     last_ui_size: UiSize,
-    #[allow(dead_code)] // TODO: probably going to need this for more dynamic UIs
     hud_inputs: HudInputs,
 
     hud_page: PageInst,
@@ -89,7 +88,7 @@ impl Vui {
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
     /// multitasking. It may safely be blocked on from a synchronous context.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub(crate) async fn new(
         input_processor: &InputProcessor,
         character_source: ListenableSource<Option<Handle<Character>>>,

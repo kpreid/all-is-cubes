@@ -94,7 +94,6 @@ impl texture::Allocator for GltfTextureAllocator {
 // texels into 2D sections. Therefore, this is just a container for the texels, not a handle
 // to the actual atlas.
 #[derive(Clone, Debug, PartialEq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
 pub struct GltfTile {
     bounds: GridAab,
     channels: texture::Channels,
@@ -157,7 +156,7 @@ impl texture::Tile for GltfTile {
 ///
 /// You should not generally need to refer to this type.
 #[derive(Clone, Debug, PartialEq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
+#[expect(clippy::derive_partial_eq_without_eq)]
 pub struct GltfTexturePlane {
     plane_id: u64,
     bounds: GridAab,

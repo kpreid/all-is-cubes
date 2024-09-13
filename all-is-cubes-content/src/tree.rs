@@ -16,8 +16,7 @@ use crate::LandscapeBlocks::{self, Leaves, Log};
 ///
 /// TODO: make the public version of this a struct with private contents
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
-#[allow(clippy::exhaustive_enums)]
-#[allow(
+#[expect(
     unnameable_types,
     reason = "TODO: this should be public with an opaque struct wrapper"
 )]
@@ -214,7 +213,7 @@ pub(crate) fn make_tree(
 
 use graph::Growph;
 mod graph {
-    #![allow(clippy::option_option)]
+    #![expect(clippy::option_option)]
 
     use super::*;
     use all_is_cubes::euclid::default::Vector3D;

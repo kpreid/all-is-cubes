@@ -135,7 +135,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
                 None,
             )
             .await?;
-        #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]
+        #[cfg_attr(target_family = "wasm", expect(clippy::arc_with_non_send_sync))]
         let device = Arc::new(device);
 
         let viewport_source = cameras.viewport_source();
@@ -299,7 +299,6 @@ struct EverythingRenderer<I: time::Instant> {
 
     /// Pipeline for the color postprocessing + info text layer drawing.
     postprocess_render_pipeline: Memo<Id<wgpu::ShaderModule>, wgpu::RenderPipeline>,
-    #[allow(clippy::type_complexity)]
     postprocess_bind_group: Memo<(Id<wgpu::TextureView>, frame_texture::FbtId), wgpu::BindGroup>,
     postprocess_bind_group_layout: wgpu::BindGroupLayout,
     postprocess_camera_buffer: wgpu::Buffer,
@@ -882,10 +881,6 @@ impl<I: time::Instant> EverythingRenderer<I> {
             info_text_texture.upload(queue);
         }
 
-        #[allow(
-            clippy::let_and_return,
-            reason = "<https://github.com/rust-lang/rust-clippy/issues/9150>"
-        )]
         let flaws = postprocess::postprocess(self, queue, output);
 
         #[cfg(feature = "rerun")]
@@ -948,7 +943,7 @@ fn choose_surface_format(capabilities: &wgpu::SurfaceCapabilities) -> wgpu::Text
                 // TODO: repro and report to wgpu, supposing that it is a wgpu bug
                 is_float: matches!(format, Rgba16Float | Rgba32Float | Rgb9e5Ufloat)
                     && !cfg!(target_family = "wasm"),
-                #[allow(clippy::cast_possible_wrap)]
+                #[expect(clippy::cast_possible_wrap)]
                 negated_original_order: -(index as isize),
             }
         })

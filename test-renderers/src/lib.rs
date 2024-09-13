@@ -40,7 +40,7 @@ pub mod test_cases;
 #[derive(
     Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
 )]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 pub enum SuiteId {
     Renderers,
     Ui,
@@ -71,7 +71,7 @@ impl fmt::Display for SuiteId {
 #[derive(
     Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, serde::Serialize, serde::Deserialize,
 )]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct TestId {
     pub suite: SuiteId,
 
@@ -119,7 +119,7 @@ pub struct ComparisonRecord {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 pub enum ComparisonOutcome {
     /// Images had no differences above the threshold.
     Equal,
@@ -149,7 +149,6 @@ impl ComparisonOutcome {
 }
 
 impl ComparisonRecord {
-    #[allow(clippy::large_types_passed_by_value)]
     fn from_paths(
         expected_file_path: &Path,
         actual_file_path: &Path,
@@ -194,7 +193,7 @@ impl ComparisonRecord {
 }
 
 /// Finish a rendering test by storing/displaying/comparing the output image.
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 pub fn compare_rendered_image(
     test: ImageId,
     allowed_difference: &Threshold,

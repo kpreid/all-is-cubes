@@ -50,7 +50,7 @@ fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [f32; 3]) -> BlockVe
 }
 
 /// Test helper to create [`BlockMesh`] alone without a `Space`.
-#[allow(clippy::needless_pass_by_value, reason = "convenience")]
+#[expect(clippy::needless_pass_by_value, reason = "convenience")]
 pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
         &block.evaluate().unwrap(),
@@ -64,7 +64,7 @@ pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<TextureMt> {
 
 /// Test helper to create [`BlockMesh`] alone without a `Space`,
 /// and with the transparency option set to `Threshold(0.5)`.
-#[allow(clippy::needless_pass_by_value, reason = "convenience")]
+#[expect(clippy::needless_pass_by_value, reason = "convenience")]
 fn test_block_mesh_threshold(block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
         &block.evaluate().unwrap(),

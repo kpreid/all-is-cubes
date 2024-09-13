@@ -17,7 +17,7 @@ use crate::space::{Space, SpaceBlockData};
 /// If you are using [`CharacterBuf`], use this [`RtBlockData`] implementation.
 // TODO: better name
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 // TODO: field would ideally be private
 pub struct CharacterRtData(pub Substr);
 
@@ -46,7 +46,7 @@ impl RtBlockData for CharacterRtData {
 /// Implements [`Accumulate`] for text output: captures the first characters of block names
 /// rather than colors.
 #[derive(Clone, Debug, Default, PartialEq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
+#[expect(clippy::derive_partial_eq_without_eq)]
 pub struct CharacterBuf {
     /// Text to draw, if determined yet.
     hit_text: Option<Substr>,

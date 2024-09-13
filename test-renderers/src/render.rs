@@ -37,7 +37,7 @@ impl Scene for &Universe {
 /// Dynamic overlay content passed to the [`HeadlessRenderer`] per-frame.
 /// This is a combination of the parameters of `update()` and `draw()`.
 #[derive(Clone, Debug, PartialEq)]
-#[allow(
+#[expect(
     clippy::exhaustive_structs,
     reason = "will very likely go through incompatible changes anyway"
 )]
@@ -72,7 +72,7 @@ pub trait RendererFactory: Send + Sync + Debug {
 
 /// [`RendererFactory`] implementor which produces [`all_is_cubes_render::raytracer::RtRenderer`]s.
 #[derive(Clone, Debug)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct RtFactory;
 
 impl RendererFactory for RtFactory {

@@ -33,7 +33,7 @@ fn main() {
     criterion.final_summary();
 }
 
-#[allow(clippy::await_holding_lock)]
+#[expect(clippy::await_holding_lock)]
 fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance) {
     let mut g = c.benchmark_group("render");
 

@@ -154,7 +154,7 @@ pub(crate) fn space_to_space_copy(
 }
 
 /// As [`space_to_space_copy`], but producing a transaction.
-#[allow(dead_code)] // TODO: currently unused but will probably come up again...?
+#[expect(dead_code)] // TODO: currently unused but will probably come up again...?
 pub(crate) fn space_to_transaction_copy(
     src: &Space,
     src_bounds: GridAab,

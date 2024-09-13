@@ -1,7 +1,7 @@
 //! Graphical test cases that can be run in any renderer.
 
-#![allow(clippy::unused_async)]
-#![allow(clippy::cast_possible_wrap)]
+#![expect(clippy::unused_async)]
+#![expect(clippy::cast_possible_wrap)]
 
 use std::future::Future;
 use std::str::FromStr;
@@ -126,7 +126,6 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("viewport_prime", None, viewport_prime);
 }
 
-#[allow(clippy::unnecessary_wraps, reason = "convenience where it is used")]
 pub fn u(
     label: &str,
     f: impl Future<Output = Arc<Universe>> + Send + 'static,

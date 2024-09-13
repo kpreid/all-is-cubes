@@ -130,7 +130,7 @@ fn evoxel_size() {
 
 #[test]
 fn visible_or_animated() {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn va(block: Block) -> bool {
         block.evaluate().unwrap().visible_or_animated()
     }

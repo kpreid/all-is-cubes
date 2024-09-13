@@ -240,9 +240,9 @@ impl BoxStyle {
     ///   extending in the [`+Z`](crate::math::Face6::PZ) direction.
     ///   It should be symmetric about the X-Y=0 plane, and will be rotated and mirrored
     ///   to make the other forms.
-    #[allow(clippy::needless_pass_by_value, reason = "consistency")]
+    #[expect(clippy::needless_pass_by_value, reason = "consistency")]
     pub fn from_composited_corner_and_edge(corner_block: Block, line_section_block: Block) -> Self {
-        #![allow(non_snake_case)]
+        #![expect(non_snake_case)]
 
         let corner_x = corner_block.clone().rotate(GridRotation::RxYZ);
         let corner_y = corner_block.clone().rotate(GridRotation::RXyZ);

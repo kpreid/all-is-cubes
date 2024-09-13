@@ -110,7 +110,6 @@ fn convert_vector(input: Vector3D<FreeCoordinate, Cube>) -> stl_io::Vector<f32> 
 }
 
 #[derive(Debug)]
-#[allow(clippy::exhaustive_enums)]
 enum StlMt {}
 
 impl mesh::MeshTypes for StlMt {

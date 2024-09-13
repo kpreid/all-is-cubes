@@ -44,7 +44,7 @@ pub fn install_widgets(
 ///
 /// TODO: give this type and [`Layoutable`] better names
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct LayoutRequest {
     /// The minimum dimensions required, without which correct functionality
     /// is not possible.
@@ -68,7 +68,7 @@ impl Fmt<ConciseDebug> for LayoutRequest {
 /// Region a widget has been given by the layout algorithm, based on its
 /// [`LayoutRequest`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)] // TODO: constructor or something
+#[expect(clippy::exhaustive_structs)] // TODO: constructor or something
 pub struct LayoutGrant {
     /// The widget may have exclusive access to this volume.
     pub bounds: GridAab,
@@ -236,7 +236,7 @@ pub enum LayoutTree<W> {
 /// Result of [`LayoutTree::perform_layout`]: specifies where items were positioned, in
 /// absolute coordinates (independent of the tree).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct Positioned<W> {
     #[allow(missing_docs)]
     pub value: W,

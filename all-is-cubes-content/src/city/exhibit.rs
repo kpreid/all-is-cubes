@@ -8,7 +8,6 @@ use all_is_cubes_ui::vui::widgets;
 
 use crate::city::CityPlanner;
 
-#[allow(clippy::type_complexity)]
 pub(crate) struct Exhibit {
     pub name: &'static str,
     pub subtitle: &'static str,

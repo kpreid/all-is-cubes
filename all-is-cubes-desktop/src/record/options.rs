@@ -10,7 +10,7 @@ use all_is_cubes_render::camera::{self, Viewport};
 ///
 /// Part of [`InnerMainParams`](crate::InnerMainParams).
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)] // TODO: make fields private again
+#[expect(clippy::exhaustive_structs)] // TODO: make fields private again
 #[allow(missing_docs)]
 pub struct RecordOptions {
     pub output_path: PathBuf,
@@ -21,7 +21,7 @@ pub struct RecordOptions {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)] // TODO: make fields private again
+#[expect(clippy::exhaustive_structs)] // TODO: make fields private again
 #[allow(missing_docs)]
 pub struct RecordAnimationOptions {
     pub frame_count: usize,

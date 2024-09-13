@@ -18,7 +18,7 @@ use crate::{block::Block, space::Space};
 // (Due to crate splitting that can't be a doc-link.)
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Eq, PartialEq)]
-#[allow(
+#[expect(
     clippy::unsafe_derive_deserialize,
     reason = "false positive from notnan! macro"
 )]

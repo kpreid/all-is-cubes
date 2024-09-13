@@ -18,7 +18,7 @@ pub(crate) type TextureCoordinate = f32;
 
 /// Unit-of-measure identifier used with [`euclid`](all_is_cubes::euclid) for “whole texels”.
 /// TODO(euclid migration): Better name, and a type alias for the point
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Debug)]
 pub enum TexelUnit {}
 
@@ -160,7 +160,7 @@ impl<T: Allocator> Allocator for alloc::rc::Rc<T> {
 /// Design note: This is an `enum` rather than a bitmask so that allocators and shaders do not
 /// have to support a large number of cases, but only typical ones.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 pub enum Channels {
     /// RGBA color (or perhaps RGB if the target does not support transparency) representing
     /// reflectance.
@@ -243,7 +243,7 @@ pub(super) fn needed_channels(voxels: &Evoxels) -> Channels {
 /// Helper function to implement the typical case of copying voxels into an X-major, sRGB, RGBA
 /// texture.
 #[doc(hidden)]
-#[allow(
+#[expect(
     clippy::needless_pass_by_value,
     reason = "<https://github.com/rust-lang/rust-clippy/issues/7456>"
 )]
@@ -285,7 +285,7 @@ pub fn copy_voxels_into_xmaj_texture(
 /// Used for generating textureless meshes. TODO: Modify triangulator to actually
 /// generate separate triangles when textures are unavailable.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct NoTextures;
 
 impl Allocator for NoTextures {
@@ -301,7 +301,7 @@ impl Allocator for NoTextures {
 ///
 /// TODO: this can and should be just ! (never) when that's available in stable Rust
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 pub enum NoTexture {}
 
 impl Tile for NoTexture {

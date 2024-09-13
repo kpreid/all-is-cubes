@@ -212,7 +212,7 @@ impl Inner {
 
 #[cfg(feature = "auto-threads")]
 /// Runs raytracing, periodically releasing the lock to allow updating input and retrieving output.
-#[allow(
+#[expect(
     clippy::needless_pass_by_value,
     reason = "let thread function own its state"
 )]
@@ -263,7 +263,7 @@ impl PixelPicker {
 impl Iterator for PixelPicker {
     type Item = Point;
 
-    #[allow(clippy::cast_possible_wrap)]
+    #[expect(clippy::cast_possible_wrap)]
     fn next(&mut self) -> Option<Self::Item> {
         // `as usize` is safe because we would have failed earlier if it doesn't fit in usize.
         let size = self.viewport.framebuffer_size.map(|s| s as usize);

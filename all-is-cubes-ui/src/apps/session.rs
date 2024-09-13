@@ -754,7 +754,7 @@ impl Shuttle {
 /// Builder for providing the configuration of a new [`Session`].
 #[derive(Clone)]
 #[must_use]
-#[allow(missing_debug_implementations)]
+#[expect(missing_debug_implementations)]
 pub struct SessionBuilder<I> {
     viewport_for_ui: Option<ListenableSource<Viewport>>,
 
@@ -939,7 +939,7 @@ struct SpaceWatchState {
     space: Option<Handle<Space>>,
 
     /// Gates the message forwarding from the `space` to `Session::fluff_notifier`.
-    #[allow(dead_code, reason = "acts upon being dropped")]
+    #[expect(dead_code, reason = "acts upon being dropped")]
     fluff_gate: listen::Gate,
     // /// Camera state copied from the character, for use by fluff forwarder.
     // camera: Camera,
@@ -1091,7 +1091,7 @@ pub enum QuitCancelled {
 /// This type carries no information and merely exists to distinguish an intentional exit
 /// from accidentally returning [`()`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct ExitMainTask;
 
 #[derive(Debug)]

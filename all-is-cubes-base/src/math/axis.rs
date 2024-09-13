@@ -9,7 +9,7 @@ use crate::math::{Face6, Rgb};
 /// See also:
 ///
 /// * [`Face6`] specifies an axis and a direction on the axis.
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 // do after tests:#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

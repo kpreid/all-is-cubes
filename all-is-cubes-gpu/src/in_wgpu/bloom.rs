@@ -110,7 +110,7 @@ impl BloomPipelines {
             cache: None,
         });
 
-        #[cfg_attr(target_family = "wasm", allow(clippy::arc_with_non_send_sync))]
+        #[cfg_attr(target_family = "wasm", expect(clippy::arc_with_non_send_sync))]
         Arc::new(Self {
             bind_group_layout,
 

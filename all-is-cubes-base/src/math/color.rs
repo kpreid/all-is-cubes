@@ -76,7 +76,7 @@ pub struct Rgba {
 /// Unit-of-measure type for vectors that contain color channels.
 //---
 // TODO(euclid migration): Better name?
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum Intensity {}
 
@@ -669,7 +669,7 @@ const fn component_from_srgb8_const(c: u8) -> NotNan<f32> {
 /// frame.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[repr(u8)]
 pub enum OpacityCategory {
     /// Alpha of zero; completely transparent; completely invisible; need not be drawn.

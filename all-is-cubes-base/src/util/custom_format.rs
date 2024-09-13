@@ -10,7 +10,7 @@ use manyfmt::{Fmt, Refmt as _};
 /// The value is a `PhantomData` to avoid requiring an actual instance of the type.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[doc(hidden)] // too specific to be good public API ... arguably should be part of refmt itself.
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct TypeName;
 impl<T> Fmt<TypeName> for PhantomData<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &TypeName) -> fmt::Result {
@@ -23,7 +23,7 @@ impl<T> Fmt<TypeName> for PhantomData<T> {
 ///
 /// This format may be on one line despite the pretty-printing option, and may lose
 /// precision or Rust syntax in favor of a short at-a-glance representation.
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ConciseDebug;
 

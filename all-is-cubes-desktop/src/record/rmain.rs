@@ -13,7 +13,7 @@ use crate::session::{ClockSource, DesktopSession};
 /// Use [`RecordOptions`] to configure `dsession`'s clock and graphics options.
 ///
 /// TODO: Change things around so that this can be done by the main task as needed.
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 pub(crate) fn configure_session_for_recording<Ren, Win>(
     dsession: &mut DesktopSession<Ren, Win>,
     options: &RecordOptions,

@@ -272,7 +272,7 @@ impl<'provider, E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> IntoIterator
 }
 
 /// Iterator returned by [`Provider::iter()`].
-#[allow(missing_debug_implementations)]
+#[expect(missing_debug_implementations)]
 pub struct ModuleIter<'provider, E: Exhaust, V> {
     /// Using the `Exhaust` iterator instead of the `HashMap` iterator guarantees a deterministic
     /// iteration order. (We don't currently publicly promise that, though.)
@@ -321,7 +321,6 @@ impl Error for ProviderError {}
 /// member was to be generated but failed.
 #[derive(Debug)]
 pub struct GenError {
-    #[cfg_attr(not(feature = "std"), allow(dead_code))]
     detail: InGenError,
     for_object: Option<Name>,
 }
@@ -594,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::try_err)]
+    #[expect(clippy::try_err)]
     fn gen_error_composition() {
         // TODO: this isn't the greatest example situation
         fn a() -> Result<(), GenError> {

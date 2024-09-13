@@ -132,7 +132,7 @@ impl<A> Alloctree<A> {
     ///
     /// If the handle does not exactly match a previous allocation from this allocator,
     /// may panic or deallocate something else.
-    #[allow(
+    #[expect(
         clippy::needless_pass_by_value,
         reason = "deliberately taking handle ownership"
     )]

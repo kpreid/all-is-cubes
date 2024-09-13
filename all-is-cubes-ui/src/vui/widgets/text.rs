@@ -21,7 +21,7 @@ use crate::vui::{self, widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, 
 ///
 /// TODO: Give this a more precise name, and a nice constructor...
 #[derive(Clone, Debug)]
-#[allow(clippy::exhaustive_structs)] // TODO: find a better strategy
+#[expect(clippy::exhaustive_structs)] // TODO: find a better strategy
 pub struct LargeText {
     /// Text to be displayed.
     pub text: ArcStr,

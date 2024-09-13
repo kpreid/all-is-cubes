@@ -152,7 +152,7 @@ impl TerminalWindow {
     }
 
     /// Send the cleanup command and wait for the thread to exit.
-    #[allow(clippy::unnecessary_wraps)] // see TODO below
+    #[expect(clippy::unnecessary_wraps)] // see TODO below
     pub(crate) fn stop(mut self) -> Result<(), anyhow::Error> {
         // Drop channel to signal thread to shut down
         self.out_sender = None;
@@ -171,7 +171,7 @@ impl TerminalWindow {
     }
 
     fn update(&mut self) {
-        #[allow(clippy::while_let_loop, reason = "this is clearer about its behavior")]
+        #[expect(clippy::while_let_loop, reason = "this is clearer about its behavior")]
         loop {
             match self.in_receiver.try_recv() {
                 Ok(InMsg::Viewport(v)) => self.viewport_position = v,

@@ -31,7 +31,7 @@ pub(crate) type Storage<T> = BTreeMap<Name, RootHandle<T>>;
 /// that, it also cannot mention anything we don't also want to make public or
 /// public-in-private.
 #[doc(hidden)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub trait UniverseMember: Sized + 'static + fmt::Debug {
     /// Generic constructor for [`AnyHandle`].
     fn into_any_handle(r: Handle<Self>) -> AnyHandle;
@@ -59,7 +59,7 @@ pub(crate) trait UniverseTable<T> {
 /// This trait must be public(-in-private) so it can be a bound on public methods.
 /// It could be just public, but it's cleaner to not require importing it everywhere.
 #[doc(hidden)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub trait UniverseOps<T>
 where
     T: UniverseMember,
@@ -77,7 +77,7 @@ where
 /// This trait must be public(-in-private) so it can be a bound on public methods.
 /// It could be just public, but it's cleaner to not require importing it everywhere.
 #[doc(hidden)]
-#[allow(unnameable_types)]
+#[expect(unnameable_types)]
 pub trait PartialUniverseOps<T>
 where
     T: UniverseMember,
@@ -242,7 +242,6 @@ macro_rules! member_enums_and_impls {
         /// Polymorphic container for [`TransactionInUniverse`] which is
         /// used to store transactions in a [`UniverseTransaction`].
         #[derive(Clone, Default, PartialEq)]
-        #[allow(clippy::large_enum_variant)]
         #[non_exhaustive]
         pub(in crate::universe) enum AnyTransaction {
             #[default]
@@ -333,7 +332,6 @@ macro_rules! member_enums_and_impls {
 
         /// [`AnyTransaction`] precondition errors.
         #[derive(Clone, Debug, Eq, PartialEq)]
-        #[allow(clippy::large_enum_variant)]
         #[non_exhaustive]
         pub(in crate::universe) enum AnyTransactionMismatch {
             $(
@@ -348,7 +346,6 @@ macro_rules! member_enums_and_impls {
 
         /// [`AnyTransaction`] conflict errors.
         #[derive(Clone, Debug, Eq, PartialEq)]
-        #[allow(clippy::large_enum_variant)]
         #[non_exhaustive]
         pub(in crate::universe) enum AnyTransactionConflict {
             TypeMismatch,

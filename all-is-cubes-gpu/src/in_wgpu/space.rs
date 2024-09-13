@@ -77,7 +77,6 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
     instance_buffer: ResizingBuffer,
 
     /// Bind group containing our block texture and light texture,
-    #[allow(clippy::type_complexity)]
     space_bind_group: Memo<[crate::Id<wgpu::TextureView>; 4], wgpu::BindGroup>,
 
     /// Mesh generator and updater.
@@ -436,7 +435,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
     ///
     /// Does not access the [`Space`] contents at all.
     // TODO: needs error return or not?
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn draw(
         &self,
         fb: &FramebufferTextures,
@@ -907,7 +906,7 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
 }
 
 /// Copy [`SpaceMesh`] data to GPU buffers.
-#[allow(
+#[expect(
     clippy::needless_pass_by_value,
     reason = "https://github.com/rust-lang/rust-clippy/issues/12525"
 )]

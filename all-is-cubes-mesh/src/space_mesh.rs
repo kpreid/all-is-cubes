@@ -668,7 +668,7 @@ pub(crate) struct Snapshot {
 }
 impl Snapshot {
     // TODO: To be used for background meshing <https://github.com/kpreid/all-is-cubes/issues/472>
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub(crate) fn new(space: &Space, bounds: GridAab) -> Snapshot {
         let expanded_bounds = bounds
             .expand(FaceMap::splat(1))
@@ -734,8 +734,8 @@ impl<'a, M: MeshTypes> GetBlockMesh<'a, M> for &'a [BlockMesh<M>] {
     fn get_block_mesh(
         &mut self,
         index: BlockIndex,
-        #[allow(unused)] cube: Cube,
-        #[allow(unused)] primary: bool,
+        #[expect(unused)] cube: Cube,
+        #[expect(unused)] primary: bool,
     ) -> Option<&'a BlockMesh<M>> {
         // TODO: Consider changing this out-of-bounds behavior to either panic or return a mesh with
         // some `Flaws` set.
@@ -879,7 +879,7 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
 
 /// Identifies a back-to-front order in which to draw triangles (of a [`SpaceMesh`]),
 /// based on the direction from which they are being viewed.
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DepthOrdering {
     /// Any ordering is acceptable.

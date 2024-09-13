@@ -29,7 +29,6 @@ type BoxedTestFn = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()> + Sen
 /// Wrapper for a `Future` which produces a `Universe` that may be used by multiple
 /// render tests (and should not be mutated).
 #[derive(Clone, Debug)]
-#[allow(clippy::exhaustive_structs)]
 pub struct UniverseFuture {
     label: String,
     future: Shared<BoxFuture<'static, Arc<Universe>>>,
@@ -521,7 +520,7 @@ where
     }
 }
 
-#[allow(missing_debug_implementations)]
+#[expect(missing_debug_implementations)]
 pub struct TestCaseCollector<'a>(&'a mut BTreeMap<String, TestCase>);
 
 impl<'a> TestCaseCollector<'a> {

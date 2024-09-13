@@ -1,10 +1,5 @@
 //! Bindings for our own JS code.
 
-#![allow(
-    clippy::empty_docs,
-    reason = "false positive <https://github.com/rust-lang/rust-clippy/pull/12466>"
-)]
-
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::HtmlCanvasElement;
 

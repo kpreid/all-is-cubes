@@ -175,7 +175,7 @@ pub trait Geometry {
 ///
 /// The primary way in which these are used is [`Geometry::wireframe_points()`].
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[allow(clippy::exhaustive_structs)]
+#[expect(clippy::exhaustive_structs)]
 pub struct LineVertex {
     /// Position of the vertex.
     pub position: FreePoint,

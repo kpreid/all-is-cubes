@@ -254,7 +254,7 @@ impl WidgetBlocks {
 /// The state of a mouse button's relationship to a toolbar slot.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[doc(hidden)] // public only because WidgetBlocks is
-#[allow(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums)]
 pub enum ToolbarButtonState {
     /// This button is not mapped to this toolbar slot.
     Unmapped,

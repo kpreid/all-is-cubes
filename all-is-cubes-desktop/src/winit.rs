@@ -163,7 +163,7 @@ pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
 }
 
 /// Creates a [`DesktopSession`] that can be run in an [`winit`] event loop.
-#[allow(clippy::large_stack_frames)]
+#[expect(clippy::large_stack_frames)]
 pub async fn create_winit_wgpu_desktop_session(
     executor: Arc<crate::Executor>,
     session: Session,
@@ -484,7 +484,6 @@ fn handle_window_event<Ren: RendererToWinit>(
 /// TODO: Give this a better name and definition.
 /// Or remove it entirely since we no longer have multiple renderers targeting winit windows.
 #[doc(hidden)]
-#[allow(unnameable_types)]
 pub trait RendererToWinit: crate::glue::Renderer + 'static {
     #[doc(hidden)]
     fn update_world_camera(&mut self);

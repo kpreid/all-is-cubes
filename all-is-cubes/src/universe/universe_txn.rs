@@ -431,7 +431,7 @@ impl UniverseTransaction {
     /// This transaction will fail if the member is already gone, is anonymous
     /// (only named entries can be deleted), or belongs to another universe.
     /// In the future, there may be a policy such that in-use items cannot be deleted.
-    #[allow(clippy::needless_pass_by_value)] // TODO: by ref or not by ref?
+    #[expect(clippy::needless_pass_by_value)] // TODO: by ref or not by ref?
     pub fn delete<R: ErasedHandle>(member_handle: R) -> Self {
         Self::from_member_txn(member_handle.name(), MemberTxn::Delete)
     }
