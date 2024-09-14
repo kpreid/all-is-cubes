@@ -158,6 +158,7 @@ where
 ///    to become the [`SpaceMesh`]’s vertices, and [`Vertex::instantiate_vertex()`] is
 ///    called on each copy to position it at the particular block's location.
 /// 3. You obtain the vertices from the [`SpaceMesh`] to draw or export them.
+#[doc(notable_trait)]
 pub trait Vertex: Copy + Sized + 'static {
     /// Whether [`SpaceMesh`]es should provide pre-sorted vertex index slices to allow
     /// back-to-front drawing order based on viewing ranges.
