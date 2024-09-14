@@ -4,6 +4,7 @@
 #![move_size_limit = "2000"]
 #![feature(let_chains)]
 #![feature(never_type)]
+#![feature(try_blocks)]
 
 //! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks
 //! are themselves made of “smaller” blocks (voxels) that define their appearance and
