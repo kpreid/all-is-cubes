@@ -1,5 +1,7 @@
 #![feature(doc_cfg)]
 #![feature(impl_restriction)]
+#![feature(large_assignments)]
+#![move_size_limit = "5000"]
 
 //! Demo content for All is Cubes.
 //!
