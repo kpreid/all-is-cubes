@@ -697,7 +697,10 @@ impl Session {
 /// [ `MainTaskContext`].
 impl Shuttle {
     fn set_universe(&mut self, universe: Box<Universe>) {
-        self.game_universe = *universe;
+        #[allow(large_assignments)]
+        {
+            self.game_universe = *universe;
+        }
         self.game_character
             .set(self.game_universe.get_default_character().map(StrongHandle::new));
 
@@ -924,6 +927,7 @@ impl SessionBuilder {
             })),
 
             shuttle: Some(Box::new(Shuttle {
+                #[allow(large_assignments, reason = "doing the best we can")]
                 ui: ui.map(|boxed_ui| *boxed_ui),
                 settings,
                 graphics_options_source,
@@ -932,6 +936,7 @@ impl SessionBuilder {
                     id: game_universe.universe_id(),
                     whence: game_universe.whence.clone(),
                 }),
+                #[allow(large_assignments)]
                 game_universe: *game_universe,
                 space_watch_state,
                 cursor_result: None,
