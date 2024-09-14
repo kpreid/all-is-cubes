@@ -1133,6 +1133,7 @@ mod tests {
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict};
     use indoc::indoc;
+    use std::assert_matches;
 
     #[test]
     fn has_default() {
@@ -1350,7 +1351,7 @@ mod tests {
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(s1);
 
         let e = t1.execute(&mut u2, (), &mut transaction::no_outputs).unwrap_err();
-        assert!(matches!(e, ExecuteError::Check(_)));
+        assert_matches!(e, ExecuteError::Check(_));
     }
 
     #[test]
