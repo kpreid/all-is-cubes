@@ -1,3 +1,5 @@
+use core::assert_matches;
+
 use crate::block::TickAction;
 use crate::block::{
     self, AIR, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16,
@@ -131,17 +133,13 @@ impl Move {
             || distance == 0 && velocity < 0
         {
             // Either a stationary displacement which is invisible, or an animated one which has finished its work.
-            assert!(
-                matches!(&block.modifiers()[this_modifier_index], Modifier::Move(m) if m == self)
-            );
+            assert_matches!(&block.modifiers()[this_modifier_index], Modifier::Move(m) if m == self);
             let mut new_block = block.clone();
             new_block.modifiers_mut().remove(this_modifier_index); // TODO: What if other modifiers want to do things?
             Some(Operation::Become(new_block))
         } else if velocity != 0 {
             // Movement in progress.
-            assert!(
-                matches!(&block.modifiers()[this_modifier_index], Modifier::Move(m) if m == self)
-            );
+            assert_matches!(&block.modifiers()[this_modifier_index], Modifier::Move(m) if m == self);
             let mut new_block = block.clone();
             {
                 let modifiers = new_block.modifiers_mut();

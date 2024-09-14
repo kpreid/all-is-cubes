@@ -7,6 +7,7 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
+use core::debug_assert_matches;
 use core::fmt;
 use core::mem;
 
@@ -805,8 +806,9 @@ fn update_phase_1(
     let read_ticket = ReadTicket::from_queries(&mq);
 
     defs.par_iter_mut().for_each(|(def_state, mut next)| {
-        debug_assert!(
-            matches!(*next, CacheUpdate::None),
+        debug_assert_matches!(
+            *next,
+            CacheUpdate::None,
             "CacheUpdate should have been cleared",
         );
 

@@ -53,7 +53,7 @@ pub(in crate::block) struct CachedBlock {
 }
 
 /// Data passed from the first phase (computation) to the second phase (writing) of cache updates.
-#[derive(ecs::Component, Default)]
+#[derive(Debug, Default, ecs::Component)]
 pub(in crate::block) enum CacheUpdate {
     #[default]
     None,

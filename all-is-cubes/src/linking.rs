@@ -607,6 +607,7 @@ mod tests {
     use crate::math::GridAab;
     use crate::transaction::Transactional as _;
     use crate::util::assert_conditional_send_sync;
+    use core::assert_matches;
 
     #[derive(Exhaust, Clone, Debug, Eq, Hash, PartialEq)]
     #[exhaust(factory_is_self)]
@@ -710,7 +711,7 @@ mod tests {
     }
 
     #[test]
-    #[expect(clippy::try_err)]
+    #[expect(clippy::try_err, reason = "purpose of test is to exercise use of ?")]
     fn gen_error_composition() {
         // TODO: this isn't the greatest example situation
         fn a() -> Result<(), GenError> {
@@ -725,15 +726,12 @@ mod tests {
             Ok(())
         }
         let r = a();
-        assert!(
-            matches!(
-                r,
-                Err(GenError {
-                    detail: InGenError::SetCube(_),
-                    for_object: Some(Name::Specific(_)),
-                })
-            ),
-            "got error: {r:?}"
+        assert_matches!(
+            r,
+            Err(GenError {
+                detail: InGenError::SetCube(_),
+                for_object: Some(Name::Specific(_)),
+            }),
         );
     }
 }

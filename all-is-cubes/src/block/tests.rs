@@ -3,6 +3,7 @@
 
 use alloc::format;
 use alloc::vec;
+use core::assert_matches;
 
 use pretty_assertions::assert_eq;
 
@@ -262,21 +263,18 @@ fn self_referential_evaluate(#[values(false, true)] via_mutation: bool) {
     } else {
         // TODO: the HandleError details are not presented clearly (it is a WrongUniverse).
         // Arrange so that this situation has a clear error and match it.
-        assert!(
-            matches!(
-                result,
-                Err(EvalBlockError {
-                    block: _,
-                    budget: _,
-                    used: block::Cost {
-                        components: 1,
-                        voxels: 0,
-                        recursion: 0
-                    },
-                    kind: block::ErrorKind::Handle(_)
-                })
-            ),
-            "{result:#?}"
+        assert_matches!(
+            result,
+            Err(EvalBlockError {
+                block: _,
+                budget: _,
+                used: block::Cost {
+                    components: 1,
+                    voxels: 0,
+                    recursion: 0
+                },
+                kind: block::ErrorKind::Handle(_)
+            }),
         );
     }
 }
