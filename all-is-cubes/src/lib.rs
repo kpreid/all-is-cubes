@@ -1,3 +1,4 @@
+#![feature(doc_notable_trait)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(never_type)]
 
