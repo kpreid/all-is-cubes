@@ -3,6 +3,7 @@
 #![feature(large_assignments)]
 #![move_size_limit = "2000"]
 #![feature(let_chains)]
+#![feature(negative_impls)]
 #![feature(never_type)]
 #![feature(trait_upcasting)]
 #![feature(try_blocks)]
