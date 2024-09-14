@@ -335,7 +335,8 @@ fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::assert_matches::assert_matches;
+        use super::*;
     use all_is_cubes::block::BlockDef;
     use all_is_cubes::universe::Handle;
     use all_is_cubes::util::yield_progress_for_testing;
@@ -475,7 +476,7 @@ mod tests {
         )
         .await
         .unwrap_err();
-        assert!(matches!(error, ExportError::NotRepresentable { .. }));
+        assert_matches!(error, ExportError::NotRepresentable { .. });
     }
 
     #[cfg(feature = "export")]
@@ -492,13 +493,13 @@ mod tests {
         )
         .await
         .unwrap_err();
-        assert!(matches!(
+        assert_matches!(
             error,
             ExportError::NotRepresentable {
                 name: Some(name),
                 ..
             }
-         if name == "x".into()));
+         if name == "x".into());
     }
 
     // TODO: add tests of loading valid files (we will need to create test data files)
