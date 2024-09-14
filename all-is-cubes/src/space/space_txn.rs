@@ -716,6 +716,8 @@ impl Default for CubeTransaction {
     }
 }
 
+impl !Transaction for CubeTransaction {}
+
 impl fmt::Debug for CubeTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
