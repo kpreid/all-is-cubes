@@ -1,3 +1,4 @@
+#![feature(assert_matches)]
 #![feature(large_assignments)]
 #![move_size_limit = "2500"] // TODO: look at `Session` size
 #![feature(never_type)]
