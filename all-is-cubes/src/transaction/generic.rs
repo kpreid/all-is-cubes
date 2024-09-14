@@ -50,6 +50,8 @@ impl<K: fmt::Debug, C> fmt::Display for MapConflict<K, C> {
     }
 }
 
+impl<K, V> !Transaction for BTreeMap<K, V> {}
+
 impl<K, V> Merge for BTreeMap<K, V>
 where
     K: Clone + Ord + fmt::Debug + 'static,
@@ -105,6 +107,8 @@ where
 
 macro_rules! hashmap_merge {
     ($module:ident) => {
+        impl<K, V, S> !Transaction for $module::HashMap<K, V, S> {}
+
         impl<K, V, S> Merge for $module::HashMap<K, V, S>
         where
             K: Clone + Eq + Hash + fmt::Debug + 'static,
