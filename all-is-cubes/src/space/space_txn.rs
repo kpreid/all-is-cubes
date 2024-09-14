@@ -477,6 +477,8 @@ pub struct CubeTransaction {
     fluff: Vec<Fluff>,
 }
 
+impl !Transaction for CubeTransaction {}
+
 impl fmt::Debug for CubeTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
