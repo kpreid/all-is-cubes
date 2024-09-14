@@ -6,6 +6,7 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::any::Any;
+use core::assert_matches;
 use core::fmt;
 use core::hash;
 use core::marker::PhantomData;
@@ -594,10 +595,7 @@ impl<T: 'static> Handle<T> {
             &mut *self.inner.state.lock().expect("Handle::state lock error"),
             State::Member { entity },
         );
-        assert!(
-            matches!(old_state, State::Pending),
-            "old handle state not pending as expected: {old_state:?}"
-        );
+        assert_matches!(old_state, State::Pending);
 
         // Inserting new members is a good time to check if there are old ones to remove.
         universe.wants_gc = true;

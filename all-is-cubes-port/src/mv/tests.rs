@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::sync::Arc;
 
 use either::Either;
@@ -114,12 +115,9 @@ async fn export_import_space() {
 #[macro_rules_attribute::apply(smol_macros::test)]
 async fn invalid_file_error() {
     let error = mv::load_dot_vox(yield_progress_for_testing(), &[]).await.unwrap_err();
-    assert!(
-        matches!(
-            error,
-            mv::DotVoxConversionError::Parse("Not a valid MagicaVoxel .vox file")
-        ),
-        "{error:?}"
+    assert_matches!(
+        error,
+        mv::DotVoxConversionError::Parse("Not a valid MagicaVoxel .vox file")
     );
 }
 
@@ -141,7 +139,7 @@ async fn export_too_large_space() {
     )
     .await
     .unwrap_err();
-    assert!(matches!(error, crate::ExportError::NotRepresentable { .. }));
+    assert_matches!(error, crate::ExportError::NotRepresentable { .. });
 }
 
 /// Test that `export_to_dot_vox_data` accepts BlockDefs.
@@ -166,12 +164,10 @@ async fn export_block_def() {
     .await
     .unwrap();
 
-    assert!(
-        matches!(
+    assert_matches!(
             data,
             dot_vox::DotVoxData { ref models, .. } if models.len() == 1
-        ),
-        "{data:#?}",
+
     );
 }
 

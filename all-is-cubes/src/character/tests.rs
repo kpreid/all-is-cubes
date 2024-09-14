@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 use alloc::vec;
+use std::assert_matches;
 use std::dbg;
 
 use euclid::{Vector3D, point3};
@@ -309,7 +310,7 @@ fn click_wrong_space_or_correct_space() {
             0,
         )
         .unwrap_err();
-        assert!(matches!(error, ToolError::Internal(_)));
+        assert_matches!(error, ToolError::Internal(_));
     }
 
     // Click in right space
@@ -324,7 +325,7 @@ fn click_wrong_space_or_correct_space() {
         assert!(cursor.is_some());
         let error =
             Character::click(universe.read_ticket(), character, cursor.as_ref(), 0).unwrap_err();
-        assert!(matches!(error, ToolError::NoTool));
+        assert_matches!(error, ToolError::NoTool);
     }
 }
 

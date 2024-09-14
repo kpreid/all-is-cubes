@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec;
+use core::assert_matches;
 use itertools::Itertools;
 use std::collections::VecDeque;
 use std::{dbg, print, println};
@@ -202,19 +203,16 @@ fn falling_collision_partial_block() {
         "not touching surface on first step{:?}",
         tester.body().position()
     );
-    assert!(
-        matches!(
-            contacts.iter().exactly_one().unwrap(),
-            Contact::Voxel {
-                cube: Cube::ORIGIN,
-                resolution: RES,
-                voxel: CubeFace {
-                    cube: _,
-                    face: Face7::PY
-                },
-            }
-        ),
-        "contact not as expected {contacts:?}",
+    assert_matches!(
+        contacts.iter().exactly_one().unwrap(),
+        Contact::Voxel {
+            cube: Cube::ORIGIN,
+            resolution: RES,
+            voxel: CubeFace {
+                cube: _,
+                face: Face7::PY
+            },
+        },
     );
 
     // Remove horizontal velocity, then let time proceed and see if any falling through happens.
