@@ -187,6 +187,7 @@ impl Vui {
         let progress_page =
             pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, &notif_hub);
 
+        #[allow(large_assignments, reason = "doing the best we can")]
         let mut new_self = Box::write(
             empty_box,
             Self {
