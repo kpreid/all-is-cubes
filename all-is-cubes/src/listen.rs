@@ -28,6 +28,7 @@ pub use util::*;
 
 /// Ability to subscribe to a source of messages, causing a [`Listener`] to receive them
 /// as long as it wishes to.
+#[doc(notable_trait)]
 pub trait Listen {
     /// The type of message which may be obtained from this source.
     ///
@@ -270,6 +271,7 @@ impl<M, const CAPACITY: usize> Drop for Buffer<'_, M, CAPACITY> {
 /// Implementors must also implement [`Send`] and [`Sync`] if the `std` feature of
 /// `all-is-cubes` is enabled. (This non-additive-feature behavior is unfortunately the
 /// least bad option available.)
+#[doc(notable_trait)]
 pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
     /// Process and store the given series of messages.
     ///
