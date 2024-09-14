@@ -686,7 +686,7 @@ pub enum OpacityCategory {
 /// 
 /// This table is validated and can be regenerated using the test `check_const_srgb_table`.
 #[rustfmt::skip]
-const CONST_SRGB_LOOKUP_TABLE: [f32; 256] = [
+const CONST_SRGB_LOOKUP_TABLE: &[f32; 256] = &[
     0.0, 0.000303527, 0.000607054, 0.000910581, 0.001214108, 0.001517635,
     0.001821162, 0.0021246888, 0.002428216, 0.002731743, 0.00303527, 0.003346535,
     0.003676507, 0.0040247166, 0.004391441, 0.0047769523, 0.005181516, 0.0056053908,
@@ -738,7 +738,7 @@ const CONST_SRGB_LOOKUP_TABLE: [f32; 256] = [
 /// 
 /// This table is validated and can be regenerated using the test `check_const_linear_table`.
 #[rustfmt::skip]
-const CONST_LINEAR_LOOKUP_TABLE: [f32; 256] = [
+const CONST_LINEAR_LOOKUP_TABLE: &[f32; 256] = &[
     0.0, 0.003921569, 0.007843138, 0.011764706, 0.015686275, 0.019607844,
     0.023529412, 0.02745098, 0.03137255, 0.03529412, 0.039215688, 0.043137256,
     0.047058824, 0.050980393, 0.05490196, 0.05882353, 0.0627451, 0.06666667,
