@@ -168,18 +168,19 @@ impl GridAab {
     ) -> Result<Self, GridOverflowError> {
         #[inline]
         fn inner(lower_bounds: GridPoint, size: GridSize) -> Result<GridAab, GridOverflowError> {
-            let upper_bounds = (|| {
-                Some(GridPoint::new(
+            match try {
+                GridPoint::new(
                     lower_bounds.x.checked_add_unsigned(size.width)?,
                     lower_bounds.y.checked_add_unsigned(size.height)?,
                     lower_bounds.z.checked_add_unsigned(size.depth)?,
-                ))
-            })()
-            .ok_or(GridOverflowError(OverflowKind::OverflowedSize {
-                lower_bounds,
-                size,
-            }))?;
-            GridAab::checked_from_lower_upper(lower_bounds, upper_bounds)
+                )
+            } {
+                Some(upper_bounds) => GridAab::checked_from_lower_upper(lower_bounds, upper_bounds),
+                None => Err(GridOverflowError(OverflowKind::OverflowedSize {
+                    lower_bounds,
+                    size,
+                })),
+            }
         }
 
         inner(lower_bounds.into(), size.into())
