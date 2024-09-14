@@ -3,15 +3,13 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
-use core::any::TypeId;
+use core::any::{Any, TypeId};
 use core::fmt;
 use core::mem;
 use core::ops;
 
 #[cfg(doc)]
 use core::task::Waker;
-
-use downcast_rs::{Downcast, impl_downcast};
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
@@ -25,9 +23,7 @@ use crate::util::StatusText;
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
-pub trait Behavior<H: Host>:
-    fmt::Debug + SendSyncIfStd + Downcast + VisitHandles + 'static
-{
+pub trait Behavior<H: Host>: fmt::Debug + Any + SendSyncIfStd + VisitHandles + 'static {
     /// Computes a transaction to apply the effects of this behavior for one timestep,
     /// and specifies when next to step the behavior again (if ever).
     ///
@@ -43,8 +39,6 @@ pub trait Behavior<H: Host>:
     /// TODO: Return type isn't a clean public API, nor extensible.
     fn persistence(&self) -> Option<Persistence>;
 }
-
-impl_downcast!(Behavior<H> where H: Host);
 
 /// A type that can have attached behaviors.
 pub trait Host: transaction::Transactional + 'static {
@@ -166,7 +160,7 @@ impl<H: Host> BehaviorSet<H> {
                  behavior,
              }| QueryItem {
                 attachment,
-                behavior: behavior.downcast_ref::<T>().unwrap(),
+                behavior: <dyn Any>::downcast_ref::<T>(behavior).unwrap(),
             },
         )
     }

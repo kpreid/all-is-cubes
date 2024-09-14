@@ -17,6 +17,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::any::Any;
 use core::fmt;
 use core::sync::atomic::{self, Ordering};
 
@@ -749,7 +750,13 @@ impl fmt::Debug for Universe {
         } = self;
 
         let mut ds = fmt.debug_struct("Universe");
-        if whence.downcast_ref::<()>().is_none() {
+
+        if {
+            let whence: &dyn WhenceUniverse = &**whence;
+            <dyn Any>::downcast_ref::<()>(whence)
+        }
+        .is_none()
+        {
             ds.field("whence", &whence);
         }
         ds.field("clock", &clock);
