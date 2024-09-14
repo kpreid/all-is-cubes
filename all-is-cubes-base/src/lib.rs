@@ -1,6 +1,7 @@
 #![feature(large_assignments)]
 #![move_size_limit = "256"]
 #![feature(never_type)]
+#![feature(try_blocks)]
 
 //! This library is an internal component of [`all-is-cubes`],
 //! which defines some core mathematical types and functions.
