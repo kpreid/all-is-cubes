@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::sync::Arc;
 
 use either::Either;
@@ -192,7 +193,7 @@ async fn export_too_large_space() {
     )
     .await
     .unwrap_err();
-    assert!(matches!(error, ExportError::NotRepresentable { .. }));
+    assert_matches!(error, ExportError::NotRepresentable { .. });
 }
 
 /// Test that `export_to_dot_vox_data` accepts BlockDefs.
@@ -217,11 +218,9 @@ async fn export_block_def() {
     .await
     .unwrap();
 
-    assert!(
-        matches!(
-            data,
-            dot_vox::DotVoxData { ref models, .. } if models.len() == 1
-        ),
+    assert_matches!(
+        data,
+        dot_vox::DotVoxData { ref models, .. } if models.len() == 1,
         "{data:#?}",
     );
 }
