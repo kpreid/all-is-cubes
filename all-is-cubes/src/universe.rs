@@ -193,6 +193,7 @@ impl Universe {
             );
         }
 
+        #[allow(large_assignments, reason = "doing the best we can")]
         Box::write(
             empty_box,
             Universe {
