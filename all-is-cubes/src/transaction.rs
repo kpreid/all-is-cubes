@@ -42,6 +42,7 @@ pub(crate) use tester::*;
 ///
 /// [atomic]: https://en.wikipedia.org/wiki/Atomicity_(database_systems)
 #[must_use]
+#[doc(notable_trait)]
 pub trait Transaction: Merge {
     /// Type of the transaction’s target (what it can be used to mutate).
     type Target;
