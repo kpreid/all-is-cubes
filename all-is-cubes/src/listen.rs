@@ -34,6 +34,7 @@ pub use util::*;
 
 /// Ability to subscribe to a source of messages, causing a [`Listener`] to receive them
 /// as long as it wishes to.
+#[doc(notable_trait)]
 pub trait Listen {
     /// The type of message which may be obtained from this source.
     ///
@@ -102,6 +103,7 @@ impl<T: Listen> Listen for Arc<T> {
 /// Consider implementing [`Store`] and using [`StoreLock`] instead of implementing [`Listener`].
 /// [`StoreLock`] provides the weak reference and mutex that are needed in the most common
 /// kind of use of [`Listener`].
+#[doc(notable_trait)]
 pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
     /// Process and store the given series of messages.
     ///
