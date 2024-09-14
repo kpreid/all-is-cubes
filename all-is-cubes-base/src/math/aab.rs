@@ -409,6 +409,7 @@ impl From<Aab> for euclid::Box3D<FreeCoordinate, Cube> {
 
 impl Wireframe for Aab {
     #[inline(never)]
+    #[allow(large_assignments)]
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,

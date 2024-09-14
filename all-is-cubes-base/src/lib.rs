@@ -1,3 +1,5 @@
+#![feature(large_assignments)]
+#![move_size_limit = "256"]
 #![feature(never_type)]
 
 //! This library is an internal component of [`all-is-cubes`],
