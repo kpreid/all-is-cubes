@@ -353,6 +353,7 @@ impl fmt::Debug for Aab {
 
 impl Wireframe for Aab {
     #[inline(never)]
+    #[allow(large_assignments)]
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,
