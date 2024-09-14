@@ -1,3 +1,6 @@
+#![feature(large_assignments)]
+#![move_size_limit = "5000"]
+
 //! Demo content for All is Cubes.
 //!
 //! All is Cubes is a “voxel game” where each block is made out of smaller blocks
