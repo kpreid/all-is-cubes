@@ -338,6 +338,7 @@ mod tests {
     use all_is_cubes::util::yield_progress_for_testing;
     use all_is_cubes_render::raytracer::print_space;
     use either::Either;
+    use std::assert_matches::assert_matches;
 
     #[test]
     #[ignore]
@@ -472,7 +473,7 @@ mod tests {
         )
         .await
         .unwrap_err();
-        assert!(matches!(error, ExportError::NotRepresentable { .. }));
+        assert_matches!(error, ExportError::NotRepresentable { .. });
     }
 
     #[cfg(feature = "export")]
@@ -489,13 +490,13 @@ mod tests {
         )
         .await
         .unwrap_err();
-        assert!(matches!(
+        assert_matches!(
             error,
             ExportError::MemberTypeNotRepresentable {
                 name,
                 ..
             }
-         if name == "x".into()));
+         if name == "x".into());
     }
 
     // TODO: add tests of loading valid files (we will need to create test data files)
