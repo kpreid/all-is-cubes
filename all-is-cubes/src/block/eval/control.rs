@@ -211,14 +211,14 @@ impl Cost {
 
     /// Compute a cost from change in budget.
     pub(crate) fn from_difference(original_budget: Budget, final_budget: Budget) -> Self {
-        let Some(new_self) = (|| {
-            Some(Self {
+        let Some(new_self) = (try {
+            Self {
                 components: original_budget.components.checked_sub(final_budget.components)?,
                 voxels: original_budget.voxels.checked_sub(final_budget.voxels)?,
                 // note use of .min_recursion!
                 recursion: original_budget.recursion.checked_sub(final_budget.min_recursion)?,
-            })
-        })() else {
+            }
+        }) else {
             panic!("overflow computing budget difference: {final_budget:#?} - {original_budget:#?}")
         };
         new_self
