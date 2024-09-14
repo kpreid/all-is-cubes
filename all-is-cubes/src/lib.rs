@@ -1,4 +1,5 @@
 #![feature(doc_cfg)]
+#![feature(doc_notable_trait)]
 #![feature(impl_trait_in_assoc_type)]
 
 //! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks
