@@ -177,6 +177,7 @@ impl Vui {
             page_state: state.as_source(),
         };
 
+        #[allow(large_assignments, reason = "doing the best we can")]
         let mut new_self = Box::write(
             empty_box,
             Self {
