@@ -1,6 +1,8 @@
 #![feature(doc_cfg)]
 #![feature(fmt_debug)]
 #![feature(impl_restriction)]
+#![feature(large_assignments)]
+#![move_size_limit = "256"]
 
 //! This library is an internal component of [`all-is-cubes`],
 //! which defines some core mathematical types and functions.
