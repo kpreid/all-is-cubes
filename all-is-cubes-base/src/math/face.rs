@@ -1236,6 +1236,7 @@ mod tests {
 
     #[test]
     #[rustfmt::skip]
+    #[allow(large_assignments)]
     fn from_snapped_vector_cases() {
         let mut f = MultiFailure::new();
         for (face, vector, comment) in [
