@@ -177,6 +177,7 @@ impl<'universe> ReadTicket<'universe> {
         &self,
         entity: ecs::Entity,
     ) -> Result<&'universe C, ReadTicketError> {
+        // TODO: figure out how to rewrite this as a try{} block
         let inner = || -> Result<&'universe C, TicketErrorKind> {
             match self.access {
                 TicketAccess::World { world, .. } => world.get(entity).ok_or_else(|| {
@@ -287,6 +288,7 @@ impl<'universe> ReadTicket<'universe> {
             }
         }
 
+        // TODO: figure out how to rewrite this as a try{} block
         let inner = || -> Result<T::Read<'universe>, TicketErrorKind> {
             match self.access {
                 TicketAccess::World {
