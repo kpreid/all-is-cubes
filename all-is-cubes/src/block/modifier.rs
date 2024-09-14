@@ -280,6 +280,7 @@ pub(crate) enum ModifierUnspecialize {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches::assert_matches;
     use super::*;
     use crate::block::{
         BlockAttributes, BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2,
@@ -438,7 +439,7 @@ mod tests {
     fn rotate_rotated_consistency() {
         let mut universe = Universe::new();
         let [block] = make_some_voxel_blocks(&mut universe);
-        assert!(matches!(block.primitive(), Primitive::Recur { .. }));
+        assert_matches!(block.primitive(), Primitive::Recur { .. });
 
         // Two rotations not in the same plane, so they are not commutative.
         let rotation_1 = GridRotation::RyXZ;
