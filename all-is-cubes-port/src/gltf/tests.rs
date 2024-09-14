@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -170,11 +171,11 @@ async fn export_character_not_supported() {
     )
     .await
     .unwrap_err();
-    assert!(matches!(
+    assert_matches!(
         error,
         ExportError::MemberTypeNotRepresentable {
             name,
             ..
         }
-     if name == "x".into()));
+     if name == "x".into());
 }

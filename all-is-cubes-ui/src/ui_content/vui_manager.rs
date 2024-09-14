@@ -665,6 +665,7 @@ impl fmt::Debug for Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::assert_matches;
 
     async fn new_vui_for_test(paused: bool) -> (Box<Vui>, flume::Receiver<ControlMessage>) {
         let (cctx, ccrx) = flume::bounded(1);
@@ -689,7 +690,7 @@ mod tests {
         let (mut vui, control_channel) = new_vui_for_test(false).await;
         vui.back();
         let msg = control_channel.try_recv().unwrap();
-        assert!(matches!(msg, ControlMessage::TogglePause), "{msg:?}");
+        assert_matches!(msg, ControlMessage::TogglePause);
         assert!(control_channel.try_recv().is_err());
     }
 
@@ -699,7 +700,7 @@ mod tests {
         vui.set_state(VuiPageState::Paused);
         vui.back();
         let msg = control_channel.try_recv().unwrap();
-        assert!(matches!(msg, ControlMessage::TogglePause), "{msg:?}");
+        assert_matches!(msg, ControlMessage::TogglePause);
         assert!(control_channel.try_recv().is_err());
     }
 }
