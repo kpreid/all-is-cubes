@@ -2,6 +2,8 @@
 //!
 //! The modifier implementation itself is so simple that it does not have its own file.
 
+use std::assert_matches::assert_matches;
+
 use super::*;
 use crate::block::{
     BlockAttributes, BlockCollision, EvaluatedBlock, Evoxel, Primitive, Resolution::R2, TickAction,
@@ -51,54 +53,51 @@ fn rotate_evaluation() {
     let rotated = block.clone().rotate(rotation);
     let re = rotated.evaluate().unwrap();
 
-    assert_eq!(
-        re,
-        EvaluatedBlock {
-            block: rotated.clone(),
-            voxels: Evoxels::from_many(
-                R2,
+    assert_eq!(re, EvaluatedBlock {
+        block: rotated.clone(),
+        voxels: Evoxels::from_many(
+            R2,
+            Vol::from_fn(block_bounds, |cube| {
+                Evoxel {
+                    color: rotated_color_fn(cube),
+                    emission: Rgb::ZERO,
+                    selectable: true,
+                    collision: BlockCollision::Hard,
+                }
+            })
+        ),
+        attributes: BlockAttributes {
+            display_name: "foo".into(),
+            tick_action: Some(TickAction::from(Operation::Become(
+                replacement.rotate(rotation).clone()
+            ))),
+            rotation_rule: block::RotationPlacementRule::Attach { by: Face6::PY },
+            ..BlockAttributes::default()
+        },
+        cost: block::Cost {
+            components: 3,           // Primitive + display_name + Rotate
+            voxels: 2u32.pow(3) * 2, // original + rotation
+            recursion: 0
+        },
+        derived: block::Derived {
+            color: be.color(),
+            face_colors: be.face_colors().rotate(rotation),
+            light_emission: Rgb::ZERO,
+            opaque: FaceMap::splat(false).with(rotation.transform(Face6::NY), true),
+            visible: true,
+            uniform_collision: Some(BlockCollision::Hard),
+            voxel_opacity_mask: block::VoxelOpacityMask::new_raw(
+                resolution,
                 Vol::from_fn(block_bounds, |cube| {
-                    Evoxel {
-                        color: rotated_color_fn(cube),
-                        emission: Rgb::ZERO,
-                        selectable: true,
-                        collision: BlockCollision::Hard,
+                    if cube.x == 0 {
+                        OpacityCategory::Opaque
+                    } else {
+                        OpacityCategory::Invisible
                     }
                 })
             ),
-            attributes: BlockAttributes {
-                display_name: "foo".into(),
-                tick_action: Some(TickAction::from(Operation::Become(
-                    replacement.rotate(rotation).clone()
-                ))),
-                rotation_rule: block::RotationPlacementRule::Attach { by: Face6::PY },
-                ..BlockAttributes::default()
-            },
-            cost: block::Cost {
-                components: 3,           // Primitive + display_name + Rotate
-                voxels: 2u32.pow(3) * 2, // original + rotation
-                recursion: 0
-            },
-            derived: block::Derived {
-                color: be.color(),
-                face_colors: be.face_colors().rotate(rotation),
-                light_emission: Rgb::ZERO,
-                opaque: FaceMap::splat(false).with(rotation.transform(Face6::NY), true),
-                visible: true,
-                uniform_collision: Some(BlockCollision::Hard),
-                voxel_opacity_mask: block::VoxelOpacityMask::new_raw(
-                    resolution,
-                    Vol::from_fn(block_bounds, |cube| {
-                        if cube.x == 0 {
-                            OpacityCategory::Opaque
-                        } else {
-                            OpacityCategory::Invisible
-                        }
-                    })
-                ),
-            },
-        }
-    );
+        },
+    });
 }
 
 /// Check that [`Block::rotate`]'s pre-composition is consistent with the interpretation
@@ -107,7 +106,7 @@ fn rotate_evaluation() {
 fn rotate_rotated_consistency() {
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);
-    assert!(matches!(block.primitive(), Primitive::Recur { .. }));
+    assert_matches!(block.primitive(), Primitive::Recur { .. });
 
     // Two rotations not in the same plane, so they are not commutative.
     let rotation_1 = GridRotation::RyXZ;
