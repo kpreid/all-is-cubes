@@ -31,6 +31,7 @@ pub type TilePoint = Point3D<TextureCoordinate, TexelUnit>;
 /// Implement this trait using the target graphics API's 3D texture type.
 ///
 /// Allocations may be deallocated for reuse by dropping the returned [`Tile`]s.
+#[doc(notable_trait)]
 pub trait Allocator {
     /// Allocation handles produced by this allocator.
     //---
@@ -69,6 +70,7 @@ pub trait Allocator {
 ///
 /// Implement this along with [`Allocator`] and [`Plane`] to provide appropriate texture
 /// storage for a particular graphics system.
+#[doc(notable_trait)]
 pub trait Tile: Clone + PartialEq {
     /// Return type of [`Self::slice()`].
     type Plane: Plane<Point = Self::Point>;
@@ -132,6 +134,7 @@ pub trait Tile: Clone + PartialEq {
 ///
 /// Implement this along with [`Allocator`] and [`Tile`] to provide appropriate texture
 /// storage for a particular graphics system.
+#[doc(notable_trait)]
 pub trait Plane: Clone {
     /// Type of points within this texture, that are to be used in vertices.
     type Point: Copy;
