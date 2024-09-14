@@ -1,5 +1,7 @@
 #![feature(doc_notable_trait)]
 #![feature(impl_trait_in_assoc_type)]
+#![feature(large_assignments)]
+#![move_size_limit = "2000"]
 #![feature(let_chains)]
 #![feature(never_type)]
 #![feature(trait_upcasting)]

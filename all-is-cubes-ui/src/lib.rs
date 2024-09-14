@@ -1,4 +1,6 @@
 #![feature(async_closure)]
+#![feature(large_assignments)]
+#![move_size_limit = "2100"] // TODO: look at `Session` size
 #![feature(let_chains)]
 #![feature(never_type)]
 #![feature(noop_waker)]

@@ -1,3 +1,5 @@
+#![feature(large_assignments)]
+#![move_size_limit = "5000"]
 #![feature(let_chains)]
 #![feature(never_type)]
 
