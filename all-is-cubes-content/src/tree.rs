@@ -191,11 +191,9 @@ pub(crate) fn make_tree(
                 let flow1 = graph.data[cube].flow;
                 let flow2 = graph.data[neighbor].flow;
                 let flow = flow1.min(flow2);
-                if let Some(edge_growth) = graph.edge_mut(cube, face) {
-                    if edge_growth.is_some() {
-                        let size = (f64::from(flow) * 1.1).sqrt() as GridCoordinate;
-                        *edge_growth = Some(TreeGrowth::from_radius(size));
-                    }
+                if let Some(edge_growth @ Some(_)) = graph.edge_mut(cube, face) {
+                    let size = (f64::from(flow) * 1.1).sqrt() as GridCoordinate;
+                    *edge_growth = Some(TreeGrowth::from_radius(size));
                 }
             }
         }

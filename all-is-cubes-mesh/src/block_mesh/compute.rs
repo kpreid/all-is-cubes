@@ -313,21 +313,19 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                             // The quad we're going to draw has identical texels, so we might as
                             // well use a solid color and skip needing a texture.
                             QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(single_color)
+                        } else if let Some(ref plane) = texture_plane_if_needed {
+                            QuadColoring::<<M::Tile as texture::Tile>::Plane>::Texture(plane)
                         } else {
-                            if let Some(ref plane) = texture_plane_if_needed {
-                                QuadColoring::<<M::Tile as texture::Tile>::Plane>::Texture(plane)
-                            } else {
-                                // Texture allocation failure.
-                                // Report the flaw and use block color as a fallback.
-                                // Further improvement that could be had here:
-                                // * Compute and use per-face colors in EvaluatedBlock
-                                // * Offer the alternative of generating as much
-                                //   geometry as needed.
-                                *flaws |= Flaws::MISSING_TEXTURES;
-                                QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(
-                                    options.transparency.limit_alpha(block.color()),
-                                )
-                            }
+                            // Texture allocation failure.
+                            // Report the flaw and use block color as a fallback.
+                            // Further improvement that could be had here:
+                            // * Compute and use per-face colors in EvaluatedBlock
+                            // * Offer the alternative of generating as much
+                            //   geometry as needed.
+                            *flaws |= Flaws::MISSING_TEXTURES;
+                            QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(
+                                options.transparency.limit_alpha(block.color()),
+                            )
                         };
 
                     if matches!(coloring, QuadColoring::Solid(_)) {
