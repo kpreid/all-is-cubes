@@ -115,6 +115,7 @@ where
 /// [`BlockMesh::new()`]: crate::BlockMesh::new()
 /// [`Space`]: all_is_cubes::space::Space
 /// [`SpaceMesh`]: crate::SpaceMesh
+#[doc(notable_trait)]
 pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static {
     /// Whether [`SpaceMesh`]es should provide pre-sorted vertex index slices to allow
     /// back-to-front drawing order based on viewing ranges.

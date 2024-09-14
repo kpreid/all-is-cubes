@@ -1,3 +1,4 @@
+#![feature(doc_notable_trait)]
 #![feature(never_type)]
 
 //! Data structures and algorithms for converting [`all_is_cubes`] voxel data to triangle
