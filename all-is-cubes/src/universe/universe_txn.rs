@@ -985,6 +985,7 @@ mod tests {
     use crate::universe::{self, HandleError};
     use alloc::sync::Arc;
     use indoc::indoc;
+    use std::assert_matches::assert_matches;
 
     #[test]
     fn has_default() {
@@ -1212,7 +1213,7 @@ mod tests {
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(s1);
 
         let e = t1.execute(&mut u2, (), &mut drop).unwrap_err();
-        assert!(matches!(e, ExecuteError::Check(_)));
+        assert_matches!(e, ExecuteError::Check(_));
     }
 
     #[test]

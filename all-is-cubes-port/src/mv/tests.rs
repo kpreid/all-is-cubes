@@ -1,3 +1,4 @@
+use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use either::Either;
@@ -138,7 +139,7 @@ async fn export_too_large_space() {
     )
     .await
     .unwrap_err();
-    assert!(matches!(error, ExportError::NotRepresentable { .. }));
+    assert_matches!(error, ExportError::NotRepresentable { .. });
 }
 
 #[cfg(feature = "export")]
@@ -159,13 +160,13 @@ async fn export_block_def() {
     )
     .await
     .unwrap_err();
-    assert!(matches!(
+    assert_matches!(
         error,
         ExportError::MemberTypeNotRepresentable {
             name,
             ..
         }
-     if name == "x".into()));
+     if name == "x".into());
 }
 
 // TODO: add tests of loading valid files (we will need to create test data files)
