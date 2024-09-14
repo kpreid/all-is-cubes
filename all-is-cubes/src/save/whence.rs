@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::string::String;
+use core::any::Any;
 use core::error::Error;
 use core::fmt;
 
@@ -15,7 +16,7 @@ use crate::util::maybe_sync::MaybeLocalBoxFuture;
 ///
 /// This trait is object-safe so that it can be stored in a [`Universe`] as `dyn WhenceUniverse`.
 /// Therefore, all its `async` methods use boxed futures.
-pub trait WhenceUniverse: fmt::Debug + Send + Sync + downcast_rs::Downcast + 'static {
+pub trait WhenceUniverse: fmt::Debug + Send + Sync + Any + 'static {
     /// Returns a string suitable for use as a window title or other user interface element
     /// identifying this universe-document.
     ///
@@ -60,8 +61,6 @@ pub trait WhenceUniverse: fmt::Debug + Send + Sync + downcast_rs::Downcast + 'st
         progress: YieldProgress,
     ) -> MaybeLocalBoxFuture<'static, Result<(), Box<dyn Error + Send + Sync>>>;
 }
-
-downcast_rs::impl_downcast!(WhenceUniverse);
 
 /// Implementation of [`WhenceUniverse`] used by [`Universe`]s freshly created.
 //---
