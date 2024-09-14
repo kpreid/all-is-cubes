@@ -287,6 +287,7 @@ mod tests {
     use super::*;
     use crate::block::BlockAttributes;
     use pretty_assertions::assert_eq;
+    
 
     /// Track the size of the `Modifier` enum to make sure we don't accidentally make it bigger
     /// by giving one variant more data.
@@ -313,10 +314,8 @@ mod tests {
             Modifier::Composite(Composite::new(block::AIR, CompositeOperator::Over)),
             Modifier::Inventory(inv::Inventory::from_slots([])),
         ];
-        assert_eq!(
-            format!("{modifiers:#?}"),
-            indoc::indoc! {
-                r#"[
+        assert_eq!(format!("{modifiers:#?}"), indoc::indoc! {
+            r#"[
                     BlockAttributes {
                         display_name: "hello",
                     },
@@ -336,7 +335,6 @@ mod tests {
                         slots: [],
                     },
                 ]"#
-            }
-        );
+        });
     }
 }
