@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::assert_matches;
 
 use either::Either;
 use pretty_assertions::assert_eq;
@@ -141,7 +142,7 @@ async fn export_too_large_space() {
     )
     .await
     .unwrap_err();
-    assert!(matches!(error, crate::ExportError::NotRepresentable { .. }));
+    assert_matches!(error, crate::ExportError::NotRepresentable { .. });
 }
 
 /// Test that `export_to_dot_vox_data` accepts BlockDefs.

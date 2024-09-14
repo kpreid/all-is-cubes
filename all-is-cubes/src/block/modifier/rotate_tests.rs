@@ -2,6 +2,8 @@
 //!
 //! The modifier implementation itself is so simple that it does not have its own file.
 
+use core::assert_matches;
+
 use pretty_assertions::assert_eq;
 
 use crate::block::{
@@ -105,7 +107,7 @@ fn rotate_evaluation() {
 fn rotate_rotated_consistency() {
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);
-    assert!(matches!(block.primitive(), Primitive::Recur { .. }));
+    assert_matches!(block.primitive(), Primitive::Recur { .. });
 
     // Two rotations not in the same plane, so they are not commutative.
     let rotation_1 = GridRotation::RyXZ;
