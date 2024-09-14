@@ -155,14 +155,13 @@ impl RootDestination {
     pub fn wrap_and_initialize(stream: RecordingStream) -> Self {
         let new_self = Self { stream };
 
-        match (|| -> RecordingStreamResult<()> {
+        match try {
             new_self.stream.log_static(entity_path![], &annotation_context())?;
             new_self.get(Stem::World).log_static(
                 &entity_path![],
                 &archetypes::ViewCoordinates::new(OUR_VIEW_COORDINATES),
             );
-            Ok(())
-        })() {
+        } {
             Ok(()) => {}
             Err(e) => log::error!("Rerun logging failed: {e}", e = crate::util::ErrorChain(&e)),
         }
