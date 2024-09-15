@@ -14,11 +14,12 @@ use super::collision::{
     aab_raycast, collide_along_ray, escape_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
 };
 use crate::block::{BlockCollision, Resolution};
+use crate::camera::Eye;
 use crate::fluff::Fluff;
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use crate::math::Euclid as _;
-use crate::math::{Aab, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry as _};
+use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry as _};
 use crate::physics::{StopAt, Velocity, POSITION_EPSILON};
 use crate::raycast::Ray;
 use crate::space::Space;
@@ -103,18 +104,27 @@ impl fmt::Debug for Body {
 /// Omits collision box on the grounds that it is presumably constant
 impl Fmt<StatusText> for Body {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        let &Self {
+            position,
+            velocity,
+            collision_box: _,
+            flying,
+            noclip,
+            yaw,
+            pitch,
+        } = self;
+        let dir_face = Face6::from_snapped_vector(self.look_direction()).unwrap();
         write!(
             fmt,
-            "Position: {}  Yaw: {:5.1}°  Pitch: {:5.1}°\nVelocity: {}",
-            self.position.refmt(&ConciseDebug),
-            self.yaw,
-            self.pitch,
-            self.velocity.refmt(&ConciseDebug),
+            "Position: {}  Yaw: {yaw:5.1}°  Pitch: {pitch:5.1}°\n\
+             Velocity: {}  Nearest axis to eye: {dir_face:?}",
+            position.refmt(&ConciseDebug),
+            velocity.refmt(&ConciseDebug),
         )?;
-        if self.flying {
+        if flying {
             write!(fmt, "  Flying")?;
         }
-        if self.noclip {
+        if noclip {
             write!(fmt, "  Noclip")?;
         }
         Ok(())
@@ -586,6 +596,20 @@ impl Body {
     /// ```
     pub fn collision_box_abs(&self) -> Aab {
         self.collision_box.translate(self.position.to_vector())
+    }
+
+    pub(crate) fn look_rotation(&self) -> euclid::Rotation3D<f64, Eye, Cube> {
+        euclid::Rotation3D::<_, Eye, Cube>::around_x(euclid::Angle {
+            radians: -self.pitch.to_radians(),
+        })
+        .then(&euclid::Rotation3D::around_y(euclid::Angle {
+            radians: -self.yaw.to_radians(),
+        }))
+    }
+
+    pub(crate) fn look_direction(&self) -> FreeVector {
+        self.look_rotation()
+            .transform_vector3d(Vector3D::new(0., 0., -1.))
     }
 
     /// Changes [`self.yaw`](Self::yaw) and [`self.pitch`](Self::pitch) to look directly

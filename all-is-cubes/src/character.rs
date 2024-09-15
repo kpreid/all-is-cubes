@@ -239,12 +239,7 @@ impl Character {
     pub fn view(&self) -> ViewTransform {
         ViewTransform {
             // Remember, this is an eye *to* world transform.
-            rotation: Rotation3D::<_, crate::camera::Eye, Cube>::around_x(Angle {
-                radians: -self.body.pitch.to_radians(),
-            })
-            .then(&Rotation3D::around_y(Angle {
-                radians: -self.body.yaw.to_radians(),
-            })),
+            rotation: self.body.look_rotation(),
             translation: (self.body.position.to_vector() + self.eye_displacement_pos).cast_unit(),
         }
     }

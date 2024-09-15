@@ -106,11 +106,8 @@ impl Face6 {
     /// *   If all magnitudes are zero, the Z axis's sign is used. (Remember that floating-point
     ///     numbers include distinct positive and negative zeroes).
     /// *   If any coordinate is NaN, returns [`None`].
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "TODO: I expect to use this in block placement")
-    )]
-    fn from_snapped_vector(vector: FreeVector) -> Option<Self> {
+    #[allow(clippy::missing_inline_in_public_items, reason = "unsure")]
+    pub fn from_snapped_vector(vector: FreeVector) -> Option<Self> {
         let Vector3D { x, y, z, _unit } = vector;
 
         // This isn't the likely case, but if we check it first, the generated code for signum()
