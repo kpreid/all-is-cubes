@@ -52,6 +52,11 @@ struct XtaskArgs {
     /// Note that a single `xtask` command may end up invoking `cargo` multiple times.
     #[arg(long, global = true)]
     timings: bool,
+
+    /// Pass the `--quiet` flag to all `cargo` build/test invocations.
+    /// This hides build progress and also switches the test harness to a more concise output.
+    #[arg(long, global = true)]
+    quiet: bool,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -65,6 +70,7 @@ enum XtaskCommand {
 
     /// Run all tests (and some builds without tests) with default features.
     Test {
+        /// Build test executables, but don't run them.
         #[arg(long)]
         no_run: bool,
     },
@@ -155,9 +161,11 @@ fn main() -> Result<(), ActionError> {
             command,
             scope,
             timings,
+            quiet,
         } = <XtaskArgs as clap::Parser>::parse();
         let config = Config {
             cargo_timings: timings,
+            cargo_quiet: quiet,
             scope,
         };
         (config, command)
@@ -411,6 +419,7 @@ fn main() -> Result<(), ActionError> {
 #[derive(Debug)]
 struct Config {
     cargo_timings: bool,
+    cargo_quiet: bool,
     scope: Scope,
 }
 
@@ -421,6 +430,9 @@ impl Config {
         let mut args = Vec::with_capacity(1);
         if self.cargo_timings {
             args.push("--timings")
+        }
+        if self.cargo_quiet {
+            args.push("--quiet")
         }
         args
     }
