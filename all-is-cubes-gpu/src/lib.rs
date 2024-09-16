@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 #![feature(never_type)]
 #![allow(exported_private_dependencies, reason = "false positive on wgpu_types")]
 
