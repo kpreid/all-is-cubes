@@ -268,10 +268,11 @@ impl Body {
             };
         }
 
-        if !self.flying && !tick.paused() {
-            if let Some(space) = colliding_space {
-                self.velocity += space.physics().gravity.cast_unit() * dt;
-            }
+        if !self.flying
+            && !tick.paused()
+            && let Some(space) = colliding_space
+        {
+            self.velocity += space.physics().gravity.cast_unit() * dt;
         }
 
         // TODO: attempt to expand `occupying` to fit `collision_box`.
