@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 #![feature(never_type)]
 
 //! Data import and export between [`all_is_cubes`] types and other data formats.
