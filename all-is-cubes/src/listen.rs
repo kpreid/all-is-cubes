@@ -324,10 +324,16 @@ pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
         Arc::new(self)
     }
 
-    /// Apply a map/filter function to incoming messages.
+    /// Apply a map/filter function (similar to [`Iterator::filter_map()`]) to incoming messages.
+    ///
+    /// Note: By default, this filter breaks up all message batching into batches of 1.
+    /// In order to avoid this and have more efficient message delivery, use
+    /// [`Filter::with_stack_buffer()`].
+    /// This is unnecessary if `size_of::<M>() == 0`; the buffer is automatically unbounded in
+    /// that case.
     ///
     /// TODO: Doc test
-    fn filter<MI, F>(self, function: F) -> Filter<F, Self>
+    fn filter<MI, F>(self, function: F) -> Filter<F, Self, 1>
     where
         Self: Sized,
         F: for<'a> Fn(&'a MI) -> Option<M> + Sync,
