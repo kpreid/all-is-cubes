@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 
+use all_is_cubes::block;
 use criterion::{
     black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
 };
@@ -7,7 +8,7 @@ use criterion::{
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{GridAab, GridCoordinate, GridSize};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridSize};
 use all_is_cubes::raytracer::UpdatingSpaceRaytracer;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -25,9 +26,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::new("fill() entire", &size_description), |b| {
             let [block] = make_some_blocks();
-            b.iter_batched(
+            b.iter_batched_ref(
                 || Space::empty(bounds),
-                |mut space| {
+                |space: &mut Space| {
                     space.fill(space.bounds(), |_| Some(&block)).unwrap();
                 },
                 BatchSize::SmallInput,
@@ -36,9 +37,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::new("fill() partial", &size_description), |b| {
             let [block] = make_some_blocks();
-            b.iter_batched(
+            b.iter_batched_ref(
                 || Space::empty(bigger_bounds),
-                |mut space| {
+                |space: &mut Space| {
                     space.fill(bounds, |_| Some(&block)).unwrap();
                 },
                 BatchSize::SmallInput,
@@ -48,11 +49,14 @@ fn space_bulk_mutation(c: &mut Criterion) {
         group.bench_function(
             BenchmarkId::new("fill() partial with notification", &size_description),
             |b| {
+                type Listeners = ([UpdatingSpaceRaytracer<()>; 3], [block::BlockDef; 3]);
                 let [block] = make_some_blocks();
-                b.iter_batched(
-                    || -> (Handle<Space>, [UpdatingSpaceRaytracer<()>; 2]) {
+
+                b.iter_batched_ref(
+                    || -> (Handle<Space>, Listeners) {
                         let space = Handle::new_pending(Name::Pending, Space::empty(bigger_bounds));
-                        // Two nontrivial things that will receive notifications
+                        // Multiple nontrivial things that will receive notifications:
+                        // 1. Raytracers
                         let rts = std::array::from_fn(|_| {
                             UpdatingSpaceRaytracer::new(
                                 space.clone(),
@@ -60,9 +64,17 @@ fn space_bulk_mutation(c: &mut Criterion) {
                                 ListenableSource::constant(()),
                             )
                         });
-                        (space, rts)
+                        // 2. Block definitions
+                        let blocks = std::array::from_fn(|_| {
+                            block::BlockDef::new(block::Block::from(block::Primitive::Recur {
+                                space: space.clone(),
+                                offset: GridPoint::zero(),
+                                resolution: block::Resolution::R32,
+                            }))
+                        });
+                        (space, (rts, blocks))
                     },
-                    |(space, _listening_rt)| {
+                    |(space, _listening_things)| {
                         space
                             .try_modify(|space| space.fill(bounds, |_| Some(&block)).unwrap())
                             .unwrap();
@@ -76,9 +88,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
             BenchmarkId::new("fill_uniform() entire", &size_description),
             |b| {
                 let [block] = make_some_blocks();
-                b.iter_batched(
+                b.iter_batched_ref(
                     || Space::empty(bounds),
-                    |mut space| {
+                    |space: &mut Space| {
                         space.fill_uniform(space.bounds(), &block).unwrap();
                     },
                     BatchSize::SmallInput,
@@ -90,9 +102,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
             BenchmarkId::new("fill_uniform() partial", &size_description),
             |b| {
                 let [block] = make_some_blocks();
-                b.iter_batched(
+                b.iter_batched_ref(
                     || Space::empty(bigger_bounds),
-                    |mut space| {
+                    |space: &mut Space| {
                         space.fill_uniform(bounds, &block).unwrap();
                     },
                     BatchSize::SmallInput,
@@ -102,9 +114,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::new("set() entire", &size_description), |b| {
             let [block] = make_some_blocks();
-            b.iter_batched(
+            b.iter_batched_ref(
                 || Space::empty(bounds),
-                |mut space| {
+                |space: &mut Space| {
                     let mutation_size = GridCoordinate::from(mutation_size);
                     for x in 0..mutation_size {
                         for y in 0..mutation_size {
@@ -121,15 +133,16 @@ fn space_bulk_mutation(c: &mut Criterion) {
         group.bench_function(
             BenchmarkId::new("transaction entire", &size_description),
             |b| {
+                // Arguably, creating the transaction is part of the cost of the operation,
+                // but it's not the part we're trying to measure.
                 let [block] = make_some_blocks();
-                b.iter_batched(
+                let txn = SpaceTransaction::filling(bounds, |_| {
+                    CubeTransaction::replacing(None, Some(block.clone()))
+                });
+                b.iter_batched_ref(
                     || Space::empty(bounds),
-                    |mut space| {
-                        let txn = SpaceTransaction::filling(bounds, |_| {
-                            CubeTransaction::replacing(None, Some(block.clone()))
-                        });
-                        txn.execute(&mut space, &mut transaction::no_outputs)
-                            .unwrap();
+                    |space: &mut Space| {
+                        txn.execute(space, &mut transaction::no_outputs).unwrap();
                     },
                     BatchSize::SmallInput,
                 )
