@@ -47,7 +47,6 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         task_done_signal,
     } = params;
 
-    #[cfg_attr(not(feature = "record"), expect(unused_variables))]
     let executor = Executor::new(runtime.handle().clone());
 
     // At this point we have just finished whatever the GraphicsType did before calling
