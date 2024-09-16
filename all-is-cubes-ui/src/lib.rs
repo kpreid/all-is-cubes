@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 #![feature(never_type)]
 
 //! User interface framework and screens for [`all_is_cubes`].
