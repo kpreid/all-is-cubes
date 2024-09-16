@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 #![feature(never_type)]
 
 //! This library is an internal component of [`all-is-cubes`],

@@ -1,5 +1,6 @@
 #![feature(doc_notable_trait)]
 #![feature(impl_trait_in_assoc_type)]
+#![feature(let_chains)]
 #![feature(never_type)]
 #![feature(trait_upcasting)]
 
