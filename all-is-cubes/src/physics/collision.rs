@@ -389,14 +389,13 @@ where
                     println_escape_debug!("  > recursing into {cube:?}");
                     let found_end = Sp::recurse_escape(cube, aab, ray, cell);
                     println_escape_debug!("  < exiting recursion {found_end:?}");
-                    if let Some(found_end) = found_end {
-                        if found_end.t_distance
+                    if let Some(found_end) = found_end
+                        && found_end.t_distance
                             > farthest_recursive_end
                                 .as_ref()
                                 .map_or(0., |end| end.t_distance)
-                        {
-                            farthest_recursive_end = Some(found_end);
-                        }
+                    {
+                        farthest_recursive_end = Some(found_end);
                     }
                 }
             }

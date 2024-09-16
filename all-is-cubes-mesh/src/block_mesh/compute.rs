@@ -153,18 +153,18 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             &mut viz,
         );
 
-        if let Some(bbox) = analysis.transparent_bounding_box {
-            if let Some(tile) = &output.texture_used {
-                let tile = tile.clone(); // TODO: needed to avoid borrowing conflict, but we should fix that by making push_box borrow less
-                push_box(
-                    output,
-                    resolution,
-                    bbox,
-                    OpacityCategory::Partial,
-                    &BoxColoring::VolumeTexture(tile),
-                    &mut viz,
-                );
-            }
+        if let Some(bbox) = analysis.transparent_bounding_box
+            && let Some(tile) = &output.texture_used
+        {
+            let tile = tile.clone(); // TODO: needed to avoid borrowing conflict, but we should fix that by making push_box borrow less
+            push_box(
+                output,
+                resolution,
+                bbox,
+                OpacityCategory::Partial,
+                &BoxColoring::VolumeTexture(tile),
+                &mut viz,
+            );
         }
     }
 }

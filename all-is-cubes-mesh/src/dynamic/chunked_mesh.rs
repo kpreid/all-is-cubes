@@ -502,13 +502,11 @@ where
         let chunk_scan_end_time = time::Instant::now();
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
-        let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
-            if chunk.depth_sort_for_view(view_point.cast::<<M::Vertex as Vertex>::Coordinate>()) {
-                render_data_updater(chunk.borrow_for_update(true));
-                Some(time::Instant::now())
-            } else {
-                None
-            }
+        let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk)
+            && chunk.depth_sort_for_view(view_point.cast::<<M::Vertex as Vertex>::Coordinate>())
+        {
+            render_data_updater(chunk.borrow_for_update(true));
+            Some(time::Instant::now())
         } else {
             None
         };

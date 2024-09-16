@@ -274,16 +274,16 @@ impl AaRay {
 
         // The origin coordinates may have saturated, but only along the axis of the ray, because
         // the others must be within the cube bounds.
-        // Replace that coordinate with one which is just outside the bounds of the cube.
-        if let Some(axis) = self.direction.axis() {
-            // Only if not starting within that cube.
-            if !(0..resolution_g).contains(&transformed_origin[axis]) {
-                transformed_origin[axis] = if self.direction.is_positive() {
-                    -1
-                } else {
-                    resolution_g
-                };
-            }
+        // Replace that coordinate with one which is just outside the bounds of the cube,
+        // but only if not starting within that cube.
+        if let Some(axis) = self.direction.axis()
+            && !(0..resolution_g).contains(&transformed_origin[axis])
+        {
+            transformed_origin[axis] = if self.direction.is_positive() {
+                -1
+            } else {
+                resolution_g
+            };
         }
 
         // Translation vector for the cube of the high-resolution grid that the ray is within

@@ -629,10 +629,10 @@ impl EverythingRenderer {
             );
         }
 
-        if !self.cameras.graphics_options().bloom_intensity.is_zero() {
-            if let Some(bloom) = &self.fb.bloom {
-                bloom.run(&mut pass_encoder);
-            }
+        if !self.cameras.graphics_options().bloom_intensity.is_zero()
+            && let Some(bloom) = &self.fb.bloom
+        {
+            bloom.run(&mut pass_encoder);
         }
 
         // let postprocess_to_submit_time = Instant::now();

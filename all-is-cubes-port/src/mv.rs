@@ -220,13 +220,14 @@ fn space_to_dot_vox_model(
         .block_data()
         .iter()
         .map(|data| {
-            if let Some(entry) = block_to_dot_vox_palette_entry(data.evaluated()) {
-                if let Ok(index) = u8::try_from(palette.len()) {
-                    palette.push(entry);
-                    return Some(index);
-                }
+            if let Some(entry) = block_to_dot_vox_palette_entry(data.evaluated())
+                && let Ok(index) = u8::try_from(palette.len())
+            {
+                palette.push(entry);
+                Some(index)
+            } else {
+                None
             }
-            None
         })
         .collect();
 

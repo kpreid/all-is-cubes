@@ -41,21 +41,20 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
         }
 
         // Lighting trace at cursor
-        if graphics_options.debug_light_rays_at_cursor {
-            if let Some(cursor) = cursor_result {
-                // TODO: kludged test
-                let is_same_space = if let Ok(cursor_space) = cursor.space().read(read_ticket) {
-                    std::ptr::eq(&raw const *cursor_space, space)
-                } else {
-                    false
-                };
-                if is_same_space {
-                    let result = space
-                        .compute_lighting::<all_is_cubes::space::LightUpdateCubeInfo>(
-                            cursor.preceding_cube(),
-                        );
-                    wireframe_vertices(v, Rgba::new(0.8, 0.8, 1.0, 1.0), &result.debug);
-                }
+        if graphics_options.debug_light_rays_at_cursor
+            && let Some(cursor) = cursor_result
+        {
+            // TODO: kludged test
+            let is_same_space = if let Ok(cursor_space) = cursor.space().read(read_ticket) {
+                std::ptr::eq(&raw const *cursor_space, space)
+            } else {
+                false
+            };
+            if is_same_space {
+                let result = space.compute_lighting::<all_is_cubes::space::LightUpdateCubeInfo>(
+                    cursor.preceding_cube(),
+                );
+                wireframe_vertices(v, Rgba::new(0.8, 0.8, 1.0, 1.0), &result.debug);
             }
         }
     }

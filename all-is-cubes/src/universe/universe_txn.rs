@@ -503,13 +503,13 @@ impl Transaction for UniverseTransaction {
     type Mismatch = UniverseMismatch;
 
     fn check(&self, target: &Universe) -> Result<Self::CommitCheck, UniverseMismatch> {
-        if let Some(universe_id) = self.universe_id() {
-            if universe_id != target.id {
-                return Err(UniverseMismatch::DifferentUniverse {
-                    transaction: universe_id,
-                    target: target.id,
-                });
-            }
+        if let Some(universe_id) = self.universe_id()
+            && universe_id != target.id
+        {
+            return Err(UniverseMismatch::DifferentUniverse {
+                transaction: universe_id,
+                target: target.id,
+            });
         }
         let mut member_checks = HbHashMap::with_capacity(self.members.len());
         for (name, member) in self.members.iter() {

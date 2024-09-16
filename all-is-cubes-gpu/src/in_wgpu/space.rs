@@ -579,29 +579,27 @@ impl SpaceRenderer {
                 ..
             } in csm.iter_in_view(camera)
             {
-                if mesh_in_view {
-                    if let Some(buffers) = &chunk.render_data {
-                        draw_chunk_instance(
-                            chunk.mesh().opaque_range(),
-                            render_pass,
-                            buffers,
-                            &mut instance_buffer_writer,
-                            chunk.position(),
-                            &mut 0,
-                            &mut flaws,
-                            "",
-                        );
-                        draw_chunk_instance(
-                            chunk.mesh().transparent_range(DepthOrdering::Any),
-                            render_pass,
-                            buffers,
-                            &mut instance_buffer_writer,
-                            chunk.position(),
-                            &mut 0,
-                            &mut flaws,
-                            "",
-                        );
-                    }
+                if mesh_in_view && let Some(buffers) = &chunk.render_data {
+                    draw_chunk_instance(
+                        chunk.mesh().opaque_range(),
+                        render_pass,
+                        buffers,
+                        &mut instance_buffer_writer,
+                        chunk.position(),
+                        &mut 0,
+                        &mut flaws,
+                        "",
+                    );
+                    draw_chunk_instance(
+                        chunk.mesh().transparent_range(DepthOrdering::Any),
+                        render_pass,
+                        buffers,
+                        &mut instance_buffer_writer,
+                        chunk.position(),
+                        &mut 0,
+                        &mut flaws,
+                        "",
+                    );
                 }
             }
         }

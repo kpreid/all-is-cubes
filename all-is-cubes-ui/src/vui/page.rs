@@ -248,11 +248,11 @@ impl PageInst {
         mut size: UiSize,
         universe: &mut Universe,
     ) -> Handle<Space> {
-        if let Some(space) = self.space.as_ref() {
-            // TODO: We will need to be comparing the entire `UiSize` if it gains other fields
-            if space.read(universe.read_ticket()).unwrap().bounds() == size.space_bounds() {
-                return space.to_weak();
-            }
+        // TODO: We will need to be comparing the entire `UiSize` if it gains other fields
+        if let Some(space) = self.space.as_ref()
+            && space.read(universe.read_ticket()).unwrap().bounds() == size.space_bounds()
+        {
+            return space.to_weak();
         }
 
         // TODO: there will be multiple layouts and the size calculation will depend on the layout

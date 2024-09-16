@@ -275,18 +275,14 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 &mut self.meta.bounding_box,
                 |face| {
                     let adjacent_cube = cube + face.normal_vector();
-                    if let Some(adj_block_index) = space_data_source(adjacent_cube) {
-                        if block_meshes
+                    if let Some(adj_block_index) = space_data_source(adjacent_cube)
+                        && block_meshes
                             .get_block_mesh(adj_block_index, adjacent_cube, false)
                             .is_some_and(|bm| bm.face_vertices[face.opposite()].fully_opaque)
-                        {
-                            // Don't draw obscured faces, but do record that we depended on them.
-                            bitset_set_and_get(
-                                &mut self.block_indices_used,
-                                adj_block_index.into(),
-                            );
-                            return true;
-                        }
+                    {
+                        // Don't draw obscured faces, but do record that we depended on them.
+                        bitset_set_and_get(&mut self.block_indices_used, adj_block_index.into());
+                        return true;
                     }
                     false
                 },
@@ -556,11 +552,11 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
             // Nothing to do; skip opacity lookup.
             continue;
         }
-        if let Ok(face) = Face6::try_from(face) {
-            if neighbor_is_fully_opaque(face) {
-                // Skip face fully obscured by a neighbor.
-                continue;
-            }
+        if let Ok(face) = Face6::try_from(face)
+            && neighbor_is_fully_opaque(face)
+        {
+            // Skip face fully obscured by a neighbor.
+            continue;
         }
 
         // Copy vertices, offset to the block position

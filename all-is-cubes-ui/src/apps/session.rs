@@ -1067,19 +1067,19 @@ impl<T: Fmt<StatusText>> fmt::Display for InfoText<'_, T> {
         let fopt = self.fopt;
         let mut empty = true;
         if fopt.show.contains(ShowStatus::CHARACTER) {
-            if let Some(shuttle) = self.session.shuttle.as_ref() {
-                if let Some(character_handle) = shuttle.game_character.get().as_ref() {
-                    empty = false;
-                    write!(
-                        f,
-                        "{}",
-                        character_handle
-                            .read(shuttle.game_universe.read_ticket())
-                            .unwrap()
-                            .refmt(&fopt)
-                    )
-                    .unwrap();
-                }
+            if let Some(shuttle) = self.session.shuttle.as_ref()
+                && let Some(character_handle) = shuttle.game_character.get().as_ref()
+            {
+                empty = false;
+                write!(
+                    f,
+                    "{}",
+                    character_handle
+                        .read(shuttle.game_universe.read_ticket())
+                        .unwrap()
+                        .refmt(&fopt)
+                )
+                .unwrap();
             }
         }
         if fopt.show.contains(ShowStatus::STEP) {

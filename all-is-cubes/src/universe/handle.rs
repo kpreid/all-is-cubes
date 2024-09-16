@@ -503,13 +503,13 @@ impl<T: 'static> Handle<T> {
     where
         T: VisitHandles + UniverseMember,
     {
-        if let Some(existing_id) = self.universe_id() {
-            if existing_id != future_universe_id {
-                return Err(InsertError {
-                    name: self.name(),
-                    kind: InsertErrorKind::AlreadyInserted,
-                });
-            }
+        if let Some(existing_id) = self.universe_id()
+            && existing_id != future_universe_id
+        {
+            return Err(InsertError {
+                name: self.name(),
+                kind: InsertErrorKind::AlreadyInserted,
+            });
         }
 
         match self.inner.state.lock() {

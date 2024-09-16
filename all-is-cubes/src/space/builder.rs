@@ -217,13 +217,13 @@ impl Builder<'_, Vol<()>> {
                 actual: contents.bounds(),
             });
         }
-        if let Some(light) = light.as_ref() {
-            if light.bounds() != self.bounds {
-                return Err(PaletteError::WrongDataBounds {
-                    expected: self.bounds.bounds(),
-                    actual: light.bounds(),
-                });
-            }
+        if let Some(light) = light.as_ref()
+            && light.bounds() != self.bounds
+        {
+            return Err(PaletteError::WrongDataBounds {
+                expected: self.bounds.bounds(),
+                actual: light.bounds(),
+            });
         }
 
         // Validate data and update palette contents

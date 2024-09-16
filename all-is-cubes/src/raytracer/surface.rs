@@ -262,10 +262,10 @@ where
     type Item = TraceStep<'a, D>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(b) = &mut self.current_block {
-            if let Some(surface) = b.next() {
-                return Some(surface);
-            }
+        if let Some(b) = &mut self.current_block
+            && let Some(surface) = b.next()
+        {
+            return Some(surface);
         }
         // If we get here, self.current_block is either exhausted or already None
         self.current_block = None;

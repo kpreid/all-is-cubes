@@ -158,27 +158,24 @@ impl ReloadableShader {
             self.next_module = Some(Box::pin(module_future));
         }
 
-        if let Some(f) = self.next_module.as_mut() {
-            if let task::Poll::Ready(result) = f
+        if let Some(f) = self.next_module.as_mut()
+            && let task::Poll::Ready(result) = f
                 .as_mut()
                 .poll(&mut task::Context::from_waker(task::Waker::noop()))
-            {
-                self.next_module = None;
-                match result {
-                    Ok(new_module) => {
-                        self.current_module = Identified::new(new_module);
-                        true
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "Error encountered while reloading shader:\n{}",
-                            all_is_cubes::util::ErrorChain(&e)
-                        );
-                        false
-                    }
+        {
+            self.next_module = None;
+            match result {
+                Ok(new_module) => {
+                    self.current_module = Identified::new(new_module);
+                    true
                 }
-            } else {
-                false
+                Err(e) => {
+                    log::error!(
+                        "Error encountered while reloading shader:\n{}",
+                        all_is_cubes::util::ErrorChain(&e)
+                    );
+                    false
+                }
             }
         } else {
             false

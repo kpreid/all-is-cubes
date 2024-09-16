@@ -371,25 +371,24 @@ impl Character {
         // TODO: lazy clone
         if let Some(self_handle) = self_handle.cloned() {
             if self.velocity_input.y > 0. {
-                if let Some((slot_index, false)) = find_jetpacks(&self.inventory).next() {
-                    if let Ok(t) =
+                if let Some((slot_index, false)) = find_jetpacks(&self.inventory).next()
+                    && let Ok(t) =
                         self.inventory
                             .use_tool(read_ticket, None, self_handle, slot_index)
-                    {
-                        result_transaction.merge_from(t).unwrap();
-                    }
+                {
+                    result_transaction.merge_from(t).unwrap();
                 }
             } else if self.is_on_ground() {
                 for (slot_index, active) in find_jetpacks(&self.inventory) {
-                    if active {
-                        if let Ok(t) = self.inventory.use_tool(
+                    if active
+                        && let Ok(t) = self.inventory.use_tool(
                             read_ticket,
                             None,
                             self_handle.clone(),
                             slot_index,
-                        ) {
-                            result_transaction.merge_from(t).unwrap();
-                        }
+                        )
+                    {
+                        result_transaction.merge_from(t).unwrap();
                     }
                 }
             }

@@ -143,20 +143,20 @@ impl RerunMesher {
             }
         }
         for (i, cubes) in instances {
-            if let Some(mesh) = self.csm.block_instance_mesh(i) {
-                if let Some(dm) = &mesh.render_data {
-                    let translations = cubes.into_iter().map(|cube| {
-                        rg::components::PoseTranslation3D(rg::convert_vec(
-                            cube.lower_bounds().to_vector(),
-                        ))
-                    });
-                    dm.destination.log(
-                        &rg::entity_path![],
-                        &rg::archetypes::InstancePoses3D::new()
-                            .with_scales([1.0]) // override earlier dummy scale
-                            .with_translations(translations),
-                    )
-                }
+            if let Some(mesh) = self.csm.block_instance_mesh(i)
+                && let Some(dm) = &mesh.render_data
+            {
+                let translations = cubes.into_iter().map(|cube| {
+                    rg::components::PoseTranslation3D(rg::convert_vec(
+                        cube.lower_bounds().to_vector(),
+                    ))
+                });
+                dm.destination.log(
+                    &rg::entity_path![],
+                    &rg::archetypes::InstancePoses3D::new()
+                        .with_scales([1.0]) // override earlier dummy scale
+                        .with_translations(translations),
+                )
             }
         }
     }

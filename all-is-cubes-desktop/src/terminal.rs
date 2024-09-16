@@ -201,11 +201,11 @@ fn run(
             .context("crossterm input poll() failed")?
         {
             let event = crossterm::event::read().context("crossterm input read() failed")?;
-            if let Some(aic_event) = event_to_key(&event) {
-                if dsession.session.input_processor.key_momentary(aic_event) {
-                    // Handled by input_processor
-                    continue 'input;
-                }
+            if let Some(aic_event) = event_to_key(&event)
+                && dsession.session.input_processor.key_momentary(aic_event)
+            {
+                // Handled by input_processor
+                continue 'input;
             }
             let options = &mut dsession.renderer.options;
             match event {

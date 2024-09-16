@@ -128,13 +128,11 @@ impl UniverseSource {
             universe_done_time.duration_since(start_time).as_secs_f32()
         );
 
-        if precompute_light {
-            if let Some(c) = universe.get_default_character() {
-                let space_handle = c.read(universe.read_ticket()).unwrap().space.clone();
-                universe
-                    .try_modify(&space_handle, evaluate_light_with_progress)
-                    .unwrap();
-            }
+        if precompute_light && let Some(c) = universe.get_default_character() {
+            let space_handle = c.read(universe.read_ticket()).unwrap().space.clone();
+            universe
+                .try_modify(&space_handle, evaluate_light_with_progress)
+                .unwrap();
         }
 
         Ok(universe)

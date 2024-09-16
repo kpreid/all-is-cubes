@@ -167,10 +167,10 @@ impl GltfWriter {
         visible_meshes: &[MeshInstance],
     ) -> Flaws {
         // Create camera if and only if one was given and we didn't have one.
-        if self.camera.is_none() {
-            if let Some(our_camera) = our_camera.as_ref() {
-                self.camera = Some(self.root.push(convert_camera(None, our_camera)));
-            }
+        if self.camera.is_none()
+            && let Some(our_camera) = our_camera.as_ref()
+        {
+            self.camera = Some(self.root.push(convert_camera(None, our_camera)));
         }
 
         self.frame_states.push(FrameState {
