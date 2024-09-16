@@ -38,14 +38,13 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
 
         // Lighting trace at cursor
         if graphics_options.debug_light_rays_at_cursor {
-            if let Some(cursor) = cursor_result {
-                if std::ptr::eq(&*cursor.space().read().unwrap(), space) {
-                    let result = space
-                        .compute_lighting::<all_is_cubes::space::LightUpdateCubeInfo>(
-                            cursor.preceding_cube(),
-                        );
-                    wireframe_vertices(v, Rgba::new(0.8, 0.8, 1.0, 1.0), &result.debug);
-                }
+            if let Some(cursor) = cursor_result
+                && std::ptr::eq(&*cursor.space().read().unwrap(), space)
+            {
+                let result = space.compute_lighting::<all_is_cubes::space::LightUpdateCubeInfo>(
+                    cursor.preceding_cube(),
+                );
+                wireframe_vertices(v, Rgba::new(0.8, 0.8, 1.0, 1.0), &result.debug);
             }
         }
     }

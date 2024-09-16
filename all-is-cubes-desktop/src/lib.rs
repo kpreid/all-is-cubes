@@ -1,4 +1,5 @@
 #![feature(async_closure)]
+#![feature(let_chains)]
 #![feature(never_type)]
 
 //! Components for creating a desktop application that renders interactive [`all_is_cubes`]
