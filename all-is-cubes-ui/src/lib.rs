@@ -1,4 +1,5 @@
 #![feature(async_closure)]
+#![feature(let_chains)]
 #![feature(never_type)]
 #![feature(noop_waker)]
 

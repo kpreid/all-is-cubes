@@ -1,6 +1,6 @@
+#![feature(let_chains)]
 #![feature(never_type)]
 #![feature(noop_waker)]
-
 #![allow(exported_private_dependencies, reason = "false positive on wgpu_types")]
 
 //! Algorithms for rendering [All is Cubes] content using a GPU, via
