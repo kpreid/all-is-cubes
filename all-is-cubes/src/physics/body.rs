@@ -232,10 +232,11 @@ impl Body {
             };
         }
 
-        if !self.flying && !tick.paused() {
-            if let Some(space) = colliding_space {
-                self.velocity += space.physics().gravity.map(|c| c.into_inner()).cast_unit() * dt;
-            }
+        if !self.flying
+            && !tick.paused()
+            && let Some(space) = colliding_space
+        {
+            self.velocity += space.physics().gravity.map(|c| c.into_inner()).cast_unit() * dt;
         }
 
         #[cfg(feature = "rerun")]
