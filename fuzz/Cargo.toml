@@ -17,6 +17,11 @@ all-is-cubes-mesh = { path = "../all-is-cubes-mesh", features = ["arbitrary"] }
 arbitrary = { version = "1.3.2", features = ["derive"] }
 libfuzzer-sys = "0.4"
 
+[patch.crates-io]
+# Here are some patches we might want to apply for development:
+#
+# exhaust = { git = "https://github.com/kpreid/exhaust/", branch = "main" }
+
 [[bin]]
 name = "fuzz_block_eval"
 path = "fuzz_targets/fuzz_block_eval.rs"

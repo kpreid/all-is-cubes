@@ -276,7 +276,7 @@ impl<'provider, E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> IntoIterator
 pub struct ModuleIter<'provider, E: Exhaust, V> {
     /// Using the `Exhaust` iterator instead of the `HashMap` iterator guarantees a deterministic
     /// iteration order. (We don't currently publicly promise that, though.)
-    key_iter: <E as Exhaust>::Iter,
+    key_iter: exhaust::Iter<E>,
     map: &'provider HbHashMap<E, V>,
 }
 
@@ -295,8 +295,10 @@ impl<'provider, E: Exhaust + Eq + Hash, V> Iterator for ModuleIter<'provider, E,
     }
 }
 
-impl<E, V> ExactSizeIterator for ModuleIter<'_, E, V> where
-    E: Exhaust<Iter: ExactSizeIterator> + Eq + Hash
+impl<E, V> ExactSizeIterator for ModuleIter<'_, E, V>
+where
+    E: Exhaust + Eq + Hash,
+    exhaust::Iter<E>: ExactSizeIterator,
 {
 }
 
