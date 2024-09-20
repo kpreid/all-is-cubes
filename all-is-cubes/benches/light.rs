@@ -17,7 +17,7 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
     group.sample_size(10);
 
     group.bench_function("lighting_bench_space", |b| {
-        b.iter_batched(
+        b.iter_batched_ref(
             || {
                 let mut u = Universe::new();
                 let space = rt
@@ -29,7 +29,7 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
                     .unwrap();
                 (u, space)
             },
-            |(_u, mut space)| {
+            |(_u, space)| {
                 space.evaluate_light::<time::NoTime>(1, |_| {});
             },
             BatchSize::LargeInput,
