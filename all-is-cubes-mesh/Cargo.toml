@@ -12,7 +12,7 @@ categories = ["games", "graphics", "rendering"]
 keywords = ["all-is-cubes", "voxel", "mesh"]
 
 [package.metadata.docs.rs]
-features = []
+features = ["_full-documentation"]
 
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
@@ -39,6 +39,9 @@ arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary", "ordered-float/arbitrary
 # If disabled, `std::thread` is never used.
 # If enabled, threads may be created and the active `rayon` thread pool may be used.
 auto-threads = ["dep:rayon"]
+# Internal use only. Used to ensure that docs.rs builds have complete information;
+# in particular, `all-is-cubes/std` would otherwise be missing, making types appear `!Sync`.
+_full-documentation = ["all-is-cubes/std", "arbitrary"]
 
 
 [dependencies]
