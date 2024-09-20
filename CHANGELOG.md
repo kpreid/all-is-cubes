@@ -23,6 +23,8 @@
     - `math::FaceMap::repeat()` has been renamed to `splat()`, for consistency with the same concept in the `euclid` vector types which we use.
     * `math::Geometry` is now `math::Wireframe`, and its `translate()` method has been replaced with inherent methods on its implementors.
     - `math::GridAab::expand()` now takes unsigned values; use `GridAab::shrink()` instead of negative ones. This allows both versions to never panic.
+    - `math::Vol::subdivide()` now returns an array instead of a tuple, and the `Vol<&mut [_]>` version takes a filter function.
+      The filter should make it easier to use in cases where the mutable subdivisions need to meet some size condition.
 
     - Renamed `behavior::BehaviorContext` to `behavior::Context`.
     - Renamed `behavior::BehaviorHost` to `behavior::Host`.
