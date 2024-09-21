@@ -183,16 +183,17 @@ mod tests {
         let [original_block] = make_some_voxel_blocks(&mut universe);
 
         let ev_original = original_block.evaluate().unwrap();
+        assert_eq!(ev_original.resolution(), Resolution::R16);
+        let scale = R2; // scale up by two = divide resolution by two
         let zoom_resolution = ev_original.resolution().halve().unwrap();
         let original_voxels = &ev_original.voxels;
 
         // Try zoom at multiple offset steps.
         for x in 0i32..2 {
             dbg!(x);
-            let zoomed = original_block.clone().with_modifier(Zoom::new(
-                R2, // scale up by two = divide resolution by two
-                point3(x, 0, 0),
-            ));
+            let zoomed = original_block
+                .clone()
+                .with_modifier(Zoom::new(scale, point3(x, 0, 0)));
             let ev_zoomed = zoomed.evaluate().unwrap();
             assert_eq!(
                 ev_zoomed,
@@ -203,9 +204,8 @@ mod tests {
                         ev_original.attributes.clone(),
                         Evoxels::from_one(Evoxel::from_color(Rgba::TRANSPARENT)),
                         block::Cost {
-                            components: 3,        // Primitive + display_name + Zoom
-                            voxels: 16u32.pow(3), // counts evaluation of Recur
-                            recursion: 0,
+                            components: ev_original.cost.components + 1,
+                            ..ev_original.cost
                         },
                     )
                 } else {
@@ -223,9 +223,11 @@ mod tests {
                             }),
                         ),
                         block::Cost {
-                            components: 3,
-                            voxels: 16u32.pow(3) + 8u32.pow(3), // Recur + Zoom
-                            recursion: 0,
+                            components: ev_original.cost.components + 1,
+                            // 8 = 16 (original) / 2 (zoom level)
+                            voxels: ev_original.cost.voxels
+                                + u32::from((ev_original.resolution() / scale).unwrap()).pow(3),
+                            ..ev_original.cost
                         },
                     )
                 }

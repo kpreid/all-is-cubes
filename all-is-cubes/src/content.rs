@@ -6,19 +6,13 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use embedded_graphics::mono_font::iso_8859_1::FONT_9X15_BOLD;
-use embedded_graphics::mono_font::MonoTextStyle;
-use embedded_graphics::prelude::{Drawable, Point};
-use embedded_graphics::text::Alignment;
-use embedded_graphics::text::Baseline;
-use embedded_graphics::text::Text;
-use embedded_graphics::text::TextStyleBuilder;
-
 use crate::arcstr::{literal, ArcStr};
-use crate::block::{Block, Resolution, Resolution::R16, RotationPlacementRule};
+use crate::block::{self, Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::color_block;
 use crate::inv::{Slot, Tool};
-use crate::math::{rgb_const, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, Rgb, Rgba};
+use crate::math::{
+    rgb_const, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb, Rgba,
+};
 use crate::space::{SetCubeError, Space};
 use crate::transaction::Transactional as _;
 use crate::universe::{Universe, UniverseTransaction};
@@ -93,31 +87,52 @@ pub fn make_some_voxel_blocks_txn<const COUNT: usize>(
 
 #[inline(never)] // discourage unnecessarily repeated code
 fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usize) -> Block {
+    use crate::block::text;
+
     let resolution = R16;
     let color = color_for_make_blocks(i, n);
+    let label_voxel = Block::from(palette::ALMOST_BLACK);
+    let label = arcstr::format!("{i}");
+
     let mut block_space = Space::for_block(resolution)
         .filled_with(Block::from(color))
         .build();
     axes(&mut block_space).unwrap();
-    for face in Face6::ALL {
-        Text::with_text_style(
-            &i.to_string(),
-            Point::new(i32::from(resolution) / 2, i32::from(resolution) / 2),
-            MonoTextStyle::new(&FONT_9X15_BOLD, palette::ALMOST_BLACK),
-            TextStyleBuilder::new()
-                .baseline(Baseline::Middle)
-                .alignment(Alignment::Center)
-                .build(),
-        )
-        .draw(
-            &mut block_space.draw_target(face.face_transform(GridCoordinate::from(resolution) - 1)),
-        )
-        .unwrap();
-    }
-    Block::builder()
-        .display_name(i.to_string())
+
+    let base_block = Block::builder()
+        .display_name(label.clone())
         .voxels_handle(resolution, transaction.insert_anonymous(block_space))
-        .build()
+        .build();
+
+    let text_block = Block::from(block::Primitive::Text {
+        text: text::Text::builder()
+            .string(label.clone())
+            .font(text::Font::Logo) // legacy compatibility choice
+            .foreground(label_voxel.clone())
+            .positioning(text::Positioning {
+                x: text::PositioningX::Center,
+                line_y: text::PositioningY::BodyMiddle,
+                z: text::PositioningZ::Front,
+            })
+            .layout_bounds(
+                resolution,
+                GridAab::for_block(resolution)
+                    // legacy compatibility -- nudge downward 1 voxel to keep the old text layout.
+                    // Not sure why this is different but we'll be revisiting text layout in the future anyway.
+                    .shrink(FaceMap::splat(0).with(Face6::PY, 1))
+                    .unwrap(),
+            )
+            .build(),
+        offset: GridVector::zero(),
+    });
+
+    block::Composite::stack(
+        base_block,
+        Face6::ALL
+            .iter()
+            .map(|face| text_block.clone().rotate(face.rotation_from_nz()))
+            .map(|text_block| block::Composite::new(text_block, block::CompositeOperator::Over)),
+    )
 }
 
 fn color_for_make_blocks(i: usize, n: usize) -> Rgba {
