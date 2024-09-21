@@ -327,18 +327,34 @@ impl GridRotation {
     //
     // TODO: add tests
     #[inline]
-    pub fn to_positive_octant_transform(self, size: GridCoordinate) -> Gridgid {
-        fn offset(face: Face6, size: GridCoordinate) -> GridVector {
+    pub const fn to_positive_octant_transform(self, size: GridCoordinate) -> Gridgid {
+        #[inline(always)]
+        const fn offset(face: Face6, size: GridCoordinate) -> GridVector {
             if face.is_positive() {
-                GridVector::zero()
+                GridVector::new(0, 0, 0)
             } else {
-                face.normal_vector() * -size
+                // const scalar multiplication
+                let mut v = face.into7().normal_vector_const();
+                v.x *= -size;
+                v.y *= -size;
+                v.z *= -size;
+                v
             }
+        }
+        #[inline(always)]
+        const fn add(mut a: GridVector, b: GridVector) -> GridVector {
+            a.x += b.x;
+            a.y += b.y;
+            a.z += b.z;
+            a
         }
         let basis = self.to_basis();
         Gridgid {
             rotation: self,
-            translation: offset(basis.x, size) + offset(basis.y, size) + offset(basis.z, size),
+            translation: add(
+                add(offset(basis.x, size), offset(basis.y, size)),
+                offset(basis.z, size),
+            ),
         }
     }
 

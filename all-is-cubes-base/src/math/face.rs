@@ -156,7 +156,7 @@ impl Face6 {
     /// assert_eq!(Face6::NX.is_positive(), false);
     /// ```
     #[inline]
-    pub fn is_positive(self) -> bool {
+    pub const fn is_positive(self) -> bool {
         matches!(self, Self::PX | Self::PY | Self::PZ)
     }
 
@@ -235,6 +235,24 @@ impl Face6 {
         self.into7().dot(vector)
     }
 
+    /// Returns a rotation, without reflection, which will rotate `Face6::NZ` to be `self`.
+    ///
+    /// The significance of this rotation is that it may be used to obtain a set of
+    /// coordinate systems for all six faces of some cube. It is arbitrary, but convenient
+    /// to have the arbitrary choice already made.
+    #[inline]
+    pub const fn rotation_from_nz(self) -> GridRotation {
+        match self {
+            Face6::NX => GridRotation::RYZX,
+            Face6::NY => GridRotation::RZXY,
+            Face6::NZ => GridRotation::RXYZ,
+            // Positives have the same axis swaps but an arbitrary choice of 180° rotation.
+            Face6::PX => GridRotation::RyZx, // PX rotates about Y.
+            Face6::PY => GridRotation::RZxy, // PY rotates about X.
+            Face6::PZ => GridRotation::RXyz, // PZ rotates about Y.
+        }
+    }
+
     /// Returns a [`Gridgid`] transformation which, if given points on the square
     /// with x ∈ [0, scale], y ∈ [0, scale], and z = 0, converts them to points that lie
     /// on the faces of the cube with x ∈ [0, scale], y ∈ [0, scale], and z ∈ [0, scale].
@@ -243,39 +261,22 @@ impl Face6 {
     /// consistent with that. Note that there are arbitrary choices in the rotation
     /// of all other faces. (TODO: Document those choices and test them.)
     ///
+    /// The rotations used are equal to [`Face6::rotation_from_nz()`],
+    /// and this method is equivalent to
+    /// `self.rotation_from_nz().to_positive_octant_transform(scale)`.
+    // TODO: decide whether to replace this entirely with `rotation_from_nz()`
+    ///
     /// To work with floating-point coordinates, use `.face_transform().to_matrix().to_free()`.
     #[must_use]
     #[rustfmt::skip]
     #[allow(clippy::missing_inline_in_public_items)]
     pub const fn face_transform(self, scale: GridCoordinate) -> Gridgid {
-        use GridRotation::*;
-        match self {
-            Face6::NX => Gridgid::from_rotation_about_origin(RYZX),
-            Face6::NY => Gridgid::from_rotation_about_origin(RZXY),
-            Face6::NZ => Gridgid::from_rotation_about_origin(RXYZ),
-
-            // Positives are same as negatives but with translation and an arbitrary choice of rotation.
-            // PX rotates about Y.
-            Face6::PX => Gridgid {
-                rotation: RyZx,
-                translation: GridVector::new(scale, scale, 0),
-            },
-            // PY rotates about X.
-            Face6::PY => Gridgid {
-                rotation: RZxy,
-                translation: GridVector::new(scale, scale, 0),
-            },
-            // PZ rotates about Y.
-            Face6::PZ => Gridgid {
-                rotation: RXyz,
-                translation: GridVector::new(0, scale, scale),
-            },
-        }
+        self.rotation_from_nz().to_positive_octant_transform(scale)
     }
 
     /// Helper to convert in const context; equivalent to `.into()`.
     #[inline]
-    const fn into7(self) -> Face7 {
+    pub(crate) const fn into7(self) -> Face7 {
         match self {
             Face6::NX => Face7::NX,
             Face6::NY => Face7::NY,
@@ -448,6 +449,24 @@ impl Face7 {
             Face7::PX => Vector3D::new(S::one(), S::zero(), S::zero()),
             Face7::PY => Vector3D::new(S::zero(), S::one(), S::zero()),
             Face7::PZ => Vector3D::new(S::zero(), S::zero(), S::one()),
+        }
+    }
+
+    /// Returns the vector normal to this face. [`Within`](Self::Within) is assigned the
+    /// zero vector.
+    ///
+    /// This version is `const` but not generic.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn normal_vector_const(self) -> GridVector {
+        match self {
+            Face7::Within => Vector3D::new(0, 0, 0),
+            Face7::NX => Vector3D::new(-1, 0, 0),
+            Face7::NY => Vector3D::new(0, -1, 0),
+            Face7::NZ => Vector3D::new(0, 0, -1),
+            Face7::PX => Vector3D::new(1, 0, 0),
+            Face7::PY => Vector3D::new(0, 1, 0),
+            Face7::PZ => Vector3D::new(0, 0, 1),
         }
     }
 
@@ -1074,6 +1093,19 @@ mod tests {
                     );
                 });
             }
+        }
+    }
+
+    #[test]
+    fn rotation_from_nz() {
+        for face in Face6::ALL {
+            let rot = face.rotation_from_nz();
+            assert_eq!(
+                rot.transform(Face6::NZ),
+                face,
+                "{face:?}: {rot:?} should rotate from NZ"
+            );
+            assert!(!rot.is_reflection(), "{face:?}: {rot:?} should not reflect");
         }
     }
 
