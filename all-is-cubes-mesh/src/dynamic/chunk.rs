@@ -1,10 +1,12 @@
+use all_is_cubes::euclid::Translation3D;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 use core::mem;
 use core::ops;
 
-use all_is_cubes::chunking::ChunkPos;
+use all_is_cubes::chunking::{ChunkPos, ChunkRelative};
+use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Cube, Geometry, GridCoordinate, LineVertex};
 use all_is_cubes::space::{BlockIndex, Space};
 
@@ -14,8 +16,8 @@ use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
 
-/// TODO: use chunk-relative coordinates to save a bit of memory
-type MeshCubeSet = hashbrown::HashSet<Cube>;
+/// Hash set that stores chunk-relative cubes
+type MeshCubeSet = hashbrown::HashSet<Point3D<u8, ChunkRelative>>;
 
 /// Stores a [`SpaceMesh`] covering one [chunk](all_is_cubes::chunking) of a [`Space`],
 /// a list of blocks to render instanced instead, caller-provided rendering data, and incidentals.
@@ -138,6 +140,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     ) -> bool {
         // let compute_start: Option<I> = dynamic::LOG_CHUNK_UPDATES.then(Instant::now);
         let bounds = self.position.bounds();
+        let absolute_to_relative = Translation3D::from(-bounds.lower_bounds().to_vector());
 
         self.block_instances.clear();
         let old_mesh_cubes = mem::take(&mut self.mesh_cubes);
@@ -145,6 +148,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             block_meshes,
             instances: &mut self.block_instances,
             mesh_cubes: &mut self.mesh_cubes,
+            absolute_to_relative,
         };
 
         let actually_changed_mesh = match chunk_todo.state {
@@ -153,7 +157,10 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
                 // We know the mesh is fine, so sweep for instances only.
                 let mut missing_instance_mesh = false;
                 for cube in bounds.interior_iter() {
-                    if old_mesh_cubes.contains(&cube) {
+                    let relative_cube = absolute_to_relative
+                        .transform_point3d(&cube.lower_bounds())
+                        .cast();
+                    if old_mesh_cubes.contains(&relative_cube) {
                         // If the cube is in the mesh, then `chunk_todo` won't have sent us
                         // merely `DirtyInstances` unless we don't need to care about updating it.
                         continue;
@@ -297,6 +304,7 @@ struct InstanceTrackingBlockMeshSource<'a, M: DynamicMeshTypes> {
     block_meshes: &'a dynamic::VersionedBlockMeshes<M>,
     instances: &'a mut dynamic::InstanceMap,
     mesh_cubes: &'a mut MeshCubeSet,
+    absolute_to_relative: Translation3D<GridCoordinate, Cube, ChunkRelative>,
 }
 
 impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshSource<'a, M> {
@@ -317,7 +325,11 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshS
             None
         } else {
             if primary && !vbm.mesh.is_empty() {
-                self.mesh_cubes.insert(cube);
+                self.mesh_cubes.insert(
+                    self.absolute_to_relative
+                        .transform_point3d(&cube.lower_bounds())
+                        .cast(),
+                );
             }
             Some(&vbm.mesh)
         }
