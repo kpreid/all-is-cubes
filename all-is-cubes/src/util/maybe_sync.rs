@@ -197,6 +197,10 @@ impl<'a, T> ops::DerefMut for RwLockWriteGuard<'a, T> {
 }
 
 pub(crate) enum LockError<G> {
+    #[cfg_attr(
+        not(feature = "std"),
+        expect(dead_code, reason = "no poisoning from RefCell")
+    )]
     Poisoned(G),
 }
 
@@ -228,6 +232,10 @@ impl<G> fmt::Debug for LockError<G> {
 }
 
 pub(crate) enum TryLockError<G> {
+    #[cfg_attr(
+        not(feature = "std"),
+        expect(dead_code, reason = "no poisoning from RefCell")
+    )]
     Poisoned(G),
     WouldBlock,
 }
