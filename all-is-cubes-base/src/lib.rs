@@ -10,7 +10,7 @@
     not(any(test, feature = "arbitrary")),
     warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
 )]
-#![cfg_attr(not(feature = "std"), expect(clippy::arc_with_non_send_sync))]
+#![cfg_attr(not(feature = "std"), allow(clippy::arc_with_non_send_sync))]
 #![warn(clippy::missing_inline_in_public_items)]
 
 #[cfg(any(feature = "std", test))]

@@ -8,7 +8,7 @@ use euclid::{vec3, Point3D};
 use num_traits::float::Float as _;
 
 /// Acts as polyfill for float methods
-#[cfg(not(feature = "std"))]
+#[cfg(not(any(feature = "std", test)))]
 #[allow(unused_imports)]
 use crate::math::Euclid as _;
 

@@ -6,8 +6,8 @@ use euclid::Vector3D;
 use ordered_float::NotNan;
 
 /// Acts as polyfill for float methods
-#[cfg(not(feature = "std"))]
-#[allow(unused_imports)]
+#[cfg(not(any(feature = "std", test)))]
+#[allow(unused_imports, reason = "unclear why this warns even though it is needed")]
 use num_traits::float::Float as _;
 
 use super::collision::{
@@ -16,8 +16,8 @@ use super::collision::{
 use crate::block::{BlockCollision, Resolution};
 use crate::camera::Eye;
 use crate::fluff::Fluff;
-#[cfg(not(feature = "std"))]
-#[allow(unused_imports)]
+#[cfg(not(any(feature = "std", test)))]
+#[allow(unused_imports, reason = "unclear why this warns even though it is needed")]
 use crate::math::Euclid as _;
 use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry as _};
 use crate::physics::{StopAt, Velocity, POSITION_EPSILON};

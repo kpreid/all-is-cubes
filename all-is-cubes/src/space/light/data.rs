@@ -5,7 +5,8 @@ use core::fmt;
 use euclid::default::Vector3D;
 
 /// Acts as polyfill for float methods
-#[cfg(not(feature = "std"))]
+#[cfg(not(any(feature = "std", test)))]
+#[allow(unused_imports, reason = "unclear why this warns even though it is needed")]
 use num_traits::float::Float as _;
 
 use crate::math::{NotNan, Rgb};

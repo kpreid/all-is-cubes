@@ -334,7 +334,11 @@ struct Key(u64);
 
 impl Key {
     fn new() -> Self {
-        #![allow(clippy::useless_conversion)] // useless on pointer_width=64
+        #![allow(
+            clippy::useless_conversion,
+            clippy::unnecessary_fallible_conversions,
+            reason = "depends on pointer width and atomic support"
+        )]
 
         use core::sync::atomic::{self, Ordering};
 

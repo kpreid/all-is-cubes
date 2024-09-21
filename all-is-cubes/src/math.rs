@@ -28,7 +28,8 @@ pub use all_is_cubes_base::{notnan, rgb_const, rgba_const};
 #[doc = include_str!("save/serde-warning.md")]
 pub use all_is_cubes_base::math::GridAab;
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(any(feature = "std", test)))]
+#[allow(dead_code, reason = "unclear why this warns even though it is needed")]
 /// Identical to [`num_traits::Euclid`] except that its signatures are compatible with
 /// `std` versions.
 ///
@@ -38,7 +39,7 @@ pub(crate) trait Euclid {
     fn div_euclid(self, rhs: Self) -> Self;
     fn rem_euclid(self, rhs: Self) -> Self;
 }
-#[cfg(not(feature = "std"))]
+#[cfg(not(any(feature = "std", test)))]
 impl<T: num_traits::Euclid + Copy> Euclid for T {
     fn div_euclid(self, rhs: Self) -> Self {
         <T as num_traits::Euclid>::div_euclid(&self, &rhs)

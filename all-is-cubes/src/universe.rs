@@ -163,7 +163,11 @@ cfg_if::cfg_if! {
 
 impl UniverseId {
     fn new() -> Self {
-        #![allow(clippy::useless_conversion, reason = "useless on pointer_width=64")]
+        #![allow(
+            clippy::useless_conversion,
+            clippy::unnecessary_fallible_conversions,
+            reason = "depends on pointer width and atomic support"
+        )]
 
         let id = UNIVERSE_ID_COUNTER
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |counter| {

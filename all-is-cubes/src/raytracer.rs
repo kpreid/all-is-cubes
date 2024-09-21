@@ -10,8 +10,11 @@ use core::marker::PhantomData;
 use euclid::{vec3, Vector3D};
 use manyfmt::Fmt;
 /// Acts as polyfill for float methods
-#[cfg(not(feature = "std"))]
-#[allow(unused_imports)]
+#[cfg(not(any(feature = "std", test)))]
+#[allow(
+    unused_imports,
+    reason = "unclear why this warns even though it is needed"
+)]
 use num_traits::float::Float as _;
 use ordered_float::NotNan;
 
@@ -21,8 +24,11 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use crate::block::{Evoxels, Resolution, AIR};
 use crate::camera::NdcPoint2;
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
-#[cfg(not(feature = "std"))]
-#[allow(unused_imports)]
+#[cfg(not(any(feature = "std", test)))]
+#[allow(
+    unused_imports,
+    reason = "unclear why this warns even though it is needed"
+)]
 use crate::math::Euclid as _;
 use crate::math::{
     rgb_const, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab,
