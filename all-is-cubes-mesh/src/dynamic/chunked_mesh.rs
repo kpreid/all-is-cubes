@@ -1,10 +1,8 @@
 use alloc::vec::Vec;
 use core::fmt;
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, Weak};
 
-use fnv::{FnvHashMap, FnvHashSet};
+use hashbrown::hash_map::Entry;
 use indoc::indoc;
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{ParallelBridge, ParallelIterator as _};
@@ -60,7 +58,7 @@ where
 
     /// Invariant: the set of present chunks (keys here) is the same as the set of keys
     /// in `todo.read().unwrap().chunks`.
-    chunks: FnvHashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<M, CHUNK_SIZE>>,
+    chunks: hashbrown::HashMap<ChunkPos<CHUNK_SIZE>, ChunkMesh<M, CHUNK_SIZE>>,
 
     /// Resized as needed upon each [`Self::update()`].
     chunk_chart: ChunkChart<CHUNK_SIZE>,
@@ -115,7 +113,7 @@ where
             space,
             todo: todo_rc,
             block_meshes: dynamic::VersionedBlockMeshes::new(texture_allocator),
-            chunks: FnvHashMap::default(),
+            chunks: Default::default(),
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Cube::new(0, 0, 0)),
             did_not_finish_chunks: true,
@@ -714,18 +712,18 @@ impl CsmUpdateInfo {
 struct CsmTodo<const CHUNK_SIZE: GridCoordinate> {
     all_blocks_and_chunks: bool,
     // TODO: Benchmark using a BitVec instead.
-    blocks: FnvHashSet<BlockIndex>,
+    blocks: hashbrown::HashSet<BlockIndex>,
     /// Membership in this table indicates that the chunk *exists;* todos for chunks
     /// outside of the view area are not tracked.
-    chunks: FnvHashMap<ChunkPos<CHUNK_SIZE>, ChunkTodo>,
+    chunks: hashbrown::HashMap<ChunkPos<CHUNK_SIZE>, ChunkTodo>,
 }
 
 impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
     fn initially_dirty() -> Self {
         Self {
             all_blocks_and_chunks: true,
-            blocks: HashSet::default(),
-            chunks: HashMap::default(),
+            blocks: Default::default(),
+            chunks: Default::default(),
         }
     }
 

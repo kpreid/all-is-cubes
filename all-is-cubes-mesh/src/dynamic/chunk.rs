@@ -15,7 +15,7 @@ use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
 use crate::dynamic::ChunkedSpaceMesh;
 
 /// TODO: use chunk-relative coordinates to save a bit of memory
-type MeshCubeSet = fnv::FnvHashSet<Cube>;
+type MeshCubeSet = hashbrown::HashSet<Cube>;
 
 /// Stores a [`SpaceMesh`] covering one [chunk](all_is_cubes::chunking) of a [`Space`],
 /// a list of blocks to render instanced instead, caller-provided rendering data, and incidentals.

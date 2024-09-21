@@ -85,7 +85,6 @@ embedded-graphics-core = "0.4.0"
 euclid = { version = "0.22.10", default-features = false }
 exhaust = { version = "0.2.0", default-features = false }
 flume = { version = "0.11.0", default-features = false, features = ["async"] }
-fnv = "1.0.7"
 futures-channel = { version = "0.3.28", default-features = false, features = ["alloc"] }
 futures-core = { version = "0.3.28", default-features = false, features = ["alloc"] }
 futures-task = { version = "0.3.28", default-features = false }

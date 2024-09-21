@@ -4,7 +4,6 @@ use core::num::NonZeroU32;
 use core::time::Duration;
 use core::{fmt, ops};
 
-use fnv::FnvHashSet;
 use futures_channel::oneshot::Canceled;
 
 use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
@@ -71,7 +70,7 @@ where
     /// Relies on the caller to check if `mesh_options` has changed and fill `todo`.
     pub(crate) fn update<F>(
         &mut self,
-        todo: &mut FnvHashSet<BlockIndex>,
+        todo: &mut hashbrown::HashSet<BlockIndex>,
         space: &Space,
         mesh_options: &MeshOptions,
         deadline: time::Deadline<M::Instant>,

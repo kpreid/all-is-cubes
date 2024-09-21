@@ -17,7 +17,7 @@ use crate::dynamic::ChunkMesh;
 /// over them with [`Self::iter()`].
 #[derive(Debug, Default)]
 pub struct InstanceCollector {
-    map: fnv::FnvHashMap<BlockIndex, Vec<Cube>>,
+    map: hashbrown::HashMap<BlockIndex, Vec<Cube>>,
 }
 
 impl InstanceCollector {
@@ -69,8 +69,8 @@ where
 /// Unlike [`InstanceCollector`], this is used only internally, and does prohibit duplicates.
 #[derive(Default)]
 pub(crate) struct InstanceMap {
-    by_block: fnv::FnvHashMap<BlockIndex, fnv::FnvHashSet<Cube>>,
-    by_cube: fnv::FnvHashMap<Cube, BlockIndex>,
+    by_block: hashbrown::HashMap<BlockIndex, hashbrown::HashSet<Cube>>,
+    by_cube: hashbrown::HashMap<Cube, BlockIndex>,
 }
 
 impl InstanceMap {
