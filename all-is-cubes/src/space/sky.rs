@@ -1,4 +1,4 @@
-use euclid::point3;
+use euclid::vec3;
 
 use crate::content::palette;
 use crate::math::{Cube, Face6, FaceMap, FreeVector, GridAab, Rgb};
@@ -55,19 +55,19 @@ impl Sky {
             faces: match *self {
                 Sky::Uniform(color) => FaceMap::splat(PackedLight::from(color)),
                 Sky::Octants(_) => FaceMap::from_fn(|face| {
-                    let transform = face.face_transform(0);
+                    let transform = face.rotation_from_nz();
                     // Take four samples from rays into the correct octants.
                     // The rays start out exiting the NZ face and are transformed.
                     // We could calculate which octants to use directly, but that would be more
                     // error-prone.
                     PackedLight::from(
                         [
-                            point3(-1, -1, -1),
-                            point3(-1, 1, -1),
-                            point3(1, -1, -1),
-                            point3(1, 1, -1),
+                            vec3(-1, -1, -1),
+                            vec3(-1, 1, -1),
+                            vec3(1, -1, -1),
+                            vec3(1, 1, -1),
                         ]
-                        .map(|p| self.sample(transform.transform_point(p).to_vector().to_f64()))
+                        .map(|p| self.sample(transform.transform_vector(p).to_f64()))
                         .into_iter()
                         .sum::<Rgb>()
                             * 0.25_f32,
