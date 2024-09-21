@@ -111,7 +111,6 @@ petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"
 png-decoder = "0.1.1" # used by all-is-cubes for no_std-compatible reading pngs
 png = "0.17.6" # used by all-is-cubes-desktop for writing pngs
 pollster = { version = "0.3.0", default-features = false }
-polonius-the-crab = { version = "0.4.1" }
 pretty_assertions = "1.2.0"
 rand = { version = "0.8.3", default-features = false }
 rand_xoshiro = "0.6.0"
