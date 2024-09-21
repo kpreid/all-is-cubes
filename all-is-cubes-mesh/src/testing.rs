@@ -13,7 +13,6 @@ use all_is_cubes::space::Space;
 use all_is_cubes::util::{ConciseDebug, Fmt};
 use all_is_cubes_render::camera::GraphicsOptions;
 
-use crate::dynamic::DynamicMeshTypes;
 use crate::{block_meshes_for_space, texture, BlockMeshes, BlockVertex, MeshTypes, SpaceMesh};
 
 /// Generic [`MeshTypes`] implementor for tests to use.
@@ -30,8 +29,9 @@ where
     type Alloc = Alloc;
     type Tile = Alloc::Tile;
 }
-impl<Alloc: texture::Allocator + fmt::Debug + 'static, const MBM: usize> DynamicMeshTypes
-    for Mt<Alloc, MBM>
+#[cfg(feature = "dynamic")]
+impl<Alloc: texture::Allocator + fmt::Debug + 'static, const MBM: usize>
+    crate::dynamic::DynamicMeshTypes for Mt<Alloc, MBM>
 where
     Alloc::Point: Fmt<ConciseDebug>, // TODO: clunky bound
 {

@@ -467,13 +467,13 @@ jobs:
 
     - name: no_std lint
       run: |
-        cargo clippy --target=thumbv7em-none-eabihf --no-default-features -p all-is-cubes -p all-is-cubes-render
+        cargo clippy --target=thumbv7em-none-eabihf --no-default-features -p all-is-cubes -p all-is-cubes-render -p all-is-cubes-mesh
 
     - name: no_std build
       # This is `cargo build`, not `cargo check`, because `cargo check` won't detect problems like
       # use of undefined linker symbols. Not sure if that matters.
       run: |
-        cargo build --target=thumbv7em-none-eabihf --no-default-features -p all-is-cubes -p all-is-cubes-render
+        cargo build --target=thumbv7em-none-eabihf --no-default-features -p all-is-cubes -p all-is-cubes-render -p all-is-cubes-mesh
 
   fuzz:
     # Don't spend time on fuzzing if the build failed indicating the code is bad other ways

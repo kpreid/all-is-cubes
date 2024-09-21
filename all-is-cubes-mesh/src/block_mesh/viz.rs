@@ -15,6 +15,7 @@ use {
     all_is_cubes::math::{Cube, GridAab, GridVector},
     all_is_cubes::rerun_glue as rg,
     alloc::vec::Vec,
+    core::iter,
     itertools::Itertools as _,
 };
 
@@ -213,11 +214,10 @@ impl Viz {
                 .mesh_vertex_positions
                 .extend(vertex_positions.iter().copied());
             state.mesh_vertex_colors.extend(
-                std::iter::repeat(rg::components::Color(color_fn().into()))
-                    .take(vertex_positions.len()),
+                iter::repeat(rg::components::Color(color_fn().into())).take(vertex_positions.len()),
             );
             state.mesh_vertex_normals.extend(
-                std::iter::repeat(rg::components::Vector3D(rg::convert_vec(
+                iter::repeat(rg::components::Vector3D(rg::convert_vec(
                     normal.normal_vector::<f32, ()>(),
                 )))
                 .take(vertex_positions.len()),

@@ -1,31 +1,27 @@
 #![allow(missing_docs)]
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_main, BatchSize, Criterion};
 
 use all_is_cubes::block::{Block, Resolution::R16, AIR};
 use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_voxel_blocks;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::space::Space;
-use all_is_cubes::time;
-use all_is_cubes::universe::{Handle, Name, Universe};
-use all_is_cubes_render::camera::{Camera, GraphicsOptions, Viewport};
-use all_is_cubes_render::Flaws;
+use all_is_cubes::universe::Universe;
+use all_is_cubes_render::camera::GraphicsOptions;
 
-use all_is_cubes_mesh::testing::Allocator;
-use all_is_cubes_mesh::testing::TextureMt as Mt;
-use all_is_cubes_mesh::{
-    block_meshes_for_space, dynamic, BlockMesh, BlockMeshes, MeshOptions, SpaceMesh,
-};
+use all_is_cubes_mesh::testing::{Allocator, TextureMt as Mt};
+use all_is_cubes_mesh::{block_meshes_for_space, BlockMesh, BlockMeshes, MeshOptions, SpaceMesh};
 
-criterion_group!(
-    benches,
-    block_mesh_benches,
-    space_mesh_benches,
-    slow_mesh_benches,
-    dynamic_benches,
-);
 criterion_main!(benches);
+fn benches() {
+    let mut c = Criterion::default().configure_from_args();
+    block_mesh_benches(&mut c);
+    space_mesh_benches(&mut c);
+    slow_mesh_benches(&mut c);
+    #[cfg(feature = "dynamic")]
+    dynamic_benches(&mut c);
+}
 
 fn block_mesh_benches(c: &mut Criterion) {
     let mut g = c.benchmark_group("block");
@@ -172,7 +168,14 @@ fn slow_mesh_benches(c: &mut Criterion) {
     });
 }
 
+#[cfg(feature = "dynamic")]
 fn dynamic_benches(c: &mut Criterion) {
+    use all_is_cubes::time;
+    use all_is_cubes::universe::{Handle, Name};
+    use all_is_cubes_mesh::dynamic;
+    use all_is_cubes_render::camera::{Camera, Viewport};
+    use all_is_cubes_render::Flaws;
+
     let mut g = c.benchmark_group("dynamic");
     let graphics_options = GraphicsOptions::default();
     let camera = Camera::new(graphics_options, Viewport::with_scale(1.0, [100, 100]));

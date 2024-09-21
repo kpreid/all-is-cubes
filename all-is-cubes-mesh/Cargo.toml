@@ -12,7 +12,7 @@ categories = ["games", "graphics", "rendering"]
 keywords = ["all-is-cubes", "voxel", "mesh"]
 
 [package.metadata.docs.rs]
-features = ["_full-documentation"]
+features = ["_full-documentation", "arbitrary", "dynamic"]
 
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
@@ -31,6 +31,14 @@ required-features = ["rerun"]
 
 [features]
 default = []
+# Updating meshes as their data sources change. Requires std.
+dynamic = [
+    "dep:flume",
+    "dep:futures-channel",
+    "dep:futures-util",
+    "dep:hashbrown",
+    "dep:log",
+]
 # Adds support for mesh generation performance logging to Rerun.
 rerun = ["all-is-cubes/rerun"]
 # Adds `impl arbitrary::Arbitrary for ...`
@@ -52,13 +60,13 @@ bitvec = { workspace = true }
 bytemuck = { workspace = true }
 cfg-if = { workspace = true }
 either = { workspace = true }
-flume = { workspace = true }
-futures-channel = { workspace = true }
-futures-util = { workspace = true }
-hashbrown = { workspace = true }
+flume = { workspace = true, optional = true }
+futures-channel = { workspace = true, optional = true }
+futures-util = { workspace = true, optional = true }
+hashbrown = { workspace = true, optional = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
-log = { workspace = true }
+log = { workspace = true, optional = true }
 mutants = { workspace = true }
 num-traits = { workspace = true }
 ordered-float = { workspace = true }

@@ -23,20 +23,14 @@
 //! [`GfxVertex`] and [`texture::Allocator`] traits, then implement [`MeshTypes`] to bundle them
 //! together.
 
-// This crate is *almost* `no_std` compatible; the tricky parts are synchronization stuff:
-// * the `Mutex` that `chunked_mesh::CsmTodo` uses.
-// * the `flume` channels used for background mesh calculation.
-// We could address that by exporting `all_is_cubes::util::maybe_sync::Mutex` and using some
-// non-Sync channel implementation, but I don't want to do that (and switch hash maps to
-// `hashbrown`) until I have some imaginable use case for mesh building on a `no_std` target.
-// So for now, the code is just in a state of “reveal how close it is”, hence using `core` and
-// `alloc` imports.
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::large_stack_arrays))]
 
 extern crate alloc;
+
+#[cfg(any(test, feature = "dynamic"))]
 #[macro_use]
 extern crate std;
 
@@ -48,7 +42,9 @@ mod block_vertex;
 pub use block_vertex::*;
 mod block_mesh;
 pub use block_mesh::*;
+#[cfg(feature = "dynamic")]
 mod cache;
+#[cfg(feature = "dynamic")]
 pub mod dynamic;
 mod index_vec;
 pub use index_vec::*;

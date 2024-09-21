@@ -151,6 +151,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     // chunk meshes. That's implemented but not fully settled yet. Think about whether this should
     // be public and whether it should count indices or whole triangles.
     // Whatever is decided, also update `MeshMeta::count_indices()`.
+    #[cfg_attr(not(feature = "dynamic"), allow(dead_code))]
     pub(crate) fn count_indices(&self) -> usize {
         self.all_face_meshes()
             .map(|(_, fm)| fm.indices_opaque.len() + fm.indices_transparent.len())
@@ -160,6 +161,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// Update this mesh's textures in-place to the given new block data, if this is
     /// possible without changing the vertices.
     // TODO: non-public while we decide whether it's a good interface
+    #[cfg_attr(not(feature = "dynamic"), allow(dead_code))]
     #[must_use]
     #[mutants::skip] // optimization, doesn't change things if it fails
     pub(crate) fn try_update_texture_only(&mut self, block: &EvaluatedBlock) -> bool {

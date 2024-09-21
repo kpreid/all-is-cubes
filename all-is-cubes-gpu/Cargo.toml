@@ -50,7 +50,7 @@ auto-threads = [
 
 [dependencies]
 all-is-cubes = { workspace = true, features = ["std"] }
-all-is-cubes-mesh = { workspace = true }
+all-is-cubes-mesh = { workspace = true, features = ["dynamic"] }
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }
