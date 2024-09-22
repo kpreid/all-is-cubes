@@ -9,9 +9,7 @@ use exhaust::Exhaust;
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::behavior::BehaviorSetTransaction;
 use all_is_cubes::block::{
-    self,
-    builder::BlockBuilderVoxels,
-    Block, BlockBuilder,
+    self, Block, BlockBuilder,
     Resolution::{self, *},
 };
 use all_is_cubes::color_block;
@@ -19,10 +17,8 @@ use all_is_cubes::content::load_image::{default_srgb, DecodedPng, PngAdapter};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{
     image::Image as EgImage,
-    mono_font::{MonoFont, MonoTextStyle},
     prelude::{Dimensions, PixelColor, Point, Size},
     primitives::{Primitive, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment},
-    text::{Alignment, Baseline, Text, TextStyleBuilder},
     Drawable,
 };
 use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
@@ -490,7 +486,6 @@ pub(crate) fn draw_target_for_button_label<C: PixelColor>(
 
 pub(crate) enum ButtonIcon<'a> {
     Icon(&'a DecodedPng),
-    Text(&'a MonoFont<'a>, &'a str),
 }
 
 /// TODO: document, refine, and make public
@@ -499,41 +494,32 @@ pub(crate) fn make_button_label_block(
     txn: &mut UniverseTransaction,
     name: &str,
     icon: ButtonIcon<'_>,
-) -> Result<BlockBuilder<BlockBuilderVoxels, ()>, InGenError> {
-    let mut space = Space::builder(GridAab::from_lower_size(
-        [0, 0, 0],
-        [theme::RESOLUTION.into(), theme::RESOLUTION.into(), 1],
-    ))
-    .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-    .build();
-    let mut draw_target = draw_target_for_button_label(&mut space);
-
-    match icon {
+) -> Result<Block, InGenError> {
+    Ok(match icon {
         ButtonIcon::Icon(icon) => {
-            let id = &PngAdapter::adapt(icon, &default_srgb);
-            EgImage::new(&id, -id.bounding_box().center() - Point::new(1, 1))
-                .draw(&mut draw_target)?;
+            let mut space = Space::builder(GridAab::from_lower_size(
+                [0, 0, 0],
+                [theme::RESOLUTION.into(), theme::RESOLUTION.into(), 1],
+            ))
+            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+            .build();
+
+            // TODO: replace this with space_from_image()
+            {
+                let mut draw_target = draw_target_for_button_label(&mut space);
+
+                let id = &PngAdapter::adapt(icon, &default_srgb);
+                EgImage::new(&id, -id.bounding_box().center() - Point::new(1, 1))
+                    .draw(&mut draw_target)?;
+            }
+
+            let space = txn.insert_anonymous(space);
+            Block::builder()
+                .display_name(name.to_owned())
+                .voxels_handle(theme::RESOLUTION, space)
+                .build()
         }
-        ButtonIcon::Text(font, text) => {
-            Text::with_text_style(
-                text,
-                Point::new(-1, -1),
-                MonoTextStyle::new(
-                    font,
-                    &VoxelBrush::single(color_block!(palette::BUTTON_LABEL)),
-                ),
-                TextStyleBuilder::new()
-                    .baseline(Baseline::Middle)
-                    .alignment(Alignment::Center)
-                    .build(),
-            )
-            .draw(&mut draw_target)?;
-        }
-    }
-    let space = txn.insert_anonymous(space);
-    Ok(Block::builder()
-        .display_name(name.to_owned())
-        .voxels_handle(theme::RESOLUTION, space))
+    })
 }
 
 /// Common constants for button shapes.
