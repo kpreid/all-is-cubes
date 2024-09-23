@@ -205,7 +205,7 @@ impl vui::WidgetController for ProgressBarController {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
+    use all_is_cubes::space::{self, SpacePhysics};
     use all_is_cubes::transaction::Transaction as _;
     use all_is_cubes::util::yield_progress_for_testing;
     use all_is_cubes::{transaction, universe};
@@ -231,7 +231,7 @@ mod tests {
                 ListenableSource::constant(ProgressBarState::new(fraction)),
             ));
 
-            let mut space = SpaceBuilder::default()
+            let mut space = space::Builder::default()
                 .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                 .bounds(bounds)
                 .build();

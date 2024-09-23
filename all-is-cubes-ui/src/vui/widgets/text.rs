@@ -251,7 +251,7 @@ mod tests {
     use all_is_cubes::color_block;
     use all_is_cubes::euclid::size3;
     use all_is_cubes::math::{GridSizeCoord, Rgba};
-    use all_is_cubes::space::{SpaceBuilder, SpacePhysics};
+    use all_is_cubes::space::{self, SpacePhysics};
 
     #[test]
     fn large_text_size() {
@@ -276,7 +276,7 @@ mod tests {
 
         // to_space() serves as a widget building sanity check. TODO: make a proper widget tester
         tree.to_space(
-            SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+            space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
             vui::Gravity::new(vui::Align::Center, vui::Align::Center, vui::Align::Low),
         )
         .unwrap();

@@ -18,7 +18,7 @@ use all_is_cubes::math::{
     notnan, rgb_const, rgba_const, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
     GridPoint, GridRotation, GridVector, NotNan, Rgb, Rgba, Vol,
 };
-use all_is_cubes::space::{self, LightPhysics, Space, SpaceBuilder};
+use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Handle, HandleError, Universe, UniverseTransaction};
@@ -622,7 +622,7 @@ async fn icons(mut context: RenderTestContext) {
     fn block_from_widget(w: &vui::WidgetTree) -> Block {
         let space = w
             .to_space(
-                SpaceBuilder::default(),
+                space::Builder::default(),
                 Vector3D::new(Align::Low, Align::Low, Align::Low),
             )
             .unwrap();

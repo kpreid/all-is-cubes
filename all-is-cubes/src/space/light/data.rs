@@ -15,7 +15,7 @@ use num_traits::float::Float as _;
 use crate::math::{NotNan, Rgb};
 
 #[cfg(doc)]
-use crate::space::Space;
+use crate::space::{self, Space};
 
 /// One component of a `PackedLight`.
 pub(crate) type PackedLightScalar = u8;
@@ -33,7 +33,7 @@ pub(crate) enum LightStatus {
     ///
     /// This value may appear when:
     ///
-    /// * [`SpaceBuilder::palette_and_contents()`] was called without including light data.
+    /// * [`space::Builder::palette_and_contents()`] was called without including light data.
     /// * The light updater is speculatively copying from neighboring cubes.
     Uninitialized = 0,
     /// The cube has no surfaces to catch light and therefore the light value is not tracked.

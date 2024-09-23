@@ -135,7 +135,7 @@ impl embedded_graphics::geometry::OriginDimensions for &'_ PngAdapter<'_> {
 ///
 /// The `block_function` will be memoized.
 ///
-/// TODO: Allow `SpaceBuilder` controls somehow. Maybe this belongs as a method on SpaceBuilder.
+/// TODO: Allow `space::Builder` controls somehow. Maybe this belongs as a method on it.
 /// TODO: pixel_function should have a Result return
 #[doc(hidden)] // still experimental API
 #[inline(never)]

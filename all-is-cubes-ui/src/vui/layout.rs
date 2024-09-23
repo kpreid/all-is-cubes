@@ -9,7 +9,7 @@ use core::fmt;
 
 use all_is_cubes::euclid::{self, size3, Size3D, Vector3D};
 use all_is_cubes::math::{Axis, Cube, Face6, FaceMap, GridAab, GridPoint, GridSize};
-use all_is_cubes::space::{Space, SpaceBuilder, SpaceTransaction};
+use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};
 use all_is_cubes::util::{ConciseDebug, Fmt};
 
@@ -432,9 +432,9 @@ impl LayoutTree<Arc<dyn Widget>> {
     ///
     /// Note that the widgets will not actually appear as blocks until the first time the
     /// space is stepped.
-    pub fn to_space<B: all_is_cubes::space::SpaceBuilderBounds>(
+    pub fn to_space<B: space::builder::Bounds>(
         self: &Arc<Self>,
-        builder: SpaceBuilder<B>,
+        builder: space::Builder<B>,
         gravity: Gravity,
     ) -> Result<Space, InstallVuiError> {
         let mut space = builder

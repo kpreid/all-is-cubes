@@ -74,7 +74,7 @@ fn template_menu_widget_tree(
 
     // TODO: the scaled-down logo should exist as a widget itself
     let logo_text_space = vui::leaf_widget(logo_text()).to_space(
-        space::SpaceBuilder::default().physics(space::SpacePhysics::DEFAULT_FOR_BLOCK),
+        space::Builder::default().physics(space::SpacePhysics::DEFAULT_FOR_BLOCK),
         Vector3D::new(Align::Center, Align::Center, Align::Low),
     )?;
     let logo_text_bounds = logo_text_space.bounds();

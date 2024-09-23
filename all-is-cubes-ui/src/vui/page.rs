@@ -9,7 +9,7 @@ use all_is_cubes::euclid::{size2, Size2D};
 use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba,
 };
-use all_is_cubes::space::{self, Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::space::{self, Space, SpacePhysics};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes_render::camera::{self, ViewTransform};
@@ -305,7 +305,7 @@ pub(crate) mod parts {
         large: &WidgetTree,
     ) -> Result<Arc<dyn Widget>, InstallVuiError> {
         let space = large.to_space(
-            SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+            space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
             Gravity::new(Align::Center, Align::Center, Align::Low),
         )?;
         Ok(Arc::new(widgets::Voxels::new(

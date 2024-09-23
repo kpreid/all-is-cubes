@@ -31,9 +31,8 @@ use crate::transaction::{self, Merge, Transaction as _};
 use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
-mod builder;
-#[allow(clippy::module_name_repetitions)] // TODO: rename to Builder?
-pub use builder::{SpaceBuilder, SpaceBuilderBounds};
+pub mod builder;
+pub use builder::Builder;
 
 mod light;
 #[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
@@ -113,24 +112,26 @@ impl fmt::Debug for Space {
 pub type BlockIndex = u16;
 
 impl Space {
-    /// Returns a [`SpaceBuilder`] configured for a block,
+    /// Returns a space [`Builder`] configured for a [recursive] block,
     /// which may be used to construct a new [`Space`].
     ///
     /// This means that its bounds are as per [`GridAab::for_block()`], and its
     /// [`physics`](Self::physics) is [`SpacePhysics::DEFAULT_FOR_BLOCK`].
-    pub fn for_block(resolution: Resolution) -> SpaceBuilder<Vol<()>> {
-        SpaceBuilder::new()
+    ///
+    /// [recursive]: crate::block::Primitive::Recur
+    pub fn for_block(resolution: Resolution) -> Builder<Vol<()>> {
+        Builder::new()
             .bounds(GridAab::for_block(resolution))
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
     }
 
-    /// Returns a [`SpaceBuilder`] with the given bounds and all default values,
+    /// Returns a [`space::Builder`](Builder) with the given bounds and all default values,
     /// which may be used to construct a new [`Space`].
     ///
     /// Panics if `bounds` has a volume exceeding `usize::MAX`.
     /// (But there will likely be a memory allocation failure well below that point.)
-    pub fn builder(bounds: GridAab) -> SpaceBuilder<Vol<()>> {
-        SpaceBuilder::new().bounds(bounds)
+    pub fn builder(bounds: GridAab) -> Builder<Vol<()>> {
+        Builder::new().bounds(bounds)
     }
 
     /// Constructs a [`Space`] that is entirely filled with [`AIR`].
@@ -140,9 +141,9 @@ impl Space {
         Space::builder(bounds).build()
     }
 
-    /// Implementation of [`SpaceBuilder`]'s terminal methods.
-    fn new_from_builder(builder: SpaceBuilder<Vol<()>>) -> Self {
-        let SpaceBuilder {
+    /// Implementation of [`Builder`]'s terminal methods.
+    fn new_from_builder(builder: Builder<Vol<()>>) -> Self {
+        let Builder {
             bounds,
             spawn,
             physics,

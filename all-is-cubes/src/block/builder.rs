@@ -192,7 +192,7 @@ impl<P, Txn> BlockBuilder<P, Txn> {
         B: Into<Cow<'a, Block>>,
     {
         // This is a worldgen convenience, not the most efficient possible path (which would be
-        // `SpaceBuilder::palette_and_contents()`), so save quite a lot of code generation
+        // `Builder::palette_and_contents()`), so save quite a lot of code generation
         // by keeping it monomorphic and not inlined.
         #[inline(never)]
         fn voxels_fn_impl<'a>(
@@ -204,7 +204,7 @@ impl<P, Txn> BlockBuilder<P, Txn> {
             let mut not_air_bounds: Option<GridAab> = None;
 
             let mut space = Space::for_block(resolution).build();
-            // TODO: Teach the SpaceBuilder to accept a function in the same way?
+            // TODO: Teach the Space Builder to accept a function in the same way?
             space.fill(space.bounds(), |cube| {
                 let block = function(cube);
 

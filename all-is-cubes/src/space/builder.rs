@@ -1,3 +1,5 @@
+//! Lesser-used helpers for [`Builder`].
+
 use alloc::boxed::Box;
 
 use crate::behavior::BehaviorSet;
@@ -8,19 +10,16 @@ use crate::space::{
     BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, Sky, Space, SpacePhysics,
 };
 
-/// Tool for constructing new [`Space`]s.
+/// Builder of [`Space`]s.
 ///
-/// To create one, call [`Space::builder()`](Space::builder).
-///
-/// TODO: Allow specifying behaviors.
+/// To create one, call [`Space::builder()`](Space::builder) or [`Builder::default()`].
 ///
 /// # Type parameters
 ///
 /// * `B` is either `()` or `Vol<()>` according to whether the bounds have been specified.
 #[derive(Clone, Debug)]
 #[must_use]
-#[allow(clippy::module_name_repetitions)]
-pub struct SpaceBuilder<B> {
+pub struct Builder<B> {
     pub(super) bounds: B,
     pub(super) spawn: Option<Spawn>,
     pub(super) physics: SpacePhysics,
@@ -39,7 +38,7 @@ pub(super) enum Fill {
     },
 }
 
-impl<B> SpaceBuilder<B> {
+impl<B> Builder<B> {
     /// Sets the [`Block`] that the space's volume will be filled with.
     ///
     /// Calling this method will replace any previous specification of the contents,
@@ -92,16 +91,16 @@ impl<B> SpaceBuilder<B> {
     }
 }
 
-impl<B: SpaceBuilderBounds> SpaceBuilder<B> {
+impl<B: Bounds> Builder<B> {
     /// Set the bounds unless they have already been set.
-    pub fn bounds_if_not_set(self, bounds_fn: impl FnOnce() -> GridAab) -> SpaceBuilder<Vol<()>> {
+    pub fn bounds_if_not_set(self, bounds_fn: impl FnOnce() -> GridAab) -> Builder<Vol<()>> {
         // Delegate to the trait. (This method exists so the trait need not be imported.)
-        SpaceBuilderBounds::bounds_if_not_set(self, bounds_fn)
+        Bounds::bounds_if_not_set(self, bounds_fn)
     }
 }
 
-impl SpaceBuilder<()> {
-    /// Use [`SpaceBuilder::default()`] as the public way to call this.
+impl Builder<()> {
+    /// Use [`Builder::default()`] as the public way to call this.
     pub(super) fn new() -> Self {
         Self {
             bounds: (),
@@ -116,8 +115,8 @@ impl SpaceBuilder<()> {
     ///
     /// Panics if `bounds` has a volume exceeding `usize::MAX`.
     /// (But there will likely be a memory allocation failure well below that point.)
-    pub fn bounds(self, bounds: GridAab) -> SpaceBuilder<Vol<()>> {
-        SpaceBuilder {
+    pub fn bounds(self, bounds: GridAab) -> Builder<Vol<()>> {
+        Builder {
             bounds: bounds.to_vol().unwrap(),
             spawn: self.spawn,
             physics: self.physics,
@@ -127,7 +126,7 @@ impl SpaceBuilder<()> {
     }
 }
 
-impl SpaceBuilder<Vol<()>> {
+impl Builder<Vol<()>> {
     /// Sets the default spawn location of new characters.
     ///
     /// Panics if any of the given coordinates is infinite or NaN.
@@ -238,52 +237,52 @@ impl SpaceBuilder<Vol<()>> {
     }
 }
 
-impl Default for SpaceBuilder<()> {
+impl Default for Builder<()> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Helper for [`SpaceBuilder::bounds_if_not_set()`]. Do not call or implement this trait.
-pub trait SpaceBuilderBounds: sbb::SbbSealed + Sized {
+/// Helper for [`Builder::bounds_if_not_set()`]. Do not call or implement this trait.
+pub trait Bounds: sealed::Sealed + Sized {
     /// Set the bounds unless they have already been set.
     ///
     /// This function is an implementation detail; call
-    /// [`SpaceBuilder::bounds_if_not_set()`] instead.
+    /// [`Builder::bounds_if_not_set()`] instead.
     #[doc(hidden)]
     fn bounds_if_not_set(
-        builder: SpaceBuilder<Self>,
+        builder: Builder<Self>,
         bounds_fn: impl FnOnce() -> GridAab,
-    ) -> SpaceBuilder<Vol<()>>;
+    ) -> Builder<Vol<()>>;
 }
 
-impl SpaceBuilderBounds for () {
+impl Bounds for () {
     fn bounds_if_not_set(
-        builder: SpaceBuilder<Self>,
+        builder: Builder<Self>,
         bounds_fn: impl FnOnce() -> GridAab,
-    ) -> SpaceBuilder<Vol<()>> {
+    ) -> Builder<Vol<()>> {
         builder.bounds(bounds_fn())
     }
 }
 
-impl SpaceBuilderBounds for Vol<()> {
+impl Bounds for Vol<()> {
     fn bounds_if_not_set(
-        builder: SpaceBuilder<Self>,
+        builder: Builder<Self>,
         _bounds_fn: impl FnOnce() -> GridAab,
-    ) -> SpaceBuilder<Vol<()>> {
+    ) -> Builder<Vol<()>> {
         builder
     }
 }
 
 /// Module for sealed trait
-mod sbb {
+mod sealed {
     #![expect(clippy::module_name_repetitions)]
     use super::*;
     #[doc(hidden)]
     #[expect(unnameable_types)]
-    pub trait SbbSealed {}
-    impl SbbSealed for () {}
-    impl SbbSealed for Vol<()> {}
+    pub trait Sealed {}
+    impl Sealed for () {}
+    impl Sealed for Vol<()> {}
 }
 
 #[cfg(feature = "arbitrary")]
@@ -363,10 +362,7 @@ mod tests {
     fn bounds_if_not_set_when_not_set() {
         let bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
         assert_eq!(
-            SpaceBuilder::new()
-                .bounds_if_not_set(|| bounds)
-                .build()
-                .bounds(),
+            Builder::new().bounds_if_not_set(|| bounds).build().bounds(),
             bounds
         );
     }

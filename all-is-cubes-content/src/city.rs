@@ -20,7 +20,7 @@ use all_is_cubes::math::{
     GridSizeCoord, GridVector, Gridgid, VectorOps,
 };
 use all_is_cubes::op::Operation;
-use all_is_cubes::space::{LightPhysics, Space, SpaceBuilder, SpacePhysics};
+use all_is_cubes::space::{self, LightPhysics, Space, SpacePhysics};
 use all_is_cubes::time::Instant;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::Universe;
@@ -581,7 +581,7 @@ fn place_one_exhibit<I: Instant>(
         // Install the signboard-and-text widgets in a space.
         let info_sign_space = info_voxels_widget
             .to_space(
-                SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+                space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
                 vui::Gravity::new(vui::Align::Center, vui::Align::Center, vui::Align::Low),
             )
             .unwrap();
@@ -832,7 +832,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
 
     // TODO: give it a maximum size, instead of what we currently do which is truncating later
     let space = info_widgets.to_space(
-        SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+        space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
         vui::Gravity::new(vui::Align::Low, vui::Align::Low, vui::Align::Low),
     )?;
     Ok(space)

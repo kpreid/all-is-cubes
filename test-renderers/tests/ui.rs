@@ -214,7 +214,7 @@ fn render_widget(widget: &vui::WidgetTree, gravity: vui::Gravity) -> Rendering {
     let space_handle = Handle::new_pending(
         Name::Pending,
         widget
-            .to_space(space::SpaceBuilder::default(), gravity)
+            .to_space(space::Builder::default(), gravity)
             .unwrap(),
     );
     let space_to_render_time = Instant::now();

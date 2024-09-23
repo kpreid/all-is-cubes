@@ -18,6 +18,9 @@ use crate::time::Instant;
 use crate::util::maybe_sync::Mutex;
 use crate::util::TimeStats;
 
+#[cfg(doc)]
+use crate::space;
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
         // HashDoS-resistant
@@ -541,11 +544,9 @@ impl listen::Listener<BlockChange> for BlockListener {
 }
 
 /// Errors that can occur in palette-and-indices data, such as that provided to
-/// [`SpaceBuilder::palette_and_contents()`].
-///
-/// [`SpaceBuilder::palette_and_contents()`]: crate::space::SpaceBuilder::palette_and_contents()
+/// [`space::Builder::palette_and_contents()`].
 //
-// TODO: `SpaceBuilder` doesn't actually use `Palette` directly yet; this is here because
+// TODO: `space::Builder` doesn't actually use `Palette` directly yet; this is here because
 // we plan that it *will*, and then `Palette` will be returning some of these errors.
 #[derive(Clone, Debug, PartialEq)]
 #[allow(missing_docs)]
@@ -663,5 +664,5 @@ mod tests {
     }
 
     // TODO: test Palette::from_blocks(), especially around remapping.
-    // It has tests via `SpaceBuilder`, but not much.
+    // It has tests via `space::Builder`, but not much.
 }

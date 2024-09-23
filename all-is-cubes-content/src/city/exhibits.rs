@@ -33,7 +33,7 @@ use all_is_cubes::math::{
     GridPoint, GridRotation, GridSize, GridVector, Gridgid, NotNan, Rgb, Rgba,
 };
 use all_is_cubes::op::Operation;
-use all_is_cubes::space::{SetCubeError, Space, SpaceBuilder, SpacePhysics, SpaceTransaction};
+use all_is_cubes::space::{self, SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::{color_block, include_image};
 
@@ -1503,7 +1503,7 @@ fn UI_PROGRESS_BAR(ctx: Context<'_>) {
     });
 
     let space = tree.to_space(
-        SpaceBuilder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+        space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
         vui::Gravity::new(vui::Align::Center, vui::Align::Low, vui::Align::Center),
     )?;
 
