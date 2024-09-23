@@ -644,6 +644,7 @@ impl<'de> serde::Deserialize<'de> for Character {
 ///
 /// Use `Debug` or [`StatusText`] formatting to examine this.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[expect(clippy::module_name_repetitions)] // TODO: rename to StepInfo?
 pub struct CharacterStepInfo {
     /// Number of characters whose updates were aggregated into this value.
     count: usize,
@@ -673,6 +674,7 @@ impl ops::AddAssign for CharacterStepInfo {
 /// A [`Transaction`] that modifies a [`Character`].
 #[derive(Clone, Debug, Default, PartialEq)]
 #[must_use]
+#[expect(clippy::module_name_repetitions)] // TODO: reconsider
 pub struct CharacterTransaction {
     set_space: Option<Handle<Space>>,
     body: BodyTransaction,
@@ -819,6 +821,7 @@ impl Merge for CharacterTransaction {
 /// Transaction precondition error type for a [`CharacterTransaction`].
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
+#[expect(clippy::module_name_repetitions)]
 pub enum CharacterTransactionMismatch {
     /// in character body
     Body(<BodyTransaction as Transaction>::Mismatch),
@@ -831,6 +834,7 @@ pub enum CharacterTransactionMismatch {
 /// Transaction conflict error type for a [`CharacterTransaction`].
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
+#[expect(clippy::module_name_repetitions)]
 pub enum CharacterTransactionConflict {
     /// conflict in space to move character into
     SetSpace,
@@ -866,6 +870,7 @@ impl core::error::Error for CharacterTransactionConflict {
 /// Description of a change to a [`Character`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[expect(clippy::exhaustive_enums)] // any change will probably be breaking anyway
+#[expect(clippy::module_name_repetitions)] // TODO: reconsider together with other Change types
 pub enum CharacterChange {
     /// Inventory contents.
     Inventory(inv::InventoryChange),

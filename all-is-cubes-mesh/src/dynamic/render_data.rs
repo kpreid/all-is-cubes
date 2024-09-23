@@ -1,3 +1,8 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use core::fmt;
 
 use all_is_cubes::euclid::Vector3D;

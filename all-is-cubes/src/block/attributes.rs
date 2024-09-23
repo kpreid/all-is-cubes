@@ -1,5 +1,10 @@
 //! [`BlockAttributes`] and closely related types.
 
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use core::{fmt, ops};
 
 use arcstr::ArcStr;

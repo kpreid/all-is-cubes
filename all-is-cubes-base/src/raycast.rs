@@ -447,6 +447,7 @@ impl core::iter::FusedIterator for Raycaster {}
 
 /// Describes a ray crossing into a cube as defined by [`Raycaster`].
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[expect(clippy::module_name_repetitions)] // TODO: rename to Step?
 pub struct RaycastStep {
     // The fields of this structure are private to allow for future revision of which
     // values are calculated versus stored.

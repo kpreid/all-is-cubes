@@ -32,6 +32,7 @@ use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
 mod builder;
+#[allow(clippy::module_name_repetitions)] // TODO: rename to Builder?
 pub use builder::{SpaceBuilder, SpaceBuilderBounds};
 
 mod light;
@@ -43,7 +44,9 @@ pub use light::{LightUpdatesInfo, PackedLight};
 
 mod palette;
 use palette::Palette;
-pub use palette::{PaletteError, SpaceBlockData};
+pub use palette::PaletteError;
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming
+pub use palette::SpaceBlockData;
 
 mod sky;
 pub use sky::*;
@@ -1014,6 +1017,7 @@ impl behavior::BehaviorHost for Space {
 // TODO: This shouldn't directly implement Serialize
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming all Space* types
 pub struct SpaceBehaviorAttachment {
     bounds: GridAab,
     rotation: GridRotation,
@@ -1053,6 +1057,7 @@ impl SpaceBehaviorAttachment {
 #[derive(Clone, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming all Space* types
 pub struct SpacePhysics {
     /// Gravity vector for moving objects, in cubes/s².
     ///
@@ -1184,6 +1189,7 @@ impl fmt::Display for SetCubeError {
     clippy::exhaustive_enums,
     reason = "any change will probably be breaking anyway"
 )]
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming all *Change types
 pub enum SpaceChange {
     /// The block occupying the specified cube was replaced.
     CubeBlock {
@@ -1228,6 +1234,7 @@ pub enum SpaceChange {
 /// [`Fluff`] happening at a point in space.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 #[non_exhaustive]
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming all Space* types
 pub struct SpaceFluff {
     /// Cube at which it was emitted.
     /// TODO: we're going to want rotation and fine positioning eventually
@@ -1243,6 +1250,7 @@ pub struct SpaceFluff {
 /// a specific need for one of the values.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming all Space* types and all *StepInfo types
 pub struct SpaceStepInfo {
     /// Number of spaces whose updates were aggregated into this value.
     pub spaces: usize,

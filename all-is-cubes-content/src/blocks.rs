@@ -1,6 +1,11 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use alloc::sync::Arc;
 use core::fmt;
 use core::num::NonZeroU16;

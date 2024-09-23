@@ -141,6 +141,7 @@ pub fn map_key(key: winit::keyboard::PhysicalKey) -> Option<all_is_cubes_ui::app
     })
 }
 
+#[expect(clippy::module_name_repetitions)]
 pub fn cursor_icon_to_winit(icon: &all_is_cubes_ui::apps::CursorIcon) -> winit::window::CursorIcon {
     use all_is_cubes_ui::apps::CursorIcon as A;
     use winit::window::CursorIcon as W;

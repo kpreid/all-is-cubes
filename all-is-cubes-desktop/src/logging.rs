@@ -10,6 +10,7 @@ use all_is_cubes::rerun_glue as rg;
 
 /// A [`clap::Args`] struct for options controlling log output to stderr and Rerun.
 #[derive(Clone, Debug, clap::Args)]
+#[expect(clippy::module_name_repetitions)]
 pub struct LoggingArgs {
     /// Additional logging to stderr.
     #[arg(long = "verbose", short = 'v')]
@@ -220,6 +221,7 @@ pub(crate) enum RerunDataKind {
 /// Produced by [`install()`] and used by calling [`inner_main()`](crate::inner_main).
 #[derive(Debug)]
 #[must_use]
+#[expect(clippy::module_name_repetitions)]
 pub struct LateLogging {
     kinds: HashSet<RerunDataKind>,
     #[cfg(feature = "rerun")]

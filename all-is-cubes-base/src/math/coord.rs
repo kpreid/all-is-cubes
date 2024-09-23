@@ -1,5 +1,10 @@
 //! Numeric types used for coordinates and related quantities.
 
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use euclid::{Box3D, Point3D, Size2D, Size3D, Vector3D};
 
 use crate::math::Cube;

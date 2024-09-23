@@ -34,6 +34,10 @@ pub use render_data::{MeshId, RenderDataUpdate};
 ///
 /// Implement this trait (using a placeholder type which need not store any data) and [`MeshTypes`]
 /// if you are using [`ChunkedSpaceMesh`].
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "practically needs to be distinct from MeshTypes"
+)]
 pub trait DynamicMeshTypes: MeshTypes {
     /// Data accompanying meshes within a [`ChunkedSpaceMesh`] and derived from the individual
     /// chunk or block instance meshes, for purposes such as handles to GPU buffers.

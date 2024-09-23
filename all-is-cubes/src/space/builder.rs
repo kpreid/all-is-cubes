@@ -19,6 +19,7 @@ use crate::space::{
 /// * `B` is either `()` or `Vol<()>` according to whether the bounds have been specified.
 #[derive(Clone, Debug)]
 #[must_use]
+#[allow(clippy::module_name_repetitions)]
 pub struct SpaceBuilder<B> {
     pub(super) bounds: B,
     pub(super) spawn: Option<Spawn>,
@@ -276,6 +277,7 @@ impl SpaceBuilderBounds for Vol<()> {
 
 /// Module for sealed trait
 mod sbb {
+    #![expect(clippy::module_name_repetitions)]
     use super::*;
     #[doc(hidden)]
     #[expect(unnameable_types)]

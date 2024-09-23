@@ -247,6 +247,7 @@ pub(super) fn needed_channels(voxels: &Evoxels) -> Channels {
     clippy::needless_pass_by_value,
     reason = "<https://github.com/rust-lang/rust-clippy/issues/7456>"
 )]
+#[expect(clippy::module_name_repetitions)]
 pub fn copy_voxels_into_xmaj_texture(
     voxels: Vol<&[Evoxel]>,
     reflectance_texture: &mut [[u8; 4]],
@@ -302,6 +303,7 @@ impl Allocator for NoTextures {
 /// TODO: this can and should be just ! (never) when that's available in stable Rust
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[expect(clippy::exhaustive_enums)]
+#[expect(clippy::module_name_repetitions, reason = "short name would be confusing")]
 pub enum NoTexture {}
 
 impl Tile for NoTexture {

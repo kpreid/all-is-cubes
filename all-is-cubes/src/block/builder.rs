@@ -36,6 +36,7 @@ use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
+#[expect(clippy::module_name_repetitions)] // TODO: rename to Builder?
 pub struct BlockBuilder<P, Txn> {
     attributes: BlockAttributes,
     primitive_builder: P,

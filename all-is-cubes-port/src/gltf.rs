@@ -6,6 +6,8 @@
 //!
 //! TODO: This is not a clean, well-abstracted library API yet.
 
+#![expect(clippy::module_name_repetitions)] // TODO: review all the naming in this module
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::time::Duration;

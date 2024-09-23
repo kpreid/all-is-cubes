@@ -56,6 +56,7 @@ impl Fileish for PathBuf {
 /// General-purpose implementation of [`Fileish`].
 ///
 /// TODO: figure out how writing works for this
+#[expect(clippy::module_name_repetitions)] // TODO: reconsider
 pub struct NonDiskFile<O> {
     name: String,
     reader: O,

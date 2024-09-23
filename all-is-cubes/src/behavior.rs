@@ -47,6 +47,7 @@ pub trait Behavior<H: BehaviorHost>:
 impl_downcast!(Behavior<H> where H: BehaviorHost);
 
 /// A type that can have attached behaviors.
+#[expect(clippy::module_name_repetitions)] // TODO: rename to Host?
 pub trait BehaviorHost: transaction::Transactional + 'static {
     /// Additional data about “where” the behavior is attached to the host; what part of
     /// the host should be affected by the behavior.
@@ -55,6 +56,7 @@ pub trait BehaviorHost: transaction::Transactional + 'static {
 
 /// Items available to a [`Behavior`] during [`Behavior::step()`].
 #[non_exhaustive]
+#[expect(clippy::module_name_repetitions)] // TODO: rename to Context?
 pub struct BehaviorContext<'a, H: BehaviorHost> {
     /// The time tick that is currently passing, causing this step.
     pub tick: Tick,
@@ -132,6 +134,7 @@ pub enum Then {
 /// To modify the set, use a [`BehaviorSetTransaction`].
 ///
 #[doc = include_str!("save/serde-warning.md")]
+#[expect(clippy::module_name_repetitions)] // TODO: rename to Set?
 pub struct BehaviorSet<H: BehaviorHost> {
     /// Note that this map is deterministically ordered, so any incidental things
     /// depending on ordering, such as [`Self::query()`] will be deterministic.
@@ -430,6 +433,7 @@ type WokenSet = Mutex<BTreeSet<Key>>;
 /// This type is [`Send`] and [`Sync`] if the `std` feature of `all-is-cubes` is enabled,
 /// and not otherwise.
 #[derive(Clone, Debug)]
+#[expect(clippy::module_name_repetitions)] // TODO: rename to Waker? Or would that be confusing?
 pub struct BehaviorWaker(Arc<BehaviorWakerInner>);
 impl BehaviorWaker {
     /// Wake up the behavior; cause it to be invoked during the next [`Universe`] step.
@@ -507,6 +511,7 @@ impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> fmt::Debug for QueryItem<'a, 
 
 /// A [`Transaction`] that adds or modifies [`Behavior`]s in a [`BehaviorSet`].
 #[derive(Debug)]
+#[expect(clippy::module_name_repetitions)] // TODO: rename to Transaction or SetTransaction?
 pub struct BehaviorSetTransaction<H: BehaviorHost> {
     /// Replacement of existing behaviors or their attachments, or removal.
     replace: BTreeMap<Key, Replace<H>>,
@@ -775,6 +780,7 @@ pub struct MergeCheck {
 
 /// Transaction precondition error type for a [`BehaviorSet`].
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[expect(clippy::module_name_repetitions)]
 pub struct BehaviorTransactionMismatch {
     key: Key,
     // These should probably really be an ErrorKind-style enum
@@ -787,6 +793,7 @@ pub struct BehaviorTransactionMismatch {
 #[derive(Clone, Debug, Eq, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 #[displaydoc("tried to replace the same behavior slot, {key}, twice")]
+#[expect(clippy::module_name_repetitions)]
 pub struct BehaviorTransactionConflict {
     key: Key,
 }
@@ -860,6 +867,7 @@ mod testing {
 /// offer some means to access this functionality or replace the [`Behavior`] system
 /// entirely.
 #[derive(Debug)]
+#[expect(clippy::module_name_repetitions)]
 pub struct BehaviorPersistence(
     #[cfg(feature = "save")] pub(crate) crate::save::schema::BehaviorV1Ser,
     #[cfg(not(feature = "save"))] (),

@@ -20,6 +20,7 @@ use crate::LandscapeBlocks::{self, Leaves, Log};
     unnameable_types,
     reason = "TODO: this should be public with an opaque struct wrapper"
 )]
+#[expect(clippy::module_name_repetitions)] // TODO: rename to Growth?
 pub enum TreeGrowth {
     Sapling = 1, // radius = 1
     G2,          // radius = 2

@@ -48,6 +48,7 @@ use crate::universe::{Handle, HandleVisitor, VisitHandles};
 // ---
 // Must declare this macro before child modules, so they can use it.
 #[macro_export]
+#[expect(clippy::module_name_repetitions, reason = "macro export is actually at crate root")]
 macro_rules! color_block {
     ($color:expr) => {
         $crate::block::Block::from_static_primitive(const {
@@ -72,6 +73,7 @@ pub use block_def::*;
 
 pub mod builder;
 #[doc(inline)]
+#[expect(clippy::module_name_repetitions)] // TODO: rename to Builder?
 pub use builder::BlockBuilder;
 
 mod eval;
@@ -1095,6 +1097,7 @@ mod conversions_for_indirect {
 /// Notification when an [`EvaluatedBlock`] result changes.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
+#[expect(clippy::module_name_repetitions)] // TODO: rename?
 pub struct BlockChange {
     /// I expect there _might_ be future uses for a set of flags of what changed;
     /// this helps preserve the option of adding them.

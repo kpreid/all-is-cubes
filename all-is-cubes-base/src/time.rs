@@ -41,6 +41,7 @@ impl Instant for std::time::Instant {
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 #[expect(clippy::exhaustive_structs)]
+#[expect(clippy::module_name_repetitions)]
 pub struct NoTime;
 
 impl Instant for NoTime {

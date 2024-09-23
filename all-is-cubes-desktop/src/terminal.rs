@@ -1,5 +1,7 @@
 //! Rendering as styled terminal text.
 
+#![expect(clippy::module_name_repetitions)] // TODO: consider renaming relevant items
+
 use std::sync::mpsc::{self, TrySendError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};

@@ -1,6 +1,11 @@
 //! Integer-coordinate matrices.
 //! This module is private but reexported by its parent.
 
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use core::cmp::Ordering;
 use core::ops;
 

@@ -5,6 +5,10 @@
     clippy::large_stack_arrays,
     reason = "effectively-false positive on Arbitrary derive"
 )]
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
 
 use core::marker::PhantomData;
 use core::ops::Mul;

@@ -147,6 +147,7 @@ impl crate::glue::Window for WinAndState {
 /// Run `winit` event loop, using [`RendererToWinit`] to perform rendering.
 ///
 /// Might not return but exit the process instead.
+#[expect(clippy::module_name_repetitions)] // TODO: rename?
 pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
     dsession_fn: SessionFn<Ren>,
     inner_params: crate::InnerMainParams,
@@ -484,6 +485,7 @@ fn handle_window_event<Ren: RendererToWinit>(
 /// TODO: Give this a better name and definition.
 /// Or remove it entirely since we no longer have multiple renderers targeting winit windows.
 #[doc(hidden)]
+#[expect(clippy::module_name_repetitions)]
 pub trait RendererToWinit: crate::glue::Renderer + 'static {
     #[doc(hidden)]
     fn update_world_camera(&mut self);

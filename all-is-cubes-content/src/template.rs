@@ -1,5 +1,10 @@
 //! First-run game content.
 
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use alloc::boxed::Box;
 use alloc::string::{String, ToString as _};
 use alloc::sync::Arc;

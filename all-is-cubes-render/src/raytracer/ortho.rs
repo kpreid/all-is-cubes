@@ -193,6 +193,7 @@ impl MultiOrthoCamera {
 
 /// A view of a `Space` from an axis-aligned direction at a chosen pixel-perfect resolution.
 #[derive(Clone, Copy, Debug)]
+#[expect(clippy::module_name_repetitions)]
 pub struct OrthoCamera {
     image_size: camera::ImageSize,
     transform: Transform3D<f64, ImagePixel, Cube>,

@@ -166,6 +166,7 @@ impl math::Wireframe for Ray {
 
 /// An axis-aligned, grid-aligned version of [`Ray`].
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(clippy::module_name_repetitions)]
 pub struct AaRay {
     /// Cube within which the ray starts.
     pub(in crate::raycast) origin: Cube,

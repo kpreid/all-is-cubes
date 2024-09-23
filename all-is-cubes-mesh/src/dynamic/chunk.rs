@@ -1,3 +1,8 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use all_is_cubes::euclid::Translation3D;
 use alloc::sync::Arc;
 use alloc::vec::Vec;

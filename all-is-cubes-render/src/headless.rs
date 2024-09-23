@@ -1,3 +1,8 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use alloc::vec::Vec;
 
 use embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD;

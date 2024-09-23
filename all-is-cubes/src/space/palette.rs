@@ -1,3 +1,8 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::Cell;

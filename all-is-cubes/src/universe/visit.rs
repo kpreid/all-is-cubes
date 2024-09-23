@@ -1,3 +1,8 @@
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 #[cfg(test)]
 use alloc::vec::Vec;
 

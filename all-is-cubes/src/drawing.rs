@@ -110,6 +110,7 @@ pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: Gri
 /// `'s` is the lifetime of the [`Space`].
 /// `C` is the “color” type to use, which should implement [`VoxelColor`].
 #[derive(Debug)]
+#[expect(clippy::module_name_repetitions)]
 pub struct DrawingPlane<'s, T, C> {
     space: &'s mut T,
     /// Defines the coordinate transformation from 2D graphics to the [`Space`].

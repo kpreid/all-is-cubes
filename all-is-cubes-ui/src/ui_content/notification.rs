@@ -18,6 +18,7 @@ use crate::vui::widgets::ProgressBarState;
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
+#[expect(clippy::module_name_repetitions)] // TODO: rename?
 pub enum NotificationContent {
     // TODO: Not implemented:
     // /// The message may be multi-line.

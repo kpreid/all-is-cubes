@@ -146,6 +146,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Name {
 ///
 /// Used to check whether [`Handle`]s belong to particular [`Universe`]s.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming to Id
 pub struct UniverseId(u64);
 
 cfg_if::cfg_if! {
@@ -744,6 +745,7 @@ impl behavior::BehaviorHost for Universe {
 
 /// Iterator type for [`Universe::iter_by_type`].
 #[derive(Clone, Debug)]
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming to Iter
 pub struct UniverseIter<'u, T>(alloc::collections::btree_map::Iter<'u, Name, RootHandle<T>>);
 impl<'u, T> Iterator for UniverseIter<'u, T> {
     type Item = (Name, Handle<T>);
@@ -842,6 +844,7 @@ pub(crate) struct DeserializeHandlesError {
 /// a specific need for one of the values.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming to StepInfo
 pub struct UniverseStepInfo {
     #[doc(hidden)]
     pub computation_time: time::Duration,
@@ -917,6 +920,7 @@ fn gc_members<T>(table: &mut Storage<T>) {
 #[doc(hidden)]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[expect(clippy::exhaustive_structs)]
+#[expect(clippy::module_name_repetitions)]
 pub struct PartialUniverse {
     // TODO: design API that doesn't rely on making these public, but still allows
     // exports to be statically exhaustive.

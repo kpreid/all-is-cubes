@@ -15,6 +15,7 @@ use all_is_cubes::{
 use crate::vui;
 
 /// All is Cubes logo text as a widget, at "1:1" scale (1 block per font pixel).
+#[expect(clippy::module_name_repetitions)]
 pub fn logo_text() -> Arc<dyn vui::Widget> {
     let foreground_text_block: Block = palette::LOGO_FILL.into();
     let background_text_block: Block = palette::LOGO_STROKE.into();

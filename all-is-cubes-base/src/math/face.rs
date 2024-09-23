@@ -1,6 +1,11 @@
 //! Axis-aligned unit vectors: the [`Face6`] and [`Face7`] types.
 //! This module is private but reexported by its parent.
 
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use core::fmt;
 use core::ops;
 

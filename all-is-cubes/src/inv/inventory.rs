@@ -1,5 +1,10 @@
 //! [`Inventory`] for storing items.
 
+#![expect(
+    clippy::module_name_repetitions,
+    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+)]
+
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
