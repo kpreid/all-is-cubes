@@ -147,23 +147,19 @@ pub fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
     }
 }
 
-/// Common features of objects that have a location and shape in space.
-pub trait Geometry {
-    /// Type of coordinates; generally determines whether this object can be translated by a
-    /// non-integer amount.
-    type Coord;
-
-    /// Translate (move) this object by the specified offset.
-    #[must_use]
-    fn translate(self, offset: Vector3D<Self::Coord, Cube>) -> Self;
-
+/// Geometric objects that can be drawn as wireframes.
+pub trait Wireframe {
     /// Represent this object as a line drawing, or wireframe.
     ///
     /// The generated points should be in pairs, each pair defining a line segment.
     /// If there are an odd number of vertices, the caller should ignore the last.
     ///
-    /// TODO: This should probably return an iterator instead, but defining the type
-    /// will be awkward until `type_alias_impl_trait` is stable.
+    /// Design note: This method accepts a destination to write to, rather than returning an
+    /// iterator, because if it did return an iterator, it would be difficult to compose in
+    /// ways like allocating a temporary `Wireframe` and delegating to that, if it borrowed
+    /// its input, and would risk composing a very large yet unnecessary iterator struct
+    /// if it owned its input.
+    /// This way, composition is simply calling further functions.
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>;
@@ -171,9 +167,7 @@ pub trait Geometry {
 
 /// One end of a line to be drawn.
 ///
-/// Mostly used for debugging visualizations and not for game content.
-///
-/// The primary way in which these are used is [`Geometry::wireframe_points()`].
+/// These are the output of [`Wireframe::wireframe_points()`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[expect(clippy::exhaustive_structs)]
 pub struct LineVertex {

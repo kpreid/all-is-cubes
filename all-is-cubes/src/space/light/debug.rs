@@ -6,7 +6,7 @@
 
 use alloc::vec::Vec;
 
-use crate::math::{Cube, FreeCoordinate, FreeVector, Geometry, LineVertex};
+use crate::math::{Cube, LineVertex};
 use crate::raycast::Ray;
 use crate::space::PackedLight;
 use crate::util::MapExtend;
@@ -48,13 +48,7 @@ pub struct LightUpdateCubeInfo {
     pub(crate) rays: Vec<LightUpdateRayInfo>,
 }
 
-impl Geometry for LightUpdateCubeInfo {
-    type Coord = FreeCoordinate;
-
-    fn translate(self, _offset: FreeVector) -> Self {
-        unimplemented!();
-    }
-
+impl crate::math::Wireframe for LightUpdateCubeInfo {
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,
@@ -81,13 +75,7 @@ pub struct LightUpdateRayInfo {
     pub(crate) value: PackedLight,
 }
 
-impl Geometry for LightUpdateRayInfo {
-    type Coord = FreeCoordinate;
-
-    fn translate(self, _offset: FreeVector) -> Self {
-        unimplemented!();
-    }
-
+impl crate::math::Wireframe for LightUpdateRayInfo {
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,

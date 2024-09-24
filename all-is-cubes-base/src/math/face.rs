@@ -14,8 +14,8 @@ use manyfmt::Refmt as _;
 use num_traits::float::FloatCore as _;
 
 use crate::math::{
-    Axis, ConciseDebug, Cube, FreeCoordinate, FreeVector, Geometry, GridCoordinate, GridPoint,
-    GridRotation, GridVector, Gridgid, LineVertex, Zero,
+    Axis, ConciseDebug, Cube, FreeCoordinate, FreeVector, GridCoordinate, GridPoint, GridRotation,
+    GridVector, Gridgid, LineVertex, Zero,
 };
 
 /// Identifies a face of a cube or an orthogonal unit vector.
@@ -961,6 +961,14 @@ impl CubeFace {
     pub fn adjacent(self) -> Cube {
         self.cube + self.face.normal_vector()
     }
+
+    /// Translate `self` by adding `offset` to `self.cube`.
+    #[inline]
+    #[must_use]
+    pub fn translate(mut self, offset: GridVector) -> Self {
+        self.cube += offset;
+        self
+    }
 }
 
 impl fmt::Debug for CubeFace {
@@ -975,16 +983,7 @@ impl fmt::Debug for CubeFace {
     }
 }
 
-// TODO: This is a quick kludge to get some debug rendering going. We should offer more controls, probably
-impl Geometry for CubeFace {
-    type Coord = GridCoordinate;
-
-    #[inline]
-    fn translate(mut self, offset: GridVector) -> Self {
-        self.cube += offset;
-        self
-    }
-
+impl crate::math::Wireframe for CubeFace {
     #[allow(clippy::missing_inline_in_public_items)]
     fn wireframe_points<E>(&self, output: &mut E)
     where

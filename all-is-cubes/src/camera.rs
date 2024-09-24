@@ -13,7 +13,7 @@ use ordered_float::NotNan;
 use num_traits::float::Float as _;
 
 use crate::math::{
-    Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, LineVertex, Octant,
+    self, Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, LineVertex, Octant,
     OctantMask, Rgba,
 };
 use crate::raycast::Ray;
@@ -347,7 +347,7 @@ impl Camera {
     }
 
     #[doc(hidden)] // for tests
-    pub fn view_frustum_geometry(&self) -> &(impl Geometry + '_) {
+    pub fn view_frustum_geometry(&self) -> &(impl math::Wireframe + '_) {
         &self.view_frustum
     }
 
@@ -666,14 +666,7 @@ impl FrustumPoints {
     }
 }
 
-/// Implemented only for debug visualization
-impl Geometry for FrustumPoints {
-    type Coord = FreeCoordinate;
-
-    fn translate(self, _offset: euclid::Vector3D<Self::Coord, Cube>) -> Self {
-        unimplemented!()
-    }
-
+impl math::Wireframe for FrustumPoints {
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,

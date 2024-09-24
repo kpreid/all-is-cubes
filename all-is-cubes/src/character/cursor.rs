@@ -8,10 +8,7 @@ use euclid::point3;
 
 use crate::block::{Block, EvaluatedBlock, Evoxel};
 use crate::content::palette;
-use crate::math::{
-    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry, GridCoordinate,
-    GridVector, LineVertex,
-};
+use crate::math::{Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, LineVertex};
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::Handle;
@@ -212,17 +209,7 @@ impl fmt::Display for Cursor {
     }
 }
 
-/// TODO: This implementation exists because it was convenient to support drawing;
-/// eventually we will probably want cursor rendering to be its own more elaborate
-/// thing.
-impl Geometry for Cursor {
-    type Coord = GridCoordinate;
-
-    /// Not implemented for [`Cursor`].
-    fn translate(self, _offset: GridVector) -> Self {
-        unimplemented!()
-    }
-
+impl crate::math::Wireframe for Cursor {
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,

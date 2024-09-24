@@ -25,7 +25,7 @@ use crate::fluff::Fluff;
     reason = "unclear why this warns even though it is needed"
 )]
 use crate::math::Euclid as _;
-use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, Geometry as _};
+use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector};
 use crate::physics::{StopAt, Velocity, POSITION_EPSILON};
 use crate::raycast::Ray;
 use crate::space::Space;

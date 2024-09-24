@@ -7,7 +7,7 @@ use core::ops;
 
 use all_is_cubes::chunking::{ChunkPos, ChunkRelative};
 use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Cube, Geometry, GridCoordinate, LineVertex};
+use all_is_cubes::math::{Cube, GridCoordinate, LineVertex, Wireframe as _};
 use all_is_cubes::space::{BlockIndex, Space};
 
 use crate::dynamic::{self, DynamicMeshTypes};

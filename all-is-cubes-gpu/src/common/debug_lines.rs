@@ -1,6 +1,6 @@
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{Face7, FreePoint, Geometry, LineVertex, Rgba};
+use all_is_cubes::math::{Face7, FreePoint, LineVertex, Rgba, Wireframe};
 use all_is_cubes::space::Space;
 use all_is_cubes::util::MapExtend;
 use all_is_cubes_render::camera::GraphicsOptions;
@@ -77,7 +77,7 @@ pub(crate) fn wireframe_vertices<V, E, G>(vertices: &mut E, color: Rgba, geometr
 where
     E: Extend<V>,
     V: DebugLineVertex,
-    G: Geometry,
+    G: Wireframe,
 {
     geometry.wireframe_points(&mut map_line_vertices(vertices, color))
 }

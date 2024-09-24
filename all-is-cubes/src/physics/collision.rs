@@ -12,10 +12,7 @@ use hashbrown::HashSet as HbHashSet;
 use num_traits::float::FloatCore as _;
 
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
-use crate::math::{
-    Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, Geometry, GridAab, GridCoordinate,
-    LineVertex, Vol,
-};
+use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, LineVertex, Vol};
 use crate::physics::POSITION_EPSILON;
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
@@ -128,17 +125,7 @@ impl fmt::Debug for Contact {
     }
 }
 
-impl Geometry for Contact {
-    type Coord = GridCoordinate;
-
-    fn translate(mut self, offset: Vector3D<Self::Coord, Cube>) -> Self {
-        match &mut self {
-            Contact::Block(CubeFace { mut cube, .. }) => cube += offset,
-            Contact::Voxel { mut cube, .. } => cube += offset,
-        }
-        self
-    }
-
+impl crate::math::Wireframe for Contact {
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,

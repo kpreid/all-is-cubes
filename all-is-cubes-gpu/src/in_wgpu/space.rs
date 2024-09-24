@@ -12,8 +12,8 @@ use all_is_cubes::content::palette;
 use all_is_cubes::euclid::num::Zero as _;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{
-    rgba_const, Cube, Face6, FreeCoordinate, FreePoint, Geometry as _, GridAab, GridCoordinate,
-    GridPoint, GridSize, GridVector, NotNan, Rgb,
+    rgba_const, Cube, Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
+    GridSize, GridVector, NotNan, Rgb, Wireframe as _,
 };
 use all_is_cubes::raycast::Ray;
 #[cfg(feature = "rerun")]

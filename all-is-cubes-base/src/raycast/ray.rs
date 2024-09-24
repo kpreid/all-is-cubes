@@ -65,6 +65,16 @@ impl Ray {
         Raycaster::new(self.origin, self.direction)
     }
 
+    /// Add `offset` to the origin of this ray.
+    #[inline]
+    #[must_use]
+    pub fn translate(self, offset: FreeVector) -> Self {
+        Self {
+            origin: self.origin + offset,
+            ..self
+        }
+    }
+
     /// Scale the ray's coordinates by the given factor.
     #[must_use]
     #[inline]
@@ -103,17 +113,7 @@ impl Ray {
     }
 }
 
-impl math::Geometry for Ray {
-    type Coord = FreeCoordinate;
-
-    #[inline]
-    fn translate(self, offset: FreeVector) -> Self {
-        Self {
-            origin: self.origin + offset,
-            ..self
-        }
-    }
-
+impl math::Wireframe for Ray {
     #[allow(clippy::missing_inline_in_public_items)]
     fn wireframe_points<E>(&self, output: &mut E)
     where

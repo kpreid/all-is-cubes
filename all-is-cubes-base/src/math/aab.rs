@@ -10,8 +10,8 @@ use euclid::{Point3D, Size3D, Vector3D};
 use num_traits::float::FloatCore as _;
 
 use crate::math::{
-    Axis, Cube, Face6, FreeCoordinate, FreePoint, FreeVector, Geometry, GridAab, GridCoordinate,
-    LineVertex,
+    Axis, Cube, Face6, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, LineVertex,
+    Wireframe,
 };
 
 /// Axis-Aligned Box data type.
@@ -220,6 +220,15 @@ impl Aab {
         )
     }
 
+    /// Translate this box by the specified offset.
+    ///
+    /// Note that due to rounding error, the result may not have the same size.
+    #[inline]
+    #[must_use]
+    pub fn translate(self, offset: FreeVector) -> Self {
+        Self::from_lower_upper(self.lower_bounds + offset, self.upper_bounds + offset)
+    }
+
     /// Scale this AAB by the given amount (about the zero point, not its center).
     #[must_use]
     #[inline]
@@ -342,14 +351,7 @@ impl fmt::Debug for Aab {
     }
 }
 
-impl Geometry for Aab {
-    type Coord = FreeCoordinate;
-
-    #[inline]
-    fn translate(self, offset: FreeVector) -> Self {
-        Self::from_lower_upper(self.lower_bounds + offset, self.upper_bounds + offset)
-    }
-
+impl Wireframe for Aab {
     #[inline(never)]
     fn wireframe_points<E>(&self, output: &mut E)
     where

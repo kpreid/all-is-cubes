@@ -14,9 +14,7 @@ use rayon::iter::{IntoParallelRefMutIterator as _, ParallelIterator as _};
 
 use super::debug::LightComputeOutput;
 use crate::block::{self, EvaluatedBlock};
-use crate::math::{
-    Cube, CubeFace, Face6, Face7, FaceMap, Geometry, NotNan, OpacityCategory, Rgb, Rgba, Vol,
-};
+use crate::math::{Cube, CubeFace, Face6, Face7, FaceMap, NotNan, OpacityCategory, Rgb, Rgba, Vol};
 use crate::raycast::Ray;
 use crate::space::light::{
     chart::LightChart, LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority,
