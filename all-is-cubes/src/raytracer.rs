@@ -608,6 +608,20 @@ impl<P: Accumulate> TracingState<P> {
 /// scaling the light emission.
 #[inline]
 fn apply_transmittance(color: Rgba, thickness: f32) -> (Rgba, f32) {
+    // Distance calculations might produce small negative values; tolerate this.
+    let thickness = thickness.max(0.0);
+
+    // If the thickness is zero and the alpha is one, this is theoretically undefined.
+    // In practice, thickness has error, so we want to count this as if it were a small
+    // nonzero thickness.
+    if thickness == 0.0 {
+        return if color.fully_opaque() {
+            (color, 1.0)
+        } else {
+            (Rgba::TRANSPARENT, 0.0)
+        };
+    }
+
     // Convert alpha to transmittance (light transmitted / light received).
     let unit_transmittance = 1.0 - color.clamp().alpha().into_inner();
     // Adjust transmittance for the thickness relative to an assumed 1.0 thickness.
@@ -635,7 +649,7 @@ fn apply_transmittance(color: Rgba, thickness: f32) -> (Rgba, f32) {
         (depth_transmittance - 1.) / (unit_transmittance - 1.)
     };
 
-    (modified_color, emission_coeff)
+    (modified_color, emission_coeff.max(0.0))
 }
 
 /// Minimal raytracing helper used by block evaluation to compute aggregate properties
@@ -752,5 +766,32 @@ mod tests {
         case(color, 1);
         case(color, 2);
         case(color, 8);
+    }
+
+    /// Regression test for numerical error actually encountered.
+    #[test]
+    fn apply_transmittance_negative_thickness_transparent() {
+        assert_eq!(
+            apply_transmittance(rgba_const!(1.0, 0.5, 0.0, 0.5), -0.125),
+            (Rgba::TRANSPARENT, 0.0)
+        );
+    }
+    #[test]
+    fn apply_transmittance_negative_thickness_opaque() {
+        let color = rgba_const!(1.0, 0.5, 0.0, 1.0);
+        assert_eq!(apply_transmittance(color, -0.125), (color, 1.0));
+    }
+
+    #[test]
+    fn apply_transmittance_zero_thickness_transparent() {
+        assert_eq!(
+            apply_transmittance(rgba_const!(1.0, 0.5, 0.0, 0.5), 0.0),
+            (Rgba::TRANSPARENT, 0.0)
+        );
+    }
+    #[test]
+    fn apply_transmittance_zero_thickness_opaque() {
+        let color = rgba_const!(1.0, 0.5, 0.0, 1.0);
+        assert_eq!(apply_transmittance(color, 0.0), (color, 1.0));
     }
 }
