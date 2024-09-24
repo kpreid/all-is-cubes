@@ -169,7 +169,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "trycmd",
- "unicode-width",
+ "unicode-width 0.2.0",
  "wgpu 22.1.0",
  "winit",
  "yield-progress",
@@ -1294,7 +1294,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3538270d33cc669650c4b093848450d380def10c331d38c768e34cac80576e6e"
 dependencies = [
  "termcolor",
- "unicode-width",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -1359,7 +1359,7 @@ dependencies = [
  "crossterm 0.27.0",
  "strum",
  "strum_macros",
- "unicode-width",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -4614,7 +4614,7 @@ dependencies = [
  "strum_macros",
  "unicode-segmentation",
  "unicode-truncate",
- "unicode-width",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -6316,7 +6316,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5fbabedabe362c618c714dbefda9927b5afc8e2a8102f47f081089a9019226"
 dependencies = [
  "itertools 0.12.1",
- "unicode-width",
+ "unicode-width 0.1.13",
 ]
 
 [[package]]
@@ -6324,6 +6324,12 @@ name = "unicode-width"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0336d538f7abc86d282a4189614dfaa90810dfc2c6f6427eaf88e16311dd225d"
+
+[[package]]
+name = "unicode-width"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 
 [[package]]
 name = "unicode-xid"
