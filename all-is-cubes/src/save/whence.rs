@@ -1,25 +1,11 @@
-//! Serialization/persistence/saved games.
-
-use core::error::Error;
-use core::fmt;
-
 use alloc::boxed::Box;
 use alloc::string::String;
+use core::error::Error;
+use core::fmt;
 
 use crate::universe::Universe;
 use crate::util::maybe_sync::MaybeLocalBoxFuture;
 use crate::util::YieldProgress;
-
-#[cfg(feature = "save")]
-mod compress;
-#[cfg(feature = "save")]
-pub(crate) mod conversion;
-#[cfg(feature = "save")]
-pub(crate) mod schema;
-
-#[cfg(test)]
-#[cfg(feature = "save")]
-mod tests;
 
 /// Specifies a file or other data storage a [`Universe`] can be read from or written to.
 ///
