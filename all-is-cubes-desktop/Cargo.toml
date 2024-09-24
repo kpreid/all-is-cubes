@@ -40,7 +40,7 @@ default = ["audio", "import", "record", "terminal"]
 # Producing image or video recording, or any exported/saved data.
 record = [
     "dep:png",
-    "all-is-cubes-mesh", # used in glTF recording
+    "dep:all-is-cubes-mesh", # used in glTF recording
     "all-is-cubes-port/export",
     "all-is-cubes-port/all-formats",
 ]
@@ -54,9 +54,9 @@ audio = ["dep:kira"]
 # Adds rerun logging support. Intended mainly for development of All is Cubes itself.
 rerun = [
     "dep:re_sdk",
+    "dep:all-is-cubes-mesh",
     "all-is-cubes/rerun",
     "all-is-cubes-gpu/rerun",
-    "all-is-cubes-mesh",
 ]
 # TODO: Define a feature with which to turn off windowing & GPU support.
 
@@ -65,7 +65,7 @@ all-is-cubes = { workspace = true, features = ["auto-threads", "save"] }
 # TODO: make template support an optional feature, and this dependency with it
 all-is-cubes-content = { workspace = true }
 all-is-cubes-gpu = { workspace = true, features = ["auto-threads", "wgpu"] }
-all-is-cubes-mesh = { workspace = true, optional = true, features = ["dynamic"] } # TODO: make this optional
+all-is-cubes-mesh = { workspace = true, optional = true, features = ["dynamic"] }
 # TODO: make all file access an optional feature
 all-is-cubes-port = { workspace = true, features = ["import", "native"] }
 # TODO: make raytracer optional
