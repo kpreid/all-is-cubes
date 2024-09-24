@@ -15,11 +15,17 @@ use euclid::{Point3D, Vector3D};
 
 /// Acts as polyfill for float methods
 #[cfg(not(any(feature = "std", test)))]
-#[allow(unused_imports, reason = "unclear why this warns even though it is needed")]
+#[allow(
+    unused_imports,
+    reason = "unclear why this warns even though it is needed"
+)]
 use num_traits::float::FloatCore as _;
 
 #[cfg(not(any(feature = "std", test)))]
-#[allow(unused_imports, reason = "unclear why this warns even though it is needed")]
+#[allow(
+    unused_imports,
+    reason = "unclear why this warns even though it is needed"
+)]
 use crate::math::Euclid as _;
 use crate::math::{
     Cube, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, OctantMask,

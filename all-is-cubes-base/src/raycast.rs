@@ -2,11 +2,17 @@ use euclid::Vector3D;
 
 /// Acts as polyfill for float methods
 #[cfg(not(any(feature = "std", test)))]
-#[allow(unused_imports, reason = "unclear why this warns even though it is needed")]
+#[allow(
+    unused_imports,
+    reason = "unclear why this warns even though it is needed"
+)]
 use num_traits::float::Float as _;
 
 #[cfg(not(any(feature = "std", test)))]
-#[allow(unused_imports, reason = "unclear why this warns even though it is needed")]
+#[allow(
+    unused_imports,
+    reason = "unclear why this warns even though it is needed"
+)]
 use crate::math::Euclid as _;
 use crate::math::{
     Axis, Cube, CubeFace, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate,
