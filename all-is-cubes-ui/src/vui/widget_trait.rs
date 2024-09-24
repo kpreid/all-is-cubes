@@ -177,7 +177,7 @@ impl VisitHandles for WidgetBehavior {
 }
 
 impl Behavior<Space> for WidgetBehavior {
-    fn step(&self, context: &behavior::BehaviorContext<'_, Space>) -> (UniverseTransaction, Then) {
+    fn step(&self, context: &behavior::Context<'_, Space>) -> (UniverseTransaction, Then) {
         let (txn, then) = self
             .controller
             .lock()
@@ -193,7 +193,7 @@ impl Behavior<Space> for WidgetBehavior {
         (context.bind_host(txn), then)
     }
 
-    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+    fn persistence(&self) -> Option<behavior::Persistence> {
         None
     }
 }
@@ -201,7 +201,7 @@ impl Behavior<Space> for WidgetBehavior {
 /// Context passed to [`WidgetController::step()`].
 #[derive(Debug)]
 pub struct WidgetContext<'a> {
-    behavior_context: Option<&'a behavior::BehaviorContext<'a, Space>>,
+    behavior_context: Option<&'a behavior::Context<'a, Space>>,
     grant: &'a LayoutGrant,
 }
 

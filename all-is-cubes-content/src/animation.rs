@@ -57,7 +57,7 @@ impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavi
 {
     fn step(
         &self,
-        context: &behavior::BehaviorContext<'_, Space>,
+        context: &behavior::Context<'_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
         let txn = if context.tick.prev_phase().rem_euclid(self.frame_period) == 0 {
             let mut mut_self: AnimatedVoxels<F> = self.clone();
@@ -77,7 +77,7 @@ impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavi
         (txn, behavior::Then::Step)
     }
 
-    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+    fn persistence(&self) -> Option<behavior::Persistence> {
         // TODO: serialize
         None
     }
@@ -183,7 +183,7 @@ impl Fire {
 impl behavior::Behavior<Space> for Fire {
     fn step(
         &self,
-        context: &behavior::BehaviorContext<'_, Space>,
+        context: &behavior::Context<'_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
         let mut mut_self = self.clone();
         let txn = if mut_self.tick_state(context.tick) {
@@ -198,7 +198,7 @@ impl behavior::Behavior<Space> for Fire {
         (txn, behavior::Then::Step)
     }
 
-    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+    fn persistence(&self) -> Option<behavior::Persistence> {
         // TODO: serialize
         None
     }
@@ -285,7 +285,7 @@ impl Clock {
 impl behavior::Behavior<Space> for Clock {
     fn step(
         &self,
-        context: &behavior::BehaviorContext<'_, Space>,
+        context: &behavior::Context<'_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
         let mut mut_self = self.clone();
         mut_self.ticks += 1;
@@ -298,7 +298,7 @@ impl behavior::Behavior<Space> for Clock {
         )
     }
 
-    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+    fn persistence(&self) -> Option<behavior::Persistence> {
         // TODO: serialize
         None
     }

@@ -1003,11 +1003,11 @@ mod tests {
         impl behavior::Behavior<Universe> for UTestBehavior {
             fn step(
                 &self,
-                _: &behavior::BehaviorContext<'_, Universe>,
+                _: &behavior::Context<'_, Universe>,
             ) -> (UniverseTransaction, behavior::Then) {
                 unimplemented!()
             }
-            fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+            fn persistence(&self) -> Option<behavior::Persistence> {
                 None
             }
         }

@@ -353,14 +353,14 @@ fn universe_behavior() {
     impl behavior::Behavior<Universe> for UTestBehavior {
         fn step(
             &self,
-            _context: &behavior::BehaviorContext<'_, Universe>,
+            _context: &behavior::Context<'_, Universe>,
         ) -> (UniverseTransaction, behavior::Then) {
             (
                 UniverseTransaction::insert(Handle::new_pending("foo".into(), BlockDef::new(AIR))),
                 behavior::Then::Drop,
             )
         }
-        fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+        fn persistence(&self) -> Option<behavior::Persistence> {
             None
         }
     }

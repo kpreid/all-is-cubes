@@ -739,7 +739,7 @@ impl fmt::Debug for Universe {
     }
 }
 
-impl behavior::BehaviorHost for Universe {
+impl behavior::Host for Universe {
     type Attachment = (); // TODO: store a `BTreeSet<Name>` or something to define a scope
 }
 

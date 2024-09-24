@@ -24,6 +24,10 @@
     * `math::Geometry` is now `math::Wireframe`, and its `translate()` method has been replaced with inherent methods on its implementors.
     - `math::GridAab::expand()` now takes unsigned values; use `GridAab::shrink()` instead of negative ones. This allows both versions to never panic.
 
+    - Renamed `behavior::BehaviorContext` to `behavior::Context`.
+    - Renamed `behavior::BehaviorHost` to `behavior::Host`.
+    - Renamed `behavior::BehaviorPersistence` to `behavior::Persistence`.
+
 - `all-is-cubes-gpu` library:
     - `in_wgpu::SurfaceRenderer::new()` requires `wgpu::Adapter` instead of `&wgpu::Adapter`.
 

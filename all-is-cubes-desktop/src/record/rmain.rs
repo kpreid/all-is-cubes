@@ -75,7 +75,7 @@ struct AutoRotate {
 impl behavior::Behavior<Character> for AutoRotate {
     fn step(
         &self,
-        context: &behavior::BehaviorContext<'_, Character>,
+        context: &behavior::Context<'_, Character>,
     ) -> (universe::UniverseTransaction, behavior::Then) {
         let mut body_txn = BodyTransaction::default();
         body_txn.delta_yaw = self.rate.into_inner() * context.tick.delta_t().as_secs_f64();
@@ -85,7 +85,7 @@ impl behavior::Behavior<Character> for AutoRotate {
         )
     }
 
-    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+    fn persistence(&self) -> Option<behavior::Persistence> {
         None
     }
 }

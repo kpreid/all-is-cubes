@@ -12,23 +12,21 @@ use super::schema;
 
 mod behavior {
     use super::*;
-    use crate::behavior::{
-        Behavior, BehaviorHost, BehaviorPersistence, BehaviorSet, BehaviorSetTransaction,
-    };
+    use crate::behavior::{Behavior, BehaviorSet, BehaviorSetTransaction, Host, Persistence};
     use crate::transaction::{Merge as _, Transactional as _};
 
     // TODO: Stop serializing H::Attachment directly or document that it has to be stable.
 
     impl<H> Serialize for BehaviorSet<H>
     where
-        H: BehaviorHost<Attachment: Serialize>,
+        H: Host<Attachment: Serialize>,
     {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             schema::BehaviorSetSer::BehaviorSetV1 {
                 behaviors: self
                     .iter()
                     .filter_map(|entry| {
-                        let BehaviorPersistence(behavior) = entry.behavior.persistence()?;
+                        let Persistence(behavior) = entry.behavior.persistence()?;
                         Some(schema::BehaviorSetEntryV1Ser {
                             attachment: entry.attachment.clone(),
                             behavior,
@@ -42,7 +40,7 @@ mod behavior {
 
     impl<'de, H> Deserialize<'de> for BehaviorSet<H>
     where
-        H: BehaviorHost<Attachment: serde::de::DeserializeOwned>,
+        H: Host<Attachment: serde::de::DeserializeOwned>,
     {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             match schema::BehaviorSetSer::<H::Attachment>::deserialize(deserializer)? {

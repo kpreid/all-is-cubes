@@ -1007,7 +1007,7 @@ impl Listen for Space {
     }
 }
 
-impl behavior::BehaviorHost for Space {
+impl behavior::Host for Space {
     type Attachment = SpaceBehaviorAttachment;
 }
 
@@ -1360,13 +1360,13 @@ impl ActivatableRegion {
 impl behavior::Behavior<Space> for ActivatableRegion {
     fn step(
         &self,
-        _context: &behavior::BehaviorContext<'_, Space>,
+        _context: &behavior::Context<'_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
         // TODO: Give a way for this to be deleted automatically when
         // its effect is gone
         (UniverseTransaction::default(), behavior::Then::Step)
     }
-    fn persistence(&self) -> Option<behavior::BehaviorPersistence> {
+    fn persistence(&self) -> Option<behavior::Persistence> {
         // Not useful to serialize since `EphemeralOpaque` can't be.
         None
     }

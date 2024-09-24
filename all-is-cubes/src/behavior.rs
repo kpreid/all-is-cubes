@@ -25,14 +25,14 @@ use crate::util::StatusText;
 /// Dynamic add-ons to game objects; we might also have called them “components”.
 /// Each behavior is owned by a “host” of type `H` which determines when the behavior
 /// is invoked.
-pub trait Behavior<H: BehaviorHost>:
+pub trait Behavior<H: Host>:
     fmt::Debug + SendSyncIfStd + Downcast + VisitHandles + 'static
 {
     /// Computes a transaction to apply the effects of this behavior for one timestep,
     /// and specifies when next to step the behavior again (if ever).
     ///
     /// TODO: Define what happens if the transaction fails.
-    fn step(&self, context: &BehaviorContext<'_, H>) -> (UniverseTransaction, Then);
+    fn step(&self, context: &Context<'_, H>) -> (UniverseTransaction, Then);
 
     /// If `None`, then the behavior should not be persisted/saved to disk, because it will be
     /// reconstructed as needed (e.g. collision, occupancy, user interaction, particles).
@@ -41,14 +41,13 @@ pub trait Behavior<H: BehaviorHost>:
     /// just the state of the behavior but _which_ behavior to recreate.
     ///
     /// TODO: Return type isn't a clean public API, nor extensible.
-    fn persistence(&self) -> Option<BehaviorPersistence>;
+    fn persistence(&self) -> Option<Persistence>;
 }
 
-impl_downcast!(Behavior<H> where H: BehaviorHost);
+impl_downcast!(Behavior<H> where H: Host);
 
 /// A type that can have attached behaviors.
-#[expect(clippy::module_name_repetitions)] // TODO: rename to Host?
-pub trait BehaviorHost: transaction::Transactional + 'static {
+pub trait Host: transaction::Transactional + 'static {
     /// Additional data about “where” the behavior is attached to the host; what part of
     /// the host should be affected by the behavior.
     type Attachment: fmt::Debug + Clone + Eq + 'static;
@@ -56,8 +55,7 @@ pub trait BehaviorHost: transaction::Transactional + 'static {
 
 /// Items available to a [`Behavior`] during [`Behavior::step()`].
 #[non_exhaustive]
-#[expect(clippy::module_name_repetitions)] // TODO: rename to Context?
-pub struct BehaviorContext<'a, H: BehaviorHost> {
+pub struct Context<'a, H: Host> {
     /// The time tick that is currently passing, causing this step.
     pub tick: Tick,
 
@@ -74,7 +72,7 @@ pub struct BehaviorContext<'a, H: BehaviorHost> {
     self_transaction_binder: &'a dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
 }
 
-impl<'a, H: BehaviorHost> BehaviorContext<'a, H> {
+impl<'a, H: Host> Context<'a, H> {
     /// Returns a waker that should be used to signal when the behavior's
     /// [`step()`](Behavior::step) should be called again, in the case where it
     /// returns [`Then::Sleep`].
@@ -100,10 +98,10 @@ impl<'a, H: BehaviorHost> BehaviorContext<'a, H> {
     }
 }
 
-impl<'a, H: BehaviorHost + fmt::Debug> fmt::Debug for BehaviorContext<'a, H> {
+impl<'a, H: Host + fmt::Debug> fmt::Debug for Context<'a, H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // binder functions are not debuggable
-        f.debug_struct("BehaviorContext")
+        f.debug_struct("Context")
             .field("host", &self.host)
             .finish_non_exhaustive()
     }
@@ -122,7 +120,7 @@ pub enum Then {
     // TODO: specify whether to step when paused?
     Step,
 
-    /// Don't step until the [`BehaviorContext::waker()`] is invoked.
+    /// Don't step until the [`Context::waker()`] is invoked.
     Sleep,
 }
 
@@ -135,7 +133,7 @@ pub enum Then {
 ///
 #[doc = include_str!("save/serde-warning.md")]
 #[expect(clippy::module_name_repetitions)] // TODO: rename to Set?
-pub struct BehaviorSet<H: BehaviorHost> {
+pub struct BehaviorSet<H: Host> {
     /// Note that this map is deterministically ordered, so any incidental things
     /// depending on ordering, such as [`Self::query()`] will be deterministic.
     /// (Transaction merges would prevent nondeterministic gameplay outcomes, but
@@ -146,7 +144,7 @@ pub struct BehaviorSet<H: BehaviorHost> {
     woken: Arc<WokenSet>,
 }
 
-impl<H: BehaviorHost> BehaviorSet<H> {
+impl<H: Host> BehaviorSet<H> {
     /// Constructs an empty [`BehaviorSet`].
     pub fn new() -> Self {
         BehaviorSet {
@@ -223,7 +221,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
                 continue;
             };
 
-            let context = &BehaviorContext {
+            let context = &Context {
                 tick,
                 host,
                 attachment: &entry.attachment,
@@ -281,7 +279,7 @@ impl<H: BehaviorHost> BehaviorSet<H> {
     }
 }
 
-impl<H: BehaviorHost> Clone for BehaviorSet<H> {
+impl<H: Host> Clone for BehaviorSet<H> {
     fn clone(&self) -> Self {
         let woken = Arc::new(Mutex::new(self.members.keys().copied().collect()));
 
@@ -302,13 +300,13 @@ impl<H: BehaviorHost> Clone for BehaviorSet<H> {
     }
 }
 
-impl<H: BehaviorHost> Default for BehaviorSet<H> {
+impl<H: Host> Default for BehaviorSet<H> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<H: BehaviorHost> fmt::Debug for BehaviorSet<H> {
+impl<H: Host> fmt::Debug for BehaviorSet<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "BehaviorSet(")?;
         f.debug_map().entries(self.members.iter()).finish()?;
@@ -317,7 +315,7 @@ impl<H: BehaviorHost> fmt::Debug for BehaviorSet<H> {
     }
 }
 
-impl<H: BehaviorHost> VisitHandles for BehaviorSet<H> {
+impl<H: Host> VisitHandles for BehaviorSet<H> {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Self { members, woken: _ } = self;
         for entry in members.values() {
@@ -326,7 +324,7 @@ impl<H: BehaviorHost> VisitHandles for BehaviorSet<H> {
     }
 }
 
-impl<H: BehaviorHost> transaction::Transactional for BehaviorSet<H> {
+impl<H: Host> transaction::Transactional for BehaviorSet<H> {
     type Transaction = BehaviorSetTransaction<H>;
 }
 
@@ -379,7 +377,7 @@ impl fmt::Debug for Key {
     }
 }
 
-pub(crate) struct BehaviorSetEntry<H: BehaviorHost> {
+pub(crate) struct BehaviorSetEntry<H: Host> {
     pub(crate) attachment: H::Attachment,
     /// Behaviors are stored in [`Arc`] so that they can be used in transactions in ways
     /// that would otherwise require `Clone + PartialEq`.
@@ -389,7 +387,7 @@ pub(crate) struct BehaviorSetEntry<H: BehaviorHost> {
     waker: Option<BehaviorWaker>,
 }
 
-impl<H: BehaviorHost> Clone for BehaviorSetEntry<H> {
+impl<H: Host> Clone for BehaviorSetEntry<H> {
     fn clone(&self) -> Self {
         // Manual impl avoids `H: Clone` bound.
         Self {
@@ -400,7 +398,7 @@ impl<H: BehaviorHost> Clone for BehaviorSetEntry<H> {
     }
 }
 
-impl<H: BehaviorHost> fmt::Debug for BehaviorSetEntry<H> {
+impl<H: Host> fmt::Debug for BehaviorSetEntry<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let BehaviorSetEntry {
             attachment,
@@ -413,7 +411,7 @@ impl<H: BehaviorHost> fmt::Debug for BehaviorSetEntry<H> {
     }
 }
 
-impl<H: BehaviorHost> PartialEq for BehaviorSetEntry<H> {
+impl<H: Host> PartialEq for BehaviorSetEntry<H> {
     fn eq(&self, other: &Self) -> bool {
         self.attachment == other.attachment && Arc::ptr_eq(&self.behavior, &other.behavior)
     }
@@ -477,7 +475,7 @@ impl BehaviorWakerInner {
 
 /// Result of [`BehaviorSet::query()`].
 #[non_exhaustive]
-pub struct QueryItem<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> {
+pub struct QueryItem<'a, H: Host, B: Behavior<H> + ?Sized> {
     /// The found behavior's current value.
     pub behavior: &'a B,
     /// The found behavior's current attachment.
@@ -487,7 +485,7 @@ pub struct QueryItem<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> {
     pub attachment: &'a H::Attachment,
 }
 
-impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Clone for QueryItem<'a, H, B> {
+impl<'a, H: Host, B: Behavior<H> + ?Sized> Clone for QueryItem<'a, H, B> {
     fn clone(&self) -> Self {
         // Manual impl avoids `H: Clone` bound.
         Self {
@@ -497,7 +495,7 @@ impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> Clone for QueryItem<'a, H, B>
     }
 }
 
-impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> fmt::Debug for QueryItem<'a, H, B> {
+impl<'a, H: Host, B: Behavior<H> + ?Sized> fmt::Debug for QueryItem<'a, H, B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let QueryItem {
             attachment,
@@ -512,7 +510,7 @@ impl<'a, H: BehaviorHost, B: Behavior<H> + ?Sized> fmt::Debug for QueryItem<'a, 
 /// A [`Transaction`] that adds or modifies [`Behavior`]s in a [`BehaviorSet`].
 #[derive(Debug)]
 #[expect(clippy::module_name_repetitions)] // TODO: rename to Transaction or SetTransaction?
-pub struct BehaviorSetTransaction<H: BehaviorHost> {
+pub struct BehaviorSetTransaction<H: Host> {
     /// Replacement of existing behaviors or their attachments, or removal.
     replace: BTreeMap<Key, Replace<H>>,
     /// Newly inserted behaviors.
@@ -520,20 +518,20 @@ pub struct BehaviorSetTransaction<H: BehaviorHost> {
 }
 
 #[derive(Debug)]
-struct Replace<H: BehaviorHost> {
+struct Replace<H: Host> {
     old: BehaviorSetEntry<H>,
     /// If None, delete the behavior
     new: Option<BehaviorSetEntry<H>>,
 }
 
-impl<H: BehaviorHost> BehaviorSetTransaction<H> {
+impl<H: Host> BehaviorSetTransaction<H> {
     // TODO: replace this with an empty constant or Default::default to compare with, once that's stable in Rust
     pub(crate) fn is_empty(&self) -> bool {
         self.replace.is_empty() && self.insert.is_empty()
     }
 
     /// This function is private because the normal way it is used is via
-    /// [`BehaviorContext::replace_self()`]
+    /// [`Context::replace_self()`]
     fn replace(key: Key, replacement: Replace<H>) -> Self {
         BehaviorSetTransaction {
             replace: BTreeMap::from([(key, replacement)]),
@@ -581,7 +579,7 @@ impl<H: BehaviorHost> BehaviorSetTransaction<H> {
     }
 }
 
-impl<H: BehaviorHost> Transaction for BehaviorSetTransaction<H> {
+impl<H: Host> Transaction for BehaviorSetTransaction<H> {
     type Target = BehaviorSet<H>;
     type CommitCheck = CommitCheck;
     type Output = transaction::NoOutput;
@@ -683,7 +681,7 @@ impl<H: BehaviorHost> Transaction for BehaviorSetTransaction<H> {
     }
 }
 
-impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
+impl<H: Host> transaction::Merge for BehaviorSetTransaction<H> {
     type MergeCheck = MergeCheck;
     type Conflict = BehaviorTransactionConflict;
 
@@ -705,7 +703,7 @@ impl<H: BehaviorHost> transaction::Merge for BehaviorSetTransaction<H> {
     }
 }
 
-impl<H: BehaviorHost> Clone for BehaviorSetTransaction<H> {
+impl<H: Host> Clone for BehaviorSetTransaction<H> {
     // Manual implementation to avoid bounds on `H`.
     fn clone(&self) -> Self {
         Self {
@@ -715,7 +713,7 @@ impl<H: BehaviorHost> Clone for BehaviorSetTransaction<H> {
     }
 }
 
-impl<H: BehaviorHost> Default for BehaviorSetTransaction<H> {
+impl<H: Host> Default for BehaviorSetTransaction<H> {
     // Manual implementation to avoid bounds on `H`.
     fn default() -> Self {
         Self {
@@ -725,7 +723,7 @@ impl<H: BehaviorHost> Default for BehaviorSetTransaction<H> {
     }
 }
 
-impl<H: BehaviorHost> PartialEq for BehaviorSetTransaction<H> {
+impl<H: Host> PartialEq for BehaviorSetTransaction<H> {
     // Manual implementation to avoid bounds on `H`.
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -739,7 +737,7 @@ impl<H: BehaviorHost> PartialEq for BehaviorSetTransaction<H> {
         r1 == r2 && i1 == i2
     }
 }
-impl<H: BehaviorHost> PartialEq for Replace<H> {
+impl<H: Host> PartialEq for Replace<H> {
     // Manual implementation to avoid bounds on `H` and to implement the partiality (comparing pointers instead of values).
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -754,10 +752,10 @@ impl<H: BehaviorHost> PartialEq for Replace<H> {
     }
 }
 
-impl<H: BehaviorHost> Eq for BehaviorSetTransaction<H> {}
-impl<H: BehaviorHost> Eq for Replace<H> {}
+impl<H: Host> Eq for BehaviorSetTransaction<H> {}
+impl<H: Host> Eq for Replace<H> {}
 
-impl<H: BehaviorHost> Clone for Replace<H> {
+impl<H: Host> Clone for Replace<H> {
     // Manual implementation to avoid bounds on `H`.
     fn clone(&self) -> Self {
         Self {
@@ -847,11 +845,11 @@ mod testing {
         }
     }
 
-    impl<H: BehaviorHost, D: fmt::Debug + Send + Sync + 'static> Behavior<H> for NoopBehavior<D> {
-        fn step(&self, _context: &BehaviorContext<'_, H>) -> (UniverseTransaction, Then) {
+    impl<H: Host, D: fmt::Debug + Send + Sync + 'static> Behavior<H> for NoopBehavior<D> {
+        fn step(&self, _context: &Context<'_, H>) -> (UniverseTransaction, Then) {
             (UniverseTransaction::default(), Then::Step)
         }
-        fn persistence(&self) -> Option<BehaviorPersistence> {
+        fn persistence(&self) -> Option<Persistence> {
             None
         }
     }
@@ -867,8 +865,7 @@ mod testing {
 /// offer some means to access this functionality or replace the [`Behavior`] system
 /// entirely.
 #[derive(Debug)]
-#[expect(clippy::module_name_repetitions)]
-pub struct BehaviorPersistence(
+pub struct Persistence(
     #[cfg(feature = "save")] pub(crate) crate::save::schema::BehaviorV1Ser,
     #[cfg(not(feature = "save"))] (),
 );
@@ -959,7 +956,7 @@ mod tests {
         then: Then,
     }
     impl Behavior<Character> for SelfModifyingBehavior {
-        fn step(&self, context: &BehaviorContext<'_, Character>) -> (UniverseTransaction, Then) {
+        fn step(&self, context: &Context<'_, Character>) -> (UniverseTransaction, Then) {
             let mut txn = context.bind_host(CharacterTransaction::body(BodyTransaction {
                 delta_yaw: FreeCoordinate::from(self.foo),
             }));
@@ -972,7 +969,7 @@ mod tests {
             }
             (txn, self.then.clone())
         }
-        fn persistence(&self) -> Option<BehaviorPersistence> {
+        fn persistence(&self) -> Option<Persistence> {
             None
         }
     }
@@ -1082,11 +1079,11 @@ mod tests {
             tx: mpsc::Sender<BehaviorWaker>,
         }
         impl Behavior<Space> for SleepBehavior {
-            fn step(&self, context: &BehaviorContext<'_, Space>) -> (UniverseTransaction, Then) {
+            fn step(&self, context: &Context<'_, Space>) -> (UniverseTransaction, Then) {
                 self.tx.send(context.waker().clone()).unwrap();
                 (UniverseTransaction::default(), Then::Sleep)
             }
-            fn persistence(&self) -> Option<BehaviorPersistence> {
+            fn persistence(&self) -> Option<Persistence> {
                 None
             }
         }

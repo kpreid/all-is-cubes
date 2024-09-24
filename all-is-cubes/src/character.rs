@@ -531,7 +531,7 @@ impl Transactional for Character {
     type Transaction = CharacterTransaction;
 }
 
-impl behavior::BehaviorHost for Character {
+impl behavior::Host for Character {
     type Attachment = ();
 }
 
