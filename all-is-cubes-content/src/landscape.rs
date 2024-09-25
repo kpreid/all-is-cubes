@@ -202,7 +202,7 @@ pub async fn install_landscape_blocks(
     BlockProvider::<LandscapeBlocks>::new(progress, |key| {
         let grass_blades = |txn, height: GrassHeight| -> Result<Block, InGenError> {
             let height_index = height as GridCoordinate - 1;
-            // give each grass variant a different height
+            // give each grass variant a different portion of the noise array
             let noise_section = GridVector::new(
                 height_index.rem_euclid(2),
                 height_index.div_euclid(2).rem_euclid(2),
@@ -365,6 +365,7 @@ pub fn wavy_landscape(
                     continue;
                 } else if altitude == 1 {
                     if let Some(height) = grass_at(cube) {
+                        // TODO: add randomized rotation like the city grass has
                         &blocks[GrassBlades { height }]
                     } else {
                         &AIR

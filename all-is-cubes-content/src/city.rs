@@ -4,6 +4,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use itertools::Itertools;
+use rand::seq::SliceRandom as _;
 use rand::{Rng, SeedableRng as _};
 
 use all_is_cubes::block::{self, text::Font, BlockAttributes, Resolution::*, AIR};
@@ -238,14 +239,32 @@ impl State {
     }
 
     fn plant_grass(&mut self) -> Result<(), InGenError> {
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(self.params.seed.unwrap_or(0));
+        let rotations = &[
+            // all transformations that leave Y unaltered
+            GridRotation::RXYZ,
+            GridRotation::RxYZ,
+            GridRotation::RXYz,
+            GridRotation::RxYz,
+            GridRotation::RZYX,
+            GridRotation::RzYX,
+            GridRotation::RZYx,
+            GridRotation::RzYx,
+        ];
         let grass_at = crate::landscape::grass_placement_function(0x21b5cc6b);
         self.space.fill(self.planner.y_range(1, 2), |cube| {
             if cube.x.abs() <= CityPlanner::ROAD_RADIUS || cube.z.abs() <= CityPlanner::ROAD_RADIUS
             {
                 return None;
             }
-            grass_at(cube)
-                .map(|height| &self.landscape_blocks[LandscapeBlocks::GrassBlades { height }])
+            grass_at(cube).map(|height| {
+                // TODO: this is inefficient re-allocation per cube.
+                // Build a way to look up the blocks that already exist and reuse them,
+                // or build a table of (height,rotation)s up before fill()ing.
+                self.landscape_blocks[LandscapeBlocks::GrassBlades { height }]
+                    .clone()
+                    .rotate(*rotations.choose(&mut rng).unwrap())
+            })
         })?;
         Ok(())
     }
