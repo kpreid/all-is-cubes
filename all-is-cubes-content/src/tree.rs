@@ -2,6 +2,8 @@ use core::fmt;
 
 use itertools::Itertools as _;
 use petgraph::visit::EdgeRef as _;
+use rand::seq::SliceRandom as _;
+use rand::Rng as _;
 
 use all_is_cubes::block::{self, Block, AIR};
 use all_is_cubes::linking::BlockProvider;
@@ -65,6 +67,7 @@ pub(crate) fn make_log(
     blocks: &BlockProvider<LandscapeBlocks>,
     directions: FaceMap<Option<TreeGrowth>>,
     leaves: Option<TreeGrowth>,
+    rng: &mut dyn rand::RngCore,
 ) -> Block {
     // TODO: this needs to canonicalize rotations so that we don't end up with
     // identical-looking but differently defined blocks.
@@ -87,9 +90,13 @@ pub(crate) fn make_log(
     );
 
     if let Some(leaves_growth) = leaves {
+        // Rotating (and mirroring) leaves gives less obvious repetition
+        let leaves_rotation = *GridRotation::ALL.choose(rng).unwrap();
         wood.with_modifier(
             block::Composite::new(
-                blocks[Leaves(leaves_growth)].clone(),
+                blocks[Leaves(leaves_growth)]
+                    .clone()
+                    .rotate(leaves_rotation),
                 block::CompositeOperator::Over,
             )
             .reversed() // wood always wins
@@ -106,7 +113,7 @@ pub(crate) fn make_log(
 /// Panics if `root` is not within `bounds`.
 pub(crate) fn make_tree(
     blocks: &BlockProvider<LandscapeBlocks>,
-    rng: &mut impl rand::Rng,
+    rng: &mut dyn rand::RngCore,
     root: Cube,
     bounds: GridAab,
 ) -> SpaceTransaction {
@@ -202,7 +209,7 @@ pub(crate) fn make_tree(
 
     // Convert graph into blocks. Skip the bottom layer that existed just to help the root.
     let mut txn = SpaceTransaction::default();
-    for (cube, log) in graph.logs(blocks) {
+    for (cube, log) in graph.logs(blocks, rng) {
         if log != AIR && bounds.contains_cube(cube) {
             txn.at(cube).overwrite(log);
         }
@@ -289,6 +296,7 @@ mod graph {
         pub fn logs<'a>(
             &'a self,
             blocks: &'a BlockProvider<LandscapeBlocks>,
+            rng: &'a mut dyn rand::RngCore,
         ) -> impl Iterator<Item = (Cube, Block)> + 'a {
             self.bounds().interior_iter().map(|cube| {
                 (
@@ -297,6 +305,7 @@ mod graph {
                         blocks,
                         self.neighbor_edges(cube),
                         self.leaves(cube).flatten(),
+                        rng,
                     ),
                 )
             })
