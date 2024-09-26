@@ -48,7 +48,10 @@ use crate::universe::{Handle, HandleVisitor, VisitHandles};
 // ---
 // Must declare this macro before child modules, so they can use it.
 #[macro_export]
-#[expect(clippy::module_name_repetitions, reason = "macro export is actually at crate root")]
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "macro export is actually at crate root"
+)]
 macro_rules! color_block {
     ($color:expr) => {
         $crate::block::Block::from_static_primitive(const {

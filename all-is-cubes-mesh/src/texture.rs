@@ -303,7 +303,10 @@ impl Allocator for NoTextures {
 /// TODO: this can and should be just ! (never) when that's available in stable Rust
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[expect(clippy::exhaustive_enums)]
-#[expect(clippy::module_name_repetitions, reason = "short name would be confusing")]
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "short name would be confusing"
+)]
 pub enum NoTexture {}
 
 impl Tile for NoTexture {

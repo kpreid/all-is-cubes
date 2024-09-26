@@ -227,7 +227,6 @@ impl AddAssign for TimeStats {
 
 impl fmt::Display for TimeStats {
     #[allow(clippy::missing_inline_in_public_items)]
-
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.min {
             None => write!(
