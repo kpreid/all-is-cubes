@@ -240,7 +240,6 @@ impl Tool {
     ///
     /// TODO (API instability): Eventually we will probably want additional decorations
     /// that probably should not need to be painted into the block itself.
-
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
         match self {
             Self::Activate => Cow::Borrowed(&predefined[Icons::Activate]),
