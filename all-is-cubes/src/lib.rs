@@ -70,10 +70,9 @@
 //! * [`Space`] and [`Block`] use 3-dimensional integer coordinates with no assumptions
 //!   about axes. However, the default [`SpacePhysics`] configuration currently has a
 //!   gravity vector in the &minus;Y direction.
-//! * [`camera`] assumes OpenGL-style coordinates: +X right, +Y up, +Z towards viewer —
-//!   a “right-handed” coordinate system.
 //! * [`Character`] and [`Body`] have a look direction and corresponding transformation
-//!   matrix which use the same coordinate system as [`camera`].
+//!   matrix which assumes OpenGL-style coordinates: +X right, +Y up, +Z towards viewer —
+//!   a “right-handed” coordinate system.
 //!   Jumping is also hardcoded to work in the +Y direction.
 //!   Future versions may support arbitrary character orientation.
 //!
