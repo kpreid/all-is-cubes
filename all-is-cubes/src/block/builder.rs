@@ -1,4 +1,4 @@
-//! Lesser-used helpers for [`BlockBuilder`].
+//! Support for [`Builder`].
 
 use alloc::borrow::Cow;
 use alloc::sync::Arc;
@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use arcstr::ArcStr;
 
 use crate::block::{
-    AnimationHint, Atom, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier,
+    self, AnimationHint, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier,
     Primitive, Resolution, RotationPlacementRule, AIR,
 };
 use crate::inv;
@@ -19,7 +19,7 @@ use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 /// Tool for constructing [`Block`] values conveniently.
 ///
 /// To create one, call [`Block::builder()`].
-/// ([`BlockBuilder::default()`] is also available.)
+/// ([`Builder::default()`] is also available.)
 ///
 /// ```
 /// use all_is_cubes::block::{Block, EvaluatedBlock};
@@ -34,10 +34,15 @@ use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 /// assert_eq!(evaluated.color(), Rgba::new(0.5, 0.5, 0., 1.));
 /// assert_eq!(evaluated.attributes().display_name.as_str(), "BROWN");
 /// ```
+///
+/// # Type parameters
+///
+/// * `P` is a type corresponding to the type of [`Primitive`] that is being built.
+/// * `Txn` is [`UniverseTransaction`] if the block builder is also building a transaction
+///   that must be executed, and [`()`] otherwise.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
-#[expect(clippy::module_name_repetitions)] // TODO: rename to Builder?
-pub struct BlockBuilder<P, Txn> {
+pub struct Builder<P, Txn> {
     attributes: BlockAttributes,
     primitive_builder: P,
     modifiers: Vec<Modifier>,
@@ -47,16 +52,16 @@ pub struct BlockBuilder<P, Txn> {
     transaction: Txn,
 }
 
-impl Default for BlockBuilder<NeedsPrimitive, ()> {
+impl Default for Builder<NeedsPrimitive, ()> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl BlockBuilder<NeedsPrimitive, ()> {
+impl Builder<NeedsPrimitive, ()> {
     /// Common implementation of [`Block::builder`] and [`Default::default`]; use one of those to call this.
     pub(super) const fn new() -> Self {
-        BlockBuilder {
+        Builder {
             attributes: BlockAttributes::default(),
             primitive_builder: NeedsPrimitive,
             modifiers: Vec::new(),
@@ -65,7 +70,7 @@ impl BlockBuilder<NeedsPrimitive, ()> {
     }
 }
 
-impl<P, Txn> BlockBuilder<P, Txn> {
+impl<P, Txn> Builder<P, Txn> {
     // TODO: When #![feature(const_precise_live_drops)] becomes stable, we can make
     // this builder mostly usable in const contexts.
     // https://github.com/rust-lang/rust/issues/73255
@@ -132,10 +137,10 @@ impl<P, Txn> BlockBuilder<P, Txn> {
     /// Sets the color value for building a [`Primitive::Atom`].
     ///
     /// This will replace any previous color **or voxels.**
-    pub fn color(self, color: impl Into<Rgba>) -> BlockBuilder<BlockBuilderAtom, ()> {
-        BlockBuilder {
+    pub fn color(self, color: impl Into<Rgba>) -> Builder<Atom, ()> {
+        Builder {
             attributes: self.attributes,
-            primitive_builder: BlockBuilderAtom {
+            primitive_builder: Atom {
                 color: color.into(),
                 emission: Rgb::ZERO,
                 collision: BlockCollision::Hard,
@@ -155,10 +160,10 @@ impl<P, Txn> BlockBuilder<P, Txn> {
         self,
         resolution: Resolution,
         space: Handle<Space>,
-    ) -> BlockBuilder<BlockBuilderVoxels, ()> {
-        BlockBuilder {
+    ) -> Builder<Voxels, ()> {
+        Builder {
             attributes: self.attributes,
-            primitive_builder: BlockBuilderVoxels {
+            primitive_builder: Voxels {
                 space,
                 resolution,
                 offset: GridPoint::origin(),
@@ -186,7 +191,7 @@ impl<P, Txn> BlockBuilder<P, Txn> {
         // TODO: Maybe resolution should be a separate method? Check usage patterns later.
         resolution: Resolution,
         mut function: F,
-    ) -> Result<BlockBuilder<BlockBuilderVoxels, UniverseTransaction>, SetCubeError>
+    ) -> Result<Builder<Voxels, UniverseTransaction>, SetCubeError>
     where
         F: FnMut(Cube) -> B,
         B: Into<Cow<'a, Block>>,
@@ -200,7 +205,7 @@ impl<P, Txn> BlockBuilder<P, Txn> {
             modifiers: Vec<Modifier>,
             resolution: Resolution,
             function: &mut dyn FnMut(Cube) -> Cow<'a, Block>,
-        ) -> Result<BlockBuilder<BlockBuilderVoxels, UniverseTransaction>, SetCubeError> {
+        ) -> Result<Builder<Voxels, UniverseTransaction>, SetCubeError> {
             let mut not_air_bounds: Option<GridAab> = None;
 
             let mut space = Space::for_block(resolution).build();
@@ -237,9 +242,9 @@ impl<P, Txn> BlockBuilder<P, Txn> {
 
             let space_handle = Handle::new_pending(Name::Pending, space);
 
-            Ok(BlockBuilder {
+            Ok(Builder {
                 attributes,
-                primitive_builder: BlockBuilderVoxels {
+                primitive_builder: Voxels {
                     space: space_handle.clone(),
                     resolution,
                     offset: GridPoint::origin(),
@@ -284,7 +289,7 @@ impl<P, Txn> BlockBuilder<P, Txn> {
     }
 }
 
-impl<P: BuildPrimitive> BlockBuilder<P, ()> {
+impl<P: BuildPrimitive> Builder<P, ()> {
     /// Converts this builder into a block value.
     ///
     /// This method may only be used when the builder has *not* been used with `voxels_fn()`,
@@ -295,7 +300,7 @@ impl<P: BuildPrimitive> BlockBuilder<P, ()> {
     }
 }
 
-impl<P: BuildPrimitive> BlockBuilder<P, UniverseTransaction> {
+impl<P: BuildPrimitive> Builder<P, UniverseTransaction> {
     // TODO: Also allow extracting the transaction for later use
 
     /// Converts this builder into a block value, and inserts its associated [`Space`] into the
@@ -321,7 +326,7 @@ impl<P: BuildPrimitive> BlockBuilder<P, UniverseTransaction> {
 }
 
 /// Atom-specific builder methods.
-impl<Txn> BlockBuilder<BlockBuilderAtom, Txn> {
+impl<Txn> Builder<Atom, Txn> {
     /// Sets the collision behavior of a [`Primitive::Atom`] block.
     pub const fn collision(mut self, collision: BlockCollision) -> Self {
         self.primitive_builder.collision = collision;
@@ -344,7 +349,7 @@ impl<Txn> BlockBuilder<BlockBuilderAtom, Txn> {
 }
 
 /// Voxel-specific builder methods.
-impl<Txn> BlockBuilder<BlockBuilderVoxels, Txn> {
+impl<Txn> Builder<Voxels, Txn> {
     /// Sets the coordinate offset for building a [`Primitive::Recur`]:
     /// the lower-bound corner of the region of the [`Space`]
     /// which will be used for block voxels. The default is zero.
@@ -357,32 +362,32 @@ impl<Txn> BlockBuilder<BlockBuilderVoxels, Txn> {
     // and "add offset", but don't add those until use cases are seen.
 }
 
-/// Allows implicitly converting `BlockBuilder` to the block it would build.
-impl<C: BuildPrimitive> From<BlockBuilder<C, ()>> for Block {
-    fn from(builder: BlockBuilder<C, ()>) -> Self {
+/// Allows implicitly converting [`Builder`] to the block it would build.
+impl<C: BuildPrimitive> From<Builder<C, ()>> for Block {
+    fn from(builder: Builder<C, ()>) -> Self {
         builder.build()
     }
 }
 /// Equivalent to `Block::builder().color(color)`.
-impl From<Rgba> for BlockBuilder<BlockBuilderAtom, ()> {
+impl From<Rgba> for Builder<Atom, ()> {
     fn from(color: Rgba) -> Self {
         Block::builder().color(color)
     }
 }
 /// Equivalent to `Block::builder().color(color.with_alpha_one())`.
-impl From<Rgb> for BlockBuilder<BlockBuilderAtom, ()> {
+impl From<Rgb> for Builder<Atom, ()> {
     fn from(color: Rgb) -> Self {
         Block::builder().color(color.with_alpha_one())
     }
 }
 
-/// Placeholder type for an incomplete [`BlockBuilder`]'s content. The builder
+/// Placeholder type for an incomplete [`Builder`]'s content. The builder
 /// cannot create an actual block until this is replaced.
 #[expect(clippy::exhaustive_structs)]
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct NeedsPrimitive;
 
-/// Something that a parameterized [`BlockBuilder`] can use to construct a block's primitive.
+/// Something that a parameterized [`Builder`] can use to construct a block's primitive.
 ///
 /// TODO: This is not currently necessary; we can replace the BuildPrimitive types with the
 /// primitive itself. (But will that remain true?)
@@ -391,16 +396,18 @@ pub trait BuildPrimitive {
     fn build_primitive(self) -> Primitive;
 }
 
-/// Parameter type for [`BlockBuilder::color`], building [`Primitive::Atom`].
+/// Parameter type for a [`Builder`] that is building a block with a [`Primitive::Atom`].
+///
+/// This is not the same as the [`block::Atom`] type.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct BlockBuilderAtom {
+pub struct Atom {
     color: Rgba,
     emission: Rgb,
     collision: BlockCollision,
 }
-impl BuildPrimitive for BlockBuilderAtom {
+impl BuildPrimitive for Atom {
     fn build_primitive(self) -> Primitive {
-        Primitive::Atom(Atom {
+        Primitive::Atom(block::Atom {
             color: self.color,
             emission: self.emission,
             collision: self.collision,
@@ -408,15 +415,14 @@ impl BuildPrimitive for BlockBuilderAtom {
     }
 }
 
-/// Parameter type for a [`BlockBuilder`] that is building a block with voxels
-/// ([`Primitive::Recur`]).
+/// Parameter type for a [`Builder`] that is building a block with voxels ([`Primitive::Recur`]).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct BlockBuilderVoxels {
+pub struct Voxels {
     space: Handle<Space>,
     resolution: Resolution,
     offset: GridPoint,
 }
-impl BuildPrimitive for BlockBuilderVoxels {
+impl BuildPrimitive for Voxels {
     fn build_primitive(self) -> Primitive {
         Primitive::Recur {
             offset: self.offset,
@@ -444,7 +450,7 @@ mod tests {
         let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
         assert_eq!(
             Block::builder().color(color).build(),
-            Block::from(Atom {
+            Block::from(block::Atom {
                 color,
                 emission: Rgb::ZERO,
                 collision: BlockCollision::Hard,
@@ -455,8 +461,8 @@ mod tests {
     #[test]
     fn default_equivalent() {
         assert_eq!(
-            BlockBuilder::new(),
-            <BlockBuilder<NeedsPrimitive, ()> as Default>::default()
+            Builder::new(),
+            <Builder<NeedsPrimitive, ()> as Default>::default()
         );
     }
 
@@ -482,7 +488,7 @@ mod tests {
                 .animation_hint(AnimationHint::replacement(block::AnimationChange::Shape))
                 .modifier(Modifier::Rotate(GridRotation::CLOCKWISE))
                 .build(),
-            Block::from(Atom {
+            Block::from(block::Atom {
                 color,
                 emission,
                 collision: BlockCollision::None,

@@ -27,7 +27,7 @@ use crate::{
 /// `BlockAttributes::default()` will produce a reasonable set of defaults for “ordinary”
 /// blocks.
 #[derive(Clone, Eq, Hash, PartialEq)]
-#[expect(clippy::exhaustive_structs)] // TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via BlockBuilder.
+#[expect(clippy::exhaustive_structs)] // TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via block::Builder.
 pub struct BlockAttributes {
     /// The name that should be displayed to players.
     ///
@@ -66,9 +66,7 @@ pub struct BlockAttributes {
     /// contain voxels with animation hints themselves.
     pub animation_hint: AnimationHint,
     //
-    // Reminder: When adding new fields, add them to BlockBuilder too.
-    //
-    // TODO: add 'behavior' functionality, if we don't come up with something else
+    // Reminder: When adding new fields, add them to block::Builder too.
 }
 
 impl fmt::Debug for BlockAttributes {

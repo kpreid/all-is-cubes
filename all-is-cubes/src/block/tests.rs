@@ -540,7 +540,7 @@ mod eval {
         let resolution = R4;
         let mut universe = Universe::new();
         let mut space = Space::empty(GridAab::for_block(resolution));
-        // TODO: BlockBuilder should support constructing indirects (by default, even)
+        // TODO: block::Builder should support constructing indirects (by default, even)
         // and we can use the more concise version
         space
             .fill(space.bounds(), |point| {

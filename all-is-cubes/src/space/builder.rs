@@ -274,9 +274,8 @@ impl Bounds for Vol<()> {
     }
 }
 
-/// Module for sealed trait
+/// Module for [`Bounds`] sealed trait
 mod sealed {
-    #![expect(clippy::module_name_repetitions)]
     use super::*;
     #[doc(hidden)]
     #[expect(unnameable_types)]

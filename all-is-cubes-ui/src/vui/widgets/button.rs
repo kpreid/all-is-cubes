@@ -14,7 +14,7 @@ use exhaust::Exhaust;
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::behavior::BehaviorSetTransaction;
 use all_is_cubes::block::{
-    self, Block, BlockBuilder,
+    self, Block, Builder,
     Resolution::{self, *},
 };
 use all_is_cubes::color_block;
@@ -650,7 +650,7 @@ impl ButtonBase for ToggleButtonVisualState {
     fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError> {
         let label_z = self.button_label_z();
         let active = self.value;
-        let illuminate = move |builder: BlockBuilder<block::builder::BlockBuilderAtom, ()>| {
+        let illuminate = move |builder: Builder<block::builder::Atom, ()>| {
             if active {
                 builder.light_emission(palette::BUTTON_ACTIVATED_GLOW)
             } else {

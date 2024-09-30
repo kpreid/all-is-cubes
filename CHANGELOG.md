@@ -30,6 +30,7 @@
     - Renamed `behavior::BehaviorHost` to `behavior::Host`.
     - Renamed `behavior::BehaviorPersistence` to `behavior::Persistence`.
 
+    - Renamed `block::BlockBuilder` to `block::Builder`.
     - Renamed `space::SpaceBuilder` to `space::Builder`.
 
 - `all-is-cubes-gpu` library:

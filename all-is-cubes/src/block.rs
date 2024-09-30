@@ -76,8 +76,7 @@ pub use block_def::*;
 
 pub mod builder;
 #[doc(inline)]
-#[expect(clippy::module_name_repetitions)] // TODO: rename to Builder?
-pub use builder::BlockBuilder;
+pub use builder::Builder;
 
 mod eval;
 pub use eval::*;
@@ -319,10 +318,10 @@ impl fmt::Debug for Block {
 }
 
 impl Block {
-    /// Returns a new [`BlockBuilder`] which may be used to construct a [`Block`] value
+    /// Returns a new [`Builder`] which may be used to construct a [`Block`] value
     /// from various inputs with convenient syntax.
-    pub const fn builder() -> BlockBuilder<builder::NeedsPrimitive, ()> {
-        BlockBuilder::new()
+    pub const fn builder() -> Builder<builder::NeedsPrimitive, ()> {
+        Builder::new()
     }
 
     /// Construct a [`Block`] from a [`Primitive`] value.
