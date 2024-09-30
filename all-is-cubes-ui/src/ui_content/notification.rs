@@ -9,7 +9,7 @@ use all_is_cubes::listen;
 use crate::apps::{MainTaskContext, Session};
 use crate::vui::widgets::ProgressBarState;
 
-/// --- Types --------------------------------------------------------------------------------------
+// ---- Types --------------------------------------------------------------------------------------
 
 /// User-visible contents of a [`Notification`].
 ///
