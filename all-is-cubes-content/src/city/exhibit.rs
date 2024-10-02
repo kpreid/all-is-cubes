@@ -46,7 +46,7 @@ macro_rules! exhibit {
             $( $body:tt )*
         }
     ) => {
-        const $name: Exhibit = Exhibit {
+        pub(in crate::city) const $name: Exhibit = Exhibit {
             factory: |$( $args )*| { $( $body )* },
             $( $fields )*
         };

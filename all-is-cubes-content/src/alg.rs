@@ -263,6 +263,24 @@ pub(crate) fn walk(start: Cube, end: Cube) -> impl Iterator<Item = CubeFace> + C
     }
 }
 
+/// Place a series of blocks on top of each other, starting at the specified point.
+///
+/// TODO: think about whether this should be instead returning a `VoxelBrush` or a `SpaceTransaction` or something, for the future of composable worldgen
+pub(crate) fn stack<'b, B>(
+    space: &mut Space,
+    origin: impl Into<Cube>,
+    blocks: impl IntoIterator<Item = B>,
+) -> Result<(), SetCubeError>
+where
+    B: Into<alloc::borrow::Cow<'b, Block>>,
+{
+    let origin = origin.into();
+    for (y, block) in (0..).zip(blocks) {
+        space.set(origin + GridVector::new(0, y, 0), block)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
