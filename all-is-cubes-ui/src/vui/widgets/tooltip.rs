@@ -1,5 +1,4 @@
 use alloc::sync::Arc;
-use core::error::Error;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr::{literal, ArcStr};
@@ -221,7 +220,7 @@ impl WidgetController for TooltipController {
     fn step(
         &mut self,
         context: &vui::WidgetContext<'_>,
-    ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
+    ) -> Result<vui::StepSuccess, vui::StepError> {
         // None if no update is needed
         let new_contents: Option<TooltipContents> =
             self.definition.state.try_lock().ok().and_then(|mut state| {

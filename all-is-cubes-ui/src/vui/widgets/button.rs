@@ -4,7 +4,6 @@
 )]
 
 use alloc::sync::Arc;
-use core::error::Error;
 use core::fmt;
 use core::hash::Hash;
 use core::sync::atomic::{AtomicU8, Ordering::Relaxed};
@@ -457,10 +456,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
             .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
 
-    fn step(
-        &mut self,
-        _: &vui::WidgetContext<'_>,
-    ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
+    fn step(&mut self, _: &vui::WidgetContext<'_>) -> Result<vui::StepSuccess, vui::StepError> {
         Ok((
             if self.todo.get_and_clear() || self.recently_pressed.load(Relaxed) > 0 {
                 self.draw_txn()

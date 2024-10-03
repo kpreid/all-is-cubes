@@ -97,23 +97,26 @@ pub trait WidgetController: Debug + SendSyncIfStd + 'static {
     /// the widget's data sources or user interaction.
     ///
     /// If this is not overridden, it will do nothing and the controller will be dropped.
-    ///
-    /// TODO: Be more specific than `Box<dyn Error>`
-    ///
-    fn step(
-        &mut self,
-        context: &WidgetContext<'_>,
-    ) -> Result<(WidgetTransaction, Then), Box<dyn Error + Send + Sync>> {
+    fn step(&mut self, context: &WidgetContext<'_>) -> Result<StepSuccess, StepError> {
         let _ = context;
         Ok((WidgetTransaction::default(), Then::Drop))
     }
 }
 
+/// Successful return of [`WidgetController::step()`].
+///
+/// The [`Then`] determines when `step()` is called again, if it is.
+///
+/// TODO: This should become a struct that will allow more extensibility for future needs.
+pub type StepSuccess = (WidgetTransaction, Then);
+
+/// Error return of [`WidgetController::step()`].
+///
+/// TODO: This should become a more specific error type.
+pub type StepError = Box<dyn Error + Send + Sync>;
+
 impl WidgetController for Box<dyn WidgetController> {
-    fn step(
-        &mut self,
-        context: &WidgetContext<'_>,
-    ) -> Result<(WidgetTransaction, Then), Box<dyn Error + Send + Sync>> {
+    fn step(&mut self, context: &WidgetContext<'_>) -> Result<StepSuccess, StepError> {
         (**self).step(context)
     }
 

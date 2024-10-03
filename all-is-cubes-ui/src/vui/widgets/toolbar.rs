@@ -277,7 +277,7 @@ impl WidgetController for ToolbarController {
     fn step(
         &mut self,
         context: &vui::WidgetContext<'_>,
-    ) -> Result<(WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
+    ) -> Result<vui::StepSuccess, vui::StepError> {
         // Extract button pressed state from todo (don't hold the lock more than necessary)
         let mut pressed_buttons: [bool; TOOL_SELECTIONS] = [false; TOOL_SELECTIONS];
         let mut should_update_pointers = false;

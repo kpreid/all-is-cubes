@@ -1,5 +1,4 @@
 use alloc::sync::Arc;
-use core::error::Error;
 
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::euclid::size3;
@@ -51,7 +50,7 @@ impl vui::WidgetController for CrosshairController {
     fn step(
         &mut self,
         context: &vui::WidgetContext<'_>,
-    ) -> Result<(vui::WidgetTransaction, vui::Then), Box<dyn Error + Send + Sync>> {
+    ) -> Result<vui::StepSuccess, vui::StepError> {
         let Some(position) = context.grant().shrink_to_cube() else {
             return Ok((vui::WidgetTransaction::default(), vui::Then::Drop));
         };
