@@ -22,6 +22,7 @@ use crate::block::{Block, BlockDef};
 use crate::space::{SetCubeError, SpaceTransaction};
 use crate::transaction::ExecuteError;
 use crate::universe::{Handle, InsertError, Name, Universe, UniverseTransaction};
+use crate::util::maybe_sync;
 use crate::util::YieldProgress;
 
 #[cfg(doc)]
@@ -395,10 +396,10 @@ impl From<ExecuteError<UniverseTransaction>> for GenError {
 #[non_exhaustive]
 pub enum InGenError {
     /// Generic error container for unusual situations.
-    Other(Box<dyn Error + Send + Sync>),
+    Other(maybe_sync::BoxError),
 
     /// Something else needed to be generated and that failed.
-    Gen(Box<GenError>),
+    Gen(Box<GenError>), // boxed due to being a recursive type
 
     /// Failed to insert the generated items in the [`Universe`].
     Insert(InsertError),
@@ -420,7 +421,7 @@ pub enum InGenError {
 impl InGenError {
     /// Convert an arbitrary error to `InGenError`.
     #[cfg_attr(not(feature = "std"), doc(hidden))]
-    pub fn other<E: Error + Send + Sync + 'static>(error: E) -> Self {
+    pub fn other<E: Error + maybe_sync::SendSyncIfStd + 'static>(error: E) -> Self {
         Self::Other(Box::new(error))
     }
 }
@@ -492,7 +493,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::math::GridAab;
     use crate::transaction::Transactional as _;
-    use crate::util::assert_send_sync;
+    use crate::util::assert_conditional_send_sync;
 
     #[derive(Exhaust, Clone, Debug, Eq, Hash, PartialEq)]
     enum Key {
@@ -570,8 +571,8 @@ mod tests {
 
     #[test]
     fn errors_are_send_sync() {
-        assert_send_sync::<GenError>();
-        assert_send_sync::<InGenError>();
+        assert_conditional_send_sync::<GenError>();
+        assert_conditional_send_sync::<InGenError>();
     }
 
     #[test]

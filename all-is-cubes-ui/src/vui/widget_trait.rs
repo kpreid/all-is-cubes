@@ -4,14 +4,13 @@ use all_is_cubes::time::Tick;
 use alloc::sync::Arc;
 use core::error::Error;
 use core::fmt::Debug;
-use std::sync::Mutex;
 
 use all_is_cubes::behavior::{self, Behavior};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _};
 use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
-use all_is_cubes::util::maybe_sync::SendSyncIfStd;
+use all_is_cubes::util::maybe_sync::{Mutex, SendSyncIfStd};
 
 // reused for WidgetController
 pub use all_is_cubes::behavior::Then;

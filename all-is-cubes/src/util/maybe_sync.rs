@@ -1,24 +1,38 @@
+use alloc::boxed::Box;
+use core::error::Error;
 use core::{fmt, ops};
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
         pub trait SendSyncIfStd: Send + Sync {}
         impl<T: Send + Sync> SendSyncIfStd for T {}
+
+        /// This type alias for a boxed [`Future`] requires `Send` if the `std` feature is
+        /// enabled.
+        pub(crate) type MaybeLocalBoxFuture<'a, T> = futures_core::future::BoxFuture<'a, T>;
+
+        /// This type alias for a boxed [`Error`] requires `Send + Sync` if the `std` feature is
+        /// enabled.
+        #[doc(hidden)]
+        pub type BoxError = Box<dyn Error + Send + Sync>;
     } else {
         pub trait SendSyncIfStd {}
         impl<T> SendSyncIfStd for T {}
+
+        /// This type alias for a boxed [`Future`] requires `Send` if the `std` feature is
+        /// enabled.
+        pub(crate) type MaybeLocalBoxFuture<'a, T> = futures_core::future::LocalBoxFuture<'a, T>;
+
+        /// This type alias for a boxed [`Error`] requires `Send + Sync` if the `std` feature is
+        /// enabled.
+        #[doc(hidden)]
+        pub type BoxError = Box<dyn Error>;
     }
 }
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
-        /// This type alias for a boxed future requires `Sync` if the `std` feature is
-        /// enabled.
-        pub(crate) type MaybeLocalBoxFuture<'a, T> = futures_core::future::BoxFuture<'a, T>;
     } else {
-        /// This type alias for a boxed future requires `Sync` if the `std` feature is
-        /// enabled.
-        pub(crate) type MaybeLocalBoxFuture<'a, T> = futures_core::future::LocalBoxFuture<'a, T>;
     }
 }
 
@@ -31,9 +45,10 @@ cfg_if::cfg_if! {
 /// * This may or may not implement mutex poisoning.
 /// * This may or may not deadlock if locked again from the same thread.
 #[derive(Default)]
-pub(crate) struct Mutex<T>(InnerMutex<T>);
+pub struct Mutex<T>(InnerMutex<T>);
 
-pub(crate) struct MutexGuard<'a, T>(InnerMutexGuard<'a, T>);
+#[allow(missing_debug_implementations)]
+pub struct MutexGuard<'a, T>(InnerMutexGuard<'a, T>);
 
 /// Wrapper around [`core::cell::RefCell`] or [`std::sync::RwLock`] depending on whether
 /// the `std` feature is enabled.
@@ -196,11 +211,8 @@ impl<T> ops::DerefMut for RwLockWriteGuard<'_, T> {
     }
 }
 
-pub(crate) enum LockError<G> {
-    #[cfg_attr(
-        not(feature = "std"),
-        expect(dead_code, reason = "no poisoning from RefCell")
-    )]
+#[allow(clippy::exhaustive_enums)]
+pub enum LockError<G> {
     Poisoned(G),
 }
 
@@ -213,7 +225,7 @@ impl<G> LockError<G> {
     // }
 }
 
-impl<G> core::error::Error for LockError<G> {}
+impl<G> Error for LockError<G> {}
 
 impl<G> fmt::Display for LockError<G> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -240,7 +252,7 @@ pub(crate) enum TryLockError<G> {
     WouldBlock,
 }
 
-impl<G> core::error::Error for TryLockError<G> {}
+impl<G> Error for TryLockError<G> {}
 
 impl<G> fmt::Display for TryLockError<G> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
