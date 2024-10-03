@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 
 use all_is_cubes::block::{self, text, Block, Resolution::R64};

@@ -3,8 +3,9 @@
     reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
 )]
 
+use alloc::format;
+use alloc::sync::Arc;
 use core::fmt;
-use std::sync::Arc;
 
 use exhaust::Exhaust;
 
@@ -207,16 +208,18 @@ impl WidgetBlocks {
                 }
 
                 WidgetBlocks::ProgressBar { full } => {
+                    let image = if full {
+                        include_image!("theme/progress-bar-full.png")
+                    } else {
+                        include_image!("theme/progress-bar-empty.png")
+                    };
+
                     Block::builder()
                         .display_name(format! {"Progress Bar {}", if full {"Full"} else {"Empty"}})
                         .voxels_handle(
                             R64, // 16 res × 4 tiles
                             txn.insert_anonymous(space_from_image(
-                                if full {
-                                    include_image!("theme/progress-bar-full.png")
-                                } else {
-                                    include_image!("theme/progress-bar-empty.png")
-                                },
+                                image,
                                 GridRotation::IDENTITY,
                                 &default_srgb,
                             )?),

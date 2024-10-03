@@ -3,6 +3,9 @@
     reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
 )]
 
+use alloc::borrow::ToOwned as _;
+use alloc::boxed::Box;
+use alloc::format;
 use alloc::sync::Arc;
 use core::fmt;
 use core::hash::Hash;
@@ -549,7 +552,7 @@ mod theme {
     /// Build a [`Block`] for [`ButtonBase`].
     pub fn common_block(space: Handle<Space>, name: &str) -> Block {
         Block::builder()
-            .display_name(name.to_string())
+            .display_name(name)
             .voxels_handle(MULTI_RESOLUTION, space)
             .animation_hint(block::AnimationHint::replacement(
                 block::AnimationChange::Shape,

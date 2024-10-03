@@ -1,5 +1,6 @@
 //! Specific UI widgets.
 
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 
 use all_is_cubes::block::Block;
@@ -8,7 +9,9 @@ use all_is_cubes::space::SpaceTransaction;
 
 use crate::vui;
 
+#[cfg(feature = "session")]
 mod crosshair;
+#[cfg(feature = "session")]
 pub(crate) use crosshair::*;
 mod frame;
 pub use frame::*;
@@ -22,9 +25,13 @@ mod progress_bar;
 pub use progress_bar::*;
 mod theme;
 pub use theme::*;
+#[cfg(feature = "session")]
 mod toolbar;
+#[cfg(feature = "session")]
 pub(crate) use toolbar::*;
+#[cfg(feature = "session")]
 mod tooltip;
+#[cfg(feature = "session")]
 pub(crate) use tooltip::*;
 mod voxels;
 pub use voxels::*;

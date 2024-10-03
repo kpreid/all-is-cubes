@@ -12,27 +12,41 @@ categories = ["games", "gui"]
 keywords = ["all-is-cubes", "voxel"]
 
 [package.metadata.docs.rs]
-features = []
+features = ["session"]
 
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
 
+[features]
+# Enable the `apps` and `notification` modules, particularly including the `Session` type,
+# and require `std` support.
+session = [
+    "all-is-cubes/std",
+    "dep:async_fn_traits",
+    "dep:flume",
+    "dep:futures-core",
+    "dep:futures-task",
+    "dep:futures-util",
+    "dep:scopeguard",
+    "dep:sync_wrapper",
+]
+
 [dependencies]
-# TODO: Disable default features. Requires more `maybe_sync` work.
-all-is-cubes = { workspace = true, default-features = true }
-all-is-cubes-render = { workspace = true, default-features = true }
-async_fn_traits = { workspace = true }
+all-is-cubes = { workspace = true, default-features = false }
+all-is-cubes-render = { workspace = true, default-features = false }
+async_fn_traits = { workspace = true, optional = true }
 displaydoc = { workspace = true }
 exhaust = { workspace = true }
-flume = { workspace = true }
-futures-core = { workspace = true }
-futures-task = { workspace = true }
-futures-util = { workspace = true }
+flume = { workspace = true, optional = true }
+futures-core = { workspace = true, optional = true }
+futures-task = { workspace = true, optional = true }
+futures-util = { workspace = true, optional = true }
 indoc = { workspace = true }
 log = { workspace = true }
-scopeguard = { workspace = true }
-sync_wrapper = { workspace = true }
+num-traits = { workspace = true }
+scopeguard = { workspace = true, optional = true }
+sync_wrapper = { workspace = true, optional = true }
 
 [dev-dependencies]
 futures-channel = { workspace = true }

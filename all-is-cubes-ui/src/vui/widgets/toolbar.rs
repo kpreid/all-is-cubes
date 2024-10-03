@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
 use core::error::Error;
 use core::fmt;

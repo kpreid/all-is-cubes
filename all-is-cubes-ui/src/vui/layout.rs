@@ -3,8 +3,11 @@
     reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
 )]
 
+use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::euclid::{self, size3, Size3D, Vector3D};

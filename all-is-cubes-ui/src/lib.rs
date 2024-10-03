@@ -18,21 +18,29 @@
 //! [`Space`]: all_is_cubes::space::Space
 //! [`Universe`]: all_is_cubes::universe::Universe
 
-// This crate is not `no_std` because it currently uses `std::sync::mpsc`.
-
+#![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
 extern crate alloc;
 
+#[cfg(any(test, feature = "session"))]
+#[macro_use]
+extern crate std;
+
+#[cfg(feature = "session")]
 mod editor;
+#[cfg(feature = "session")]
 mod inv_watch;
 
+#[cfg(feature = "session")]
 pub mod apps;
 
 pub mod logo;
 
+#[cfg(feature = "session")]
 mod ui_content;
+#[cfg(feature = "session")]
 pub use ui_content::notification;
 
 pub mod vui;

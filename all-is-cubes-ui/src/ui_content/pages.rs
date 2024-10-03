@@ -1,5 +1,6 @@
 //! Contents of various UI pages.
 
+use alloc::string::String;
 use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::{literal, ArcStr};

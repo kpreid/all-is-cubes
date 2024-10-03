@@ -4,7 +4,7 @@
 //! "derived information from a `ListenableSource` that requires computation" and should become
 //! general code that handles the re-listening problem.
 
-use std::sync::Arc;
+use alloc::sync::Arc;
 
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::inv::{Inventory, TOOL_SELECTIONS};

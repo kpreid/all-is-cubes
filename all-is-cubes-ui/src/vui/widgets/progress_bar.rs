@@ -3,7 +3,13 @@
     reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
 )]
 
-use std::sync::Arc;
+use alloc::boxed::Box;
+use alloc::sync::Arc;
+
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "session"))]
+#[allow(unused_imports)]
+use num_traits::float::FloatCore as _;
 
 use all_is_cubes::block::{self, Block, Composite, CompositeOperator, AIR};
 use all_is_cubes::color_block;
@@ -208,6 +214,8 @@ mod tests {
     use all_is_cubes::transaction::Transaction as _;
     use all_is_cubes::util::yield_progress_for_testing;
     use all_is_cubes::{transaction, universe};
+    use alloc::string::String;
+    use alloc::vec::Vec;
 
     #[tokio::test]
     async fn progress_output() {

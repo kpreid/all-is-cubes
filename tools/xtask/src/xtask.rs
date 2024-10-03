@@ -648,13 +648,22 @@ fn do_for_all_packages(
                 }
 
                 {
-                    // Check `all-is-cubes` with default features disabled, because that's
-                    // more easily broken by accident (such as by introducing an unintended
+                    // Check no_std compatiblepackages with default features disabled, because
+                    // that's more easily broken by accident (such as by introducing an unintended
                     // `Send` bound) then our other features.
+                    //
+                    // TODO: Replace this one-off list of packages with something more centralized,
+                    // and shared with the CI that actually builds a no_std target.
                     let _t = CaptureTime::new(time_log, "check aic no_std");
                     cargo()
                         .arg(op.non_build_check_subcmd())
-                        .args(["--package=all-is-cubes", "--no-default-features"])
+                        .args([
+                            "--package=all-is-cubes",
+                            "--package=all-is-cubes-mesh",
+                            "--package=all-is-cubes-render",
+                            "--package=all-is-cubes-ui",
+                            "--no-default-features",
+                        ])
                         .run()?;
                 }
             }

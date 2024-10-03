@@ -1,3 +1,4 @@
+use alloc::string::{String, ToString as _};
 use alloc::sync::Arc;
 use core::future::Future;
 use flume::TryRecvError;

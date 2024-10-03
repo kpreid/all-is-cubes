@@ -204,6 +204,7 @@ dependencies = [
  "futures-util",
  "indoc",
  "log",
+ "num-traits",
  "scopeguard",
  "sync_wrapper",
 ]

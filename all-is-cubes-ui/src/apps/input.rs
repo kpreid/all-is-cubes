@@ -3,6 +3,8 @@
     reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
 )]
 
+
+use alloc::vec::Vec;
 use core::time::Duration;
 use std::collections::{HashMap, HashSet};
 
