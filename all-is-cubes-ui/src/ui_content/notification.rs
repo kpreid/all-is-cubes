@@ -1,6 +1,7 @@
 //! Types used to create notifications displayed to the user.
 
 use alloc::sync::{Arc, Weak};
+use alloc::vec::Vec;
 use std::sync::Mutex;
 
 use all_is_cubes::listen;

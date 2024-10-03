@@ -1,13 +1,15 @@
 //! VUI components related to allowing the user to inspect universe contents.
 
-use all_is_cubes::universe::Handle;
 use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use all_is_cubes::arcstr::{self, literal, ArcStr};
 use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::math::Face6;
+use all_is_cubes::universe::Handle;
 
 use crate::ui_content::hud::HudInputs;
 use crate::ui_content::pages::back_button;

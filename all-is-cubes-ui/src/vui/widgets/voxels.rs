@@ -1,4 +1,6 @@
+use alloc::boxed::Box;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use all_is_cubes::block::{self, Block, Primitive, Resolution};
 use all_is_cubes::euclid::Size3D;

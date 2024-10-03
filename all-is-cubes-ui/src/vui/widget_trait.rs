@@ -1,6 +1,7 @@
 //! UI [`Widget`] trait and related glue.
 
 use all_is_cubes::time::Tick;
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::error::Error;
 use core::fmt::Debug;
@@ -10,7 +11,7 @@ use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _};
 use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
-use all_is_cubes::util::maybe_sync::{Mutex, SendSyncIfStd};
+use all_is_cubes::util::maybe_sync::{self, SendSyncIfStd};
 
 // reused for WidgetController
 pub use all_is_cubes::behavior::Then;
@@ -112,7 +113,9 @@ pub type StepSuccess = (WidgetTransaction, Then);
 /// Error return of [`WidgetController::step()`].
 ///
 /// TODO: This should become a more specific error type.
-pub type StepError = Box<dyn Error + Send + Sync>;
+//---
+// This is a type alias to cope with the maybe-Sync kludge without exposing that everywhere.
+pub type StepError = maybe_sync::BoxError;
 
 impl WidgetController for Box<dyn WidgetController> {
     fn step(&mut self, context: &WidgetContext<'_>) -> Result<StepSuccess, StepError> {
@@ -136,7 +139,7 @@ impl WidgetController for Box<dyn WidgetController> {
 pub(super) struct WidgetBehavior {
     /// Original widget -- not used directly but for error reporting
     widget: Positioned<Arc<dyn Widget>>,
-    controller: Mutex<Box<dyn WidgetController>>,
+    controller: maybe_sync::Mutex<Box<dyn WidgetController>>,
 }
 
 impl WidgetBehavior {
@@ -163,7 +166,7 @@ impl WidgetBehavior {
             space::SpaceBehaviorAttachment::new(widget.position.bounds),
             Arc::new(WidgetBehavior {
                 widget,
-                controller: Mutex::new(controller),
+                controller: maybe_sync::Mutex::new(controller),
             }),
         );
         init_txn
@@ -324,11 +327,11 @@ pub(crate) fn instantiate_widget<W: Widget + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::util::assert_send_sync;
+    use all_is_cubes::util::assert_conditional_send_sync;
 
     #[test]
     fn error_is_send_sync() {
-        assert_send_sync::<InstallVuiError>()
+        assert_conditional_send_sync::<InstallVuiError>()
     }
 
     fn _assert_widget_trait_is_object_safe(_: &dyn Widget) {}

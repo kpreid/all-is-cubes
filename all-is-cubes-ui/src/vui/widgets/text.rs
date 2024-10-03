@@ -3,6 +3,7 @@
     reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
 )]
 
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 
 use all_is_cubes::arcstr::ArcStr;
@@ -114,6 +115,7 @@ impl Label {
     /// Constructs a [`Label`] that draws the given text, with a specified font.
     //---
     // TODO: undecided what's a good API
+    #[cfg_attr(not(feature = "session"), expect(dead_code))]
     pub(crate) fn with_font(
         string: ArcStr,
         font: text::Font,

@@ -1,4 +1,6 @@
+use alloc::boxed::Box;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::arcstr::{self, literal};

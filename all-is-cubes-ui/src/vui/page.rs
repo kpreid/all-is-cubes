@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use alloc::vec;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::{text, AIR};
@@ -336,6 +337,7 @@ pub(crate) mod parts {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
 
     #[test]
     fn ui_size() {

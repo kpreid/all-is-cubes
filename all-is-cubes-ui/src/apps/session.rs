@@ -3,6 +3,8 @@
     reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
 )]
 
+use alloc::boxed::Box;
+use alloc::string::ToString as _;
 use alloc::sync::{Arc, Weak};
 use core::fmt;
 use core::future::Future;

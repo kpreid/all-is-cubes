@@ -6,10 +6,13 @@
 
 #[doc(hidden)] // public for use by test-renderers only
 pub mod blocks;
+#[cfg(feature = "session")]
 pub(crate) use blocks::UiBlocks;
 mod layout;
 pub use layout::*;
+#[cfg(feature = "session")]
 mod page;
+#[cfg(feature = "session")]
 pub(crate) use page::*;
 mod widget_trait;
 pub use widget_trait::*;

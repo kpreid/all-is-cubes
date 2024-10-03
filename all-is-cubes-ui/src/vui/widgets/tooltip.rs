@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 use std::sync::Mutex;
 
