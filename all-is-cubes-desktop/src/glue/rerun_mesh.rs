@@ -167,11 +167,11 @@ fn convert_to_rerun_mesh(input: &mesh::SpaceMesh<Mt>, output: &mut rg::archetype
         .vertex_positions
         .extend(input.vertices().iter().map(|v| v.position));
 
-    let colors = output.vertex_colors.get_or_insert_with(Vec::new);
+    let colors = output.vertex_colors.get_or_insert_default();
     colors.clear();
     colors.extend(input.vertices().iter().map(|v| v.color));
 
-    let indices = output.triangle_indices.get_or_insert_with(Vec::new);
+    let indices = output.triangle_indices.get_or_insert_default();
     indices.clear();
     indices.extend(input.indices().iter_u32().tuples().map(|(i1, i2, i3)| {
         rg::components::TriangleIndices(rg::datatypes::UVec3D::new(i1, i2, i3))
