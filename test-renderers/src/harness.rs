@@ -523,7 +523,7 @@ where
 #[expect(missing_debug_implementations)]
 pub struct TestCaseCollector<'a>(&'a mut BTreeMap<String, TestCase>);
 
-impl<'a> TestCaseCollector<'a> {
+impl TestCaseCollector<'_> {
     #[track_caller]
     pub fn insert<F>(
         &mut self,

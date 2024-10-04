@@ -19,7 +19,7 @@ pub(crate) struct GzSerde<'a, T: 'static>(pub Cow<'a, [T]>)
 where
     [T]: ToOwned;
 
-impl<'a, T: bytemuck::NoUninit> serde::Serialize for GzSerde<'a, T> {
+impl<T: bytemuck::NoUninit> serde::Serialize for GzSerde<'_, T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -48,7 +48,7 @@ impl<'a, T: bytemuck::NoUninit> serde::Serialize for GzSerde<'a, T> {
     }
 }
 
-impl<'a, 'de, T: bytemuck::CheckedBitPattern> serde::Deserialize<'de> for GzSerde<'a, T> {
+impl<'de, T: bytemuck::CheckedBitPattern> serde::Deserialize<'de> for GzSerde<'_, T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,

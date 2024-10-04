@@ -747,7 +747,7 @@ impl behavior::Host for Universe {
 #[derive(Clone, Debug)]
 #[expect(clippy::module_name_repetitions)] // TODO: consider renaming to Iter
 pub struct UniverseIter<'u, T>(alloc::collections::btree_map::Iter<'u, Name, RootHandle<T>>);
-impl<'u, T> Iterator for UniverseIter<'u, T> {
+impl<T> Iterator for UniverseIter<'_, T> {
     type Item = (Name, Handle<T>);
     fn next(&mut self) -> Option<Self::Item> {
         self.0

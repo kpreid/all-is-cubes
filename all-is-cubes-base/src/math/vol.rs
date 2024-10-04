@@ -457,7 +457,7 @@ impl<'a, V> Vol<&'a [V], ZMaj> {
     }
 }
 
-impl<'a, V> Vol<&'a mut [V], ZMaj> {
+impl<V> Vol<&mut [V], ZMaj> {
     /// Divide `self` into two approximately equal-sized parts.
     /// each of which refers to the appropriate sub-slice of elements.
     ///

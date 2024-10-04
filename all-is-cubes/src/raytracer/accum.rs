@@ -32,8 +32,8 @@ impl<'a, C> RtOptionsRef<'a, C> {
 }
 
 // Non-derived implementations for no `C: Clone` bound.
-impl<'a, C> Copy for RtOptionsRef<'a, C> {}
-impl<'a, C> Clone for RtOptionsRef<'a, C> {
+impl<C> Copy for RtOptionsRef<'_, C> {}
+impl<C> Clone for RtOptionsRef<'_, C> {
     fn clone(&self) -> Self {
         *self
     }

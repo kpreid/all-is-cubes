@@ -245,7 +245,7 @@ impl<'notifier, M, const CAPACITY: usize> Buffer<'notifier, M, CAPACITY> {
     }
 }
 
-impl<'notifier, M, const CAPACITY: usize> Drop for Buffer<'notifier, M, CAPACITY> {
+impl<M, const CAPACITY: usize> Drop for Buffer<'_, M, CAPACITY> {
     fn drop(&mut self) {
         // TODO: Should we discard messages if panicking?
         // Currently leaning no, because we've specified that listeners should not panic even under

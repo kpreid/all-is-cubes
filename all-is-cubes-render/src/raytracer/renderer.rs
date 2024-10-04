@@ -332,7 +332,7 @@ pub struct RtScene<'a, P: Accumulate> {
     options: RtOptionsRef<'a, <P::BlockData as RtBlockData>::Options>,
 }
 
-impl<'a, P: Accumulate> fmt::Debug for RtScene<'a, P>
+impl<P: Accumulate> fmt::Debug for RtScene<'_, P>
 where
     <P::BlockData as RtBlockData>::Options: fmt::Debug,
 {
@@ -345,7 +345,7 @@ where
     }
 }
 
-impl<'a, P: Accumulate> Clone for RtScene<'a, P> {
+impl<P: Accumulate> Clone for RtScene<'_, P> {
     fn clone(&self) -> Self {
         Self {
             rts: self.rts,

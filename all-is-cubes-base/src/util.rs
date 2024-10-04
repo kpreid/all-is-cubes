@@ -148,7 +148,7 @@ where
     }
 }
 
-impl<'a, A, B, T, F> Extend<A> for MapExtend<'a, A, B, T, F>
+impl<A, B, T, F> Extend<A> for MapExtend<'_, A, B, T, F>
 where
     T: Extend<B>,
     F: Fn(A) -> B,

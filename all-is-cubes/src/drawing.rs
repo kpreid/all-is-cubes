@@ -270,7 +270,7 @@ pub trait VoxelColor<'a>: PixelColor {
     fn into_blocks(self) -> VoxelBrush<'a>;
 }
 
-impl<'a> PixelColor for &'a Block {
+impl PixelColor for &Block {
     type Raw = ();
 }
 impl<'a> VoxelColor<'a> for &'a Block {

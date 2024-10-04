@@ -208,7 +208,7 @@ pub struct WidgetContext<'a> {
     grant: &'a LayoutGrant,
 }
 
-impl<'a> WidgetContext<'a> {
+impl WidgetContext<'_> {
     /// The time tick that is currently passing, causing this step.
     pub fn tick(&self) -> Tick {
         match self.behavior_context {

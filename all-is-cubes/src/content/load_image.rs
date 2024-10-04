@@ -76,7 +76,7 @@ impl<'a> PngAdapter<'a> {
     }
 }
 
-impl<'a> PngAdapter<'a> {
+impl PngAdapter<'_> {
     #[doc(hidden)] // TODO: ponder good API
     pub fn get_brush(&self, x: i32, y: i32) -> &VoxelBrush<'_> {
         if x < 0 || y < 0 || x >= self.width || y >= self.height {

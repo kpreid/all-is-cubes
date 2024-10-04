@@ -316,8 +316,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             _p: PhantomData<fn() -> P>,
         }
 
-        impl<'a, D: RtBlockData, P: Accumulate<BlockData = D> + Into<String>> fmt::Display
-            for ToText<'a, D, P>
+        impl<D: RtBlockData, P: Accumulate<BlockData = D> + Into<String>> fmt::Display
+            for ToText<'_, D, P>
         {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 self.rt

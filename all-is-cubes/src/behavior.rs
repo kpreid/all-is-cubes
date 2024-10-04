@@ -98,7 +98,7 @@ impl<'a, H: Host> Context<'a, H> {
     }
 }
 
-impl<'a, H: Host + fmt::Debug> fmt::Debug for Context<'a, H> {
+impl<H: Host + fmt::Debug> fmt::Debug for Context<'_, H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // binder functions are not debuggable
         f.debug_struct("Context")
@@ -485,7 +485,7 @@ pub struct QueryItem<'a, H: Host, B: Behavior<H> + ?Sized> {
     pub attachment: &'a H::Attachment,
 }
 
-impl<'a, H: Host, B: Behavior<H> + ?Sized> Clone for QueryItem<'a, H, B> {
+impl<H: Host, B: Behavior<H> + ?Sized> Clone for QueryItem<'_, H, B> {
     fn clone(&self) -> Self {
         // Manual impl avoids `H: Clone` bound.
         Self {
@@ -495,7 +495,7 @@ impl<'a, H: Host, B: Behavior<H> + ?Sized> Clone for QueryItem<'a, H, B> {
     }
 }
 
-impl<'a, H: Host, B: Behavior<H> + ?Sized> fmt::Debug for QueryItem<'a, H, B> {
+impl<H: Host, B: Behavior<H> + ?Sized> fmt::Debug for QueryItem<'_, H, B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let QueryItem {
             attachment,
