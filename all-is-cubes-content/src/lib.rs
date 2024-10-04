@@ -7,6 +7,10 @@
 //! provide [`UniverseTemplate`]; other items should be assumed not particularly
 //! stable.
 
+// This crate is *almost* `no_std` compatible; critically, some dependencies are not.
+// See comments in `Cargo.toml` for details.
+// For now, the code is just in a state of “reveal how close it is”, hence using `core` and
+// `alloc` imports only.
 #![no_std]
 //
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)

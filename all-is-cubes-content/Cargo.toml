@@ -37,9 +37,9 @@ hashbrown = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }
-noise = { workspace = true }
+noise = { workspace = true } # TODO: not no_std compatible (fixable)
 paste = { workspace = true }
-petgraph = { workspace = true }
+petgraph = { workspace = true } # TODO: not no_std compatible (might become so someday)
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
