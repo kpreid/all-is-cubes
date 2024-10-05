@@ -123,6 +123,8 @@ impl Composite {
     /// Called by [`Modifier::evaluate`].
     pub(super) fn evaluate(
         &self,
+        block: &Block,
+        this_modifier_index: usize,
         mut dst_evaluated: MinEval,
         filter: &block::EvalFilter,
     ) -> Result<MinEval, block::InEvalError> {
@@ -130,7 +132,7 @@ impl Composite {
             ref source,
             operator,
             reverse,
-            disassemblable: _,
+            disassemblable,
         } = *self;
 
         // The destination block is already evaluated (it is the input to this
@@ -149,7 +151,18 @@ impl Composite {
             mem::swap(&mut src_evaluated, &mut dst_evaluated);
         }
 
-        evaluate_composition(src_evaluated, dst_evaluated, operator, filter)
+        evaluate_composition(
+            src_evaluated,
+            dst_evaluated,
+            operator,
+            filter,
+            &CompEvalCtx {
+                block,
+                this_modifier_index: Some(this_modifier_index),
+                was_reversed: reverse,
+                disassemblable,
+            },
+        )
     }
 
     /// Called by [`Modifier::unspecialize()`].
@@ -193,13 +206,26 @@ impl Composite {
     }
 }
 
+/// Ingredients with which to properly process parts of the composition process.
+struct CompEvalCtx<'a> {
+    block: &'a Block,
+    /// None if this isn't a regular `Modifier::Composite`
+    this_modifier_index: Option<usize>,
+    was_reversed: bool,
+    disassemblable: bool,
+}
+
 /// Implementation of [`Composite::evaluate()`], without the requirement that the source
 /// be a [`Block`] rather than a [`MinEval`].
+///
+/// If `was_reversed` is true, this does not affect the main composition but swaps which
+/// parts of the block the composed [`Operation`]s are set up to alter.
 fn evaluate_composition(
     src_evaluated: MinEval,
     dst_evaluated: MinEval,
     operator: CompositeOperator,
     filter: &block::EvalFilter,
+    ctx: &CompEvalCtx<'_>,
 ) -> Result<MinEval, block::InEvalError> {
     // Short-circuit cases where we can return a block unchanged.
     // TODO: We currently cannot do *any* cases where we return `src_evaluated`, because
@@ -233,8 +259,26 @@ fn evaluate_composition(
         selectable: src_att.selectable | dst_att.selectable,
         inventory: src_att.inventory.concatenate(dst_att.inventory),
         rotation_rule: dst_att.rotation_rule, // TODO merge
-        tick_action: dst_att.tick_action,     // TODO: merge
+        tick_action: operator
+            .blend_operations(
+                ctx,
+                src_att.tick_action.as_ref().map(|a| &a.operation),
+                dst_att.tick_action.as_ref().map(|a| &a.operation),
+            )
+            .map(|operation| block::TickAction {
+                operation,
+                // TODO: we actually need to be able to schedule whichever period is shorter
+                // and run the specific appropriate action in that case; this only works when
+                // the schedules are equal or there is only one.
+                schedule: src_att
+                    .tick_action
+                    .as_ref()
+                    .map(|a| a.schedule)
+                    .or_else(|| dst_att.tick_action.as_ref().map(|a| a.schedule))
+                    .expect("unreachable: no schedule"),
+            }),
         activation_action: operator.blend_operations(
+            ctx,
             src_att.activation_action.as_ref(),
             dst_att.activation_action.as_ref(),
         ),
@@ -446,15 +490,100 @@ impl CompositeOperator {
         }
     }
 
-    fn blend_operations(
+    fn blend_operations<'op>(
         self,
-        source: Option<&Operation>,
-        destination: Option<&Operation>,
+        ctx: &CompEvalCtx<'_>,
+        mut source: Option<&'op Operation>,
+        mut destination: Option<&'op Operation>,
     ) -> Option<Operation> {
-        // TODO: Actually implement merging of multiple operations.
-        _ = self;
-        _ = source;
-        destination.cloned()
+        let Some(this_modifier_index) = ctx.this_modifier_index else {
+            // This is not a `Modifier::Composite` and so we cannot compose operations
+            // in the usual fashion. Do nothing.
+            return None;
+        };
+
+        // Unreverse the operations so that they apply to their original parts of the block.
+        if ctx.was_reversed {
+            mem::swap(&mut source, &mut destination);
+        }
+
+        // TODO: We haven't got *consistent* semantics for how modifiers interact with actions,
+        // which is demonstrated when `Composite` and `Move` are stacked.
+        //
+        // This breaks the `move_inside_composite_destination()` test in particular,
+        // because there are two potential semantics for modifiers acting on ops:
+        //
+        // 1. modifiers modify the ops to stack on their effects, and
+        // 2. modifiers are usually inert; the originally provided op applies to
+        //    the whole block,
+        //
+        // and `Move` kind of assumed 2 while `Composite` with the below code would be
+        // (necessarily?) doing 1 in order to incorporate the source block.
+        //
+        // Therefore, the rest of this code is stubbed out because it ends up doubling up
+        // modifiers, which would be potentially very bad, and leaves only the wrong behavior
+        // of ignoring the source’s operation.
+        if true {
+            return destination.cloned();
+        }
+
+        // For now, `Become` is the only supported operation.
+        // TODO: We should have a warning-reporting path so that this can be debugged when it fails.
+        fn require_become(op: Option<&Operation>) -> Option<&Block> {
+            match op {
+                Some(Operation::Become(block)) => Some(block),
+                _ => None,
+            }
+        }
+        let source = require_become(source);
+        let destination = require_become(destination);
+
+        if source.is_none() && destination.is_none() {
+            // No operation to produce
+            return None;
+        }
+
+        // We now know that we need to make a `Become` operation which composes two blocks,
+        // at least one of which will different.
+        let mut new_block = match destination {
+            // If there is a new whole destination block to become, then start with that.
+            Some(block) => block.clone(),
+            // Else start with the block with modifiers *preceding* this Composite modifier.
+            None => {
+                let mut new_block = Block::from_primitive(ctx.block.primitive().clone());
+                new_block
+                    .modifiers_mut()
+                    .extend(ctx.block.modifiers()[..this_modifier_index].iter().cloned());
+                new_block
+            }
+        };
+        new_block
+            .modifiers_mut()
+            .push(Modifier::Composite(Composite {
+                source: match source {
+                    Some(source) => source.clone(),
+                    None => {
+                        let Modifier::Composite(Composite { source, .. }) =
+                            &ctx.block.modifiers()[this_modifier_index]
+                        else {
+                            panic!("modifier mismatch");
+                        };
+                        source.clone()
+                    }
+                },
+                operator: self,
+                reverse: ctx.was_reversed,
+                disassemblable: ctx.disassemblable,
+            }));
+        // Include all modifiers stacked on the original block *following* this Composite modifier.
+        // TODO: This is probably not fully coherent and needs to take into account some of the later modifiers’ semantics.
+        new_block.modifiers_mut().extend(
+            ctx.block.modifiers()[(this_modifier_index + 1)..]
+                .iter()
+                .cloned(),
+        );
+
+        Some(Operation::Become(new_block))
     }
 
     /// Compute the bounds of the result given the bounds of the source and destination.
@@ -537,6 +666,12 @@ pub(in crate::block) fn render_inventory(
             input,
             CompositeOperator::Over,
             filter,
+            &CompEvalCtx {
+                block: const { &AIR },     // unused placeholder
+                this_modifier_index: None, // disables operator composition we don't want anyway
+                was_reversed: false,
+                disassemblable: false,
+            },
         )?;
     }
 
@@ -550,6 +685,7 @@ mod tests {
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::Rgba;
     use crate::space::Space;
+    use crate::time;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
     use BlockCollision::{Hard, None as CNone};
@@ -922,6 +1058,39 @@ mod tests {
             );
 
             // TODO: add other tests for when there is only one operation
+        }
+
+        #[test]
+        #[ignore = "TODO: implement operation merge to make this pass"]
+        fn tick_action_is_composed() {
+            let [result1, result2] = make_some_blocks();
+            let b1 = &Block::builder()
+                .color(Rgba::WHITE)
+                .tick_action(block::TickAction {
+                    schedule: time::Schedule::EVERY_TICK,
+                    operation: Operation::Become(result1.clone()),
+                })
+                .build();
+            let b2 = &Block::builder()
+                .color(Rgba::WHITE)
+                .tick_action(block::TickAction {
+                    schedule: time::Schedule::EVERY_TICK,
+                    operation: Operation::Become(result2.clone()),
+                })
+                .build();
+
+            assert_eq!(
+                eval_compose(b1, Over, b2).attributes().tick_action,
+                Some(block::TickAction {
+                    schedule: time::Schedule::EVERY_TICK,
+                    operation: Operation::Become(
+                        result2.with_modifier(Composite::new(result1, Over))
+                    )
+                })
+            );
+
+            // TODO: add other tests for when there is only one operation
+            // TODO: add test of merging schedules
         }
     }
 

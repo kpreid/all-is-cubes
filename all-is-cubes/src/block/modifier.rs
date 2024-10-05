@@ -169,7 +169,7 @@ impl Modifier {
                 }
             }
 
-            Modifier::Composite(ref c) => c.evaluate(value, filter)?,
+            Modifier::Composite(ref c) => c.evaluate(block, this_modifier_index, value, filter)?,
 
             Modifier::Zoom(ref z) => z.evaluate(value, filter)?,
 
