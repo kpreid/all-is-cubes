@@ -198,7 +198,7 @@ where
     /// * `camera`'s view position is used to choose what to update and for depth
     ///   ordering; its graphics options are used for triangulation and view distance.
     /// * `deadline` is the approximate time at which this should stop.
-    /// * `render_data_updater` is called for every re-meshed or depth-sorted chunk.
+    /// * `render_data_updater` is called for every re-meshed or depth-sorted chunk or block.
     ///   It may be called concurrently from multiple threads.
     ///
     /// Returns performance information and the chunk the camera is located in.

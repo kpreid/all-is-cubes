@@ -154,6 +154,7 @@ dependencies = [
  "futures-core",
  "gilrs",
  "gltf",
+ "hashbrown",
  "indicatif",
  "itertools 0.13.0",
  "kira",

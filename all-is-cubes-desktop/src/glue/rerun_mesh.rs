@@ -7,7 +7,7 @@ use itertools::Itertools as _;
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{Cube, GridCoordinate};
 use all_is_cubes::rerun_glue as rg;
-use all_is_cubes::space::Space;
+use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::time::DeadlineStd;
 use all_is_cubes::universe::Handle;
 use all_is_cubes_mesh as mesh;
@@ -27,8 +27,7 @@ impl mesh::dynamic::DynamicMeshTypes for Mt {
 
     type Instant = Instant;
 
-    // Instances are not supported by Rerun, so we should not generate them.
-    const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = usize::MAX;
+    const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = 300;
 }
 
 const CHUNK_SIZE: GridCoordinate = 32;
@@ -85,7 +84,6 @@ struct DroppingMesh {
     mesh: rg::archetypes::Mesh3D,
     destination: rg::Destination,
 }
-
 impl Drop for DroppingMesh {
     fn drop(&mut self) {
         // Clear the mesh entity we point to
@@ -111,9 +109,7 @@ impl RerunMesher {
         let _info = self.csm.update(camera, DeadlineStd::Whenever, |u| {
             assert!(!u.indices_only);
 
-            let Some(translation) = u.mesh_id.singleton_translation(CHUNK_SIZE) else {
-                return; // can't handle instances yet
-            };
+            let singleton_translation = u.mesh_id.singleton_translation(CHUNK_SIZE);
 
             let dm = u.render_data.get_or_insert_with(|| {
                 let dm = DroppingMesh {
@@ -121,10 +117,14 @@ impl RerunMesher {
                     mesh: rg::archetypes::Mesh3D::new([[0., 0., 0.]; 0]),
                 };
 
-                dm.destination.log(
-                    &rg::entity_path![],
-                    &rg::archetypes::Transform3D::from_translation(rg::convert_vec(translation)),
-                );
+                if let Some(translation) = singleton_translation {
+                    dm.destination.log(
+                        &rg::entity_path![],
+                        &rg::archetypes::Transform3D::from_translation(rg::convert_vec(
+                            translation,
+                        )),
+                    );
+                }
 
                 dm
             });
@@ -134,6 +134,30 @@ impl RerunMesher {
             // TODO: this will need different handling for instances
             dm.destination.log(&rg::entity_path![], &dm.mesh);
         });
+
+        // Gather and send all instances.
+        // TODO: It would be more efficient to do this only if there was a change, but
+        // `ChunkedSpaceMesh` doesn't have a way to report that.
+        let mut instances: hashbrown::HashMap<BlockIndex, Vec<Cube>> = Default::default();
+        for chunk in self.csm.iter_chunks() {
+            for (i, cubes) in chunk.block_instances() {
+                instances.entry(i).or_default().extend(cubes);
+            }
+        }
+        for (i, cubes) in instances {
+            if let Some(mesh) = self.csm.block_instance_mesh(i) {
+                if let Some(dm) = &mesh.render_data {
+                    dm.destination.log(
+                        &rg::entity_path![],
+                        &rg::archetypes::InstancePoses3D::new().with_translations(
+                            cubes
+                                .into_iter()
+                                .map(|cube| rg::convert_vec(cube.lower_bounds().to_vector())),
+                        ),
+                    )
+                }
+            }
+        }
     }
 }
 
