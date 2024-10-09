@@ -43,7 +43,7 @@ skip = [
     { name = "base64", version = "0.13.1" }, # old used by `embed-doc-image`
     { name = "heck" }, # old used by strum
     { name = "miniz_oxide", version = "0.4.4" }, # old used by png-decoder
-    { name = "codespan-reporting", version = "0.1" }, # old used by `codespan-reporting` via `wgpu`
+    { name = "unicode-width", version = "0.1" }, # old used by `codespan-reporting` via `wgpu`
 ]
 
 skip-tree = [
