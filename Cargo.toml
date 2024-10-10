@@ -50,6 +50,13 @@ authors = ["Kevin Reid <kpreid@switchb.org>"]
 repository = "https://github.com/kpreid/all-is-cubes"
 
 [workspace.dependencies]
+# Note: Every package here should have `default-features = false`, unless the intent is specifically
+# to use it with default features enabled everyhwere it is used.
+# This is because if `default-features` is unset (and thus defaults to true), default features are
+# enabled for *all* uses, even those which specify `default-features = false` themselves.
+# See <https://github.com/rust-lang/cargo/issues/12162> for more information; we may be able to
+# revisit this policy after the 2024 Edition is released.
+#
 all-is-cubes = { path = "all-is-cubes", version = "0.8.0", default-features = false }
 all-is-cubes-base = { path = "all-is-cubes-base", version = "0.8.0", default-features = false }
 all-is-cubes-content = { path = "all-is-cubes-content", version = "0.8.0", default-features = false }
@@ -60,17 +67,18 @@ all-is-cubes-port = { path = "all-is-cubes-port", version = "0.8.0", default-fea
 all-is-cubes-render = { path = "all-is-cubes-render", version = "0.8.0", default-features = false }
 all-is-cubes-server = { path = "all-is-cubes-server", version = "0.8.0", default-features = false }
 all-is-cubes-ui = { path = "all-is-cubes-ui", version = "0.8.0", default-features = false }
-allocation-counter = "0.8.1"
+allocation-counter = { version = "0.8.1", default-features = false }
+# Only used in std-using packages, so default features enabled
 anyhow = "1.0.70"
 # Each use should be { optional = true }.
 arbitrary = { version = "1.3.2", features = ["derive"] }
 arrayvec = { version = "0.7.4", default-features = false }
-async_fn_traits = "0.1.1"
+async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bitflags = { version = "2.6.0", default-features = false }
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.17.0", default-features = false, features = ["derive", "must_cast"] }
-cfg-if = { version = "1.0.0" }
+cfg-if = { version = "1.0.0", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.2.4", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 # Note: async_tokio feature is not needed globally but is enabled to avoid compiling two versions
@@ -80,8 +88,8 @@ displaydoc = { version = "0.2.4", default-features = false}
 downcast-rs = { version = "1.2.0", default-features = false }
 either = { version = "1.10.0", default-features = false }
 # embedded-graphics and embedded-graphics-core must match
-embedded-graphics = "0.8.0"
-embedded-graphics-core = "0.4.0"
+embedded-graphics = { version = "0.8.0", default-features = false }
+embedded-graphics-core = { version = "0.4.0", default-features = false }
 euclid = { version = "0.22.11", default-features = false }
 exhaust = { version = "0.2.0", default-features = false }
 flume = { version = "0.11.0", default-features = false, features = ["async"] }
@@ -89,46 +97,49 @@ futures-channel = { version = "0.3.31", default-features = false, features = ["a
 futures-core = { version = "0.3.31", default-features = false, features = ["alloc"] }
 futures-task = { version = "0.3.31", default-features = false }
 futures-util = { version = "0.3.31", default-features = false, features = ["alloc"] }
+# TODO: evaluate which gilrs features should be enabled
 gilrs = { version = "0.10.4" }
 gloo-timers = { version = "0.3.0", default-features = false }
-half = { version = "2.3.1", features = ["bytemuck"] }
+half = { version = "2.3.1", default-features = false, features = ["bytemuck"] }
 hashbrown = { version = "0.14.0", default-features = false, features = ["ahash", "inline-more"] }
 image = { version = "0.25.1", default-features = false }
-imgref = "1.10.1"
-indoc = "2.0.1"
+imgref = { version = "1.10.1", default-features = false }
+indoc = { version = "2.0.1", default-features = false }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
-libm = { version = "0.2.8" }
+libm = { version = "0.2.8", default-features = false }
 log = { version = "0.4.17", default-features = false }
-macro_rules_attribute = "0.2.0"
-manyfmt = "0.1.0"
-mutants = "0.0.3"
+macro_rules_attribute = { version = "0.2.0", default-features = false }
+manyfmt = { version = "0.1.0", default-features = false }
+mutants = { version = "0.0.3", default-features = false }
 noise = { version = "0.9.0", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 ordered-float = { version = "4.2.0", default-features = false }
-paste = "1.0.15"
+paste = {version = "1.0.15", default-features = false }
 petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
-png-decoder = "0.1.1" # used by all-is-cubes for no_std-compatible reading pngs
-png = "0.17.6" # used by all-is-cubes-desktop for writing pngs
+png-decoder = { version = "0.1.1", default-features = false } # used by all-is-cubes for no_std-compatible reading pngs
+png = { version = "0.17.6", default-features = false } # used by all-is-cubes-desktop for writing pngs
 pollster = { version = "0.3.0", default-features = false }
-pretty_assertions = "1.2.0"
+pretty_assertions = { version = "1.2.0" }
 rand = { version = "0.8.3", default-features = false }
-rand_xoshiro = "0.6.0"
-rayon = { version = "1.8.0" }
+rand_xoshiro = { version = "0.6.0", default-features = false }
+rayon = { version = "1.8.0", default-features = false }
 re_log_types = { version = "0.18.0", default-features = false }
 re_sdk = { version = "0.18.0", default-features = false }
 re_types = { version = "0.18.0", default-features = false }
-rectangle-pack = "0.4.2"
-rendiff = { version = "0.2.0" }
+rectangle-pack = { version = "0.4.2" } # currently only used in all-is-cubes-port which is currently std only
+rendiff = { version = "0.2.0", default-features = false }
 scopeguard = { version = "1.2.0", default-features = false }
-send_wrapper = { version = "0.6.0", features = ["futures"] }
+# "futures" feature is used by all-is-cubes-gpu, but it's small so we enable it everywhere 
+send_wrapper = { version = "0.6.0", default-features = false, features = ["futures"] }
 serde = { version = "1.0.204", default-features = false, features = ["derive"] }
-serde_json = "1.0.79"
+# TODO: currently all crates that use serde_json also need std, but that should change
+serde_json = { version = "1.0.79", default-features = false, features = ["std"] }
 simplelog = { version = "0.12.0", default-features = false, features = ["local-offset"] }
 snapbox = "0.6.10" # keep in sync with `trycmd`
 strum = { version = "0.26.1", default-features = false, features = ["derive"] }
 sync_wrapper = { version = "1.0.0", default-features = false }
-tempfile = "3.3.0"
-thiserror = "1.0.62"
+tempfile = { version = "3.3.0", default-features = false }
+thiserror = { version = "1.0.62", default-features = false }
 time = { version = "0.3.36", default-features = false }
 # Tokio is used for async test-running and for certain binaries.
 # The library crates do not require Tokio.
@@ -136,8 +147,8 @@ tokio = { version = "1.28.0", default-features = false }
 trycmd = "0.15.4" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
 unicode-width = { version = "0.2", default-features = false }
-wasm-bindgen-futures = "0.4.42"
-web-time = "1.0.0"
+wasm-bindgen-futures = { version = "0.4.42", default-features = false }
+web-time = { version = "1.0.0", default-features = false }
 wgpu = { version = "22.1.0", default-features = false, features = ["wgsl"] }
 yield-progress = { version = "0.1.6", default-features = false }
 
