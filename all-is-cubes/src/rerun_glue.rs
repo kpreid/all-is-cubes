@@ -71,6 +71,18 @@ impl Destination {
         self.catch(|| self.stream.log_static(self.path.join(path_suffix), data))
     }
 
+    pub fn log_component_batches<'a>(
+        &self,
+        path_suffix: &EntityPath,
+        r#static: bool,
+        data: impl IntoIterator<Item = &'a dyn re_sdk::ComponentBatch>,
+    ) {
+        self.catch(|| {
+            self.stream
+                .log_component_batches(self.path.join(path_suffix), r#static, data)
+        })
+    }
+
     pub fn clear_recursive(&self, path_suffix: &EntityPath) {
         // TODO: this is no longer necessary
         self.log(path_suffix, &archetypes::Clear::new(true));

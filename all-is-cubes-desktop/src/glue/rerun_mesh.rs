@@ -147,14 +147,16 @@ impl RerunMesher {
         for (i, cubes) in instances {
             if let Some(mesh) = self.csm.block_instance_mesh(i) {
                 if let Some(dm) = &mesh.render_data {
-                    dm.destination.log(
-                        &rg::entity_path![],
-                        &rg::archetypes::InstancePoses3D::new().with_translations(
-                            cubes
-                                .into_iter()
-                                .map(|cube| rg::convert_vec(cube.lower_bounds().to_vector())),
-                        ),
-                    )
+                    let translations: &dyn re_sdk::ComponentBatch = &cubes
+                        .into_iter()
+                        .map(|cube| {
+                            rg::components::PoseTranslation3D(rg::convert_vec(
+                                cube.lower_bounds().to_vector(),
+                            ))
+                        })
+                        .collect::<Vec<_>>();
+                    dm.destination
+                        .log_component_batches(&rg::entity_path![], false, [translations])
                 }
             }
         }
