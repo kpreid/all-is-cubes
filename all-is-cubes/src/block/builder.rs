@@ -335,7 +335,7 @@ impl<Txn> Builder<Atom, Txn> {
 
     /// Sets the light emission of a [`Primitive::Atom`] block.
     ///
-    /// See [`Atom::emission`] for details on the meaning of this value.
+    /// See [`Atom::emission`](block::Atom::emission) for details on the meaning of this value.
     pub fn light_emission(mut self, value: impl Into<Rgb>) -> Self {
         self.primitive_builder.emission = value.into();
         self

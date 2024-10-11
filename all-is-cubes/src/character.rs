@@ -24,7 +24,7 @@ use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
 use crate::save::schema;
 use crate::space::{CubeTransaction, Space};
 use crate::time::Tick;
-use crate::transaction::{self, CommitError, Merge, Transaction, Transactional};
+use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
 use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
@@ -676,7 +676,7 @@ impl ops::AddAssign for CharacterStepInfo {
 #[must_use]
 #[expect(clippy::module_name_repetitions)] // TODO: reconsider
 pub struct CharacterTransaction {
-    set_space: Option<Handle<Space>>,
+    set_space: Equal<Handle<Space>>,
     body: BodyTransaction,
     inventory: InventoryTransaction,
     behaviors: BehaviorSetTransaction<Character>,
@@ -689,7 +689,7 @@ impl CharacterTransaction {
     /// [`body()`](Self::body) transaction to also change that. TODO: Better API?
     pub fn move_to_space(space: Handle<Space>) -> Self {
         CharacterTransaction {
-            set_space: Some(space),
+            set_space: Equal(Some(space)),
             ..Default::default()
         }
     }
@@ -754,9 +754,7 @@ impl Transaction for CharacterTransaction {
         (body_check, inventory_check, behaviors_check): Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        if let Some(space) = &self.set_space {
-            target.space = space.clone();
-        }
+        self.set_space.commit(&mut target.space);
 
         self.body
             .commit(&mut target.body, body_check, outputs)
@@ -786,7 +784,7 @@ impl Merge for CharacterTransaction {
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         use CharacterTransactionConflict as C;
-        if self.set_space.is_some() && other.set_space.is_some() {
+        if self.set_space.check_merge(&other.set_space).is_err() {
             return Err(CharacterTransactionConflict::SetSpace);
         }
         Ok((
@@ -811,7 +809,7 @@ impl Merge for CharacterTransaction {
             inventory,
             behaviors,
         } = self;
-        transaction::merge_option(set_space, other.set_space, |_, _| panic!());
+        set_space.commit_merge(other.set_space, ());
         body.commit_merge(other.body, body_check);
         inventory.commit_merge(other.inventory, inventory_check);
         behaviors.commit_merge(other.behaviors, behaviors_check);

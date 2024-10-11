@@ -4,9 +4,12 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use core::any::type_name;
 use core::error::Error;
-use core::{fmt, mem};
+use core::fmt;
 
 use crate::universe::{Handle, HandleError, UTransactional, UniverseTransaction};
+
+mod equal;
+pub(crate) use equal::*;
 
 mod generic;
 pub use generic::*;
@@ -435,30 +438,3 @@ pub type NoOutput = core::convert::Infallible; // TODO: use `!` never type if it
 /// Output callback function for committing a [`Transaction`] whose `Output` type is
 /// [`NoOutput`] and therefore cannot produce any outputs.
 pub fn no_outputs(_: NoOutput) {}
-
-/// Implementation of committing a merge for two [`Option`]al fields.
-///
-/// `if_both` is called in the case where both Options have a value.
-pub(crate) fn merge_option<T>(this: &mut Option<T>, other: Option<T>, if_both: fn(T, T) -> T) {
-    match (this, other) {
-        (None, None) => {}
-        (this @ None, other @ Some(_)) => *this = other,
-        (Some(_), None) => {}
-        (this @ Some(_), Some(other)) => *this = Some(if_both(mem::take(this).unwrap(), other)),
-    }
-}
-
-/// For use with `merge_option()`.
-#[track_caller]
-#[expect(clippy::needless_pass_by_value)]
-pub(crate) fn panic_if_not_equal<T: fmt::Debug + PartialEq>(a: T, b: T) -> T {
-    if a == b {
-        a
-    } else {
-        panic!(
-            "transaction being merged contains conflicting elements:\n\
-            left:  {a:#?}\n
-            right: {b:#?}",
-        );
-    }
-}

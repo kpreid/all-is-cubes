@@ -14,7 +14,7 @@ use crate::fluff::Fluff;
 use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid};
 use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
-    self, no_outputs, CommitError, Merge, NoOutput, Transaction, Transactional,
+    no_outputs, CommitError, Equal, Merge, NoOutput, Transaction, Transactional,
 };
 use crate::util::{ConciseDebug, Refmt as _};
 
@@ -191,7 +191,7 @@ impl Transaction for SpaceTransaction {
         {
             let cube = Cube::from(cube);
             if let Some(cube_index) = space.contents.index(cube) {
-                if let Some(old) = old {
+                if let Equal(Some(old)) = old {
                     // Raw lookup because we already computed the index for a bounds check
                     // (TODO: Put this in a function, like get_block_index)
                     if space
@@ -204,7 +204,7 @@ impl Transaction for SpaceTransaction {
                     }
                 }
             } else {
-                if *conserved || old.is_some() {
+                if *conserved || old.0.is_some() {
                     // It is an error for conserved cube txns to be out of bounds,
                     // or for a precondition to be not meetable because it is out of bounds.
                     // TODO: Should we allow `old: Some(AIR), new: None`, since we treat
@@ -252,7 +252,7 @@ impl Transaction for SpaceTransaction {
         {
             let cube = Cube::from(cube);
 
-            if let Some(new) = new {
+            if let Equal(Some(new)) = new {
                 match Space::set_impl(&mut ctx, cube, new) {
                     Ok(_) => Ok(()),
                     Err(SetCubeError::OutOfBounds { .. }) if !conserved => {
@@ -454,11 +454,11 @@ impl fmt::Display for SpaceTransactionConflict {
 pub struct CubeTransaction {
     /// Previous block which must occupy this cube.
     /// If `None`, no precondition.
-    old: Option<Block>,
+    old: Equal<Block>,
 
     /// Block to be put in this cube.
     /// If `None`, this is only a precondition for modifying another block.
-    new: Option<Block>,
+    new: Equal<Block>,
 
     /// If true, two transactions with the same `new` block may not be merged.
     conserved: bool,
@@ -480,8 +480,8 @@ pub struct CubeTransaction {
 impl fmt::Debug for CubeTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
-            old,
-            new,
+            old: Equal(old),
+            new: Equal(new),
             conserved,
             activate_behavior,
             fluff,
@@ -512,8 +512,8 @@ impl CubeTransaction {
     }
 
     pub(crate) const ACTIVATE_BEHAVIOR: Self = Self {
-        old: None,
-        new: None,
+        old: Equal(None),
+        new: Equal(None),
         conserved: false,
         activate_behavior: true,
         fluff: Vec::new(),
@@ -526,8 +526,8 @@ impl CubeTransaction {
     /// If `new` is not [`None`], replaces the existing block with `new`.
     pub fn replacing(old: Option<Block>, new: Option<Block>) -> Self {
         CubeTransaction {
-            old,
-            new,
+            old: Equal(old),
+            new: Equal(new),
             conserved: true,
             ..Default::default()
         }
@@ -541,12 +541,12 @@ impl CubeTransaction {
     //---
     // TODO: no tests
     pub fn overwrite(&mut self, block: Block) {
-        self.new = Some(block);
+        self.new = Equal(Some(block));
     }
 
     #[doc(hidden)] // TODO: good public API?
     pub fn new_mut(&mut self) -> Option<&mut Block> {
-        self.new.as_mut()
+        self.new.0.as_mut()
     }
 
     /// Emit [`Fluff`] (sound/particle effects) at this cube when the transaction is committed.
@@ -570,14 +570,14 @@ impl Merge for CubeTransaction {
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         let conflict = CubeConflict {
             // Incompatible preconditions will always fail.
-            old: matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b),
+            old: self.old.check_merge(&other.old).is_err(),
             new: if self.conserved {
                 // Replacing the same cube twice is not allowed -- even if they're
                 // equal, doing so could violate an intended conservation law.
-                self.new.is_some() && other.new.is_some()
+                self.new.0.is_some() && other.new.0.is_some()
             } else {
                 // If nonconservative, then we simply require equal outcomes.
-                matches!((&self.new, &other.new), (Some(a), Some(b)) if a != b)
+                self.new.check_merge(&other.new).is_err()
             },
         };
 
@@ -603,10 +603,10 @@ impl Merge for CubeTransaction {
         } = self;
 
         // This would be more elegant if `conserved` was within the `self.new` Option.
-        *conserved = (*conserved && new.is_some()) || (other.conserved && other.new.is_some());
+        *conserved = (*conserved && new.0.is_some()) || (other.conserved && other.new.0.is_some());
 
-        transaction::merge_option(old, other.old, transaction::panic_if_not_equal);
-        transaction::merge_option(new, other.new, transaction::panic_if_not_equal);
+        old.commit_merge(other.old, ());
+        new.commit_merge(other.new, ());
 
         *activate_behavior |= other.activate_behavior;
 
@@ -717,8 +717,8 @@ mod tests {
                 (
                     [0, 0, 0],
                     CubeTransaction {
-                        old: Some(b1.clone()),
-                        new: Some(b2.clone()),
+                        old: Equal(Some(b1.clone())),
+                        new: Equal(Some(b2.clone())),
                         conserved: true,
                         activate_behavior: false,
                         fluff: vec![],
@@ -727,8 +727,8 @@ mod tests {
                 (
                     [1, 0, 0],
                     CubeTransaction {
-                        old: Some(b1.clone()),
-                        new: Some(b3.clone()),
+                        old: Equal(Some(b1.clone())),
+                        new: Equal(Some(b3.clone())),
                         conserved: true,
                         activate_behavior: false,
                         fluff: vec![],

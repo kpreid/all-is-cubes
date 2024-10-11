@@ -8,7 +8,7 @@ use core::{fmt, mem, ops};
 
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
 use crate::listen::{self, Gate, Listen, Listener, Notifier};
-use crate::transaction::{self, Transaction};
+use crate::transaction::{self, Equal, Transaction};
 use crate::universe::{HandleVisitor, VisitHandles};
 
 #[cfg(doc)]
@@ -286,10 +286,10 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockDef {
 #[must_use]
 pub struct BlockDefTransaction {
     // TODO: This struct is the second occurrence (the first is space::CubeTransaction) of a "assign to a mutable location" transaction. If we figure out how to have conveniently _composable_ transactions then we should have an `impl Transaction<Target = &mut T> for Assign<T>` transaction (targeting `&mut` to discourage use otherwise).
-    /// If `None`, no precondition.
-    old: Option<Block>,
-    /// If `None`, no change is made and this transaction is only a precondition.
-    new: Option<Block>,
+    /// Block that must already be present.
+    old: Equal<Block>,
+    /// Block to be written in.
+    new: Equal<Block>,
 }
 
 impl BlockDefTransaction {
@@ -297,16 +297,16 @@ impl BlockDefTransaction {
     /// equal to `old`.
     pub fn expect(old: Block) -> Self {
         Self {
-            old: Some(old),
-            new: None,
+            old: Equal(Some(old)),
+            new: Equal(None),
         }
     }
 
     /// Returns a transaction which replaces the current value of the [`BlockDef`] with `new`.
     pub fn overwrite(new: Block) -> Self {
         Self {
-            old: None,
-            new: Some(new),
+            old: Equal(None),
+            new: Equal(Some(new)),
         }
     }
 
@@ -314,8 +314,8 @@ impl BlockDefTransaction {
     /// if it is equal to `old`, and otherwise fails.
     pub fn replace(old: Block, new: Block) -> Self {
         Self {
-            old: Some(old),
-            new: Some(new),
+            old: Equal(Some(old)),
+            new: Equal(Some(new)),
         }
     }
 }
@@ -327,12 +327,9 @@ impl Transaction for BlockDefTransaction {
     type Mismatch = BlockDefMismatch;
 
     fn check(&self, target: &BlockDef) -> Result<Self::CommitCheck, Self::Mismatch> {
-        if let Some(old) = &self.old {
-            if target.state.block != *old {
-                return Err(BlockDefMismatch::Unexpected);
-            }
-        }
-        Ok(())
+        self.old
+            .check(&target.state.block)
+            .map_err(|_| BlockDefMismatch::Unexpected)
     }
 
     fn commit(
@@ -341,7 +338,7 @@ impl Transaction for BlockDefTransaction {
         (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        if let Some(new) = &self.new {
+        if let Equal(Some(new)) = &self.new {
             target.state = BlockDefState::new(new.clone());
             target.notifier.notify(BlockChange::new());
         }
@@ -355,8 +352,8 @@ impl transaction::Merge for BlockDefTransaction {
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         let conflict = BlockDefConflict {
-            old: matches!((&self.old, &other.old), (Some(a), Some(b)) if a != b),
-            new: matches!((&self.new, &other.new), (Some(a), Some(b)) if a != b),
+            old: self.old.check_merge(&other.old).is_err(),
+            new: self.new.check_merge(&other.new).is_err(),
         };
 
         if (conflict
@@ -373,8 +370,8 @@ impl transaction::Merge for BlockDefTransaction {
 
     fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
         let Self { old, new } = self;
-        transaction::merge_option(old, other.old, |a, _| a);
-        transaction::merge_option(new, other.new, |a, _| a);
+        old.commit_merge(other.old, ());
+        new.commit_merge(other.new, ());
     }
 }
 

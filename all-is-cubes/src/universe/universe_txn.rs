@@ -7,7 +7,7 @@ use core::fmt;
 use hashbrown::HashMap as HbHashMap;
 
 use crate::behavior;
-use crate::transaction::{self, CommitError, Merge, Transaction, Transactional};
+use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
 #[cfg(doc)]
 use crate::universe::HandleError;
 use crate::universe::{
@@ -204,7 +204,7 @@ pub struct UniverseTransaction {
     behaviors: behavior::BehaviorSetTransaction<Universe>,
 
     /// Invariant: Has a universe ID if any of the `members` do.
-    universe_id: Option<UniverseId>,
+    universe_id: Equal<UniverseId>,
 }
 
 // TODO: Benchmark cheaper HashMaps / using BTreeMap here
@@ -341,7 +341,7 @@ impl UniverseTransaction {
     /// The public interface to this is the other methods and [`Transaction::bind()`].
     fn from_member_txn(name: Name, transaction: MemberTxn) -> Self {
         UniverseTransaction {
-            universe_id: transaction.universe_id(),
+            universe_id: Equal(transaction.universe_id()),
             members: HbHashMap::from([(name, transaction)]),
             anonymous_insertions: Vec::new(),
             behaviors: Default::default(),
@@ -364,7 +364,7 @@ impl UniverseTransaction {
                 anonymous_insertions: vec![MemberTxn::Insert(UniverseMember::into_any_handle(
                     handle,
                 ))],
-                universe_id: None,
+                universe_id: Equal(None),
                 behaviors: Default::default(),
             },
         }
@@ -442,7 +442,7 @@ impl UniverseTransaction {
             behaviors: t,
             members: HbHashMap::new(),
             anonymous_insertions: Vec::new(),
-            universe_id: None,
+            universe_id: Equal(None),
         }
     }
 
@@ -450,7 +450,7 @@ impl UniverseTransaction {
     /// universe, then returns the ID of that universe.
     // TODO: make public?
     pub fn universe_id(&self) -> Option<UniverseId> {
-        self.universe_id
+        self.universe_id.0
     }
 }
 
@@ -545,14 +545,12 @@ impl Transaction for UniverseTransaction {
         } = checks;
 
         // final sanity check so we can't ever modify the wrong universe
-        if let Some(universe_id) = *universe_id {
-            if universe_id != target.id {
-                return Err(CommitError::message::<Self>(
-                    "cannot commit a transaction to a different universe \
+        if universe_id.check(&target.id).is_err() {
+            return Err(CommitError::message::<Self>(
+                "cannot commit a transaction to a different universe \
                         than it was constructed for"
-                        .into(),
-                ));
-            }
+                    .into(),
+            ));
         }
 
         for (name, check) in check_members {
@@ -580,6 +578,7 @@ impl Merge for UniverseTransaction {
     type Conflict = UniverseConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
+        // Not using Equal::check_merge() because this lets us report the values easier.
         if let (Some(id1), Some(id2)) = (self.universe_id(), other.universe_id()) {
             if id1 != id2 {
                 return Err(UniverseConflict::DifferentUniverse(id1, id2));
@@ -608,11 +607,7 @@ impl Merge for UniverseTransaction {
         members.commit_merge(other.members, check.members);
         anonymous_insertions.extend(other.anonymous_insertions);
         behaviors.commit_merge(other.behaviors, check.behaviors);
-        transaction::merge_option(
-            universe_id,
-            other.universe_id,
-            transaction::panic_if_not_equal,
-        );
+        universe_id.commit_merge(other.universe_id, ());
     }
 }
 
@@ -978,7 +973,7 @@ mod tests {
             UniverseTransaction {
                 members: HbHashMap::new(),
                 anonymous_insertions: Vec::new(),
-                universe_id: None,
+                universe_id: Equal(None),
                 behaviors: behavior::BehaviorSetTransaction::default()
             }
         )
