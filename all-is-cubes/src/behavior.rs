@@ -917,6 +917,7 @@ mod tests {
     use crate::time;
     use crate::transaction::no_outputs;
     use crate::universe::Universe;
+    use euclid::point3;
 
     #[test]
     fn behavior_set_debug() {
@@ -957,9 +958,13 @@ mod tests {
     }
     impl Behavior<Character> for SelfModifyingBehavior {
         fn step(&self, context: &Context<'_, Character>) -> (UniverseTransaction, Then) {
-            let mut txn = context.bind_host(CharacterTransaction::body(BodyTransaction {
-                delta_yaw: FreeCoordinate::from(self.foo),
-            }));
+            let mut txn = context.bind_host(CharacterTransaction::body(
+                BodyTransaction::default().with_position(point3(
+                    FreeCoordinate::from(self.foo),
+                    0.,
+                    0.,
+                )),
+            ));
             if self.then != Then::Drop {
                 txn.merge_from(context.replace_self(SelfModifyingBehavior {
                     foo: self.foo + 1,
@@ -1006,7 +1011,7 @@ mod tests {
                 then: Then::Step,
             }]
         );
-        assert_eq!(character.body.yaw, 3.0);
+        assert_eq!(character.body.position().x, 2.0);
     }
 
     #[test]

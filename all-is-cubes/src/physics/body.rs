@@ -35,7 +35,7 @@ use crate::physics::{StopAt, Velocity, POSITION_EPSILON};
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;
-use crate::transaction::{self, Transaction};
+use crate::transaction::{self, Equal, Transaction};
 use crate::util::{ConciseDebug, Fmt, Refmt as _, StatusText};
 
 #[cfg(feature = "rerun")]
@@ -679,11 +679,11 @@ impl Body {
             .transform_vector3d(Vector3D::new(0., 0., -1.))
     }
 
-    /// Changes [`self.yaw`](Self::yaw) and [`self.pitch`](Self::pitch) to look directly
-    /// towards the given point within the same coordinate system as
-    /// [`self.position`](Self::position).
-    pub fn look_at(&mut self, point: FreePoint) {
-        let direction: FreeVector = point - self.position;
+    /// Changes [`self.yaw`](Self::yaw) and [`self.pitch`](Self::pitch) to look in the given
+    /// direction vector.
+    ///
+    /// If `direction` has zero length, the resulting direction is unspecified but valid.
+    pub fn set_look_direction(&mut self, direction: FreeVector) {
         let horizontal_distance = direction.x.hypot(direction.z);
 
         self.yaw = (180.0 - (direction.x).atan2(direction.z).to_degrees()).rem_euclid(360.0);
@@ -847,9 +847,23 @@ impl Default for MoveSegment {
 #[must_use]
 #[non_exhaustive]
 pub struct BodyTransaction {
-    // TODO: Better strategy than just having public fields
-    #[allow(missing_docs)]
-    pub delta_yaw: FreeCoordinate,
+    set_position: Equal<FreePoint>,
+    set_look_direction: Equal<FreeVector>,
+}
+
+#[allow(missing_docs)] // TODO
+impl BodyTransaction {
+    #[inline]
+    pub fn with_position(mut self, position: FreePoint) -> Self {
+        self.set_position = Equal(Some(position));
+        self
+    }
+
+    #[inline]
+    pub fn with_look_direction(mut self, direction: FreeVector) -> Self {
+        self.set_look_direction = Equal(Some(direction));
+        self
+    }
 }
 
 impl transaction::Transactional for Body {
@@ -863,7 +877,7 @@ impl Transaction for BodyTransaction {
     type Mismatch = BodyMismatch;
 
     fn check(&self, _body: &Body) -> Result<Self::CommitCheck, Self::Mismatch> {
-        // No conflicts currently possible.
+        // No mismatches currently possible.
         Ok(())
     }
 
@@ -873,22 +887,52 @@ impl Transaction for BodyTransaction {
         (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        body.yaw += self.delta_yaw;
+        let Self {
+            set_position,
+            set_look_direction,
+        } = self;
+        set_position.commit(&mut body.position);
+        if let &Equal(Some(direction)) = set_look_direction {
+            body.set_look_direction(direction);
+        }
         Ok(())
     }
 }
 
 impl transaction::Merge for BodyTransaction {
     type MergeCheck = ();
-    type Conflict = core::convert::Infallible;
+    type Conflict = BodyConflict;
 
-    fn check_merge(&self, _other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
+    fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
+        let Self {
+            set_position,
+            set_look_direction,
+        } = self;
+        let conflict = BodyConflict {
+            position: set_position.check_merge(&other.set_position).is_err(),
+            look_direction: set_look_direction
+                .check_merge(&other.set_look_direction)
+                .is_err(),
+        };
+        if conflict
+            != (BodyConflict {
+                position: false,
+                look_direction: false,
+            })
+        {
+            return Err(conflict);
+        }
+
         Ok(())
     }
 
     fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
-        let Self { delta_yaw } = self;
-        *delta_yaw += other.delta_yaw;
+        let Self {
+            set_position,
+            set_look_direction,
+        } = self;
+        set_position.commit_merge(other.set_position, ());
+        set_look_direction.commit_merge(other.set_look_direction, ());
     }
 }
 
@@ -903,11 +947,55 @@ impl core::error::Error for BodyMismatch {
     }
 }
 
+// TODO: macro-generate these kind of conflict errors?
+//
+/// Transaction conflict error type for a [`BodyTransaction`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BodyConflict {
+    position: bool,
+    look_direction: bool,
+}
+
+impl core::error::Error for BodyConflict {}
+
+impl fmt::Display for BodyConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            BodyConflict {
+                position: true,
+                look_direction: true,
+            } => {
+                write!(f, "conflicting changes to position and look direction")
+            }
+            BodyConflict {
+                position: true,
+                look_direction: false,
+            } => {
+                write!(f, "conflicting changes to position")
+            }
+            BodyConflict {
+                position: false,
+                look_direction: true,
+            } => {
+                write!(f, "conflicting changes to look direction")
+            }
+            BodyConflict {
+                position: false,
+                look_direction: false,
+            } => {
+                unreachable!()
+            }
+        }
+    }
+}
+
 /// Note: Tests which involve both body and collision code are currently in the parent module.
 #[cfg(test)]
 mod tests {
+    use euclid::{point3, vec3};
+
     use super::*;
-    use crate::transaction::TransactionTester;
+    use crate::transaction::{PredicateRes, TransactionTester};
 
     fn test_body() -> Body {
         Body {
@@ -918,10 +1006,10 @@ mod tests {
     }
 
     #[test]
-    fn look_at() {
-        let do_test = |direction, yaw, pitch| {
+    fn look_direction() {
+        let do_test = |direction: [f64; 3], yaw, pitch| {
             let mut body = Body::new_minimal([10., 0., 0.], Aab::ZERO);
-            body.look_at(FreePoint::new(10., 0., 0.) + FreeVector::from(direction));
+            body.set_look_direction(direction.into());
             println!("{direction:?} {yaw} {pitch}");
             assert_eq!(body.yaw, yaw);
             assert_eq!(body.pitch, pitch);
@@ -944,24 +1032,46 @@ mod tests {
 
     #[test]
     fn body_transaction_systematic() {
-        // TODO: this test is pretty flimsy ... because BodyTransaction hasn't actually got a
-        // full set of operations yet and because the TransactionTester can't quite handle
-        // additive rather than conflicting transactions well
-        TransactionTester::new()
-            .transaction(BodyTransaction::default(), |_, _| Ok(()))
-            .transaction(BodyTransaction { delta_yaw: 10.0 }, |before, after| {
-                if false {
-                    // TODO: figure out how to make this assert work in the presence of more transactions
-                    let expected = &Body {
-                        yaw: before.yaw + 10.0,
-                        ..before.clone()
-                    };
-                    if after != expected {
-                        return Err(format!("unequal to {expected:#?}").into());
-                    }
+        fn check_position(expected: FreePoint) -> impl Fn(&Body, &Body) -> PredicateRes {
+            move |_, after| {
+                let actual = after.position;
+                if actual != expected {
+                    return Err(format!("expected position {expected:#?}, got {actual:#?}").into());
                 }
                 Ok(())
-            })
+            }
+        }
+        fn check_look_direction(expected: FreeVector) -> impl Fn(&Body, &Body) -> PredicateRes {
+            move |_, after| {
+                let actual = after.look_direction();
+                // TODO: improve the implementation so this is exact
+                if actual.angle_to(expected) > euclid::Angle::degrees(0.001) {
+                    return Err(
+                        format!("expected look direction {expected:#?}, got {actual:#?}").into(),
+                    );
+                }
+                Ok(())
+            }
+        }
+
+        TransactionTester::new()
+            .transaction(BodyTransaction::default(), |_, _| Ok(()))
+            .transaction(
+                BodyTransaction::default().with_position(point3(0., 0., 0.)),
+                check_position(point3(0., 0., 0.)),
+            )
+            .transaction(
+                BodyTransaction::default().with_position(point3(1., 0., 0.)),
+                check_position(point3(1., 0., 0.)),
+            )
+            .transaction(
+                BodyTransaction::default().with_look_direction(vec3(1., 0., 0.)),
+                check_look_direction(vec3(1., 0., 0.)),
+            )
+            .transaction(
+                BodyTransaction::default().with_look_direction(vec3(0., 1., 0.)),
+                check_look_direction(vec3(0., 1., 0.)),
+            )
             .target(test_body)
             .test();
     }

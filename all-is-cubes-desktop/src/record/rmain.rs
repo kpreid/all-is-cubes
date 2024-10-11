@@ -2,8 +2,10 @@ use std::fmt;
 use std::time::Duration;
 
 use all_is_cubes::character::{self, Character};
-use all_is_cubes::math::NotNan;
+use all_is_cubes::euclid::{self, num::Zero as _, vec3};
+use all_is_cubes::math::{Cube, NotNan};
 use all_is_cubes::physics::BodyTransaction;
+use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::Handle;
 use all_is_cubes::{behavior, listen, universe};
 
@@ -54,6 +56,7 @@ pub(crate) fn configure_universe_for_recording(
             character_handle
                 .try_modify(|c| {
                     c.add_behavior(AutoRotate {
+                        angle: NotNan::zero(),
                         rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
                     })
                 })
@@ -70,6 +73,7 @@ pub(crate) fn configure_universe_for_recording(
 /// TODO: Replace this with a more general camera movement scripting mechanism.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct AutoRotate {
+    pub angle: NotNan<f64>,
     pub rate: NotNan<f64>,
 }
 impl behavior::Behavior<Character> for AutoRotate {
@@ -77,10 +81,21 @@ impl behavior::Behavior<Character> for AutoRotate {
         &self,
         context: &behavior::Context<'_, Character>,
     ) -> (universe::UniverseTransaction, behavior::Then) {
-        let mut body_txn = BodyTransaction::default();
-        body_txn.delta_yaw = self.rate.into_inner() * context.tick.delta_t().as_secs_f64();
+        let mut new_self = *self;
+        new_self.angle += new_self.rate * context.tick.delta_t().as_secs_f64();
+
+        let body_txn = BodyTransaction::default().with_look_direction(
+            euclid::Rotation3D::<f64, Cube, Cube>::around_y(euclid::Angle::degrees(
+                -new_self.angle.into_inner(),
+            ))
+            .transform_vector3d(vec3(0., 0., -1.)),
+        );
+
         (
-            context.bind_host(character::CharacterTransaction::body(body_txn)),
+            context
+                .bind_host(character::CharacterTransaction::body(body_txn))
+                .merge(context.replace_self(new_self))
+                .unwrap(),
             behavior::Then::Step,
         )
     }

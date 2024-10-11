@@ -144,13 +144,22 @@ fn transaction_systematic() {
             |_, after| rassert(after.space == new_space_2, "expected new_space_2"),
         )
         // Body transactions
+        // Note: BodyTransaction has its own transaction test, but we want at least one conflict here.
         .transaction(
             CharacterTransaction::body(BodyTransaction::default()),
             |_, _| Ok(()),
         )
         .transaction(
-            CharacterTransaction::body(BodyTransaction { delta_yaw: 1.0 }),
-            |_, _| Ok(()),
+            CharacterTransaction::body(
+                BodyTransaction::default().with_position(point3(1., 0., 0.)),
+            ),
+            |_, after| rassert(after.body.position() == point3(1., 0., 0.), "position 100"),
+        )
+        .transaction(
+            CharacterTransaction::body(
+                BodyTransaction::default().with_position(point3(0., 1., 0.)),
+            ),
+            |_, after| rassert(after.body.position() == point3(0., 1., 0.), "position 010"),
         )
         // Inventory transactions
         // Note: Inventory transactions are tested separately from inventory.rs; these are just
