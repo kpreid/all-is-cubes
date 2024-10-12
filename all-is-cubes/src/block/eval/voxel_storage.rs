@@ -4,7 +4,7 @@ use core::ops;
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
-use crate::block::{Primitive, AIR};
+use crate::block::{Atom, Primitive, AIR};
 
 use crate::block::{
     BlockAttributes, BlockCollision, EvaluatedBlock,
@@ -22,19 +22,15 @@ use crate::math::{Cube, GridAab, OpacityCategory, Rgb, Rgba, Vol};
 pub struct Evoxel {
     // Note: documentation wording here should match [`BlockAttributes`]
     /// Diffuse reflection color.
+    ///
+    /// See [`Atom::color`] for details on the meaning of this value.
     // TODO: Maybe we should convert to a smaller color format at this point?
     // These are frequently going to be copied into 32-bit texture color anyway.
     pub color: Rgba,
 
     /// Light emitted (not reflected) by the voxel.
     ///
-    /// This quantity is the [_luminance_](https://en.wikipedia.org/wiki/Luminance) of
-    /// the block surface, in unspecified units where 1.0 is the display white level
-    /// (except for the effects of tone mapping).
-    /// In the future this may be redefined in terms of a physical unit, but with the same
-    /// dimensions.
-    ///
-    /// TODO: Define the interpretation for non-opaque voxels.
+    /// This field has the same meaning as [`Atom::emission`].
     pub emission: Rgb,
 
     /// Whether players' [cursors](crate::character::Cursor) target this voxel's containing

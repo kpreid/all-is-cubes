@@ -335,13 +335,7 @@ impl<Txn> Builder<Atom, Txn> {
 
     /// Sets the light emission of a [`Primitive::Atom`] block.
     ///
-    /// This quantity is the [_luminous emittance_](https://en.wikipedia.org/wiki/Luminous_emittance)
-    /// (the emitted portion of luminance) of the block surface, in unspecified units where 1.0 is
-    /// the display white level (except for the effects of tone mapping).
-    /// In the future, this may be redefined in terms of a physical unit, but with the same
-    /// dimensions.
-    ///
-    /// TODO: Define the interpretation for non-opaque blocks.
+    /// See [`Atom::emission`] for details on the meaning of this value.
     pub fn light_emission(mut self, value: impl Into<Rgb>) -> Self {
         self.primitive_builder.emission = value.into();
         self

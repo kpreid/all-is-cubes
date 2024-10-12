@@ -254,8 +254,8 @@ pub struct Atom {
 
     /// Light emitted (not reflected) by the block.
     ///
-    /// This quantity is the *[luminous emittance]* of this material, in unspecified units
-    /// where 1.0 is the display white level (except for the effects of tone mapping).
+    /// This quantity is the emitted portion of the *[luminance]* of this material, in unspecified
+    /// units where 1.0 is the display white level (except for the effects of tone mapping).
     /// In the future this may be redefined in terms of a physical unit, but with the same
     /// dimensions.
     ///
@@ -294,7 +294,8 @@ pub struct Atom {
     ///
     /// otherwise.
     ///
-    /// [luminous emittance]: https://en.wikipedia.org/wiki/Luminous_emittance
+    ///
+    /// [luminance]: https://en.wikipedia.org/wiki/Luminance
     pub emission: Rgb,
 
     /// The effect on a [`Body`](crate::physics::Body) of colliding with this block.
