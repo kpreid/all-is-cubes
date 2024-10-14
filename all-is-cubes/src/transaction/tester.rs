@@ -141,7 +141,7 @@ struct TransactionAndPredicate<'a, Tr: Transaction> {
     predicate: Rc<dyn Fn(&Tr::Target, &Tr::Target) -> PredicateRes + 'a>,
 }
 
-impl<'a, Tr: Transaction + Clone> Clone for TransactionAndPredicate<'a, Tr> {
+impl<Tr: Transaction + Clone> Clone for TransactionAndPredicate<'_, Tr> {
     fn clone(&self) -> Self {
         TransactionAndPredicate {
             transaction: self.transaction.clone(),
