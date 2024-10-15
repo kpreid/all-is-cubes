@@ -27,8 +27,7 @@ impl TestStep {
     fn matches(self, step: &RaycastStep) -> bool {
         self.cube == step.cube_ahead()
             && self.face == step.face()
-            && self.t_distance.map_or(true, |td| step.t_distance() == td)
-            && self.t_distance.map_or(true, |td| step.t_distance() == td)
+            && self.t_distance.is_none_or(|td| step.t_distance() == td)
     }
 }
 

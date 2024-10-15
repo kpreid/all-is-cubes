@@ -213,7 +213,7 @@ impl LightUpdateQueue {
     #[inline]
     pub fn pop(&mut self) -> Option<LightUpdateRequest> {
         if let Some(sweep) = &mut self.sweep {
-            if peek_priority(&self.queue).map_or(true, |p| self.sweep_priority > p) {
+            if peek_priority(&self.queue).is_none_or(|p| self.sweep_priority > p) {
                 if let Some(cube) = sweep.next() {
                     return Some(LightUpdateRequest {
                         cube,

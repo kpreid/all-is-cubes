@@ -251,7 +251,7 @@ impl GltfWriter {
             for (frame_number, state) in self.frame_states.iter().enumerate() {
                 for &instance in &state.visible_mesh_instances {
                     let timeline = timelines.entry(instance).or_default();
-                    if !timeline.last().map_or(true, |&(_, vis)| vis) {
+                    if !timeline.last().is_none_or(|&(_, vis)| vis) {
                         // Node needs to be made visible.
                         timeline.push((frame_number, true));
                     }
@@ -267,7 +267,7 @@ impl GltfWriter {
                     match timelines.entry(instance) {
                         Entry::Occupied(mut e) => {
                             let timeline = e.get_mut();
-                            if timeline.last().map_or(true, |&(_, vis)| vis) {
+                            if timeline.last().is_none_or(|&(_, vis)| vis) {
                                 // Node needs to be made invisible.
                                 timeline.push((frame_number, false));
                             }
