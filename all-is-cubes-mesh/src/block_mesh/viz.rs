@@ -213,15 +213,14 @@ impl Viz {
             state
                 .mesh_vertex_positions
                 .extend(vertex_positions.iter().copied());
-            state.mesh_vertex_colors.extend(
-                iter::repeat(rg::components::Color(color_fn().into())).take(vertex_positions.len()),
-            );
-            state.mesh_vertex_normals.extend(
-                iter::repeat(rg::components::Vector3D(rg::convert_vec(
-                    normal.normal_vector::<f32, ()>(),
-                )))
-                .take(vertex_positions.len()),
-            );
+            state.mesh_vertex_colors.extend(iter::repeat_n(
+                rg::components::Color(color_fn().into()),
+                vertex_positions.len(),
+            ));
+            state.mesh_vertex_normals.extend(iter::repeat_n(
+                rg::components::Vector3D(rg::convert_vec(normal.normal_vector::<f32, ()>())),
+                vertex_positions.len(),
+            ));
             state.mesh_triangle_indices.extend(
                 relative_indices_iter
                     .clone()

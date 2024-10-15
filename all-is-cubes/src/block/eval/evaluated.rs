@@ -289,7 +289,7 @@ impl EvaluatedBlock {
         let inventory = inv::Inventory::from_slots(
             itertools::Itertools::zip_longest(
                 contents,
-                core::iter::repeat(inv::Slot::Empty).take(config.size),
+                core::iter::repeat_n(inv::Slot::Empty, config.size),
             )
             .map(|z| z.into_left())
             .collect::<Box<[inv::Slot]>>(),
