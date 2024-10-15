@@ -107,8 +107,22 @@ impl Rgb {
     /// No other range checks are performed.
     #[inline]
     #[track_caller]
-    pub fn new(r: f32, g: f32, b: f32) -> Self {
-        Self::try_from(vec3(r, g, b)).expect("Color components may not be NaN")
+    pub const fn new(r: f32, g: f32, b: f32) -> Self {
+        match Self::try_new(vec3(r, g, b)) {
+            Ok(color) => color,
+            Err(_) => panic!("color components may not be NaN"),
+        }
+    }
+
+    const fn try_new(value: Vector3D<f32, Intensity>) -> Result<Self, FloatIsNan> {
+        match (
+            new_nn_f32(value.x),
+            new_nn_f32(value.y),
+            new_nn_f32(value.z),
+        ) {
+            (Ok(r), Ok(g), Ok(b)) => Ok(Self(vec3(r, g, b))),
+            (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Err(e),
+        }
     }
 
     /// Constructs a color from components that have already been checked for not being
@@ -124,7 +138,8 @@ impl Rgb {
     /// Constructs a shade of gray (components all equal). Panics if any component is NaN.
     /// No other range checks are performed.
     #[inline]
-    pub fn from_luminance(luminance: f32) -> Self {
+    #[track_caller]
+    pub const fn from_luminance(luminance: f32) -> Self {
         Self::new(luminance, luminance, luminance)
     }
 
@@ -224,8 +239,11 @@ impl Rgba {
     /// No other range checks are performed.
     #[inline]
     #[track_caller]
-    pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Rgb::new(r, g, b).with_alpha(NotNan::new(a).expect("Alpha may not be NaN"))
+    pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
+        match new_nn_f32(a) {
+            Ok(a) => Rgb::new(r, g, b).with_alpha(a),
+            Err(_) => panic!("alpha may not be NaN"),
+        }
     }
 
     /// Constructs a color from components that have already been checked for not being
@@ -244,7 +262,8 @@ impl Rgba {
     /// Constructs a shade of gray (components all equal). Panics if any component is NaN.
     /// No other range checks are performed.
     #[inline]
-    pub fn from_luminance(luminance: f32) -> Self {
+    #[track_caller]
+    pub const fn from_luminance(luminance: f32) -> Self {
         Rgb::new(luminance, luminance, luminance).with_alpha_one()
     }
 
@@ -783,6 +802,19 @@ const CONST_LINEAR_LOOKUP_TABLE: &[f32; 256] = &[
     0.9647059, 0.96862745, 0.972549, 0.9764706, 0.98039216, 0.9843137,
     0.9882353, 0.99215686, 0.99607843, 1.0,
 ];
+
+// Const replacement for `NotNan::new()`
+const fn new_nn_f32(value: f32) -> Result<NotNan<f32>, FloatIsNan> {
+    #![allow(clippy::eq_op)]
+    // This condition is true if and only if the value is NaN
+    // TODO: Replace this with `.is_nan()` after Rust 1.83 is released with `const_float_classify`.
+    if value != value {
+        Err(FloatIsNan)
+    } else {
+        // SAFETY: We just checked the only safety condition.
+        Ok(unsafe { NotNan::new_unchecked(value) })
+    }
+}
 
 #[cfg(test)]
 mod tests {
