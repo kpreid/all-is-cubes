@@ -191,7 +191,7 @@ impl<H: Host> BehaviorSet<H> {
                     }
                 },
             )
-            .filter(move |qi| type_filter.map_or(true, |t| (*qi.behavior).type_id() == t))
+            .filter(move |qi| type_filter.is_none_or(|t| (*qi.behavior).type_id() == t))
     }
 
     pub(crate) fn step(

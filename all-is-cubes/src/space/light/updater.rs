@@ -117,7 +117,7 @@ impl LightStorage {
         let Some(region) = region.intersection_cubes(self.contents.bounds()) else {
             return;
         };
-        if !region.volume().is_some_and(|v| v <= 400) {
+        if region.volume().is_none_or(|v| v > 400) {
             self.light_update_queue.sweep(region, priority);
         } else {
             for cube in region.interior_iter() {

@@ -150,12 +150,12 @@ impl BlockAttributes {
 
         inventory.rotationally_symmetric()
             && rotation_rule.rotationally_symmetric()
-            && !tick_action
+            && tick_action
                 .as_ref()
-                .is_some_and(|a| !a.rotationally_symmetric())
-            && !activation_action
+                .is_none_or(|a| a.rotationally_symmetric())
+            && activation_action
                 .as_ref()
-                .is_some_and(|a| !a.rotationally_symmetric())
+                .is_none_or(|a| a.rotationally_symmetric())
     }
 
     pub(crate) fn rotate(self, rotation: GridRotation) -> BlockAttributes {

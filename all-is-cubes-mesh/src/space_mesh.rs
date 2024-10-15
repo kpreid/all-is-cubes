@@ -258,7 +258,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                     if let Some(adj_block_index) = space_data_source(adjacent_cube) {
                         if block_meshes
                             .get_block_mesh(adj_block_index, adjacent_cube, false)
-                            .map_or(false, |bm| bm.face_vertices[face.opposite()].fully_opaque)
+                            .is_some_and(|bm| bm.face_vertices[face.opposite()].fully_opaque)
                         {
                             // Don't draw obscured faces, but do record that we depended on them.
                             bitset_set_and_get(
