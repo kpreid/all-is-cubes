@@ -81,9 +81,6 @@ pub enum Modifier {
     Move(Move),
 
     /// The block has an inventory (e.g. a chest, a dropped item, a machine).
-    ///
-    /// TODO(inventory): Define means for a block definition to specify the properties the inventory
-    /// should have (its size, at least), and how it is rendered into the block.
     Inventory(inv::Inventory),
 }
 
@@ -205,7 +202,7 @@ impl Modifier {
             Modifier::Inventory(i) => {
                 // TODO(inventory): Should be possible for the contents of the inventory to be
                 // split off, depending on the block definition's desires and possibly on exactly
-                // what role this unspecialize operation is playingh.
+                // what role this unspecialize operation is playing.
                 if i.is_empty() {
                     ModifierUnspecialize::Pop
                 } else {
