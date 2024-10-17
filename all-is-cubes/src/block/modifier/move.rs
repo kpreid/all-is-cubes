@@ -411,6 +411,40 @@ mod tests {
         });
     }
 
+    /// Check the behavior of a `Move` modifier under a `Rotate` modifier.
+    /// In particular, we want to make sure the outcome doesn’t end up doubly-rotated.
+    #[test]
+    #[ignore = "TODO: modifier evaluation needs fixing"]
+    fn move_inside_rotation() {
+        let [base] = make_some_blocks();
+        const R: Modifier = Modifier::Rotate(GridRotation::CLOCKWISE);
+
+        let block = base
+            .clone()
+            .with_modifier(Move {
+                direction: Face6::PX,
+                distance: 10,
+                velocity: 10,
+                schedule: time::Schedule::EVERY_TICK,
+            })
+            .with_modifier(R);
+
+        let expected_after_tick = base
+            .clone()
+            .with_modifier(Move {
+                direction: Face6::PX,
+                distance: 20,
+                velocity: 10,
+                schedule: time::Schedule::EVERY_TICK,
+            })
+            .with_modifier(R);
+
+        assert_eq!(
+            block.evaluate().unwrap().attributes.tick_action,
+            Some(TickAction::from(Operation::Become(expected_after_tick)))
+        );
+    }
+
     /// Test [`Move`] acting within another modifier ([`Composite`]).
     #[test]
     fn move_inside_composite_destination() {
