@@ -137,6 +137,7 @@ impl BlockAttributes {
         Self::DEFAULT
     }
 
+    #[mutants::skip] // currently used only as an optimization, and hard to test usefully
     pub(crate) fn rotationally_symmetric(&self) -> bool {
         let Self {
             display_name: _,

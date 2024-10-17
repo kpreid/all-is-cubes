@@ -113,6 +113,7 @@ impl LightStorage {
         }
     }
 
+    #[mutants::skip] // lots of ways for this to still work when modified
     pub(crate) fn light_needs_update_in_region(&mut self, region: GridAab, priority: Priority) {
         let Some(region) = region.intersection_cubes(self.contents.bounds()) else {
             return;

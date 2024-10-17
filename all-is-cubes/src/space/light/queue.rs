@@ -211,6 +211,7 @@ impl LightUpdateQueue {
 
     /// Removes and returns the highest priority queue entry.
     #[inline]
+    #[mutants::skip] // if it fails to pop, causes hangs
     pub fn pop(&mut self) -> Option<LightUpdateRequest> {
         if let Some(sweep) = &mut self.sweep {
             if peek_priority(&self.queue).is_none_or(|p| self.sweep_priority > p) {
