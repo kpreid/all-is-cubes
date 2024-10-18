@@ -20,11 +20,10 @@ use alloc::vec::Vec;
 use core::num::NonZeroU16;
 
 use arcstr::ArcStr;
-use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 
 use crate::block::Block;
-use crate::math::{Aab, Face6, GridAab, GridCoordinate, GridRotation};
+use crate::math::{Aab, Face6, GridAab, GridCoordinate, GridRotation, NotNan, PositiveSign};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::time::Schedule;
 use crate::universe::Handle;
@@ -366,9 +365,9 @@ pub(crate) struct IconRowSerV1 {
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `math` module
 
-type RgbSer = [NotNan<f32>; 3];
+type RgbSer = [PositiveSign<f32>; 3];
 
-type RgbaSer = [NotNan<f32>; 4];
+type RgbaSer = [PositiveSign<f32>; 4];
 
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `op` module

@@ -12,7 +12,7 @@ use euclid::default::Vector3D;
 )]
 use num_traits::float::Float as _;
 
-use crate::math::{NotNan, Rgb};
+use crate::math::{PositiveSign, Rgb};
 
 #[cfg(doc)]
 use crate::space::{self, Space};
@@ -109,10 +109,10 @@ impl PackedLight {
     /// Returns the light level.
     #[inline]
     pub fn value(&self) -> Rgb {
-        Rgb::new_nn(
-            Self::scalar_out_nn(self.value.x),
-            Self::scalar_out_nn(self.value.y),
-            Self::scalar_out_nn(self.value.z),
+        Rgb::new_ps(
+            Self::scalar_out_ps(self.value.x),
+            Self::scalar_out_ps(self.value.y),
+            Self::scalar_out_ps(self.value.z),
         )
     }
 
@@ -183,9 +183,9 @@ impl PackedLight {
     }
 
     #[inline(always)]
-    fn scalar_in(value: NotNan<f32>) -> PackedLightScalar {
+    fn scalar_in(value: PositiveSign<f32>) -> PackedLightScalar {
         // Note that `as` is a saturating cast.
-        (value.log2() * Self::LOG_SCALE + Self::LOG_OFFSET) as PackedLightScalar
+        (value.into_inner().log2() * Self::LOG_SCALE + Self::LOG_OFFSET) as PackedLightScalar
     }
 
     /// Convert a `PackedLightScalar` value to a linear color component value.
@@ -201,9 +201,9 @@ impl PackedLight {
     }
 
     #[inline(always)]
-    fn scalar_out_nn(value: PackedLightScalar) -> NotNan<f32> {
+    fn scalar_out_ps(value: PackedLightScalar) -> PositiveSign<f32> {
         // Safety: a test verifies that `scalar_out` can never return NaN.
-        unsafe { NotNan::new_unchecked(Self::scalar_out(value)) }
+        unsafe { PositiveSign::new_unchecked(Self::scalar_out(value)) }
     }
 }
 
@@ -259,7 +259,7 @@ impl From<crate::save::schema::LightSerV1> for PackedLight {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::notnan;
+    use crate::math::ps32;
     use core::iter::once;
 
     fn packed_light_test_values() -> impl Iterator<Item = PackedLight> {
@@ -294,16 +294,17 @@ mod tests {
     #[test]
     fn packed_light_roundtrip() {
         for i in PackedLightScalar::MIN..PackedLightScalar::MAX {
-            assert_eq!(i, PackedLight::scalar_in(PackedLight::scalar_out_nn(i)));
+            assert_eq!(i, PackedLight::scalar_in(PackedLight::scalar_out_ps(i)));
         }
     }
 
-    /// Safety test: we want to skip the NaN checks for constructing `Rgb`
-    /// from `PackedLight`, so it had better not be NaN for any possible input.
+    /// Safety test: we want to skip the NaN/sign checks for constructing `Rgb`
+    /// from `PackedLight`, so it had better be valid for any possible input.
     #[test]
-    fn packed_light_always_finite() {
+    fn packed_light_always_positive() {
         for i in PackedLightScalar::MIN..PackedLightScalar::MAX {
-            assert!(PackedLight::scalar_out(i).is_finite(), "{}", i);
+            let value = PackedLight::scalar_out(i);
+            assert!(value.is_finite() && value.is_sign_positive(), "{}", i);
         }
     }
 
@@ -312,11 +313,13 @@ mod tests {
     fn packed_light_clipping_in() {
         assert_eq!(
             [
-                PackedLight::scalar_in(notnan!(-1.)),
-                PackedLight::scalar_in(notnan!(1e-30)),
-                PackedLight::scalar_in(notnan!(1e+30)),
+                PackedLight::scalar_in(ps32(-0.0)),
+                PackedLight::scalar_in(ps32(0.0)),
+                PackedLight::scalar_in(ps32(1e-30)),
+                PackedLight::scalar_in(ps32(1e+30)),
+                PackedLight::scalar_in(ps32(f32::INFINITY)),
             ],
-            [0, 0, 255],
+            [0, 0, 0, 255, 255],
         );
     }
 

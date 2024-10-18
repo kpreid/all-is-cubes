@@ -33,12 +33,11 @@ fn RESOLUTIONS(ctx: Context<'_>) {
                             p.lower_bounds()
                                 .to_vector()
                                 .map(|s| {
-                                    NotNan::new(
+                                    ps32(
                                         (s / GridCoordinate::from(rescale)) as f32
                                             / f32::from(u16::from(resolution) / rescale - 1)
                                                 .max(1.),
                                     )
-                                    .unwrap()
                                 })
                                 .cast_unit(),
                         );

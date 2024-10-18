@@ -5,8 +5,8 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::{fmt, mem};
-use euclid::Vector3D;
 
+use euclid::Vector3D;
 use manyfmt::Fmt;
 
 #[cfg(feature = "auto-threads")]
@@ -14,7 +14,9 @@ use rayon::iter::{IntoParallelRefMutIterator as _, ParallelIterator as _};
 
 use super::debug::LightComputeOutput;
 use crate::block::{self, EvaluatedBlock};
-use crate::math::{Cube, CubeFace, Face6, Face7, FaceMap, NotNan, OpacityCategory, Rgb, Rgba, Vol};
+use crate::math::{
+    Cube, CubeFace, Face6, Face7, FaceMap, OpacityCategory, PositiveSign, Rgb, Rgba, Vol,
+};
 use crate::raycast::Ray;
 use crate::space::light::{
     chart::LightChart, LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority,
@@ -822,7 +824,7 @@ impl LightBuffer {
     fn finish(&self, origin_is_opaque: bool) -> PackedLight {
         // if total_rays is zero then incoming_light is zero so the result will be zero.
         // We just need to avoid dividing by zero.
-        let scale = NotNan::new(1.0 / self.total_ray_weight.max(1.0)).unwrap();
+        let scale = PositiveSign::<f32>::new_clamped(1.0 / self.total_ray_weight.max(1.0));
         let new_light_value: PackedLight = if self.total_rays > 0 {
             PackedLight::some(self.incoming_light * scale)
         } else if origin_is_opaque {

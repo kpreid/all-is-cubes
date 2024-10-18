@@ -3,15 +3,15 @@
     reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
 )]
 
+use alloc::vec;
 use core::mem;
 
-use alloc::vec;
-use ordered_float::NotNan;
+use num_traits::Zero;
 
 use crate::block::{
     self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
 };
-use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, GridSize, Rgb, Vol};
+use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, GridSize, PositiveSign, Rgb, Vol};
 use crate::op::Operation;
 use crate::universe;
 
@@ -444,31 +444,31 @@ impl CompositeOperator {
     fn alpha_blend(
         self,
         source: Rgb,
-        sa: NotNan<f32>,
+        sa: PositiveSign<f32>,
         destination: Rgb,
-        da: NotNan<f32>,
-    ) -> (Rgb, NotNan<f32>) {
+        da: PositiveSign<f32>,
+    ) -> (Rgb, PositiveSign<f32>) {
         match self {
             Self::Over => {
                 // TODO: Surely this is not the only place we have implemented rgba blending?
                 // Note that this math would be simpler if we used premultiplied alpha.
-                let sa_complement = NotNan::new(1. - sa.into_inner()).unwrap();
+                let sa_complement = PositiveSign::<f32>::new_clamped(1. - sa.into_inner());
                 let rgb = source * sa + destination * sa_complement;
                 (rgb, sa + sa_complement * da)
             }
 
             Self::In => (source, sa * da),
             Self::Out => {
-                let da_complement = NotNan::new(1. - da.into_inner()).unwrap();
+                let da_complement = PositiveSign::<f32>::new_clamped(1. - da.into_inner());
                 (source, sa * da_complement)
             }
 
             Self::Atop => {
-                let sa_complement = NotNan::new(1. - sa.into_inner()).unwrap();
+                let sa_complement = PositiveSign::<f32>::new_clamped(1. - sa.into_inner());
                 let rgb = source * sa + destination * sa_complement;
 
                 let out_alpha = da;
-                if out_alpha == 0.0 {
+                if out_alpha.is_zero() {
                     // we wouldn't have to do this if we used premultiplied alpha :/
                     (Rgb::ZERO, out_alpha)
                 } else {
@@ -683,7 +683,7 @@ mod tests {
     use super::*;
     use crate::block::{EvKey, EvaluatedBlock, Resolution::*};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::Rgba;
+    use crate::math::{ps32, Rgba};
     use crate::space::Space;
     use crate::time;
     use crate::universe::Universe;
@@ -720,7 +720,7 @@ mod tests {
         Evoxel {
             // color doesn't matter, except that at zero alpha it should be the canonical zero
             // for convenience of testing. (TODO: maybe `Rgba` should enforce that or be premultiplied.)
-            color: Rgb::ZERO.with_alpha(NotNan::new(alpha).unwrap()),
+            color: Rgb::ZERO.with_alpha(ps32(alpha)),
             emission,
             selectable: true,
             collision: Hard,

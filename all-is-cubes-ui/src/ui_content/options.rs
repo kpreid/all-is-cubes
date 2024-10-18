@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::arcstr::{self, literal};
-use all_is_cubes::math::{notnan, Face6};
+use all_is_cubes::math::{ps32, Face6};
 use all_is_cubes_render::camera::{self, AntialiasingOption, GraphicsOptions};
 
 use crate::apps::ControlMessage;
@@ -71,7 +71,7 @@ pub(crate) fn graphics_options_widgets(
                 [
                     camera::TransparencyOption::Surface,
                     camera::TransparencyOption::Volumetric,
-                    camera::TransparencyOption::Threshold(notnan!(0.5)),
+                    camera::TransparencyOption::Threshold(ps32(0.5)),
                 ],
             ),
         ]);

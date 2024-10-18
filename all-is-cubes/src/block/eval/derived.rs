@@ -3,7 +3,6 @@ use core::ops;
 use itertools::Itertools;
 
 use euclid::Vector3D;
-use ordered_float::NotNan;
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
@@ -14,7 +13,9 @@ use crate::block::{
     self,
     Resolution::{self, R1},
 };
-use crate::math::{Cube, Face6, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol};
+use crate::math::{
+    Cube, Face6, FaceMap, GridAab, Intensity, OpacityCategory, PositiveSign, Rgb, Rgba, Vol,
+};
 use crate::raytracer;
 
 #[cfg(doc)]
@@ -234,8 +235,7 @@ impl VoxSum {
                     // Note that by dividing the alpha by the full surface area, not the count,
                     // we handle the case where the voxel data doesn't cover the full block and
                     // uncounted pixels should act as if they are transparent.
-                    NotNan::new(self.alpha_sum / (surface_area))
-                        .expect("Recursive block alpha computation produced NaN"),
+                    PositiveSign::<f32>::new_clamped(self.alpha_sum / (surface_area)),
                 )
         }
     }

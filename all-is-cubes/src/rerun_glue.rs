@@ -157,9 +157,9 @@ fn annotation_context() -> archetypes::AnnotationContext {
         (C::MeshVizEdgeNx, "", Axis::X.color().with_alpha_one()),
         (C::MeshVizEdgeNy, "", Axis::Y.color().with_alpha_one()),
         (C::MeshVizEdgeNz, "", Axis::Z.color().with_alpha_one()),
-        (C::MeshVizEdgePx, "", (Rgb::ONE * 0.2 - Axis::X.color()).with_alpha_one()),
-        (C::MeshVizEdgePy, "", (Rgb::ONE * 0.2 - Axis::Y.color()).with_alpha_one()),
-        (C::MeshVizEdgePz, "", (Rgb::ONE * 0.2 - Axis::Z.color()).with_alpha_one()),
+        (C::MeshVizEdgePx, "", (Rgb::ONE * 0.2).saturating_sub(Axis::X.color()).with_alpha_one()),
+        (C::MeshVizEdgePy, "", (Rgb::ONE * 0.2).saturating_sub(Axis::Y.color()).with_alpha_one()),
+        (C::MeshVizEdgePz, "", (Rgb::ONE * 0.2).saturating_sub(Axis::Z.color()).with_alpha_one()),
     ];
 
     archetypes::AnnotationContext::new(descs.into_iter().map(|(id, label, color)| {

@@ -15,7 +15,7 @@ use all_is_cubes::color_block;
 use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Size3D, Vector3D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
-    notnan, rgb_const, rgba_const, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
+    ps32, rgb_const, rgba_const, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
     GridPoint, GridRotation, GridVector, NotNan, Rgb, Rgba, Vol,
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
@@ -501,8 +501,8 @@ async fn follow_options_change(mut context: RenderTestContext) {
     options_1.fov_y = NotNan::from(90);
     let mut options_2 = options_1.clone();
     options_2.fov_y = NotNan::from(70);
-    options_2.exposure = ExposureOption::Fixed(notnan!(1.5));
-    options_2.transparency = TransparencyOption::Threshold(notnan!(0.1));
+    options_2.exposure = ExposureOption::Fixed(ps32(1.5));
+    options_2.transparency = TransparencyOption::Threshold(ps32(0.1));
 
     let options_cell = ListenableCell::new(options_1);
     let cameras: StandardCameras = StandardCameras::new(
@@ -930,7 +930,7 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
 async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
     let mut options = tone_mapping_test_options();
     options.tone_mapping = tmo;
-    options.exposure = ExposureOption::Fixed(NotNan::new(exposure).unwrap());
+    options.exposure = ExposureOption::Fixed(ps32(exposure));
     let scene = StandardCameras::from_constant_for_test(
         options,
         Viewport::with_scale(1.0, vec2(256, 320)),

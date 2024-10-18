@@ -4,8 +4,7 @@ use euclid::{
     point3, vec3, Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D,
 };
 use itertools::Itertools as _;
-use num_traits::One;
-use ordered_float::NotNan;
+use num_traits::ConstOne as _;
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
@@ -14,7 +13,7 @@ use num_traits::float::Float as _;
 
 use crate::math::{
     self, Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, LineVertex, Octant,
-    OctantMask, Rgba,
+    OctantMask, PositiveSign, Rgba,
 };
 use crate::raycast::Ray;
 
@@ -71,7 +70,7 @@ pub struct Camera {
 
     /// Scale factor for scene brightness.
     /// Calculated from `options.exposure` by [`Self::set_options`].
-    exposure_value: NotNan<f32>,
+    exposure_value: PositiveSign<f32>,
 }
 
 /// Basic creation and mutation.
@@ -165,11 +164,11 @@ impl Camera {
     /// This may or may not affect [`Self::exposure()`] depending on the current
     /// graphics options.
     pub fn set_measured_exposure(&mut self, value: f32) {
-        if let Ok(value) = NotNan::new(value) {
+        if let Ok(value) = PositiveSign::<f32>::try_from(value) {
             match (&self.options.exposure, &self.options.lighting_display) {
                 (ExposureOption::Fixed(_), _) => { /* nothing to do */ }
                 (ExposureOption::Automatic, LightingOption::None) => {
-                    self.exposure_value = NotNan::one();
+                    self.exposure_value = PositiveSign::ONE;
                 }
                 (ExposureOption::Automatic, _) => {
                     self.exposure_value = value;
@@ -357,7 +356,7 @@ impl Camera {
     /// It may or may not be equal to the last
     /// [`set_measured_exposure()`](Self::set_measured_exposure),
     /// depending on the graphics options.
-    pub fn exposure(&self) -> NotNan<f32> {
+    pub fn exposure(&self) -> PositiveSign<f32> {
         self.exposure_value
     }
 

@@ -1,11 +1,10 @@
 //! [`Accumulate`] and output formats of the raytracer.
 
 use euclid::Vector3D;
-use ordered_float::NotNan;
 
 use crate::block::Resolution;
 use crate::camera::GraphicsOptions;
-use crate::math::{notnan, rgb_const, Intensity, Rgb, Rgba};
+use crate::math::{ps32, rgb_const, Intensity, PositiveSign, Rgb, Rgba};
 use crate::space::SpaceBlockData;
 
 /// Borrowed data which may be used to customize the result of raytracing.
@@ -252,7 +251,7 @@ impl From<ColorBuf> for Rgba {
             let non_premultiplied_color = buf.light / color_alpha;
             Rgb::try_from(non_premultiplied_color)
                 .unwrap_or_else(|_| rgb_const!(1.0, 0.0, 0.0))
-                .with_alpha(NotNan::new(color_alpha).unwrap_or(notnan!(1.0)))
+                .with_alpha(PositiveSign::<f32>::try_from(color_alpha).unwrap_or(ps32(1.0)))
         }
     }
 }

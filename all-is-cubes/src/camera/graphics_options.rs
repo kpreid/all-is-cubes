@@ -1,9 +1,9 @@
 use core::fmt;
 
-use num_traits::One;
+use num_traits::ConstOne as _;
 use ordered_float::NotNan;
 
-use crate::math::{notnan, FreeCoordinate, Rgb, Rgba};
+use crate::math::{notnan, FreeCoordinate, PositiveSign, Rgb, Rgba};
 use crate::util::ShowStatus;
 
 #[cfg(doc)]
@@ -133,7 +133,7 @@ impl GraphicsOptions {
         fov_y: notnan!(90.),
         // TODO: Change tone mapping default once we have a good implementation.
         tone_mapping: ToneMappingOperator::Clamp,
-        exposure: ExposureOption::Fixed(notnan!(1.)),
+        exposure: ExposureOption::Fixed(PositiveSign::<f32>::ONE),
         bloom_intensity: notnan!(0.),
         view_distance: notnan!(200.),
         lighting_display: LightingOption::None,
@@ -329,7 +329,7 @@ impl ToneMappingOperator {
 pub enum ExposureOption {
     /// Constant exposure; light values in the scene are multiplied by this value
     /// before the tone mapping operator is applied.
-    Fixed(NotNan<f32>),
+    Fixed(PositiveSign<f32>),
     /// Exposure adjusts to compensate for the actual brightness of the scene.
     ///
     /// Note: If [`GraphicsOptions::lighting_display`] is disabled,
@@ -347,17 +347,17 @@ impl fmt::Debug for ExposureOption {
 }
 
 impl ExposureOption {
-    pub(crate) fn initial(&self) -> NotNan<f32> {
+    pub(crate) fn initial(&self) -> PositiveSign<f32> {
         match *self {
             ExposureOption::Fixed(value) => value,
-            ExposureOption::Automatic => NotNan::one(),
+            ExposureOption::Automatic => PositiveSign::<f32>::ONE,
         }
     }
 }
 
 impl Default for ExposureOption {
     fn default() -> Self {
-        ExposureOption::Fixed(NotNan::one())
+        ExposureOption::Fixed(PositiveSign::<f32>::ONE)
     }
 }
 
@@ -398,7 +398,7 @@ pub enum TransparencyOption {
     Volumetric,
     /// Alpha above or below the given threshold value will be rounded to fully opaque
     /// or fully transparent, respectively.
-    Threshold(NotNan<f32>),
+    Threshold(PositiveSign<f32>),
 }
 
 impl TransparencyOption {
@@ -476,7 +476,7 @@ impl AntialiasingOption {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::{rgba_const, OpacityCategory};
+    use crate::math::{ps32, rgba_const, OpacityCategory};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -536,7 +536,7 @@ mod tests {
             GraphicsOptions {
                 fog: FogOption::None,
                 tone_mapping: ToneMappingOperator::Clamp,
-                exposure: ExposureOption::Fixed(NotNan::one()),
+                exposure: ExposureOption::Fixed(PositiveSign::<f32>::ONE),
                 bloom_intensity: NotNan::from(0u8),
                 lighting_display: LightingOption::None,
                 antialiasing: AntialiasingOption::None,
@@ -550,7 +550,7 @@ mod tests {
         for transparency in &[
             TransparencyOption::Surface,
             TransparencyOption::Volumetric,
-            TransparencyOption::Threshold(notnan!(0.5)),
+            TransparencyOption::Threshold(ps32(0.5)),
         ] {
             assert_eq!(
                 transparency.will_output_alpha(),

@@ -6,14 +6,14 @@ use std::sync::{atomic, mpsc, Arc, Mutex, Weak};
 use std::time::Duration;
 
 use itertools::Itertools as _;
+use num_traits::ConstZero as _;
 
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
-use all_is_cubes::euclid::num::Zero as _;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{
     rgba_const, Cube, Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
-    GridSize, GridVector, NotNan, Rgb, Wireframe as _,
+    GridSize, GridVector, PositiveSign, Rgb, Wireframe as _,
 };
 use all_is_cubes::raycast::Ray;
 #[cfg(feature = "rerun")]
@@ -980,8 +980,10 @@ impl ParticleSet {
         let mut tmp: Vec<WgpuLinesVertex> = Vec::with_capacity(24); // TODO: inefficient allocation per object
         crate::wireframe_vertices::<WgpuLinesVertex, _, _>(
             &mut tmp,
-            Rgb::ONE
-                .with_alpha(NotNan::new(0.9f32.powf(self.age as f32)).unwrap_or(NotNan::zero())),
+            Rgb::ONE.with_alpha(
+                PositiveSign::<f32>::try_from(0.9f32.powf(self.age as f32))
+                    .unwrap_or(PositiveSign::ZERO),
+            ),
             &self.fluff.position.aab().expand(0.004 * (self.age as f64)),
         );
         tmp.into_iter()

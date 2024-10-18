@@ -56,7 +56,7 @@ fn PROJECTILE(ctx: Context<'_>) {
     // This will require getting `Move` tick actions to cooperate with `Composite`.
     let launcher = Block::builder()
         .display_name(literal!("Launcher"))
-        .color(Rgb::UNIFORM_LUMINANCE_RED.with_alpha(notnan!(1.0)))
+        .color(Rgb::UNIFORM_LUMINANCE_RED.with_alpha(ps32(1.0)))
         .animation_hint(block::AnimationHint::replacement(
             block::AnimationChange::Shape,
         ))

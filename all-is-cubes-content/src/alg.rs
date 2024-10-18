@@ -11,7 +11,7 @@ use all_is_cubes::block::{Atom, Block, Primitive, Resolution, AIR};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
     Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
-    GridSizeCoord, GridVector, Gridgid, NotNan, Vol,
+    GridSizeCoord, GridVector, Gridgid, PositiveSign, Vol,
 };
 use all_is_cubes::space::{CubeTransaction, SetCubeError, Space, SpaceTransaction};
 
@@ -185,7 +185,10 @@ pub(crate) fn space_to_transaction_copy(
 /// If the computation is NaN or the block is not an atom, it is returned unchanged.
 pub(crate) fn scale_color(mut block: Block, scalar: f64, quantization: f64) -> Block {
     let scalar = (scalar / quantization).round() * quantization;
-    match (block.primitive_mut(), NotNan::new(scalar as f32)) {
+    match (
+        block.primitive_mut(),
+        PositiveSign::<f32>::try_from(scalar as f32),
+    ) {
         (Primitive::Atom(Atom { color, .. }), Ok(scalar)) => {
             *color = (color.to_rgb() * scalar).with_alpha(color.alpha());
         }

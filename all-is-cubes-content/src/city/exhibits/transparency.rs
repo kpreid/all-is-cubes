@@ -17,7 +17,7 @@ fn TRANSPARENCY_LARGE(_: Context<'_>) {
         Rgb::new(0.5, 0.5, 1.0),
         Rgb::new(0.9, 0.9, 0.9),
     ];
-    let alphas = [0.25, 0.5, 0.75, 0.95];
+    let alphas = [0.25, 0.5, 0.75, 0.95].map(ps32);
     for (rot, color) in GridRotation::CLOCKWISE.iterate().zip(&colors) {
         let windowpane =
             GridAab::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);
@@ -25,11 +25,7 @@ fn TRANSPARENCY_LARGE(_: Context<'_>) {
             windowpane
                 .transform(rot.to_positive_octant_transform(1))
                 .unwrap(),
-            |Cube { y, .. }| {
-                Some(Block::from(
-                    color.with_alpha(NotNan::new(alphas[y as usize]).unwrap()),
-                ))
-            },
+            |Cube { y, .. }| Some(Block::from(color.with_alpha(alphas[y as usize]))),
         )?;
     }
 

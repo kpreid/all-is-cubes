@@ -2,17 +2,17 @@
 
 use core::fmt;
 use core::iter::Sum;
-use core::ops::{Add, AddAssign, Mul, Sub};
+use core::ops::{Add, AddAssign, Mul};
 
 use euclid::{vec3, Vector3D};
-use ordered_float::{FloatIsNan, NotNan};
+use ordered_float::NotNan;
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::notnan;
+use crate::math::{NotPositiveSign, PositiveSign};
 
 /// Allows writing a constant [`Rgb`] color value, provided that its components are float
 /// literals.
@@ -21,11 +21,14 @@ use crate::notnan;
 #[macro_export]
 macro_rules! rgb_const {
     ($r:literal, $g:literal, $b:literal) => {
-        $crate::math::Rgb::new_nn(
-            $crate::notnan!($r),
-            $crate::notnan!($g),
-            $crate::notnan!($b),
-        )
+        // const block ensures all panics are compile-time
+        const {
+            $crate::math::Rgb::new_ps(
+                $crate::math::PositiveSign::<f32>::new_strict($r),
+                $crate::math::PositiveSign::<f32>::new_strict($g),
+                $crate::math::PositiveSign::<f32>::new_strict($b),
+            )
+        }
     };
 }
 
@@ -34,43 +37,44 @@ macro_rules! rgb_const {
 #[macro_export]
 macro_rules! rgba_const {
     ($r:literal, $g:literal, $b:literal, $a:literal) => {
-        $crate::math::Rgba::new_nn(
-            $crate::notnan!($r),
-            $crate::notnan!($g),
-            $crate::notnan!($b),
-            $crate::notnan!($a),
-        )
+        // const block ensures all panics are compile-time
+        const {
+            $crate::math::Rgba::new_ps(
+                $crate::math::PositiveSign::<f32>::new_strict($r),
+                $crate::math::PositiveSign::<f32>::new_strict($g),
+                $crate::math::PositiveSign::<f32>::new_strict($b),
+                $crate::math::PositiveSign::<f32>::new_strict($a),
+            )
+        }
     };
 }
 
 /// A floating-point RGB color value.
 ///
-/// * Each component may be considered to have a nominal range of 0 to 1, but larger
-///   values are permitted — corresponding to bright light sources and other such
-///   things which it is reasonable to “overexpose”. (No meaning is given to negative
-///   values, but they are permitted.)
-/// * NaN is banned so that [`Eq`] may be implemented. (Infinities are permitted.)
-/// * Color values are linear (gamma = 1), but use the same RGB primaries as sRGB
+/// * Each color component must have a nonnegative, non-NaN value.
+///   Depending on the application, they may be considered to have a nominal
+///   range of 0 to 1, or unbounded.
+/// * Color components are linear (gamma = 1), but use the same RGB primaries as sRGB
 ///   (Rec. 709).
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct Rgb(Vector3D<NotNan<f32>, Intensity>);
+pub struct Rgb(Vector3D<PositiveSign<f32>, Intensity>);
 
 /// A floating-point RGBA color value.
 ///
-/// * Each color component may be considered to have a nominal range of 0 to 1, but
-///   larger values are permitted — corresponding to bright light sources and other such
-///   things which it is reasonable to “overexpose”. (No meaning is given to negative
-///   values, but they are permitted.)
-/// * NaN is banned so that [`Eq`] may be implemented. (Infinities are permitted.)
-/// * Color values are linear (gamma = 1), but use the same RGB primaries as sRGB
+/// * Each color component must have a nonnegative, non-NaN value.
+///   Depending on the application, they may be considered to have a nominal
+///   range of 0 to 1, or unbounded.
+/// * The alpha must have a non-NaN value.
+/// * Color components are linear (gamma = 1), but use the same RGB primaries as sRGB
 ///   (Rec. 709).
 /// * The alpha is not premultiplied.
-/// * Alpha values less than zero and greater than one will be treated equivalently to
+/// * Alpha values less than zero and greater than one will usually be treated equivalently to
 ///   zero and one, respectively, but are preserved rather than clipped.
+///   (TODO: Constrain it to the 0-1 range to reduce hazards.)
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Rgba {
     rgb: Rgb,
-    alpha: NotNan<f32>,
+    alpha: PositiveSign<f32>,
 }
 
 /// Unit-of-measure type for vectors that contain color channels.
@@ -80,17 +84,17 @@ pub struct Rgba {
 #[derive(Debug, Eq, PartialEq)]
 pub enum Intensity {}
 
-// NotNan::zero() and one() exist, but only via traits, which can't be used in const
-const NN0: NotNan<f32> = notnan!(0.0);
-const NN1: NotNan<f32> = notnan!(1.0);
+// convenience alias
+const PS0: PositiveSign<f32> = <PositiveSign<f32> as num_traits::ConstZero>::ZERO;
+const PS1: PositiveSign<f32> = <PositiveSign<f32> as num_traits::ConstOne>::ONE;
 
 impl Rgb {
     /// Black; the constant equal to `Rgb::new(0., 0., 0.).unwrap()`.
-    pub const ZERO: Rgb = Rgb(vec3(NN0, NN0, NN0));
+    pub const ZERO: Rgb = Rgb(vec3(PS0, PS0, PS0));
     /// Nominal white; the constant equal to `Rgb::new(1., 1., 1.).unwrap()`.
     ///
     /// Note that brighter values may exist; the color system “supports HDR”.
-    pub const ONE: Rgb = Rgb(vec3(NN1, NN1, NN1));
+    pub const ONE: Rgb = Rgb(vec3(PS1, PS1, PS1));
 
     /// Pure red that is as bright as it can be,
     /// while being a sRGB color that is the same luminance as the other colors in this set.
@@ -103,22 +107,24 @@ impl Rgb {
     /// (That turns out to be 100% blue, `#0000FF`.)
     pub const UNIFORM_LUMINANCE_BLUE: Rgb = Rgb::from_srgb8([0x00, 0x00, 0xFF]);
 
-    /// Constructs a color from components. Panics if any component is NaN.
-    /// No other range checks are performed.
+    /// Constructs a color from components.
+    ///
+    /// Panics if any component is NaN.
+    /// Clamps any component that is negative.
     #[inline]
     #[track_caller]
     pub const fn new(r: f32, g: f32, b: f32) -> Self {
         match Self::try_new(vec3(r, g, b)) {
             Ok(color) => color,
-            Err(_) => panic!("color components may not be NaN"),
+            Err(_) => panic!("color component out of range"),
         }
     }
 
-    const fn try_new(value: Vector3D<f32, Intensity>) -> Result<Self, FloatIsNan> {
+    const fn try_new(value: Vector3D<f32, Intensity>) -> Result<Self, NotPositiveSign<f32>> {
         match (
-            new_nn_f32(value.x),
-            new_nn_f32(value.y),
-            new_nn_f32(value.z),
+            PositiveSign::<f32>::try_new(value.x),
+            PositiveSign::<f32>::try_new(value.y),
+            PositiveSign::<f32>::try_new(value.z),
         ) {
             (Ok(r), Ok(g), Ok(b)) => Ok(Self(vec3(r, g, b))),
             (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Err(e),
@@ -126,12 +132,12 @@ impl Rgb {
     }
 
     /// Constructs a color from components that have already been checked for not being
-    /// NaN.
+    /// NaN or negative.
     ///
     /// Note: This exists primarily to assist the [`rgb_const!`] macro and may be renamed
     /// or replaced in future versions.
     #[inline]
-    pub const fn new_nn(r: NotNan<f32>, g: NotNan<f32>, b: NotNan<f32>) -> Self {
+    pub const fn new_ps(r: PositiveSign<f32>, g: PositiveSign<f32>, b: PositiveSign<f32>) -> Self {
         Self(vec3(r, g, b))
     }
 
@@ -145,13 +151,13 @@ impl Rgb {
 
     /// Adds an alpha component to produce an [Rgba] color.
     #[inline]
-    pub const fn with_alpha(self, alpha: NotNan<f32>) -> Rgba {
+    pub const fn with_alpha(self, alpha: PositiveSign<f32>) -> Rgba {
         Rgba { rgb: self, alpha }
     }
     /// Adds an alpha component of `1.0` (fully opaque) to produce an [Rgba] color.
     #[inline]
     pub const fn with_alpha_one(self) -> Rgba {
-        self.with_alpha(NN1)
+        self.with_alpha(PS1)
     }
 
     /// Adds an alpha component of `1.0` (fully opaque) to produce an [Rgba] color.
@@ -160,22 +166,22 @@ impl Rgb {
     #[inline]
     #[must_use]
     pub const fn with_alpha_one_if_has_no_alpha(self) -> Rgba {
-        self.with_alpha(NN1)
+        self.with_alpha(PS1)
     }
 
     /// Returns the red color component. Values are linear (gamma = 1).
     #[inline]
-    pub const fn red(self) -> NotNan<f32> {
+    pub const fn red(self) -> PositiveSign<f32> {
         self.0.x
     }
     /// Returns the green color component. Values are linear (gamma = 1).
     #[inline]
-    pub const fn green(self) -> NotNan<f32> {
+    pub const fn green(self) -> PositiveSign<f32> {
         self.0.y
     }
     /// Returns the blue color component. Values are linear (gamma = 1).
     #[inline]
-    pub const fn blue(self) -> NotNan<f32> {
+    pub const fn blue(self) -> PositiveSign<f32> {
         self.0.z
     }
 
@@ -223,39 +229,52 @@ impl Rgb {
     #[inline]
     #[must_use]
     pub fn clamp(self) -> Self {
-        Self(self.0.map(|c| c.clamp(NN0, NN1)))
+        Self(self.0.map(|c| c.clamp(PS0, PS1)))
+    }
+
+    /// Subtract `other` from `self`; if any component would be negative, it is zero instead.
+    #[inline]
+    #[must_use]
+    pub fn saturating_sub(self, other: Self) -> Self {
+        Self(vec3(
+            self.red().saturating_sub(other.red()),
+            self.green().saturating_sub(other.green()),
+            self.blue().saturating_sub(other.blue()),
+        ))
     }
 }
 impl Rgba {
     /// Transparent black (all components zero); identical to
     /// `Rgba::new(0.0, 0.0, 0.0, 0.0)` except for being a constant.
-    pub const TRANSPARENT: Rgba = Rgb::ZERO.with_alpha(NN0);
+    pub const TRANSPARENT: Rgba = Rgb::ZERO.with_alpha(PS0);
     /// Black; identical to `Rgba::new(0.0, 0.0, 0.0, 1.0)` except for being a constant.
     pub const BLACK: Rgba = Rgb::ZERO.with_alpha_one();
     /// White; identical to `Rgba::new(1.0, 1.0, 1.0, 1.0)` except for being a constant.
     pub const WHITE: Rgba = Rgb::ONE.with_alpha_one();
 
-    /// Constructs a color from components. Panics if any component is NaN.
+    /// Constructs a color from components. Panics if any component is NaN or negative.
     /// No other range checks are performed.
     #[inline]
     #[track_caller]
     pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
-        match new_nn_f32(a) {
-            Ok(a) => Rgb::new(r, g, b).with_alpha(a),
-            Err(_) => panic!("alpha may not be NaN"),
-        }
+        Rgb::new(r, g, b).with_alpha(PositiveSign::<f32>::new_strict(a))
     }
 
     /// Constructs a color from components that have already been checked for not being
-    /// NaN.
+    /// NaN or negative.
     ///
-    /// Note: This exists primarily to assist the [`rgb_const!`] macro and may be renamed
+    /// Note: This exists primarily to assist the [`rgba_const!`] macro and may be renamed
     /// or replaced in future versions.
     #[inline]
-    pub const fn new_nn(r: NotNan<f32>, g: NotNan<f32>, b: NotNan<f32>, a: NotNan<f32>) -> Self {
+    pub const fn new_ps(
+        r: PositiveSign<f32>,
+        g: PositiveSign<f32>,
+        b: PositiveSign<f32>,
+        alpha: PositiveSign<f32>,
+    ) -> Self {
         Self {
-            rgb: Rgb::new_nn(r, g, b),
-            alpha: a,
+            rgb: Rgb::new_ps(r, g, b),
+            alpha,
         }
     }
 
@@ -278,17 +297,17 @@ impl Rgba {
 
     /// Returns the red color component. Values are linear (gamma = 1) and not premultiplied.
     #[inline]
-    pub const fn red(self) -> NotNan<f32> {
+    pub const fn red(self) -> PositiveSign<f32> {
         self.rgb.red()
     }
     /// Returns the green color component. Values are linear (gamma = 1) and not premultiplied.
     #[inline]
-    pub const fn green(self) -> NotNan<f32> {
+    pub const fn green(self) -> PositiveSign<f32> {
         self.rgb.green()
     }
     /// Returns the blue color component. Values are linear (gamma = 1) and not premultiplied.
     #[inline]
-    pub const fn blue(self) -> NotNan<f32> {
+    pub const fn blue(self) -> PositiveSign<f32> {
         self.rgb.blue()
     }
     /// Returns the alpha component.
@@ -297,7 +316,7 @@ impl Rgba {
     /// allowed and may be returned by this method, but alpha test methods will treat
     // them equivalently to zero and one.
     #[inline]
-    pub const fn alpha(self) -> NotNan<f32> {
+    pub const fn alpha(self) -> PositiveSign<f32> {
         self.alpha
     }
 
@@ -305,13 +324,13 @@ impl Rgba {
     /// zero or less.
     #[inline]
     pub fn fully_transparent(self) -> bool {
-        self.alpha() <= NN0
+        self.alpha() <= PS0
     }
     /// Returns whether this color is fully opaque, or has an alpha component of
     /// one or greater.
     #[inline]
     pub fn fully_opaque(self) -> bool {
-        self.alpha() >= NN1
+        self.alpha() >= PS1
     }
     /// Returns the [`OpacityCategory`] which this color's alpha fits into.
     /// This returns the same information as [`Rgba::fully_transparent`] combined with
@@ -379,7 +398,7 @@ impl Rgba {
     /// Converts sRGB 8-bits-per-component color to the corresponding linear [`Rgba`] value.
     #[inline]
     pub const fn from_srgb8(rgba: [u8; 4]) -> Self {
-        Self::new_nn(
+        Self::new_ps(
             component_from_srgb8_const(rgba[0]),
             component_from_srgb8_const(rgba[1]),
             component_from_srgb8_const(rgba[2]),
@@ -393,7 +412,7 @@ impl Rgba {
     pub fn clamp(self) -> Self {
         Self {
             rgb: self.rgb.clamp(),
-            alpha: self.alpha.clamp(NN0, NN1),
+            alpha: self.alpha.min(PS1),
         }
     }
 
@@ -409,26 +428,26 @@ impl Rgba {
     pub fn reflect(self, illumination: Rgb) -> Rgb {
         // TODO: do this math without any NaN checks or negative/amplified values.
         // by introducing a dedicated RgbaReflectance type with constrained components?
-        self.to_rgb() * illumination * self.alpha
+        self.to_rgb() * illumination * PositiveSign::<f32>::new_clamped(self.alpha.into_inner())
     }
 }
 
-impl From<Vector3D<NotNan<f32>, Intensity>> for Rgb {
+impl From<Vector3D<PositiveSign<f32>, Intensity>> for Rgb {
     #[inline]
-    fn from(value: Vector3D<NotNan<f32>, Intensity>) -> Self {
+    fn from(value: Vector3D<PositiveSign<f32>, Intensity>) -> Self {
         Self(value)
     }
 }
 
-impl From<[NotNan<f32>; 3]> for Rgb {
+impl From<[PositiveSign<f32>; 3]> for Rgb {
     #[inline]
-    fn from(value: [NotNan<f32>; 3]) -> Self {
+    fn from(value: [PositiveSign<f32>; 3]) -> Self {
         Self(value.into())
     }
 }
-impl From<[NotNan<f32>; 4]> for Rgba {
+impl From<[PositiveSign<f32>; 4]> for Rgba {
     #[inline]
-    fn from(value: [NotNan<f32>; 4]) -> Self {
+    fn from(value: [PositiveSign<f32>; 4]) -> Self {
         let [r, g, b, alpha] = value;
         Self {
             rgb: Rgb::from([r, g, b]),
@@ -440,28 +459,42 @@ impl From<[NotNan<f32>; 4]> for Rgba {
 impl From<Rgb> for Vector3D<f32, Intensity> {
     #[inline]
     fn from(value: Rgb) -> Self {
-        value.0.map(NotNan::into_inner)
+        value.0.map(PositiveSign::<f32>::into_inner)
+    }
+}
+
+impl From<Rgb> for [PositiveSign<f32>; 3] {
+    #[inline]
+    fn from(value: Rgb) -> Self {
+        value.0.into()
+    }
+}
+impl From<Rgba> for [PositiveSign<f32>; 4] {
+    #[inline]
+    fn from(value: Rgba) -> Self {
+        let [r, g, b]: [PositiveSign<f32>; 3] = value.rgb.into();
+        [r, g, b, value.alpha]
     }
 }
 
 impl From<Rgb> for [NotNan<f32>; 3] {
     #[inline]
     fn from(value: Rgb) -> Self {
-        value.0.into()
+        value.0.map(PositiveSign::into).into()
     }
 }
 impl From<Rgba> for [NotNan<f32>; 4] {
     #[inline]
     fn from(value: Rgba) -> Self {
         let [r, g, b]: [NotNan<f32>; 3] = value.rgb.into();
-        [r, g, b, value.alpha]
+        [r, g, b, value.alpha.into()]
     }
 }
 
 impl From<Rgb> for [f32; 3] {
     #[inline]
     fn from(value: Rgb) -> Self {
-        value.0.map(NotNan::into_inner).into()
+        value.0.map(PositiveSign::<f32>::into_inner).into()
     }
 }
 impl From<Rgba> for [f32; 4] {
@@ -472,7 +505,7 @@ impl From<Rgba> for [f32; 4] {
 }
 
 impl TryFrom<Vector3D<f32, Intensity>> for Rgb {
-    type Error = FloatIsNan;
+    type Error = NotPositiveSign<f32>;
     #[inline]
     fn try_from(value: Vector3D<f32, Intensity>) -> Result<Self, Self::Error> {
         Ok(Self(vec3(
@@ -496,13 +529,6 @@ impl AddAssign<Rgb> for Rgb {
         self.0 += other.0;
     }
 }
-impl Sub<Rgb> for Rgb {
-    type Output = Self;
-    #[inline]
-    fn sub(self, other: Self) -> Self {
-        Self(self.0 - other.0)
-    }
-}
 /// Multiplies two color values componentwise.
 impl Mul<Rgb> for Rgb {
     type Output = Self;
@@ -513,21 +539,26 @@ impl Mul<Rgb> for Rgb {
     }
 }
 /// Multiplies this color value by a scalar.
-impl Mul<NotNan<f32>> for Rgb {
+impl Mul<PositiveSign<f32>> for Rgb {
     type Output = Self;
     /// Multiplies this color value by a scalar.
     #[inline]
-    fn mul(self, scalar: NotNan<f32>) -> Self {
+    fn mul(self, scalar: PositiveSign<f32>) -> Self {
         Self(self.0 * scalar)
     }
 }
-/// Multiplies this color value by a scalar. Panics if the scalar is NaN.
+/// Multiplies this color value by a scalar.
+///
+/// Panics if the scalar is NaN. Returns zero if the scalar is negative.
+// TODO: consider removing this panic risk
 impl Mul<f32> for Rgb {
     type Output = Self;
-    /// Multiplies this color value by a scalar. Panics if the scalar is NaN.
+    /// Multiplies this color value by a scalar.
+    ///
+    /// Panics if the scalar is NaN. Returns zero if the scalar is negative.
     #[inline]
     fn mul(self, scalar: f32) -> Self {
-        Self(self.0 * NotNan::new(scalar).unwrap())
+        Self(self.0 * PositiveSign::<f32>::new_clamped(scalar))
     }
 }
 
@@ -574,7 +605,7 @@ impl fmt::Debug for Rgba {
 #[allow(clippy::missing_inline_in_public_items)]
 impl<'a> arbitrary::Arbitrary<'a> for Rgb {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Rgb::new_nn(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
+        Ok(Rgb::new_ps(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
@@ -586,7 +617,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgb {
 #[allow(clippy::missing_inline_in_public_items)]
 impl<'a> arbitrary::Arbitrary<'a> for Rgba {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Rgba::new_nn(
+        Ok(Rgba::new_ps(
             u.arbitrary()?,
             u.arbitrary()?,
             u.arbitrary()?,
@@ -640,10 +671,11 @@ mod rerun {
     }
 }
 
+/// Apply the sRGB encoding function. Do not use this on alpha values.
 #[inline]
-fn component_to_srgb(c: NotNan<f32>) -> f32 {
+fn component_to_srgb(c: PositiveSign<f32>) -> f32 {
     // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_forward_transformation_(CIE_XYZ_to_sRGB)> (version as of Feb 3, 2020)
-    // Strip NotNan
+    // Strip wrapper
     let c = c.into_inner();
     // Apply sRGB gamma curve
     if c <= 0.0031308 {
@@ -654,45 +686,45 @@ fn component_to_srgb(c: NotNan<f32>) -> f32 {
 }
 
 #[inline]
-fn component_to_srgb8(c: NotNan<f32>) -> u8 {
+fn component_to_srgb8(c: PositiveSign<f32>) -> u8 {
+    // out of range values will be clamped by `as u8`
     (component_to_srgb(c) * 255.).round() as u8
 }
 
 #[cfg(test)] // only used to validate the lookup tables
-fn component_from_linear8_arithmetic(c: u8) -> NotNan<f32> {
+fn component_from_linear8_arithmetic(c: u8) -> f32 {
     // TODO: make this const when Rust `const_fn_floating_point_arithmetic` is stable,
     // and we can do away with the lookup tables.
-    NotNan::from(c) / NotNan::from(255u8)
+    f32::from(c) / 255.0
 }
 
 #[inline]
-const fn component_from_linear8_const(c: u8) -> NotNan<f32> {
-    // Safety: the table may be inspected to contain no NaNs.
-    unsafe { NotNan::new_unchecked(CONST_LINEAR_LOOKUP_TABLE[c as usize]) }
+const fn component_from_linear8_const(c: u8) -> PositiveSign<f32> {
+    // Safety: the table may be inspected to contain no NaNs or negatives.
+    unsafe { PositiveSign::new_unchecked(CONST_LINEAR_LOOKUP_TABLE[c as usize]) }
 }
 
 /// Implements sRGB decoding using the standard arithmetic.
 #[cfg(test)] // only used to validate the lookup tables
-fn component_from_srgb8_arithmetic(c: u8) -> NotNan<f32> {
+fn component_from_srgb8_arithmetic(c: u8) -> f32 {
     // Source: <https://en.wikipedia.org/w/index.php?title=SRGB&oldid=1002296118#The_reverse_transformation> (version as of Feb 3, 2020)
     // Convert to float
     let c = f32::from(c) / 255.0;
     // Apply sRGB gamma curve
-    let c = if c <= 0.04045 {
+    if c <= 0.04045 {
         c * (25. / 323.)
     } else {
         // Use pure-Rust implementation from `libm` to avoid platform-dependent rounding
         // which would be inconsistent with our hardcoded lookup table.
         libm::powf((200. * c + 11.) / 211., 12. / 5.)
-    };
-    NotNan::new(c).unwrap()
+    }
 }
 
 /// Implements sRGB decoding using a lookup table.
 #[inline]
-const fn component_from_srgb8_const(c: u8) -> NotNan<f32> {
-    // Safety: the table may be inspected to contain no NaNs.
-    unsafe { NotNan::new_unchecked(CONST_SRGB_LOOKUP_TABLE[c as usize]) }
+const fn component_from_srgb8_const(c: u8) -> PositiveSign<f32> {
+    // Safety: the table may be inspected to contain no negative or NaN values.
+    unsafe { PositiveSign::new_unchecked(CONST_SRGB_LOOKUP_TABLE[c as usize]) }
 }
 
 /// Reduces alpha/opacity values to only three possibilities, by conflating all alphas
@@ -818,19 +850,6 @@ const CONST_LINEAR_LOOKUP_TABLE: &[f32; 256] = &[
     0.9882353, 0.99215686, 0.99607843, 1.0,
 ];
 
-// Const replacement for `NotNan::new()`
-const fn new_nn_f32(value: f32) -> Result<NotNan<f32>, FloatIsNan> {
-    #![allow(clippy::eq_op)]
-    // This condition is true if and only if the value is NaN
-    // TODO: Replace this with `.is_nan()` after Rust 1.83 is released with `const_float_classify`.
-    if value != value {
-        Err(FloatIsNan)
-    } else {
-        // SAFETY: We just checked the only safety condition.
-        Ok(unsafe { NotNan::new_unchecked(value) })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -849,7 +868,7 @@ mod tests {
 
         // Test saturation
         assert_eq!(
-            Rgba::new(0.5, -1.0, 10.0, 1.0).to_srgb8(),
+            Rgba::new(0.5, -0.0, 10.0, 1.0).to_srgb8(),
             [188, 0, 255, 255]
         );
     }
@@ -909,9 +928,8 @@ mod tests {
 
     #[test]
     fn check_const_srgb_table() {
-        let generated_table: Vec<f32> = (0..=u8::MAX)
-            .map(|component| component_from_srgb8_arithmetic(component).into_inner())
-            .collect();
+        let generated_table: Vec<f32> =
+            (0..=u8::MAX).map(component_from_srgb8_arithmetic).collect();
         print!("const CONST_SRGB_LOOKUP_TABLE: [f32; 256] = [");
         for i in 0..=u8::MAX {
             if i % 6 == 0 {
@@ -928,7 +946,7 @@ mod tests {
     #[test]
     fn check_const_linear_table() {
         let generated_table: Vec<f32> = (0..=u8::MAX)
-            .map(|component| component_from_linear8_arithmetic(component).into_inner())
+            .map(component_from_linear8_arithmetic)
             .collect();
         print!("const CONST_LINEAR_LOOKUP_TABLE: [f32; 256] = [");
         for i in 0..=u8::MAX {

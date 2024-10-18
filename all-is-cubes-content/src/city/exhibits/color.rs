@@ -26,7 +26,9 @@ fn COLORS(ctx: Context<'_>) {
         let color = Rgb::from(
             color_point
                 .to_vector()
-                .map(|s| NotNan::new(s as f32 / (gradient_resolution - 1) as f32).unwrap())
+                .map(|s| {
+                    PositiveSign::<f32>::new_strict(s as f32 / (gradient_resolution - 1) as f32)
+                })
                 .cast_unit(),
         );
         let color_srgb = color.with_alpha_one().to_srgb8();

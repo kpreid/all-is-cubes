@@ -6,7 +6,7 @@ use crate::camera::{
     look_at_y_up, Camera, ExposureOption, FrustumPoints, GraphicsOptions, LightingOption,
     ViewTransform, Viewport,
 };
-use crate::math::{notnan, rgba_const, Aab, NotNan};
+use crate::math::{ps32, rgba_const, Aab, NotNan};
 
 #[test]
 fn camera_bad_viewport_doesnt_panic() {
@@ -110,7 +110,7 @@ fn post_process() {
     assert_eq!(camera.post_process_color(color), color);
 
     // Try exposure
-    options.exposure = ExposureOption::Fixed(notnan!(0.5));
+    options.exposure = ExposureOption::Fixed(ps32(0.5));
     camera.set_options(options);
     assert_eq!(
         camera.post_process_color(color),
@@ -130,7 +130,7 @@ fn exposure_automatic_active() {
     );
 
     camera.set_measured_exposure(7.0);
-    assert_eq!(camera.exposure(), notnan!(7.0));
+    assert_eq!(camera.exposure(), ps32(7.0));
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn exposure_automatic_disabled_when_lighting_is_disabled() {
     );
 
     camera.set_measured_exposure(7.0);
-    assert_eq!(camera.exposure(), notnan!(1.0)); // ignoring measured
+    assert_eq!(camera.exposure(), ps32(1.0)); // ignoring measured
 }
 
 #[test]

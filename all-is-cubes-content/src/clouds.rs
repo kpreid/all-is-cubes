@@ -1,7 +1,7 @@
 //! Cloud generation.
 
 use all_is_cubes::block::{Block, BlockCollision, AIR};
-use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, NotNan, Rgb};
+use all_is_cubes::math::{ps32, GridAab, GridCoordinate, GridPoint, Rgb};
 use all_is_cubes::space::{SetCubeError, Space};
 
 use crate::alg::NoiseFnExt as _;
@@ -24,7 +24,7 @@ pub fn clouds(region: GridAab, space: &mut Space, density: f32) -> Result<(), Se
     fn cloud_block(alpha: f32) -> Block {
         Block::builder()
             .display_name("Cloud")
-            .color(Rgb::ONE.with_alpha(NotNan::new(alpha).unwrap()))
+            .color(Rgb::ONE.with_alpha(ps32(alpha)))
             .collision(if alpha >= 1.0 {
                 BlockCollision::Hard
             } else {

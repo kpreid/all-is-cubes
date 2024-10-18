@@ -16,7 +16,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
 use crate::math::{
-    notnan, Cube, Face6, FaceMap, GridAab, GridPoint, GridRotation, GridVector, Intensity, NotNan,
+    ps32, Cube, Face6, FaceMap, GridAab, GridPoint, GridRotation, GridVector, Intensity,
     OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::space::{Space, SpaceTransaction};
@@ -292,8 +292,9 @@ mod eval {
                     .unwrap()
                     .build_into(&mut universe);
 
-                let total_emission = voxel_block.evaluate().unwrap().light_emission();
-                let difference: Vector3D<f32, Intensity> = (total_emission - atom_emission).into();
+                let total_emission: Vector3D<f32, Intensity> =
+                    voxel_block.evaluate().unwrap().light_emission().into();
+                let difference: Vector3D<f32, Intensity> = total_emission - atom_emission.into();
                 assert!(
                     difference.length() < 0.0001,
                     "reflectance = {reflectance:?}\n\
@@ -314,9 +315,9 @@ mod eval {
         let block = Block::builder()
             .voxels_fn(resolution, |point| {
                 Block::from(voxel_color.with_alpha(if point.x == 0 && point.z == 0 {
-                    NotNan::new(alpha).unwrap()
+                    ps32(alpha)
                 } else {
-                    notnan!(1.0)
+                    ps32(1.0)
                 }))
             })
             .unwrap()
@@ -328,13 +329,11 @@ mod eval {
         // the light paths with opaque surfaces.
         assert_eq!(
             e.color(),
-            voxel_color.with_alpha(
-                NotNan::new(1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))).unwrap()
-            )
+            voxel_color.with_alpha(ps32(1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))))
         );
         // This is the sum of the transparency of one voxel on one of the six faces
-        let one_face_transparency = voxel_color
-            .with_alpha(NotNan::new(1.0 - (alpha / f32::from(resolution).powi(2))).unwrap());
+        let one_face_transparency =
+            voxel_color.with_alpha(ps32(1.0 - (alpha / f32::from(resolution).powi(2))));
         assert_eq!(
             e.face_colors(),
             FaceMap {
@@ -370,7 +369,7 @@ mod eval {
         let mut universe = Universe::new();
         let c1 = Rgb::new(1.0, 0.0, 0.0);
         let c2 = Rgb::new(0.0, 1.0, 0.0);
-        let colors = [c1.with_alpha_one(), c2.with_alpha(notnan!(0.5))];
+        let colors = [c1.with_alpha_one(), c2.with_alpha(ps32(0.5))];
         let block = Block::builder()
             .voxels_fn(R2, |cube| Block::from(colors[cube.y as usize]))
             .unwrap()

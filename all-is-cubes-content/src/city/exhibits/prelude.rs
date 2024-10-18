@@ -28,8 +28,8 @@ pub(super) use all_is_cubes::euclid::{
 pub(super) use all_is_cubes::linking::{BlockProvider, InGenError};
 pub(super) use all_is_cubes::listen::ListenableSource;
 pub(super) use all_is_cubes::math::{
-    notnan, rgb_const, rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate,
-    GridPoint, GridRotation, GridSize, GridVector, Gridgid, NotNan, Rgb, Rgba,
+    ps32, rgb_const, rgba_const, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate,
+    GridPoint, GridRotation, GridSize, GridVector, Gridgid, PositiveSign, Rgb, Rgba,
 };
 pub(super) use all_is_cubes::op::Operation;
 pub(super) use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};
