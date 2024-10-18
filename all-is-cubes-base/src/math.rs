@@ -30,6 +30,8 @@ mod grid_iter;
 pub use grid_iter::*;
 mod rigid;
 pub use rigid::*;
+mod restricted_number;
+pub use restricted_number::*;
 mod matrix;
 pub use matrix::*;
 mod octant;

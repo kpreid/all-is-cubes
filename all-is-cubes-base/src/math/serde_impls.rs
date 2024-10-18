@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::math::{Aab, Cube, GridAab, GridCoordinate};
+use crate::math::{self, Aab, Cube, GridAab, GridCoordinate};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct AabSer {
@@ -83,5 +83,26 @@ impl<'de> Deserialize<'de> for GridAab {
     {
         let GridAabSer { lower, upper } = GridAabSer::deserialize(deserializer)?;
         GridAab::checked_from_lower_upper(lower, upper).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<T: Serialize> Serialize for math::PositiveSign<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_ref().serialize(serializer)
+    }
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for math::PositiveSign<T>
+where
+    Self: TryFrom<T, Error: core::error::Error>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::try_from(T::deserialize(deserializer)?).map_err(serde::de::Error::custom)
     }
 }
