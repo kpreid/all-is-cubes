@@ -66,8 +66,7 @@ impl<D: RtBlockData> Surface<'_, D> {
 
         let illumination = self.compute_illumination(rt);
         // Combine reflected and emitted light to produce the outgoing light.
-        let outgoing_rgb =
-            diffuse_color.to_rgb() * illumination * diffuse_color.alpha() + self.emission;
+        let outgoing_rgb = diffuse_color.reflect(illumination) + self.emission;
 
         Some(ColorBuf::from_light_and_transmittance(
             outgoing_rgb,

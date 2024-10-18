@@ -398,7 +398,7 @@ pub(crate) fn grass_placement_function(seed: u32) -> impl Fn(Cube) -> Option<Gra
 
 /// Sky whose lower half pretends to be a grassy plane.
 pub(crate) fn sky_with_grass(sky_color: Rgb) -> Sky {
-    let ground = palette::GRASS * sky_color;
+    let ground = palette::GRASS.with_alpha_one().reflect(sky_color);
     Sky::Octants([
         ground, ground, sky_color, sky_color, //
         ground, ground, sky_color, sky_color, //

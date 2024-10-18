@@ -732,9 +732,9 @@ impl LightBuffer {
             let light_cube = hit.adjacent();
             let stored_light = light_behind_cache.unwrap_or_else(|| current_light.get(light_cube));
 
-            let reflectance = hit_surface_color.to_rgb() * hit_alpha;
             let light_from_struck_face =
-                ev_hit.light_emission() + stored_light.value() * reflectance;
+                ev_hit.light_emission() + hit_surface_color.reflect(stored_light.value());
+
             self.incoming_light +=
                 light_from_struck_face * ray_state.alpha * ray_state.ray_weight_by_faces;
 

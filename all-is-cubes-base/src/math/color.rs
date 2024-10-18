@@ -396,6 +396,21 @@ impl Rgba {
             alpha: self.alpha.clamp(NN0, NN1),
         }
     }
+
+    /// Compute the light reflected from a surface with this reflectance and alpha.
+    //---
+    // Design note: This method doesn't exist because it’s a terribly frequent pattern,
+    // but because when I experimented with some stronger typing of color values,
+    // it popped up 3 times as a needed operation, and I think there’s something notable
+    // there. Someday we might distinguish “RGB light” and “RGB fully-opaque surface colors”
+    // and then this will be important for working with definitely the former and not the latter.
+    #[inline]
+    #[doc(hidden)] // not sure if good public API
+    pub fn reflect(self, illumination: Rgb) -> Rgb {
+        // TODO: do this math without any NaN checks or negative/amplified values.
+        // by introducing a dedicated RgbaReflectance type with constrained components?
+        self.to_rgb() * illumination * self.alpha
+    }
 }
 
 impl From<Vector3D<NotNan<f32>, Intensity>> for Rgb {
