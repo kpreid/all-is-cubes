@@ -250,7 +250,7 @@ impl From<ColorBuf> for Rgba {
             let color_alpha = 1.0 - buf.transmittance;
             let non_premultiplied_color = buf.light / color_alpha;
             Rgb::try_from(non_premultiplied_color)
-                .unwrap_or_else(|_| rgb_const!(1.0, 0.0, 0.0))
+                .unwrap_or(rgb_const!(1.0, 0.0, 0.0))
                 .with_alpha(PositiveSign::<f32>::try_from(color_alpha).unwrap_or(ps32(1.0)))
         }
     }
