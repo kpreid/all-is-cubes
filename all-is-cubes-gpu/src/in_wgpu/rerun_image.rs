@@ -23,6 +23,8 @@ pub(crate) struct RerunImageExport {
     /// The texture ID is of the scene color texture we need to read.
     /// The image size is our intermediate texture size, which may be different.
     resources: Memo<(crate::Id<wgpu::TextureView>, ImageSize), Resources>,
+
+    frame_number: i64,
 }
 
 struct Resources {
@@ -41,6 +43,7 @@ impl RerunImageExport {
             device,
             destination: rg::Destination::default(),
             image_copy_future: None,
+            frame_number: 0,
         }
     }
 
@@ -59,6 +62,10 @@ impl RerunImageExport {
         pipelines: &Pipelines,
         fb: &super::frame_texture::FramebufferTextures,
     ) {
+        if self.image_copy_future.is_some() {
+            return;
+        }
+
         if !self.destination.is_enabled() {
             self.image_copy_future = None;
             self.resources.clear();
@@ -214,6 +221,9 @@ impl RerunImageExport {
     pub(crate) fn finish_frame(&mut self) {
         if let Some(image_copy_future) = self.image_copy_future.take() {
             let d = &self.destination;
+
+            d.stream.set_time_sequence("gpu_frame", self.frame_number);
+            self.frame_number += 1;
 
             // Note: It's not great that we're blocking on the GPU work, but to get appropriate
             // Rerun timepoints for everything, we can't just let it complete asynchronously.
