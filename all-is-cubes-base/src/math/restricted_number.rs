@@ -144,7 +144,7 @@ macro_rules! non_generic_impls {
             /// Unwraps the value without modifying it.
             // TODO: When #![feature(const_precise_live_drops)] becomes stable, we can make this generic.
             #[inline]
-            pub fn into_inner(self) -> $t {
+            pub const fn into_inner(self) -> $t {
                 self.0
             }
 
