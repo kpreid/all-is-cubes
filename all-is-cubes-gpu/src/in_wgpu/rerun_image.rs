@@ -255,6 +255,11 @@ fn perform_image_copy(
     // currently doesn't.
     let (pinhole, transform) = rg::convert_camera_to_pinhole(camera);
 
+    let depth_range = Some(rg::components::ValueRange::new(
+        camera.near_plane_distance(),
+        camera.view_distance(),
+    ));
+
     Box::pin(async move {
         let color_data: Vec<u8> = color_future.await;
         let depth_data: Vec<f32> = depth_future.await;
@@ -279,6 +284,7 @@ fn perform_image_copy(
                 )
                 .into(),
                 meter: Some(1f32.into()),
+                depth_range,
                 draw_order: None,
                 colormap: None,
                 point_fill_ratio: None,

@@ -67,7 +67,7 @@ impl Destination {
         self.catch(|| self.stream.log(self.path.join(path_suffix), data))
     }
 
-    pub fn log_static(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
+    pub fn log_timeless(&self, path_suffix: &EntityPath, data: &impl re_sdk::AsComponents) {
         self.catch(|| self.stream.log_static(self.path.join(path_suffix), data))
     }
 
