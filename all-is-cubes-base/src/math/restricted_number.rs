@@ -29,44 +29,16 @@ use ordered_float::NotNan;
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct PositiveSign<T>(T);
 
-// /// ```
-// /// use all_is_cubes_base::{positive_sign, math::PositiveSign};
-// ///
-// /// const X: PositiveSign<f32> = positive_sign!(0.0);
-// /// const Y: PositiveSign<f32> = positive_sign!(1.0);
-// /// const Z: PositiveSign<f32> = positive_sign!(99.0);
-// /// ```
-// ///
-// /// ```compile_fail
-// /// use all_is_cubes_base::{positive_sign, math::PositiveSign};
-// /// // Not a literal; will not compile
-// /// use f32::NAN;
-// /// const X: PositiveSign<f32> = positive_sign!(NAN);
-// /// ```
-// ///
-// /// ```compile_fail
-// /// use all_is_cubes_base::{positive_sign, math::PositiveSign};
-// /// // Not positive; will not compile
-// /// const X: PositiveSign<f32> = positive_sign!(-0.0);
-// /// ```
-// #[macro_export]
-// #[doc(hidden)] // kludge we don't want to publish, for now
-// macro_rules! positive_sign {
-//     // Parsing shenanigan: Matching `tt` allows only a single token, but `-1.0` is two tokens,
-//     // so it is prohibited.
-//     // This is brittle, but we can get rid of it as soon as Rust 1.82 is released.
-//     ($value:tt) => {
-//         match $crate::notnan!($value) {
-//             value => unsafe { $crate::math::PositiveSign::new_nn_unchecked(value) },
-//         }
-//     };
-// }
-
 // --- Inherent implementations --------------------------------------------------------------------
 
 impl<T: FloatCore> PositiveSign<T> {
-    // public, but unsafe, so it can be called from a macro
-    #[doc(hidden)]
+    /// Construct [`PositiveSign`] without checking the value.
+    ///
+    /// # Safety
+    ///
+    /// `value` must not be NaN and must have a positive sign bit.
+    /// Note that `value >= 0.` is not a sufficient condition,
+    /// because it does not exclude negative zero.
     #[inline]
     pub const unsafe fn new_unchecked(value: T) -> Self {
         Self(value)
@@ -273,7 +245,6 @@ impl<T: FloatCore + ops::Add<Output = T>> ops::Add for PositiveSign<T> {
 }
 impl<T: FloatCore + ops::Mul<Output = T>> ops::Mul for PositiveSign<T> {
     type Output = Self;
-    /// Componentwise multiplication.
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         // Construction safety:
@@ -368,7 +339,7 @@ const fn positive_sign_not_positive_panic() -> ! {
 /// to be used in tests and pseudo-literals.
 #[inline]
 pub const fn ps32(value: f32) -> PositiveSign<f32> {
-    PositiveSign::<f32>::new_clamped(value)
+    PositiveSign::<f32>::new_strict(value)
 }
 
 // -------------------------------------------------------------------------------------------------
