@@ -7,7 +7,7 @@ use core::fmt;
 use core::hash;
 use core::ops;
 
-use num_traits::ConstZero as _;
+use num_traits::{ConstOne as _, ConstZero as _};
 use ordered_float::FloatCore;
 use ordered_float::NotNan;
 
@@ -28,6 +28,16 @@ use ordered_float::NotNan;
 /// but may be assumed for `f32` and `f64`.)
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct PositiveSign<T>(T);
+
+/// A floating-point number which is within the range +0 to +1 (inclusive).
+///
+/// This may be used for alpha blending, reflectance, lerps, and anything else where values
+/// outside the range 0 to 1 is meaningless. It is closed under multiplication.
+///
+/// Because NaN and negative zero are excluded, this type implements [`Eq`] straightforwardly,
+/// and can reliably be used as a map key for caching, interning, etc.
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct ZeroOne<T>(T);
 
 // --- Inherent implementations --------------------------------------------------------------------
 
@@ -57,6 +67,58 @@ impl<T: FloatCore> PositiveSign<T> {
     {
         assert!(!self.0.is_nan() && self.0.is_sign_positive(), "{self:?}");
     }
+}
+
+impl<T: FloatCore> ZeroOne<T> {
+    /// Construct [`ZeroOne`] without checking the value.
+    ///
+    /// # Safety
+    ///
+    /// `value` must be +0, 1, or some value in between those two.
+    /// Note that `value >= 0. && value <= 1.` is not a sufficient condition,
+    /// because it does not exclude negative zero.
+    #[inline]
+    pub const unsafe fn new_unchecked(value: T) -> Self {
+        Self(value)
+    }
+
+    pub(crate) const fn into_nn(self) -> NotNan<T> {
+        // SAFETY: `ZeroOne`’s restrictions are a superset of `NotNan`’s.
+        unsafe { NotNan::new_unchecked(self.0) }
+    }
+
+    #[cfg(test)]
+    #[track_caller]
+    pub(crate) fn consistency_check(self)
+    where
+        Self: fmt::Debug,
+    {
+        assert!(
+            self.0.is_sign_positive() && self.0 >= T::zero() && self.0 <= T::one(),
+            "{self:?}"
+        );
+    }
+
+    /// Returns `1.0 - self`.
+    ///
+    /// The result cannot be out of range, so this operation is always successful.
+    #[inline]
+    #[must_use]
+    pub fn complement(self) -> Self {
+        // Construction safety:
+        // `self.0` is at most 1.0, so the result cannot be less than 0.0.
+        // `self.0` is at least 0.0, so the result cannot be greater than 1.0.
+        Self(T::one() - self.0)
+    }
+}
+
+impl<T: FloatCore + num_traits::ConstZero + num_traits::ConstOne> ZeroOne<T> {
+    /// The number zero, as a constant.
+    // This cannot be a `ConstZero` implementation because `ZeroOne` does not implement `ops::Add`.
+    pub const ZERO: Self = Self(T::ZERO);
+    /// The number one, as a constant.
+    // This exists too just for symmetry, though there is a `ConstOne` implementation
+    pub const ONE: Self = Self(T::ONE);
 }
 
 // --- Non-generic macro-generated implementations -------------------------------------------------
@@ -129,6 +191,78 @@ macro_rules! non_generic_impls {
             }
         }
 
+        impl ZeroOne<$t> {
+            /// Wraps the given value in `ZeroOne`.
+            ///
+            /// * If `value` is in range, returns wrapped `value`.
+            /// * If `value` is zero of either sign, returns wrapped positive zero.
+            ///   This is lossy, but corresponds to the IEEE 754 idea that -0.0 == +0.0.
+            /// * If `value` is out of range or NaN, panics.
+            #[track_caller]
+            #[inline]
+            pub const fn new_strict(value: $t) -> Self {
+                if value > 0. && value <= 1. {
+                    Self(value)
+                } else if value == 0. {
+                    Self(0.)
+                } else {
+                    zero_one_out_of_range_panic()
+                }
+            }
+
+            /// Wraps the given value in `ZeroOne`.
+            ///
+            /// * If the value is NaN, panics.
+            /// * If the value is out of range, replaces it with the nearest in-range value
+            ///   (0 or 1).
+            #[track_caller]
+            #[inline]
+            pub const fn new_clamped(value: $t) -> Self {
+                if value > 0. && value <= 1. {
+                    // note > 0, which excludes negative zero
+                    Self(value)
+                } else if value <= 0. {
+                    Self(0.)
+                } else if value >= 1. {
+                    Self(1.)
+                } else {
+                    zero_one_nan_panic()
+                }
+            }
+
+            /// Const equivalent of `TryFrom::try_from()`.
+            #[inline]
+            pub(crate) const fn try_new(value: $t) -> Result<Self, NotZeroOne<$t>> {
+                if value > <$t>::ZERO && value <= <$t>::ONE {
+                    Ok(Self(value))
+                } else if value == <$t>::ZERO {
+                    // must be zero, not NaN, but we don’t know the sign
+                    Ok(Self(<$t>::ZERO))
+                } else {
+                    Err(NotZeroOne(value))
+                }
+            }
+
+            /// Unwraps the value without modifying it.
+            // TODO: When #![feature(const_precise_live_drops)] becomes stable, we can make this generic.
+            #[inline]
+            pub const fn into_inner(self) -> $t {
+                self.0
+            }
+
+            /// Const version of `self == ZeroOne::ZERO`
+            #[inline]
+            pub const fn is_zero(self) -> bool {
+                self.0 == <$t>::ZERO
+            }
+
+            /// Const version of `self == ZeroOne::ONE`
+            #[inline]
+            pub const fn is_one(self) -> bool {
+                self.0 == <$t>::ONE
+            }
+        }
+
         impl From<PositiveSign<$t>> for NotNan<$t> {
             #[inline]
             fn from(value: PositiveSign<$t>) -> Self {
@@ -141,6 +275,27 @@ macro_rules! non_generic_impls {
                 value.0
             }
         }
+        impl From<ZeroOne<$t>> for NotNan<$t> {
+            #[inline]
+            fn from(value: ZeroOne<$t>) -> Self {
+                value.into_nn()
+            }
+        }
+        impl From<ZeroOne<$t>> for $t {
+            #[inline]
+            fn from(value: ZeroOne<$t>) -> Self {
+                value.0
+            }
+        }
+
+        impl From<ZeroOne<$t>> for PositiveSign<$t> {
+            #[inline]
+            fn from(value: ZeroOne<$t>) -> Self {
+                // Construction safety:
+                // Valid `PositiveSign` values are a superset of valid `ZeroOne` values.
+                PositiveSign(value.0)
+            }
+        }
 
         impl TryFrom<$t> for PositiveSign<$t> {
             type Error = NotPositiveSign<$t>;
@@ -151,6 +306,20 @@ macro_rules! non_generic_impls {
             /// * If `value` is zero of either sign, returns wrapped positive zero.
             ///   This is lossy, but corresponds to the IEEE 754 idea that -0.0 == +0.0.
             /// * If `value` is negative non-zero or NaN, returns an error.
+            #[inline]
+            fn try_from(value: $t) -> Result<Self, Self::Error> {
+                Self::try_new(value)
+            }
+        }
+        impl TryFrom<$t> for ZeroOne<$t> {
+            type Error = NotZeroOne<$t>;
+
+            /// Checks that `value` is within the range 0 to 1.
+            ///
+            /// * If `value` > 0 and `value` ≤ 1, returns wrapped `value`.
+            /// * If `value` is zero of either sign, returns wrapped positive zero.
+            ///   This is lossy, but corresponds to the IEEE 754 idea that -0.0 == +0.0.
+            /// * If `value` is out of range or NaN, returns an error.
             #[inline]
             fn try_from(value: $t) -> Result<Self, Self::Error> {
                 Self::try_new(value)
@@ -181,12 +350,37 @@ impl<T: fmt::Display> fmt::Display for PositiveSign<T> {
         value.fmt(f)
     }
 }
+impl<T: fmt::Debug> fmt::Debug for ZeroOne<T> {
+    #[inline(never)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Don't print the wrappers, just the value.
+        let value: &T = &self.0;
+        value.fmt(f)
+    }
+}
+impl<T: fmt::Display> fmt::Display for ZeroOne<T> {
+    #[inline(never)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Don't print the wrappers, just the value.
+        let value: &T = &self.0;
+        value.fmt(f)
+    }
+}
 
 // The derived PartialEq implementation is okay, but we need to add Eq.
 impl<T: PartialEq> Eq for PositiveSign<T> {}
+impl<T: PartialEq> Eq for ZeroOne<T> {}
 
 #[allow(clippy::derive_ord_xor_partial_ord)]
 impl<T: FloatCore + PartialOrd> Ord for PositiveSign<T> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        // Correctness: All values that would violate `Ord`’s properties are prohibited.
+        self.partial_cmp(other).unwrap()
+    }
+}
+#[allow(clippy::derive_ord_xor_partial_ord)]
+impl<T: FloatCore + PartialOrd> Ord for ZeroOne<T> {
     #[inline]
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         // Correctness: All values that would violate `Ord`’s properties are prohibited.
@@ -200,8 +394,21 @@ impl<T: FloatCore> hash::Hash for PositiveSign<T> {
         self.into_nn().hash(state)
     }
 }
+impl<T: FloatCore> hash::Hash for ZeroOne<T> {
+    #[inline]
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.into_nn().hash(state)
+    }
+}
 
 impl<T: FloatCore + num_traits::Zero> Default for PositiveSign<T> {
+    /// The default is zero, regardless of what `T::default()` is.
+    #[inline]
+    fn default() -> Self {
+        Self(T::zero())
+    }
+}
+impl<T: FloatCore + num_traits::Zero> Default for ZeroOne<T> {
     /// The default is zero, regardless of what `T::default()` is.
     #[inline]
     fn default() -> Self {
@@ -232,6 +439,15 @@ impl<T: FloatCore + num_traits::ConstZero> num_traits::ConstZero for PositiveSig
 impl<T: FloatCore + num_traits::ConstOne> num_traits::ConstOne for PositiveSign<T> {
     const ONE: Self = Self(T::ONE);
 }
+impl<T: FloatCore + num_traits::One> num_traits::One for ZeroOne<T> {
+    #[inline]
+    fn one() -> Self {
+        Self(T::one())
+    }
+}
+impl<T: FloatCore + num_traits::ConstOne> num_traits::ConstOne for ZeroOne<T> {
+    const ONE: Self = Self(T::ONE);
+}
 
 impl<T: FloatCore + ops::Add<Output = T>> ops::Add for PositiveSign<T> {
     type Output = Self;
@@ -253,8 +469,46 @@ impl<T: FloatCore + ops::Mul<Output = T>> ops::Mul for PositiveSign<T> {
         Self(self.0 * rhs.0)
     }
 }
+impl<T: FloatCore + ops::Mul<Output = T>> ops::Mul for ZeroOne<T> {
+    type Output = Self;
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        // Construction safety:
+        // If the in-range subset of T isn't closed under multiplication, the number type is
+        // too weird to be useful, and probably doesn’t honestly implement `FloatCore` either.
+        Self(self.0 * rhs.0)
+    }
+}
+
+// Mixed-type multiplications
+impl<T: FloatCore> ops::Mul<ZeroOne<T>> for PositiveSign<T>
+where
+    PositiveSign<T>: From<ZeroOne<T>>,
+{
+    type Output = PositiveSign<T>;
+    #[inline]
+    fn mul(self, rhs: ZeroOne<T>) -> Self::Output {
+        self * PositiveSign::from(rhs)
+    }
+}
+impl<T: FloatCore> ops::Mul<PositiveSign<T>> for ZeroOne<T>
+where
+    PositiveSign<T>: From<ZeroOne<T>>,
+{
+    type Output = PositiveSign<T>;
+    #[inline]
+    fn mul(self, rhs: PositiveSign<T>) -> Self::Output {
+        PositiveSign::from(self) * rhs
+    }
+}
 
 impl<T> AsRef<T> for PositiveSign<T> {
+    #[inline]
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+impl<T> AsRef<T> for ZeroOne<T> {
     #[inline]
     fn as_ref(&self) -> &T {
         &self.0
@@ -300,12 +554,39 @@ where
         NotNan::<T>::size_hint(depth)
     }
 }
+#[cfg(feature = "arbitrary")]
+#[mutants::skip]
+#[allow(clippy::missing_inline_in_public_items)]
+impl<'a, T> arbitrary::Arbitrary<'a> for ZeroOne<T>
+where
+    T: FloatCore,
+    NotNan<T>: arbitrary::Arbitrary<'a> + ops::Neg<Output = NotNan<T>> + Copy,
+    Self: TryFrom<T>,
+{
+    #[inline(never)]
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let value: T = NotNan::<T>::arbitrary(u)?.into_inner().abs();
+        Self::try_from(value)
+            // if it's greater than 1, try to make it less than 1
+            .or_else(|_| Self::try_from(value.recip()))
+            .map_err(|_| arbitrary::Error::IncorrectFormat)
+    }
+
+    #[inline(never)]
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        NotNan::<T>::size_hint(depth)
+    }
+}
 
 // --- Errors --------------------------------------------------------------------------------------
 
 /// Error from attempting to construct a [`PositiveSign`].
 #[derive(Clone, Debug)]
 pub struct NotPositiveSign<T>(T);
+
+/// Error from attempting to construct a [`ZeroOne`].
+#[derive(Clone, Debug)]
+pub struct NotZeroOne<T>(T);
 
 impl<T: FloatCore + fmt::Display> fmt::Display for NotPositiveSign<T> {
     #[inline(never)]
@@ -319,7 +600,22 @@ impl<T: FloatCore + fmt::Display> fmt::Display for NotPositiveSign<T> {
     }
 }
 
+impl<T: FloatCore + fmt::Display> fmt::Display for NotZeroOne<T> {
+    #[inline(never)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let value = self.0;
+        if value <= T::zero() {
+            write!(f, "{value} was less than zero")
+        } else if value >= T::one() {
+            write!(f, "{value} was greater than one")
+        } else {
+            write!(f, "value was NaN")
+        }
+    }
+}
+
 impl<T: FloatCore + fmt::Display + fmt::Debug> core::error::Error for NotPositiveSign<T> {}
+impl<T: FloatCore + fmt::Display + fmt::Debug> core::error::Error for NotZeroOne<T> {}
 
 #[track_caller]
 #[cold]
@@ -333,6 +629,18 @@ const fn positive_sign_not_positive_panic() -> ! {
     panic!("PositiveSign value must not be NaN or negative")
 }
 
+#[track_caller]
+#[cold]
+const fn zero_one_nan_panic() -> ! {
+    panic!("ZeroOne value must not be NaN")
+}
+
+#[track_caller]
+#[cold]
+const fn zero_one_out_of_range_panic() -> ! {
+    panic!("ZeroOne value must be between zero and one")
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Convenient alias for [`PositiveSign::<f32>::new_strict()`],
@@ -342,16 +650,24 @@ pub const fn ps32(value: f32) -> PositiveSign<f32> {
     PositiveSign::<f32>::new_strict(value)
 }
 
+/// Convenient alias for [`ZeroOne::<f32>::new_strict()`],
+/// to be used in tests and pseudo-literals.
+#[inline]
+pub const fn zo32(value: f32) -> ZeroOne<f32> {
+    ZeroOne::<f32>::new_strict(value)
+}
+
 // -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(clippy::manual_range_contains)]
 mod tests {
     use super::*;
     use alloc::string::ToString as _;
     use exhaust::Exhaust as _;
 
     #[test]
-    fn canonicalizes_negative_zero() {
+    fn ps_canonicalizes_negative_zero() {
         let was_nz = PositiveSign::<f32>::new_strict(-0.0);
         assert!(was_nz.into_inner().is_sign_positive());
         assert_eq!(was_nz.to_string(), "0");
@@ -359,7 +675,7 @@ mod tests {
     }
 
     #[test]
-    fn exhaustive() {
+    fn ps_exhaustive() {
         for f in f32::exhaust() {
             match PositiveSign::<f32>::try_from(f) {
                 Ok(ps) => {
@@ -374,4 +690,46 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn zo_canonicalizes_negative_zero() {
+        let was_nz = ZeroOne::<f32>::new_strict(-0.0);
+        assert!(was_nz.into_inner().is_sign_positive());
+        assert_eq!(was_nz.to_string(), "0");
+        assert_eq!(was_nz, ZeroOne::<f32>::try_from(-0.0).unwrap())
+    }
+
+    #[test]
+    fn zo_exhaustive() {
+        for f in f32::exhaust() {
+            match ZeroOne::<f32>::try_from(f) {
+                Ok(zo) => {
+                    zo.consistency_check();
+                    assert_eq!(zo, ZeroOne::<f32>::new_clamped(f));
+                    assert_eq!(zo, ZeroOne::<f32>::new_strict(f));
+                    assert_eq!(zo.into_inner(), f);
+                    assert_eq!(f32::from(zo), f);
+                    assert_eq!(NotNan::from(zo), NotNan::new(f).unwrap());
+                }
+                Err(_) => assert!(f.is_nan() || f < 0.0 || f > 1.0),
+            }
+        }
+    }
+
+    #[test]
+    fn zo_complement() {
+        assert_eq!(zo32(0.0).complement(), zo32(1.0));
+        assert_eq!(zo32(1.0).complement(), zo32(0.0));
+
+        // Also check the most extreme cases that aren’t exact
+        for f in [
+            f32::from_bits(0x00000001), // next up from 0
+            f32::from_bits(0x3f7fffff), // next down from 1
+        ] {
+            zo32(f).consistency_check();
+        }
+    }
+
+    // TODO: could use some edge-case tests for being closed under arithmetic ops,
+    // or is that best handled as a fuzz test?
 }
