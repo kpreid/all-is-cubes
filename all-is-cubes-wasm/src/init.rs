@@ -162,7 +162,7 @@ async fn start_game_with_dom(
         .build::<crate::AdaptedInstant>(
             universe_progress,
             all_is_cubes_content::TemplateParameters {
-                seed: thread_rng().gen(),
+                seed: thread_rng().r#gen(),
                 size: None,
             },
         )
