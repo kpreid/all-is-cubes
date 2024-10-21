@@ -16,7 +16,7 @@ use crate::block::{
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
 use crate::math::{
-    ps32, Cube, Face6, FaceMap, GridAab, GridPoint, GridRotation, GridVector, Intensity,
+    zo32, Cube, Face6, FaceMap, GridAab, GridPoint, GridRotation, GridVector, Intensity,
     OpacityCategory, Rgb, Rgba, Vol,
 };
 use crate::space::{Space, SpaceTransaction};
@@ -315,9 +315,9 @@ mod eval {
         let block = Block::builder()
             .voxels_fn(resolution, |point| {
                 Block::from(voxel_color.with_alpha(if point.x == 0 && point.z == 0 {
-                    ps32(alpha)
+                    zo32(alpha)
                 } else {
-                    ps32(1.0)
+                    zo32(1.0)
                 }))
             })
             .unwrap()
@@ -329,11 +329,11 @@ mod eval {
         // the light paths with opaque surfaces.
         assert_eq!(
             e.color(),
-            voxel_color.with_alpha(ps32(1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))))
+            voxel_color.with_alpha(zo32(1.0 - (alpha / (f32::from(resolution).powi(2) * 3.0))))
         );
         // This is the sum of the transparency of one voxel on one of the six faces
         let one_face_transparency =
-            voxel_color.with_alpha(ps32(1.0 - (alpha / f32::from(resolution).powi(2))));
+            voxel_color.with_alpha(zo32(1.0 - (alpha / f32::from(resolution).powi(2))));
         assert_eq!(
             e.face_colors(),
             FaceMap {
@@ -369,7 +369,7 @@ mod eval {
         let mut universe = Universe::new();
         let c1 = Rgb::new(1.0, 0.0, 0.0);
         let c2 = Rgb::new(0.0, 1.0, 0.0);
-        let colors = [c1.with_alpha_one(), c2.with_alpha(ps32(0.5))];
+        let colors = [c1.with_alpha_one(), c2.with_alpha(zo32(0.5))];
         let block = Block::builder()
             .voxels_fn(R2, |cube| Block::from(colors[cube.y as usize]))
             .unwrap()
@@ -600,7 +600,7 @@ mod eval {
     #[test]
     fn color_evaluation_regression() {
         let block = Block::builder()
-            .color(Rgba::new(1e28, 1e28, 1e28, 1e28))
+            .color(Rgba::new(1e28, 1e28, 1e28, 1.0))
             // Modifier matters because it causes the block to become voxels
             .modifier(Modifier::Move(modifier::Move::new(Face6::NX, 0, 0)))
             .build();

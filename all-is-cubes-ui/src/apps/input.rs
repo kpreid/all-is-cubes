@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
-use all_is_cubes::math::{ps32, FreeCoordinate, FreeVector};
+use all_is_cubes::math::{zo32, FreeCoordinate, FreeVector};
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes_render::camera::{
@@ -374,7 +374,7 @@ impl InputProcessor {
                             options.transparency = match options.transparency {
                                 TransparencyOption::Surface => TransparencyOption::Volumetric,
                                 TransparencyOption::Volumetric => {
-                                    TransparencyOption::Threshold(ps32(0.5))
+                                    TransparencyOption::Threshold(zo32(0.5))
                                 }
                                 TransparencyOption::Threshold(_) => TransparencyOption::Surface,
                                 _ => TransparencyOption::Surface, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive

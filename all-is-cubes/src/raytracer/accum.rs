@@ -4,7 +4,7 @@ use euclid::Vector3D;
 
 use crate::block::Resolution;
 use crate::camera::GraphicsOptions;
-use crate::math::{ps32, rgb_const, Intensity, PositiveSign, Rgb, Rgba};
+use crate::math::{rgb_const, zo32, Intensity, Rgb, Rgba, ZeroOne};
 use crate::space::SpaceBlockData;
 
 /// Borrowed data which may be used to customize the result of raytracing.
@@ -251,7 +251,7 @@ impl From<ColorBuf> for Rgba {
             let non_premultiplied_color = buf.light / color_alpha;
             Rgb::try_from(non_premultiplied_color)
                 .unwrap_or(rgb_const!(1.0, 0.0, 0.0))
-                .with_alpha(PositiveSign::<f32>::try_from(color_alpha).unwrap_or(ps32(1.0)))
+                .with_alpha(ZeroOne::<f32>::try_from(color_alpha).unwrap_or(zo32(1.0)))
         }
     }
 }

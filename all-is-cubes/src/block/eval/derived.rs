@@ -1,8 +1,8 @@
 use alloc::sync::Arc;
 use core::ops;
-use itertools::Itertools;
 
 use euclid::Vector3D;
+use itertools::Itertools;
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
@@ -14,7 +14,7 @@ use crate::block::{
     Resolution::{self, R1},
 };
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, Intensity, OpacityCategory, PositiveSign, Rgb, Rgba, Vol,
+    Cube, Face6, FaceMap, GridAab, Intensity, OpacityCategory, Rgb, Rgba, Vol, ZeroOne,
 };
 use crate::raytracer;
 
@@ -235,7 +235,7 @@ impl VoxSum {
                     // Note that by dividing the alpha by the full surface area, not the count,
                     // we handle the case where the voxel data doesn't cover the full block and
                     // uncounted pixels should act as if they are transparent.
-                    PositiveSign::<f32>::new_clamped(self.alpha_sum / (surface_area)),
+                    ZeroOne::<f32>::new_clamped(self.alpha_sum / (surface_area)),
                 )
         }
     }

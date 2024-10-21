@@ -12,7 +12,7 @@ use ordered_float::NotNan;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::math::{NotPositiveSign, PositiveSign};
+use crate::math::{NotPositiveSign, PositiveSign, ZeroOne};
 
 /// Allows writing a constant [`Rgb`] color value, provided that its components are float
 /// literals.
@@ -43,7 +43,7 @@ macro_rules! rgba_const {
                 $crate::math::PositiveSign::<f32>::new_strict($r),
                 $crate::math::PositiveSign::<f32>::new_strict($g),
                 $crate::math::PositiveSign::<f32>::new_strict($b),
-                $crate::math::PositiveSign::<f32>::new_strict($a),
+                $crate::math::ZeroOne::<f32>::new_strict($a),
             )
         }
     };
@@ -70,11 +70,12 @@ pub struct Rgb(Vector3D<PositiveSign<f32>, Intensity>);
 /// * The alpha is not premultiplied.
 /// * Alpha values less than zero and greater than one will usually be treated equivalently to
 ///   zero and one, respectively, but are preserved rather than clipped.
-///   (TODO: Constrain it to the 0-1 range to reduce hazards.)
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Rgba {
+    // TODO: Split `Rgba` into two types: one premultiplied with unbounded RGB, and one with
+    // RGB restricted to 0-1 for reflectance-like use cases.
     rgb: Rgb,
-    alpha: PositiveSign<f32>,
+    alpha: ZeroOne<f32>,
 }
 
 /// Unit-of-measure type for vectors that contain color channels.
@@ -151,13 +152,13 @@ impl Rgb {
 
     /// Adds an alpha component to produce an [Rgba] color.
     #[inline]
-    pub const fn with_alpha(self, alpha: PositiveSign<f32>) -> Rgba {
+    pub const fn with_alpha(self, alpha: ZeroOne<f32>) -> Rgba {
         Rgba { rgb: self, alpha }
     }
     /// Adds an alpha component of `1.0` (fully opaque) to produce an [Rgba] color.
     #[inline]
     pub const fn with_alpha_one(self) -> Rgba {
-        self.with_alpha(PS1)
+        self.with_alpha(ZeroOne::ONE)
     }
 
     /// Adds an alpha component of `1.0` (fully opaque) to produce an [Rgba] color.
@@ -166,7 +167,7 @@ impl Rgb {
     #[inline]
     #[must_use]
     pub const fn with_alpha_one_if_has_no_alpha(self) -> Rgba {
-        self.with_alpha(PS1)
+        self.with_alpha(ZeroOne::ONE)
     }
 
     /// Returns the red color component. Values are linear (gamma = 1).
@@ -246,7 +247,7 @@ impl Rgb {
 impl Rgba {
     /// Transparent black (all components zero); identical to
     /// `Rgba::new(0.0, 0.0, 0.0, 0.0)` except for being a constant.
-    pub const TRANSPARENT: Rgba = Rgb::ZERO.with_alpha(PS0);
+    pub const TRANSPARENT: Rgba = Rgb::ZERO.with_alpha(ZeroOne::ZERO);
     /// Black; identical to `Rgba::new(0.0, 0.0, 0.0, 1.0)` except for being a constant.
     pub const BLACK: Rgba = Rgb::ZERO.with_alpha_one();
     /// White; identical to `Rgba::new(1.0, 1.0, 1.0, 1.0)` except for being a constant.
@@ -257,7 +258,7 @@ impl Rgba {
     #[inline]
     #[track_caller]
     pub const fn new(r: f32, g: f32, b: f32, a: f32) -> Self {
-        Rgb::new(r, g, b).with_alpha(PositiveSign::<f32>::new_strict(a))
+        Rgb::new(r, g, b).with_alpha(ZeroOne::<f32>::new_strict(a))
     }
 
     /// Constructs a color from components that have already been checked for not being
@@ -270,7 +271,7 @@ impl Rgba {
         r: PositiveSign<f32>,
         g: PositiveSign<f32>,
         b: PositiveSign<f32>,
-        alpha: PositiveSign<f32>,
+        alpha: ZeroOne<f32>,
     ) -> Self {
         Self {
             rgb: Rgb::new_ps(r, g, b),
@@ -312,11 +313,9 @@ impl Rgba {
     }
     /// Returns the alpha component.
     ///
-    /// Alpha is not premultiplied. Alpha values less than zero and greater than one are
-    /// allowed and may be returned by this method, but alpha test methods will treat
-    // them equivalently to zero and one.
+    /// Note that the RGB components are not premultiplied by alpha.
     #[inline]
-    pub const fn alpha(self) -> PositiveSign<f32> {
+    pub const fn alpha(self) -> ZeroOne<f32> {
         self.alpha
     }
 
@@ -324,13 +323,13 @@ impl Rgba {
     /// zero or less.
     #[inline]
     pub fn fully_transparent(self) -> bool {
-        self.alpha() <= PS0
+        self.alpha().is_zero()
     }
     /// Returns whether this color is fully opaque, or has an alpha component of
     /// one or greater.
     #[inline]
     pub fn fully_opaque(self) -> bool {
-        self.alpha() >= PS1
+        self.alpha().is_one()
     }
     /// Returns the [`OpacityCategory`] which this color's alpha fits into.
     /// This returns the same information as [`Rgba::fully_transparent`] combined with
@@ -412,7 +411,7 @@ impl Rgba {
     pub fn clamp(self) -> Self {
         Self {
             rgb: self.rgb.clamp(),
-            alpha: self.alpha.min(PS1),
+            alpha: self.alpha,
         }
     }
 
@@ -428,7 +427,7 @@ impl Rgba {
     pub fn reflect(self, illumination: Rgb) -> Rgb {
         // TODO: do this math without any NaN checks or negative/amplified values.
         // by introducing a dedicated RgbaReflectance type with constrained components?
-        self.to_rgb() * illumination * self.alpha
+        self.to_rgb() * illumination * PositiveSign::from(self.alpha)
     }
 }
 
@@ -445,10 +444,40 @@ impl From<[PositiveSign<f32>; 3]> for Rgb {
         Self(value.into())
     }
 }
-impl From<[PositiveSign<f32>; 4]> for Rgba {
+impl From<[ZeroOne<f32>; 3]> for Rgb {
     #[inline]
-    fn from(value: [PositiveSign<f32>; 4]) -> Self {
+    fn from(value: [ZeroOne<f32>; 3]) -> Self {
+        Self::from(value.map(PositiveSign::from))
+    }
+}
+impl From<[ZeroOne<f32>; 4]> for Rgba {
+    #[inline]
+    fn from(value: [ZeroOne<f32>; 4]) -> Self {
         let [r, g, b, alpha] = value;
+        Self {
+            rgb: Rgb::from([r, g, b]),
+            alpha,
+        }
+    }
+}
+impl
+    From<(
+        PositiveSign<f32>,
+        PositiveSign<f32>,
+        PositiveSign<f32>,
+        ZeroOne<f32>,
+    )> for Rgba
+{
+    #[inline]
+    fn from(
+        value: (
+            PositiveSign<f32>,
+            PositiveSign<f32>,
+            PositiveSign<f32>,
+            ZeroOne<f32>,
+        ),
+    ) -> Self {
+        let (r, g, b, alpha) = value;
         Self {
             rgb: Rgb::from([r, g, b]),
             alpha,
@@ -473,7 +502,21 @@ impl From<Rgba> for [PositiveSign<f32>; 4] {
     #[inline]
     fn from(value: Rgba) -> Self {
         let [r, g, b]: [PositiveSign<f32>; 3] = value.rgb.into();
-        [r, g, b, value.alpha]
+        [r, g, b, value.alpha.into()]
+    }
+}
+impl From<Rgba>
+    for (
+        PositiveSign<f32>,
+        PositiveSign<f32>,
+        PositiveSign<f32>,
+        ZeroOne<f32>,
+    )
+{
+    #[inline]
+    fn from(value: Rgba) -> Self {
+        let [r, g, b]: [PositiveSign<f32>; 3] = value.rgb.into();
+        (r, g, b, value.alpha)
     }
 }
 
@@ -545,6 +588,14 @@ impl Mul<PositiveSign<f32>> for Rgb {
     #[inline]
     fn mul(self, scalar: PositiveSign<f32>) -> Self {
         Self(self.0 * scalar)
+    }
+}
+impl Mul<ZeroOne<f32>> for Rgb {
+    type Output = Self;
+    /// Multiplies this color value by a scalar.
+    #[inline]
+    fn mul(self, scalar: ZeroOne<f32>) -> Self {
+        Self(self.0 * PositiveSign::from(scalar))
     }
 }
 /// Multiplies this color value by a scalar.
@@ -699,9 +750,9 @@ fn component_from_linear8_arithmetic(c: u8) -> f32 {
 }
 
 #[inline]
-const fn component_from_linear8_const(c: u8) -> PositiveSign<f32> {
-    // Safety: the table may be inspected to contain no NaNs or negatives.
-    unsafe { PositiveSign::new_unchecked(CONST_LINEAR_LOOKUP_TABLE[c as usize]) }
+const fn component_from_linear8_const(c: u8) -> ZeroOne<f32> {
+    // Safety: the table may be inspected to contain no NaNs or out-of-bounds values.
+    unsafe { ZeroOne::new_unchecked(CONST_LINEAR_LOOKUP_TABLE[c as usize]) }
 }
 
 /// Implements sRGB decoding using the standard arithmetic.

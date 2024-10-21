@@ -8,7 +8,7 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::listen::Listener as _;
-use all_is_cubes::math::{ps32, GridPoint, NotNan};
+use all_is_cubes::math::{zo32, GridPoint, NotNan};
 use all_is_cubes::math::{Cube, FreePoint, GridAab, GridCoordinate};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::time;
@@ -284,7 +284,7 @@ fn graphics_options_change() {
     assert_eq!(vertices, Some(24));
 
     // Change options so that the mesh should disappear
-    options.transparency = TransparencyOption::Threshold(ps32(0.5));
+    options.transparency = TransparencyOption::Threshold(zo32(0.5));
     tester.camera.set_options(options.clone());
 
     vertices = None;

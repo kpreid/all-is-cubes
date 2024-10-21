@@ -3,7 +3,7 @@ use core::fmt;
 use num_traits::ConstOne as _;
 use ordered_float::NotNan;
 
-use crate::math::{notnan, FreeCoordinate, PositiveSign, Rgb, Rgba};
+use crate::math::{notnan, FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne};
 use crate::util::ShowStatus;
 
 #[cfg(doc)]
@@ -398,7 +398,7 @@ pub enum TransparencyOption {
     Volumetric,
     /// Alpha above or below the given threshold value will be rounded to fully opaque
     /// or fully transparent, respectively.
-    Threshold(PositiveSign<f32>),
+    Threshold(ZeroOne<f32>),
 }
 
 impl TransparencyOption {
@@ -476,7 +476,7 @@ impl AntialiasingOption {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::{ps32, rgba_const, OpacityCategory};
+    use crate::math::{rgba_const, zo32, OpacityCategory};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -550,7 +550,7 @@ mod tests {
         for transparency in &[
             TransparencyOption::Surface,
             TransparencyOption::Volumetric,
-            TransparencyOption::Threshold(ps32(0.5)),
+            TransparencyOption::Threshold(zo32(0.5)),
         ] {
             assert_eq!(
                 transparency.will_output_alpha(),

@@ -36,7 +36,7 @@ use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 use crate::math::Euclid as _;
 use crate::math::{
     rgb_const, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab,
-    GridMatrix, Intensity, PositiveSign, Rgb, Rgba, Vol,
+    GridMatrix, Intensity, Rgb, Rgba, Vol, ZeroOne,
 };
 use crate::raycast::{self, Ray, RayIsh};
 use crate::space::{BlockIndex, BlockSky, PackedLight, Sky, Space, SpaceBlockData};
@@ -628,7 +628,7 @@ fn apply_transmittance(color: Rgba, thickness: f32) -> (Rgba, f32) {
     // Convert back to alpha.
     // TODO: skip NaN check ... this may require refactoring Surface usage.
     // We might also benefit from an "UncheckedRgba" concept.
-    let alpha = PositiveSign::<f32>::new_clamped(1.0 - depth_transmittance);
+    let alpha = ZeroOne::<f32>::new_clamped(1.0 - depth_transmittance);
     let modified_color = color.to_rgb().with_alpha(alpha);
 
     // Compute how the emission should be scaled to account for internal absorption and thickness.

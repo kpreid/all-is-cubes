@@ -8,7 +8,7 @@ use all_is_cubes::block::{self, Block, Resolution::*, AIR};
 use all_is_cubes::color_block;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::euclid::{point3, Point3D, Vector3D};
-use all_is_cubes::math::{ps32, Cube, Rgb};
+use all_is_cubes::math::{zo32, Cube, Rgb};
 use all_is_cubes::math::{
     Face6::{self, *},
     FaceMap, FreeCoordinate, GridAab, GridRotation, Rgba,
@@ -69,7 +69,7 @@ fn test_block_mesh_threshold(block: Block) -> BlockMesh<TextureMt> {
         &block.evaluate().unwrap(),
         &Allocator::new(),
         &MeshOptions {
-            transparency: TransparencyOption::Threshold(ps32(0.5)),
+            transparency: TransparencyOption::Threshold(zo32(0.5)),
             ..MeshOptions::dont_care_for_test()
         },
     )

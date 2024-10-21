@@ -231,7 +231,7 @@ mod tests {
     use super::*;
     use crate::block::{Composite, EvaluatedBlock, Resolution::*, VoxelOpacityMask};
     use crate::content::make_some_blocks;
-    use crate::math::{ps32, rgba_const, FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
+    use crate::math::{rgba_const, zo32, FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
     use crate::space::Space;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;
@@ -265,14 +265,14 @@ mod tests {
                     recursion: 0
                 },
                 derived: block::Derived {
-                    color: color.to_rgb().with_alpha(ps32(2. / 3.)),
+                    color: color.to_rgb().with_alpha(zo32(2. / 3.)),
                     face_colors: FaceMap {
-                        nx: color.to_rgb().with_alpha(ps32(0.5)),
-                        ny: color.to_rgb().with_alpha(ps32(1.0)),
-                        nz: color.to_rgb().with_alpha(ps32(0.5)),
-                        px: color.to_rgb().with_alpha(ps32(0.5)),
-                        py: color.to_rgb().with_alpha(ps32(1.0)),
-                        pz: color.to_rgb().with_alpha(ps32(0.5)),
+                        nx: color.to_rgb().with_alpha(zo32(0.5)),
+                        ny: color.to_rgb().with_alpha(zo32(1.0)),
+                        nz: color.to_rgb().with_alpha(zo32(0.5)),
+                        px: color.to_rgb().with_alpha(zo32(0.5)),
+                        py: color.to_rgb().with_alpha(zo32(1.0)),
+                        pz: color.to_rgb().with_alpha(zo32(0.5)),
                     },
                     light_emission: Rgb::ZERO,
                     opaque: FaceMap::splat(false).with(Face6::PY, true),
@@ -322,14 +322,14 @@ mod tests {
                     Vol::repeat(expected_bounds, Evoxel::from_block(&ev_original))
                 ),
                 derived: block::Derived {
-                    color: color.to_rgb().with_alpha(ps32(2. / 3.)),
+                    color: color.to_rgb().with_alpha(zo32(2. / 3.)),
                     face_colors: FaceMap {
-                        nx: color.to_rgb().with_alpha(ps32(0.5)),
-                        ny: color.to_rgb().with_alpha(ps32(1.0)),
-                        nz: color.to_rgb().with_alpha(ps32(0.5)),
-                        px: color.to_rgb().with_alpha(ps32(0.5)),
-                        py: color.to_rgb().with_alpha(ps32(1.0)),
-                        pz: color.to_rgb().with_alpha(ps32(0.5)),
+                        nx: color.to_rgb().with_alpha(zo32(0.5)),
+                        ny: color.to_rgb().with_alpha(zo32(1.0)),
+                        nz: color.to_rgb().with_alpha(zo32(0.5)),
+                        px: color.to_rgb().with_alpha(zo32(0.5)),
+                        py: color.to_rgb().with_alpha(zo32(1.0)),
+                        pz: color.to_rgb().with_alpha(zo32(0.5)),
                     },
                     light_emission: Rgb::ZERO,
                     opaque: FaceMap::splat(false).with(Face6::PY, true),

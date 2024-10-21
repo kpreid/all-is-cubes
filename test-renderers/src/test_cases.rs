@@ -15,7 +15,7 @@ use all_is_cubes::color_block;
 use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Size3D, Vector3D};
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
-    ps32, rgb_const, rgba_const, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
+    ps32, rgb_const, rgba_const, zo32, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
     GridPoint, GridRotation, GridVector, NotNan, Rgb, Rgba, Vol,
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
@@ -502,7 +502,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
     let mut options_2 = options_1.clone();
     options_2.fov_y = NotNan::from(70);
     options_2.exposure = ExposureOption::Fixed(ps32(1.5));
-    options_2.transparency = TransparencyOption::Threshold(ps32(0.1));
+    options_2.transparency = TransparencyOption::Threshold(zo32(0.1));
 
     let options_cell = ListenableCell::new(options_1);
     let cameras: StandardCameras = StandardCameras::new(

@@ -17,7 +17,7 @@ use all_is_cubes::block::{
     AIR,
 };
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
-use all_is_cubes::math::{ps32, Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb};
+use all_is_cubes::math::{zo32, Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb};
 use all_is_cubes::space::Sky;
 use all_is_cubes::space::{SetCubeError, Space};
 use all_is_cubes::universe::UniverseTransaction;
@@ -109,7 +109,7 @@ impl DefaultProvision<Block> for LandscapeBlocks {
         fn blades() -> Block {
             Block::builder()
                 .display_name("Grass Blades")
-                .color(palette::GRASS.with_alpha(ps32(0.1)))
+                .color(palette::GRASS.with_alpha(zo32(0.1)))
                 .collision(BlockCollision::None)
                 .build()
         }

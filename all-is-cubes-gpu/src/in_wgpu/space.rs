@@ -6,14 +6,13 @@ use std::sync::{atomic, mpsc, Arc, Mutex, Weak};
 use std::time::Duration;
 
 use itertools::Itertools as _;
-use num_traits::ConstZero as _;
 
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{Listen as _, Listener};
 use all_is_cubes::math::{
     rgba_const, Cube, Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
-    GridSize, GridVector, PositiveSign, Rgb, Wireframe as _,
+    GridSize, GridVector, Rgb, Wireframe as _, ZeroOne,
 };
 use all_is_cubes::raycast::Ray;
 #[cfg(feature = "rerun")]
@@ -981,8 +980,7 @@ impl ParticleSet {
         crate::wireframe_vertices::<WgpuLinesVertex, _, _>(
             &mut tmp,
             Rgb::ONE.with_alpha(
-                PositiveSign::<f32>::try_from(0.9f32.powf(self.age as f32))
-                    .unwrap_or(PositiveSign::ZERO),
+                ZeroOne::<f32>::try_from(0.9f32.powf(self.age as f32)).unwrap_or(ZeroOne::ZERO),
             ),
             &self.fluff.position.aab().expand(0.004 * (self.age as f64)),
         );

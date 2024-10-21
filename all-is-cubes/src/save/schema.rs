@@ -23,7 +23,9 @@ use arcstr::ArcStr;
 use serde::{Deserialize, Serialize};
 
 use crate::block::Block;
-use crate::math::{Aab, Face6, GridAab, GridCoordinate, GridRotation, NotNan, PositiveSign};
+use crate::math::{
+    Aab, Face6, GridAab, GridCoordinate, GridRotation, NotNan, PositiveSign, ZeroOne,
+};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::time::Schedule;
 use crate::universe::Handle;
@@ -367,7 +369,12 @@ pub(crate) struct IconRowSerV1 {
 
 type RgbSer = [PositiveSign<f32>; 3];
 
-type RgbaSer = [PositiveSign<f32>; 4];
+type RgbaSer = (
+    PositiveSign<f32>,
+    PositiveSign<f32>,
+    PositiveSign<f32>,
+    ZeroOne<f32>,
+);
 
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `op` module

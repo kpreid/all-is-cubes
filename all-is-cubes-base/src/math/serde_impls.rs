@@ -106,3 +106,24 @@ where
         Self::try_from(T::deserialize(deserializer)?).map_err(serde::de::Error::custom)
     }
 }
+
+impl<T: Serialize> Serialize for math::ZeroOne<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.as_ref().serialize(serializer)
+    }
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for math::ZeroOne<T>
+where
+    Self: TryFrom<T, Error: core::error::Error>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::try_from(T::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+    }
+}

@@ -6,12 +6,12 @@
 use alloc::vec;
 use core::mem;
 
-use num_traits::Zero;
-
 use crate::block::{
     self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
 };
-use crate::math::{Cube, GridAab, GridCoordinate, GridRotation, GridSize, PositiveSign, Rgb, Vol};
+use crate::math::{
+    Cube, GridAab, GridCoordinate, GridRotation, GridSize, PositiveSign, Rgb, Vol, ZeroOne,
+};
 use crate::op::Operation;
 use crate::universe;
 
@@ -444,24 +444,27 @@ impl CompositeOperator {
     fn alpha_blend(
         self,
         source: Rgb,
-        sa: PositiveSign<f32>,
+        sa: ZeroOne<f32>,
         destination: Rgb,
-        da: PositiveSign<f32>,
-    ) -> (Rgb, PositiveSign<f32>) {
+        da: ZeroOne<f32>,
+    ) -> (Rgb, ZeroOne<f32>) {
         match self {
             Self::Over => {
                 // TODO: Surely this is not the only place we have implemented rgba blending?
                 // Note that this math would be simpler if we used premultiplied alpha.
-                let sa_complement = PositiveSign::<f32>::new_clamped(1. - sa.into_inner());
+                let sa_complement = sa.complement();
                 let rgb = source * sa + destination * sa_complement;
-                (rgb, sa + sa_complement * da)
+                (
+                    rgb,
+                    // TODO: express this alpha calculation in a correct-by-construction way instead
+                    ZeroOne::<f32>::new_clamped(
+                        sa.into_inner() + (sa_complement * da).into_inner(),
+                    ),
+                )
             }
 
             Self::In => (source, sa * da),
-            Self::Out => {
-                let da_complement = PositiveSign::<f32>::new_clamped(1. - da.into_inner());
-                (source, sa * da_complement)
-            }
+            Self::Out => (source, sa * da.complement()),
 
             Self::Atop => {
                 let sa_complement = PositiveSign::<f32>::new_clamped(1. - sa.into_inner());
@@ -683,7 +686,7 @@ mod tests {
     use super::*;
     use crate::block::{EvKey, EvaluatedBlock, Resolution::*};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::{ps32, Rgba};
+    use crate::math::{zo32, Rgba};
     use crate::space::Space;
     use crate::time;
     use crate::universe::Universe;
@@ -720,7 +723,7 @@ mod tests {
         Evoxel {
             // color doesn't matter, except that at zero alpha it should be the canonical zero
             // for convenience of testing. (TODO: maybe `Rgba` should enforce that or be premultiplied.)
-            color: Rgb::ZERO.with_alpha(ps32(alpha)),
+            color: Rgb::ZERO.with_alpha(zo32(alpha)),
             emission,
             selectable: true,
             collision: Hard,
@@ -853,10 +856,11 @@ mod tests {
 
         #[test]
         fn over_silly_floats() {
-            // We just want to see this does not panic on NaN.
+            // We just want to see this does not panic on math errors.
+            // TODO: this test should eventually become obsolete by using constrained numeric types.
             Over.blend_evoxel(
-                evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
-                evcolor(Rgba::new(2e25, 2e25, 2e25, 2e25)),
+                evcolor(Rgba::new(2e25, 2e25, 2e25, 1.0)),
+                evcolor(Rgba::new(2e25, 2e25, 2e25, 1.0)),
             );
         }
 
