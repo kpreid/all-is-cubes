@@ -150,7 +150,7 @@ async fn antialias(mut context: RenderTestContext, antialias_option: Antialiasin
 
 async fn bloom(mut context: RenderTestContext, bloom_intensity: f32) {
     let mut options = light_test_options();
-    options.bloom_intensity = NotNan::new(bloom_intensity).unwrap();
+    options.bloom_intensity = bloom_intensity.try_into().unwrap();
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
     context

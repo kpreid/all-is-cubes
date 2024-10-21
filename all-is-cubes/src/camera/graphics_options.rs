@@ -3,7 +3,7 @@ use core::fmt;
 use num_traits::ConstOne as _;
 use ordered_float::NotNan;
 
-use crate::math::{notnan, FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne};
+use crate::math::{notnan, zo32, FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne};
 use crate::util::ShowStatus;
 
 #[cfg(doc)]
@@ -53,7 +53,7 @@ pub struct GraphicsOptions {
 
     /// Proportion of bloom (blurred image) to mix into the original image.
     /// 0.0 is no bloom and 1.0 is no original image.
-    pub bloom_intensity: NotNan<f32>,
+    pub bloom_intensity: ZeroOne<f32>,
 
     /// Distance, in unit cubes, from the camera to the farthest visible point.
     ///
@@ -134,7 +134,7 @@ impl GraphicsOptions {
         // TODO: Change tone mapping default once we have a good implementation.
         tone_mapping: ToneMappingOperator::Clamp,
         exposure: ExposureOption::Fixed(PositiveSign::<f32>::ONE),
-        bloom_intensity: notnan!(0.),
+        bloom_intensity: zo32(0.),
         view_distance: notnan!(200.),
         lighting_display: LightingOption::None,
         transparency: TransparencyOption::Volumetric,
@@ -153,7 +153,6 @@ impl GraphicsOptions {
     #[must_use]
     pub fn repair(mut self) -> Self {
         self.fov_y = self.fov_y.clamp(NotNan::from(1), NotNan::from(189));
-        self.bloom_intensity = self.bloom_intensity.clamp(notnan!(0.0), notnan!(1.0));
         self.view_distance = self
             .view_distance
             .clamp(NotNan::from(1), NotNan::from(10000));
@@ -220,7 +219,7 @@ impl Default for GraphicsOptions {
             // TODO: Change tone mapping default once we have a good implementation.
             tone_mapping: ToneMappingOperator::Clamp,
             exposure: ExposureOption::default(),
-            bloom_intensity: notnan!(0.125),
+            bloom_intensity: zo32(0.125),
             view_distance: NotNan::from(200),
             lighting_display: LightingOption::Smooth,
             transparency: TransparencyOption::Volumetric,
@@ -537,7 +536,7 @@ mod tests {
                 fog: FogOption::None,
                 tone_mapping: ToneMappingOperator::Clamp,
                 exposure: ExposureOption::Fixed(PositiveSign::<f32>::ONE),
-                bloom_intensity: NotNan::from(0u8),
+                bloom_intensity: zo32(0.),
                 lighting_display: LightingOption::None,
                 antialiasing: AntialiasingOption::None,
                 ..GraphicsOptions::default()

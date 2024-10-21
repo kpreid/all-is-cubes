@@ -12,7 +12,7 @@ use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Gray8, Drawable as _};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen::DirtyFlag;
-use all_is_cubes::math::{notnan, VectorOps as _};
+use all_is_cubes::math::VectorOps as _;
 use all_is_cubes_render::camera::{Layers, RenderMethod, StandardCameras};
 use all_is_cubes_render::info_text_drawable;
 use all_is_cubes_render::{Flaws, RenderError};
@@ -833,7 +833,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             );
         }
 
-        if self.cameras.graphics_options().bloom_intensity > notnan!(0.0) {
+        if !self.cameras.graphics_options().bloom_intensity.is_zero() {
             if let Some(bloom) = &self.fb.bloom {
                 bloom.run(&mut encoder);
             }

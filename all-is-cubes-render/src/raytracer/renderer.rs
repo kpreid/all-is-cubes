@@ -12,7 +12,7 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{self, point2, vec2};
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{NotNan, Rgba};
+use all_is_cubes::math::{Rgba, ZeroOne};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Handle;
 
@@ -253,7 +253,7 @@ impl RtRenderer<()> {
 
         let options = self.cameras.graphics_options();
         let mut flaws = Flaws::empty();
-        if options.bloom_intensity != NotNan::from(0u8) {
+        if options.bloom_intensity != ZeroOne::ZERO {
             flaws |= Flaws::NO_BLOOM;
         }
         if self.had_cursor {
