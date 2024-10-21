@@ -148,7 +148,7 @@ pub async fn install_landscape_blocks(
     }]
     .clone();
     // TODO: easier way to do this?
-    if let Primitive::Atom(ref mut atom) = grass_blade_atom.primitive_mut() {
+    if let Primitive::Atom(atom) = grass_blade_atom.primitive_mut() {
         atom.color = atom.color.to_rgb().with_alpha_one();
         atom.collision = BlockCollision::None;
     }

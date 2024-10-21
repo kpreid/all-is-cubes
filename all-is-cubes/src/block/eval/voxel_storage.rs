@@ -213,7 +213,7 @@ impl Evoxels {
         match (&self.0, position) {
             (&EvoxelsInner::One(voxel), Cube::ORIGIN) => Some(voxel),
             (EvoxelsInner::One(_), _) => None,
-            (EvoxelsInner::Many(_, ref voxels), position) => voxels.get(position).copied(),
+            (EvoxelsInner::Many(_, voxels), position) => voxels.get(position).copied(),
         }
     }
 

@@ -53,7 +53,7 @@ impl<T: PartialEq> Merge for Equal<T> {
             (this @ None, other @ Some(_)) => *this = other,
 
             // Conflict
-            (Some(ref this), Some(ref other)) if this != other => {
+            (&mut Some(ref this), Some(ref other)) if this != other => {
                 panic!("Equal::merge() was given invalid merge check")
             }
 

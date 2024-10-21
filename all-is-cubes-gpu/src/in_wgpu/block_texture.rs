@@ -307,7 +307,7 @@ impl AllocatorBacking {
         // If we have textures already, check if they are the right size.
         let old_textures: Option<Msw<Group<_>>> = if matches!(
             backing.textures.as_deref(),
-            Some(Group { reflectance: GpuTexture { ref texture, .. }, .. })
+            Some(Group { reflectance: GpuTexture { texture, .. }, .. })
             if texture.size() != needed_texture_size
         ) {
             backing.textures.take()
