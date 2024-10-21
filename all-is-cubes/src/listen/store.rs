@@ -126,7 +126,7 @@ impl<T: ?Sized> StoreLock<T> {
     /// operation with the lock held panicked.
     ///
     /// If it is called while the same thread has already acquired the lock, it may panic or hang.
-    pub fn lock(&self) -> Result<impl core::ops::DerefMut<Target = T> + use<'_, T>, PoisonError> {
+    pub fn lock(&self) -> Result<impl core::ops::DerefMut<Target = T>, PoisonError> {
         // TODO: make poison tracking guaranteed by using a RefCell-with-poison
         self.0.lock().map_err(|_| PoisonError)
     }

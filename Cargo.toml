@@ -42,8 +42,8 @@ resolver = "2"
 [workspace.package]
 # When changing any of these values, be sure to also update the non-workspace packages
 # as listed above, if applicable.
-edition = "2021"
-rust-version = "1.83"
+edition = "2024"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
 # TODO: add homepage = "..." when we have one
