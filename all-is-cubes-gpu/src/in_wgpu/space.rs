@@ -972,7 +972,7 @@ impl ParticleSet {
         }
     }
 
-    fn lines(&self) -> impl Iterator<Item = WgpuLinesVertex> {
+    fn lines(&self) -> impl Iterator<Item = WgpuLinesVertex> + use<> {
         // TODO: this simple wireframe cube is a placeholder for more general mechanisms.
         // (But probably we also want to stop using lines, at some point, and use
         // specially-created block meshes instead.)

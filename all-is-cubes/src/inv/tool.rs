@@ -504,7 +504,7 @@ impl ToolError {
     ///
     /// TODO: This should have spatial information (located at the cursor target or the
     /// character's "hand" or other).
-    pub fn fluff(&self) -> impl Iterator<Item = Fluff> {
+    pub fn fluff(&self) -> impl Iterator<Item = Fluff> + use<> {
         core::iter::once(Fluff::Beep)
     }
 }

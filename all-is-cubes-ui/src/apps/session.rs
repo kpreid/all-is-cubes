@@ -624,7 +624,7 @@ impl<I: time::Instant> Session<I> {
     /// The returned future will produce a [`QuitCancelled`] value if quitting was unsuccessful for
     /// any reason. If it is successful, the future never resolves. It is not necessary to poll
     /// the future if the result value is not wanted.
-    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
+    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static + use<I> {
         self.shuttle().quit()
     }
 
@@ -672,7 +672,7 @@ impl Shuttle {
         // TODO: Need to sync FrameClock's schedule with the universe in case it is different
     }
 
-    fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
+    fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static + use<> {
         let fut: BoxFuture<'static, QuitResult> = match (&self.ui, &self.quit_fn) {
             (Some(ui), _) => Box::pin(ui.quit()),
             (None, Some(quit_fn)) => Box::pin(std::future::ready(quit_fn())),
@@ -1160,7 +1160,7 @@ impl MainTaskContext {
     /// The returned future will produce a [`QuitCancelled`] value if quitting was unsuccessful for
     /// any reason. If it is successful, the future never resolves. It is not necessary to poll
     /// the future if the result value is not wanted.
-    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
+    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static + use<> {
         self.with_ref(|shuttle| shuttle.quit())
     }
 

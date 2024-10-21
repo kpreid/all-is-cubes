@@ -150,7 +150,7 @@ pub fn get_image_from_gpu(
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     flaws: Flaws,
-) -> impl Future<Output = Rendering> + 'static {
+) -> impl Future<Output = Rendering> + 'static + use<> {
     // By making this an explicit `Future` return we avoid capturing the queue and texture
     // references.
 
@@ -177,7 +177,7 @@ pub fn get_texels_from_gpu<C>(
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     components: usize,
-) -> impl Future<Output = Vec<C>> + 'static
+) -> impl Future<Output = Vec<C>> + 'static + use<C>
 where
     C: bytemuck::AnyBitPattern,
 {

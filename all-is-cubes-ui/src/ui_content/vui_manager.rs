@@ -463,7 +463,7 @@ impl Vui {
     /// The returned future will produce a [`QuitCancelled`] value if quitting was unsuccessful for
     /// any reason. If it is successful, the future never resolves. It is not necessary to poll
     /// the future if the result value is not wanted.
-    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static {
+    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static + use<> {
         if let Some(quit_fn) = self.hud_inputs.quit.as_ref() {
             std::future::ready(quit_fn())
         } else {
