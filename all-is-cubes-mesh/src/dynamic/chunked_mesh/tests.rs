@@ -8,7 +8,7 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::listen::Listener as _;
-use all_is_cubes::math::{zo32, GridPoint, NotNan};
+use all_is_cubes::math::{zo32, GridPoint};
 use all_is_cubes::math::{Cube, FreePoint, GridAab, GridCoordinate};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::time;
@@ -167,7 +167,7 @@ impl<const MBM: usize> CsmTester<MBM> {
         let camera = Camera::new(
             {
                 let mut o = GraphicsOptions::default();
-                o.view_distance = NotNan::new(view_distance).unwrap();
+                o.view_distance = view_distance.try_into().unwrap();
                 o
             },
             Viewport::ARBITRARY,
@@ -268,7 +268,7 @@ fn sort_view_every_frame_only_if_transparent() {
 fn graphics_options_change() {
     // TODO: This test is fragile because it doesn't think about multiple chunks.
     let mut options = GraphicsOptions::default();
-    options.view_distance = NotNan::from(1);
+    options.view_distance = 1u8.into();
     options.transparency = TransparencyOption::Volumetric;
 
     let mut space = Space::empty_positive(1, 1, 1);

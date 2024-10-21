@@ -16,7 +16,7 @@ use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Si
 use all_is_cubes::listen::{ListenableCell, ListenableSource};
 use all_is_cubes::math::{
     ps32, rgb_const, rgba_const, zo32, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
-    GridPoint, GridRotation, GridVector, NotNan, Rgb, Rgba, Vol,
+    GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol,
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::time;
@@ -427,7 +427,7 @@ async fn error_character_unavailable(context: RenderTestContext) {
 async fn fog(mut context: RenderTestContext, fog: FogOption) {
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.lighting_display = LightingOption::Smooth;
-    options.view_distance = NotNan::from(50);
+    options.view_distance = 50u8.into();
     options.fog = fog;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
@@ -498,9 +498,9 @@ async fn follow_options_change(mut context: RenderTestContext) {
     // Two sets of graphics options with various differences
     let mut options_1 = GraphicsOptions::UNALTERED_COLORS;
     options_1.lighting_display = LightingOption::Smooth;
-    options_1.fov_y = NotNan::from(90);
+    options_1.fov_y = 90u8.into();
     let mut options_2 = options_1.clone();
-    options_2.fov_y = NotNan::from(70);
+    options_2.fov_y = 70u8.into();
     options_2.exposure = ExposureOption::Fixed(ps32(1.5));
     options_2.transparency = TransparencyOption::Threshold(zo32(0.1));
 
@@ -698,7 +698,7 @@ async fn icons(mut context: RenderTestContext) {
 
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.lighting_display = LightingOption::Flat;
-    options.fov_y = NotNan::from(45);
+    options.fov_y = 45u8.into();
     context
         .render_comparison_test(
             // Fairly sloppy because this test is looking for "Does this icon look right",
@@ -1238,7 +1238,7 @@ async fn light_test_universe() -> Arc<Universe> {
 fn light_test_options() -> GraphicsOptions {
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.lighting_display = LightingOption::Smooth;
-    options.fov_y = NotNan::from(45);
+    options.fov_y = 45u8.into();
     options
 }
 
@@ -1349,6 +1349,6 @@ fn tone_mapping_test_options() -> GraphicsOptions {
     // TODO: We want to see how bloom looks along with the tone mapping, but raytracer doesn't
     // support bloom yet and we can't opt out per-test of Flaws matching.
     // options.bloom_intensity = GraphicsOptions::default().bloom_intensity;
-    options.fov_y = NotNan::from(45);
+    options.fov_y = 45u8.into();
     options
 }

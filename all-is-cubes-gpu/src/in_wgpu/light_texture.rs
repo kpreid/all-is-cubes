@@ -5,11 +5,14 @@ use rayon::{
     slice::ParallelSliceMut as _,
 };
 
-use all_is_cubes::euclid::{Box3D, Vector3D};
 use all_is_cubes::math::{
     Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord,
 };
 use all_is_cubes::space::Space;
+use all_is_cubes::{
+    euclid::{Box3D, Vector3D},
+    math::PositiveSign,
+};
 use all_is_cubes_render::camera::Camera;
 
 use crate::{
@@ -36,7 +39,8 @@ const CAMERA_MARGIN_RADIUS: f64 = crate::in_wgpu::space::CHUNK_SIZE as f64 * 1.7
 /// This region is bounded by view distance and by `Space` bounds.
 fn visible_light_volume(space_bounds: GridAab, camera: &Camera) -> GridAab {
     // TODO: handle NaN and overflow cases, and the texture not being big enough, for robustness.
-    let effective_view_radius = Vector3D::splat(camera.view_distance() + CAMERA_MARGIN_RADIUS);
+    let effective_view_radius =
+        Vector3D::splat(camera.view_distance().into_inner() + CAMERA_MARGIN_RADIUS);
     let visible_bounds = Aab::from_lower_upper(
         camera.view_position() - effective_view_radius,
         camera.view_position() + effective_view_radius,
@@ -83,7 +87,7 @@ impl LightTexture {
     pub fn choose_size(
         limits: &wgpu::Limits,
         space_bounds: GridAab,
-        view_distance: FreeCoordinate,
+        view_distance: PositiveSign<FreeCoordinate>,
     ) -> GridSize {
         // Extra volume of 1 extra cube around all sides automatically captures sky light.
         let space_size = space_bounds.size() + GridSize::splat(2);
@@ -92,6 +96,7 @@ impl LightTexture {
         // containing cubes.
         let camera_size = GridSize::splat(
             view_distance
+                .into_inner()
                 .mul_add(2., CAMERA_MARGIN_RADIUS.mul_add(2., 1.))
                 .ceil() as GridSizeCoord,
         );
@@ -445,7 +450,7 @@ fn split_axis(
 #[cfg(test)]
 mod tests {
     use all_is_cubes::euclid::vec3;
-    use all_is_cubes::math::NotNan;
+    use all_is_cubes::math::ps64;
     use all_is_cubes_render::camera::{GraphicsOptions, ViewTransform, Viewport};
 
     use super::*;
@@ -465,12 +470,12 @@ mod tests {
         // for this.
         let step = 1. / 8.;
         // note: view distance is clamped in graphics options to be a minimum of 1.0
-        for view_distance in (8..100).map(|i| f64::from(i) * step) {
+        for view_distance in (8..100).map(|i| ps64(f64::from(i) * step)) {
             let texture_size =
                 LightTexture::choose_size(&limits, irrelevant_space_bounds, view_distance);
 
             let mut options = GraphicsOptions::default();
-            options.view_distance = NotNan::new(view_distance).unwrap();
+            options.view_distance = view_distance;
             camera.set_options(options);
 
             for position in (0..100).map(|i| f64::from(i) * step) {

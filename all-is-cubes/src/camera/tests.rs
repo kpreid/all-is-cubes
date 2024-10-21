@@ -6,7 +6,7 @@ use crate::camera::{
     look_at_y_up, Camera, ExposureOption, FrustumPoints, GraphicsOptions, LightingOption,
     ViewTransform, Viewport,
 };
-use crate::math::{ps32, rgba_const, Aab, NotNan};
+use crate::math::{ps32, ps64, rgba_const, Aab};
 
 #[test]
 fn camera_bad_viewport_doesnt_panic() {
@@ -25,7 +25,7 @@ fn set_options_updates_matrices() {
     let matrix = camera.projection_matrix();
     camera.set_options({
         let mut g = camera.options().clone();
-        g.fov_y = NotNan::from(30);
+        g.fov_y = ps64(30.);
         g
     });
     assert_ne!(matrix, camera.projection_matrix());
@@ -54,7 +54,7 @@ fn projection_depth() {
     let world_depths = [camera.near_plane_distance(), camera.view_distance()];
     let expected_ndc_depths = [0., 1.];
     let actual_ndc_depths = world_depths.map(|z| {
-        let eye = point3(0., 0., -z);
+        let eye = point3(0., 0., -f64::from(z));
         let clip = mat.transform_point3d_homogeneous(eye);
         // doesn't reject z=0 like euclid's to_point3d() does
         clip.z / clip.w
@@ -71,8 +71,8 @@ fn projection_depth() {
 fn view_frustum() {
     let camera = Camera::new(
         GraphicsOptions {
-            view_distance: NotNan::from(10i32.pow(2)),
-            fov_y: NotNan::from(90),
+            view_distance: ps64(10f64.powi(2)),
+            fov_y: ps64(90.),
             ..GraphicsOptions::default()
         },
         Viewport::with_scale(1.0, [10, 5]),

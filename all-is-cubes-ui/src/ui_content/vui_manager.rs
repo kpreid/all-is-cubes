@@ -8,7 +8,6 @@ use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
 use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
-use all_is_cubes::math::NotNan;
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
@@ -277,14 +276,14 @@ impl Vui {
     /// Compute graphics options to render the VUI space given the user's regular options.
     fn graphics_options(mut options: GraphicsOptions) -> GraphicsOptions {
         // Set FOV to give a predictable, not-too-wide-angle perspective.
-        options.fov_y = NotNan::from(30);
+        options.fov_y = 30u8.into();
 
         // Disable fog for maximum clarity and because we shouldn't have any far clipping to hide.
         options.fog = FogOption::None;
 
         // Fixed view distance for our layout.
         // TODO: Derive this from HudLayout and also FOV (since FOV determines eye-to-space distance).
-        options.view_distance = NotNan::from(100);
+        options.view_distance = 100u8.into();
 
         // clutter
         options.debug_chunk_boxes = false;

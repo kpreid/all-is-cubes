@@ -36,7 +36,7 @@ pub(crate) struct ShaderSpaceCamera {
 impl ShaderSpaceCamera {
     pub fn new(camera: &Camera) -> Self {
         let options = camera.options();
-        let view_distance = camera.view_distance() as f32;
+        let view_distance = camera.view_distance().into_inner() as f32;
         let (fog_mode_blend, fog_distance) = match options.fog {
             FogOption::Abrupt => (1.0, view_distance),
             FogOption::Compromise => (0.5, view_distance),

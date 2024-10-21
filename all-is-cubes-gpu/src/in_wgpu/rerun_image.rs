@@ -266,8 +266,8 @@ fn perform_image_copy(
     let (pinhole, transform) = rg::convert_camera_to_pinhole(camera);
 
     let depth_range = Some(rg::components::ValueRange::new(
-        camera.near_plane_distance(),
-        camera.view_distance(),
+        camera.near_plane_distance().into_inner(),
+        camera.view_distance().into_inner(),
     ));
 
     Box::pin(async move {

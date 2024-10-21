@@ -1,5 +1,6 @@
 //! Note: This module is hidden, and its contents re-exported as `all_is_cubes_render::camera`.
 
+use all_is_cubes_base::math::ps64;
 use euclid::{
     point3, vec3, Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D,
 };
@@ -189,15 +190,15 @@ impl Camera {
 
     /// Returns the view distance; the far plane of the view frustum, or the distance
     /// at which rendering may be truncated.
-    pub fn view_distance(&self) -> FreeCoordinate {
-        self.options.view_distance.into_inner()
+    pub fn view_distance(&self) -> PositiveSign<FreeCoordinate> {
+        self.options.view_distance
     }
 
     /// Returns the position of the near plane of the view frustum.
     /// This is not currently configurable.
-    pub fn near_plane_distance(&self) -> FreeCoordinate {
+    pub fn near_plane_distance(&self) -> PositiveSign<FreeCoordinate> {
         // half a voxel at resolution=16
-        (32.0f64).recip()
+        ps64((32.0f64).recip())
     }
 
     /// Returns a perspective projection matrix based on the configured FOV and view distance,
@@ -378,8 +379,8 @@ impl Camera {
         let fov_cot = (self.fov_y() / 2.).to_radians().tan().recip();
         let aspect = self.viewport.nominal_aspect_ratio();
 
-        let near = self.near_plane_distance();
-        let far = self.view_distance();
+        let near = self.near_plane_distance().into_inner();
+        let far = self.view_distance().into_inner();
 
         // Rationale for this particular matrix formula: "that's what `cgmath` does",
         // and we used to use `cgmath`.

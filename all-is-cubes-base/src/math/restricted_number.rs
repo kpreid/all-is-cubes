@@ -685,11 +685,25 @@ pub const fn ps32(value: f32) -> PositiveSign<f32> {
     PositiveSign::<f32>::new_strict(value)
 }
 
+/// Convenient alias for [`PositiveSign::<f64>::new_strict()`],
+/// to be used in tests and pseudo-literals.
+#[inline]
+pub const fn ps64(value: f64) -> PositiveSign<f64> {
+    PositiveSign::<f64>::new_strict(value)
+}
+
 /// Convenient alias for [`ZeroOne::<f32>::new_strict()`],
 /// to be used in tests and pseudo-literals.
 #[inline]
 pub const fn zo32(value: f32) -> ZeroOne<f32> {
     ZeroOne::<f32>::new_strict(value)
+}
+
+/// Convenient alias for [`ZeroOne::<f64>::new_strict()`],
+/// to be used in tests and pseudo-literals.
+#[inline]
+pub const fn zo64(value: f64) -> ZeroOne<f64> {
+    ZeroOne::<f64>::new_strict(value)
 }
 
 // -------------------------------------------------------------------------------------------------

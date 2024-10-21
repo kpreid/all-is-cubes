@@ -480,7 +480,7 @@ fn convert_camera(name: Option<String>, camera: &Camera) -> gltf_json::Camera {
             aspect_ratio: Some(camera.viewport().nominal_aspect_ratio() as f32),
             yfov: camera.options().fov_y.into_inner() as f32 * (std::f32::consts::PI / 180.),
             zfar: Some(camera.options().view_distance.into_inner() as f32),
-            znear: camera.near_plane_distance() as f32,
+            znear: camera.near_plane_distance().into_inner() as f32,
             extensions: Default::default(),
             extras: Default::default(),
         }),

@@ -14,7 +14,7 @@ use wgpu::util::DeviceExt as _;
 
 use all_is_cubes::euclid::{point3, Rotation3D};
 use all_is_cubes::listen::ListenableSource;
-use all_is_cubes::math::{notnan, Face6, FreeVector, GridSize, GridVector, Rgba};
+use all_is_cubes::math::{ps64, Face6, FreeVector, GridSize, GridVector, Rgba};
 use all_is_cubes::time;
 use all_is_cubes_mesh::{BlockVertex, Coloring};
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
@@ -174,7 +174,7 @@ where
     });
 
     let mut options = GraphicsOptions::default();
-    options.fov_y = notnan!(90.0);
+    options.fov_y = ps64(90.0);
     let mut camera = Camera::new(options, output_viewport);
     camera.set_view_transform(ViewTransform {
         rotation: Rotation3D::identity(),

@@ -1,9 +1,8 @@
 use core::fmt;
 
 use num_traits::ConstOne as _;
-use ordered_float::NotNan;
 
-use crate::math::{notnan, zo32, FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne};
+use crate::math::{ps64, zo32, FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne};
 use crate::util::ShowStatus;
 
 #[cfg(doc)]
@@ -18,13 +17,6 @@ use crate::{block::Block, space::Space};
 // (Due to crate splitting that can't be a doc-link.)
 #[doc = include_str!("../save/serde-warning.md")]
 #[derive(Clone, Eq, PartialEq)]
-#[cfg_attr(
-    feature = "save",
-    expect(
-        clippy::unsafe_derive_deserialize,
-        reason = "false positive from notnan! macro"
-    )
-)]
 #[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "save", serde(default))]
 #[non_exhaustive]
@@ -41,7 +33,7 @@ pub struct GraphicsOptions {
     pub fog: FogOption,
 
     /// Field of view, in degrees from top to bottom edge of the viewport.
-    pub fov_y: NotNan<FreeCoordinate>,
+    pub fov_y: PositiveSign<FreeCoordinate>,
 
     /// Method to use to remap colors to fit within the displayable range.
     pub tone_mapping: ToneMappingOperator,
@@ -58,7 +50,7 @@ pub struct GraphicsOptions {
     /// Distance, in unit cubes, from the camera to the farthest visible point.
     ///
     /// TODO: Implement view distance limit (and fog) in raytracer.
-    pub view_distance: NotNan<FreeCoordinate>,
+    pub view_distance: PositiveSign<FreeCoordinate>,
 
     /// Style in which to draw the lighting of [`Space`](crate::space::Space)s.
     /// This does not affect the *computation* of lighting.
@@ -130,12 +122,12 @@ impl GraphicsOptions {
     pub const UNALTERED_COLORS: Self = Self {
         render_method: RenderMethod::Preferred,
         fog: FogOption::None,
-        fov_y: notnan!(90.),
+        fov_y: ps64(90.),
         // TODO: Change tone mapping default once we have a good implementation.
         tone_mapping: ToneMappingOperator::Clamp,
         exposure: ExposureOption::Fixed(PositiveSign::<f32>::ONE),
         bloom_intensity: zo32(0.),
-        view_distance: notnan!(200.),
+        view_distance: ps64(200.),
         lighting_display: LightingOption::None,
         transparency: TransparencyOption::Volumetric,
         show_ui: true,
@@ -152,10 +144,8 @@ impl GraphicsOptions {
     /// Constrain fields to valid/practical values.
     #[must_use]
     pub fn repair(mut self) -> Self {
-        self.fov_y = self.fov_y.clamp(NotNan::from(1), NotNan::from(189));
-        self.view_distance = self
-            .view_distance
-            .clamp(NotNan::from(1), NotNan::from(10000));
+        self.fov_y = self.fov_y.clamp(ps64(1.), ps64(189.));
+        self.view_distance = self.view_distance.clamp(ps64(1.), ps64(10000.));
         self
     }
 }
@@ -215,12 +205,12 @@ impl Default for GraphicsOptions {
         Self {
             render_method: RenderMethod::Preferred,
             fog: FogOption::Abrupt,
-            fov_y: NotNan::from(90),
+            fov_y: ps64(90.),
             // TODO: Change tone mapping default once we have a good implementation.
             tone_mapping: ToneMappingOperator::Clamp,
             exposure: ExposureOption::default(),
             bloom_intensity: zo32(0.125),
-            view_distance: NotNan::from(200),
+            view_distance: ps64(200.),
             lighting_display: LightingOption::Smooth,
             transparency: TransparencyOption::Volumetric,
             show_ui: true,

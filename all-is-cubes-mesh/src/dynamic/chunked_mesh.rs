@@ -305,7 +305,8 @@ where
             self.complete_time = None;
         }
 
-        self.chunk_chart.resize_if_needed(camera.view_distance());
+        self.chunk_chart
+            .resize_if_needed(camera.view_distance().into_inner());
 
         let prep_to_update_meshes_time = M::Instant::now();
 
@@ -334,7 +335,7 @@ where
             // Not urgently needed, though.
             let cache_distance = FreeCoordinate::from(CHUNK_SIZE);
             let retention_distance_squared =
-                (camera.view_distance().ceil() + cache_distance).powi(2) as i32;
+                (camera.view_distance().into_inner().ceil() + cache_distance).powi(2) as i32;
             self.chunks.retain(|pos, _| {
                 pos.min_distance_squared_from(view_chunk) <= retention_distance_squared
             });
