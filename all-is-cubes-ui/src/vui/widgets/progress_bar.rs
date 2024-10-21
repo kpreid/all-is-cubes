@@ -13,9 +13,8 @@ use num_traits::float::FloatCore as _;
 
 use all_is_cubes::block::{self, Block, Composite, CompositeOperator, AIR};
 use all_is_cubes::color_block;
-use all_is_cubes::euclid::num::Zero as _;
 use all_is_cubes::listen::{DirtyFlag, ListenableSource};
-use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, NotNan, Rgb};
+use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, Rgb, ZeroOne};
 use all_is_cubes::space::SpaceTransaction;
 
 use crate::vui;
@@ -35,7 +34,7 @@ pub struct ProgressBar {
 #[non_exhaustive]
 pub struct ProgressBarState {
     /// A number from 0 to 1 which specifies how much of the progress bar is full.
-    fraction: NotNan<f64>,
+    fraction: ZeroOne<f64>,
 }
 
 /// Identical to [`ProgressBarState`] except rounded to the finest granularity we distinguish.
@@ -89,7 +88,7 @@ impl ProgressBarState {
     /// full. If it is `NaN`, zero is substituted.
     pub fn new(fraction: f64) -> Self {
         Self {
-            fraction: NotNan::new(fraction.clamp(0.0, 1.0)).unwrap_or(NotNan::zero()),
+            fraction: ZeroOne::try_from(fraction.clamp(0.0, 1.0)).unwrap_or(ZeroOne::ZERO),
         }
     }
 }
