@@ -296,7 +296,7 @@ pub(crate) struct DisplaySizeArg(pub Option<Size2D<u32, camera::NominalPixel>>);
 impl FromStr for DisplaySizeArg {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.to_ascii_lowercase() == "auto" {
+        if s.eq_ignore_ascii_case("auto") {
             Ok(DisplaySizeArg(None))
         } else {
             let dims: [u32; 2] = s
@@ -320,7 +320,7 @@ pub(crate) struct SpaceSizeArg(pub Option<GridSize>);
 impl FromStr for SpaceSizeArg {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.to_ascii_lowercase() == "default" {
+        if s.eq_ignore_ascii_case("default") {
             Ok(SpaceSizeArg(None))
         } else {
             let dims: [GridSizeCoord; 3] = s
