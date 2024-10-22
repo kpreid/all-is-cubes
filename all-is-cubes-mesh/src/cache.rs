@@ -51,7 +51,10 @@ impl<M: MeshTypes> BlockMeshCache<M> {
     /// then the mesh will be computed for only one of them and the others will wait.
     /// Reentrantly accessing the cache (e.g. in a texture allocator implementation)
     /// will fail in an unspecified fashion (deadlock, panic, etc.).
-    pub fn get_or_compute(&self, block: &EvaluatedBlock) -> impl Deref<Target = BlockMesh<M>> + use<M> {
+    pub fn get_or_compute(
+        &self,
+        block: &EvaluatedBlock,
+    ) -> impl Deref<Target = BlockMesh<M>> + use<M> {
         let key = EvKey::new(block);
         let cell: Arc<OnceLock<BlockMesh<M>>> = self
             .storage

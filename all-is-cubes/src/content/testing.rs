@@ -206,7 +206,9 @@ impl LightingBenchLayout {
         GridCoordinate::from(self.section_height()).saturating_sub_unsigned(self.yup())
     }
 
-    fn section_iter(&self) -> impl ExactSizeIterator<Item = (GridCoordinate, GridCoordinate)> + use<> {
+    fn section_iter(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (GridCoordinate, GridCoordinate)> + use<> {
         let size = self.array_side_lengths;
         let size_z = GridCoordinate::from(size.y);
         let total = GridCoordinate::from(size.x) * size_z;

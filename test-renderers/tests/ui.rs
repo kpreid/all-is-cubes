@@ -213,9 +213,7 @@ fn render_widget(widget: &vui::WidgetTree, gravity: vui::Gravity) -> Rendering {
     let start_time = Instant::now();
     let space_handle = Handle::new_pending(
         Name::Pending,
-        widget
-            .to_space(space::Builder::default(), gravity)
-            .unwrap(),
+        widget.to_space(space::Builder::default(), gravity).unwrap(),
     );
     let space_to_render_time = Instant::now();
     let rendering = render_orthographic(&space_handle);
