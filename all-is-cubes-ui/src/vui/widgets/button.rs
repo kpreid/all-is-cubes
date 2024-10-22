@@ -1,8 +1,3 @@
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
-)]
-
 use alloc::borrow::ToOwned as _;
 use alloc::boxed::Box;
 use alloc::format;

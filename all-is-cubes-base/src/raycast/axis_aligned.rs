@@ -1,8 +1,3 @@
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
-)]
-
 use crate::math::{self, Cube, Face7, FreeCoordinate, GridAab};
 
 use super::{AaRay, RaycastStep};

@@ -1,8 +1,3 @@
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
-)]
-
 mod data;
 pub use data::PackedLight;
 pub(crate) use data::{LightStatus, PackedLightScalar};

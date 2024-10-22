@@ -5,11 +5,6 @@
 //! it does not contain the elements that are evaluated
 //! ([`crate::block::Primitive`] and [`crate::block::Modifier`])
 
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
-)]
-
 mod control;
 #[cfg(test)]
 pub(crate) use control::ErrorKind;

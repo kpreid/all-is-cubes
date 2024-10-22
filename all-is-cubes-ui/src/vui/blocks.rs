@@ -1,6 +1,6 @@
 #![expect(
     clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+    reason = "module is private; TODO: file new bug"
 )]
 
 use core::fmt;

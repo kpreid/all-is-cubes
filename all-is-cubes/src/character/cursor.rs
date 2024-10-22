@@ -2,11 +2,6 @@
 //!
 //! TODO: It's unclear what the scope of this module should be.
 
-#![expect(
-    clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
-)]
-
 use core::fmt;
 
 use euclid::point3;
