@@ -103,7 +103,7 @@ gloo-timers = { version = "0.3.0", default-features = false }
 half = { version = "2.3.1", default-features = false, features = ["bytemuck"] }
 hashbrown = { version = "0.14.0", default-features = false, features = ["ahash", "inline-more"] }
 image = { version = "0.25.1", default-features = false }
-imgref = { version = "1.10.1", default-features = false }
+imgref = { version = "1.11.0", default-features = false }
 indoc = { version = "2.0.1", default-features = false }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 libm = { version = "0.2.8", default-features = false }
