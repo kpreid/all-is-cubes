@@ -533,6 +533,41 @@ where
     }
 }
 
+/// Unsigned integers can be infallibly converted to `PositiveSign`.
+mod integer_to_positive_sign {
+    use super::*;
+    macro_rules! integer_to_positive_sign {
+        ($int:ident, $float:ident) => {
+            impl From<$int> for PositiveSign<$float> {
+                #[inline]
+                fn from(value: $int) -> PositiveSign<$float> {
+                    PositiveSign(value.into())
+                }
+            }
+        };
+    }
+    // This is almost just a list of `T: FloatCore + From<U>`,
+    // but that would be open to weird adversarial implementations.
+    integer_to_positive_sign!(bool, f32);
+    integer_to_positive_sign!(bool, f64);
+    integer_to_positive_sign!(u8, f32);
+    integer_to_positive_sign!(u8, f64);
+    integer_to_positive_sign!(u16, f32);
+    integer_to_positive_sign!(u16, f64);
+    integer_to_positive_sign!(u32, f64);
+}
+
+impl<T: FloatCore> From<bool> for ZeroOne<T> {
+    #[inline]
+    fn from(value: bool) -> Self {
+        if value {
+            ZeroOne(T::one())
+        } else {
+            ZeroOne(T::zero())
+        }
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
 #[allow(clippy::missing_inline_in_public_items)]
