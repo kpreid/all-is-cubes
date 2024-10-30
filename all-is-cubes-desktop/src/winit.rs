@@ -164,7 +164,6 @@ pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
 }
 
 /// Creates a [`DesktopSession`] that can be run in an [`winit`] event loop.
-#[expect(clippy::large_stack_frames)]
 pub async fn create_winit_wgpu_desktop_session(
     executor: Arc<crate::Executor>,
     session: Session,
