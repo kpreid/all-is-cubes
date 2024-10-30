@@ -83,13 +83,13 @@ impl RerunImageExport {
         let mut logged_camera = normal_camera.clone();
         logged_camera.set_viewport(Viewport::with_scale(1.0, logged_size));
 
-        let Resources {
-            camera_buffer,
-            srgb_color_texture,
-            srgb_color_texture_view,
-            linear_depth_texture,
-            linear_depth_texture_view,
-            copy_bind_group,
+        let &mut Resources {
+            ref camera_buffer,
+            ref srgb_color_texture,
+            ref srgb_color_texture_view,
+            ref linear_depth_texture,
+            ref linear_depth_texture_view,
+            ref copy_bind_group,
         } = self.resources.get_or_insert(
             (fb.scene_for_postprocessing_input().global_id(), logged_size),
             || {
