@@ -425,9 +425,7 @@ impl Rgba {
     #[inline]
     #[doc(hidden)] // not sure if good public API
     pub fn reflect(self, illumination: Rgb) -> Rgb {
-        // TODO: do this math without any NaN checks or negative/amplified values.
-        // by introducing a dedicated RgbaReflectance type with constrained components?
-        self.to_rgb() * illumination * PositiveSign::from(self.alpha)
+        self.to_rgb() * illumination * self.alpha
     }
 }
 
