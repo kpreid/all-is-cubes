@@ -1,9 +1,7 @@
 //! Momentary decorative and informative effects produced by the game world, such as sound and
 //! particles.
 
-use ordered_float::NotNan;
-
-use crate::math::GridAab;
+use crate::math::{GridAab, PositiveSign};
 
 #[cfg(doc)]
 use crate::block::BlockAttributes;
@@ -44,7 +42,7 @@ pub enum Fluff {
     #[non_exhaustive]
     BlockImpact {
         /// Closing velocity in m/s.
-        velocity: NotNan<f32>,
+        velocity: PositiveSign<f32>,
     },
 }
 

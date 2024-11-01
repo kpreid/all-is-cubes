@@ -30,7 +30,7 @@ use crate::fluff::Fluff;
     reason = "unclear why this warns even though it is needed"
 )]
 use crate::math::Euclid as _;
-use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector};
+use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign};
 use crate::physics::{StopAt, Velocity, POSITION_EPSILON};
 use crate::raycast::Ray;
 use crate::space::Space;
@@ -678,7 +678,7 @@ impl BodyStepInfo {
         // don't emit anything for slow change or movement in the air
         if velocity >= 0.25 && self.move_segments.iter().any(|s| s.stopped_by.is_some()) {
             Some(Fluff::BlockImpact {
-                velocity: NotNan::new(velocity as f32).ok()?,
+                velocity: PositiveSign::try_from(velocity as f32).ok()?,
             })
         } else {
             None
