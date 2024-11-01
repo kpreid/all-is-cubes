@@ -1,6 +1,6 @@
-#![expect(
+#![allow(
     clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+    reason = "false positive; TODO: remove after Rust 1.84 is released"
 )]
 
 use alloc::sync::Arc;

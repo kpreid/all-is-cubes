@@ -1,9 +1,9 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
-#![expect(
+#![allow(
     clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+    reason = "false positive; TODO: remove after Rust 1.84 is released"
 )]
 
 use alloc::sync::Arc;

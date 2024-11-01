@@ -1,9 +1,9 @@
 //! Note: This module is hidden, and its contents re-exported as `all_is_cubes_render::raytracer`.
 //! It is located in this crate so that it can be used by unit tests.
 
-#![expect(
+#![allow(
     clippy::module_name_repetitions,
-    reason = "module is private; https://github.com/rust-lang/rust-clippy/issues/8524"
+    reason = "false positive; TODO: remove after Rust 1.84 is released"
 )]
 
 use alloc::boxed::Box;
