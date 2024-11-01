@@ -102,6 +102,7 @@ struct BlockFragmentInput {
 
     // Cube position in world coordinates, used for space data lookups
     // (currently only LightingOption::Flat).
+    @interpolate(flat, either)
     @location(2) world_cube: vec3<f32>,
 
     // Vectors making up a transformation matrix from tangent space to world space,
@@ -110,12 +111,17 @@ struct BlockFragmentInput {
     // Both tangents are always positive.
     //
     // Used to look up world light data when computing interpolated light.
+    @interpolate(flat, either)
     @location(3) tangent: vec3<f32>,
+    @interpolate(flat, either)
     @location(4) bitangent: vec3<f32>,
+    @interpolate(flat, either)
     @location(5) normal: vec3<f32>,
     
     @location(6) color_or_texture: vec4<f32>,
+    @interpolate(flat, either)
     @location(7) clamp_min: vec3<f32>,
+    @interpolate(flat, either)
     @location(8) clamp_max: vec3<f32>,
     
     @location(9) fog_mix: f32,
