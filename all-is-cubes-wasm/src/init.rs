@@ -102,6 +102,7 @@ async fn start_game_with_dom(
         .map_or_else(String::new, |q| q.search().unwrap_or_default());
     let OptionsInUrl {
         template,
+        seed,
         graphics_options,
         renderer: renderer_option,
     } = options_from_query_string(query_string.trim_start_matches('?').as_bytes());
@@ -162,7 +163,11 @@ async fn start_game_with_dom(
         .build::<crate::AdaptedInstant>(
             universe_progress,
             all_is_cubes_content::TemplateParameters {
-                seed: thread_rng().gen(),
+                seed: Some(seed.unwrap_or_else(|| {
+                    let seed: u64 = thread_rng().gen();
+                    log::info!("Randomly chosen universe seed: {seed}");
+                    seed
+                })),
                 size: None,
             },
         )

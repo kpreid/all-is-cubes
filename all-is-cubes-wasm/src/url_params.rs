@@ -14,6 +14,7 @@ use all_is_cubes_render::camera::GraphicsOptions;
 #[expect(clippy::derive_partial_eq_without_eq)]
 pub struct OptionsInUrl {
     pub template: UniverseTemplate,
+    pub seed: Option<u64>,
     pub graphics_options: GraphicsOptions,
     pub renderer: RendererOption,
 }
@@ -43,11 +44,19 @@ where
                 let s = s.borrow();
                 let t = s.parse::<UniverseTemplate>();
                 if t.is_err() {
-                    log::warn!("Unrecognized value for template=: {:?}", s);
+                    log::warn!("Unrecognized value for template=: {s:?}");
                 }
                 t.ok()
             })
             .unwrap_or_default(),
+        seed: params.get("seed").and_then(|s| {
+            let s = s.borrow();
+            let t = s.parse::<u64>();
+            if t.is_err() {
+                log::warn!("Unparseable number for seed=: {s:?}");
+            }
+            t.ok()
+        }),
         graphics_options: GraphicsOptions::default(), // TODO: offer graphics options
         renderer: params
             .get("renderer")
@@ -56,7 +65,7 @@ where
                 match s {
                     "wgpu" => Some(RendererOption::Wgpu),
                     _ => {
-                        log::warn!("Unrecognized value for renderer=: {:?}", s);
+                        log::warn!("Unrecognized value for renderer=: {s:?}");
                         None
                     }
                 }
@@ -75,6 +84,7 @@ mod tests {
             options_from_query_string(b""),
             OptionsInUrl {
                 template: UniverseTemplate::default(),
+                seed: None,
                 graphics_options: GraphicsOptions::default(),
                 renderer: RendererOption::Wgpu,
             },
@@ -87,6 +97,11 @@ mod tests {
             options_from_query_string(b"template=cornell-box").template,
             UniverseTemplate::CornellBox,
         )
+    }
+
+    #[test]
+    fn parse_specified_seed() {
+        assert_eq!(options_from_query_string(b"seed=123").seed, Some(123));
     }
 
     #[test]
