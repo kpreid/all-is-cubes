@@ -108,6 +108,9 @@ struct AllocatorBacking {
     /// Tracks which regions of the texture are free or allocated.
     alloctree: Alloctree<AtlasTexel>,
 
+    /// log2 of the maximum texture size we may consider growing to.
+    maximum_texture_size_exponent: u8,
+
     /// Whether flush needs to do anything.
     dirty: bool,
 
@@ -144,12 +147,13 @@ struct GpuTexture {
 // Implementations
 
 impl AtlasAllocator {
-    pub fn new(label_prefix: &str) -> Self {
+    pub fn new(label_prefix: &str, limits: &wgpu::Limits) -> Self {
         Self {
-            reflectance_backing: AllocatorBacking::new(label_prefix, Channels::Reflectance),
+            reflectance_backing: AllocatorBacking::new(label_prefix, Channels::Reflectance, limits),
             reflectance_and_emission_backing: AllocatorBacking::new(
                 label_prefix,
                 Channels::ReflectanceEmission,
+                limits,
             ),
         }
     }
@@ -191,12 +195,13 @@ impl texture::Allocator for AtlasAllocator {
             Channels::Reflectance => &self.reflectance_backing,
             Channels::ReflectanceEmission => &self.reflectance_and_emission_backing,
         };
-        let mut backing_guard = backing_arc.lock().unwrap();
+        let backing_guard = &mut *backing_arc.lock().unwrap();
 
         // If alloctree grows, the next flush() will take care of reallocating the texture.
-        let handle = backing_guard
-            .alloctree
-            .allocate_with_growth(requested_bounds)?;
+        let handle = backing_guard.alloctree.allocate_with_growth(
+            requested_bounds,
+            backing_guard.maximum_texture_size_exponent,
+        )?;
         let allocated_bounds = handle.allocation;
 
         let result = AtlasTile {
@@ -282,10 +287,21 @@ impl texture::Tile for AtlasTile {
 }
 
 impl AllocatorBacking {
-    fn new(label_prefix: &str, channels: Channels) -> Arc<Mutex<Self>> {
+    fn new(label_prefix: &str, channels: Channels, limits: &wgpu::Limits) -> Arc<Mutex<Self>> {
+        let maximum_texture_size_exponent = limits
+            .max_texture_dimension_3d
+            // Kludge: Chrome WebGPU fails if the buffer size is exceeded, as of 129.0.6668.101,
+            // even though we’re not making any such buffer, only a texture.
+            // Could not reproduce standalone.
+            .min(u32::try_from(cube_root_u64(limits.max_buffer_size / 4)).unwrap_or(u32::MAX))
+            .ilog2()
+            .try_into()
+            .unwrap_or(u8::MAX);
+
         Arc::new(Mutex::new(AllocatorBacking {
             // Default size of 2⁵ = 32 holding up to 8 × 16³ block textures.
             alloctree: Alloctree::new(5),
+            maximum_texture_size_exponent,
             dirty: false,
             in_use: Vec::new(),
             channels,
@@ -303,6 +319,10 @@ impl AllocatorBacking {
         let backing = &mut *backing_lock_guard;
 
         let needed_texture_size = size3d_to_extent(backing.alloctree.bounds().size());
+        // Note: We have the Alloctree ensure that it does not exceed the device’s texture size
+        // limit, so needed_texture_size will not be too big.
+        // However, there is no handling of if texture allocation fails; that would require
+        // using an error scope and being able to recover asynchronously from the failed attempt.
 
         // If we have textures already, check if they are the right size.
         let old_textures: Option<Msw<Group<_>>> = if matches!(
@@ -553,4 +573,15 @@ impl Drop for TileBacking {
 
 fn zero_box(volume: usize) -> Box<[[u8; 4]]> {
     vec![[0, 0, 0, 0]; volume].into_boxed_slice()
+}
+
+/// Compute the cube root of `value`, rounded down.
+/// (This algorithm is probably wrong for certain large values, but we only use it to compute
+/// a size limit and underapproximating is OK.)
+fn cube_root_u64(value: u64) -> u64 {
+    let mut root = (value as f64).powf(3f64.recip()) as u64;
+    while root.saturating_pow(3) > value {
+        root -= 1;
+    }
+    root
 }

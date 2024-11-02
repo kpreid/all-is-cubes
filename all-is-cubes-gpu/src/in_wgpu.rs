@@ -405,7 +405,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             postprocess::create_postprocess_bind_group_layout(&device);
 
         let pipelines = Pipelines::new(&device, &shaders, &fb, cameras.graphics_options_source());
-        let block_texture = AtlasAllocator::new("EverythingRenderer");
+        let block_texture = AtlasAllocator::new("EverythingRenderer", &device.limits());
 
         let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(

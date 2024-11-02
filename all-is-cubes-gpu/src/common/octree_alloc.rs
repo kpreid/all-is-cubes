@@ -82,9 +82,15 @@ impl<A> Alloctree<A> {
 
     /// Allocates a region of the given size, growing the overall bounds if needed.
     ///
-    /// Returns `None` if the tree cannot grow further.
-    pub fn allocate_with_growth(&mut self, request: GridAab) -> Option<AlloctreeHandle<A>> {
-        if !fits(request, Self::MAX_SIZE_EXPONENT) {
+    /// Returns `None` if the tree cannot grow further, or if growth is required but would exceed
+    /// `grow_to_at_most_size_exponent`.
+    pub fn allocate_with_growth(
+        &mut self,
+        request: GridAab,
+        mut grow_to_at_most_size_exponent: u8,
+    ) -> Option<AlloctreeHandle<A>> {
+        grow_to_at_most_size_exponent = grow_to_at_most_size_exponent.min(Self::MAX_SIZE_EXPONENT);
+        if !fits(request, grow_to_at_most_size_exponent) {
             // Too big, can never fit even with growth.
             return None;
         }
@@ -104,7 +110,7 @@ impl<A> Alloctree<A> {
             .max(requested_size_exponent)
             .checked_add(1)?;
 
-        if new_size_exponent <= Self::MAX_SIZE_EXPONENT {
+        if new_size_exponent <= grow_to_at_most_size_exponent {
             // Grow the allocatable region and try again.
             self.grow_to(new_size_exponent);
 
@@ -490,7 +496,7 @@ mod tests {
         assert_eq!(t.allocate(GridAab::ORIGIN_CUBE), None, "initially full");
 
         // Allocation with growth succeeds
-        t.allocate_with_growth(GridAab::ORIGIN_CUBE)
+        t.allocate_with_growth(GridAab::ORIGIN_CUBE, Alloctree::<Cube>::MAX_SIZE_EXPONENT)
             .expect("second allocation should succeed");
         assert_eq!(t.bounds().map(i32::from), GridAab::for_block(R16).into());
     }

@@ -15,7 +15,7 @@ struct FuzzOctree {
 #[derive(Arbitrary, Debug)]
 enum Operation {
     Allocate(GridAab),
-    AllocateGrow(GridAab),
+    AllocateGrow(GridAab, u8),
     Free(usize),
 }
 
@@ -31,8 +31,8 @@ fuzz_target!(|input: FuzzOctree| {
                     handles.push(handle);
                 }
             }
-            Operation::AllocateGrow(request) => {
-                let result = t.allocate_with_growth(request);
+            Operation::AllocateGrow(request, max_growth) => {
+                let result = t.allocate_with_growth(request, max_growth);
                 if let Some(handle) = result {
                     handles.push(handle);
                 }
