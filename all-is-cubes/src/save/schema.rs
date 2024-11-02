@@ -66,7 +66,7 @@ pub(crate) enum BehaviorV1Ser {
 #[serde(tag = "type")]
 pub(crate) enum BlockSer<'a> {
     BlockV1 {
-        primitive: PrimitiveSer<'a>,
+        primitive: PrimitiveSer,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         modifiers: Vec<ModifierSer<'a>>,
     },
@@ -74,7 +74,7 @@ pub(crate) enum BlockSer<'a> {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum PrimitiveSer<'a> {
+pub(crate) enum PrimitiveSer {
     AirV1,
     AtomV1 {
         color: RgbaSer,
@@ -82,14 +82,14 @@ pub(crate) enum PrimitiveSer<'a> {
         light_emission: RgbSer,
         /// Note: Attributes stored on the primitive are no longer used, and supported only for deserialization.
         #[serde(flatten)]
-        attributes: BlockAttributesV1Ser<'a>,
+        attributes: BlockAttributesV1Ser,
         #[serde(default, skip_serializing_if = "is_default")]
         collision: BlockCollisionSer,
     },
     RecurV1 {
         /// Note: Attributes stored on the primitive are no longer used, and supported only for deserialization.
         #[serde(flatten)]
-        attributes: BlockAttributesV1Ser<'a>,
+        attributes: BlockAttributesV1Ser,
         space: Handle<space::Space>,
         #[serde(default, skip_serializing_if = "is_default")]
         offset: [i32; 3],
@@ -105,7 +105,7 @@ pub(crate) enum PrimitiveSer<'a> {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct BlockAttributesV1Ser<'a> {
+pub(crate) struct BlockAttributesV1Ser {
     #[serde(default, skip_serializing_if = "str::is_empty")]
     pub display_name: ArcStr,
     #[serde(default = "return_true", skip_serializing_if = "is_true")]
@@ -115,9 +115,9 @@ pub(crate) struct BlockAttributesV1Ser<'a> {
     #[serde(default, skip_serializing_if = "is_default")]
     pub rotation_rule: RotationPlacementRuleSer,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tick_action: Option<TickActionSer<'a>>,
+    pub tick_action: Option<TickActionSer>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub activation_action: Option<op::Operation>, // no Cow because Operation is cheap to clone
+    pub activation_action: Option<op::Operation>,
     #[serde(default, skip_serializing_if = "is_default")]
     pub animation_hint: AnimationHintSer,
 }
@@ -151,8 +151,8 @@ pub(crate) enum RotationPlacementRuleSer {
 
 /// Unversioned because it's versioned by the parent struct
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct TickActionSer<'a> {
-    pub operation: Cow<'a, op::Operation>,
+pub(crate) struct TickActionSer {
+    pub operation: op::Operation,
     pub schedule: Schedule,
 }
 #[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -184,7 +184,7 @@ pub(crate) enum AnimationChangeV1Ser {
 pub(crate) enum ModifierSer<'a> {
     AttributesV1 {
         #[serde(flatten)]
-        attributes: BlockAttributesV1Ser<'a>,
+        attributes: BlockAttributesV1Ser,
     },
     QuoteV1 {
         suppress_ambient: bool,

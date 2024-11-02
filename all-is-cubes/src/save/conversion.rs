@@ -121,7 +121,7 @@ mod block {
         }
     }
 
-    impl<'a> From<&'a Primitive> for schema::PrimitiveSer<'a> {
+    impl<'a> From<&'a Primitive> for schema::PrimitiveSer {
         fn from(value: &'a Primitive) -> Self {
             match value {
                 Primitive::Indirect(definition) => schema::PrimitiveSer::IndirectV1 {
@@ -160,9 +160,7 @@ mod block {
         }
     }
 
-    fn primitive_from_schema(
-        value: schema::PrimitiveSer<'_>,
-    ) -> (Primitive, Option<BlockAttributes>) {
+    fn primitive_from_schema(value: schema::PrimitiveSer) -> (Primitive, Option<BlockAttributes>) {
         match value {
             schema::PrimitiveSer::IndirectV1 { definition } => {
                 (Primitive::Indirect(definition), None)
@@ -204,7 +202,7 @@ mod block {
         }
     }
 
-    impl<'a> From<&'a BlockAttributes> for schema::BlockAttributesV1Ser<'a> {
+    impl<'a> From<&'a BlockAttributes> for schema::BlockAttributesV1Ser {
         fn from(value: &'a BlockAttributes) -> Self {
             let &BlockAttributes {
                 ref display_name,
@@ -225,7 +223,7 @@ mod block {
                          ref operation,
                          schedule,
                      }| schema::TickActionSer {
-                        operation: Cow::Borrowed(operation),
+                        operation: operation.clone(),
                         schedule,
                     },
                 ),
@@ -235,8 +233,8 @@ mod block {
         }
     }
 
-    impl<'a> From<schema::BlockAttributesV1Ser<'a>> for BlockAttributes {
-        fn from(value: schema::BlockAttributesV1Ser<'a>) -> Self {
+    impl From<schema::BlockAttributesV1Ser> for BlockAttributes {
+        fn from(value: schema::BlockAttributesV1Ser) -> Self {
             let schema::BlockAttributesV1Ser {
                 display_name,
                 selectable,
@@ -257,7 +255,7 @@ mod block {
                          schedule,
                      }| {
                         TickAction {
-                            operation: operation.into_owned(),
+                            operation,
                             schedule,
                         }
                     },
