@@ -797,6 +797,12 @@ impl<I: time::Instant> SpaceRenderer<I> {
         }
         self.rerun_destination = destination;
     }
+
+    /// This is separate so we can run it once for the shared allocator.
+    #[cfg(feature = "rerun")]
+    pub(crate) fn texture_allocator_log_to_rerun(&self, destination: rg::Destination) {
+        self.block_texture.log_to_rerun(destination);
+    }
 }
 
 fn depth_ordering_for_viewing(

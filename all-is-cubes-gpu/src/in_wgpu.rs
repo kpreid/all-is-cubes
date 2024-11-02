@@ -892,7 +892,12 @@ impl<I: time::Instant> EverythingRenderer<I> {
     /// Activate logging performance information to a Rerun stream.
     #[cfg(feature = "rerun")]
     pub fn log_to_rerun(&mut self, destination: rg::Destination, filter: RerunFilter) {
-        if filter.performance {
+        let RerunFilter {
+            performance,
+            image,
+            textures,
+        } = filter;
+        if performance {
             self.space_renderers
                 .world
                 .log_to_rerun(destination.child(&rg::entity_path!["world"]));
@@ -900,9 +905,14 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 .ui
                 .log_to_rerun(destination.child(&rg::entity_path!["ui"]));
         }
-        if filter.image {
+        if image {
             self.rerun_image
-                .log_to_rerun(destination.into_child(&rg::entity_path!["image"]));
+                .log_to_rerun(destination.child(&rg::entity_path!["image"]));
+        }
+        if textures {
+            self.space_renderers
+                .world
+                .texture_allocator_log_to_rerun(destination.into_child(&rg::entity_path!["atlas"]));
         }
     }
 }

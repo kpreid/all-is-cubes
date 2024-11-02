@@ -5,10 +5,15 @@
 
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
+#[cfg(feature = "rerun")]
+use itertools::iproduct;
+
 use all_is_cubes::block::Evoxel;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Box3D, Translation3D};
 use all_is_cubes::math::{Cube, GridAab, GridCoordinate, VectorOps as _, Vol};
+#[cfg(feature = "rerun")]
+use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
 use all_is_cubes_mesh::texture::{self, Channels};
 
@@ -100,6 +105,10 @@ struct TileBacking {
     /// Reference to the allocator so we can coordinate.
     /// Weak because if the allocator is dropped, nobody cares.
     allocator: Weak<Mutex<AllocatorBacking>>,
+
+    /// If we are logging atlas content to Rerun, then this is where we log it.
+    #[cfg(feature = "rerun")]
+    rerun_destination: rg::Destination,
 }
 
 /// Data shared by [`AtlasAllocator`] and all its [`AtlasTile`]s.
@@ -127,6 +136,12 @@ struct AllocatorBacking {
 
     /// GPU texture objects and texture views. [`None`] if `flush()` has never been called.
     textures: Option<Msw<Group<GpuTexture>>>,
+
+    /// If we are logging the state of the texture, do it here.
+    /// This is not used directly but used to create destinations for child entities
+    /// for each tile.
+    #[cfg(feature = "rerun")]
+    rerun_destination: rg::Destination,
 }
 
 #[derive(Debug)]
@@ -184,6 +199,22 @@ impl AtlasAllocator {
             },
         )
     }
+
+    #[cfg(feature = "rerun")]
+    pub(crate) fn log_to_rerun(&self, destination: rg::Destination) {
+        let Self {
+            reflectance_backing,
+            reflectance_and_emission_backing,
+        } = self;
+        reflectance_backing
+            .lock()
+            .unwrap()
+            .log_to_rerun(destination.child(&rg::entity_path!["reflectance"]));
+        reflectance_and_emission_backing
+            .lock()
+            .unwrap()
+            .log_to_rerun(destination.into_child(&rg::entity_path!["reflectance_and_emission"]));
+    }
 }
 
 impl texture::Allocator for AtlasAllocator {
@@ -206,6 +237,24 @@ impl texture::Allocator for AtlasAllocator {
         )?;
         let allocated_bounds = handle.allocation;
 
+        // Turn the tile’s position into a entity path for it, that is unique *as long as it is
+        // allocated* but will be reused if the same space is reallocated
+        #[cfg(feature = "rerun")]
+        let rerun_destination = backing_guard
+            .rerun_destination
+            .child(&rg::entity_path![format!("{:?}", handle.allocation.min)]);
+        #[cfg(feature = "rerun")]
+        {
+            rerun_destination.log(
+                &rg::entity_path!["bbox"],
+                &rg::archetypes::Boxes3D::from_mins_and_sizes(
+                    [handle.allocation.min.to_f32().to_array()],
+                    [handle.allocation.size().to_f32().to_array()],
+                )
+                .with_fill_mode(rg::components::FillMode::MajorWireframe),
+            );
+        }
+
         let result = AtlasTile {
             requested_bounds,
             channels,
@@ -217,6 +266,9 @@ impl texture::Allocator for AtlasAllocator {
                 emission: None,
                 dirty: false,
                 allocator: Arc::downgrade(backing_arc),
+
+                #[cfg(feature = "rerun")]
+                rerun_destination,
             })),
         };
         backing_guard.in_use.push(WeakTile {
@@ -279,6 +331,47 @@ impl texture::Tile for AtlasTile {
             );
             tile_backing.dirty = true;
 
+            #[cfg(feature = "rerun")]
+            if tile_backing.rerun_destination.is_enabled() {
+                let mut points_for_rerun = Vec::new();
+                let mut colors_for_rerun = Vec::new();
+                let mut radii_for_rerun = Vec::new();
+                let region: Box3D<_, _> = self
+                    .offset
+                    .transform_box3d(&Box3D::from(self.bounds()).cast_unit());
+
+                points_for_rerun.extend(
+                    iproduct!(region.z_range(), region.y_range(), region.x_range()).map(
+                        |(z, y, x)| {
+                            rg::components::Position3D::new(
+                                x as f32 + 0.5,
+                                y as f32 + 0.5,
+                                z as f32 + 0.5,
+                            )
+                        },
+                    ),
+                );
+                colors_for_rerun.extend(
+                    tile_backing
+                        .reflectance
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|&[r, g, b, _a]| rg::components::Color::from_rgb(r, g, b)),
+                );
+                radii_for_rerun.extend(tile_backing.reflectance.as_ref().unwrap().iter().map(
+                    |&[_, _, _, alpha]| {
+                        rg::components::Radius::new_scene_units(if alpha == 0 { 0.1 } else { 0.6 })
+                    },
+                ));
+                tile_backing.rerun_destination.log(
+                    &rg::entity_path![],
+                    &rg::archetypes::Points3D::new(points_for_rerun)
+                        .with_colors(colors_for_rerun)
+                        .with_radii(radii_for_rerun),
+                );
+            }
+
             tile_backing.allocator.upgrade()
         };
 
@@ -309,6 +402,9 @@ impl AllocatorBacking {
             channels,
             texture_label: format!("{label_prefix} block {channels:?} texture"),
             textures: None,
+
+            #[cfg(feature = "rerun")]
+            rerun_destination: rg::Destination::default(),
         }))
     }
 
@@ -405,16 +501,16 @@ impl AllocatorBacking {
                 match weak_tile.backing.upgrade() {
                     Some(strong_ref) => {
                         {
-                            let backing: &mut TileBacking = &mut strong_ref.lock().unwrap();
-                            if backing.dirty || copy_everything_anyway {
-                                let region: Box3D<u32, AtlasTexel> = backing
+                            let tile_backing: &mut TileBacking = &mut strong_ref.lock().unwrap();
+                            if tile_backing.dirty || copy_everything_anyway {
+                                let region: Box3D<u32, AtlasTexel> = tile_backing
                                     .handle
                                     .as_ref()
                                     .expect("can't happen: dead TileBacking")
                                     .allocation
                                     .map(u32::from);
 
-                                if let Some(data) = backing.reflectance.as_ref() {
+                                if let Some(data) = tile_backing.reflectance.as_ref() {
                                     write_texture_by_aab(
                                         queue,
                                         &textures.reflectance.texture,
@@ -426,7 +522,7 @@ impl AllocatorBacking {
                                     count_written += 1;
                                 }
                                 if let (Some(data), Some(gtexture)) =
-                                    (backing.emission.as_ref(), &textures.emission)
+                                    (tile_backing.emission.as_ref(), &textures.emission)
                                 {
                                     write_texture_by_aab(queue, &gtexture.texture, region, data);
                                     // If we don't have reflectance then the tile was never written
@@ -434,7 +530,7 @@ impl AllocatorBacking {
                                     count_written += 1;
                                 }
 
-                                backing.dirty = false;
+                                tile_backing.dirty = false;
                             }
                         }
 
@@ -468,9 +564,9 @@ impl AllocatorBacking {
                     }
                 }
             });
-        }
 
-        backing.dirty = false;
+            backing.dirty = false;
+        }
 
         let output = (
             Group {
@@ -492,6 +588,18 @@ impl AllocatorBacking {
         drop(deferred_tile_drops);
 
         output
+    }
+
+    /// Activate logging of all texels to Rerun as a point cloud.
+    /// Does not take effect until the next [`Self::flush()`].
+    #[cfg(feature = "rerun")]
+    pub(crate) fn log_to_rerun(&mut self, destination: rg::Destination) {
+        destination.log(
+            &rg::entity_path![],
+            &rg::archetypes::DisconnectedSpace::new(rg::components::DisconnectedSpace::default()),
+        );
+        destination.log(&rg::entity_path![], &rg::archetypes::ViewCoordinates::RUF);
+        self.rerun_destination = destination;
     }
 }
 
@@ -552,6 +660,11 @@ impl texture::Plane for AtlasPlane {
 
 impl Drop for TileBacking {
     fn drop(&mut self) {
+        #[cfg(feature = "rerun")]
+        {
+            self.rerun_destination.clear_recursive(&rg::entity_path![]);
+        }
+
         let Some(backing_lock) = self.allocator.upgrade() else {
             // Texture is gone, so nothing to do
             return;

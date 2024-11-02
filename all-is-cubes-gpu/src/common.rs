@@ -86,12 +86,14 @@ impl ops::Sub<Duration> for AdaptedInstant {
 #[cfg(feature = "rerun")]
 #[doc(hidden)] // not stable, just exists to support config from desktop cmdline
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-#[non_exhaustive]
+#[allow(clippy::exhaustive_structs)] // hidden, not stable
 pub struct RerunFilter {
     /// Log performance info
     pub performance: bool,
     /// Log the rendered image.
     pub image: bool,
+    /// Log the contents of the texture atlases.
+    pub textures: bool,
 }
 
 /// Single-entry cache.

@@ -210,11 +210,18 @@ pub fn common_progress_style() -> indicatif::ProgressStyle {
 /// Types of data that command line options can request be written to Rerun.
 #[derive(Debug, Clone, Eq, Hash, PartialEq, clap::ValueEnum)]
 pub(crate) enum RerunDataKind {
+    /// Send log messages.
     Log,
+    /// Send data about the game world (particularly collisions).
     World,
+    /// Send rendering performance data, for plotting.
     RenderPerf,
+    /// Send the rendered image (including depth).
     RenderImage,
+    /// Send the mesh used for rendering.
     RenderMesh,
+    /// Send the texture atlases used for rendering.
+    RenderTextures,
 }
 
 /// Input for logging-like initialization that needs to happen later when we have more information.
@@ -276,13 +283,11 @@ fn log_renderer_to_rerun<Ren: crate::glue::Renderer>(this: &LateLogging, rendere
             rerun_destination: destination,
     } = this;
 
-    let mut render_filter = RerunFilter::default();
-    if kinds.contains(&RerunDataKind::RenderPerf) {
-        render_filter.performance = true;
-    }
-    if kinds.contains(&RerunDataKind::RenderImage) {
-        render_filter.image = true;
-    }
+    let render_filter = RerunFilter {
+        performance: kinds.contains(&RerunDataKind::RenderPerf),
+        image: kinds.contains(&RerunDataKind::RenderImage),
+        textures: kinds.contains(&RerunDataKind::RenderTextures),
+    };
 
     if render_filter != RerunFilter::default() {
         renderer.log_to_rerun(destination.clone(), render_filter);
