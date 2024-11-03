@@ -98,6 +98,7 @@ impl texture::Allocator for Allocator {
     type Point = TexPoint;
 
     fn allocate(&self, bounds: GridAab, channels: texture::Channels) -> Option<Self::Tile> {
+        assert!(!bounds.is_empty());
         self.count_allocated
             .fetch_update(SeqCst, SeqCst, |count| {
                 if count < self.capacity {

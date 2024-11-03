@@ -68,7 +68,10 @@ impl<A> Alloctree<A> {
     /// The returned handle **does not deallocate on drop**, because this tree does not
     /// implement interior mutability; it is the caller's responsibility to provide such
     /// functionality if needed.
+    ///
+    /// Panics if the request has zero volume.
     pub fn allocate(&mut self, request: GridAab) -> Option<AlloctreeHandle<A>> {
+        assert!(!request.is_empty());
         if !fits(request, self.size_exponent) {
             // Too big, can never fit.
             return None;

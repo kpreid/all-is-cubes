@@ -3,7 +3,7 @@ extern crate all_is_cubes;
 
 use core::fmt;
 
-use all_is_cubes::math::GridAab;
+use all_is_cubes::math::{Face6, FaceMap, GridAab};
 use all_is_cubes_gpu::octree_alloc::Alloctree;
 
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
@@ -16,10 +16,13 @@ struct FuzzOctree {
 
 #[derive(Arbitrary)]
 enum Operation {
-    Allocate(GridAab),
-    AllocateGrow(GridAab, u8),
+    Allocate(NonEmptyGridAab),
+    AllocateGrow(NonEmptyGridAab, u8),
     Free(usize),
 }
+
+#[derive(Clone, Copy, Debug)]
+struct NonEmptyGridAab(GridAab);
 
 fuzz_target!(|input: FuzzOctree| {
     let mut t = Alloctree::<()>::new(clean_exponent(input.size_exponent));
@@ -27,13 +30,13 @@ fuzz_target!(|input: FuzzOctree| {
 
     for operation in input.operations {
         match operation {
-            Operation::Allocate(request) => {
+            Operation::Allocate(NonEmptyGridAab(request)) => {
                 let result = t.allocate(request);
                 if let Some(handle) = result {
                     handles.push(handle);
                 }
             }
-            Operation::AllocateGrow(request, max_growth) => {
+            Operation::AllocateGrow(NonEmptyGridAab(request), max_growth) => {
                 let result = t.allocate_with_growth(request, max_growth);
                 if let Some(handle) = result {
                     handles.push(handle);
@@ -57,7 +60,8 @@ fn clean_exponent(input: u8) -> u8 {
 /// Print operations in the form of code that can be roughly copied into an integration test.
 impl fmt::Debug for Operation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fn fmt_aab(f: &mut fmt::Formatter<'_>, aab: GridAab) -> fmt::Result {
+        fn fmt_aab(f: &mut fmt::Formatter<'_>, aab: NonEmptyGridAab) -> fmt::Result {
+            let aab = aab.0;
             let lower = aab.lower_bounds().to_array();
             let size = aab.size().to_array();
             write!(f, "GridAab::from_lower_size({lower:?}, {size:?})")
@@ -76,5 +80,26 @@ impl fmt::Debug for Operation {
             }
             Self::Free(i) => write!(f, "t.free(handles.remove({i}))"),
         }
+    }
+}
+
+impl<'a> arbitrary::Arbitrary<'a> for NonEmptyGridAab {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let mut candidate = GridAab::arbitrary(u)?;
+        if candidate.is_empty() {
+            candidate = candidate.expand(FaceMap::default().with(Face6::arbitrary(u)?, 1));
+        }
+        if candidate.is_empty() {
+            Err(arbitrary::Error::IncorrectFormat)
+        } else {
+            Ok(NonEmptyGridAab(candidate))
+        }
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::and(
+            GridAab::size_hint(depth),
+            arbitrary::size_hint::or((0, Some(0)), Face6::size_hint(depth)),
+        )
     }
 }

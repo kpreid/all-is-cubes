@@ -106,8 +106,9 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
         viz.voxels(voxels);
         let voxels_array = voxels.as_vol_ref();
 
-        // Exit when the voxel data is not at all in the right volume.
-        // This dodges some integer overflow cases on bad input.
+        // Exit when the voxel data is not at all in the right volume, or is empty.
+        // This dodges some integer overflow cases on bad input,
+        // and avoids asking the texture allocator for an empty allocation.
         // TODO: Add a test for this case
         if voxels_array
             .bounds()

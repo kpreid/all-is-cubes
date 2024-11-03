@@ -68,6 +68,8 @@ impl texture::Allocator for GltfTextureAllocator {
     type Point = GltfAtlasPoint;
 
     fn allocate(&self, bounds: GridAab, mut channels: texture::Channels) -> Option<GltfTile> {
+        assert!(!bounds.is_empty());
+
         if self.enable {
             // TODO: implement more channels
             if true {

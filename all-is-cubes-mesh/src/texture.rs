@@ -53,6 +53,7 @@ pub trait Allocator {
     /// * `bounds` specifies the desired size of the allocation;
     ///   its translation does not affect the size but may be used to make the resulting
     ///   texture coordinate transformation convenient for the caller.
+    ///   It must not be empty (zero volume).
     /// * `channels` specifies what types of data the texture should capture from the
     ///   [`Evoxel`]s that will be provided later to [`Tile::write()`].
     ///   The allocator may choose to ignore some channels if this suits the
@@ -212,6 +213,7 @@ pub fn validate_slice(tile_bounds: GridAab, slice_bounds: GridAab) -> Axis {
     }
 }
 
+/// `voxels` must not be empty (zero volume).
 pub(super) fn copy_voxels_to_new_texture<A: Allocator>(
     texture_allocator: &A,
     voxels: &Evoxels,
@@ -293,7 +295,8 @@ impl Allocator for NoTextures {
     type Tile = NoTexture;
     type Point = NoTexture;
 
-    fn allocate(&self, _: GridAab, _: Channels) -> Option<Self::Tile> {
+    fn allocate(&self, bounds: GridAab, _: Channels) -> Option<Self::Tile> {
+        assert!(!bounds.is_empty());
         None
     }
 }

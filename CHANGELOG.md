@@ -36,6 +36,9 @@
 - `all-is-cubes-gpu` library:
     - `in_wgpu::SurfaceRenderer::new()` requires `wgpu::Adapter` instead of `&wgpu::Adapter`.
 
+- `all-is-cubes-mesh` library:
+    - `texture::Allocator` implementations are now permitted to reject zero-volume allocations.
+
 - `all-is-cubes-port` library:
     - All functionality is now conditional on feature flags, to allow omitting unneeded formats and operations.
     - `ExportFormat` is now named `Format`.
