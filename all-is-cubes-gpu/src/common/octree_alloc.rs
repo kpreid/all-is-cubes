@@ -1,9 +1,10 @@
 use core::fmt;
 use core::marker::PhantomData;
+use core::ops::Range;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size3D, Translation3D};
 use all_is_cubes::math::{
-    self, Cube, GridAab, GridCoordinate, GridSizeCoord, Octant, OctantMap, VectorOps as _,
+    self, Axis, Cube, GridAab, GridCoordinate, GridSizeCoord, Octant, OctantMap, VectorOps as _,
 };
 
 type TreeCoord = u16;
@@ -233,7 +234,7 @@ impl<A> fmt::Debug for Alloctree<A> {
 /// Tree node making up an [`Alloctree`].
 ///
 /// The nodes do not know their size or position; this is tracked by the traversal
-/// algorithms.
+/// algorithms. Every node’s size is a cube whose side length is a power of 2.
 #[derive(Clone, Debug)]
 enum AlloctreeNode {
     /// No contents.
@@ -245,6 +246,16 @@ enum AlloctreeNode {
 
     /// Subdivided into parts with `size_exponent` decremented by one.
     Oct(Box<OctantMap<AlloctreeNode>>),
+
+    /// Subdivided into non-cubical layers along some axis.
+    Sliced {
+        /// Axis perpendicular to the slicing.
+        axis: Axis,
+        /// Ranges of `axis` that are allocated.
+        /// This vector is kept sorted.
+        /// The ranges are in local, not global, coordinates.
+        occupied: Vec<Range<TreeCoord>>,
+    },
 }
 
 impl AlloctreeNode {
@@ -258,9 +269,11 @@ impl AlloctreeNode {
     fn allocate<A>(
         &mut self,
         size_exponent: u8,
-        low_corner: Point3D<TreeCoord, A>,
+        low_corner_of_node: Point3D<TreeCoord, A>,
         request: GridAab,
     ) -> Option<AlloctreeHandle<A>> {
+        #![expect(clippy::single_range_in_vec_init)]
+
         // eprintln!(
         //     "allocate(2^{} = {}, {:?})",
         //     size_exponent,
@@ -283,29 +296,25 @@ impl AlloctreeNode {
                     let mut child = AlloctreeNode::Empty;
                     // We allocate in the low corner of the new subdivision, so no adjustment
                     // to low_corner is needed.
-                    let handle = child.allocate(size_exponent - 1, low_corner, request)?;
+                    let handle = child.allocate(size_exponent - 1, low_corner_of_node, request)?;
                     // Note this mutation is made only after a successful allocation in the child.
                     *self = child.wrap_in_oct();
                     Some(handle)
                 } else {
                     // Occupy this node with the allocation.
-
-                    // It's possible for the offset calculation to overflow if the request
-                    // bounds are near GridCoordinate::MIN.
-                    let low_corner = low_corner.map(GridCoordinate::from);
-                    let offset = Translation3D::<GridCoordinate, Cube, A>::new(
-                        low_corner.x.checked_sub(request.lower_bounds().x)?,
-                        low_corner.y.checked_sub(request.lower_bounds().y)?,
-                        low_corner.z.checked_sub(request.lower_bounds().z)?,
-                    );
-                    *self = AlloctreeNode::Full;
-                    Some(AlloctreeHandle {
-                        allocation: offset
-                            .transform_box3d(&Box3D::from(request))
-                            .try_cast()
-                            .expect("can't happen: computing translation overflowed"),
-                        offset,
-                    })
+                    let handle = create_handle(low_corner_of_node, request)?;
+                    // Modify the tree only once create_handle succeeds.
+                    if let Some(axis) =
+                        should_slice(request.size().cast::<TreeCoord>(), size_exponent)
+                    {
+                        *self = AlloctreeNode::Sliced {
+                            axis,
+                            occupied: vec![0..TreeCoord::try_from(request.size()[axis]).unwrap()],
+                        }
+                    } else {
+                        *self = AlloctreeNode::Full;
+                    }
+                    Some(handle)
                 }
             }
             AlloctreeNode::Full => None,
@@ -321,10 +330,56 @@ impl AlloctreeNode {
                 children.iter_mut().find_map(|(octant, child)| {
                     child.allocate(
                         size_exponent - 1,
-                        low_corner + octant.to_01().map(TreeCoord::from) * child_size,
+                        low_corner_of_node + octant.to_01().map(TreeCoord::from) * child_size,
                         request,
                     )
                 })
+            }
+            &mut AlloctreeNode::Sliced {
+                axis,
+                ref mut occupied,
+            } => {
+                let node_size = expsize(size_exponent);
+                let request_size_on_axis = TreeCoord::try_from(request.size()[axis]).unwrap();
+                let (insert_index, relative_offset): (usize, TreeCoord) = 'pos: {
+                    let occupied_iter = occupied.iter().cloned();
+                    // Iterate over adjacent pairs, including off the beginning and off the end
+                    // represented by placeholder empty ranges
+                    for (
+                        i,
+                        (
+                            Range {
+                                start: _,
+                                end: end1,
+                            },
+                            Range {
+                                start: start2,
+                                end: _,
+                            },
+                        ),
+                    ) in [0..0]
+                        .into_iter()
+                        .chain(occupied_iter.clone())
+                        .zip(occupied_iter.chain([node_size..node_size]))
+                        .enumerate()
+                    {
+                        if request_size_on_axis <= (start2 - end1) {
+                            break 'pos (i, end1);
+                        }
+                    }
+                    return None;
+                };
+
+                let new_range = relative_offset..(relative_offset + request_size_on_axis);
+                //log::trace!("slice search succeeded; inserting {new_range:?} into {occupied:?} at {insert_index}");
+
+                let mut low_corner_of_slice = low_corner_of_node;
+                low_corner_of_slice[axis] += relative_offset;
+
+                let handle = create_handle(low_corner_of_slice, request)?;
+                // Modify the tree only once create_handle succeeds.
+                occupied.insert(insert_index, new_range);
+                Some(handle)
             }
         }
     }
@@ -352,7 +407,72 @@ impl AlloctreeNode {
                     relative_low_corner - octant.to_01().map(TreeCoord::from) * child_size,
                 );
             }
+            &mut AlloctreeNode::Sliced {
+                axis,
+                ref mut occupied,
+            } => {
+                let rlc_on_axis = relative_low_corner[axis];
+
+                if let Ok(index) =
+                    occupied.binary_search_by(|range| Ord::cmp(&range.start, &rlc_on_axis))
+                {
+                    // Vec::remove() is O(n) but n is in practice going to be small here.
+                    occupied.remove(index);
+                } else {
+                    panic!("Alloctree::free: expected range starting with {rlc_on_axis} not found in {occupied:?}")
+                }
+
+                if occupied.is_empty() {
+                    // Simplify
+                    *self = AlloctreeNode::Empty;
+                }
+            }
         }
+    }
+}
+
+/// Helper for `AlloctreeNode::allocate()` that does the work of creating an
+/// [`AlloctreeHandle`].
+///
+/// Returns `None` on numeric overflow.
+/// It's possible for the offset calculation to overflow if the request
+/// bounds are near [`GridCoordinate::MIN`].
+fn create_handle<A>(
+    low_corner: Point3D<TreeCoord, A>,
+    request: GridAab,
+) -> Option<AlloctreeHandle<A>> {
+    let low_corner = low_corner.map(GridCoordinate::from);
+    let offset = Translation3D::<GridCoordinate, Cube, A>::new(
+        low_corner.x.checked_sub(request.lower_bounds().x)?,
+        low_corner.y.checked_sub(request.lower_bounds().y)?,
+        low_corner.z.checked_sub(request.lower_bounds().z)?,
+    );
+    Some(AlloctreeHandle {
+        allocation: offset
+            .transform_box3d(&Box3D::from(request))
+            .try_cast()
+            .expect("can't happen: computing translation overflowed"),
+        offset,
+    })
+}
+
+/// Decide whether it makes sense to allocate slices of an `AlloctreeNode`,
+/// and if so on what axis.
+///
+/// TODO: We would like to make this dependent on *where* in the tree the slices lie,
+/// so that we have an opportunity to pack similar shapes into similar regions,
+/// but this also requires changing the order of the allocation search based on the request size.
+fn should_slice(request_size: Size3D<u16, Cube>, node_size_exponent: u8) -> Option<Axis> {
+    let node_size = expsize(node_size_exponent);
+    let remainder = request_size.map(|size| node_size.saturating_sub(size));
+    if remainder.width > remainder.height && remainder.width > remainder.depth {
+        Some(Axis::X)
+    } else if remainder.width > remainder.depth {
+        Some(Axis::Y)
+    } else if remainder.depth > 0 {
+        Some(Axis::Z)
+    } else {
+        None
     }
 }
 
@@ -536,5 +656,29 @@ mod tests {
         assert_eq!(expsize(31), 1 << 11);
         assert_eq!(expsize(32), 1 << 11);
         assert_eq!(expsize(33), 1 << 11);
+    }
+
+    #[test]
+    fn regression_1() {
+        let mut t = Alloctree::<()>::new(8);
+        let mut handles = Vec::new();
+        handles.push(
+            t.allocate(GridAab::from_lower_size([0, 0, 0], [1, 129, 59]))
+                .unwrap(),
+        );
+        dbg!(&t);
+        handles.push(
+            t.allocate(GridAab::from_lower_size([0, 0, 0], [26, 32, 128]))
+                .unwrap(),
+        );
+        dbg!(&t);
+        t.free(handles.remove(0));
+        dbg!(&t);
+        handles.push(
+            t.allocate(GridAab::from_lower_size([0, 0, 0], [1, 7, 129]))
+                .unwrap(),
+        );
+        dbg!(&t);
+        t.consistency_check(&handles);
     }
 }

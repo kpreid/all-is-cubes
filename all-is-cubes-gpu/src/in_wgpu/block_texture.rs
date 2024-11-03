@@ -223,7 +223,7 @@ impl texture::Allocator for AtlasAllocator {
 
     fn allocate(&self, requested_bounds: GridAab, channels: Channels) -> Option<AtlasTile> {
         assert!(!requested_bounds.is_empty());
-        
+
         let backing_arc = match channels {
             Channels::Reflectance => &self.reflectance_backing,
             Channels::ReflectanceEmission => &self.reflectance_and_emission_backing,
