@@ -2,7 +2,7 @@
 extern crate all_is_cubes;
 
 use all_is_cubes::math::GridAab;
-use all_is_cubes_gpu::octree_alloc::{Alloctree, AlloctreeHandle};
+use all_is_cubes_gpu::octree_alloc::Alloctree;
 
 use libfuzzer_sys::{arbitrary::Arbitrary, fuzz_target};
 
@@ -20,7 +20,7 @@ enum Operation {
 }
 
 fuzz_target!(|input: FuzzOctree| {
-    let mut t = Alloctree::new(clean_exponent(input.size_exponent));
+    let mut t = Alloctree::<()>::new(clean_exponent(input.size_exponent));
     let mut handles = Vec::new();
 
     for operation in input.operations {
@@ -44,29 +44,9 @@ fuzz_target!(|input: FuzzOctree| {
             }
         }
 
-        validate(&t, &handles);
+        t.consistency_check(&handles);
     }
 });
-
-fn validate(tree: &Alloctree<()>, handles: &[AlloctreeHandle<()>]) {
-    for (i, h1) in handles.iter().enumerate() {
-        assert!(
-            tree.bounds().contains_box(&h1.allocation),
-            "allocation was out of bounds"
-        );
-        for (j, h2) in handles.iter().enumerate() {
-            if i == j {
-                continue;
-            }
-            if h1.allocation.intersection(&h2.allocation).is_some() {
-                panic!(
-                    "intersection between\n{:?} and {:?}\n",
-                    h1.allocation, h2.allocation
-                );
-            }
-        }
-    }
-}
 
 fn clean_exponent(input: u8) -> u8 {
     input.rem_euclid(Alloctree::<()>::MAX_SIZE_EXPONENT + 1)

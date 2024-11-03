@@ -176,6 +176,32 @@ impl<A> Alloctree<A> {
     pub fn occupied_volume(&self) -> usize {
         self.occupied_volume
     }
+
+    /// Check that the given set of handles are correctly allocated.
+    ///
+    /// This operation is intended only for tests of the allocator.
+    ///
+    /// TODO: This doesn’t currently check that the tree actualy reserves every handle.
+    #[doc(hidden)]
+    pub fn consistency_check(&self, handles: &[AlloctreeHandle<A>]) {
+        for (i, h1) in handles.iter().enumerate() {
+            assert!(
+                self.bounds().contains_box(&h1.allocation),
+                "allocation was out of bounds"
+            );
+            for (j, h2) in handles.iter().enumerate() {
+                if i == j {
+                    continue;
+                }
+                if h1.allocation.intersection(&h2.allocation).is_some() {
+                    panic!(
+                        "intersection between\n{:?} and {:?}\n",
+                        h1.allocation, h2.allocation
+                    );
+                }
+            }
+        }
+    }
 }
 
 // Manual implementation to avoid trait bounds.
@@ -429,19 +455,8 @@ mod tests {
                 request,
                 handle.allocation
             );
-            for existing in &handles {
-                if handle
-                    .allocation
-                    .intersection(&existing.allocation)
-                    .is_some()
-                {
-                    panic!(
-                        "intersection between\n{:?} and {:?}\n",
-                        existing.allocation, handle.allocation
-                    );
-                }
-            }
             handles.push(handle);
+            t.consistency_check(&handles);
         }
         handles
     }
