@@ -58,12 +58,10 @@ fn validate(tree: &Alloctree<()>, handles: &[AlloctreeHandle<()>]) {
             if i == j {
                 continue;
             }
-            if let Some(intersection) = h1.allocation.intersection(&h2.allocation) {
-                assert!(
-                    intersection.volume() == 0,
+            if h1.allocation.intersection(&h2.allocation).is_some() {
+                panic!(
                     "intersection between\n{:?} and {:?}\n",
-                    h1.allocation,
-                    h2.allocation
+                    h1.allocation, h2.allocation
                 );
             }
         }

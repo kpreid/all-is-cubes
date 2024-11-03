@@ -430,12 +430,14 @@ mod tests {
                 handle.allocation
             );
             for existing in &handles {
-                if let Some(intersection) = handle.allocation.intersection(&existing.allocation) {
-                    assert!(
-                        intersection.volume() == 0,
+                if handle
+                    .allocation
+                    .intersection(&existing.allocation)
+                    .is_some()
+                {
+                    panic!(
                         "intersection between\n{:?} and {:?}\n",
-                        existing.allocation,
-                        handle.allocation
+                        existing.allocation, handle.allocation
                     );
                 }
             }
