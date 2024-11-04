@@ -312,25 +312,12 @@ impl Fmt<StatusText> for SpaceDrawInfo {
 /// Performance info about [`Block`] texture management.
 ///
 /// [`Block`]: all_is_cubes::block::Block
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct BlockTextureInfo {
     pub(crate) flushed: usize,
     pub(crate) flush_time: Duration,
     pub(crate) in_use_tiles: usize,
-    pub(crate) in_use_texels: usize,
-    pub(crate) capacity_texels: usize,
-}
-
-impl Default for BlockTextureInfo {
-    fn default() -> Self {
-        BlockTextureInfo {
-            flushed: 0,
-            flush_time: Duration::ZERO,
-            in_use_tiles: 0,
-            in_use_texels: 0,
-            capacity_texels: 0,
-        }
-    }
+    pub(crate) texels: crate::octree_alloc::Info,
 }
 
 impl ops::Add for BlockTextureInfo {
@@ -340,8 +327,7 @@ impl ops::Add for BlockTextureInfo {
             flushed: self.flushed + rhs.flushed,
             flush_time: self.flush_time + rhs.flush_time,
             in_use_tiles: self.in_use_tiles + rhs.in_use_tiles,
-            in_use_texels: self.in_use_texels + rhs.in_use_texels,
-            capacity_texels: self.capacity_texels + rhs.capacity_texels,
+            texels: self.texels + rhs.texels,
         }
     }
 }
@@ -350,11 +336,9 @@ impl Fmt<StatusText> for BlockTextureInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         write!(
             fmt,
-            "Textures: {} tiles, {} texels ({}% of {}) used, {:2} flushed in {}",
+            "Textures: {}  Atlas: {}  Flushed: {:2} in {}",
             self.in_use_tiles,
-            self.in_use_texels,
-            (self.in_use_texels as f32 / self.capacity_texels as f32 * 100.0).ceil() as usize,
-            self.capacity_texels,
+            self.texels.refmt(fopt),
             self.flushed,
             self.flush_time.refmt(fopt)
         )

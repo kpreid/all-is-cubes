@@ -577,8 +577,7 @@ impl AllocatorBacking {
                 flushed: count_written,
                 flush_time: time::Duration::ZERO,
                 in_use_tiles: backing.in_use.len(),
-                in_use_texels: backing.alloctree.occupied_volume(),
-                capacity_texels: backing.alloctree.bounds().to_usize().volume(),
+                texels: backing.alloctree.info(),
             },
         );
 

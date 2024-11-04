@@ -1,11 +1,12 @@
 use core::fmt;
 use core::marker::PhantomData;
-use core::ops::Range;
+use core::ops::{self, Range};
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size3D, Translation3D};
 use all_is_cubes::math::{
     self, Axis, Cube, GridAab, GridCoordinate, GridSizeCoord, Octant, OctantMap, VectorOps as _,
 };
+use all_is_cubes::util::{Fmt, StatusText};
 
 type TreeCoord = u16;
 
@@ -26,14 +27,17 @@ type TreeCoord = u16;
 ///
 /// Note: this struct is public (but hidden) for the `fuzz_octree` test.
 pub struct Alloctree<A> {
-    /// log2 of the size of the region available to allocate. Lower bounds are always zero
+    /// log2 of the size of the region available to allocate. Lower bounds are always zero.
     size_exponent: u8,
 
     root: AlloctreeNode,
 
-    /// Occupied units, strictly in terms of request volume.
-    /// TODO: Change this to account for known fragmentation that can't be allocated.
-    occupied_volume: usize,
+    /// Total volume of all currently allocated requests.
+    used_volume: usize,
+
+    /// Total volume unavailable for further allocation
+    /// (greater than or equal to `used_volume`).
+    allocated_volume: usize,
 
     _phantom: PhantomData<fn() -> A>,
 }
@@ -59,7 +63,8 @@ impl<A> Alloctree<A> {
         Self {
             size_exponent,
             root: AlloctreeNode::Empty,
-            occupied_volume: 0,
+            used_volume: 0,
+            allocated_volume: 0,
             _phantom: PhantomData,
         }
     }
@@ -80,7 +85,8 @@ impl<A> Alloctree<A> {
         let handle = self
             .root
             .allocate::<A>(self.size_exponent, Point3D::origin(), request)?;
-        self.occupied_volume += request.volume().unwrap();
+        self.used_volume += request.volume().unwrap();
+        self.allocated_volume += handle.allocated_volume;
         Some(handle)
     }
 
@@ -141,14 +147,15 @@ impl<A> Alloctree<A> {
     /// Deallocates the given previously allocated region.
     ///
     /// If the handle does not exactly match a previous allocation from this allocator,
-    /// may panic or deallocate something else.
+    /// may panic or deallocate something else, and the allocation info may become inconsistent.
     #[expect(
         clippy::needless_pass_by_value,
         reason = "deliberately taking handle ownership"
     )]
     pub fn free(&mut self, handle: AlloctreeHandle<A>) {
         self.root.free(self.size_exponent, handle.allocation.min);
-        self.occupied_volume -= handle.allocation.map(usize::from).volume();
+        self.used_volume -= handle.allocation.map(usize::from).volume();
+        self.allocated_volume -= handle.allocated_volume;
     }
 
     /// Enlarge the bounds to be as if this tree had been allocated with
@@ -166,7 +173,9 @@ impl<A> Alloctree<A> {
             *self = Alloctree {
                 size_exponent: old.size_exponent + 1,
                 root: old.root.wrap_in_oct(),
-                occupied_volume: old.occupied_volume, // we're only adding unoccupied volume
+                // we're only adding non-allocated volume
+                used_volume: old.used_volume,
+                allocated_volume: old.allocated_volume,
                 _phantom: PhantomData,
             };
         }
@@ -177,8 +186,12 @@ impl<A> Alloctree<A> {
         Box3D::from_size(Size3D::splat(expsize(self.size_exponent)))
     }
 
-    pub fn occupied_volume(&self) -> usize {
-        self.occupied_volume
+    pub(crate) fn info(&self) -> Info {
+        Info {
+            total_volume: usize::from(expsize(self.size_exponent)).pow(3),
+            used_volume: self.used_volume,
+            allocated_volume: self.allocated_volume,
+        }
     }
 
     /// Check that the given set of handles are correctly allocated.
@@ -214,7 +227,8 @@ impl<A> Clone for Alloctree<A> {
         Self {
             size_exponent: self.size_exponent,
             root: self.root.clone(),
-            occupied_volume: self.occupied_volume,
+            used_volume: self.used_volume,
+            allocated_volume: self.allocated_volume,
             _phantom: PhantomData,
         }
     }
@@ -223,10 +237,18 @@ impl<A> Clone for Alloctree<A> {
 // Manual implementation to avoid trait bounds.
 impl<A> fmt::Debug for Alloctree<A> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            size_exponent,
+            root,
+            used_volume,
+            allocated_volume,
+            _phantom,
+        } = self;
         f.debug_struct("Alloctree")
-            .field("size_exponent", &self.size_exponent)
-            .field("occupied_volume", &self.occupied_volume)
-            .field("root", &self.root)
+            .field("size_exponent", &size_exponent)
+            .field("used_volume", &used_volume)
+            .field("allocated_volume", &allocated_volume)
+            .field("root", &root)
             .finish()
     }
 }
@@ -288,6 +310,10 @@ impl AlloctreeNode {
             "request {request:?} unexpectedly too big for {size_exponent}"
         );
 
+        // TODO: Make this faster than a full depth-first tree iteration, by having nodes
+        // keep track of what the size exponent of their largest free volume is,
+        // so we can skip them if we know searching them is fruitless.
+
         match self {
             AlloctreeNode::Empty => {
                 if size_exponent > 0 && fits(request, size_exponent - 1) {
@@ -302,19 +328,30 @@ impl AlloctreeNode {
                     Some(handle)
                 } else {
                     // Occupy this node with the allocation.
-                    let handle = create_handle(low_corner_of_node, request)?;
-                    // Modify the tree only once create_handle succeeds.
                     if let Some(axis) =
                         should_slice(request.size().cast::<TreeCoord>(), size_exponent)
                     {
+                        let handle = create_handle(
+                            low_corner_of_node,
+                            request,
+                            usize::from(expsize(size_exponent)).pow(2)
+                                * usize::try_from(request.size()[axis]).unwrap(),
+                        )?;
+                        // Modify the tree only once create_handle succeeds.
                         *self = AlloctreeNode::Sliced {
                             axis,
                             occupied: vec![0..TreeCoord::try_from(request.size()[axis]).unwrap()],
-                        }
+                        };
+                        Some(handle)
                     } else {
+                        let handle = create_handle(
+                            low_corner_of_node,
+                            request,
+                            usize::from(expsize(size_exponent)).pow(3),
+                        )?;
                         *self = AlloctreeNode::Full;
+                        Some(handle)
                     }
-                    Some(handle)
                 }
             }
             AlloctreeNode::Full => None,
@@ -376,7 +413,11 @@ impl AlloctreeNode {
                 let mut low_corner_of_slice = low_corner_of_node;
                 low_corner_of_slice[axis] += relative_offset;
 
-                let handle = create_handle(low_corner_of_slice, request)?;
+                let handle = create_handle(
+                    low_corner_of_slice,
+                    request,
+                    usize::from(node_size).pow(2) * usize::from(request_size_on_axis),
+                )?;
                 // Modify the tree only once create_handle succeeds.
                 occupied.insert(insert_index, new_range);
                 Some(handle)
@@ -440,6 +481,7 @@ impl AlloctreeNode {
 fn create_handle<A>(
     low_corner: Point3D<TreeCoord, A>,
     request: GridAab,
+    allocated_volume: usize,
 ) -> Option<AlloctreeHandle<A>> {
     let low_corner = low_corner.map(GridCoordinate::from);
     let offset = Translation3D::<GridCoordinate, Cube, A>::new(
@@ -453,6 +495,7 @@ fn create_handle<A>(
             .try_cast()
             .expect("can't happen: computing translation overflowed"),
         offset,
+        allocated_volume,
     })
 }
 
@@ -486,16 +529,27 @@ fn should_slice(request_size: Size3D<u16, Cube>, node_size_exponent: u8) -> Opti
 pub struct AlloctreeHandle<A> {
     /// Allocated region — this is the region to write into.
     pub allocation: Box3D<u16, A>,
+
     /// Coordinate translation from the originally requested [`GridAab`] to the location
     /// allocated for it.
     pub offset: Translation3D<GridCoordinate, Cube, A>,
+
+    /// Volume of the tree that is unusable due to this allocation, which may be greater than
+    /// the requested region.
+    allocated_volume: usize,
 }
 
 impl<A> Eq for AlloctreeHandle<A> {}
 impl<A> PartialEq for AlloctreeHandle<A> {
     fn eq(&self, other: &Self) -> bool {
-        let &Self { allocation, offset } = self;
-        allocation == other.allocation && offset == other.offset
+        let &Self {
+            allocation,
+            offset,
+            allocated_volume,
+        } = self;
+        allocation == other.allocation
+            && offset == other.offset
+            && allocated_volume == other.allocated_volume
     }
 }
 
@@ -504,7 +558,50 @@ impl<A> fmt::Debug for AlloctreeHandle<A> {
         f.debug_struct("AlloctreeHandle")
             .field("allocation", &self.allocation)
             .field("offset", &self.offset)
+            .field("allocated_volume", &self.allocated_volume)
             .finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[allow(clippy::struct_field_names)]
+pub(crate) struct Info {
+    /// Total volume, whether free or allocated.
+    pub total_volume: usize,
+    /// Volume that is not free.
+    /// This is never greater than `total_volume`.
+    ///
+    /// It may be greater than `used_volume` when small pieces are not tracked.
+    pub allocated_volume: usize,
+    /// Volume that is occupied by requested allocations.
+    /// This is never greater than `allocated_volume`.
+    pub used_volume: usize,
+}
+
+impl ops::Add for Info {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        Self {
+            total_volume: self.total_volume + rhs.total_volume,
+            allocated_volume: self.allocated_volume + rhs.allocated_volume,
+            used_volume: self.used_volume + rhs.used_volume,
+        }
+    }
+}
+
+impl Fmt<StatusText> for Info {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        let &Self {
+            total_volume,
+            allocated_volume,
+            used_volume,
+        } = self;
+        write!(
+            fmt,
+            "{up:3}% used of {ap:3}% allocated of {total_volume}",
+            up = (used_volume as f32 / self.total_volume as f32 * 100.0).ceil() as usize,
+            ap = (allocated_volume as f32 / self.total_volume as f32 * 100.0).ceil() as usize,
+        )
     }
 }
 
