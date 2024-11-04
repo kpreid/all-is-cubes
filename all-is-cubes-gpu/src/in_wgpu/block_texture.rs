@@ -593,7 +593,7 @@ impl AllocatorBacking {
     /// Does not take effect until the next [`Self::flush()`].
     #[cfg(feature = "rerun")]
     pub(crate) fn log_to_rerun(&mut self, destination: rg::Destination) {
-        destination.log(
+        destination.log_static(
             &rg::entity_path![],
             &rg::archetypes::DisconnectedSpace::new(rg::components::DisconnectedSpace::default()),
         );
