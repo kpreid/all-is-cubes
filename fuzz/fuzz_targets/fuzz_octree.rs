@@ -57,7 +57,7 @@ fn clean_exponent(input: u8) -> u8 {
     input.rem_euclid(Alloctree::<()>::MAX_SIZE_EXPONENT + 1)
 }
 
-/// Print operations in the form of code that can be roughly copied into an integration test.
+/// Print operations in the form of code that can be roughly copied into a regression test.
 impl fmt::Debug for Operation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fn fmt_aab(f: &mut fmt::Formatter<'_>, aab: NonEmptyGridAab) -> fmt::Result {
