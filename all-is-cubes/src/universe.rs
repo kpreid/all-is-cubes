@@ -685,7 +685,7 @@ impl Universe {
 
         // Initialize axes.
         // TODO: this should be per-Space in principle
-        self.rerun_destination.log_timeless(
+        self.rerun_destination.log_static(
             &rg::entity_path![],
             &rg::archetypes::ViewCoordinates::new(
                 rg::components::ViewCoordinates::from_up_and_handedness(
