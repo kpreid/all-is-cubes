@@ -306,63 +306,55 @@ mod tests {
     }
 
     /// Exercise the analysis on the outputs of `make_slab()`.
-    #[test]
-    fn analyze_slab() {
+    #[rstest::rstest]
+    fn analyze_slab(#[values(0, 1, 2, 3, 4)] thickness: i32) {
         let mut u = Universe::new();
-        for thickness in [0, 1, 2, 3, 4] {
-            eprintln!("thickness {thickness}:");
-            let slab = all_is_cubes::content::make_slab(&mut u, thickness, Resolution::R4);
-            let ev = slab.evaluate().unwrap();
-            let analysis = analyze(
-                ev.resolution(),
-                ev.voxels().as_vol_ref(),
-                &mut Viz::disabled(),
-            );
 
-            let occupied_planes = FaceMap::from_fn(|f| analysis.occupied_planes(f).collect_vec());
-            if thickness == 0 {
-                assert_eq!(analysis.needs_texture, false, "needs_texture");
-                assert_eq!(
-                    occupied_planes,
-                    FaceMap::default(), // all empty
-                );
-            } else {
-                assert_eq!(analysis.needs_texture, true, "needs_texture");
-                // Note: the orientation of these rects depends on the arbitrary choices of
-                // Face6::face_transform().
-                assert_eq!(
-                    occupied_planes,
-                    FaceMap {
-                        nx: vec![(
-                            0,
-                            Rect::from_origin_and_size(point2(0, 0), size2(thickness, 4))
-                        )],
-                        ny: vec![(0, Rect::from_origin_and_size(point2(0, 0), size2(4, 4)))],
-                        nz: vec![(
-                            0,
-                            Rect::from_origin_and_size(point2(0, 0), size2(4, thickness))
-                        )],
-                        px: vec![(
-                            0,
-                            Rect::from_origin_and_size(
-                                point2(4 - thickness, 0),
-                                size2(thickness, 4)
-                            )
-                        )],
-                        py: vec![(
-                            4 - thickness,
-                            Rect::from_origin_and_size(point2(0, 0), size2(4, 4))
-                        )],
-                        pz: vec![(
-                            0,
-                            Rect::from_origin_and_size(
-                                point2(0, 4 - thickness),
-                                size2(4, thickness)
-                            )
-                        )],
-                    }
-                );
-            }
+        let slab = all_is_cubes::content::make_slab(&mut u, thickness, Resolution::R4);
+        let ev = slab.evaluate().unwrap();
+        let analysis = analyze(
+            ev.resolution(),
+            ev.voxels().as_vol_ref(),
+            &mut Viz::disabled(),
+        );
+
+        let occupied_planes = FaceMap::from_fn(|f| analysis.occupied_planes(f).collect_vec());
+        if thickness == 0 {
+            assert_eq!(analysis.needs_texture, false, "needs_texture");
+            assert_eq!(
+                occupied_planes,
+                FaceMap::default(), // all empty
+            );
+        } else {
+            assert_eq!(analysis.needs_texture, true, "needs_texture");
+            // Note: the orientation of these rects depends on the arbitrary choices of
+            // Face6::face_transform().
+            assert_eq!(
+                occupied_planes,
+                FaceMap {
+                    nx: vec![(
+                        0,
+                        Rect::from_origin_and_size(point2(0, 0), size2(thickness, 4))
+                    )],
+                    ny: vec![(0, Rect::from_origin_and_size(point2(0, 0), size2(4, 4)))],
+                    nz: vec![(
+                        0,
+                        Rect::from_origin_and_size(point2(0, 0), size2(4, thickness))
+                    )],
+                    px: vec![(
+                        0,
+                        Rect::from_origin_and_size(point2(4 - thickness, 0), size2(thickness, 4))
+                    )],
+                    py: vec![(
+                        4 - thickness,
+                        Rect::from_origin_and_size(point2(0, 0), size2(4, 4))
+                    )],
+                    pz: vec![(
+                        0,
+                        Rect::from_origin_and_size(point2(0, 4 - thickness), size2(4, thickness))
+                    )],
+                }
+            );
         }
     }
 

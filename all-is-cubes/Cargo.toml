@@ -140,6 +140,7 @@ allocation-counter = { workspace = true }
 criterion = { workspace = true }
 futures-util = { workspace = true }
 pretty_assertions = { workspace = true }
+rstest = { workspace = true }
 serde_json = { workspace = true }
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "sync"] }

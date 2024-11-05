@@ -11,7 +11,9 @@ use pretty_assertions::assert_eq;
 use crate::block::{
     self, modifier, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockChange,
     BlockCollision, BlockDef, BlockDefTransaction, EvalBlockError, Evoxel, Evoxels, Modifier,
-    Primitive, Resolution::*, AIR, AIR_EVALUATED,
+    Primitive,
+    Resolution::{self, *},
+    AIR, AIR_EVALUATED,
 };
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};
@@ -84,6 +86,8 @@ fn block_debug_with_modifiers() {
 }
 
 mod eval {
+    use rstest::rstest;
+
     use crate::block::{Cost, EvKey, EvaluatedBlock, VoxelOpacityMask};
 
     use super::{assert_eq, *};
@@ -275,35 +279,33 @@ mod eval {
 
     /// Test that light emission from voxels doesn't depend on resolution, or rather, the emission
     /// is taken as an intensive property rather than an extensive property.
-    #[test]
-    fn voxels_emission_equivalence() {
+    #[rstest]
+    fn voxels_emission_equivalence(
+        #[values(Rgba::TRANSPARENT, Rgba::new(0.0, 0.5, 1.0, 0.5))] reflectance: Rgba,
+        #[values(R1, R2, R4, R32)] resolution: Resolution,
+    ) {
         let mut universe = Universe::new();
-
         let atom_emission = Rgb::new(1.0, 2.0, 3.0);
-        for reflectance in [Rgba::TRANSPARENT, Rgba::new(0.0, 0.5, 1.0, 0.5)] {
-            let atom = Block::builder()
-                .color(reflectance)
-                .light_emission(atom_emission)
-                .build();
+        let atom = Block::builder()
+            .color(reflectance)
+            .light_emission(atom_emission)
+            .build();
 
-            for resolution in [R1, R2, R4, R32] {
-                let voxel_block = Block::builder()
-                    .voxels_fn(resolution, |_| &atom)
-                    .unwrap()
-                    .build_into(&mut universe);
+        let voxel_block = Block::builder()
+            .voxels_fn(resolution, |_| &atom)
+            .unwrap()
+            .build_into(&mut universe);
 
-                let total_emission: Vector3D<f32, Intensity> =
-                    voxel_block.evaluate().unwrap().light_emission().into();
-                let difference: Vector3D<f32, Intensity> = total_emission - atom_emission.into();
-                assert!(
-                    difference.length() < 0.0001,
-                    "reflectance = {reflectance:?}\n\
+        let total_emission: Vector3D<f32, Intensity> =
+            voxel_block.evaluate().unwrap().light_emission().into();
+        let difference: Vector3D<f32, Intensity> = total_emission - atom_emission.into();
+        assert!(
+            difference.length() < 0.0001,
+            "reflectance = {reflectance:?}\n\
                     resolution = {resolution}\n\
                     expected = {atom_emission:?}\n\
                     actual = {total_emission:?}"
-                );
-            }
-        }
+        );
     }
 
     #[test]

@@ -75,9 +75,10 @@ rayon = { workspace = true, optional = true }
 [dev-dependencies]
 # used for visualize-block-mesh example
 all-is-cubes-content = { workspace = true }
-pollster = { workspace = true }
 criterion = { workspace = true }
+pollster = { workspace = true }
 pretty_assertions = { workspace = true }
+rstest = { workspace = true }
 
 [lints]
 workspace = true

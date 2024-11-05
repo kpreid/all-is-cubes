@@ -433,34 +433,35 @@ mod tests {
     ///
     /// TODO: A more thorough test would be to double the resolution of a non-uniform block,
     /// though that might have rounding error.
-    #[test]
-    fn solid_block_equivalent_at_any_resolution() {
-        let mut attributes = block::BlockAttributes::default();
-        attributes.display_name = "foo".into();
-
-        for color in [
+    #[rstest::rstest]
+    fn solid_block_equivalent_at_any_resolution(
+        #[values(
             Rgba::BLACK,
             Rgba::WHITE,
             Rgba::TRANSPARENT,
-            Rgba::new(0.0, 0.5, 1.0, 0.5),
-        ] {
-            let voxel = Evoxel::from_color(color);
-            let ev_one = compute_derived(&attributes, &Evoxels::from_one(voxel));
-            let ev_many = compute_derived(
-                &attributes,
-                &Evoxels::from_many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
-            );
+            Rgba::new(0.0, 0.5, 1.0, 0.5)
+        )]
+        color: Rgba,
+    ) {
+        let mut attributes = block::BlockAttributes::default();
+        attributes.display_name = "foo".into();
 
-            // Check that the derived attributes are all identical (except for the opacity mask),
-            assert_eq!(
-                Derived {
-                    voxel_opacity_mask: ev_one.voxel_opacity_mask.clone(),
-                    ..ev_many
-                },
-                ev_one,
-                "Input color {color:?}"
-            );
-        }
+        let voxel = Evoxel::from_color(color);
+        let ev_one = compute_derived(&attributes, &Evoxels::from_one(voxel));
+        let ev_many = compute_derived(
+            &attributes,
+            &Evoxels::from_many(R2, Vol::from_fn(GridAab::for_block(R2), |_| voxel)),
+        );
+
+        // Check that the derived attributes are all identical (except for the opacity mask),
+        assert_eq!(
+            Derived {
+                voxel_opacity_mask: ev_one.voxel_opacity_mask.clone(),
+                ..ev_many
+            },
+            ev_one,
+            "Input color {color:?}"
+        );
     }
 
     // Unit tests for `VoxSum`'s math. `VoxSum` is an internal helper type, so if there is reason

@@ -620,6 +620,7 @@ mod tests {
     use crate::util::yield_progress_for_testing;
     use all_is_cubes_base::math::Rgba;
     use pretty_assertions::assert_eq;
+    use rstest::rstest;
 
     #[derive(Debug)]
     struct ToolTester {
@@ -778,38 +779,36 @@ mod tests {
         );
     }
 
-    #[test]
-    fn use_remove_block() {
-        for keep in [false, true] {
-            let [existing] = make_some_blocks();
-            let mut tester = ToolTester::new(|space| {
-                space.set([1, 0, 0], &existing).unwrap();
-            });
-            let actual_transaction = tester
-                .equip_and_use_tool(Tool::RemoveBlock { keep })
-                .unwrap();
+    #[rstest]
+    fn use_remove_block(#[values(false, true)] keep: bool) {
+        let [existing] = make_some_blocks();
+        let mut tester = ToolTester::new(|space| {
+            space.set([1, 0, 0], &existing).unwrap();
+        });
+        let actual_transaction = tester
+            .equip_and_use_tool(Tool::RemoveBlock { keep })
+            .unwrap();
 
-            let mut expected_delete =
-                SpaceTransaction::set_cube([1, 0, 0], Some(existing.clone()), Some(AIR))
-                    .bind(tester.space_handle.clone());
-            if keep {
-                expected_delete
-                    .merge_from(
-                        CharacterTransaction::inventory(InventoryTransaction::insert([
-                            Tool::Block(existing),
-                        ]))
-                        .bind(tester.character_handle.clone()),
-                    )
-                    .unwrap();
-            }
-            assert_eq!(actual_transaction, expected_delete);
-
-            actual_transaction
-                .execute(&mut tester.universe, &mut drop)
+        let mut expected_delete =
+            SpaceTransaction::set_cube([1, 0, 0], Some(existing.clone()), Some(AIR))
+                .bind(tester.space_handle.clone());
+        if keep {
+            expected_delete
+                .merge_from(
+                    CharacterTransaction::inventory(InventoryTransaction::insert([Tool::Block(
+                        existing,
+                    )]))
+                    .bind(tester.character_handle.clone()),
+                )
                 .unwrap();
-            print_space(&tester.space(), [-1., 1., 1.]);
-            assert_eq!(&tester.space()[[1, 0, 0]], &AIR);
         }
+        assert_eq!(actual_transaction, expected_delete);
+
+        actual_transaction
+            .execute(&mut tester.universe, &mut drop)
+            .unwrap();
+        print_space(&tester.space(), [-1., 1., 1.]);
+        assert_eq!(&tester.space()[[1, 0, 0]], &AIR);
     }
 
     #[test]
@@ -833,46 +832,44 @@ mod tests {
         );
     }
 
-    #[test]
-    fn use_block() {
+    #[rstest]
+    fn use_block(#[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool) {
         let [existing, tool_block] = make_some_blocks();
-        for (tool, expect_consume) in [
-            (Tool::Block(tool_block.clone()), true),
-            (Tool::InfiniteBlocks(tool_block.clone()), false),
-        ] {
-            let mut tester = ToolTester::new(|space| {
-                space.set([1, 0, 0], &existing).unwrap();
-            });
-            let transaction = tester.equip_and_use_tool(tool.clone()).unwrap();
+        let tool = tool_ctor(tool_block.clone());
+        let expect_consume = matches!(tool, Tool::Block(_));
 
-            let mut expected_cube_transaction =
-                SpaceTransaction::set_cube(Cube::ORIGIN, Some(AIR), Some(tool_block.clone()));
+        let mut tester = ToolTester::new(|space| {
+            space.set([1, 0, 0], &existing).unwrap();
+        });
+        let transaction = tester.equip_and_use_tool(tool.clone()).unwrap();
+
+        let mut expected_cube_transaction =
+            SpaceTransaction::set_cube(Cube::ORIGIN, Some(AIR), Some(tool_block.clone()));
+        expected_cube_transaction
+            .at(Cube::ORIGIN)
+            .add_fluff(Fluff::PlaceBlockGeneric);
+        let mut expected_cube_transaction =
+            expected_cube_transaction.bind(tester.space_handle.clone());
+        if expect_consume {
             expected_cube_transaction
-                .at(Cube::ORIGIN)
-                .add_fluff(Fluff::PlaceBlockGeneric);
-            let mut expected_cube_transaction =
-                expected_cube_transaction.bind(tester.space_handle.clone());
-            if expect_consume {
-                expected_cube_transaction
-                    .merge_from(
-                        CharacterTransaction::inventory(InventoryTransaction::replace(
-                            0,
-                            Slot::from(tool.clone()),
-                            Slot::Empty,
-                        ))
-                        .bind(tester.character_handle.clone()),
-                    )
-                    .unwrap();
-            }
-            assert_eq!(transaction, expected_cube_transaction);
-
-            transaction
-                .execute(&mut tester.universe, &mut drop)
+                .merge_from(
+                    CharacterTransaction::inventory(InventoryTransaction::replace(
+                        0,
+                        Slot::from(tool.clone()),
+                        Slot::Empty,
+                    ))
+                    .bind(tester.character_handle.clone()),
+                )
                 .unwrap();
-            print_space(&tester.space(), [-1., 1., 1.]);
-            assert_eq!(&tester.space()[[1, 0, 0]], &existing);
-            assert_eq!(&tester.space()[[0, 0, 0]], &tool_block);
         }
+        assert_eq!(transaction, expected_cube_transaction);
+
+        transaction
+            .execute(&mut tester.universe, &mut drop)
+            .unwrap();
+        print_space(&tester.space(), [-1., 1., 1.]);
+        assert_eq!(&tester.space()[[1, 0, 0]], &existing);
+        assert_eq!(&tester.space()[[0, 0, 0]], &tool_block);
     }
 
     /// TODO: Expand this test to exhaustively test all rotation placement rules?
@@ -929,45 +926,41 @@ mod tests {
         assert_eq!(tester.character().inventory().slots[0], Slot::Empty);
     }
 
-    #[test]
-    fn use_block_with_obstacle() {
+    #[rstest]
+    fn use_block_with_obstacle(
+        #[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool,
+    ) {
         let [existing, tool_block, obstacle] = make_some_blocks();
-        for tool in [
-            Tool::Block(tool_block.clone()),
-            Tool::InfiniteBlocks(tool_block.clone()),
-        ] {
-            let tester = ToolTester::new(|space| {
-                space.set([1, 0, 0], &existing).unwrap();
-            });
-            // Place the obstacle after the raycast
-            tester
-                .space_handle()
-                .execute(&SpaceTransaction::set_cube(
-                    [0, 0, 0],
-                    None,
-                    Some(obstacle.clone()),
-                ))
-                .unwrap();
-            assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));
-            print_space(&tester.space(), [-1., 1., 1.]);
-            assert_eq!(&tester.space()[[1, 0, 0]], &existing);
-            assert_eq!(&tester.space()[[0, 0, 0]], &obstacle);
-        }
+        let tool = tool_ctor(tool_block.clone());
+        let tester = ToolTester::new(|space| {
+            space.set([1, 0, 0], &existing).unwrap();
+        });
+        // Place the obstacle after the raycast
+        tester
+            .space_handle()
+            .execute(&SpaceTransaction::set_cube(
+                [0, 0, 0],
+                None,
+                Some(obstacle.clone()),
+            ))
+            .unwrap();
+        assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));
+        print_space(&tester.space(), [-1., 1., 1.]);
+        assert_eq!(&tester.space()[[1, 0, 0]], &existing);
+        assert_eq!(&tester.space()[[0, 0, 0]], &obstacle);
     }
 
-    #[test]
-    fn use_block_without_target() {
+    #[rstest]
+    fn use_block_without_target(
+        #[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool,
+    ) {
         let [tool_block] = make_some_blocks();
-        for tool in [
-            Tool::Block(tool_block.clone()),
-            Tool::InfiniteBlocks(tool_block.clone()),
-        ] {
-            let tester = ToolTester::new(|_space| {});
-            assert_eq!(
-                tester.equip_and_use_tool(tool),
-                Err(ToolError::NothingSelected)
-            );
-        }
+        let tool = tool_ctor(tool_block.clone());
+        let tester = ToolTester::new(|_space| {});
+        assert_eq!(
+            tester.equip_and_use_tool(tool),
+            Err(ToolError::NothingSelected)
+        );
     }
 
     #[test]
