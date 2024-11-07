@@ -11,7 +11,7 @@ use super::prelude::*;
 fn ANIMATION(ctx: Context<'_>) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
 
-    let footprint = GridAab::from_lower_size([0, 0, -1], [3, 2, 3]);
+    let footprint = GridAab::from_lower_size([0, 0, -1], [5, 2, 3]);
     let mut space = Space::empty(footprint);
     let mut txn = ExhibitTransaction::default();
 
@@ -73,7 +73,11 @@ fn ANIMATION(ctx: Context<'_>) {
     };
 
     space.set([0, 0, 0], sweep_block)?;
-    space.set([2, 0, 0], fire_block)?;
+    space.fill_uniform(
+        GridAab::from_lower_upper([2, 0, -1], [5, 1, 2]),
+        &fire_block,
+    )?;
+    space.set([3, 0, 0], &demo_blocks[DemoBlocks::Road])?; // in middle of fire
     space.set([1, 1, -1], &demo_blocks[DemoBlocks::Clock])?;
 
     Ok((space, txn))
