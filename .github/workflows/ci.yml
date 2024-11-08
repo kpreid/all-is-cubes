@@ -317,7 +317,7 @@ jobs:
       run: cargo build --package xtask
 
     - name: Lint
-      run: cargo xtask --scope=only-normal lint --timings
+      run: cargo xtask --scope=all lint --timings
     
     - run: df -h .
 
@@ -537,10 +537,6 @@ jobs:
         key: fuzz-corpus
         path: |
           fuzz/corpus
-
-    - name: Lint
-      # We run lint because otherwise the fuzz code won't get linted.
-      run: cargo xtask --scope=only-fuzz lint
 
     - name: Fuzz
       # Note: The specified timeout value is per-fuzz-target; as of this writing
