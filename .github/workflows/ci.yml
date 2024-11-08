@@ -316,10 +316,6 @@ jobs:
     - name: Compile xtask
       run: cargo build --package xtask
 
-    # Kludge: Avoid dependency on `cargo-about` by making the generated license info file look fresh.
-    - name: Skip license generation
-      run: touch all-is-cubes-wasm/static/third-party-licenses.html
-
     - name: Lint
       run: cargo xtask --scope=only-normal lint --timings
     

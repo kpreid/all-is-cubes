@@ -316,6 +316,9 @@ fn main() -> Result<(), ActionError> {
                 .run()?;
         }
         XtaskCommand::BuildWebRelease => {
+            // We only generate the license file in release builds, to save time.
+            generate_wasm_licenses_file(&mut time_log)?;
+
             build_web(&config, &mut time_log, Profile::Release)?;
         }
         XtaskCommand::Update { to, dry_run } => {
@@ -859,19 +862,19 @@ SingleMainWindow=true
     Ok(())
 }
 
-fn ensure_wasm_tools_installed(
-    config: &Config,
-    time_log: &mut Vec<Timing>,
-) -> Result<(), ActionError> {
+#[allow(clippy::unnecessary_wraps)]
+fn ensure_wasm_tools_installed(config: &Config, _: &mut Vec<Timing>) -> Result<(), ActionError> {
     assert!(config.scope.includes_main_workspace());
 
     // TODO: check that wasm-pack is installed
 
-    // Generate combined license file for the wasm build.
+    Ok(())
+}
+
+fn generate_wasm_licenses_file(time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
     let web_ws_path = PROJECT_DIR.join("all-is-cubes-wasm");
     let license_html_path = PROJECT_DIR.join("all-is-cubes-wasm/static/third-party-licenses.html");
     let license_template_path = PROJECT_DIR.join("tools/about.hbs");
-    let config_path = PROJECT_DIR.join("tools/about.toml");
     if newer_than(
         [&web_ws_path.join("Cargo.lock"), &license_template_path],
         [&license_html_path],
@@ -884,7 +887,7 @@ fn ensure_wasm_tools_installed(
                 "generate",
                 "--fail",
                 "--config",
-                config_path.to_str().unwrap(),
+                PROJECT_DIR.join("tools/about.toml").to_str().unwrap(),
                 license_template_path.to_str().unwrap(),
                 "-o",
                 license_html_path.to_str().unwrap(),
