@@ -7,7 +7,6 @@ use all_is_cubes::math::{self, FreeCoordinate, NotNan};
 use all_is_cubes::space::Space;
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::Universe;
-use all_is_cubes::util::{ConciseDebug, Refmt as _};
 
 use libfuzzer_sys::fuzz_target;
 
@@ -23,11 +22,11 @@ fuzz_target!(|input: ([FreeCoordinate; 3], [FreeCoordinate; 3], Space)| {
         return;
     }
 
-    println!(
-        "{} {}",
-        position.refmt(&ConciseDebug),
-        velocity.refmt(&ConciseDebug)
-    );
+    // println!(
+    //     "{} {}",
+    //     position.refmt(&ConciseDebug),
+    //     velocity.refmt(&ConciseDebug)
+    // );
 
     let mut universe = Universe::new();
     let space_handle = universe.insert_anonymous(space);
