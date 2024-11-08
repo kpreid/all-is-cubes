@@ -741,15 +741,22 @@ pub(crate) mod vol_arb {
         }
 
         fn size_hint(depth: usize) -> (usize, Option<usize>) {
-            arbitrary::size_hint::recursion_guard(depth, |depth| {
-                let (lower, upper) = V::size_hint(depth);
-                arbitrary::size_hint::and(
+            // recommended impl from trait documentation
+            Self::try_size_hint(depth).unwrap_or_default()
+        }
+
+        fn try_size_hint(
+            depth: usize,
+        ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+            arbitrary::size_hint::try_recursion_guard(depth, |depth| {
+                let (lower, upper) = V::try_size_hint(depth)?;
+                Ok(arbitrary::size_hint::and(
                     ARBITRARY_BOUNDS_SIZE_HINT,
                     (
                         lower.saturating_mul(MAX_VOLUME),
                         upper.map(|u| u.saturating_mul(MAX_VOLUME)),
                     ),
-                )
+                ))
             })
         }
     }

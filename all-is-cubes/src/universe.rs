@@ -117,28 +117,44 @@ impl fmt::Display for Name {
 
 // Manual impl because `ArcStr` doesn't impl Arbitrary.
 #[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for Name {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(match u.int_in_range::<u8>(0..=2)? {
-            0 => Name::Specific(u.arbitrary::<String>()?.into()),
-            1 => Name::Anonym(u.arbitrary()?),
-            2 => Name::Pending,
-            _ => unreachable!(),
-        })
+mod impl_arbitrary {
+    use super::*;
+    #[derive(arbitrary::Arbitrary)]
+    enum ArbName {
+        Specific(String),
+        Anonym(usize),
+        Pending,
     }
 
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::size_hint;
-        size_hint::recursion_guard(depth, |depth| {
-            size_hint::and(
-                u8::size_hint(depth),
-                size_hint::or_all(&[
-                    String::size_hint(depth),
-                    usize::size_hint(depth),
-                    <()>::size_hint(depth),
-                ]),
-            )
-        })
+    impl<'a> arbitrary::Arbitrary<'a> for Name {
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            let input = ArbName::arbitrary(u)?;
+            let value = match input {
+                ArbName::Specific(name) => Name::Specific(name.into()),
+                ArbName::Anonym(index) => Name::Anonym(index),
+                ArbName::Pending => Name::Pending,
+            };
+            if false {
+                // This non-executed code proves ArbName has as many variants as Name
+                let _ = match value {
+                    Name::Specific(name) => ArbName::Specific(name.to_string()),
+                    Name::Anonym(index) => ArbName::Anonym(index),
+                    Name::Pending => ArbName::Pending,
+                };
+                unreachable!()
+            } else {
+                Ok(value)
+            }
+        }
+
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            ArbName::size_hint(depth)
+        }
+        fn try_size_hint(
+            depth: usize,
+        ) -> arbitrary::Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+            ArbName::try_size_hint(depth)
+        }
     }
 }
 

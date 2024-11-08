@@ -214,14 +214,21 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        arbitrary::size_hint::and_all(&[
-            alloc::string::String::size_hint(depth),
-            bool::size_hint(depth),
-            InvInBlock::size_hint(depth),
-            RotationPlacementRule::size_hint(depth),
-            TickAction::size_hint(depth),
-            AnimationHint::size_hint(depth),
-        ])
+        Self::try_size_hint(depth).unwrap_or_default()
+    }
+    fn try_size_hint(
+        depth: usize,
+    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+        arbitrary::size_hint::try_recursion_guard(depth, |depth| {
+            Ok(arbitrary::size_hint::and_all(&[
+                alloc::string::String::try_size_hint(depth)?,
+                bool::try_size_hint(depth)?,
+                InvInBlock::try_size_hint(depth)?,
+                RotationPlacementRule::try_size_hint(depth)?,
+                TickAction::try_size_hint(depth)?,
+                AnimationHint::try_size_hint(depth)?,
+            ]))
+        })
     }
 }
 

@@ -418,8 +418,19 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        arbitrary::size_hint::recursion_guard(depth, |depth| {
-            arbitrary::size_hint::and_all(&[
+        // recommended impl from trait documentation
+        Self::try_size_hint(depth).unwrap_or_default()
+    }
+
+    fn try_size_hint(
+        depth: usize,
+    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+        // Note that `Text` is recursive because `Text` contains `Block` and `Block` contains
+        // `Text`. However, this will still produce a useful, cheap result because
+        // `Block::size_hint()` has an explicitly set bound.
+
+        arbitrary::size_hint::try_recursion_guard(depth, |depth| {
+            Ok(arbitrary::size_hint::and_all(&[
                 alloc::string::String::size_hint(depth),
                 Font::size_hint(depth),
                 Block::size_hint(depth),
@@ -427,7 +438,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
                 Resolution::size_hint(depth),
                 GridAab::size_hint(depth),
                 bool::size_hint(depth),
-            ])
+            ]))
         })
     }
 }

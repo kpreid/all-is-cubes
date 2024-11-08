@@ -277,6 +277,7 @@ impl<'a> arbitrary::Arbitrary<'a> for BlockDef {
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        // We don't need to bother with try_size_hint() because Block short-circuits recursion
         Block::size_hint(depth)
     }
 }

@@ -71,7 +71,7 @@ allocation-counter = { version = "0.8.1", default-features = false }
 # Only used in std-using packages, so default features enabled
 anyhow = "1.0.70"
 # Each use should be { optional = true }.
-arbitrary = { version = "1.3.2", features = ["derive"] }
+arbitrary = { version = "1.4.1", features = ["derive"] }
 arrayvec = { version = "0.7.4", default-features = false }
 async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
