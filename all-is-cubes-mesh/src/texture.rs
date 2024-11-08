@@ -17,7 +17,6 @@ use all_is_cubes::util::{ConciseDebug, Fmt};
 pub(crate) type TextureCoordinate = f32;
 
 /// Unit-of-measure identifier used with [`euclid`](all_is_cubes::euclid) for “whole texels”.
-/// TODO(euclid migration): Better name, and a type alias for the point
 #[expect(clippy::exhaustive_enums)]
 #[derive(Debug)]
 pub enum TexelUnit {}

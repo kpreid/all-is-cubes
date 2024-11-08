@@ -22,7 +22,6 @@ use crate::math::GridAab;
 #[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Ray {
-    // TODO(euclid migration): should we expose the coordinate unit generic?
     /// The sole endpoint of the ray.
     pub origin: FreePoint,
 

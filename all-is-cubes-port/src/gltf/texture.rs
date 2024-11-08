@@ -174,7 +174,7 @@ impl texture::Plane for GltfTexturePlane {
             .rotation
             .to_rotation_matrix()
             .to_free()
-            .with_source::<texture::TexelUnit>() // TODO(euclid migration): clunky
+            .with_source::<texture::TexelUnit>() // TODO: avoid these unit changes by being able to get Transform3D straight from GridRotation
             .with_destination::<texture::TexelUnit>()
             .transform_point3d(tc_in_tile.map(f64::from))
             .unwrap()

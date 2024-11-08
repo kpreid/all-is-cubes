@@ -300,7 +300,6 @@ impl Character {
         self.body.flying = flying;
 
         let dt = tick.delta_t().as_secs_f64();
-        // TODO(euclid migration): take advantage of coordinate system types
         let control_orientation = Rotation3D::around_y(-Angle::radians(self.body.yaw.to_radians()));
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
         let initial_body_velocity = self.body.velocity;

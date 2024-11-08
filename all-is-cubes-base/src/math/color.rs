@@ -80,7 +80,7 @@ pub struct Rgba {
 
 /// Unit-of-measure type for vectors that contain color channels.
 //---
-// TODO(euclid migration): Better name?
+// TODO: replace this with formally accurate units.
 #[expect(clippy::exhaustive_enums)]
 #[derive(Debug, Eq, PartialEq)]
 pub enum Intensity {}

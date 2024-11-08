@@ -300,8 +300,7 @@ pub(super) struct QuadTransform {
     // TODO: specialize transforms since there are only 6 possible values plus scale,
     // so we don't need as many ops as a full matrix-vector multiplication?
     // Or would the branching needed make it pointless?
-    //
-    // TODO(euclid migration): We can at least make this a RigidTransform3D
+    // We can at least make this a euclid::RigidTransform3D.
     position_transform: Transform3D<FreeCoordinate, Cube, Cube>,
     texture_transform: Transform3D<TextureCoordinate, TexelUnit, TexelUnit>,
 }
