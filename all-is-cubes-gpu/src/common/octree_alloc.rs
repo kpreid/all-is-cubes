@@ -523,8 +523,6 @@ fn should_slice(request_size: Size3D<u16, Cube>, node_size_exponent: u8) -> Opti
 ///
 /// This **does not deallocate on drop**, because the tree does not implement interior
 /// mutability; it is the caller's responsibility to provide such functionality if needed.
-//
-// TODO(euclid migration): don't use Grid* units since these are not space cubes
 #[non_exhaustive]
 pub struct AlloctreeHandle<A> {
     /// Allocated region — this is the region to write into.
