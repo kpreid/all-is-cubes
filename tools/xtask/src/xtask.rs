@@ -688,13 +688,8 @@ fn do_for_all_packages(
         ensure_wasm_tools_installed(config, time_log)?;
     }
 
-    // Ensure all-is-cubes-server build that might be looking for the files will succeed.
-    // Note that this is only an “exists” check not a “up-to-date” check, on the assumption
-    // that running server tests will not depend on the specific file contents.
-    // TODO: That's a fragile assumption.
-    if config.scope.includes_main_workspace() && !static_web_app_out_dir(Profile::Dev).exists() {
-        build_web(config, time_log, Profile::Dev)?;
-    }
+    // Ensure all-is-cubes-server build that might be looking for the web client files will succeed.
+    build_web(config, time_log, Profile::Dev)?;
 
     // Test everything we can with default features and target.
     // But if we're linting, then the below --all-targets run will handle that.
