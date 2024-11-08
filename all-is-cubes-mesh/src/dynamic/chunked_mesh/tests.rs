@@ -1,5 +1,6 @@
 #![expect(clippy::identity_op)]
 
+use all_is_cubes::euclid::{point3, Point3D, Scale};
 use alloc::vec::Vec;
 use std::sync::{Arc, Mutex};
 
@@ -9,7 +10,7 @@ use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::listen::Listener as _;
 use all_is_cubes::math::{zo32, GridPoint};
-use all_is_cubes::math::{Cube, FreePoint, GridAab, GridCoordinate};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Universe};
@@ -195,10 +196,11 @@ impl<const MBM: usize> CsmTester<MBM> {
     }
 
     /// Move camera to a position measured in chunks.
-    fn move_camera_to(&mut self, position: impl Into<FreePoint>) {
-        // TODO(euclid migration): wrong unit
+    fn move_camera_to(&mut self, position: impl Into<Point3D<f64, ()>>) {
+        const SCALE: Scale<f64, (), Cube> = Scale::new(CHUNK_SIZE as f64);
+
         let mut view_transform = self.camera.view_transform();
-        view_transform.translation = position.into().to_vector() * f64::from(CHUNK_SIZE);
+        view_transform.translation = SCALE.transform_point3d(position.into()).to_vector();
         self.camera.set_view_transform(view_transform);
     }
 
@@ -316,7 +318,7 @@ fn drop_chunks_when_moving() {
 
     // Move over one chunk at a time repeatedly.
     for i in 1..30 {
-        let position = FreePoint::new(1.5 + f64::from(i), 0.5, 0.5);
+        let position = point3(1.5 + f64::from(i), 0.5, 0.5);
         tester.move_camera_to(position);
         tester.update(|_| {});
         let count = tester.csm.iter_chunks().count();
