@@ -327,6 +327,12 @@ impl<'a> arbitrary::Arbitrary<'a> for EvaluatedBlock {
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         MinEval::size_hint(depth)
     }
+
+    fn try_size_hint(
+        depth: usize,
+    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+        MinEval::try_size_hint(depth)
+    }
 }
 
 /// The result of <code>[AIR].[evaluate()](Block::evaluate)</code>, as a constant.
@@ -500,7 +506,18 @@ impl<'a> arbitrary::Arbitrary<'a> for MinEval {
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        arbitrary::size_hint::and(BlockAttributes::size_hint(depth), Evoxels::size_hint(depth))
+        Self::try_size_hint(depth).unwrap_or_default()
+    }
+
+    fn try_size_hint(
+        depth: usize,
+    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+        arbitrary::size_hint::try_recursion_guard(depth, |depth| {
+            Ok(arbitrary::size_hint::and(
+                BlockAttributes::try_size_hint(depth)?,
+                Evoxels::try_size_hint(depth)?,
+            ))
+        })
     }
 }
 

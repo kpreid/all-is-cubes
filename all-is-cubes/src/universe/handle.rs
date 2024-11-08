@@ -483,14 +483,22 @@ impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for Han
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        arbitrary::size_hint::recursion_guard(depth, |depth| {
-            arbitrary::size_hint::and(
+        Self::try_size_hint(depth).unwrap_or_default()
+    }
+    fn try_size_hint(
+        depth: usize,
+    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+        arbitrary::size_hint::try_recursion_guard(depth, |depth| {
+            Ok(arbitrary::size_hint::and(
                 bool::size_hint(depth),
                 arbitrary::size_hint::or(
-                    Name::size_hint(depth),
-                    arbitrary::size_hint::and(Name::size_hint(depth), T::size_hint(depth)),
+                    Name::try_size_hint(depth)?,
+                    arbitrary::size_hint::and(
+                        Name::try_size_hint(depth)?,
+                        T::try_size_hint(depth)?,
+                    ),
                 ),
-            )
+            ))
         })
     }
 }

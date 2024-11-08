@@ -596,12 +596,17 @@ impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaq
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        Self::try_size_hint(depth).unwrap_or_default()
+    }
+    fn try_size_hint(
+        depth: usize,
+    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
         use arbitrary::{size_hint, Arbitrary};
-        size_hint::recursion_guard(depth, |depth| {
-            size_hint::and(
-                <usize as Arbitrary>::size_hint(depth),
-                <T as Arbitrary>::size_hint(depth),
-            )
+        size_hint::try_recursion_guard(depth, |depth| {
+            Ok(size_hint::and(
+                <bool as Arbitrary>::size_hint(depth),
+                <T as Arbitrary>::try_size_hint(depth)?,
+            ))
         })
     }
 }
