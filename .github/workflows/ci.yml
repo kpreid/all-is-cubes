@@ -191,18 +191,50 @@ jobs:
         path: |
           target/cargo-timings/cargo-timing-*.html
 
+    - run: df -h .
+
+  # Build web version with release profile.
+  build-web:
+    # Only do this if the tests passed
+    needs: build
+    runs-on: ubuntu-latest
+
+    # Same condition as "deploy-web" job, because the result will only be used then.
+    if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/pages-alt') }}
+
+    steps:
+
+    - uses: actions/checkout@v4
+
+    - uses: Swatinem/rust-cache@v2.7.3
+      with:
+        # Reuse the cache from the normal `build` job instead of creating an independent one,
+        # to reduce redundant work and save disk space — but don't *write* to that cache, so
+        # we don't bloat it or conflict.
+        #
+        # Since this is a release build, it won’t be able to reuse most of the build artifacts,
+        # but it will be able to reuse xtask and possibly some build dependencies, so it will
+        # still be faster than a clean build.
+        prefix-key: "v1-rust-ubuntu-stable-locked"
+        shared-key: "build"
+        save-if: false
+        workspaces: |
+          ./
+          all-is-cubes-wasm/
+
+    - run: cargo build --package xtask
+    
+    - run: cargo xtask build-web-release
+
     # Save wasm build so that we can optionally deploy it without rebuilding
     # (but only for the stablest matrix version)
-    - name: Save wasm dist artifact
-      if: ${{ matrix.primary }}
-      uses: actions/upload-pages-artifact@v3
+    - uses: actions/upload-pages-artifact@v3
       with:
         path: all-is-cubes-wasm/dist
 
-    - run: df -h .
-
-  deploy:
-    needs: build
+  # Deploy web build to GitHub Pages.
+  deploy-web:
+    needs: build-web
     runs-on: ubuntu-latest
     permissions:
       pages: write

@@ -22,12 +22,9 @@ impl AicClientSource {
         let static_service = match self {
             #[cfg(feature = "embed")]
             AicClientSource::Embedded => axum::routing::get(embedded::client),
-            AicClientSource::Workspace => {
-                axum::routing::get_service(tower_http::services::ServeDir::new(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/../all-is-cubes-wasm/dist/"
-                )))
-            }
+            AicClientSource::Workspace => axum::routing::get_service(
+                tower_http::services::ServeDir::new(concat!(env!("AIC_CLIENT_BUILD_DIR"), "/")),
+            ),
         };
 
         Router::new()
@@ -43,8 +40,9 @@ mod embedded {
     use axum::http::StatusCode;
     use axum::response::{IntoResponse, Response};
 
+    // TODO: need to support optionally embedding the release build rather than the dev build
     static CLIENT_STATIC: include_dir::Dir<'static> =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../all-is-cubes-wasm/dist");
+        include_dir::include_dir!("$AIC_CLIENT_BUILD_DIR");
 
     /// Handler for client static files
     pub(crate) async fn client(path: Option<Path<String>>) -> impl IntoResponse {

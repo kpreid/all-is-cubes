@@ -7285,6 +7285,7 @@ dependencies = [
  "anyhow",
  "cargo_metadata 0.8.2",
  "clap",
+ "strum",
  "toml_edit 0.22.14",
  "walkdir",
  "xshell 0.1.17",

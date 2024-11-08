@@ -106,6 +106,8 @@ enum XtaskCommand {
         server_args: Vec<String>,
     },
 
+    BuildWebRelease,
+
     /// Update dependency versions.
     Update {
         #[arg(default_value = "latest")]
@@ -155,6 +157,28 @@ enum Scope {
     OnlyFuzz,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, strum::IntoStaticStr, strum::Display)]
+#[strum(serialize_all = "kebab-case")]
+enum Profile {
+    Dev,
+    Release,
+}
+impl Profile {
+    /// Name of the subdirectory in `target/` where Cargo puts builds with this profile.
+    fn target_subdirectory_name(self) -> &'static Path {
+        // The dev profile is a special case:
+        // <https://doc.rust-lang.org/cargo/guide/build-cache.html?highlight=debug%20directory#build-cache>
+        #[expect(
+            clippy::match_wildcard_for_single_variants,
+            reason = "this is the correct general form"
+        )]
+        match self {
+            Profile::Dev => Path::new("debug"),
+            other => Path::new(other.into()),
+        }
+    }
+}
+
 fn main() -> Result<(), ActionError> {
     let (config, command) = {
         let XtaskArgs {
@@ -178,7 +202,7 @@ fn main() -> Result<(), ActionError> {
         XtaskCommand::Init => {
             write_development_files(&config)?;
             if config.scope.includes_main_workspace() {
-                update_server_static(&config, &mut time_log)?; // includes installing wasm tools
+                build_web(&config, &mut time_log, Profile::Dev)?; // includes installing wasm tools
             }
         }
         XtaskCommand::Test { no_run } => {
@@ -280,7 +304,7 @@ fn main() -> Result<(), ActionError> {
                 .run()?;
         }
         XtaskCommand::RunGameServer { server_args } => {
-            update_server_static(&config, &mut time_log)?;
+            build_web(&config, &mut time_log, Profile::Dev)?;
 
             cargo()
                 .arg("run")
@@ -290,6 +314,9 @@ fn main() -> Result<(), ActionError> {
                 .arg("--")
                 .args(server_args)
                 .run()?;
+        }
+        XtaskCommand::BuildWebRelease => {
+            build_web(&config, &mut time_log, Profile::Release)?;
         }
         XtaskCommand::Update { to, dry_run } => {
             let mut options: Vec<&str> = Vec::new();
@@ -517,88 +544,117 @@ fn exhaustive_test(
 ) -> Result<(), ActionError> {
     assert!(config.scope.includes_main_workspace());
 
-    update_server_static(config, time_log)?;
+    build_web(config, time_log, Profile::Dev)?;
 
     do_for_all_packages(config, op, Features::AllAndNothing, time_log)?;
     Ok(())
 }
 
+fn static_web_app_out_dir(profile: Profile) -> PathBuf {
+    PROJECT_DIR.join(format!("all-is-cubes-wasm/target/web-app-{profile}"))
+}
+
 /// Build the WASM and other 'client' files that the web server might need.
 /// Needed for build whenever `all-is-cubes-server` is being tested/run with
-/// the `embed` feature; needed for run regardless.
-fn update_server_static(config: &Config, time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
+/// the `embed` feature; needed to run the server regardless.
+fn build_web(
+    config: &Config,
+    time_log: &mut Vec<Timing>,
+    profile: Profile,
+) -> Result<(), ActionError> {
     assert!(config.scope.includes_main_workspace());
+
+    let wasm_package_dir: &Path = &PROJECT_DIR.join("all-is-cubes-wasm");
 
     ensure_wasm_tools_installed(config, time_log)?;
 
     // Run the compilation if needed, which ensures that the wasm binary is fresh.
-    // Note: This must use the same profile as thfe wasm-pack command is! (Both are dev for now)
+    // We do this explicitly because wasm-pack release builds run `wasm-opt` unconditionally,
+    // and we want to do modification time checks instead.
     {
-        let _t = CaptureTime::new(time_log, "wasm cargo build");
+        let _t = CaptureTime::new(time_log, format!("wasm cargo build --{profile}"));
         cargo()
             .arg("build")
-            .arg("--manifest-path=all-is-cubes-wasm/Cargo.toml")
+            .arg("--manifest-path")
+            .arg(wasm_package_dir.join("Cargo.toml"))
+            .arg("--profile")
+            .arg(<&str>::from(profile))
             .arg(TARGET_WASM)
             .args(config.cargo_build_args())
             .run()?;
     }
 
-    // Run wasm-pack if and only if we need to.
-    // This is because it unconditionally runs `wasm-opt` which is slow and also means
-    // the files will be touched unnecessarily.
+    // Directory we ask wasm-pack to write its output (modified wasm and generated JS) to.
+    let wasm_pack_out_dir = wasm_package_dir.join(format!("target/wasm-pack-{profile}"));
+    fs::create_dir_all(&wasm_pack_out_dir)?;
+    // Directory where we write the files that make up the all-static web version of All is Cubes,
+    // which are made from wasm_pack_out_dir and our static files.
+    let static_web_app_out_dir = &static_web_app_out_dir(profile);
+    fs::create_dir_all(static_web_app_out_dir)?;
+
+    // Run wasm-pack if and only if we need to because the `cargo build` output is newer than
+    // the wasm-pack generated JS.
     if newer_than(
-        ["all-is-cubes-wasm/target/wasm32-unknown-unknown/debug/all_is_cubes_wasm.wasm"],
-        ["all-is-cubes-wasm/pkg/all_is_cubes_wasm.js"],
+        [PathBuf::from_iter([
+            wasm_package_dir,
+            Path::new("target/wasm32-unknown-unknown"),
+            profile.target_subdirectory_name(),
+            Path::new("all_is_cubes_wasm.wasm"),
+        ])],
+        [wasm_pack_out_dir.join("all_is_cubes_wasm.js")],
     ) {
-        let _t = CaptureTime::new(time_log, "wasm-pack build");
-        let _pushd: Pushd = pushd("all-is-cubes-wasm")?;
-
-        // Run the compilation if needed, which ensures that the wasm binary is fresh.
-        // Note: This must use the same profile as the wasm-pack command is! (Both are dev for now)
-        cargo().arg("build").arg(TARGET_WASM).run()?;
-
-        // Run wasm-pack if and only if we need to.
-        // This is because it unconditionally runs `wasm-opt` which is slow and also means
-        // the files will be touched unnecessarily.
-        if newer_than(
-            ["target/wasm32-unknown-unknown/debug/all_is_cubes_wasm.wasm"],
-            ["pkg/all_is_cubes_wasm.js"],
-        ) {
-            cmd!("wasm-pack build --dev --target web").run()?;
-        }
+        let _t = CaptureTime::new(time_log, format!("wasm-pack build --{profile}"));
+        cmd!("wasm-pack build --target web")
+            .arg("--out-dir")
+            .arg(
+                wasm_pack_out_dir
+                    .canonicalize()
+                    .with_context(|| wasm_pack_out_dir.display().to_string())?,
+            )
+            .arg(format!("--{profile}"))
+            .arg(wasm_package_dir)
+            .run()?;
     }
 
     // Combine the static files and build results in the same way that webpack used to
     // (This will need replacement if we get subdirectories)
-    let pkg_path = Path::new("all-is-cubes-wasm/pkg");
-    let pkg_files: BTreeSet<PathBuf> = {
+    let wasm_pack_output_files: BTreeSet<PathBuf> = {
         let mut set = BTreeSet::from([
             // There are lots of other files in pkg which we do not need
             PathBuf::from("all_is_cubes_wasm_bg.wasm"),
             PathBuf::from("all_is_cubes_wasm.js"),
             PathBuf::from("snippets"), // note this gets only the dir but not the contents
         ]);
-        let snippets = &pkg_path.join("snippets/");
-        set.extend(directory_tree_contents(pkg_path, snippets)?);
+        set.extend(directory_tree_contents(
+            &wasm_pack_out_dir,
+            &wasm_pack_out_dir.join("snippets/"),
+        )?);
         set
     };
-    let static_path = &Path::new("all-is-cubes-wasm/static");
-    let static_files = directory_tree_contents(static_path, static_path)?;
-    let dest_dir: &'static Path = Path::new("all-is-cubes-wasm/dist/");
-    let client_dest_dir = dest_dir.join("client/");
-    fs::create_dir_all(dest_dir)?;
+    // Path for our non-compiled static files that should be included.
+    let static_input_files_path = &wasm_package_dir.join("static");
+    let static_files = directory_tree_contents(static_input_files_path, static_input_files_path)?;
+    // Path where the wasm and js files are put.
+    let web_client_dir = static_web_app_out_dir.join("client/");
+    fs::create_dir_all(static_web_app_out_dir)?;
     for src_file in &static_files {
-        copy_file_with_context(&static_path.join(src_file), &dest_dir.join(src_file))?;
+        copy_file_with_context(
+            &static_input_files_path.join(src_file),
+            &static_web_app_out_dir.join(src_file),
+        )?;
     }
-    for src_file in &pkg_files {
-        copy_file_with_context(&pkg_path.join(src_file), &client_dest_dir.join(src_file))?;
+    for src_file in &wasm_pack_output_files {
+        copy_file_with_context(
+            &wasm_pack_out_dir.join(src_file),
+            &web_client_dir.join(src_file),
+        )?;
     }
 
     // Warn of unexpected files.
     // (In the future with more confidence, perhaps we should delete them.)
-    let extra_dest_files = directory_tree_contents(dest_dir, dest_dir)?
+    let extra_dest_files = directory_tree_contents(static_web_app_out_dir, static_web_app_out_dir)?
         .difference(
-            &pkg_files
+            &wasm_pack_output_files
                 .into_iter()
                 .map(|p| Path::new("client/").join(p))
                 .collect(),
@@ -610,8 +666,8 @@ fn update_server_static(config: &Config, time_log: &mut Vec<Timing>) -> Result<(
         .collect::<BTreeSet<_>>();
     if !extra_dest_files.is_empty() {
         eprintln!(
-            "Warning: possibly stale files in {dest_dir}: {extra_dest_files:#?}",
-            dest_dir = dest_dir.display()
+            "Warning: possibly stale files in {static_web_app_out_dir}: {extra_dest_files:#?}",
+            static_web_app_out_dir = static_web_app_out_dir.display()
         );
     }
 
@@ -633,8 +689,8 @@ fn do_for_all_packages(
     // Note that this is only an “exists” check not a “up-to-date” check, on the assumption
     // that running server tests will not depend on the specific file contents.
     // TODO: That's a fragile assumption.
-    if config.scope.includes_main_workspace() && !Path::new("all-is-cubes-wasm/dist/").exists() {
-        update_server_static(config, time_log)?;
+    if config.scope.includes_main_workspace() && !static_web_app_out_dir(Profile::Dev).exists() {
+        build_web(config, time_log, Profile::Dev)?;
     }
 
     // Test everything we can with default features and target.
