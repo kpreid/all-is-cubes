@@ -1,4 +1,4 @@
-use euclid::{point3, vec2, vec3, Point3D, Rotation3D, Size2D};
+use euclid::{point2, point3, vec2, vec3, Point3D, Rotation3D, Size2D};
 use pretty_assertions::assert_eq;
 use rand::SeedableRng;
 
@@ -189,4 +189,19 @@ fn viewport_is_empty() {
 
     // nominal size does not matter
     assert!(!Viewport::with_scale(0.0, vec2(10, 10)).is_empty());
+}
+
+#[test]
+fn project_ndc_into_world_edge_cases() {
+    let camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
+    {
+        let ray = dbg!(camera.project_ndc_into_world(point2(f64::NAN, 0.0)));
+        assert!(ray.origin.x.is_nan());
+        assert!(ray.direction.x.is_nan());
+    }
+    {
+        let ray = dbg!(camera.project_ndc_into_world(point2(f64::INFINITY, 0.0)));
+        assert!(ray.origin.x.is_nan());
+        assert!(ray.direction.x.is_nan());
+    }
 }

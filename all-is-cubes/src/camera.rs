@@ -224,20 +224,16 @@ impl Camera {
     /// Converts a screen position in normalized device coordinates (as produced by
     /// [`Viewport::normalize_nominal_point()`]) into a ray in world space.
     /// Uses the view transformation given by [`set_view_transform`](Self::set_view_transform).
+    ///
+    /// The input coordinates should be within the range -1 to 1, inclusive.
+    /// If they are not, the result may be a ray whose components are NaN.
     pub fn project_ndc_into_world(&self, ndc: NdcPoint2) -> Ray {
         let ndc_near = ndc.extend(-1.0);
         let ndc_far = ndc.extend(1.0);
 
         // World-space endpoints of the ray.
-        // TODO(euclid migration): don't unwrap, do what instead?
-        let world_near = self
-            .inverse_projection_view
-            .transform_point3d(ndc_near)
-            .unwrap();
-        let world_far = self
-            .inverse_projection_view
-            .transform_point3d(ndc_far)
-            .unwrap();
+        let world_near = self.project_ndc3_into_world(ndc_near);
+        let world_far = self.project_ndc3_into_world(ndc_far);
 
         let direction = world_far - world_near;
         Ray {
@@ -246,9 +242,10 @@ impl Camera {
         }
     }
 
-    fn project_point_into_world(&self, p: NdcPoint3) -> FreePoint {
-        // TODO(euclid migration): don't unwrap, do what instead?
-        self.inverse_projection_view.transform_point3d(p).unwrap()
+    fn project_ndc3_into_world(&self, p: NdcPoint3) -> FreePoint {
+        self.inverse_projection_view
+            .transform_point3d(p)
+            .unwrap_or(FreePoint::splat(FreeCoordinate::NAN))
     }
 
     /// Returns an [`OctantMask`] which includes all directions (in world space) visible in
@@ -409,14 +406,14 @@ impl Camera {
         // Compute the view frustum's corner points,
         // by unprojecting the corners of clip space.
         self.view_frustum = FrustumPoints {
-            lbn: self.project_point_into_world(point3(-1., -1., 0.)),
-            rbn: self.project_point_into_world(point3(1., -1., 0.)),
-            ltn: self.project_point_into_world(point3(-1., 1., 0.)),
-            rtn: self.project_point_into_world(point3(1., 1., 0.)),
-            lbf: self.project_point_into_world(point3(-1., -1., 1.)),
-            rbf: self.project_point_into_world(point3(1., -1., 1.)),
-            ltf: self.project_point_into_world(point3(-1., 1., 1.)),
-            rtf: self.project_point_into_world(point3(1., 1., 1.)),
+            lbn: self.project_ndc3_into_world(point3(-1., -1., 0.)),
+            rbn: self.project_ndc3_into_world(point3(1., -1., 0.)),
+            ltn: self.project_ndc3_into_world(point3(-1., 1., 0.)),
+            rtn: self.project_ndc3_into_world(point3(1., 1., 0.)),
+            lbf: self.project_ndc3_into_world(point3(-1., -1., 1.)),
+            rbf: self.project_ndc3_into_world(point3(1., -1., 1.)),
+            ltf: self.project_ndc3_into_world(point3(-1., 1., 1.)),
+            rtf: self.project_ndc3_into_world(point3(1., 1., 1.)),
             bounds: Aab::ZERO,
         };
         self.view_frustum.compute_bounds();
