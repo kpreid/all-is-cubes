@@ -565,6 +565,10 @@ fn build_web(
     time_log: &mut Vec<Timing>,
     profile: Profile,
 ) -> Result<(), ActionError> {
+    // Currently, wasm is considered part of the main workspace scope,
+    // even though it is actually a separate workspace. This is a bug.
+    // <https://github.com/kpreid/all-is-cubes/issues/270>
+    // <https://github.com/kpreid/all-is-cubes/issues/410>
     assert!(config.scope.includes_main_workspace());
 
     let wasm_package_dir: &Path = &PROJECT_DIR.join("all-is-cubes-wasm");
@@ -686,10 +690,10 @@ fn do_for_all_packages(
 ) -> Result<(), ActionError> {
     if config.scope.includes_main_workspace() {
         ensure_wasm_tools_installed(config, time_log)?;
-    }
 
-    // Ensure all-is-cubes-server build that might be looking for the web client files will succeed.
-    build_web(config, time_log, Profile::Dev)?;
+        // Ensure all-is-cubes-server build that might be looking for the web client files will succeed.
+        build_web(config, time_log, Profile::Dev)?;
+    }
 
     // Test everything we can with default features and target.
     // But if we're linting, then the below --all-targets run will handle that.
