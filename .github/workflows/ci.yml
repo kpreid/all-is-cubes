@@ -230,7 +230,7 @@ jobs:
     # (but only for the stablest matrix version)
     - uses: actions/upload-pages-artifact@v3
       with:
-        path: all-is-cubes-wasm/dist
+        path: all-is-cubes-wasm/target/web-app-release
 
   # Deploy web build to GitHub Pages.
   deploy-web:
