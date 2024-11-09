@@ -6,7 +6,10 @@ use ordered_float::NotNan;
 use rand::prelude::SliceRandom as _;
 use rand::{Rng as _, SeedableRng as _};
 
-use crate::block::{Resolution, AIR};
+use crate::block::{
+    Resolution::{self, R2},
+    AIR,
+};
 use crate::content::{make_slab, make_some_blocks};
 use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, GridAab};
 use crate::physics::{Body, Contact, Velocity, POSITION_EPSILON, VELOCITY_MAGNITUDE_LIMIT};
@@ -161,7 +164,28 @@ fn push_out_simple() {
 
     assert_eq!(body.position(), point3(1.5 + POSITION_EPSILON, 0.5, 0.5));
     assert_eq!(body.velocity(), Vector3D::zero());
-    // TODO: push out should create report contacts just like normal collision
+    // TODO: push out should create and report contacts just like normal collision
+    // assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face7::PY)]);
+}
+
+#[test]
+#[ignore = "TODO: enable this test when push_out() works as intended"]
+fn push_out_voxels() {
+    let u = &mut Universe::new();
+    let block = make_slab(u, 1, R2);
+    let mut space = Space::empty_positive(1, 1, 1);
+    space.set([0, 0, 0], &block).unwrap();
+    let mut body = test_body();
+    body.set_position(point3(0.5, 0.75, 0.5)); // intersection of 0.25 in the Y axis
+    body.flying = true;
+
+    let mut contacts = Vec::new();
+    let info = body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
+    dbg!(info);
+
+    assert_eq!(body.position(), point3(0.5, 1.0 + POSITION_EPSILON, 0.5));
+    assert_eq!(body.velocity(), Vector3D::zero());
+    // TODO: push out should create and report contacts just like normal collision
     // assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face7::PY)]);
 }
 
