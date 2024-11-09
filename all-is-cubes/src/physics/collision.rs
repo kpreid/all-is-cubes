@@ -958,6 +958,31 @@ mod tests {
         );
     }
 
+    #[test]
+    #[ignore = "needs fixing before we can use new push_out"]
+    fn escape_random_test() {
+        // TODO: increase coverage via voxel blocks and random Space arrangements
+        let [block1] = make_some_blocks();
+        let mut space = Space::empty_positive(2, 1, 1);
+        space.set([0, 0, 0], &block1).unwrap();
+
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+        for _ in 0..1000 {
+            let ray = Ray::new(
+                Aab::new(-2., 2., -2., 2., -2., 2.).random_point(&mut rng),
+                Aab::new(-1., 1., -1., 1., -1., 1.)
+                    .random_point(&mut rng)
+                    .to_vector(),
+            );
+            // No assertion of the expected result; just not triggering any assertion.
+            escape_along_ray(
+                &space,
+                ray,
+                Aab::from_lower_upper([0., 0., 0.], [1.5, 1.5, 1.5]),
+            );
+        }
+    }
+
     #[expect(clippy::needless_pass_by_value, reason = "convenience")]
     fn escape_along_ray_tester(
         ray: Ray,
