@@ -496,6 +496,7 @@ async fn arbitrary_space(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::block;
     use all_is_cubes::util::yield_progress_for_testing;
     use futures_core::future::BoxFuture;
 
@@ -540,6 +541,8 @@ mod tests {
                 let _ = u.get_default_character().unwrap().read().unwrap();
             }
             u.step(false, time::DeadlineNt::Asap);
+
+            check_block_spaces(&u);
         }
 
         // Test that asking for an impossibly huge size does not panic, but returns an error or
@@ -563,6 +566,29 @@ mod tests {
                     )
                     .await
             );
+        }
+    }
+
+    /// Assert that every `Space` used in a `Block` has appropriate properties;
+    /// in particular, that it is not unnecessarily having lighting computations.
+    fn check_block_spaces(universe: &Universe) {
+        // TODO: also check blocks that are found in `Composite` and directly in `Space`, etc.
+        // Use case for `VisitHandles` being more general?
+        for (block_def_name, block_def_handle) in universe.iter_by_type::<block::BlockDef>() {
+            let block_def = &*block_def_handle.read().unwrap();
+            if let block::Primitive::Recur {
+                space: space_handle,
+                ..
+            } = block_def.block().primitive()
+            {
+                assert_eq!(
+                    space_handle.read().unwrap().physics().light,
+                    LightPhysics::None,
+                    "block {block_def_name} has space {space_name} \
+                        whose light physics are not disabled",
+                    space_name = space_handle.name()
+                );
+            }
         }
     }
 }
