@@ -544,6 +544,12 @@ impl Body {
             // push-out actually work with recursive blocks.
 
             let direction = direction.normalize(); // TODO: set this to a max distance
+            if direction.x.is_nan() {
+                // This case happens in push_out() when the velocity is zero.
+                // Checking exactly here is a cheap way to catch it.
+                return None;
+            }
+
             let ray = Ray::new(self.position, direction);
 
             let end = escape_along_ray(space, ray, self.collision_box)?;
