@@ -225,6 +225,7 @@ impl Aab {
     /// Note that due to rounding error, the result may not have the same size.
     #[inline]
     #[must_use]
+    #[track_caller] // in case of NaN
     pub fn translate(self, offset: FreeVector) -> Self {
         Self::from_lower_upper(self.lower_bounds + offset, self.upper_bounds + offset)
     }
