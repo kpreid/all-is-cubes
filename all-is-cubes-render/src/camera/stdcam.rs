@@ -163,9 +163,16 @@ impl StandardCameras {
     ///
     /// This should be called at the beginning of each frame or as needed when the
     /// cameras are to be used.
-    pub fn update(&mut self) {
+    ///
+    /// Returns whether any values actually changed.
+    /// (This does not include tracking changes to space content — only which part of which spaces
+    /// are being looked at.)
+    pub fn update(&mut self) -> bool {
+        let mut anything_changed = false;
+
         let options_dirty = self.graphics_options_dirty.get_and_clear();
         if options_dirty {
+            anything_changed = true;
             self.cameras
                 .world
                 .set_options(self.graphics_options.snapshot());
@@ -173,6 +180,7 @@ impl StandardCameras {
 
         let ui_dirty = self.ui_dirty.get_and_clear();
         if ui_dirty || options_dirty {
+            anything_changed = true;
             let UiViewState {
                 space,
                 view_transform: ui_transform,
@@ -192,6 +200,7 @@ impl StandardCameras {
         // changes.
         let viewport_dirty = self.viewport_dirty.get_and_clear();
         if viewport_dirty {
+            anything_changed = true;
             let viewport: Viewport = self.viewport_source.snapshot();
             // TODO: this should be a Layers::iter_mut() or something
             self.cameras.world.set_viewport(viewport);
@@ -199,6 +208,7 @@ impl StandardCameras {
         }
 
         if self.character_dirty.get_and_clear() {
+            anything_changed = true;
             self.character = self.character_source.snapshot();
             if self.character.is_none() {
                 // Reset transform so it isn't a *stale* transform.
@@ -212,18 +222,25 @@ impl StandardCameras {
         if let Some(character_handle) = &self.character {
             match character_handle.read() {
                 Ok(character) => {
-                    // TODO: Shouldn't we also grab the character's Space while we
-                    // have the access? Renderers could use that.
-                    self.cameras.world.set_view_transform(character.view());
+                    let view_transform = character.view();
+                    if view_transform != self.cameras.world.view_transform() {
+                        anything_changed = true;
+                        self.cameras.world.set_view_transform(character.view());
+                    }
 
                     // TODO: ListenableCell should make this easier and cheaper
                     if Option::as_ref(&*self.world_space.get()) != Some(&character.space) {
+                        anything_changed = true;
+
                         self.world_space.set(Some(character.space.clone()));
                     }
 
+                    // Update camera exposure from character.
+                    let old_actual_exposure = self.cameras.world.exposure();
                     self.cameras
                         .world
                         .set_measured_exposure(character.exposure());
+                    anything_changed |= self.cameras.world.exposure() != old_actual_exposure;
                 }
                 Err(_) => {
                     // TODO: set an error flag indicating failure to update
@@ -231,9 +248,12 @@ impl StandardCameras {
             }
         } else {
             if self.world_space.get().is_some() {
+                anything_changed = true;
                 self.world_space.set(None);
             }
         }
+
+        anything_changed
     }
 
     /// Returns current graphics options as of the last [`update()`](Self::update).
@@ -397,12 +417,12 @@ mod tests {
         );
 
         let world_source = cameras.world_space();
-        let flag = DirtyFlag::listening(false, &world_source);
+        let world_flag = DirtyFlag::listening(false, &world_source);
         assert_eq!(world_source.snapshot().as_ref(), None);
 
         // No redundant notification when world is absent
-        cameras.update();
-        assert!(!flag.get_and_clear());
+        let changed = cameras.update();
+        assert_eq!((changed, world_flag.get_and_clear()), (false, false));
 
         // Create a universe with space and character
         let mut universe = Universe::new();
@@ -416,14 +436,14 @@ mod tests {
         character_cell.set(Some(character));
 
         // Now the world_source should be reporting the new space
-        assert!(!flag.get_and_clear());
-        cameras.update();
-        assert!(flag.get_and_clear());
+        assert!(!world_flag.get_and_clear());
+        let changed = cameras.update();
+        assert_eq!((changed, world_flag.get_and_clear()), (true, true));
         assert_eq!(world_source.snapshot().as_ref(), Some(&space_handle));
 
         // No redundant notification when world is present
-        cameras.update();
-        assert!(!flag.get_and_clear());
+        let changed = cameras.update();
+        assert_eq!((changed, world_flag.get_and_clear()), (false, false));
 
         // TODO: test further changes
     }
