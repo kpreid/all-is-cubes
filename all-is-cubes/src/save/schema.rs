@@ -425,6 +425,7 @@ pub(crate) enum BodySer {
         position: [f64; 3],
         velocity: [f64; 3],
         collision_box: Aab,
+        occupying: Aab,
         flying: bool,
         noclip: bool,
         yaw: f64,

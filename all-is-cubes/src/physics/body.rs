@@ -52,17 +52,32 @@ pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
 #[derive(Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Body {
-    // TODO: reduce visibility from pub(crate) to private, in preparation for new collision
-    // strategy where we have a absolute-coordinate collision box.
     /// Position.
+    ///
+    /// Invariant: `self.occupying` must be updated to fit whenever this is changed.
+    /// `self.occupying` must always contain `self.position`.
     position: FreePoint,
+
     /// Velocity, in position units per second.
     velocity: Vector3D<FreeCoordinate, Velocity>,
 
-    /// Collision volume, defined with `position` as the origin.
-    // Thought for the future: switching to a "cylinder" representation (height + radius)
-    // would allow for simultaneous collision with multiple spaces with different axes.
+    /// Volume that this body attempts to occupy, in coordinates relative to `self.position`.
+    ///
+    /// It should always contain the origin (i.e. always contain the position point).
+    /// TODO: Actually enforce that.
+    ///
+    /// It does not change as a consequence of physics stepping; it is configuration rather than
+    /// instantaneous state.
     collision_box: Aab,
+
+    /// Volume that this body believes it is successfully occupying, in coordinates relative to
+    /// the [`Space`] it collides with.
+    ///
+    /// In the ideal case, this is always equal to `collision_box.translate(position.to_vector())`.
+    /// In practice, it will differ at least due to rounding errors, and additionally due to
+    /// numerical error during collision resolution, or be shrunk by large distances if the body has
+    /// been squeezed by moving obstacles (TODO: not implemented yet).
+    occupying: Aab,
 
     /// Is this body not subject to gravity?
     pub flying: bool,
@@ -92,6 +107,7 @@ impl fmt::Debug for Body {
             position,
             velocity,
             collision_box,
+            occupying,
             flying,
             noclip,
             yaw,
@@ -101,6 +117,7 @@ impl fmt::Debug for Body {
             .field("position", &position.refmt(&ConciseDebug))
             .field("velocity", &velocity.refmt(&ConciseDebug))
             .field("collision_box", &collision_box)
+            .field("occupying", &occupying)
             .field("flying", &flying)
             .field("noclip", &noclip)
             .field("yaw", &yaw)
@@ -116,6 +133,7 @@ impl Fmt<StatusText> for Body {
             position,
             velocity,
             collision_box: _,
+            occupying: _,
             flying,
             noclip,
             yaw,
@@ -142,10 +160,13 @@ impl Fmt<StatusText> for Body {
 impl Body {
     /// Constructs a [`Body`] requiring only information that can't be reasonably defaulted.
     pub fn new_minimal(position: impl Into<FreePoint>, collision_box: impl Into<Aab>) -> Self {
+        let position = position.into();
+        let collision_box = collision_box.into();
         Self {
-            position: position.into(),
+            position,
             velocity: Vector3D::zero(),
-            collision_box: collision_box.into(),
+            collision_box,
+            occupying: collision_box.translate(position.to_vector()),
             flying: false,
             noclip: false,
             yaw: 0.0,
@@ -235,6 +256,8 @@ impl Body {
             }
         }
 
+        // TODO: attempt to expand `occupying` to fit `collision_box`.
+
         #[cfg(feature = "rerun")]
         let position_before_push_out = self.position;
         let push_out_info = if let Some(space) = colliding_space {
@@ -283,7 +306,7 @@ impl Body {
                 move_segment_index += 1;
             }
         } else {
-            self.position += unobstructed_delta_position;
+            self.set_position(self.position + unobstructed_delta_position);
             move_segments[0] = MoveSegment {
                 delta_position: unobstructed_delta_position,
                 stopped_by: None,
@@ -376,13 +399,19 @@ impl Body {
             );
 
             // Log body collision box
-            let collision_boxes = rg::convert_aabs([self.collision_box], self.position.to_vector());
             rerun_destination.log(
                 &rg::entity_path!["collision_box"],
-                &collision_boxes.with_class_ids([rg::ClassId::BodyCollisionBox]),
+                &rg::convert_aabs([self.collision_box], self.position.to_vector())
+                    .with_class_ids([rg::ClassId::BodyCollisionBox]),
+            );
+            rerun_destination.log(
+                &rg::entity_path!["occupying"],
+                &rg::convert_aabs([self.occupying], FreeVector::zero())
+                    .with_class_ids([rg::ClassId::BodyCollisionBox]),
             );
 
-            // Our movement arrows shall be logged relative to all collision box corners.
+            // Our movement arrows shall be logged relative to all collision box corners
+            // for legibility of how they interact with things.
             let arrow_offsets = || self.collision_box.corner_points().map(|p| p.to_vector());
 
             // Log push_out operation
@@ -443,7 +472,7 @@ impl Body {
         let collision = collide_along_ray(
             space,
             movement_ignoring_collision,
-            self.collision_box,
+            self.collision_box, // TODO: use occupying
             collision_callback,
             StopAt::NotAlreadyColliding,
         );
@@ -458,20 +487,22 @@ impl Body {
             // But a little bit back from that, to avoid floating point error pushing us
             // into being already colliding next frame.
             let motion_segment = nudge_on_ray(
-                self.collision_box,
+                self.collision_box, // TODO: use occupying
                 movement_ignoring_collision.scale_direction(collision.t_distance),
                 collision.contact.normal().opposite(),
                 collision.contact.resolution(),
                 true,
             );
             let unobstructed_delta_position = motion_segment.direction;
-            self.position += unobstructed_delta_position;
+            self.set_position(self.position + unobstructed_delta_position);
             // Figure the distance we have have left.
             delta_position -= unobstructed_delta_position;
             // Convert it to sliding movement for the axes we didn't collide in.
             delta_position[axis] = 0.0;
 
-            // Absorb velocity in that direction.
+            // Zero the velocity in that direction.
+            // (This is the velocity part of collision response. That is, if we supported bouncy
+            // objects, we'd do something different here.)
             self.velocity[axis] = 0.0;
 
             (
@@ -483,7 +514,7 @@ impl Body {
             )
         } else {
             // We did not hit anything for the length of the raycast. Proceed unobstructed.
-            self.position += delta_position;
+            self.set_position(self.position + delta_position);
             (
                 Vector3D::zero(),
                 MoveSegment {
@@ -496,6 +527,8 @@ impl Body {
 
     /// Check if we're intersecting any blocks and fix that if so.
     fn push_out(&mut self, space: &Space) -> Option<FreeVector> {
+        // TODO: need to unsquash the `occupying` box if possible
+
         let colliding = find_colliding_cubes(space, self.collision_box_abs())
             .next()
             .is_some();
@@ -521,7 +554,7 @@ impl Body {
 
             if let Some((new_position, _)) = shortest_push_out {
                 let old_position = self.position;
-                self.position = new_position;
+                self.set_position(new_position);
                 return Some(new_position - old_position);
             }
         }
@@ -549,7 +582,11 @@ impl Body {
 
             let ray = Ray::new(self.position, direction);
 
-            let end = escape_along_ray(space, ray, self.collision_box)?;
+            let end = escape_along_ray(
+                space,
+                ray,
+                self.collision_box, /* TODO: use occupying */
+            )?;
 
             let nudged_distance = end.t_distance + POSITION_EPSILON;
             Some((
@@ -559,16 +596,18 @@ impl Body {
         } else {
             let ray = Ray::new(self.position, direction);
             // TODO: upper bound on distance to try
-            'raycast: for ray_step in aab_raycast(self.collision_box, ray, true) {
+            'raycast: for ray_step in
+                aab_raycast(self.collision_box /* TODO: use occupying */, ray, true)
+            {
                 let adjusted_segment = nudge_on_ray(
-                    self.collision_box,
+                    self.collision_box, /* TODO: use occupying */
                     ray.scale_direction(ray_step.t_distance()),
                     ray_step.face(),
                     Resolution::R1,
                     true,
                 );
                 let step_aab = self
-                    .collision_box
+                    .collision_box /* TODO: use occupying */
                     .translate(adjusted_segment.unit_endpoint().to_vector());
                 for cube in step_aab.round_up_to_grid().interior_iter() {
                     // TODO: refactor to combine this with other collision attribute tests
@@ -606,8 +645,19 @@ impl Body {
     ///
     /// Note: This may have effects that normal time stepping does not. In particular,
     /// `body.set_position(body.position())` is not guaranteed to do nothing.
+    ///
+    /// If `position` contains any component which is infinite or NaN, this function does nothing.
+    /// This behavior may change in the future.
     pub fn set_position(&mut self, position: FreePoint) {
+        if !position.is_finite() {
+            return;
+        }
+
         self.position = position;
+
+        // This new box might collide with the `Space`, but (TODO: not implemented yet)
+        // stepping will recover from that if possible.
+        self.occupying = self.collision_box.translate(self.position.to_vector());
     }
 
     /// Returns the body’s current velocity.
@@ -644,7 +694,9 @@ impl Body {
         self.collision_box
     }
 
-    /// Returns the body's collision box in world coordinates.
+    /// Returns the body's current collision box in world coordinates.
+    ///
+    /// This is not necessarily equal in size to [`Self::collision_box_rel()`].
     ///
     /// ```
     /// use all_is_cubes::math::Aab;
@@ -656,8 +708,10 @@ impl Body {
     /// );
     /// assert_eq!(body.collision_box_abs(), Aab::new(-1.0, 1.0, 18.0, 22.0, -3.0, 3.0));
     /// ```
+    //---
+    // TODO: After `occupying` is a little more fleshed out, consider renaming this method to that.
     pub fn collision_box_abs(&self) -> Aab {
-        self.collision_box.translate(self.position.to_vector())
+        self.occupying
     }
 
     pub(crate) fn look_rotation(&self) -> euclid::Rotation3D<f64, Eye, Cube> {
@@ -697,6 +751,7 @@ impl serde::Serialize for Body {
             position,
             velocity,
             collision_box,
+            occupying,
             flying,
             noclip,
             yaw,
@@ -706,6 +761,7 @@ impl serde::Serialize for Body {
             position: position.into(),
             velocity: velocity.into(),
             collision_box,
+            occupying,
             flying,
             noclip,
             yaw,
@@ -726,6 +782,7 @@ impl<'de> serde::Deserialize<'de> for Body {
                 position,
                 velocity,
                 collision_box,
+                occupying,
                 flying,
                 noclip,
                 yaw,
@@ -734,6 +791,7 @@ impl<'de> serde::Deserialize<'de> for Body {
                 position: position.into(),
                 velocity: velocity.into(),
                 collision_box,
+                occupying,
                 flying,
                 noclip,
                 yaw,
@@ -887,7 +945,9 @@ impl Transaction for BodyTransaction {
             set_position,
             set_look_direction,
         } = self;
-        set_position.commit(&mut body.position);
+        if let &Equal(Some(position)) = set_position {
+            body.set_position(position);
+        }
         if let &Equal(Some(direction)) = set_look_direction {
             body.set_look_direction(direction);
         }
@@ -1033,6 +1093,9 @@ mod tests {
                 let actual = after.position;
                 if actual != expected {
                     return Err(format!("expected position {expected:#?}, got {actual:#?}").into());
+                }
+                if !after.occupying.contains(after.position) {
+                    return Err("bad collision box".into());
                 }
                 Ok(())
             }

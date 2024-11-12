@@ -473,6 +473,10 @@ fn character() {
                     "lower": [-0.35, -1.75, -0.35],
                     "upper": [0.35, 0.15, 0.35],
                 },
+                "occupying": {
+                    "lower": [2.15, 2.0, 25.65],
+                    "upper": [2.85, 3.9, 26.35],
+                },
                 "flying": false,
                 "noclip": false,
                 "yaw": 0.0,
@@ -872,6 +876,10 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                         "collision_box": {
                             "lower": [-0.35, -1.75, -0.35],
                             "upper": [0.35, 0.15, 0.35],
+                        },
+                        "occupying": {
+                            "lower": [0.65, 0.0, 21.65],
+                            "upper": [1.35, 1.9, 22.35],
                         },
                         "flying": false,
                         "noclip": false,
