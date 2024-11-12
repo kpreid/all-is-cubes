@@ -202,11 +202,12 @@ impl Character {
         };
 
         Self {
-            body: Body {
-                flying: false, // will be overriden anyway
-                yaw,
-                pitch,
-                ..Body::new_minimal(position, collision_box)
+            body: {
+                let mut body = Body::new_minimal(position, collision_box);
+                body.flying = false; // will be overriden anyway
+                body.yaw = yaw;
+                body.pitch = pitch;
+                body
             },
             space,
             velocity_input: Vector3D::zero(),
@@ -240,7 +241,7 @@ impl Character {
         ViewTransform {
             // Remember, this is an eye *to* world transform.
             rotation: self.body.look_rotation(),
-            translation: (self.body.position.to_vector() + self.eye_displacement_pos).cast_unit(),
+            translation: (self.body.position().to_vector() + self.eye_displacement_pos).cast_unit(),
         }
     }
 
@@ -300,9 +301,9 @@ impl Character {
         self.body.flying = flying;
 
         let dt = tick.delta_t().as_secs_f64();
-        let control_orientation = Rotation3D::around_y(-Angle::radians(self.body.yaw.to_radians()));
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
-        let initial_body_velocity = self.body.velocity;
+        let control_orientation = Rotation3D::around_y(-Angle::radians(self.body.yaw.to_radians()));
+        let initial_body_velocity = self.body.velocity();
 
         let speed = if flying { FLYING_SPEED } else { WALKING_SPEED };
         let mut velocity_target =
@@ -317,7 +318,8 @@ impl Character {
             Vector3D::new(10.8, 0., 10.8)
         }; // TODO constants/tables...
 
-        let control_delta_v = (velocity_target - self.body.velocity).component_mul(stiffness) * dt;
+        let control_delta_v =
+            (velocity_target - initial_body_velocity).component_mul(stiffness) * dt;
 
         self.last_step_info = if let Ok(space) = self.space.read() {
             self.exposure.step(&space, self.view(), dt);
@@ -341,7 +343,7 @@ impl Character {
             }
 
             if let Some(fluff_txn) = info.impact_fluff().and_then(|fluff| {
-                Some(CubeTransaction::fluff(fluff).at(Cube::containing(self.body.position)?))
+                Some(CubeTransaction::fluff(fluff).at(Cube::containing(self.body.position())?))
             }) {
                 result_transaction
                     .merge_from(fluff_txn.bind(self.space.clone()))
@@ -401,7 +403,7 @@ impl Character {
         // other such events.
         // TODO: Try applying velocity_input to this positively, "leaning forward".
         // First, update velocity.
-        let body_delta_v_this_frame = self.body.velocity - initial_body_velocity;
+        let body_delta_v_this_frame = self.body.velocity() - initial_body_velocity;
         self.eye_displacement_vel -= body_delta_v_this_frame.cast_unit() * 0.04;
         // Return-to-center force — linear near zero and increasing quadratically
         self.eye_displacement_vel -= self.eye_displacement_pos.cast_unit()
@@ -473,12 +475,12 @@ impl Character {
     /// Figure out what the correct overall thing is.
     pub fn jump_if_able(&mut self) {
         if self.is_on_ground() {
-            self.body.velocity += Vector3D::new(0., JUMP_SPEED, 0.);
+            self.body.add_velocity(Vector3D::new(0., JUMP_SPEED, 0.));
         }
     }
 
     fn is_on_ground(&self) -> bool {
-        self.body.velocity.y <= 0.0
+        self.body.velocity().y <= 0.0
             && self
                 .colliding_cubes
                 .iter()
@@ -540,17 +542,10 @@ impl serde::Serialize for Character {
     where
         S: serde::Serializer,
     {
+        use alloc::borrow::Cow::Borrowed;
+
         let &Character {
-            body:
-                Body {
-                    position,
-                    velocity,
-                    collision_box,
-                    flying,
-                    noclip,
-                    yaw,
-                    pitch,
-                },
+            ref body,
             ref space,
             ref inventory,
             selected_slots,
@@ -571,18 +566,10 @@ impl serde::Serialize for Character {
         } = self;
         schema::CharacterSer::CharacterV1 {
             space: space.clone(),
-
-            position: position.into(),
-            velocity: velocity.into(),
-            collision_box,
-            flying,
-            noclip,
-            yaw,
-            pitch,
-
-            inventory: alloc::borrow::Cow::Borrowed(inventory),
+            body: Borrowed(body),
+            inventory: Borrowed(inventory),
             selected_slots,
-            behaviors: alloc::borrow::Cow::Borrowed(behaviors),
+            behaviors: Borrowed(behaviors),
         }
         .serialize(serializer)
     }
@@ -597,26 +584,12 @@ impl<'de> serde::Deserialize<'de> for Character {
         match schema::CharacterSer::deserialize(deserializer)? {
             schema::CharacterSer::CharacterV1 {
                 space,
-                position,
-                velocity,
-                collision_box,
-                flying,
-                noclip,
-                yaw,
-                pitch,
+                body,
                 inventory,
                 selected_slots,
                 behaviors,
             } => Ok(Character {
-                body: Body {
-                    position: position.into(),
-                    velocity: velocity.into(),
-                    collision_box,
-                    flying,
-                    noclip,
-                    yaw,
-                    pitch,
-                },
+                body: body.into_owned(),
                 space,
                 inventory: inventory.into_owned(),
                 selected_slots,

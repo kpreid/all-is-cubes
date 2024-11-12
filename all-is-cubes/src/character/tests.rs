@@ -34,7 +34,7 @@ fn spawn_inferred_position() {
 
     // Character's box should be standing on the bottom of the bounds.
     let cbox = character.body.collision_box_abs();
-    dbg!(character.body.position, cbox);
+    dbg!(character.body.position(), cbox);
     assert_eq!(
         bounds.to_free().face_coordinate(Face6::NY),
         cbox.face_coordinate(Face6::NY)
@@ -202,28 +202,32 @@ fn no_superjumping() {
             .build(),
     );
     let mut character = Character::spawn_default(space);
-    character.body.position = point3(
+    character.body.set_position(point3(
         0.,
-        character.body.collision_box.face_coordinate(Face6::NY) + 1.1,
+        character
+            .body
+            .collision_box_rel()
+            .face_coordinate(Face6::NY)
+            + 1.1,
         0.,
-    );
+    ));
     let _ = character.step(None, Tick::from_seconds(1.0)); // initial settling
 
     assert!(
         character.is_on_ground(),
         "should be on ground; current position = {:?}",
-        character.body.position
+        character.body.position()
     );
-    assert_eq!(character.body.velocity.y, 0.0);
+    assert_eq!(character.body.velocity().y, 0.0);
 
     character.jump_if_able();
     assert!(!character.is_on_ground());
-    let velocity = character.body.velocity;
+    let velocity = character.body.velocity();
     assert!(velocity.y > 0.0);
 
     // Second jump without ticking should do nothing
     character.jump_if_able();
-    assert_eq!(character.body.velocity, velocity);
+    assert_eq!(character.body.velocity(), velocity);
 }
 
 #[test]

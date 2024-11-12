@@ -57,15 +57,17 @@ pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
 #[derive(Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Body {
+    // TODO: reduce visibility from pub(crate) to private, in preparation for new collision
+    // strategy where we have a absolute-coordinate collision box.
     /// Position.
-    pub position: FreePoint,
+    position: FreePoint,
     /// Velocity, in position units per second.
-    pub velocity: Vector3D<FreeCoordinate, Velocity>,
+    velocity: Vector3D<FreeCoordinate, Velocity>,
 
     /// Collision volume, defined with `position` as the origin.
     // Thought for the future: switching to a "cylinder" representation (height + radius)
     // would allow for simultaneous collision with multiple spaces with different axes.
-    pub collision_box: Aab,
+    collision_box: Aab,
 
     /// Is this body not subject to gravity?
     pub flying: bool,
@@ -598,8 +600,56 @@ impl Body {
         }
     }
 
-    /// Returns the body's collision box in world coordinates
-    /// (`collision_box` translated by `position`).
+    /// Returns the body’s current position.
+    ///
+    /// If you are interested in the space it occupies, use [`Self::collision_box_abs()`] instead.
+    pub fn position(&self) -> FreePoint {
+        self.position
+    }
+
+    /// Sets the position of the body, disregarding collision.
+    ///
+    /// Note: This may have effects that normal time stepping does not. In particular,
+    /// `body.set_position(body.position())` is not guaranteed to do nothing.
+    pub fn set_position(&mut self, position: FreePoint) {
+        self.position = position;
+    }
+
+    /// Returns the body’s current velocity.
+    pub fn velocity(&self) -> Vector3D<f64, Velocity> {
+        self.velocity
+    }
+
+    /// Adds the given value to the body’s velocity.
+    #[allow(non_snake_case)]
+    pub fn add_velocity(&mut self, Δv: Vector3D<f64, Velocity>) {
+        // TODO: NaN/infinity checks?
+        self.velocity += Δv;
+    }
+
+    /// Replaces the body’s velocity with the given value.
+    pub fn set_velocity(&mut self, v: Vector3D<f64, Velocity>) {
+        // TODO: NaN/infinity checks?
+        self.velocity = v;
+    }
+
+    /// Returns the body's configured collision box in coordinates relative to [`Self::position()`].
+    ///
+    /// ```
+    /// use all_is_cubes::math::Aab;
+    /// use all_is_cubes::physics::Body;
+    ///
+    /// let body = Body::new_minimal(
+    ///     (0.0, 20.0, 0.0),
+    ///     Aab::new(-1.0, 1.0, -2.0, 2.0, -3.0, 3.0)
+    /// );
+    /// assert_eq!(body.collision_box_abs(), Aab::new(-1.0, 1.0, 18.0, 22.0, -3.0, 3.0));
+    /// ```
+    pub fn collision_box_rel(&self) -> Aab {
+        self.collision_box
+    }
+
+    /// Returns the body's collision box in world coordinates.
     ///
     /// ```
     /// use all_is_cubes::math::Aab;
@@ -638,6 +688,62 @@ impl Body {
 
         self.yaw = (180.0 - (direction.x).atan2(direction.z).to_degrees()).rem_euclid(360.0);
         self.pitch = -(direction.y).atan2(horizontal_distance).to_degrees();
+    }
+}
+
+#[cfg(feature = "save")]
+impl serde::Serialize for Body {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let &Body {
+            position,
+            velocity,
+            collision_box,
+            flying,
+            noclip,
+            yaw,
+            pitch,
+        } = self;
+        crate::save::schema::BodySer::BodyV1 {
+            position: position.into(),
+            velocity: velocity.into(),
+            collision_box,
+            flying,
+            noclip,
+            yaw,
+            pitch,
+        }
+        .serialize(serializer)
+    }
+}
+
+#[cfg(feature = "save")]
+impl<'de> serde::Deserialize<'de> for Body {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match crate::save::schema::BodySer::deserialize(deserializer)? {
+            crate::save::schema::BodySer::BodyV1 {
+                position,
+                velocity,
+                collision_box,
+                flying,
+                noclip,
+                yaw,
+                pitch,
+            } => Ok(Body {
+                position: position.into(),
+                velocity: velocity.into(),
+                collision_box,
+                flying,
+                noclip,
+                yaw,
+                pitch,
+            }),
+        }
     }
 }
 

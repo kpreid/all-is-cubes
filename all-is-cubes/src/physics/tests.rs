@@ -17,24 +17,19 @@ use crate::universe::Universe;
 fn collision_noop(_: Contact) {}
 
 fn test_body() -> Body {
-    Body {
-        flying: false,
-        noclip: false,
-        ..Body::new_minimal([0., 2., 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
-    }
+    Body::new_minimal([0., 2., 0.], Aab::new(-0.5, 0.5, -0.5, 0.5, -0.5, 0.5))
 }
 
 #[test]
 fn freefall_no_gravity() {
-    let mut body = Body {
-        velocity: vec3(2.0, 0.0, 0.0),
-        flying: true,
-        ..test_body()
-    };
+    let mut body = test_body();
+    body.set_velocity(vec3(2.0, 0.0, 0.0));
+    body.flying = true;
+
     body.step(Tick::from_seconds(1.5), None, collision_noop);
-    assert_eq!(body.position, point3(3.0, 2.0, 0.0));
+    assert_eq!(body.position(), point3(3.0, 2.0, 0.0));
     body.step(Tick::from_seconds(1.5), None, collision_noop);
-    assert_eq!(body.position, point3(6.0, 2.0, 0.0));
+    assert_eq!(body.position(), point3(6.0, 2.0, 0.0));
 }
 
 #[test]
@@ -44,26 +39,25 @@ fn freefall_with_gravity() {
         gravity: vec3(0, -20, 0).map(NotNan::from),
         ..SpacePhysics::default()
     });
-    let mut body = Body {
-        velocity: vec3(2.0, 0.0, 0.0),
-        flying: false,
-        ..test_body()
-    };
+    let mut body = test_body();
+    body.set_velocity(vec3(2.0, 0.0, 0.0));
+    body.flying = false;
+
     body.step(Tick::from_seconds(1.5), Some(&space), collision_noop);
-    assert_eq!(body.position, point3(3.0, -43.0, 0.0));
+    assert_eq!(body.position(), point3(3.0, -43.0, 0.0));
     body.step(Tick::from_seconds(1.5), Some(&space), collision_noop);
-    assert_eq!(body.position, point3(6.0, -133.0, 0.0));
+    assert_eq!(body.position(), point3(6.0, -133.0, 0.0));
 }
 
 #[test]
 fn paused_does_not_move() {
-    let mut body = Body {
-        velocity: vec3(2.0, 0.0, 0.0),
-        flying: false,
-        ..test_body()
-    };
+    let mut body = test_body();
+    body.set_velocity(vec3(2.0, 0.0, 0.0));
+    body.flying = false;
+
     body.step(Tick::from_seconds(1.5).pause(), None, collision_noop);
-    assert_eq!(body.position, test_body().position);
+
+    assert_eq!(body.position(), test_body().position());
 }
 
 #[test]
@@ -71,18 +65,20 @@ fn falling_collision() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(1, 1, 1);
     space.set([0, 0, 0], &block).unwrap();
-    let mut body = Body {
-        velocity: vec3(2.0, 0.0, 0.0),
-        flying: false,
-        ..test_body()
-    };
+    let mut body = test_body();
+    body.set_velocity(vec3(2.0, 0.0, 0.0));
+    body.flying = false;
 
     let mut contacts = Vec::new();
     body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
 
-    assert_eq!(body.position.x, 2.0);
-    assert_eq!(body.position.z, 0.0);
-    assert!((body.position.y - 1.5).abs() < 1e-6, "{:?}", body.position);
+    assert_eq!(body.position().x, 2.0);
+    assert_eq!(body.position().z, 0.0);
+    assert!(
+        (body.position().y - 1.5).abs() < 1e-6,
+        "{:?}",
+        body.position()
+    );
     assert_eq!(
         contacts,
         vec![Contact::Block(CubeFace::new([0, 0, 0], Face7::PY))]
@@ -99,23 +95,21 @@ fn falling_collision_partial_block() {
 
     let mut space = Space::empty_positive(1, 1, 1);
     space.set([0, 0, 0], &block).unwrap();
-    let mut body = Body {
-        velocity: vec3(x_velocity, 0.0, 0.0),
-        flying: false,
-        ..test_body()
-    };
+    let mut body = test_body();
+    body.set_velocity(vec3(x_velocity, 0.0, 0.0));
+    body.flying = false;
 
     let mut contacts = Vec::new();
     dbg!(body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c)));
 
-    dbg!(body.collision_box.translate(body.position.to_vector()));
+    dbg!(body.collision_box_abs());
 
-    assert_eq!(body.position.x, x_velocity);
-    assert_eq!(body.position.z, 0.0);
+    assert_eq!(body.position().x, x_velocity);
+    assert_eq!(body.position().z, 0.0);
     assert!(
-        (body.position.y - 1.0).abs() < 1e-6,
+        (body.position().y - 1.0).abs() < 1e-6,
         "not touching surface on first step{:?}",
-        body.position
+        body.position()
     );
     assert!(
         matches!(
@@ -134,16 +128,19 @@ fn falling_collision_partial_block() {
     );
 
     // Remove horizontal velocity, then let time proceed and see if any falling through happens.
-    body.velocity.x = 0.0;
+    body.set_velocity(Vector3D {
+        x: 0.0,
+        ..body.velocity()
+    });
 
     for t in 1..=1000 {
         eprintln!("--- step {t}");
         body.step(Tick::from_seconds(1.0), Some(&space), |_| {});
         assert!(
-            (body.position.y - 1.0).abs() < 1e-6,
+            (body.position().y - 1.0).abs() < 1e-6,
             "not touching surface on step {:?}: {:?}",
             t,
-            body.position
+            body.position()
         );
     }
 }
@@ -153,19 +150,17 @@ fn push_out_simple() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(1, 1, 1);
     space.set([0, 0, 0], &block).unwrap();
-    let mut body = Body {
-        position: point3(1.25, 0.5, 0.5), // intersection of 0.25
-        velocity: Vector3D::zero(),
-        flying: true,
-        ..test_body()
-    };
+    let mut body = test_body();
+    body.set_position(point3(1.25, 0.5, 0.5)); // intersection of 0.25
+    body.set_velocity(Vector3D::zero());
+    body.flying = true;
 
     let mut contacts = Vec::new();
     let info = body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
     dbg!(info);
 
-    assert_eq!(body.position, point3(1.5 + POSITION_EPSILON, 0.5, 0.5));
-    assert_eq!(body.velocity, Vector3D::zero());
+    assert_eq!(body.position(), point3(1.5 + POSITION_EPSILON, 0.5, 0.5));
+    assert_eq!(body.velocity(), Vector3D::zero());
     // TODO: push out should create report contacts just like normal collision
     // assert_eq!(contacts, vec![CubeFace::new((0, 0, 0), Face7::PY)]);
 }
@@ -182,10 +177,9 @@ fn no_passing_through_blocks() {
         print!("Velocity {velocity:?}... ");
         let start = point3(0.5, 0.5, 0.5);
         let box_radius = 0.375; // use an exact float to minimize complications
-        let mut body = Body {
-            flying: true,
-            position: start,
-            collision_box: Aab::new(
+        let mut body = Body::new_minimal(
+            start,
+            Aab::new(
                 -box_radius,
                 box_radius,
                 -box_radius,
@@ -193,8 +187,9 @@ fn no_passing_through_blocks() {
                 -box_radius,
                 box_radius,
             ),
-            ..test_body()
-        };
+        );
+        body.flying = true;
+
         let mut iterations = 0;
         let mut position_history = VecDeque::new();
         loop {
@@ -210,20 +205,24 @@ fn no_passing_through_blocks() {
                 return;
             }
             // Reset velocity every frame as an approximation of the effect of player input.
-            body.velocity = velocity;
-            position_history.push_front(body.position);
+            body.set_velocity(velocity);
+            position_history.push_front(body.position());
             body.step(Tick::from_seconds(1.0 / 60.0), Some(&space), |_contact| {});
 
-            let distance_from_start = max_norm(body.position - start);
-            assert!(distance_from_start < 0.5, "escaped to {:?}", body.position);
-            if position_history.contains(&body.position) {
+            let distance_from_start = max_norm(body.position() - start);
+            assert!(
+                distance_from_start < 0.5,
+                "escaped to {:?}",
+                body.position()
+            );
+            if position_history.contains(&body.position()) {
                 // Reached steady state. Ish.
                 break;
             }
             position_history.truncate(10);
         }
-        println!("{iterations:?} iterations to {:?}", body.position);
-        let distance_from_start = max_norm(body.position - start);
+        println!("{iterations:?} iterations to {:?}", body.position());
+        let distance_from_start = max_norm(body.position() - start);
         assert!(
             distance_from_start > 0.09,
             "didn't move away from origin: {distance_from_start}"
@@ -256,11 +255,10 @@ fn no_passing_through_blocks() {
 #[test]
 fn position_nan() {
     let space = Space::empty_positive(1, 1, 1);
-    let mut body = Body {
-        position: point3(FreeCoordinate::NAN, 0., 0.),
-        velocity: vec3(1., 0., 0.),
-        ..test_body()
-    };
+    let mut body = test_body();
+    body.set_position(point3(FreeCoordinate::NAN, 0., 0.));
+    body.set_velocity(vec3(1., 0., 0.));
+
     body.step(Tick::from_seconds(2.0), Some(&space), collision_noop);
     // TODO: We would like to have some recovery strategy.
     // For now, this is just a "doesn't panic" test.
@@ -269,30 +267,31 @@ fn position_nan() {
 #[test]
 fn velocity_nan() {
     let space = Space::empty_positive(1, 1, 1);
-    let mut body = Body {
-        position: point3(1., 0., 0.),
-        velocity: vec3(1., FreeCoordinate::NAN, 0.),
-        ..test_body()
-    };
+    let mut body = test_body();
+    body.set_position(point3(1., 0., 0.));
+    body.set_velocity(vec3(1., FreeCoordinate::NAN, 0.));
+
     body.step(Tick::from_seconds(2.0), Some(&space), collision_noop);
 
     // Velocity is zeroed and position is unchanged.
-    assert_eq!(body.velocity, vec3(0., 0., 0.));
-    assert_eq!(body.position, point3(1., 0., 0.));
+    assert_eq!(body.velocity(), vec3(0., 0., 0.));
+    assert_eq!(body.position(), point3(1., 0., 0.));
 }
 
 #[test]
 fn velocity_limit() {
-    let mut body = Body {
-        position: point3(0., 0., 0.),
-        velocity: vec3(1e7, 0., 0.),
-        ..test_body()
-    };
+    let mut body = test_body();
+    body.set_position(point3(0., 0., 0.));
+    body.set_velocity(vec3(1e7, 0., 0.));
+
     body.step(Tick::from_seconds(2.0), None, collision_noop);
 
     // Velocity is capped and *then* applied to position
-    assert_eq!(body.velocity, vec3(VELOCITY_MAGNITUDE_LIMIT, 0., 0.));
-    assert_eq!(body.position, point3(2. * VELOCITY_MAGNITUDE_LIMIT, 0., 0.));
+    assert_eq!(body.velocity(), vec3(VELOCITY_MAGNITUDE_LIMIT, 0., 0.));
+    assert_eq!(
+        body.position(),
+        point3(2. * VELOCITY_MAGNITUDE_LIMIT, 0., 0.)
+    );
 }
 
 /// Takes the maximum length on all coordinate axes; all points forming a cube

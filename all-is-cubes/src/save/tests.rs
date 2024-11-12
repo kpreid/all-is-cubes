@@ -465,16 +465,19 @@ fn character() {
         json!({
             "type": "CharacterV1",
             "space": {"type": "HandleV1", "Specific": "a_space"},
-            "position": [2.5, 3.75, 26.0],
-            "velocity": [0.0, 0.0, 0.0],
-            "collision_box": {
-                "lower": [-0.35, -1.75, -0.35],
-                "upper": [0.35, 0.15, 0.35],
+            "body": {
+                "type": "BodyV1",
+                "position": [2.5, 3.75, 26.0],
+                "velocity": [0.0, 0.0, 0.0],
+                "collision_box": {
+                    "lower": [-0.35, -1.75, -0.35],
+                    "upper": [0.35, 0.15, 0.35],
+                },
+                "flying": false,
+                "noclip": false,
+                "yaw": 0.0,
+                "pitch": -0.0,
             },
-            "flying": false,
-            "noclip": false,
-            "yaw": 0.0,
-            "pitch": -0.0,
             "selected_slots": [0, 0, 10],
             "inventory": {
                 "type": "InventoryV1",
@@ -862,16 +865,19 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                 "value": {
                     "type": "CharacterV1",
                     "space": {"type": "HandleV1", "Specific": "a_space"},
-                    "position": [1.0, 1.75, 22.0],
-                    "velocity": [0.0, 0.0, 0.0],
-                    "collision_box": {
-                        "lower": [-0.35, -1.75, -0.35],
-                        "upper": [0.35, 0.15, 0.35],
+                    "body": {
+                        "type": "BodyV1",
+                        "position": [1.0, 1.75, 22.0],
+                        "velocity": [0.0, 0.0, 0.0],
+                        "collision_box": {
+                            "lower": [-0.35, -1.75, -0.35],
+                            "upper": [0.35, 0.15, 0.35],
+                        },
+                        "flying": false,
+                        "noclip": false,
+                        "yaw": 0.0,
+                        "pitch": -0.0,
                     },
-                    "flying": false,
-                    "noclip": false,
-                    "yaw": 0.0,
-                    "pitch": -0.0,
                     "selected_slots": [0, 0, 10],
                     "inventory": {
                         "type": "InventoryV1",

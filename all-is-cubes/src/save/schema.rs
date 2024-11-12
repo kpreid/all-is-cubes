@@ -292,13 +292,7 @@ pub(crate) enum PositioningZSer {
 pub(crate) enum CharacterSer<'a> {
     CharacterV1 {
         space: Handle<space::Space>,
-        position: [f64; 3],
-        velocity: [f64; 3],
-        collision_box: Aab,
-        flying: bool,
-        noclip: bool,
-        yaw: f64,
-        pitch: f64,
+        body: Cow<'a, crate::physics::Body>,
         inventory: Cow<'a, inv::Inventory>,
         selected_slots: [usize; 3],
         #[serde(default, skip_serializing_if = "behavior::BehaviorSet::is_empty")]
@@ -407,6 +401,23 @@ pub(crate) enum OperationSer<'a> {
     },
     NeighborsV1 {
         neighbors: Cow<'a, [([i32; 3], op::Operation)]>,
+    },
+}
+
+//------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `physics` module
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum BodySer {
+    BodyV1 {
+        position: [f64; 3],
+        velocity: [f64; 3],
+        collision_box: Aab,
+        flying: bool,
+        noclip: bool,
+        yaw: f64,
+        pitch: f64,
     },
 }
 

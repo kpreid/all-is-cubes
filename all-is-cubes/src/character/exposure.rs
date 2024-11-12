@@ -189,7 +189,7 @@ mod tests {
             space
         });
         let mut character = Character::spawn_default(space);
-        character.body.position = point3(5., 5., 5.);
+        character.body.set_position(point3(5., 5., 5.));
 
         // Let exposure sampling reach steady state
         for i in 0..100 {

@@ -31,10 +31,10 @@ fuzz_target!(|input: ([FreeCoordinate; 3], [FreeCoordinate; 3], Space)| {
     let mut universe = Universe::new();
     let space_handle = universe.insert_anonymous(space);
     let mut character = Character::spawn_default(space_handle);
-    character.body.position = position;
-    character.body.velocity = velocity;
+    character.body.set_position(position);
+    character.body.add_velocity(velocity);
     for i in 0..5000 {
-        if !interesting_bounds_aab.contains(character.body.position) {
+        if !interesting_bounds_aab.contains(character.body.position()) {
             // Flying out of bounds is not interesting.
             return;
         }
