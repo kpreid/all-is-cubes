@@ -71,7 +71,10 @@ where
 
         // TODO: Placeholder for more detailed graphics options updating
         graphics_options.listen(
-            TodoListener(Arc::downgrade(&todo)).filter(|&()| Some(SpaceChange::EveryBlock)),
+            // TODO: this filter should be coalescing instead of having a large buffer
+            TodoListener(Arc::downgrade(&todo))
+                .filter(|&()| Some(SpaceChange::EveryBlock))
+                .with_stack_buffer::<1000>(),
         );
 
         Self {

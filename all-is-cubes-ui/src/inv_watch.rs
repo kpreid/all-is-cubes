@@ -107,13 +107,16 @@ impl InventoryWatcher {
                     Ok(cg) => {
                         character_guard = cg;
                         if let Some(l) = listener_to_install {
-                            character_guard.listen(l.filter(|cc| match cc {
-                                // This match is useless now, but in the future there will probably
-                                // be CharacterChange messages we want to ignore.
-                                CharacterChange::Inventory(_) | CharacterChange::Selections => {
-                                    Some(WatcherChange::NeedsUpdate)
-                                }
-                            }));
+                            character_guard.listen(
+                                l.filter(|cc| match cc {
+                                    // This match is useless now, but in the future there will probably
+                                    // be CharacterChange messages we want to ignore.
+                                    CharacterChange::Inventory(_) | CharacterChange::Selections => {
+                                        Some(WatcherChange::NeedsUpdate)
+                                    }
+                                })
+                                .with_stack_buffer::<100>(),
+                            );
                         }
                         (
                             character_guard.inventory(),

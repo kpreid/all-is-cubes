@@ -965,6 +965,7 @@ impl SpaceWatchState {
                         // TODO: do not discard spatial information; and add source information
                         Some(sf.fluff.clone())
                     })
+                    .with_stack_buffer::<10>() // TODO: non-arbitrary number
                     .gate();
             space_read.fluff().listen(fluff_forwarder);
             Ok(Self {
