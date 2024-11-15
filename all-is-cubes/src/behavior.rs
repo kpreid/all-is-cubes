@@ -994,9 +994,19 @@ mod tests {
         u.step(false, time::DeadlineNt::Whenever);
         u.step(false, time::DeadlineNt::Whenever);
 
-        // Until we have a way to query the behavior set, the best test we can do is to
-        // read its effects.
-        assert_eq!(character.read().unwrap().body.yaw, 3.0);
+        let character = character.read().unwrap();
+        assert_eq!(
+            character
+                .behaviors
+                .query::<SelfModifyingBehavior>()
+                .map(|qi| qi.behavior)
+                .collect::<Vec<_>>(),
+            vec![&SelfModifyingBehavior {
+                foo: 3,
+                then: Then::Step,
+            }]
+        );
+        assert_eq!(character.body.yaw, 3.0);
     }
 
     #[test]
