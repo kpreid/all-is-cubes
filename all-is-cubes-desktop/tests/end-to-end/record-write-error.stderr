@@ -2,4 +2,5 @@
 Error: failed to configure session for recording
 
 Caused by:
-    [..]
+    0: failed to open recording output file “obstacle.png”
+    1: [..]

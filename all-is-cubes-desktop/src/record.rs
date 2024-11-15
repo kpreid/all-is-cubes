@@ -111,7 +111,12 @@ impl Recorder {
                 std::thread::Builder::new()
                     .name("image encoder".to_string())
                     .spawn({
-                        let file = File::create(&options.output_path)?;
+                        let file = File::create(&options.output_path).with_context(|| {
+                            format!(
+                                "failed to open recording output file “{}”",
+                                options.output_path.display()
+                            )
+                        })?;
                         let status_notifier = status_notifier.clone();
                         let options = options.clone();
                         move || {
