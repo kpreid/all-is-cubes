@@ -674,7 +674,8 @@ impl Body {
         }))
     }
 
-    pub(crate) fn look_direction(&self) -> FreeVector {
+    /// Returns the direction the body is facing (when it is part of a character).
+    pub fn look_direction(&self) -> FreeVector {
         self.look_rotation()
             .transform_vector3d(Vector3D::new(0., 0., -1.))
     }

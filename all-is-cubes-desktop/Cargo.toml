@@ -43,6 +43,7 @@ record = [
     "dep:all-is-cubes-mesh", # used in glTF recording
     "all-is-cubes-port/export",
     "all-is-cubes-port/all-formats",
+    "euclid/serde", # TODO: stop depending on euclid’s serde impls for record::Script
 ]
 # Importing non-native data formats.
 import = ["all-is-cubes-port/import", "all-is-cubes-port/all-formats"]
@@ -75,6 +76,7 @@ anyhow = { workspace = true }
 cfg-if = { workspace = true }
 clap = { workspace = true }
 directories-next = "2.0.0"
+euclid = { workspace = true, optional = true }
 futures-core = { workspace = true }
 gilrs = { workspace = true }
 hashbrown = { workspace = true }
@@ -104,6 +106,7 @@ yield-progress = { workspace = true, features = ["log_hiccups"] }
 
 [dev-dependencies]
 gltf = "1.4.0" # for round-trip test; must match version of gltf-json
+pretty_assertions = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 trycmd = { workspace = true }

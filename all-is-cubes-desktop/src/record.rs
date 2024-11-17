@@ -20,6 +20,8 @@ mod options;
 pub use options::*;
 mod rmain;
 pub(crate) use rmain::{configure_session_for_recording, configure_universe_for_recording};
+mod script;
+pub use script::Script;
 mod write_gltf;
 mod write_png;
 

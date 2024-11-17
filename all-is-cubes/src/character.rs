@@ -684,7 +684,7 @@ impl CharacterTransaction {
     }
 
     /// Modify the character's [`BehaviorSet`].
-    fn behaviors(t: BehaviorSetTransaction<Character>) -> Self {
+    pub fn behaviors(t: BehaviorSetTransaction<Character>) -> Self {
         Self {
             behaviors: t,
             ..Default::default()
