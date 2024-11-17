@@ -142,7 +142,7 @@ snapbox = "0.6.10" # keep in sync with `trycmd`
 strum = { version = "0.26.3", default-features = false, features = ["derive"] }
 sync_wrapper = { version = "1.0.0", default-features = false }
 tempfile = { version = "3.3.0", default-features = false }
-thiserror = { version = "1.0.65", default-features = false }
+thiserror = { version = "1.0.69", default-features = false }
 time = { version = "0.3.36", default-features = false }
 # Tokio is used for async test-running and for certain binaries.
 # The library crates do not require Tokio.
