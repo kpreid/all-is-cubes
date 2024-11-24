@@ -76,16 +76,20 @@ where
     /// Update the renderer's internal copy of the scene from the data sources
     /// (`Handle<Character>` etc.) it is tracking.
     ///
+    /// On success, returns whether any of the scene actually changed.
+    ///
     /// Returns [`RenderError::Read`] if said sources are in use.
     /// In that case, the renderer is still functional but will have stale data.
     ///
     /// This method is equivalent to [`HeadlessRenderer::update()`] except for
     /// fitting the raytracer's needs and capabilities (works with all types;
     /// not `async`).
-    pub fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
+    pub fn update(&mut self, cursor: Option<&Cursor>) -> Result<bool, RenderError> {
+        let mut anything_changed = false;
+
         // TODO: raytracer needs to implement drawing the cursor
         self.had_cursor = cursor.is_some();
-        self.cameras.update();
+        anything_changed |= self.cameras.update();
         self.custom_options_cache = self.custom_options.get();
 
         fn sync_space<D>(
@@ -93,6 +97,7 @@ where
             optional_space: Option<&Handle<Space>>,
             graphics_options_source: &ListenableSource<GraphicsOptions>,
             custom_options_source: &ListenableSource<D::Options>,
+            anything_changed: &mut bool,
         ) -> Result<(), RenderError>
         where
             D: RtBlockData<Options: Clone + Sync + 'static>,
@@ -105,18 +110,19 @@ where
                 (Some(space), Some(rt)) if space == rt.space() => {}
                 // Needs replacement
                 (Some(space), rt) => {
+                    *anything_changed = true;
                     *rt = Some(UpdatingSpaceRaytracer::new(
                         space.clone(),
                         graphics_options_source.clone(),
                         custom_options_source.clone(),
-                    ))
+                    ));
                 }
                 // Space is None, so drop raytracer if any
                 (None, c) => *c = None,
             }
             // Now that we have one if we should have one, update it.
             if let Some(rt) = cached_rt {
-                rt.update().map_err(RenderError::Read)?;
+                *anything_changed |= rt.update().map_err(RenderError::Read)?;
             }
             Ok(())
         }
@@ -126,15 +132,17 @@ where
             Option::as_ref(&self.cameras.world_space().get()),
             &gs,
             &self.custom_options,
+            &mut anything_changed,
         )?;
         sync_space(
             &mut self.rts.ui,
             self.cameras.ui_space(),
             &gs,
             &self.custom_options,
+            &mut anything_changed,
         )?;
 
-        Ok(())
+        Ok(anything_changed)
     }
 
     /// Produce an image of the current state of the scene this renderer was created to
@@ -298,7 +306,10 @@ impl HeadlessRenderer for RtRenderer<()> {
         &'a mut self,
         cursor: Option<&'a Cursor>,
     ) -> futures_core::future::BoxFuture<'a, Result<(), RenderError>> {
-        Box::pin(async move { self.update(cursor) })
+        Box::pin(async move {
+            let _anything_changed = self.update(cursor)?;
+            Ok(())
+        })
     }
 
     fn draw<'a>(

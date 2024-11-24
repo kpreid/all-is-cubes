@@ -104,8 +104,10 @@ where
 
     /// Reads the previously provided [`Space`] and updates the local copy of its contents.
     ///
-    /// Returns an error if reading fails.
-    pub fn update(&mut self) -> Result<(), HandleError> {
+    /// On success, returns whether any of the scene actually changed.
+    ///
+    /// Returns an error if reading the [`Space`] fails.
+    pub fn update(&mut self) -> Result<bool, HandleError> {
         // Deadlock safety note:
         // If the space is being updated, that will acquire the space's lock and then our
         // todo's lock for notifications. Therefore, to avoid deadlock we would need to
@@ -117,7 +119,7 @@ where
         let todo: &mut SrtTodo = &mut self.todo.lock().unwrap();
         if todo.is_empty() {
             // Nothing to do
-            return Ok(());
+            return Ok(false);
         }
         let space = self.space.read()?;
 
@@ -133,7 +135,12 @@ where
             );
             todo.blocks.clear();
             todo.cubes.clear();
+
+            Ok(true)
         } else {
+            let mut anything_changed = false;
+
+            // TODO: need to listen to the options sources for accurate change detection
             let graphics_options = &*self.graphics_options.get();
             let custom_options = &*self.custom_options.get();
             let options = RtOptionsRef {
@@ -143,6 +150,7 @@ where
 
             let block_data_slice = space.block_data();
             if block_data_slice.len() > self.state.blocks.len() {
+                anything_changed = true;
                 for block_data in block_data_slice[self.state.blocks.len()..].iter() {
                     self.state
                         .blocks
@@ -150,13 +158,14 @@ where
                 }
             }
             for block_index in todo.blocks.drain() {
-                // TODO: handle extending the vector
+                anything_changed = true;
                 let block_index = usize::from(block_index);
                 self.state.blocks[block_index] =
                     TracingBlock::from_block(options, &block_data_slice[block_index]);
             }
 
             for cube in todo.cubes.drain() {
+                anything_changed = true;
                 // TODO: this does 2 cube index calculations instead of the 1 it needs
                 let block_index = space.get_block_index(cube).unwrap_or(0);
                 self.state.cubes[cube] = TracingCubeData {
@@ -165,9 +174,9 @@ where
                     always_invisible: block_data_slice[block_index as usize].block() == &AIR,
                 };
             }
-        }
 
-        Ok(())
+            Ok(anything_changed)
+        }
     }
 }
 
@@ -285,9 +294,9 @@ mod tests {
             }
         }
 
-        fn update_and_assert(&mut self) -> Result<(), HandleError> {
+        fn update_and_assert(&mut self) -> Result<bool, HandleError> {
             self.camera.set_options(self.graphics_options.snapshot());
-            self.updating.update()?;
+            let changed = self.updating.update()?;
             let image_updating = self
                 .updating
                 .get()
@@ -304,7 +313,7 @@ mod tests {
 
             assert_eq!(image_updating.refmt(&Unquote), image_fresh.refmt(&Unquote));
             print!("{image_updating}");
-            Ok(())
+            Ok(changed)
         }
     }
 
