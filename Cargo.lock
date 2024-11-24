@@ -3166,7 +3166,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e310b3a6b5907f99202fcdb4960ff45b93735d7c7d96b760fcff8db2dc0e103d"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -5003,7 +5003,7 @@ dependencies = [
  "syn 2.0.87",
  "tempfile",
  "unindent",
- "xshell 0.2.6",
+ "xshell",
 ]
 
 [[package]]
@@ -7253,33 +7253,18 @@ checksum = "791978798f0597cfc70478424c2b4fdc2b7a8024aaff78497ef00f24ef674193"
 
 [[package]]
 name = "xshell"
-version = "0.1.17"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eaad2035244c56da05573d4d7fda5f903c60a5f35b9110e157a14a1df45a9f14"
+checksum = "9e7290c623014758632efe00737145b6867b66292c42167f2ec381eb566a373d"
 dependencies = [
- "xshell-macros 0.1.17",
-]
-
-[[package]]
-name = "xshell"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db0ab86eae739efd1b054a8d3d16041914030ac4e01cd1dca0cf252fd8b6437"
-dependencies = [
- "xshell-macros 0.2.6",
+ "xshell-macros",
 ]
 
 [[package]]
 name = "xshell-macros"
-version = "0.1.17"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4916a4a3cad759e499a3620523bf9545cc162d7a06163727dde97ce9aaa4cf39"
-
-[[package]]
-name = "xshell-macros"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d422e8e38ec76e2f06ee439ccc765e9c6a9638b9e7c9f2e8255e4d41e8bd852"
+checksum = "32ac00cd3f8ec9c1d33fb3e7958a82df6989c42d747bd326c822b1d625283547"
 
 [[package]]
 name = "xtask"
@@ -7291,7 +7276,7 @@ dependencies = [
  "strum",
  "toml_edit 0.22.14",
  "walkdir",
- "xshell 0.1.17",
+ "xshell",
 ]
 
 [[package]]

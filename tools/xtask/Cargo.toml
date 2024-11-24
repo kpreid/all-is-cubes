@@ -20,7 +20,7 @@ clap = { workspace = true }
 strum = { workspace = true }
 toml_edit = { version = "0.22.13" }
 walkdir = "2.3.2"
-xshell = "0.1.17"
+xshell = "0.2.7"
 
 [lints]
 workspace = true
