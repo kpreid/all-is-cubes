@@ -1,4 +1,4 @@
-use all_is_cubes::math::NotNan;
+use all_is_cubes::math::{zo64, PositiveSign, ZeroOne};
 use all_is_cubes::time::{Duration, Instant, TickSchedule};
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;
@@ -142,7 +142,7 @@ impl<I: Instant> FrameClock<I> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
 pub struct FpsCounter<I> {
-    average_frame_time_seconds: Option<NotNan<f64>>,
+    average_frame_time_seconds: Option<PositiveSign<f64>>,
     last_frame: Option<I>,
 }
 
@@ -179,12 +179,12 @@ impl<I: Instant> FpsCounter<I> {
                     None
                 }
             })
-            .and_then(|duration| NotNan::new(duration.as_secs_f64()).ok());
+            .and_then(|duration| PositiveSign::try_from(duration.as_secs_f64()).ok());
         if let Some(this_seconds) = this_seconds {
             self.average_frame_time_seconds = Some(
                 if let Some(previous) = self.average_frame_time_seconds.filter(|v| v.is_finite()) {
-                    let mix = 2.0f64.powi(-3);
-                    this_seconds * mix + previous * (1. - mix)
+                    const MIX: ZeroOne<f64> = zo64(1.0 / 8.0);
+                    this_seconds * MIX + previous * MIX.complement()
                 } else {
                     // recover from any weirdness or initial state
                     this_seconds

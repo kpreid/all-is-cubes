@@ -59,6 +59,17 @@ impl<T: FloatCore> PositiveSign<T> {
         unsafe { NotNan::new_unchecked(self.0) }
     }
 
+    /// Returns whether the value is finite.
+    ///
+    /// Since the value is statically guaranteed to be neither NaN nor negative,
+    /// the only case where this returns `false` is when the value is positive infinity.
+    #[inline]
+    pub fn is_finite(&self) -> bool {
+        // We could delegate to FloatCore::is_finite() but that would perform an unnecessary
+        // NaN check.
+        self.0 != T::infinity()
+    }
+
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn consistency_check(self)
