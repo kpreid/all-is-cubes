@@ -132,8 +132,9 @@ impl RaytraceToTexture {
 
 impl Inner {
     fn update_inputs(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
-        self.rtr.update(cursor)?;
-        self.dirty();
+        if self.rtr.update(cursor)? {
+            self.dirty();
+        }
         Ok(())
     }
 
