@@ -138,6 +138,10 @@ impl Inner {
     }
 
     fn set_viewport(&mut self, device: &wgpu::Device, render_viewport: Viewport) {
+        if self.render_viewport == render_viewport {
+            // don't reset/dirty anything
+            return;
+        }
         self.render_viewport = render_viewport;
         self.render_target.resize(
             device,
