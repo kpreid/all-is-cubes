@@ -26,6 +26,14 @@ use ordered_float::NotNan;
 /// The permitted values of a `PositiveSign<T>` are a subset of those of a `NotNan<T>`.
 /// (This may not be guaranteed if `T` implements numeric traits in inconsistent ways,
 /// but may be assumed for `f32` and `f64`.)
+///
+/// The arithmetic behavior of `PositiveSign<T>` is *not* identical to `T`.
+/// Specifically, the value of `0. * fXX::INFINITY` is NaN, but the value of
+/// `PositiveSign(0.) * PositiveSign(fXX::INFINITY)` is `PositiveSign(0.)` instead.
+/// Our assumption here is that for the applications where `PositiveSign` is suitable, infinities
+/// are either impossible or arise as “would be finite but it is too large to be represented”,
+/// and do not arise as the reciprocal of zero, and thus we can treat “zero times anything
+/// is zero” as being a more important property than “infinity times anything is infinity”.
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub struct PositiveSign<T>(T);
 
@@ -470,14 +478,22 @@ impl<T: FloatCore + ops::Add<Output = T>> ops::Add for PositiveSign<T> {
         Self(self.0 + rhs.0)
     }
 }
+
 impl<T: FloatCore + ops::Mul<Output = T>> ops::Mul for PositiveSign<T> {
     type Output = Self;
+
+    /// This multiplication operation differs from standard floating-point multiplication
+    /// in that multiplying zero by positive infinity returns zero instead of NaN.
+    /// This is necessary for the type to be closed under multiplication.
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
-        // Construction safety:
-        // If the nonnegative subset of T isn't closed under multiplication, the number type is
-        // too weird to be useful, and probably doesn’t honestly implement `FloatCore` either.
-        Self(self.0 * rhs.0)
+        let value = self.0 * rhs.0;
+        if value.is_nan() {
+            Self(T::zero())
+        } else {
+            debug_assert!(value.is_sign_positive());
+            Self(value)
+        }
     }
 }
 impl<T: FloatCore + ops::Mul<Output = T>> ops::Mul for ZeroOne<T> {
@@ -485,9 +501,14 @@ impl<T: FloatCore + ops::Mul<Output = T>> ops::Mul for ZeroOne<T> {
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
         // Construction safety:
+        //
         // If the in-range subset of T isn't closed under multiplication, the number type is
         // too weird to be useful, and probably doesn’t honestly implement `FloatCore` either.
-        Self(self.0 * rhs.0)
+        //
+        // In particular, unlike for `PositiveSign`, NaN cannot result because Infinity is out
+        // of range for the arguments.
+        let value = self.0 * rhs.0;
+        Self(value)
     }
 }
 
@@ -749,6 +770,11 @@ mod tests {
                 Err(_) => assert!(f.is_nan() || f < 0.0),
             }
         }
+    }
+
+    #[test]
+    fn ps_closed_under_multiplication() {
+        assert_eq!(ps32(0.0) * ps32(f32::INFINITY), ps32(0.0));
     }
 
     #[test]

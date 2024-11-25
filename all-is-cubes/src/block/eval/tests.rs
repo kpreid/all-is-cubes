@@ -587,11 +587,24 @@ fn indirect_has_derived_value_cache_internally() {
 /// Fuzz-discovered test case for panic during evaluation,
 /// in `raytracer::apply_transmittance`.
 #[test]
-fn color_evaluation_regression() {
+fn color_evaluation_regression_1() {
     let block = Block::builder()
         .color(Rgba::new(1e28, 1e28, 1e28, 1.0))
         // Modifier matters because it causes the block to become voxels
         .modifier(Modifier::Move(modifier::Move::new(Face6::NX, 0, 0)))
         .build();
     block.evaluate().unwrap();
+}
+
+/// Fuzz-discovered test case for a NaN sneaking in to a color.
+#[test]
+fn color_evaluation_regression_2() {
+    let block = AIR.with_modifier(block::Composite::new(
+        Block::builder()
+            .color(Rgba::new(0.0, 0.0, 9.1835e-41, 0.0))
+            .light_emission(Rgb::new(f32::INFINITY, 1.5783e-41, 0.0))
+            .build(),
+        block::CompositeOperator::Over,
+    ));
+    block.evaluate().unwrap().consistency_check();
 }
