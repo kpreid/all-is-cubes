@@ -606,3 +606,166 @@ impl core::hash::Hash for EvKey {
         voxels.cheap_or_ptr_hash(state);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::block::eval::Derived;
+    use crate::math::{Cube, Vol};
+    use crate::universe::Universe;
+    use indoc::indoc;
+
+    #[test]
+    fn evaluated_block_debug_simple() {
+        let ev = color_block!(Rgba::WHITE).evaluate().unwrap();
+
+        // not testing the one-line version because it'll be not too surprising
+        assert_eq!(
+            format!("{ev:#?}\n"),
+            indoc! {"
+                EvaluatedBlock {
+                    block: Block {
+                        primitive: Atom {
+                            color: Rgba(1.0, 1.0, 1.0, 1.0),
+                            collision: Hard,
+                        },
+                    },
+                    color: Rgba(1.0, 1.0, 1.0, 1.0),
+                    opaque: {all: true},
+                    visible: true,
+                    uniform_collision: Some(Hard),
+                    resolution: 1,
+                    voxel: Evoxel {
+                        color: Rgba(1.0, 1.0, 1.0, 1.0),
+                        emission: Rgb(0.0, 0.0, 0.0),
+                        selectable: true,
+                        collision: Hard,
+                    },
+                    voxel_opacity_mask: VoxelOpacityMask {
+                        resolution: 1,
+                        bounds: GridAab(0..1, 0..1, 0..1),
+                        opacity: Opaque,
+                    },
+                    cost: Cost {
+                        components: 1,
+                        voxels: 0,
+                        recursion: 0,
+                    },
+                }
+            "}
+        );
+    }
+
+    #[test]
+    fn evaluated_block_debug_complex() {
+        let mut universe = Universe::new();
+        let voxel = Block::builder()
+            .color(Rgba::WHITE)
+            .light_emission(Rgb::new(1.0, 2.0, 3.0))
+            .build();
+        let ev = Block::builder()
+            .display_name("hello")
+            .voxels_fn(Resolution::R2, |p| {
+                if p == Cube::new(1, 1, 1) {
+                    &block::AIR
+                } else {
+                    &voxel
+                }
+            })
+            .unwrap()
+            .build_into(&mut universe)
+            .evaluate()
+            .unwrap();
+
+        assert_eq!(
+            format!("{ev:#?}\n"),
+            indoc! {r#"
+                EvaluatedBlock {
+                    block: Block {
+                        primitive: Recur {
+                            space: Handle([anonymous #0]),
+                            offset: (
+                                0,
+                                0,
+                                0,
+                            ),
+                            resolution: 2,
+                        },
+                        modifiers: [
+                            BlockAttributes {
+                                display_name: "hello",
+                            },
+                        ],
+                    },
+                    attributes: BlockAttributes {
+                        display_name: "hello",
+                    },
+                    color: Rgba(1.0, 1.0, 1.0, 1.0),
+                    light_emission: Rgb(1.0, 2.0, 3.0),
+                    opaque: {−all: true, +all: false},
+                    visible: true,
+                    uniform_collision: None,
+                    resolution: 2,
+                    voxels: GridAab(0..2, 0..2, 0..2),
+                    voxel_opacity_mask: VoxelOpacityMask {
+                        resolution: 2,
+                        bounds: GridAab(0..2, 0..2, 0..2),
+                        ..
+                    },
+                    cost: Cost {
+                        components: 2,
+                        voxels: 8,
+                        recursion: 0,
+                    },
+                }
+            "#}
+        );
+    }
+
+    #[test]
+    fn from_voxels_with_zero_bounds() {
+        let attributes = BlockAttributes::default();
+        let resolution = Resolution::R4;
+        let bounds = GridAab::from_lower_size([1, 2, 3], [0, 0, 0]);
+        let voxels = Evoxels::from_many(resolution, Vol::from_fn(bounds, |_| unreachable!()));
+        assert_eq!(
+            EvaluatedBlock::from_voxels(
+                block::AIR, // caution: incorrect placeholder value
+                attributes.clone(),
+                voxels.clone(),
+                Cost::ZERO
+            ),
+            EvaluatedBlock {
+                block: block::AIR, // caution: incorrect placeholder value
+                cost: Cost::ZERO,  // TODO wrong
+                attributes,
+                derived: Derived {
+                    color: Rgba::TRANSPARENT,
+                    face_colors: FaceMap::splat(Rgba::TRANSPARENT),
+                    light_emission: Rgb::ZERO,
+                    opaque: FaceMap::splat(false),
+                    visible: false,
+                    uniform_collision: Some(BlockCollision::None),
+                    voxel_opacity_mask: VoxelOpacityMask::new(resolution, voxels.as_vol_ref()),
+                },
+                voxels,
+            }
+        );
+    }
+
+    #[test]
+    fn opacity_as_category() {
+        for color in [
+            Rgba::BLACK,
+            Rgba::WHITE,
+            Rgba::TRANSPARENT,
+            Rgba::new(0.0, 0.5, 1.0, 0.5),
+        ] {
+            assert_eq!(
+                Block::from(color).evaluate().unwrap().opacity_as_category(),
+                color.opacity_category(),
+                "Input color {color:?}"
+            );
+        }
+    }
+}
