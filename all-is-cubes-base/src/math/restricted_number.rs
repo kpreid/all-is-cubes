@@ -1,8 +1,3 @@
-#![allow(
-    clippy::eq_op,
-    reason = "necessary for const is_nan() tests; remove after Rust 1.83"
-)]
-
 use core::fmt;
 use core::hash;
 use core::ops;
