@@ -79,7 +79,7 @@ pub fn install(
     let (rerun_destination_general, rerun_destination_logging) = if !kinds.is_empty() {
         let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
             .default_enabled(true)
-            .connect()
+            .connect_tcp()
             .unwrap();
         let destination = rg::Destination {
             stream,

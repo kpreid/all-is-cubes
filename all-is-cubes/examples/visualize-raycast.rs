@@ -15,7 +15,7 @@ fn main() {
     let destination = rg::Destination {
         stream: rg::RecordingStreamBuilder::new("all-is-cubes/visualize-raycast")
             .default_enabled(true)
-            .connect()
+            .connect_tcp()
             .unwrap(),
         path: rg::entity_path![],
     };
