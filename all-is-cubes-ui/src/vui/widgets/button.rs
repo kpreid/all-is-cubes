@@ -307,14 +307,20 @@ pub struct ToggleButton<D> {
 
 impl<D: Clone + Sync + fmt::Debug> fmt::Debug for ToggleButton<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            common,
+            data_source,
+            projection,
+            action,
+        } = self;
         f.debug_struct("ToggleButton")
-            .field("common", &self.common)
-            .field("data_source", &self.data_source)
+            .field("common", common)
+            .field("data_source", data_source)
             .field(
                 "projection(data_source)",
-                &(self.projection)(&self.data_source.snapshot()),
+                &projection(&data_source.snapshot()),
             )
-            .field("action", &self.action)
+            .field("action", action)
             .finish()
     }
 }

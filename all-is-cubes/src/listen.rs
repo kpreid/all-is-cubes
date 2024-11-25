@@ -434,6 +434,6 @@ mod tests {
         let sink: Sink<&str> = Sink::new();
         let listener: DynListener<&str> = Arc::new(sink.listener());
 
-        assert_eq!(format!("{listener:?}"), "SinkListener { alive: true }");
+        assert_eq!(format!("{listener:?}"), "SinkListener { alive: true, .. }");
     }
 }

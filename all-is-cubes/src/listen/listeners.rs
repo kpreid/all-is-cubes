@@ -132,7 +132,7 @@ impl<M> fmt::Debug for SinkListener<M> {
         f.debug_struct("SinkListener")
             // not useful to print weak_messages unless we were to upgrade and lock it
             .field("alive", &(self.weak_messages.strong_count() > 0))
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

@@ -295,7 +295,7 @@ where
             .field("rts", rts)
             .field("custom_options", custom_options)
             .field("had_cursor", had_cursor)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -348,10 +348,15 @@ where
     <P::BlockData as RtBlockData>::Options: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            rts,
+            cameras,
+            options,
+        } = self;
         f.debug_struct("RtScene")
-            .field("rts", &self.rts)
-            .field("cameras", &self.cameras)
-            .field("options", &self.options)
+            .field("rts", rts)
+            .field("cameras", cameras)
+            .field("options", options)
             .finish()
     }
 }

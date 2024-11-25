@@ -35,7 +35,8 @@ fn universe_debug_empty() {
             clock: Clock(0/60 of 1s), \
             behaviors: BehaviorSet({}), \
             session_step_time: 0, \
-            spaces_with_work: 0 \
+            spaces_with_work: 0, \
+            .. \
         }"
     );
     assert_eq!(
@@ -46,6 +47,7 @@ fn universe_debug_empty() {
                 behaviors: BehaviorSet({}),
                 session_step_time: 0,
                 spaces_with_work: 0,
+                ..
             }\
         "}
     );
@@ -66,7 +68,8 @@ fn universe_debug_elements() {
             session_step_time: 0, \
             spaces_with_work: 0, \
             [anonymous #0]: all_is_cubes::block::block_def::BlockDef, \
-            'foo': all_is_cubes::space::Space \
+            'foo': all_is_cubes::space::Space, \
+            .. \
         }"
     );
     assert_eq!(
@@ -79,6 +82,7 @@ fn universe_debug_elements() {
                 spaces_with_work: 0,
                 [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
                 'foo': all_is_cubes::space::Space,
+                ..
             }\
         "}
     );

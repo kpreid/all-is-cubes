@@ -751,7 +751,7 @@ impl fmt::Debug for Universe {
         ds.field("session_step_time", &session_step_time);
         ds.field("spaces_with_work", &spaces_with_work);
         tables.fmt_members(&mut ds);
-        ds.finish()
+        ds.finish_non_exhaustive()
     }
 }
 

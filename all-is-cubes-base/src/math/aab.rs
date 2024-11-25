@@ -342,7 +342,6 @@ impl fmt::Debug for Aab {
         let Aab {
             lower_bounds: l,
             upper_bounds: u,
-            ..
         } = *self;
         f.debug_tuple("Aab")
             .field(&(l.x..=u.x))
