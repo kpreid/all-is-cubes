@@ -175,7 +175,6 @@ impl LightStorage {
     }
 
     /// Do some lighting updates.
-    #[doc(hidden)] // TODO: eliminate calls outside the crate
     pub(in crate::space) fn update_lighting_from_queue<I: Instant>(
         &mut self,
         uc: UpdateCtx<'_>,
