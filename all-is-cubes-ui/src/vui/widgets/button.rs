@@ -63,8 +63,11 @@ impl ButtonLabel {
     /// Always has as many elements as `requirements().minimum`.
     fn blocks(&self, mut gravity: vui::Gravity) -> impl Iterator<Item = Block> + '_ {
         // TODO: need a better plan for how gravity interacts with icons;
-        // this is a kludge to get okay layout of the text for now
-        gravity.x = vui::Align::Low;
+        // this is a kludge to get okay layout of the text for now, by left-aligning the
+        // text to meet the icon.
+        if self.icon.is_some() {
+            gravity.x = vui::Align::Low;
+        }
 
         self.icon
             .clone()
