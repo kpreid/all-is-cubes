@@ -1,3 +1,4 @@
+use all_is_cubes::block::text;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -36,47 +37,45 @@ pub(crate) fn graphics_options_widgets(
             },
         )));
     }
-    // TODO: Improve labeled button layout and enable these
-    if false {
-        w.extend([
-            graphics_enum_button(
-                hud_inputs,
-                style,
-                |g| &g.fog,
-                |g, v| g.fog = v,
-                // TODO: put these lists somewhere that is not individual UI code
-                [
-                    camera::FogOption::None,
-                    camera::FogOption::Abrupt,
-                    camera::FogOption::Compromise,
-                    camera::FogOption::Physical,
-                ],
-            ),
-            graphics_enum_button(
-                hud_inputs,
-                style,
-                |g| &g.lighting_display,
-                |g, v| g.lighting_display = v,
-                [
-                    camera::LightingOption::None,
-                    camera::LightingOption::Flat,
-                    camera::LightingOption::Smooth,
-                ],
-            ),
-            graphics_enum_button(
-                hud_inputs,
-                style,
-                |g| &g.transparency,
-                |g, v| g.transparency = v,
-                [
-                    camera::TransparencyOption::Surface,
-                    camera::TransparencyOption::Volumetric,
-                    camera::TransparencyOption::Threshold(zo32(0.5)),
-                ],
-            ),
-        ]);
-    }
     w.extend([
+        graphics_enum_button(
+            hud_inputs,
+            style,
+            literal!("Fog"),
+            |g| &g.fog,
+            |g, v| g.fog = v,
+            // TODO: put these lists somewhere that is not individual UI code
+            [
+                camera::FogOption::None,
+                camera::FogOption::Abrupt,
+                camera::FogOption::Compromise,
+                camera::FogOption::Physical,
+            ],
+        ),
+        graphics_enum_button(
+            hud_inputs,
+            style,
+            literal!("Light"),
+            |g| &g.lighting_display,
+            |g, v| g.lighting_display = v,
+            [
+                camera::LightingOption::None,
+                camera::LightingOption::Flat,
+                camera::LightingOption::Smooth,
+            ],
+        ),
+        graphics_enum_button(
+            hud_inputs,
+            style,
+            literal!("Transparency"),
+            |g| &g.transparency,
+            |g, v| g.transparency = v,
+            [
+                camera::TransparencyOption::Surface,
+                camera::TransparencyOption::Volumetric,
+                camera::TransparencyOption::Threshold(zo32(0.5)),
+            ],
+        ),
         // TODO: this needs to be an enum button set for the multiple states, in principle. But
         // for now, while we aren't actually saving the options, there's no reason to select
         // IfCheap.
@@ -186,17 +185,27 @@ fn graphics_toggle_button(
 fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static>(
     hud_inputs: &HudInputs,
     style: OptionsStyle,
+    label: arcstr::ArcStr,
     getter: fn(&GraphicsOptions) -> &T,
     setter: fn(&mut GraphicsOptions, T),
     list: impl IntoIterator<Item = T>,
 ) -> WidgetTree {
+    let label = vui::leaf_widget(widgets::Label::with_font(
+        label,
+        text::Font::System16,
+        text::Positioning {
+            x: text::PositioningX::Right,
+            line_y: text::PositioningY::BodyMiddle,
+            z: text::PositioningZ::Back,
+        },
+    ));
     match style {
         OptionsStyle::CompactRow => LayoutTree::spacer(vui::LayoutRequest::EMPTY),
         OptionsStyle::LabeledColumn => Arc::new(LayoutTree::Stack {
             direction: Face6::PX,
-            children: list
+            children: [label]
                 .into_iter()
-                .map(|value| {
+                .chain(list.into_iter().map(|value| {
                     let value2 = value.clone();
                     let button = widgets::ToggleButton::new(
                         hud_inputs.graphics_options.clone(),
@@ -219,7 +228,7 @@ fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'stati
                         },
                     );
                     vui::leaf_widget(button)
-                })
+                }))
                 .collect(),
         }),
     }
