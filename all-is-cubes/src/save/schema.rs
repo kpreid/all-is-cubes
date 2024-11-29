@@ -15,6 +15,11 @@
 //!   (and not, say, as structures with named fields).
 //! * [`Cow`] is sometimes used to avoid unnecessary clones during serialization.
 
+#![allow(
+    unexpected_cfgs,
+    reason = "https://github.com/Lokathor/bytemuck/issues/286"
+)]
+
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
