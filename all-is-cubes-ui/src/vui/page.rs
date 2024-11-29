@@ -122,7 +122,13 @@ impl Page {
     }
 
     /// Wrap the given widget tree in a dialog box and a transparent screen-filling background.
-    pub fn new_modal_dialog(theme: &widgets::WidgetTheme, contents: WidgetTree) -> Self {
+    pub fn new_modal_dialog(
+        theme: &widgets::WidgetTheme,
+        title: ArcStr,
+        corner_button: Option<WidgetTree>,
+        contents: WidgetTree,
+    ) -> Self {
+        let title_widget = vui::leaf_widget(widgets::Label::new(title));
         let tree = Arc::new(LayoutTree::Stack {
             direction: Face6::PZ,
             children: vec![
@@ -138,7 +144,24 @@ impl Page {
                 })),
                 vui::leaf_widget(widgets::Frame::with_block(color_block!(0., 0., 0., 0.7))),
                 Arc::new(LayoutTree::Shrink(
-                    theme.dialog_background().as_background_of(contents),
+                    theme
+                        .dialog_background()
+                        .as_background_of(Arc::new(LayoutTree::Stack {
+                            direction: Face6::NY,
+                            children: vec![
+                                Arc::new(LayoutTree::Stack {
+                                    direction: Face6::PX,
+                                    children: if let Some(corner_button) = corner_button {
+                                        // TODO: arrange so that title text is centered if possible
+                                        // (need a new LayoutTree variant or to generalize Stack, but it might help with our HUD too)
+                                        vec![corner_button, title_widget]
+                                    } else {
+                                        vec![title_widget]
+                                    },
+                                }),
+                                contents,
+                            ],
+                        })),
                 )),
             ],
         });

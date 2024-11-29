@@ -22,12 +22,11 @@ pub(super) fn new_paused_page(
     u: &mut Universe,
     hud_inputs: &HudInputs,
 ) -> Result<vui::Page, InstallVuiError> {
-    use parts::{heading, shrink};
+    use parts::shrink;
 
     let mut children = vec![
         // TODO: establish standard resolutions for logo etc
         vui::leaf_widget(shrink(u, R16, &vui::leaf_widget(logo_text()))?),
-        heading("Paused"),
         vui::leaf_widget(open_page_button(
             hud_inputs,
             VuiPageState::AboutText,
@@ -66,6 +65,11 @@ pub(super) fn new_paused_page(
     });
     Ok(vui::Page::new_modal_dialog(
         &hud_inputs.hud_blocks.widget_theme,
+        literal!("Paused"),
+        Some(vui::leaf_widget(pause_toggle_button(
+            hud_inputs,
+            OptionsStyle::CompactRow,
+        ))),
         contents,
     ))
 }
@@ -86,36 +90,28 @@ pub(super) fn new_progress_page(
         )),
     ];
 
-    // TODO: should have at least a title giving context
+    // TODO: should have a title sourced from the notification data
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children,
     });
-    vui::Page::new_modal_dialog(theme, contents)
+    vui::Page::new_modal_dialog(theme, literal!("Progress"), None, contents)
 }
 
-pub(super) fn new_options_widget_tree(
-    u: &mut Universe,
-    hud_inputs: &HudInputs,
-) -> Result<vui::Page, InstallVuiError> {
-    use parts::{heading, shrink};
-
+pub(super) fn new_options_widget_tree(hud_inputs: &HudInputs) -> vui::Page {
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
-        children: vec![
-            vui::leaf_widget(shrink(u, R32, &vui::leaf_widget(logo_text()))?),
-            heading("Options"),
-            back_button(hud_inputs),
-            Arc::new(LayoutTree::Stack {
-                direction: Face6::NY,
-                children: graphics_options_widgets(hud_inputs, OptionsStyle::LabeledColumn),
-            }),
-        ],
+        children: vec![Arc::new(LayoutTree::Stack {
+            direction: Face6::NY,
+            children: graphics_options_widgets(hud_inputs, OptionsStyle::LabeledColumn),
+        })],
     });
-    Ok(vui::Page::new_modal_dialog(
+    vui::Page::new_modal_dialog(
         &hud_inputs.hud_blocks.widget_theme,
+        literal!("Options"),
+        Some(back_button(hud_inputs)),
         contents,
-    ))
+    )
 }
 
 /// TODO: The content of the about page should be customizable in the final build or
@@ -152,7 +148,6 @@ pub(super) fn new_about_page(
         direction: Face6::NY,
         children: vec![
             vui::leaf_widget(shrink(u, R8, &vui::leaf_widget(logo_text()))?),
-            back_button(hud_inputs),
             heading("Controls"),
             paragraph(controls_text),
             heading("About"),
@@ -164,6 +159,8 @@ pub(super) fn new_about_page(
 
     Ok(vui::Page::new_modal_dialog(
         &hud_inputs.hud_blocks.widget_theme,
+        literal!("About All is Cubes"),
+        Some(back_button(hud_inputs)),
         contents,
     ))
 }
@@ -172,12 +169,12 @@ pub(super) fn new_about_page(
 pub(super) fn new_message_page(message: ArcStr, hud_inputs: &HudInputs) -> vui::Page {
     use parts::paragraph;
 
-    let contents = Arc::new(LayoutTree::Stack {
-        direction: Face6::NY,
-        children: vec![paragraph(message), back_button(hud_inputs)],
-    });
-
-    vui::Page::new_modal_dialog(&hud_inputs.hud_blocks.widget_theme, contents)
+    vui::Page::new_modal_dialog(
+        &hud_inputs.hud_blocks.widget_theme,
+        literal!(""), // TODO:
+        Some(back_button(hud_inputs)),
+        paragraph(message),
+    )
 }
 
 /// Make a button that sends [`VuiMessage::Open`].

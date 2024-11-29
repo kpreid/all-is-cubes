@@ -25,7 +25,6 @@ pub fn inspect_block_at_cursor(
     let contents = Arc::new(vui::LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
-            back_button(inputs),
             vui::leaf_widget(hit.block.clone().with_modifier(block::Quote::new())),
             Arc::new(vui::LayoutTree::Stack {
                 direction: Face6::PX,
@@ -43,7 +42,12 @@ pub fn inspect_block_at_cursor(
         ],
     });
 
-    vui::Page::new_modal_dialog(&inputs.hud_blocks.widget_theme, contents)
+    vui::Page::new_modal_dialog(
+        &inputs.hud_blocks.widget_theme,
+        literal!("Inspect Block"),
+        Some(back_button(inputs)),
+        contents,
+    )
 }
 
 fn inspect_block_definition(block: &Block) -> vui::WidgetTree {
