@@ -231,7 +231,12 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
         context.universe(),
     );
 
-    context.render_comparison_test(0, cameras, Overlays::NONE).await;
+    // Note: the specific threshold of 15 pixels will ensure that if any color tile (of 16 pixels)
+    // is completely incorrect, the test still fails. This threshold is intended to allow minor
+    // geometrical errors in the glTF rendering mode.
+    context
+        .render_comparison_test(Threshold::new([(2, 15)]), cameras, Overlays::NONE)
+        .await;
 }
 
 /// Test rendering of the cursor.

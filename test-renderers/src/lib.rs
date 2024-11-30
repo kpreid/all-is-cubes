@@ -234,7 +234,7 @@ pub fn compare_rendered_image(
             actual_rendering.size.height,
             actual_rendering.data.as_flattened(),
         )
-        .unwrap();
+        .expect("rendering contains incorrect data size");
 
         actual_to_save
             .save(&actual_file_path)

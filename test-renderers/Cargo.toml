@@ -21,6 +21,14 @@ doctest = false
 bench = false
 
 [[test]]
+# Note: This test has its dependencies disabled and thus doesn’t compile.
+# It has its dependencies disabled because it was written for Bevy 0.16.0 and we don’t want both
+# newer and older Bevy crates to end up in the lock file.
+# TODO: Figure out what’s wrong and improve it.
+#
+# Dependencies we would have if this were runnable:
+# bevy = { version = "0.16.0", optional = true, default-features = false, features = ["bevy_animation", "bevy_core_pipeline", "bevy_gltf", "bevy_pbr", "bevy_render", "bevy_scene", "bevy_window", "dynamic_linking", "multi_threaded", "png"]}
+# bevy_gltf = { version = "0.16.0", features = ["bevy_animation"] }
 name = "gltf-render"
 doctest = false
 harness = false
@@ -51,9 +59,13 @@ auto-threads = [
     "all-is-cubes-port/auto-threads",
     "all-is-cubes-render/auto-threads",
 ]
+# Enables `gltf-render` test target. Doesn’t work — see comments above on the [[test]].
 gltf = [
     "dep:all-is-cubes-port",
     "dep:bytemuck",
+    # "dep:bevy",
+    # "dep:half",
+    # "dep:manyfmt",
     "tokio/fs",
 ]
 
