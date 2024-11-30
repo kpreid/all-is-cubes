@@ -53,13 +53,6 @@ auto-threads = [
 gltf = [
     "dep:all-is-cubes-port",
     "dep:bytemuck",
-    "dep:futures-channel",
-    "dep:rend3",
-    "dep:rend3-gltf",
-    "dep:rend3-routine",
-    "dep:glam", # activates mint feature for interop
-    "dep:mint",
-    "dep:wgpu_for_rend3",
     "tokio/fs",
 ]
 
@@ -77,18 +70,12 @@ bytemuck = { workspace = true, optional = true }
 clap = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
-futures-channel = { workspace = true, optional = true }
+#futures-channel = { workspace = true, optional = true }
 futures-util = { workspace = true, features = ["std"] }
-# Must be the same version of glam as rend3 uses
-glam = { version = "0.24", optional = true, features = ["mint"] }
 image = { workspace = true, features = ["png"] }
 imgref = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
-mint = { version = "0.5.9", optional = true }
-rend3 = { git = "https://github.com/BVE-Reborn/rend3/", rev = "86bc4d2d2f4048a0adaa9af5ef542dc652308966", optional = true }
-rend3-gltf = { git = "https://github.com/BVE-Reborn/rend3/", rev = "86bc4d2d2f4048a0adaa9af5ef542dc652308966",  optional = true, default-features = false }
-rend3-routine = { git = "https://github.com/BVE-Reborn/rend3/", rev = "86bc4d2d2f4048a0adaa9af5ef542dc652308966", optional = true }
 rendiff = { workspace = true }
 send_wrapper = { workspace = true }
 serde = { workspace = true }
@@ -104,7 +91,6 @@ tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "park
 # In addition to depending on wgpu directly, we also need to select backends to be enabled in our binary.
 # (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
 wgpu = { workspace = true, features = ["dx12", "metal"] }
-wgpu_for_rend3 = { package = "wgpu", version = "0.19", optional = true, features = ["dx12", "metal"] }
 
 [lints]
 workspace = true

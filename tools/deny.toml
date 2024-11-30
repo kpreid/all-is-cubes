@@ -32,16 +32,9 @@ allow-wildcard-paths = true
 # external-default-features = "warn"
 
 skip = [
-    { name = "itertools" },
     { name = "sync_wrapper" },
     { name = "cfg_aliases" }, # winit and wgpu use different versions
-    { name = "wasi" }, # not actually used on our targets
-    { name = "syn", version = "1" },
-    { name = "libloading" },
-    { name = "redox_syscall", version = "=0.4.1" },
     { name = "base64", version = "0.13.1" }, # old used by `embed-doc-image`
-    { name = "heck" }, # old used by strum
-    { name = "miniz_oxide", version = "0.4.4" }, # old used by png-decoder
     { name = "unicode-width", version = "0.1" }, # old used by `codespan-reporting` via `wgpu`
 ]
 
