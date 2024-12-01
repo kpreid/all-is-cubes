@@ -168,7 +168,7 @@ pub fn get_image_from_gpu(
 
 /// Fetch the contents of a 2D texture, assuming that its byte layout is the same as that
 /// of `[C; components]` and returning a vector of length
-/// `dimensions.x * dimensions.y * components`.
+/// `texture.width() * texture.height() * components`.
 ///
 /// Panics if the provided sizes are incorrect.
 #[doc(hidden)]
@@ -184,45 +184,8 @@ where
     // By making this an explicit `Future` return we avoid capturing the queue and texture
     // references.
 
-    let dimensions = camera::ImageSize::new(texture.width(), texture.height());
-    assert_eq!(texture.depth_or_array_layers(), 1);
-
-    // Check that the format matches
-    let format = texture.format();
-    let size_of_texel = components * size_of::<C>();
-    assert_eq!(
-        (format.block_copy_size(None), format.block_dimensions()),
-        (Some(size_of_texel as u32), (1, 1)),
-        "Texture format does not match requested size",
-    );
-
-    let dense_bytes_per_row = dimensions.width * u32::try_from(size_of_texel).unwrap();
-    let padded_bytes_per_row = dense_bytes_per_row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
-        * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-
-    let temp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("GPU-to-CPU image copy buffer"),
-        size: u64::from(padded_bytes_per_row) * u64::from(dimensions.height),
-        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-        mapped_at_creation: false,
-    });
-
-    {
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-        encoder.copy_texture_to_buffer(
-            texture.as_image_copy(),
-            wgpu::ImageCopyBuffer {
-                buffer: &temp_buffer,
-                layout: wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(padded_bytes_per_row),
-                    rows_per_image: None,
-                },
-            },
-            texture.size(),
-        );
-        queue.submit(Some(encoder.finish()));
-    }
+    let tc = TextureCopyParameters::from_texture(texture);
+    let temp_buffer = tc.copy_texture_to_new_buffer(device, queue, texture);
 
     // Start the buffer mapping
     let (sender, receiver) = futures_channel::oneshot::channel();
@@ -240,29 +203,122 @@ where
             .expect("communication failed")
             .expect("buffer reading failed");
 
-        {
-            let element_count = camera::area_usize(dimensions).unwrap() * components;
+        let texel_vector = tc.copy_mapped_to_vec(components, &temp_buffer);
 
-            // Copy the mapped buffer data into a Rust vector, removing row padding if present
-            // by copying it one row at a time.
-            let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
-            {
-                let mapped: &[u8] = &temp_buffer.slice(..).get_mapped_range();
-                for row in 0..dimensions.height {
-                    let byte_start_of_row = padded_bytes_per_row * row;
-                    // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.
-                    texel_vector.extend(bytemuck::cast_slice::<u8, C>(
-                        &mapped[byte_start_of_row as usize..][..dense_bytes_per_row as usize],
-                    ));
-                }
-                debug_assert_eq!(texel_vector.len(), element_count);
-            }
+        // Note: We must do this after the get_mapped_range() has been dropped, due to the
+        // WebGPU backend otherwise crashing: <https://github.com/gfx-rs/wgpu/issues/6202>.
+        temp_buffer.destroy();
 
-            // Note: We do this after the get_mapped_range() has been dropped, due to the
-            // WebGPU backend otherwise crashing: <https://github.com/gfx-rs/wgpu/issues/6202>.
-            temp_buffer.destroy();
+        texel_vector
+    }
+}
 
-            texel_vector
+/// Elements of GPU-to-CPU copying, without presuming a specific schedule strategy.
+#[doc(hidden)]
+#[allow(clippy::exhaustive_structs)]
+#[derive(Clone, Copy, Debug)]
+pub struct TextureCopyParameters {
+    pub size: camera::ImageSize,
+    pub byte_size_of_texel: u32,
+}
+impl TextureCopyParameters {
+    pub fn from_texture(texture: &wgpu::Texture) -> Self {
+        assert_eq!(
+            texture.depth_or_array_layers(),
+            1,
+            "3d textures not supported"
+        );
+        let format = texture.format();
+        assert_eq!(
+            format.block_dimensions(),
+            (1, 1),
+            "compressed texture format {format:?} not supported",
+        );
+
+        Self {
+            size: camera::ImageSize::new(texture.width(), texture.height()),
+            byte_size_of_texel: format
+                .block_copy_size(None)
+                .expect("non-color texture format {format:} not supported"),
         }
+    }
+
+    pub fn dense_bytes_per_row(&self) -> u32 {
+        self.size.width * self.byte_size_of_texel
+    }
+
+    pub fn padded_bytes_per_row(&self) -> u32 {
+        self.dense_bytes_per_row()
+            .div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
+            * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT
+    }
+
+    #[track_caller]
+    pub fn copy_texture_to_new_buffer(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        texture: &wgpu::Texture,
+    ) -> wgpu::Buffer {
+        let padded_bytes_per_row = self.padded_bytes_per_row();
+
+        let temp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("GPU-to-CPU image copy buffer"),
+            size: u64::from(padded_bytes_per_row) * u64::from(self.size.height),
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        {
+            let mut encoder =
+                device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+            encoder.copy_texture_to_buffer(
+                texture.as_image_copy(),
+                wgpu::ImageCopyBuffer {
+                    buffer: &temp_buffer,
+                    layout: wgpu::ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row: Some(padded_bytes_per_row),
+                        rows_per_image: None,
+                    },
+                },
+                texture.size(),
+            );
+            queue.submit(Some(encoder.finish()));
+        }
+
+        temp_buffer
+    }
+
+    /// Given a mapped buffer, make a [`Vec<C>`] of it.
+    ///
+    /// `size_of::<C>() * components` must be equal to the byte size of a texel.
+    pub fn copy_mapped_to_vec<C>(&self, components: usize, buffer: &wgpu::Buffer) -> Vec<C>
+    where
+        C: bytemuck::AnyBitPattern,
+    {
+        assert_eq!(
+            u32::try_from(components * size_of::<C>()).ok(),
+            Some(self.byte_size_of_texel),
+            "Texture format does not match requested format",
+        );
+
+        let element_count = camera::area_usize(self.size).unwrap() * components;
+        // Copy the mapped buffer data into a Rust vector, removing row padding if present
+        // by copying it one row at a time.
+        let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
+        {
+            let mapped: &[u8] = &buffer.slice(..).get_mapped_range();
+            for row in 0..self.size.height {
+                let byte_start_of_row = self.padded_bytes_per_row() * row;
+                // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.
+                texel_vector.extend(bytemuck::cast_slice::<u8, C>(
+                    &mapped[byte_start_of_row as usize..][..self.dense_bytes_per_row() as usize],
+                ));
+            }
+            debug_assert_eq!(texel_vector.len(), element_count);
+        }
+
+        texel_vector
     }
 }
