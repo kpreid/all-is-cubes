@@ -195,19 +195,22 @@ async fn init_wgpu(
     canvas: &web_sys::HtmlCanvasElement,
     backends: wgpu::Backends,
 ) -> Result<(wgpu::Surface<'static>, wgpu::Adapter), Box<dyn core::error::Error>> {
-    let wgpu_instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends,
-        ..Default::default()
-    });
-    let surface = wgpu_instance
-        .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
-        .map_err(|e| format!("Requesting {backends:?} context failed: {e:?}"))?;
-    let adapter = wgpu_instance
-        .request_adapter(&wgpu::RequestAdapterOptions {
+    let (surface, request_adapter_future) = {
+        let wgpu_instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends,
+            ..Default::default()
+        });
+        let surface = wgpu_instance
+            .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
+            .map_err(|e| format!("Requesting {backends:?} context failed: {e:?}"))?;
+        let request_adapter_future = wgpu_instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
-        })
+        });
+        (surface, request_adapter_future)
+    };
+    let adapter = request_adapter_future
         .await
         .ok_or("Could not request suitable graphics adapter")?;
     Ok((surface, adapter))

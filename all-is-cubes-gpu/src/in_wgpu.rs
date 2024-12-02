@@ -126,15 +126,14 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         adapter: wgpu::Adapter,
         executor: Arc<dyn Executor>,
     ) -> Result<Self, wgpu::RequestDeviceError> {
-        let (device, queue) = adapter
-            .request_device(
-                &EverythingRenderer::<I>::device_descriptor(
-                    "SurfaceRenderer::device",
-                    adapter.limits(),
-                ),
-                None,
-            )
-            .await?;
+        let request_device_future = adapter.request_device(
+            &EverythingRenderer::<I>::device_descriptor(
+                "SurfaceRenderer::device",
+                adapter.limits(),
+            ),
+            None,
+        );
+        let (device, queue) = request_device_future.await?;
         #[cfg_attr(target_family = "wasm", expect(clippy::arc_with_non_send_sync))]
         let device = Arc::new(device);
 

@@ -188,14 +188,13 @@ pub async fn create_winit_wgpu_desktop_session(
     let mut adapter: Option<wgpu::Adapter> =
         wgpu::util::initialize_adapter_from_env(&instance, Some(&surface));
     if adapter.is_none() {
-        adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::util::power_preference_from_env()
-                    .unwrap_or(wgpu::PowerPreference::HighPerformance),
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
-            .await;
+        let request_adapter_future = instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::util::power_preference_from_env()
+                .unwrap_or(wgpu::PowerPreference::HighPerformance),
+            compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
+        });
+        adapter = request_adapter_future.await;
     }
     let adapter = adapter
         .ok_or_else(|| anyhow::format_err!("Could not request suitable graphics adapter"))?;
