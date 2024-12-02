@@ -182,10 +182,6 @@ pub async fn create_winit_wgpu_desktop_session(
         ..Default::default()
     });
 
-    // Safety: create_surface specifies that the window must be kept alive
-    // as long as the surface is. We will do that by keeping them both in
-    // the `DesktopSession` struct. TODO: Make this more robust by having
-    // the renderer jointly own the window via `Arc`.
     let surface = instance.create_surface(Arc::clone(&window.window))?;
 
     // Pick an adapter.
