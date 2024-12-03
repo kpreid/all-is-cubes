@@ -10,6 +10,8 @@ use manyfmt::Refmt as _;
 use crate::listen::{Listen, Listener};
 use crate::util::maybe_sync::{RwLock, SendSyncIfStd};
 
+// -------------------------------------------------------------------------------------------------
+
 /// A [`Listener`] which discards all messages.
 ///
 /// Use this when a [`Listener`] is demanded, but there is nothing it should do.
@@ -23,6 +25,8 @@ impl<M> Listener<M> for NullListener {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Tuples of listeners may be used to distribute messages.
 impl<M, L1, L2> Listener<M> for (L1, L2)
 where
@@ -34,6 +38,8 @@ where
         self.0.receive(messages) | self.1.receive(messages)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// A [`Listener`] which delivers messages by calling a function on a [`Weak`] reference's
 /// referent, and stops when the weak reference breaks.
@@ -81,6 +87,8 @@ where
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// A [`Listener`] which stores all the messages it receives.
 ///
@@ -163,6 +171,8 @@ impl<M> Default for Sink<M> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// A [`Listener`] destination which only stores a single flag indicating if any messages
 /// were received.
 pub struct DirtyFlag {
@@ -233,6 +243,8 @@ impl<M> Listener<M> for DirtyFlagListener {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

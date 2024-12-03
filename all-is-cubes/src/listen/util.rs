@@ -4,7 +4,7 @@ use core::fmt;
 use manyfmt::formats::Unquote;
 use manyfmt::Refmt as _;
 
-use crate::listen::{Listener, Notifier};
+use crate::listen::Listener;
 
 /// A [`Listener`] which transforms or discards messages before passing them on.
 /// Construct this using [`Listener::filter`].
@@ -150,39 +150,10 @@ where
     }
 }
 
-/// A [`Listener`] which forwards messages through a [`Notifier`] to its listeners.
-/// Constructed by [`Notifier::forwarder()`].
-pub struct NotifierForwarder<M>(pub(super) Weak<Notifier<M>>);
-
-impl<M> fmt::Debug for NotifierForwarder<M> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("NotifierForwarder")
-            .field("alive(shallow)", &(self.0.strong_count() > 0))
-            .finish_non_exhaustive()
-    }
-}
-
-impl<M> Listener<M> for NotifierForwarder<M> {
-    fn receive(&self, messages: &[M]) -> bool {
-        if let Some(notifier) = self.0.upgrade() {
-            notifier.notify_many(messages);
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl<M> Clone for NotifierForwarder<M> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::listen::{Listen as _, Sink};
+    use crate::listen::{Listen as _, Notifier, Sink};
     use alloc::vec::Vec;
 
     /// Breaks the listener rules for testing by recording batch boundaries.
@@ -302,6 +273,4 @@ mod tests {
 
         assert_eq!(notifier.count(), 0);
     }
-
-    // Test for NotifierForwarder exists as a doc-test.
 }
