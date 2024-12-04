@@ -9,6 +9,7 @@
         - `block::Block::with_inventory` attaches inventory to a block.
         - `inv::InvInBlock`, stored in `block::BlockAttributes::inventory`, describes the size and rendering such inventories should have.
     - `block::Modifier::Attributes` allows overriding block attributes.
+    - `listen::Store` and `listen::StoreLock` help implement `Listener` with less boilerplate.
     - `math::Face6::rotation_from_nz()` produces the same transformation as `Face6::face_transform()`, but expressed as a rotation value.
     - `op::Operation::Alt` allows operations to try alternatives.
 

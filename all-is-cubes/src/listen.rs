@@ -24,6 +24,9 @@ pub use listeners::*;
 mod notifier;
 pub use notifier::*;
 
+mod store;
+pub use store::*;
+
 mod util;
 pub use util::*;
 
@@ -76,6 +79,10 @@ impl<T: Listen> Listen for Arc<T> {
 /// Implementors must also implement [`Send`] and [`Sync`] if the `std` feature of
 /// `all-is-cubes` is enabled. (This non-additive-feature behavior is unfortunately the
 /// least bad option available.)
+///
+/// Consider implementing [`Store`] and using [`StoreLock`] instead of implementing [`Listener`].
+/// [`StoreLock`] provides the weak reference and mutex that are needed in the most common
+/// kind of use of [`Listener`].
 pub trait Listener<M>: fmt::Debug + SendSyncIfStd {
     /// Process and store the given series of messages.
     ///
