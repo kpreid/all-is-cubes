@@ -179,6 +179,7 @@ unused_qualifications = "warn"
 
 [workspace.lints.clippy]
 # clippy default lints that are set to allow
+bool_assert_comparison = "allow" # not necessarily clearer
 collapsible_else_if = "allow"
 collapsible_if = "allow"
 duplicated_attributes = "allow" # false positive prone <https://github.com/rust-lang/rust-clippy/issues/13355>
