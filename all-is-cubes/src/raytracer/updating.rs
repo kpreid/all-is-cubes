@@ -6,7 +6,6 @@
     reason = "false positive; TODO: remove after Rust 1.84 is released"
 )]
 
-use alloc::sync::{Arc, Weak};
 use core::fmt;
 use core::mem;
 
@@ -15,12 +14,11 @@ use hashbrown::HashSet as HbHashSet;
 use crate::block::AIR;
 use crate::camera::GraphicsOptions;
 use crate::content::palette;
-use crate::listen::{Listen as _, ListenableSource, Listener};
+use crate::listen::{self, Listen as _, ListenableSource, Listener};
 use crate::math::Cube;
 use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::{self, BlockIndex, Space, SpaceChange};
 use crate::universe::{Handle, HandleError};
-use crate::util::maybe_sync::Mutex;
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is
 /// changed.
@@ -29,7 +27,7 @@ pub struct UpdatingSpaceRaytracer<D: RtBlockData> {
     graphics_options: ListenableSource<GraphicsOptions>,
     custom_options: ListenableSource<D::Options>,
     state: SpaceRaytracer<D>,
-    todo: Arc<Mutex<SrtTodo>>,
+    todo: listen::StoreLock<SrtTodo>,
 }
 
 // manual impl avoids `D: Debug` bound
@@ -62,17 +60,17 @@ where
         graphics_options: ListenableSource<GraphicsOptions>,
         custom_options: ListenableSource<D::Options>,
     ) -> Self {
-        let todo = Arc::new(Mutex::new(SrtTodo {
+        let todo = listen::StoreLock::new(SrtTodo {
             listener: true,
             everything: true,
             blocks: Default::default(),
             cubes: Default::default(),
-        }));
+        });
 
         // TODO: Placeholder for more detailed graphics options updating
         graphics_options.listen(
             // TODO: this filter should be coalescing instead of having a large buffer
-            TodoListener(Arc::downgrade(&todo))
+            todo.listener()
                 .filter(|&()| Some(SpaceChange::EveryBlock))
                 .with_stack_buffer::<1000>(),
         );
@@ -124,7 +122,7 @@ where
         let space = self.space.read()?;
 
         if mem::take(&mut todo.listener) {
-            space.listen(TodoListener(Arc::downgrade(&self.todo)));
+            space.listen(self.todo.listener());
         }
 
         if mem::take(&mut todo.everything) {
@@ -206,41 +204,24 @@ impl SrtTodo {
     }
 }
 
-/// [`Listener`] adapter for [`SpaceRendererTodo`].
-#[derive(Clone, Debug)]
-struct TodoListener(Weak<Mutex<SrtTodo>>);
-
-impl Listener<SpaceChange> for TodoListener {
-    fn receive(&self, messages: &[SpaceChange]) -> bool {
-        let Some(mutex) = self.0.upgrade() else {
-            // noop if dead listener
-            return false;
-        };
-        if messages.is_empty() {
-            // don't acquire lock if not delivering messages
-            return true;
-        }
-        let Ok(mut todo) = mutex.lock() else {
-            // noop if poisoned
-            return false;
-        };
+impl listen::Store<SpaceChange> for SrtTodo {
+    fn receive(&mut self, messages: &[SpaceChange]) {
         for message in messages {
             match *message {
                 SpaceChange::EveryBlock => {
-                    todo.everything = true;
-                    todo.blocks.clear();
-                    todo.cubes.clear()
+                    self.everything = true;
+                    self.blocks.clear();
+                    self.cubes.clear()
                 }
                 SpaceChange::CubeLight { cube, .. } | SpaceChange::CubeBlock { cube, .. } => {
-                    todo.cubes.insert(cube);
+                    self.cubes.insert(cube);
                 }
                 SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
-                    todo.blocks.insert(index);
+                    self.blocks.insert(index);
                 }
                 SpaceChange::Physics => {}
             }
         }
-        true
     }
 }
 

@@ -1,16 +1,15 @@
 #![expect(clippy::identity_op)]
 
-use all_is_cubes::euclid::{point3, Point3D, Scale};
 use alloc::vec::Vec;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use all_is_cubes::block::{self, Block, BlockDef, BlockDefTransaction, AIR};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::listen::Listener as _;
-use all_is_cubes::math::{zo32, GridPoint};
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate};
+use all_is_cubes::euclid::{point3, Point3D, Scale};
+use all_is_cubes::listen::Store as _;
+use all_is_cubes::math::{zo32, Cube, GridAab, GridCoordinate, GridPoint};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Universe};
@@ -20,7 +19,7 @@ use all_is_cubes_render::Flaws;
 use crate::texture::NoTextures;
 use crate::{dynamic, testing};
 
-use super::{ChunkTodo, ChunkedSpaceMesh, CsmTodo, CsmUpdateInfo, TodoListener};
+use super::{ChunkTodo, ChunkedSpaceMesh, CsmTodo, CsmUpdateInfo};
 
 type Mt<const MBM: usize> = testing::Mt<NoTextures, MBM>;
 
@@ -29,10 +28,8 @@ const LARGE_VIEW_DISTANCE: f64 = 200.0;
 const NO_INSTANCES: usize = usize::MAX;
 const ALL_INSTANCES: usize = 0;
 
-fn read_todo_chunks(todo: &Mutex<CsmTodo<CHUNK_SIZE>>) -> Vec<(ChunkPos<CHUNK_SIZE>, ChunkTodo)> {
+fn read_todo_chunks(todo: &CsmTodo<CHUNK_SIZE>) -> Vec<(ChunkPos<CHUNK_SIZE>, ChunkTodo)> {
     let mut v = todo
-        .lock()
-        .unwrap()
         .chunks
         .iter()
         .map(|(&p, ct)| (p, ct.clone()))
@@ -43,14 +40,13 @@ fn read_todo_chunks(todo: &Mutex<CsmTodo<CHUNK_SIZE>>) -> Vec<(ChunkPos<CHUNK_SI
 
 #[test]
 fn update_adjacent_chunk_positive() {
-    let todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>> = Default::default();
-    let listener = TodoListener(Arc::downgrade(&todo));
-    todo.lock().unwrap().chunks.extend(vec![
+    let mut todo: CsmTodo<CHUNK_SIZE> = Default::default();
+    todo.chunks.extend(vec![
         (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
     ]);
-    listener.receive(&[SpaceChange::CubeBlock {
+    todo.receive(&[SpaceChange::CubeBlock {
         cube: Cube::new(CHUNK_SIZE - 1, CHUNK_SIZE / 2, CHUNK_SIZE / 2),
         old_block_index: 123,
         new_block_index: 456,
@@ -79,14 +75,13 @@ fn update_adjacent_chunk_positive() {
 
 #[test]
 fn update_adjacent_chunk_negative() {
-    let todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>> = Default::default();
-    let listener = TodoListener(Arc::downgrade(&todo));
-    todo.lock().unwrap().chunks.extend(vec![
+    let mut todo: CsmTodo<CHUNK_SIZE> = Default::default();
+    todo.chunks.extend(vec![
         (ChunkPos::new(-1, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN),
         (ChunkPos::new(1, 0, 0), ChunkTodo::CLEAN),
     ]);
-    listener.receive(&[SpaceChange::CubeBlock {
+    todo.receive(&[SpaceChange::CubeBlock {
         cube: Cube::new(0, CHUNK_SIZE / 2, CHUNK_SIZE / 2),
         old_block_index: 123,
         new_block_index: 456,
@@ -115,23 +110,19 @@ fn update_adjacent_chunk_negative() {
 
 #[test]
 fn todo_ignores_absent_chunks() {
-    let todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>> = Default::default();
-    let listener = TodoListener(Arc::downgrade(&todo));
+    let mut todo: CsmTodo<CHUNK_SIZE> = Default::default();
 
     let cube = Cube::from(GridPoint::new(1, 1, 1) * (CHUNK_SIZE / 2));
     // Nothing happens...
-    listener.receive(&[SpaceChange::CubeBlock {
+    todo.receive(&[SpaceChange::CubeBlock {
         cube,
         old_block_index: 0,
         new_block_index: 0,
     }]);
     assert_eq!(read_todo_chunks(&todo), vec![]);
-    // until the chunk exists in the table already.
-    todo.lock()
-        .unwrap()
-        .chunks
-        .insert(ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN);
-    listener.receive(&[SpaceChange::CubeBlock {
+    // ...until the chunk exists in the table already.
+    todo.chunks.insert(ChunkPos::new(0, 0, 0), ChunkTodo::CLEAN);
+    todo.receive(&[SpaceChange::CubeBlock {
         cube,
         old_block_index: 0,
         new_block_index: 0,

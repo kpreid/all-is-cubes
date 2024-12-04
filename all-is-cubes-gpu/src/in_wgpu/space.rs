@@ -2,14 +2,14 @@
 
 use std::collections::HashSet;
 use std::mem;
-use std::sync::{atomic, mpsc, Arc, Mutex, Weak};
+use std::sync::{atomic, mpsc, Arc, Mutex};
 use std::time::Duration;
 
 use itertools::Itertools as _;
 
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
-use all_is_cubes::listen::{Listen as _, Listener};
+use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
     rgba_const, Cube, Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
     GridSize, GridVector, Rgb, Wireframe as _, ZeroOne,
@@ -60,7 +60,7 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
 
     /// Tracks information we need to update from the `Space`.
     /// Note that `self.csm` has its own todo listener too.
-    todo: Arc<Mutex<SpaceRendererTodo>>,
+    todo: listen::StoreLock<SpaceRendererTodo>,
 
     /// Skybox texture.
     skybox: skybox::Skybox,
@@ -119,7 +119,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         let camera_buffer = SpaceCameraBuffer::new(&space_label, device, pipelines);
 
-        let todo = Arc::new(Mutex::new(SpaceRendererTodo::EVERYTHING));
+        let todo = listen::StoreLock::new(SpaceRendererTodo::EVERYTHING);
 
         SpaceRenderer {
             todo,
@@ -192,8 +192,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
         } = self;
 
         *todo = {
-            let todo = Arc::new(Mutex::new(SpaceRendererTodo::EVERYTHING));
-            space_borrowed.listen(TodoListener(Arc::downgrade(&todo)));
+            let todo = listen::StoreLock::new(SpaceRendererTodo::EVERYTHING);
+            space_borrowed.listen(todo.listener());
             todo
         };
 
@@ -265,7 +265,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         } = self;
 
         // detach from space notifier, and also request rebuilding the skybox
-        *todo = Arc::new(Mutex::new(SpaceRendererTodo::EVERYTHING));
+        *todo = listen::StoreLock::new(SpaceRendererTodo::EVERYTHING);
         particle_sets.clear();
         (_, *particle_rx) = mpsc::sync_channel(0);
         *csm = None;
@@ -285,7 +285,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
     ) -> Result<SpaceUpdateInfo, RenderError> {
         let start_time = I::now();
 
-        let mut todo = self.todo.lock().unwrap();
+        let todo = &mut self.todo.lock().unwrap();
 
         let Some(csm) = &mut self.csm else {
             if mem::take(&mut todo.sky) {
@@ -1015,27 +1015,16 @@ impl SpaceRendererTodo {
     };
 }
 
-/// [`Listener`] adapter for [`SpaceRendererTodo`].
-#[derive(Clone, Debug)]
-struct TodoListener(Weak<Mutex<SpaceRendererTodo>>);
-
-impl Listener<SpaceChange> for TodoListener {
-    fn receive(&self, messages: &[SpaceChange]) -> bool {
-        let Some(cell) = self.0.upgrade() else {
-            return false; // noop if dead listener
-        };
-        let Ok(mut todo) = cell.lock() else {
-            return false; // noop if poisoned
-        };
-
+impl listen::Store<SpaceChange> for SpaceRendererTodo {
+    fn receive(&mut self, messages: &[SpaceChange]) {
         for message in messages {
             match *message {
                 SpaceChange::EveryBlock => {
-                    todo.light = None;
+                    self.light = None;
                 }
                 SpaceChange::CubeLight { cube } => {
                     // None means we're already at "update everything"
-                    if let Some(set) = &mut todo.light {
+                    if let Some(set) = &mut self.light {
                         set.insert(cube);
                     }
                 }
@@ -1043,12 +1032,10 @@ impl Listener<SpaceChange> for TodoListener {
                 SpaceChange::BlockIndex(..) => {}
                 SpaceChange::BlockEvaluation(..) => {}
                 SpaceChange::Physics => {
-                    todo.sky = true;
+                    self.sky = true;
                 }
             }
         }
-
-        true
     }
 }
 

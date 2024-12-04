@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 use core::fmt;
-use std::sync::{Arc, Mutex, Weak};
 
 use hashbrown::hash_map::Entry;
 use indoc::indoc;
@@ -8,7 +7,7 @@ use indoc::indoc;
 use rayon::iter::{ParallelBridge, ParallelIterator as _};
 
 use all_is_cubes::chunking::{cube_to_chunk, point_to_chunk, ChunkChart, ChunkPos};
-use all_is_cubes::listen::{Listen as _, Listener};
+use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex, OctantMask};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
@@ -52,7 +51,7 @@ where
     space: Handle<Space>,
 
     /// Dirty flags listening to `space`.
-    todo: Arc<Mutex<CsmTodo<CHUNK_SIZE>>>,
+    todo: listen::StoreLock<CsmTodo<CHUNK_SIZE>>,
 
     block_meshes: dynamic::VersionedBlockMeshes<M>,
 
@@ -105,13 +104,12 @@ where
     /// a fully detailed one, by using placeholder block meshes on the first pass.
     pub fn new(space: Handle<Space>, texture_allocator: M::Alloc, interactive: bool) -> Self {
         let space_borrowed = space.read().unwrap();
-        let todo = CsmTodo::initially_dirty();
-        let todo_rc = Arc::new(Mutex::new(todo));
-        space_borrowed.listen(TodoListener(Arc::downgrade(&todo_rc)));
+        let todo = listen::StoreLock::new(CsmTodo::initially_dirty());
+        space_borrowed.listen(todo.listener());
 
         Self {
             space,
-            todo: todo_rc,
+            todo,
             block_meshes: dynamic::VersionedBlockMeshes::new(texture_allocator),
             chunks: Default::default(),
             chunk_chart: ChunkChart::new(0.0),
@@ -745,24 +743,14 @@ impl<const CHUNK_SIZE: GridCoordinate> CsmTodo<CHUNK_SIZE> {
     }
 }
 
-/// [`Listener`] adapter for [`CsmTodo`].
-#[derive(Clone, Debug)]
-struct TodoListener<const CHUNK_SIZE: GridCoordinate>(Weak<Mutex<CsmTodo<CHUNK_SIZE>>>);
-
-impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CHUNK_SIZE> {
-    fn receive(&self, messages: &[SpaceChange]) -> bool {
-        let Some(cell) = self.0.upgrade() else {
-            return false;
-        }; // noop if dead listener
-        let Ok(mut todo) = cell.lock() else {
-            return false;
-        }; // noop if poisoned
+impl<const CHUNK_SIZE: GridCoordinate> listen::Store<SpaceChange> for CsmTodo<CHUNK_SIZE> {
+    fn receive(&mut self, messages: &[SpaceChange]) {
         for message in messages {
             match *message {
                 SpaceChange::EveryBlock => {
-                    todo.all_blocks_and_chunks = true;
-                    todo.blocks.clear();
-                    todo.chunks.clear();
+                    self.all_blocks_and_chunks = true;
+                    self.blocks.clear();
+                    self.chunks.clear();
                 }
                 SpaceChange::CubeBlock {
                     cube,
@@ -770,7 +758,7 @@ impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CH
                     new_block_index,
                     ..
                 } => {
-                    todo.modify_block_and_adjacent(cube, |chunk_todo| {
+                    self.modify_block_and_adjacent(cube, |chunk_todo| {
                         // TODO(instancing): Once we have "temporarily instance anything",
                         // the right thing to do here is only check the old index, not the new one,
                         // because what we're actually checking is whether the old block *in our
@@ -788,13 +776,12 @@ impl<const CHUNK_SIZE: GridCoordinate> Listener<SpaceChange> for TodoListener<CH
                     // Meshes are not affected by light
                 }
                 SpaceChange::BlockIndex(index) | SpaceChange::BlockEvaluation(index) => {
-                    if !todo.all_blocks_and_chunks {
-                        todo.blocks.insert(index);
+                    if !self.all_blocks_and_chunks {
+                        self.blocks.insert(index);
                     }
                 }
                 SpaceChange::Physics => {}
             }
         }
-        true
     }
 }

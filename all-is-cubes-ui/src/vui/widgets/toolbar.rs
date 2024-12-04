@@ -1,14 +1,13 @@
 use alloc::boxed::Box;
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use core::error::Error;
-use core::fmt;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, text, Block, Resolution};
 use all_is_cubes::character::Character;
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
-use all_is_cubes::listen::{Listen as _, ListenableSource, Listener};
+use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::math::{
     Cube, GridAab, GridCoordinate, GridPoint, GridSize, GridSizeCoord, GridVector,
 };
@@ -44,7 +43,7 @@ impl Toolbar {
     const TOOLBAR_STEP: GridCoordinate = 2;
 
     pub fn new(
-        character_source: ListenableSource<Option<Handle<Character>>>,
+        character_source: listen::ListenableSource<Option<Handle<Character>>>,
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         slot_count: u16,
@@ -91,11 +90,10 @@ impl Widget for Toolbar {
     fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn WidgetController> {
         let bounds = grant.bounds;
 
-        let todo_more = Arc::new(Mutex::new(ToolbarTodo {
+        let todo_more = listen::StoreLock::new(ToolbarTodo {
             button_pressed_decay: [Duration::ZERO; TOOL_SELECTIONS],
-        }));
-        self.cue_channel
-            .listen(CueListener(Arc::downgrade(&todo_more)));
+        });
+        self.cue_channel.listen(todo_more.listener());
 
         Box::new(ToolbarController {
             todo_more,
@@ -115,7 +113,7 @@ impl Widget for Toolbar {
 #[derive(Debug)]
 struct ToolbarController {
     definition: Arc<Toolbar>,
-    todo_more: Arc<Mutex<ToolbarTodo>>,
+    todo_more: listen::StoreLock<ToolbarTodo>,
     first_slot_position: Cube,
 }
 
@@ -283,7 +281,7 @@ impl WidgetController for ToolbarController {
         let mut pressed_buttons: [bool; TOOL_SELECTIONS] = [false; TOOL_SELECTIONS];
         let mut should_update_pointers = false;
         {
-            let mut todo = self.todo_more.lock().unwrap();
+            let todo = &mut self.todo_more.lock().unwrap();
             for (i, t) in todo.button_pressed_decay.iter_mut().enumerate() {
                 if *t != Duration::ZERO {
                     // include a final goes-to-zero update
@@ -324,31 +322,16 @@ struct ToolbarTodo {
     button_pressed_decay: [Duration; TOOL_SELECTIONS],
 }
 
-struct CueListener(Weak<Mutex<ToolbarTodo>>);
-
-impl Listener<CueMessage> for CueListener {
-    fn receive(&self, messages: &[CueMessage]) -> bool {
-        let Some(cell) = self.0.upgrade() else {
-            return false;
-        }; // noop if dead listener
+impl listen::Store<CueMessage> for ToolbarTodo {
+    fn receive(&mut self, messages: &[CueMessage]) {
         for message in messages {
             match *message {
                 CueMessage::Clicked(button) => {
-                    let Ok(mut todo) = cell.lock() else {
-                        return false;
-                    }; // noop if poisoned
-                    if let Some(t) = todo.button_pressed_decay.get_mut(button) {
+                    if let Some(t) = self.button_pressed_decay.get_mut(button) {
                         *t = Duration::from_millis(200);
                     }
                 }
             }
         }
-        true
-    }
-}
-
-impl fmt::Debug for CueListener {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CueListener").finish_non_exhaustive()
     }
 }
