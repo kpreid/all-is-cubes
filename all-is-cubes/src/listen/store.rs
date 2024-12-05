@@ -277,10 +277,12 @@ mod tests {
         let listener = sl.listener();
 
         // Poison the mutex by panicking inside it
-        let _ = std::panic::catch_unwind(|| {
+        // TODO: Get rid of this `AssertUnwindSafe` by making `StoreLock` *always* (rather than
+        // conditionally) `RefUnwindSafe`
+        let _ = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
             let _guard = sl.lock();
             panic!("poison");
-        });
+        }));
 
         // Listener does not panic, and returns false.
         assert_eq!(listener.receive(&["foo"]), false);
