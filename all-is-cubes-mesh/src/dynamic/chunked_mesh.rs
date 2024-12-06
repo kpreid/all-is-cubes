@@ -265,7 +265,7 @@ where
         let view_chunk_is_different = self.view_chunk != view_chunk;
         self.view_chunk = view_chunk;
 
-        let todo: &mut CsmTodo<CHUNK_SIZE> = &mut self.todo.lock().unwrap();
+        let todo: &mut CsmTodo<CHUNK_SIZE> = &mut self.todo.lock();
 
         let space = &*if let Ok(space) = self.space.read() {
             space

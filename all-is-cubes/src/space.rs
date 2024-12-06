@@ -802,7 +802,9 @@ impl Space {
     }
 
     /// Returns the source of [fluff](Fluff) occurring in this space.
-    pub fn fluff(&self) -> impl Listen<Msg = SpaceFluff> + '_ {
+    pub fn fluff(
+        &self,
+    ) -> impl Listen<Msg = SpaceFluff, Listener = listen::DynListener<SpaceFluff>> + '_ {
         &self.fluff_notifier
     }
 
@@ -1003,7 +1005,8 @@ impl VisitHandles for Space {
 /// Registers a listener for mutations of this space.
 impl Listen for Space {
     type Msg = SpaceChange;
-    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
+    type Listener = <Notifier<Self::Msg> as Listen>::Listener;
+    fn listen_raw(&self, listener: Self::Listener) {
         self.change_notifier.listen_raw(listener)
     }
 }
@@ -1424,7 +1427,8 @@ impl<'s> Extract<'s> {
 }
 
 // TODO: Tune this buffer size parameter, and validate it isn't overly large on the stack.
-type ChangeBuffer<'notifier> = listen::Buffer<'notifier, SpaceChange, 16>;
+type ChangeBuffer<'notifier> =
+    listen::Buffer<'notifier, SpaceChange, listen::DynListener<SpaceChange>, 16>;
 
 /// Argument passed to [`Space`] mutation methods that are used in bulk mutations.
 struct MutationCtx<'a, 'n> {

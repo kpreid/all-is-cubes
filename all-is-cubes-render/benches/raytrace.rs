@@ -8,7 +8,7 @@ use criterion::{criterion_group, criterion_main, Bencher, Criterion};
 use all_is_cubes::character::Character;
 use all_is_cubes::content::testing::lighting_bench_space;
 use all_is_cubes::euclid::size3;
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen;
 use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_render::camera::{
@@ -46,13 +46,13 @@ impl TestData {
         options_fn(&mut options);
         let mut renderer = RtRenderer::new(
             StandardCameras::new(
-                ListenableSource::constant(Arc::new(options)),
-                ListenableSource::constant(Viewport::with_scale(1.0, [64, 16])),
-                ListenableSource::constant(Some(self.character.clone())),
-                ListenableSource::constant(Arc::new(UiViewState::default())),
+                listen::constant(Arc::new(options)),
+                listen::constant(Viewport::with_scale(1.0, [64, 16])),
+                listen::constant(Some(self.character.clone())),
+                listen::constant(Arc::new(UiViewState::default())),
             ),
             Box::new(core::convert::identity),
-            ListenableSource::constant(Arc::new(())),
+            listen::constant(Arc::new(())),
         );
         renderer.update(None).unwrap();
         renderer

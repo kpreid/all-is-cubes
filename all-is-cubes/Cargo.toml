@@ -54,6 +54,7 @@ default = ["std"]
 std = [
     "all-is-cubes-base/std",
     "arcstr/std", # not required but nicer behavior
+    "nosy/sync",
     "yield-progress/sync",
 ]
 # Adds `impl arbitrary::Arbitrary for ...`
@@ -111,6 +112,7 @@ itertools = { workspace = true }
 log = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
+nosy = { workspace = true }
 num-traits = { workspace = true }
 ordered-float = { workspace = true }
 paste = { workspace = true }

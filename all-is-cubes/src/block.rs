@@ -11,7 +11,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
-use crate::listen::{Listen as _, Listener};
+use crate::listen::{self, Listen as _, Listener};
 use crate::math::{GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol};
 use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::{Handle, HandleVisitor, VisitHandles};
@@ -607,11 +607,11 @@ impl Block {
     /// incompletely or not at all. It should not be relied on.
     pub fn evaluate_and_listen(
         &self,
-        listener: impl Listener<BlockChange> + 'static,
+        listener: impl listen::IntoDynListener<BlockChange, listen::DynListener<BlockChange>>,
     ) -> Result<EvaluatedBlock, EvalBlockError> {
         self.evaluate2(&EvalFilter {
             skip_eval: false,
-            listener: Some(listener.erased()),
+            listener: Some(listener.into_dyn_listener()),
             budget: Default::default(),
         })
     }

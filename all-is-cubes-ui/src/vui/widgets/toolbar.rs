@@ -43,7 +43,7 @@ impl Toolbar {
     const TOOLBAR_STEP: GridCoordinate = 2;
 
     pub fn new(
-        character_source: listen::ListenableSource<Option<Handle<Character>>>,
+        character_source: listen::DynSource<Option<Handle<Character>>>,
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         slot_count: u16,
@@ -281,7 +281,7 @@ impl WidgetController for ToolbarController {
         let mut pressed_buttons: [bool; TOOL_SELECTIONS] = [false; TOOL_SELECTIONS];
         let mut should_update_pointers = false;
         {
-            let todo = &mut self.todo_more.lock().unwrap();
+            let todo = &mut self.todo_more.lock();
             for (i, t) in todo.button_pressed_decay.iter_mut().enumerate() {
                 if *t != Duration::ZERO {
                     // include a final goes-to-zero update

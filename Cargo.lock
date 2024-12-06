@@ -74,6 +74,7 @@ dependencies = [
  "log",
  "manyfmt",
  "mutants",
+ "nosy",
  "num-traits",
  "ordered-float",
  "paste",
@@ -3726,6 +3727,18 @@ name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
+
+[[package]]
+name = "nosy"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb59fd933a0061e11498ce4eebcb47a2b8baa8f22b163c5d21ea4d090cdd1cb2"
+dependencies = [
+ "arrayvec",
+ "cfg-if",
+ "manyfmt",
+ "mutants",
+]
 
 [[package]]
 name = "ntapi"

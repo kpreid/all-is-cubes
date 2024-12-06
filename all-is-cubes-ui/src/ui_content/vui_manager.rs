@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
-use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource, Notifier};
+use all_is_cubes::listen::{self, DirtyFlag, ListenableCell, Notifier};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
@@ -50,7 +50,7 @@ pub(crate) struct Vui {
     state: ListenableCell<Arc<VuiPageState>>,
 
     changed_viewport: DirtyFlag,
-    viewport_source: ListenableSource<Viewport>,
+    viewport_source: listen::DynSource<Viewport>,
     /// Size computed from `viewport_source` and compared with `PageInst`.
     last_ui_size: UiSize,
     hud_inputs: HudInputs,
@@ -70,10 +70,10 @@ pub(crate) struct Vui {
     /// `Send + Sync`, unlike the `std` one.
     /// Our choice of `flume` in particular is just because our other crates use it.
     control_channel: flume::Receiver<VuiMessage>,
-    character_source: ListenableSource<Option<Handle<Character>>>,
+    character_source: listen::DynSource<Option<Handle<Character>>>,
     changed_character: DirtyFlag,
     tooltip_state: Arc<Mutex<TooltipState>>,
-    /// Messages from session to UI that don't fit as [`ListenableSource`] changes.
+    /// Messages from session to UI that don't fit as [`listen::DynSource`] changes.
     cue_channel: CueNotifier,
 
     notif_hub: notification::Hub,
@@ -91,12 +91,12 @@ impl Vui {
     #[expect(clippy::too_many_arguments)]
     pub(crate) async fn new(
         input_processor: &InputProcessor,
-        character_source: ListenableSource<Option<Handle<Character>>>,
-        paused: ListenableSource<bool>,
-        graphics_options: ListenableSource<Arc<GraphicsOptions>>,
+        character_source: listen::DynSource<Option<Handle<Character>>>,
+        paused: listen::DynSource<bool>,
+        graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
         app_control_channel: flume::Sender<ControlMessage>,
-        viewport_source: ListenableSource<Viewport>,
-        fullscreen_source: ListenableSource<FullscreenState>,
+        viewport_source: listen::DynSource<Viewport>,
+        fullscreen_source: listen::DynSource<FullscreenState>,
         set_fullscreen: FullscreenSetter,
         quit: Option<QuitFn>,
     ) -> Self {
@@ -183,7 +183,7 @@ impl Vui {
 
     /// The space that should be displayed to the user, drawn on top of the world.
     // TODO: It'd be more encapsulating if we could provide a _read-only_ Handle...
-    pub fn view(&self) -> ListenableSource<Arc<UiViewState>> {
+    pub fn view(&self) -> listen::DynSource<Arc<UiViewState>> {
         self.current_view.as_source()
     }
 
@@ -561,7 +561,7 @@ pub(crate) enum VuiMessage {
 }
 
 /// Channel for broadcasting, from session to widgets, various user interface responses
-/// to events (that don't fit into the [`ListenableSource`] model).
+/// to events (that don't fit into the [`listen::DynSource`] model).
 ///
 /// TODO: This `Arc` is a kludge; probably Notifier should have some kind of clonable
 /// add-a-listener handle to itself, and that would help out other situations too.
@@ -585,12 +585,12 @@ mod tests {
         let (cctx, ccrx) = flume::bounded(1);
         let vui = Vui::new(
             &InputProcessor::new(),
-            ListenableSource::constant(None),
-            ListenableSource::constant(paused),
-            ListenableSource::constant(Arc::new(GraphicsOptions::default())),
+            listen::constant(None),
+            listen::constant(paused),
+            listen::constant(Arc::new(GraphicsOptions::default())),
             cctx,
-            ListenableSource::constant(Viewport::ARBITRARY),
-            ListenableSource::constant(None),
+            listen::constant(Viewport::ARBITRARY),
+            listen::constant(None),
             None,
             None,
         )

@@ -9,7 +9,7 @@ use criterion::{
 use all_is_cubes::block;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen;
 use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridSize};
 use all_is_cubes::raytracer::UpdatingSpaceRaytracer;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
@@ -62,8 +62,8 @@ fn space_bulk_mutation(c: &mut Criterion) {
                         let rts = std::array::from_fn(|_| {
                             UpdatingSpaceRaytracer::new(
                                 space.clone(),
-                                ListenableSource::constant(Arc::new(GraphicsOptions::default())),
-                                ListenableSource::constant(Arc::new(())),
+                                listen::constant(Arc::new(GraphicsOptions::default())),
+                                listen::constant(Arc::new(())),
                             )
                         });
                         // 2. Block definitions

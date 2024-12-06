@@ -17,7 +17,7 @@ use num_traits::float::Float as _;
 use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
-use crate::listen::{self, Listen, Notifier};
+use crate::listen;
 use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector};
 use crate::physics;
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
@@ -89,7 +89,7 @@ pub struct Character {
     selected_slots: [usize; inv::TOOL_SELECTIONS],
 
     /// Notifier for modifications.
-    notifier: Notifier<CharacterChange>,
+    notifier: listen::Notifier<CharacterChange>,
 
     // TODO: not crate access: we need something like the listen() method for Notifier
     pub(crate) behaviors: BehaviorSet<Character>,
@@ -219,7 +219,7 @@ impl Character {
             exposure: exposure::State::default(),
             inventory: Inventory::from_slots(inventory),
             selected_slots,
-            notifier: Notifier::new(),
+            notifier: listen::Notifier::new(),
             behaviors: BehaviorSet::new(),
 
             #[cfg(feature = "rerun")]
@@ -522,10 +522,11 @@ impl VisitHandles for Character {
 }
 
 /// Registers a listener for mutations of this character.
-impl Listen for Character {
+impl listen::Listen for Character {
     type Msg = CharacterChange;
-    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
-        self.notifier.listen(listener)
+    type Listener = <listen::Notifier<Self::Msg> as listen::Listen>::Listener;
+    fn listen_raw(&self, listener: Self::Listener) {
+        self.notifier.listen_raw(listener)
     }
 }
 
@@ -597,7 +598,7 @@ impl<'de> serde::Deserialize<'de> for Character {
                 behaviors: behaviors.into_owned(),
 
                 // Not persisted - run-time connections to other things
-                notifier: Notifier::new(),
+                notifier: listen::Notifier::new(),
                 velocity_input: Vector3D::zero(),
                 #[cfg(feature = "rerun")]
                 rerun_destination: Default::default(),

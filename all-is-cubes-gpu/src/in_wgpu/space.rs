@@ -285,7 +285,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
     ) -> Result<SpaceUpdateInfo, RenderError> {
         let start_time = I::now();
 
-        let todo = &mut self.todo.lock().unwrap();
+        let todo = &mut self.todo.lock();
 
         let Some(csm) = &mut self.csm else {
             if mem::take(&mut todo.sky) {

@@ -6,7 +6,7 @@ use futures_channel::oneshot;
 use futures_core::future::BoxFuture;
 
 use all_is_cubes::character::Cursor;
-use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::listen::{self, DirtyFlag};
 use all_is_cubes::util::Executor;
 use all_is_cubes_render::camera::{StandardCameras, Viewport};
 use all_is_cubes_render::{Flaws, HeadlessRenderer, RenderError, Rendering};
@@ -104,7 +104,7 @@ struct RendererImpl {
     queue: Arc<wgpu::Queue>,
     color_texture: wgpu::Texture,
     everything: super::EverythingRenderer<AdaptedInstant>,
-    viewport_source: ListenableSource<Viewport>,
+    viewport_source: listen::DynSource<Viewport>,
     viewport_dirty: DirtyFlag,
     flaws: Flaws,
 }

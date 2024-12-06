@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::{Point2D, Vector2D};
-use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::listen::{self, ListenableCell};
 use all_is_cubes::math::{zo32, FreeCoordinate, FreeVector};
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{Handle, Universe};
@@ -437,7 +437,7 @@ impl InputProcessor {
     /// interpreted as view rotation) is currently active.
     ///
     /// This value may be toggled by in-game UI.
-    pub fn mouselook_mode(&self) -> ListenableSource<bool> {
+    pub fn mouselook_mode(&self) -> listen::DynSource<bool> {
         self.mouselook_mode.as_source()
     }
 
@@ -581,12 +581,12 @@ mod tests {
         let (cctx, _) = flume::bounded(1);
         let mut ui = crate::ui_content::Vui::new(
             &InputProcessor::new(),
-            ListenableSource::constant(None),
+            listen::constant(None),
             paused.as_source(),
-            ListenableSource::constant(Arc::new(GraphicsOptions::default())),
+            listen::constant(Arc::new(GraphicsOptions::default())),
             cctx,
-            ListenableSource::constant(Viewport::ARBITRARY),
-            ListenableSource::constant(None),
+            listen::constant(Viewport::ARBITRARY),
+            listen::constant(None),
             None,
             None,
         )

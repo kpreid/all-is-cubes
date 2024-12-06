@@ -26,7 +26,7 @@ pub(super) use all_is_cubes::euclid::{
     size3, vec3, Point3D, Rotation2D, Size3D, Vector2D, Vector3D,
 };
 pub(super) use all_is_cubes::linking::{BlockProvider, InGenError};
-pub(super) use all_is_cubes::listen::ListenableSource;
+pub(super) use all_is_cubes::listen;
 pub(super) use all_is_cubes::math::{
     ps32, rgb_const, rgba_const, zo32, Cube, Face6, FaceMap, FreeCoordinate, GridAab,
     GridCoordinate, GridPoint, GridRotation, GridSize, GridVector, Gridgid, PositiveSign, Rgb,

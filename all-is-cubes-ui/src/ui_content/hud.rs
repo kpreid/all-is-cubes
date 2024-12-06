@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use all_is_cubes::character::Character;
 use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen;
 use all_is_cubes::math::Face6;
 use all_is_cubes::universe::{Handle, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -29,11 +29,11 @@ pub(crate) struct HudInputs {
     pub cue_channel: CueNotifier,
     pub vui_control_channel: flume::Sender<VuiMessage>,
     pub app_control_channel: flume::Sender<ControlMessage>,
-    pub graphics_options: ListenableSource<Arc<GraphicsOptions>>,
-    pub paused: ListenableSource<bool>,
-    pub page_state: ListenableSource<Arc<VuiPageState>>,
-    pub mouselook_mode: ListenableSource<bool>,
-    pub fullscreen_mode: ListenableSource<FullscreenState>,
+    pub graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
+    pub paused: listen::DynSource<bool>,
+    pub page_state: listen::DynSource<Arc<VuiPageState>>,
+    pub mouselook_mode: listen::DynSource<bool>,
+    pub fullscreen_mode: listen::DynSource<FullscreenState>,
     pub set_fullscreen: FullscreenSetter,
     pub(crate) quit: Option<crate::apps::QuitFn>,
 }
@@ -46,7 +46,7 @@ impl fmt::Debug for HudInputs {
 
 pub(super) fn new_hud_page(
     // TODO: mess of tightly coupled parameters
-    character_source: ListenableSource<Option<Handle<Character>>>,
+    character_source: listen::DynSource<Option<Handle<Character>>>,
     hud_inputs: &HudInputs,
     // TODO: stop mutating the universe in widget construction
     universe: &mut Universe,

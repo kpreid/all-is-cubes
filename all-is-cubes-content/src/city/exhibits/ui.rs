@@ -83,7 +83,7 @@ fn UI_PROGRESS_BAR(ctx: Context<'_>) {
         vui::LayoutTree::leaf(widgets::ProgressBar::new(
             ctx.widget_theme,
             Face6::PX,
-            ListenableSource::constant(widgets::ProgressBarState::new(fraction)),
+            listen::constant(widgets::ProgressBarState::new(fraction)),
         ))
     };
 

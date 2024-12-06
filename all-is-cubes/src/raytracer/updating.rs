@@ -15,7 +15,7 @@ use hashbrown::HashSet as HbHashSet;
 use crate::block::AIR;
 use crate::camera::GraphicsOptions;
 use crate::content::palette;
-use crate::listen::{self, Listen as _, ListenableSource, Listener};
+use crate::listen::{self, Listen as _, Listener};
 use crate::math::Cube;
 use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::{self, BlockIndex, Space, SpaceChange};
@@ -25,8 +25,8 @@ use crate::universe::{Handle, HandleError};
 /// changed.
 pub struct UpdatingSpaceRaytracer<D: RtBlockData> {
     space: Handle<Space>,
-    graphics_options: ListenableSource<Arc<GraphicsOptions>>,
-    custom_options: ListenableSource<Arc<D::Options>>,
+    graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
+    custom_options: listen::DynSource<Arc<D::Options>>,
     state: SpaceRaytracer<D>,
     todo: listen::StoreLock<SrtTodo>,
 }
@@ -58,8 +58,8 @@ where
     /// so the space is accessed on a consistent schedule.)
     pub fn new(
         space: Handle<Space>,
-        graphics_options: ListenableSource<Arc<GraphicsOptions>>,
-        custom_options: ListenableSource<Arc<D::Options>>,
+        graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
+        custom_options: listen::DynSource<Arc<D::Options>>,
     ) -> Self {
         let todo = listen::StoreLock::new(SrtTodo {
             listener: true,
@@ -115,7 +115,7 @@ where
         // so no deadlock can actually occur. If we change this to block on the space lock,
         // we must reorder the actions here (or perhaps acquire the todo lock twice) to
         // avoid deadlock.
-        let todo: &mut SrtTodo = &mut self.todo.lock().unwrap();
+        let todo: &mut SrtTodo = &mut self.todo.lock();
         if todo.is_empty() {
             // Nothing to do
             return Ok(false);
@@ -241,8 +241,8 @@ mod tests {
     struct EquivalenceTester {
         camera: Camera,
         space: Handle<Space>,
-        graphics_options: ListenableSource<Arc<GraphicsOptions>>,
-        custom_options: ListenableSource<Arc<()>>,
+        graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
+        custom_options: listen::DynSource<Arc<()>>,
         updating: UpdatingSpaceRaytracer<CharacterRtData>,
     }
 
@@ -251,8 +251,9 @@ mod tests {
             let bounds = space.read().unwrap().bounds();
 
             // TODO: add tests of changing the options
-            let graphics_options = ListenableSource::constant(Arc::new(GraphicsOptions::default()));
-            let custom_options = ListenableSource::constant(Arc::new(()));
+            let graphics_options: listen::DynSource<_> =
+                listen::constant(Arc::new(GraphicsOptions::default()));
+            let custom_options: listen::DynSource<_> = listen::constant(Arc::new(()));
 
             let mut camera = Camera::new(
                 (*graphics_options.get()).clone(),

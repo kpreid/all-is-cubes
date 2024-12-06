@@ -24,12 +24,12 @@ use crate::universe::{HandleError, Name, Universe};
 /// changes only with notification.
 fn listen(
     block: &Block,
-    listener: impl listen::Listener<BlockChange> + 'static,
+    listener: impl listen::IntoDynListener<BlockChange, listen::DynListener<BlockChange>>,
 ) -> Result<(), EvalBlockError> {
     block
         .evaluate2(&block::EvalFilter {
             skip_eval: true,
-            listener: Some(listener.erased()),
+            listener: Some(listener.into_dyn_listener()),
             budget: Default::default(),
         })
         .map(|_| ())

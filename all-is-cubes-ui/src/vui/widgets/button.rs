@@ -32,7 +32,7 @@ use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
-use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::listen::{self, DirtyFlag};
 use all_is_cubes::math::{
     Cube, Face6, GridAab, GridCoordinate, GridSize, GridVector, Gridgid, Rgba,
 };
@@ -299,11 +299,11 @@ impl vui::WidgetController for ActionButtonController {
 }
 
 /// A single-block button that displays a boolean state derived from a
-/// [`ListenableSource`] and can be clicked.
+/// [`listen::DynSource`] and can be clicked.
 #[derive(Clone)]
 pub struct ToggleButton<D> {
     common: ButtonCommon<ToggleButtonVisualState>,
-    data_source: ListenableSource<D>,
+    data_source: listen::DynSource<D>,
     projection: Arc<dyn Fn(&D) -> bool + Send + Sync>,
     action: Action,
 }
@@ -328,7 +328,7 @@ impl<D: Clone + Sync + fmt::Debug> fmt::Debug for ToggleButton<D> {
 impl<D> ToggleButton<D> {
     #[allow(missing_docs)]
     pub fn new(
-        data_source: ListenableSource<D>,
+        data_source: listen::DynSource<D>,
         projection: impl Fn(&D) -> bool + Send + Sync + 'static,
         label: impl Into<ButtonLabel>,
         theme: &WidgetTheme,
@@ -352,7 +352,7 @@ impl<D> vui::Layoutable for ToggleButton<D> {
     }
 }
 
-// TODO: Mess of generic bounds due to the combination of Widget and ListenableSource
+// TODO: Mess of generic bounds due to the combination of Widget and listen::DynSource
 // requirements -- should we make a trait alias for these?
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton<D> {
     fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {

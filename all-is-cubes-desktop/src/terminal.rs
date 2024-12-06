@@ -13,7 +13,7 @@ use ratatui::layout::Rect;
 
 use all_is_cubes::arcstr::literal_substr;
 use all_is_cubes::euclid::{Point2D, Size2D};
-use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::listen::{self, ListenableCell};
 use all_is_cubes::math::Rgba;
 use all_is_cubes_render::camera::{self, Camera, StandardCameras, Viewport};
 use all_is_cubes_render::raytracer::{
@@ -108,7 +108,7 @@ pub fn create_terminal_session(
             .send(RtRenderer::new(
                 cameras.clone(),
                 Box::new(|v| v),
-                ListenableSource::constant(Arc::new(())),
+                listen::constant(Arc::new(())),
             ))
             .unwrap();
     }

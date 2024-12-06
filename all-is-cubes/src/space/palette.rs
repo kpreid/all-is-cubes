@@ -11,7 +11,7 @@ use core::fmt;
 use itertools::Itertools as _;
 
 use crate::block::{self, Block, BlockChange, EvaluatedBlock, AIR, AIR_EVALUATED};
-use crate::listen::{self, Listener as _};
+use crate::listen::{self, IntoDynListener as _, Listener as _};
 use crate::math::{self, OpacityCategory};
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::time::Instant;
@@ -460,11 +460,18 @@ impl SpaceBlockData {
         }
     }
 
-    fn new(block: Block, listener: impl listen::Listener<BlockChange> + 'static) -> Self {
+    fn new<L>(block: Block, listener: L) -> Self
+    where
+        L: listen::Listener<BlockChange>,
+        listen::GateListener<L>: listen::IntoDynListener<
+            BlockChange,
+            <listen::Notifier<BlockChange> as listen::Listen>::Listener,
+        >,
+    {
         // Note: Block evaluation also happens in `Space::step()`.
 
         let (gate, block_listener) = listener.gate();
-        let block_listener = block_listener.erased();
+        let block_listener: listen::DynListener<BlockChange> = block_listener.into_dyn_listener();
 
         let original_budget = block::Budget::default();
         let filter = block::EvalFilter {

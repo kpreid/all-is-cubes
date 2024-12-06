@@ -1053,7 +1053,7 @@ mod tests {
                             block: Block {
                                 primitive: Air,
                             },
-                            cache_dirty: DirtyFlag(false),
+                            cache_dirty: Flag(false),
                             listeners_ok: true,
                             notifier: Notifier(0),
                             ..

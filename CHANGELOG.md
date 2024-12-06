@@ -21,6 +21,9 @@
     - `block::EvalBlockError` is now a `struct` with an inner `ErrorKind` enum, instead of an enum, and contains more information.
     - `block::Move`’s means of construction have been changed to be more systematic and orthogonal. In particular, paired moves are constructed from unpaired ones.
 
+    - The `listen` module is now a reexport of the separate library [`nosy`](https://docs.rs/nosy).
+      Many items have changed in name and signature.
+
     - `math::FaceMap::repeat()` has been renamed to `splat()`, for consistency with the same concept in the `euclid` vector types which we use.
     * `math::Geometry` is now `math::Wireframe`, and its `translate()` method has been replaced with inherent methods on its implementors.
     - `math::GridAab::expand()` now takes unsigned values; use `GridAab::shrink()` instead of negative ones. This allows both versions to never panic.

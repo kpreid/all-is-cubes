@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::euclid::size3;
-use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::listen::{self, DirtyFlag};
 use all_is_cubes::space::SpaceTransaction;
 
 use crate::vui;
@@ -11,11 +11,11 @@ use crate::vui;
 #[derive(Debug)]
 pub(crate) struct Crosshair {
     icon: Block,
-    mouselook_mode: ListenableSource<bool>,
+    mouselook_mode: listen::DynSource<bool>,
 }
 
 impl Crosshair {
-    pub fn new(icon: Block, mouselook_mode: ListenableSource<bool>) -> Arc<Self> {
+    pub fn new(icon: Block, mouselook_mode: listen::DynSource<bool>) -> Arc<Self> {
         Arc::new(Self {
             icon,
             mouselook_mode,

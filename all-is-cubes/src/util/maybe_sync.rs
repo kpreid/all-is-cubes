@@ -120,6 +120,10 @@ impl<T> RwLock<T> {
 }
 
 impl<T: ?Sized> RwLock<T> {
+    #[expect(
+        dead_code,
+        reason = "part of a complete wrapper, but happens to be unused"
+    )]
     pub fn read(&self) -> Result<RwLockReadGuard<'_, T>, LockError<RwLockReadGuard<'_, T>>> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "std")] {
@@ -133,6 +137,10 @@ impl<T: ?Sized> RwLock<T> {
         result.map(RwLockReadGuard)
     }
 
+    #[expect(
+        dead_code,
+        reason = "part of a complete wrapper, but happens to be unused"
+    )]
     pub fn write(&self) -> Result<RwLockWriteGuard<'_, T>, LockError<RwLockWriteGuard<'_, T>>> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "std")] {

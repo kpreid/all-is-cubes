@@ -13,7 +13,7 @@ use num_traits::float::FloatCore as _;
 
 use all_is_cubes::block::{self, Block, Composite, CompositeOperator, AIR};
 use all_is_cubes::color_block;
-use all_is_cubes::listen::{DirtyFlag, ListenableSource};
+use all_is_cubes::listen::{self, DirtyFlag};
 use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, Rgb, ZeroOne};
 use all_is_cubes::space::SpaceTransaction;
 
@@ -26,7 +26,7 @@ pub struct ProgressBar {
     empty_style: BoxStyle,
     filled_style: BoxStyle,
     direction: Face6,
-    source: ListenableSource<ProgressBarState>,
+    source: listen::DynSource<ProgressBarState>,
 }
 
 /// Information presented by a [`ProgressBar`] widget.
@@ -52,7 +52,7 @@ impl ProgressBar {
     pub fn new(
         theme: &WidgetTheme,
         direction: Face6,
-        source: ListenableSource<ProgressBarState>,
+        source: listen::DynSource<ProgressBarState>,
     ) -> Arc<Self> {
         Arc::new(Self {
             empty_style: theme.progress_bar_empty.clone(),
@@ -234,7 +234,7 @@ mod tests {
             let tree = vui::leaf_widget(ProgressBar::new(
                 &widget_theme,
                 Face6::PX,
-                ListenableSource::constant(ProgressBarState::new(fraction)),
+                listen::constant(ProgressBarState::new(fraction)),
             ));
 
             let mut space = space::Builder::default()

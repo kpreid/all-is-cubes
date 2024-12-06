@@ -153,8 +153,8 @@ impl Hub {
         notification
     }
 
-    // TODO: should be optional but ProgressBar isn't friendly to that. We really need a ListenableSource::map()
-    pub(crate) fn primary_progress(&self) -> listen::ListenableSource<ProgressBarState> {
+    // TODO: should be optional but ProgressBar isn't friendly to that. We really need a listen::DynSource::map()
+    pub(crate) fn primary_progress(&self) -> listen::DynSource<ProgressBarState> {
         self.primary_progress.as_source()
     }
 

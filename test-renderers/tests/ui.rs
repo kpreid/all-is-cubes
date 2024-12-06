@@ -8,7 +8,7 @@ use clap::Parser as _;
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::linking::BlockProvider;
-use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::listen::{self, ListenableCell};
 use all_is_cubes::math::Face6;
 use all_is_cubes::time::NoTime;
 use all_is_cubes::transaction::Transaction as _;
@@ -167,7 +167,7 @@ async fn widget_progress_bar(mut context: RenderTestContext) {
 // --- Test helpers -------------------------------------------------------------------------------
 
 async fn create_session() -> Session<NoTime> {
-    let viewport = ListenableSource::constant(Viewport::with_scale(1.0, [256, 192]));
+    let viewport = listen::constant(Viewport::with_scale(1.0, [256, 192]));
     let start_time = Instant::now();
     let session: Session<NoTime> = Session::builder().ui(viewport).build().await;
     log::trace!(

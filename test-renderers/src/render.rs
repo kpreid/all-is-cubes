@@ -81,7 +81,7 @@ impl RendererFactory for RtFactory {
         Box::new(all_is_cubes_render::raytracer::RtRenderer::new(
             cameras,
             Box::new(|v| v),
-            listen::ListenableSource::constant(Arc::new(())),
+            listen::constant(Arc::new(())),
         ))
     }
 

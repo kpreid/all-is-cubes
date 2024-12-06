@@ -25,7 +25,7 @@ use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{
-    self, Listen as _, ListenableCell, ListenableCellWithLocal, ListenableSource, Listener as _,
+    self, Listen as _, ListenableCell, ListenableCellWithLocal, Listener as _,
 };
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{self, Space};
@@ -214,7 +214,7 @@ impl<I: time::Instant> Session<I> {
     }
 
     /// Returns a source for the [`Character`] that should be shown to the user.
-    pub fn character(&self) -> ListenableSource<Option<Handle<Character>>> {
+    pub fn character(&self) -> listen::DynSource<Option<Handle<Character>>> {
         self.shuttle().game_character.as_source()
     }
 
@@ -276,17 +276,17 @@ impl<I: time::Instant> Session<I> {
 
     /// Allows observing replacement of the current universe in this session, or updates to its
     /// [`WhenceUniverse`].
-    pub fn universe_info(&self) -> ListenableSource<SessionUniverseInfo> {
+    pub fn universe_info(&self) -> listen::DynSource<SessionUniverseInfo> {
         self.shuttle().game_universe_info.as_source()
     }
 
     /// What the renderer should be displaying on screen for the UI.
-    pub fn ui_view(&self) -> ListenableSource<Arc<UiViewState>> {
+    pub fn ui_view(&self) -> listen::DynSource<Arc<UiViewState>> {
         self.shuttle().ui_view()
     }
 
     /// Allows reading, and observing changes to, the current graphics options.
-    pub fn graphics_options(&self) -> ListenableSource<Arc<GraphicsOptions>> {
+    pub fn graphics_options(&self) -> listen::DynSource<Arc<GraphicsOptions>> {
         self.shuttle().graphics_options.as_source()
     }
 
@@ -297,7 +297,7 @@ impl<I: time::Instant> Session<I> {
 
     /// Returns a [`StandardCameras`] which may be used in rendering a view of this session,
     /// including following changes to the current character or universe.
-    pub fn create_cameras(&self, viewport_source: ListenableSource<Viewport>) -> StandardCameras {
+    pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
         StandardCameras::new(
             self.graphics_options(),
             viewport_source,
@@ -340,7 +340,7 @@ impl<I: time::Instant> Session<I> {
                 self.input_processor.apply_input(
                     InputTargets {
                         universe: Some(&mut shuttle.game_universe),
-                        character: shuttle.game_character.borrow().as_ref(),
+                        character: shuttle.game_character.get().as_ref(),
                         paused: Some(&self.paused),
                         graphics_options: Some(&shuttle.graphics_options),
                         control_channel: Some(&self.control_channel_sender),
@@ -682,10 +682,10 @@ impl Shuttle {
     }
 
     /// What the renderer should be displaying on screen for the UI.
-    fn ui_view(&self) -> ListenableSource<Arc<UiViewState>> {
+    fn ui_view(&self) -> listen::DynSource<Arc<UiViewState>> {
         match &self.ui {
             Some(ui) => ui.view(),
-            None => ListenableSource::constant(Arc::new(UiViewState::default())), // TODO: cache this to allocate less
+            None => listen::constant(Arc::new(UiViewState::default())), // TODO: cache this to allocate less
         }
     }
 
@@ -703,7 +703,7 @@ impl Shuttle {
         } else {
             // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
             // Character::click will validate against being a click in the wrong space.
-            if let Some(character_handle) = self.game_character.borrow() {
+            if let Some(character_handle) = self.game_character.get() {
                 let transaction = Character::click(
                     character_handle.clone(),
                     self.cursor_result.as_ref(),
@@ -745,7 +745,7 @@ impl Shuttle {
         {
             let character_read: Option<universe::UBorrow<Character>> = self
                 .game_character
-                .borrow()
+                .get()
                 .as_ref()
                 .map(|cref| cref.read().expect("TODO: decide how to handle error"));
             let space: Option<&Handle<Space>> = character_read.as_ref().map(|ch| &ch.space);
@@ -763,9 +763,9 @@ impl Shuttle {
 #[must_use]
 #[expect(missing_debug_implementations)]
 pub struct SessionBuilder<I> {
-    viewport_for_ui: Option<ListenableSource<Viewport>>,
+    viewport_for_ui: Option<listen::DynSource<Viewport>>,
 
-    fullscreen_state: ListenableSource<FullscreenState>,
+    fullscreen_state: listen::DynSource<FullscreenState>,
     set_fullscreen: FullscreenSetter,
 
     quit: Option<QuitFn>,
@@ -777,7 +777,7 @@ impl<I> Default for SessionBuilder<I> {
     fn default() -> Self {
         Self {
             viewport_for_ui: None,
-            fullscreen_state: ListenableSource::constant(None),
+            fullscreen_state: listen::constant(None),
             set_fullscreen: None,
             quit: None,
             _instant: PhantomData,
@@ -862,7 +862,7 @@ impl<I: time::Instant> SessionBuilder<I> {
     ///
     /// If this is not called, then the session will simulate a world but not present any
     /// controls for it other than those provided directly by the [`InputProcessor`].
-    pub fn ui(mut self, viewport: ListenableSource<Viewport>) -> Self {
+    pub fn ui(mut self, viewport: listen::DynSource<Viewport>) -> Self {
         self.viewport_for_ui = Some(viewport);
         self
     }
@@ -874,7 +874,7 @@ impl<I: time::Instant> SessionBuilder<I> {
     /// * `setter` is a function which attempts to change the fullscreen state.
     pub fn fullscreen(
         mut self,
-        state: ListenableSource<Option<bool>>,
+        state: listen::DynSource<Option<bool>>,
         setter: Option<Arc<dyn Fn(bool) + Send + Sync>>,
     ) -> Self {
         self.fullscreen_state = state;
@@ -1020,7 +1020,7 @@ impl<I: time::Instant, T: Fmt<StatusText>> fmt::Display for InfoText<'_, I, T> {
                 .session
                 .shuttle
                 .as_ref()
-                .and_then(|shuttle| shuttle.game_character.borrow().as_ref())
+                .and_then(|shuttle| shuttle.game_character.get().as_ref())
             {
                 empty = false;
                 write!(f, "{}", character_handle.read().unwrap().refmt(&fopt)).unwrap();
@@ -1123,7 +1123,7 @@ impl fmt::Debug for MainTaskContext {
 impl MainTaskContext {
     /// Returns a [`StandardCameras`] which may be used in rendering a view of this session,
     /// including following changes to the current character or universe.
-    pub fn create_cameras(&self, viewport_source: ListenableSource<Viewport>) -> StandardCameras {
+    pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
         self.with_ref(|shuttle| {
             StandardCameras::new(
                 shuttle.graphics_options.as_source(),
@@ -1376,7 +1376,7 @@ mod tests {
 
         // Set up task (that won't do anything until it's polled as part of stepping)
         let (send, recv) = oneshot::channel();
-        let mut cameras = session.create_cameras(ListenableSource::constant(Viewport::ARBITRARY));
+        let mut cameras = session.create_cameras(listen::constant(Viewport::ARBITRARY));
         session.set_main_task({
             let noticed_step = noticed_step.clone();
             move |mut ctx| async move {
@@ -1435,7 +1435,7 @@ mod tests {
     #[tokio::test]
     async fn input_is_processed_even_without_character() {
         let mut session = Session::<time::NoTime>::builder()
-            .ui(ListenableSource::constant(Viewport::ARBITRARY))
+            .ui(listen::constant(Viewport::ARBITRARY))
             .build()
             .await;
         assert!(!session.paused.get());

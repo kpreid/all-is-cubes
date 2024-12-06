@@ -1,14 +1,14 @@
 //! “Hot-reloadable” data sources such as shaders.
 //!
 //! This module builds on top of the `resource` library to add change notification
-//! via a background thread and all-is-cubes's `ListenableSource` mechanism.
+//! via a background thread and all-is-cubes's `ListenableCell` mechanism.
 
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 use std::time::Duration;
 
 use resource::Resource;
 
-use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::listen::{self, ListenableCell};
 
 #[derive(Clone)]
 pub(crate) struct Reloadable(Arc<ReloadableInner>);
@@ -55,7 +55,7 @@ impl Reloadable {
         }
     }
 
-    pub fn as_source(&self) -> ListenableSource<Arc<str>> {
+    pub fn as_source(&self) -> listen::DynSource<Arc<str>> {
         self.0.cell.as_source()
     }
 }

@@ -11,7 +11,7 @@ use core::fmt;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{self, point2, vec2};
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen;
 use all_is_cubes::math::{Rgba, ZeroOne};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Handle;
@@ -40,7 +40,7 @@ pub struct RtRenderer<D: RtBlockData = ()> {
     /// The output images will alway
     size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
 
-    custom_options: ListenableSource<Arc<D::Options>>,
+    custom_options: listen::DynSource<Arc<D::Options>>,
     /// Borrowable copy of the value in `custom_options`.
     custom_options_cache: Arc<D::Options>,
 
@@ -61,7 +61,7 @@ where
     pub fn new(
         cameras: StandardCameras,
         size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
-        custom_options: ListenableSource<Arc<D::Options>>,
+        custom_options: listen::DynSource<Arc<D::Options>>,
     ) -> Self {
         RtRenderer {
             rts: Layers::<Option<_>>::default(),
@@ -95,8 +95,8 @@ where
         fn sync_space<D>(
             cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
             optional_space: Option<&Handle<Space>>,
-            graphics_options_source: &ListenableSource<Arc<GraphicsOptions>>,
-            custom_options_source: &ListenableSource<Arc<D::Options>>,
+            graphics_options_source: &listen::DynSource<Arc<GraphicsOptions>>,
+            custom_options_source: &listen::DynSource<Arc<D::Options>>,
             anything_changed: &mut bool,
         ) -> Result<(), RenderError>
         where

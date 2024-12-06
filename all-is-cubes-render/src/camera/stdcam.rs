@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use core::fmt;
 
 use all_is_cubes::character::{cursor_raycast, Character, Cursor};
-use all_is_cubes::listen::{DirtyFlag, ListenableCell, ListenableSource};
+use all_is_cubes::listen::{self, DirtyFlag, ListenableCell};
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Universe};
@@ -56,7 +56,7 @@ impl<T> Layers<T> {
 /// Bundle of inputs specifying the “standard” configuration of [`Camera`]s and other
 /// things to render an All is Cubes scene and user interface.
 ///
-/// All of its data is provided through [`ListenableSource`]s, and consists of:
+/// All of its data is provided through [`listen::DynSource`]s, and consists of:
 ///
 /// * [`GraphicsOptions`].
 /// * A [`Viewport`] specifying the dimensions of image to render.
@@ -68,7 +68,7 @@ impl<T> Layers<T> {
 /// and used to update the [`Camera`] data. Those cameras, and copies of the input
 /// data, are then available for use while rendering.
 ///
-/// Because every input is a [`ListenableSource`], it is never necessary to call a setter.
+/// Because every input is a [`listen::DynSource`], it is never necessary to call a setter.
 /// Every [`StandardCameras`] which was created with the same sources will have the same
 /// results (after `update()`).
 ///
@@ -78,10 +78,10 @@ impl<T> Layers<T> {
 #[derive(Debug)]
 pub struct StandardCameras {
     /// Cameras are synced with this
-    graphics_options: ListenableSource<Arc<GraphicsOptions>>,
+    graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
     graphics_options_dirty: DirtyFlag,
 
-    character_source: ListenableSource<Option<Handle<Character>>>,
+    character_source: listen::DynSource<Option<Handle<Character>>>,
     /// Tracks whether the character was replaced (not whether its view changed).
     character_dirty: DirtyFlag,
     character: Option<Handle<Character>>,
@@ -89,11 +89,11 @@ pub struct StandardCameras {
     /// TODO: This should be in a `Layers` along with `ui_state`...?
     world_space: ListenableCell<Option<Handle<Space>>>,
 
-    ui_source: ListenableSource<Arc<UiViewState>>,
+    ui_source: listen::DynSource<Arc<UiViewState>>,
     ui_dirty: DirtyFlag,
     ui_space: Option<Handle<Space>>,
 
-    viewport_source: ListenableSource<Viewport>,
+    viewport_source: listen::DynSource<Viewport>,
     viewport_dirty: DirtyFlag,
 
     cameras: Layers<Camera>,
@@ -104,10 +104,10 @@ impl StandardCameras {
     /// want to discourage use of this directly.
     #[doc(hidden)]
     pub fn new(
-        graphics_options: ListenableSource<Arc<GraphicsOptions>>,
-        viewport_source: ListenableSource<Viewport>,
-        character_source: ListenableSource<Option<Handle<Character>>>,
-        ui_source: ListenableSource<Arc<UiViewState>>,
+        graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
+        viewport_source: listen::DynSource<Viewport>,
+        character_source: listen::DynSource<Option<Handle<Character>>>,
+        ui_source: listen::DynSource<Arc<UiViewState>>,
     ) -> Self {
         // TODO: Add a unit test that each of these listeners works as intended.
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
@@ -153,10 +153,10 @@ impl StandardCameras {
         universe: &Universe,
     ) -> Self {
         Self::new(
-            ListenableSource::constant(Arc::new(graphics_options)),
-            ListenableSource::constant(viewport),
-            ListenableSource::constant(universe.get_default_character()),
-            ListenableSource::constant(Default::default()),
+            listen::constant(Arc::new(graphics_options)),
+            listen::constant(viewport),
+            listen::constant(universe.get_default_character()),
+            listen::constant(Default::default()),
         )
     }
 
@@ -264,7 +264,7 @@ impl StandardCameras {
 
     /// Returns a clone of the source of graphics options that this [`StandardCameras`]
     /// was created with.
-    pub fn graphics_options_source(&self) -> ListenableSource<Arc<GraphicsOptions>> {
+    pub fn graphics_options_source(&self) -> listen::DynSource<Arc<GraphicsOptions>> {
         self.graphics_options.clone()
     }
 
@@ -281,10 +281,10 @@ impl StandardCameras {
 
     /// Returns the space that should be drawn as the game world, using `self.cameras().world`.
     ///
-    /// This is a [`ListenableSource`] to make it simple to cache the Space rendering data and
+    /// This is a [`listen::DynSource`] to make it simple to cache the Space rendering data and
     /// follow space transitions.
     /// It updates when [`Self::update()`] is called.
-    pub fn world_space(&self) -> ListenableSource<Option<Handle<Space>>> {
+    pub fn world_space(&self) -> listen::DynSource<Option<Handle<Space>>> {
         self.world_space.as_source()
     }
 
@@ -293,7 +293,7 @@ impl StandardCameras {
     /// This implements [`GraphicsOptions::show_ui`] by returning [`None`] when the option is
     /// false.
     ///
-    /// TODO: Make this also a [`ListenableSource`]
+    /// TODO: Make this also a [`listen::DynSource`]
     pub fn ui_space(&self) -> Option<&Handle<Space>> {
         self.ui_space.as_ref()
     }
@@ -307,7 +307,7 @@ impl StandardCameras {
     }
 
     /// Returns a clone of the viewport source this is following.
-    pub fn viewport_source(&self) -> ListenableSource<Viewport> {
+    pub fn viewport_source(&self) -> listen::DynSource<Viewport> {
         self.viewport_source.clone()
     }
 
@@ -411,10 +411,10 @@ mod tests {
     fn cameras_follow_character_and_world() {
         let character_cell = ListenableCell::new(None);
         let mut cameras = StandardCameras::new(
-            ListenableSource::constant(Arc::new(GraphicsOptions::default())),
-            ListenableSource::constant(Viewport::ARBITRARY),
+            listen::constant(Arc::new(GraphicsOptions::default())),
+            listen::constant(Viewport::ARBITRARY),
             character_cell.as_source(),
-            ListenableSource::constant(Arc::new(UiViewState::default())),
+            listen::constant(Arc::new(UiViewState::default())),
         );
 
         let world_source = cameras.world_space();
@@ -454,9 +454,9 @@ mod tests {
         let options_cell = ListenableCell::new(Arc::new(GraphicsOptions::default()));
         let mut cameras = StandardCameras::new(
             options_cell.as_source(),
-            ListenableSource::constant(Viewport::ARBITRARY),
-            ListenableSource::constant(None),
-            ListenableSource::constant(Arc::new(UiViewState::default())),
+            listen::constant(Viewport::ARBITRARY),
+            listen::constant(None),
+            listen::constant(Arc::new(UiViewState::default())),
         );
         let mut cameras2 = cameras.clone();
 

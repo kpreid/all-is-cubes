@@ -7,7 +7,7 @@ use alloc::sync::Arc;
 use core::{fmt, mem, ops};
 
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
-use crate::listen::{self, Gate, Listen, Listener, Notifier};
+use crate::listen::{self, Gate, IntoDynListener as _, Listener, Notifier};
 use crate::transaction::{self, Equal, Transaction};
 use crate::universe::{HandleVisitor, VisitHandles};
 
@@ -116,7 +116,7 @@ impl BlockDef {
         } = filter;
 
         if let Some(listener) = listener {
-            <BlockDef as Listen>::listen(self, listener.clone());
+            <BlockDef as listen::Listen>::listen(self, listener.clone());
         }
 
         if skip_eval {
@@ -148,7 +148,7 @@ impl BlockDefState {
         let cache = block
             .evaluate2(&block::EvalFilter {
                 skip_eval: false,
-                listener: Some(block_listener.erased()),
+                listener: Some(block_listener.into_dyn_listener()),
                 budget: Default::default(),
             })
             .map(MinEval::from);
@@ -233,10 +233,11 @@ impl fmt::Debug for BlockDef {
 
 /// Registers a listener for whenever the result of evaluation of this block definition changes.
 /// Note that this only occurs when the owning [`Universe`] is being stepped.
-impl Listen for BlockDef {
+impl listen::Listen for BlockDef {
     type Msg = BlockChange;
+    type Listener = <Notifier<Self::Msg> as listen::Listen>::Listener;
 
-    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
+    fn listen_raw(&self, listener: Self::Listener) {
         self.notifier.listen_raw(listener)
     }
 }

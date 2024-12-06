@@ -13,7 +13,7 @@ use all_is_cubes::block::{Block, Resolution::*, AIR};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::color_block;
 use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Size3D, Vector3D};
-use all_is_cubes::listen::{ListenableCell, ListenableSource};
+use all_is_cubes::listen::{self, ListenableCell};
 use all_is_cubes::math::{
     ps32, rgb_const, rgba_const, zo32, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
     GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol,
@@ -450,10 +450,10 @@ async fn follow_character_change(context: RenderTestContext) {
     let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
     let character_cell = ListenableCell::new(Some(c1));
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
-        ListenableSource::constant(COMMON_VIEWPORT),
+        listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
+        listen::constant(COMMON_VIEWPORT),
         character_cell.as_source(),
-        ListenableSource::constant(Arc::new(UiViewState::default())),
+        listen::constant(Arc::new(UiViewState::default())),
     );
     let mut renderer = context.renderer(cameras);
 
@@ -507,9 +507,9 @@ async fn follow_options_change(mut context: RenderTestContext) {
     let options_cell = ListenableCell::new(Arc::new(options_1));
     let cameras: StandardCameras = StandardCameras::new(
         options_cell.as_source(),
-        ListenableSource::constant(COMMON_VIEWPORT),
-        ListenableSource::constant(universe.get_default_character()),
-        ListenableSource::constant(Arc::new(UiViewState::default())),
+        listen::constant(COMMON_VIEWPORT),
+        listen::constant(universe.get_default_character()),
+        listen::constant(Arc::new(UiViewState::default())),
     );
 
     // Render the image once. This isn't that interesting a comparison test,
@@ -646,7 +646,7 @@ async fn icons(mut context: RenderTestContext) {
     ]
     .map(|(label_key, state)| {
         block_from_widget(&vui::leaf_widget(widgets::ToggleButton::new(
-            ListenableSource::constant(state),
+            listen::constant(state),
             |state| *state,
             ui_blocks_p[label_key].clone(),
             &widget_theme,
@@ -730,10 +730,10 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     options.lighting_display = LightingOption::Flat;
     options.show_ui = show_ui;
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(Arc::new(options.clone())),
-        ListenableSource::constant(COMMON_VIEWPORT),
-        ListenableSource::constant(universe.get_default_character()),
-        ListenableSource::constant(Arc::new(UiViewState {
+        listen::constant(Arc::new(options.clone())),
+        listen::constant(COMMON_VIEWPORT),
+        listen::constant(universe.get_default_character()),
+        listen::constant(Arc::new(UiViewState {
             space: Some(ui_space(&mut universe)),
             view_transform: ViewTransform::identity(),
             graphics_options: options,
@@ -777,10 +777,10 @@ async fn layers_none_but_text(mut context: RenderTestContext) {
 async fn layers_ui_only(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
-        ListenableSource::constant(COMMON_VIEWPORT),
-        ListenableSource::constant(None),
-        ListenableSource::constant(Arc::new(UiViewState {
+        listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
+        listen::constant(COMMON_VIEWPORT),
+        listen::constant(None),
+        listen::constant(Arc::new(UiViewState {
             space: Some(ui_space(&mut universe)),
             view_transform: ViewTransform::identity(),
             graphics_options: GraphicsOptions::UNALTERED_COLORS,
@@ -978,10 +978,10 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let zero = Viewport::with_scale(1.00, [0, 0]);
     let viewport_cell = ListenableCell::new(zero);
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(Arc::new(GraphicsOptions::default())),
+        listen::constant(Arc::new(GraphicsOptions::default())),
         viewport_cell.as_source(),
-        ListenableSource::constant(universe.get_default_character()),
-        ListenableSource::constant(Arc::new(UiViewState::default())),
+        listen::constant(universe.get_default_character()),
+        listen::constant(Arc::new(UiViewState::default())),
     );
     let overlays = Overlays {
         cursor: None,

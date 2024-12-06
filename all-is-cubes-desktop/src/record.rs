@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 
-use all_is_cubes::listen::{self, Listen as _, ListenableSource};
+use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 use all_is_cubes_port::{ExportSet, Format};
@@ -168,16 +168,16 @@ impl Recorder {
                 let export_set = if options.save_all || export_format == Format::AicJson {
                     ExportSet::all_of_universe(universe)
                 } else {
-                    ExportSet::from_spaces(vec![cameras.world_space().get().ok_or_else(
-                        || match universe.whence.document_name() {
+                    ExportSet::from_spaces(vec![cameras.world_space().get().ok_or_else(|| {
+                        match universe.whence.document_name() {
                             None => {
                                 anyhow::anyhow!("universe contains no default space to export")
                             }
                             Some(name) => anyhow::anyhow!(
                                 "universe {name:?} contains no default space to export",
                             ),
-                        },
-                    )?])
+                        }
+                    })?])
                 };
 
                 RecorderInner::Export {
@@ -208,7 +208,7 @@ impl Recorder {
                 let mut renderer = RtRenderer::new(
                     rec.cameras.clone(),
                     Box::new(|v| v),
-                    ListenableSource::constant(Arc::new(())),
+                    listen::constant(Arc::new(())),
                 );
                 renderer.update(None).unwrap();
 
@@ -328,8 +328,9 @@ impl Recorder {
 
 impl listen::Listen for Recorder {
     type Msg = Status;
+    type Listener = <listen::Notifier<Self::Msg> as listen::Listen>::Listener;
 
-    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
+    fn listen_raw(&self, listener: Self::Listener) {
         if let Some(notifier) = self.status_notifier.upgrade() {
             notifier.listen_raw(listener)
         }

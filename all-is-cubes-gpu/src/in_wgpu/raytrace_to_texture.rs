@@ -16,7 +16,7 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::drawing::embedded_graphics::pixelcolor::PixelColor;
 use all_is_cubes::drawing::embedded_graphics::{draw_target::DrawTarget, prelude::Point, Pixel};
 use all_is_cubes::euclid::{point2, vec2, Box2D};
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen;
 use all_is_cubes::math::{Rgb, Rgba, VectorOps as _};
 use all_is_cubes_render::camera::{area_usize, Camera, StandardCameras, Viewport};
 use all_is_cubes_render::raytracer::{ColorBuf, RtRenderer};
@@ -51,7 +51,7 @@ impl RaytraceToTexture {
             rtr: RtRenderer::new(
                 cameras,
                 Box::new(raytracer_size_policy),
-                ListenableSource::constant(Arc::new(())),
+                listen::constant(Arc::new(())),
             ),
             pixel_picker: PixelPicker::new(initial_viewport, false),
             dirty_pixels: initial_viewport.pixel_count().unwrap(),

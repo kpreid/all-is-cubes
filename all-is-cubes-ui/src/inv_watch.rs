@@ -1,7 +1,7 @@
 //! Support for widgets that display inventory contents.
 //!
 //! TODO: This is a pattern that, if it works out, probably generalizes to many other
-//! "derived information from a `ListenableSource` that requires computation" and should become
+//! "derived information from a `listen::DynSource` that requires computation" and should become
 //! general code that handles the re-listening problem.
 
 use alloc::sync::Arc;
@@ -21,7 +21,7 @@ type Owner = Option<Handle<Character>>;
 #[derive(Debug)]
 pub(crate) struct InventoryWatcher {
     /// Source of what inventory we should be looking at.
-    inventory_source: listen::ListenableSource<Owner>,
+    inventory_source: listen::DynSource<Owner>,
 
     /// Last value gotten from `inventory_source`.
     inventory_owner: Owner,
@@ -51,7 +51,7 @@ impl InventoryWatcher {
     ///
     /// `ui_universe` will be used to create anonymous resources used to depict the inventory.
     pub fn new(
-        inventory_source: listen::ListenableSource<Option<Handle<Character>>>,
+        inventory_source: listen::DynSource<Option<Handle<Character>>>,
         _ui_universe: &mut Universe,
     ) -> Self {
         let dirty = listen::DirtyFlag::new(true);
@@ -183,8 +183,9 @@ impl InventoryWatcher {
 
 impl listen::Listen for InventoryWatcher {
     type Msg = WatcherChange;
+    type Listener = <listen::Notifier<Self::Msg> as listen::Listen>::Listener;
 
-    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
+    fn listen_raw(&self, listener: Self::Listener) {
         self.notifier.listen_raw(listener)
     }
 }

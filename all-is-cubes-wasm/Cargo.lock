@@ -51,6 +51,7 @@ dependencies = [
  "log",
  "manyfmt",
  "mutants",
+ "nosy",
  "num-traits",
  "ordered-float",
  "paste",
@@ -1190,6 +1191,18 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "nosy"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb59fd933a0061e11498ce4eebcb47a2b8baa8f22b163c5d21ea4d090cdd1cb2"
+dependencies = [
+ "arrayvec",
+ "cfg-if",
+ "manyfmt",
+ "mutants",
 ]
 
 [[package]]

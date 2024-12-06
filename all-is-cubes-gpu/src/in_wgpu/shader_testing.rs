@@ -13,7 +13,7 @@ use std::sync::Arc;
 use wgpu::util::DeviceExt as _;
 
 use all_is_cubes::euclid::{point3, Rotation3D};
-use all_is_cubes::listen::ListenableSource;
+use all_is_cubes::listen;
 use all_is_cubes::math::{ps64, Face6, FreeVector, GridSize, GridVector, Rgba};
 use all_is_cubes::time;
 use all_is_cubes_mesh::{BlockVertex, Coloring};
@@ -82,7 +82,7 @@ where
         &device,
         &shaders,
         &fbt,
-        ListenableSource::constant(Arc::new(GraphicsOptions::default())),
+        listen::constant(Arc::new(GraphicsOptions::default())),
     );
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {

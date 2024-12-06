@@ -89,8 +89,9 @@ impl Shaders {
 
 impl listen::Listen for Shaders {
     type Msg = ();
-    fn listen_raw(&self, listener: listen::DynListener<()>) {
-        self.modules_changed.listen(listener)
+    type Listener = <listen::Notifier<Self::Msg> as listen::Listen>::Listener;
+    fn listen_raw(&self, listener: Self::Listener) {
+        self.modules_changed.listen_raw(listener)
     }
 }
 
@@ -99,18 +100,14 @@ impl listen::Listen for Shaders {
 /// The code on initial creation must be valid or creation will panic.
 pub(crate) struct ReloadableShader {
     label: String,
-    source: listen::ListenableSource<Arc<str>>,
+    source: listen::DynSource<Arc<str>>,
     dirty: listen::DirtyFlag,
     current_module: Identified<wgpu::ShaderModule>,
     next_module: Option<BoxFuture<'static, Result<wgpu::ShaderModule, wgpu::Error>>>,
 }
 
 impl ReloadableShader {
-    fn new(
-        device: &wgpu::Device,
-        label: String,
-        wgsl_source: listen::ListenableSource<Arc<str>>,
-    ) -> Self {
+    fn new(device: &wgpu::Device, label: String, wgsl_source: listen::DynSource<Arc<str>>) -> Self {
         let dirty = listen::DirtyFlag::listening(false, &wgsl_source);
         let current_module =
             Identified::new(device.create_shader_module(wgpu::ShaderModuleDescriptor {
