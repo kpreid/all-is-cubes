@@ -130,7 +130,7 @@ impl InventoryWatcher {
                             // or even better, give Handles a way to notify when they become ready
                             // to read.
                             self.dirty.set();
-                            self.notifier.notify(WatcherChange::NeedsUpdate);
+                            self.notifier.notify(&WatcherChange::NeedsUpdate);
                         }
                         empty_inventory
                     }
@@ -152,11 +152,11 @@ impl InventoryWatcher {
 
         if *new_inventory != self.inventory {
             self.inventory = new_inventory.clone();
-            self.notifier.notify(WatcherChange::Inventory);
+            self.notifier.notify(&WatcherChange::Inventory);
         }
         if new_selections != self.selected_slots {
             self.selected_slots = new_selections;
-            self.notifier.notify(WatcherChange::Selections);
+            self.notifier.notify(&WatcherChange::Selections);
         }
     }
 

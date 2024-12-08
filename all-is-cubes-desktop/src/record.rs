@@ -246,7 +246,7 @@ impl Recorder {
                 } else {
                     // Ignore other frames
                 }
-                status_notifier.notify(Status {
+                status_notifier.notify(&Status {
                     frame_number: this_frame_number,
                     flaws: Flaws::empty(), // TODO: should have a concept of export flaws
                 });

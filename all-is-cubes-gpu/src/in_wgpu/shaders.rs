@@ -82,7 +82,7 @@ impl Shaders {
         }
 
         if changed {
-            modules_changed.notify(());
+            modules_changed.notify(&());
         }
     }
 }

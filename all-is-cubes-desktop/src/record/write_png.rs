@@ -28,7 +28,7 @@ pub(crate) fn threaded_write_frames(
                 Ok((status, image)) => {
                     let image_data: &[[u8; 4]] = image.data.as_ref();
                     png_writer.write_image_data(image_data.as_flattened())?;
-                    status_notifier.notify(status);
+                    status_notifier.notify(&status);
                 }
                 Err(mpsc::RecvError) => {
                     break 'frame_loop;

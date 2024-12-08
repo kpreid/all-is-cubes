@@ -99,7 +99,7 @@ impl Notification {
     /// Replace the existing content of the notification.
     pub fn set_content(&self, content: NotificationContent) {
         *self.shared.content.lock().unwrap() = content;
-        self.shared.notifier.notify(());
+        self.shared.notifier.notify(&());
     }
 }
 

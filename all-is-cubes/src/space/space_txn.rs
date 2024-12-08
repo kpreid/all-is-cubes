@@ -269,7 +269,7 @@ impl Transaction for SpaceTransaction {
             }
 
             for fluff in fluff.iter().cloned() {
-                space.fluff_notifier.notify(super::SpaceFluff {
+                space.fluff_notifier.notify(&super::SpaceFluff {
                     position: cube,
                     fluff,
                 });

@@ -548,7 +548,7 @@ impl Space {
                 .light_needs_update_in_region(region, light::Priority::UNINIT);
             // TODO: also need to activate tick_action if present.
             // And see if we can share more of the logic of this with new_from_builder().
-            self.change_notifier.notify(SpaceChange::EveryBlock);
+            self.change_notifier.notify(&SpaceChange::EveryBlock);
             Ok(())
         } else {
             // Fall back to the generic strategy.
@@ -715,7 +715,7 @@ impl Space {
                         Err(_e) => {
                             // The operation produced a transaction which, itself, cannot execute
                             // against the state of the Space. Omit it from the set.
-                            self.fluff_notifier.notify(SpaceFluff {
+                            self.fluff_notifier.notify(&SpaceFluff {
                                 position: cube,
                                 fluff: Fluff::BlockFault(fluff::BlockFault::TickPrecondition(
                                     space_txn.bounds().unwrap_or_else(|| cube.grid_aab()),
@@ -729,7 +729,7 @@ impl Space {
                 Err(_) => {
                     // The operation failed to apply. This is normal if it just isn't the right
                     // conditions yet.
-                    self.fluff_notifier.notify(SpaceFluff {
+                    self.fluff_notifier.notify(&SpaceFluff {
                         position: cube,
                         fluff: Fluff::BlockFault(fluff::BlockFault::TickPrecondition(
                             cube.grid_aab(),
@@ -775,7 +775,7 @@ impl Space {
         } else {
             // Don't run the transaction. Instead, report conflicts.
             for cube in first_pass_cubes {
-                self.fluff_notifier.notify(SpaceFluff {
+                self.fluff_notifier.notify(&SpaceFluff {
                     position: cube,
                     fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(
                         // pick an arbitrary conflicting txn — best we can do for now till we
@@ -789,7 +789,7 @@ impl Space {
                 });
             }
             for cube in first_pass_conflicts.keys().copied() {
-                self.fluff_notifier.notify(SpaceFluff {
+                self.fluff_notifier.notify(&SpaceFluff {
                     position: cube,
                     fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(
                         first_pass_txn.bounds().unwrap_or_else(|| cube.grid_aab()),

@@ -67,10 +67,10 @@ impl<M> Notifier<M> {
     /// # assert_eq!(notifier_1.count(), 1);
     /// # assert_eq!(notifier_2.count(), 1);
     ///
-    /// notifier_1.notify("a");
+    /// notifier_1.notify(&"a");
     /// assert_eq!(sink.drain(), vec!["a"]);
     /// drop(notifier_2);
-    /// notifier_1.notify("a");
+    /// notifier_1.notify(&"a");
     /// assert!(sink.drain().is_empty());
     ///
     /// # assert_eq!(notifier_1.count(), 0);
@@ -80,8 +80,8 @@ impl<M> Notifier<M> {
     }
 
     /// Deliver a message to all [`Listener`]s.
-    pub fn notify(&self, message: M) {
-        self.notify_many(&[message])
+    pub fn notify(&self, message: &M) {
+        self.notify_many(core::slice::from_ref(message))
     }
 
     /// Deliver multiple messages to all [`Listener`]s.
@@ -262,7 +262,7 @@ mod tests {
     fn notifier_basics_and_debug() {
         let cn: Notifier<u8> = Notifier::new();
         assert_eq!(format!("{cn:?}"), "Notifier(0)");
-        cn.notify(0);
+        cn.notify(&0);
         assert_eq!(format!("{cn:?}"), "Notifier(0)");
         let sink = Sink::new();
         cn.listen(sink.listener());
@@ -270,8 +270,8 @@ mod tests {
         // type annotation to prevent spurious inference failures in the presence
         // of other compiler errors
         assert_eq!(sink.drain(), Vec::<u8>::new());
-        cn.notify(1);
-        cn.notify(2);
+        cn.notify(&1);
+        cn.notify(&2);
         assert_eq!(sink.drain(), vec![1, 2]);
         assert_eq!(format!("{cn:?}"), "Notifier(1)");
     }

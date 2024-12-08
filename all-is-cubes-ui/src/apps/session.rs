@@ -381,7 +381,7 @@ impl<I: time::Instant> Session<I> {
 
                 // --- Post-step activities ---
 
-                shuttle.session_event_notifier.notify(Event::Stepped);
+                shuttle.session_event_notifier.notify(&Event::Stepped);
 
                 // Let main task do things triggered by the step.
                 // Note that we do this once per step even with catch-up.
@@ -602,7 +602,7 @@ impl<I: time::Instant> Session<I> {
         if let Err(error) = &result {
             let shuttle = self.shuttle();
             for fluff in error.fluff() {
-                shuttle.fluff_notifier.notify(fluff);
+                shuttle.fluff_notifier.notify(&fluff);
             }
         } else {
             // success effects should come from the tool's transaction

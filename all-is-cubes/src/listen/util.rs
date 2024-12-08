@@ -176,8 +176,8 @@ mod tests {
         assert_eq!(notifier.count(), 1);
 
         // Try delivering messages
-        notifier.notify(Some(1));
-        notifier.notify(None);
+        notifier.notify(&Some(1));
+        notifier.notify(&None);
         assert_eq!(sink.drain(), vec![1]);
 
         // Drop the sink and the notifier should observe it gone
@@ -262,13 +262,13 @@ mod tests {
         assert_eq!(notifier.count(), 1);
 
         // Try delivering messages
-        notifier.notify(1);
+        notifier.notify(&1);
         assert_eq!(sink.drain(), vec![1]);
 
         // Drop the gate and messages should stop passing immediately
         // (even though we didn't even trigger notifier cleanup by calling count())
         drop(gate);
-        notifier.notify(2);
+        notifier.notify(&2);
         assert_eq!(sink.drain(), Vec::<i32>::new());
 
         assert_eq!(notifier.count(), 0);

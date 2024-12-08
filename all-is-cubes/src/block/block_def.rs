@@ -171,7 +171,7 @@ impl BlockDefState {
             // If there was an evaluation error, then we may also be missing listeners.
             // Start over.
             *self = BlockDefState::new(self.block.clone());
-            notifier.notify(BlockChange::new());
+            notifier.notify(&BlockChange::new());
             info.updated = 1;
         } else if self.cache_dirty.get_and_clear() {
             // We have a cached value, but it is stale.
@@ -194,7 +194,7 @@ impl BlockDefState {
                 // In case the definition changed in the way which turned out not to affect the
                 // evaluation, compare old and new before notifying.
                 if old_cache != self.cache {
-                    notifier.notify(BlockChange::new());
+                    notifier.notify(&BlockChange::new());
                     info.updated = 1;
                 }
             }
@@ -341,7 +341,7 @@ impl Transaction for BlockDefTransaction {
     ) -> Result<(), transaction::CommitError> {
         if let Equal(Some(new)) = &self.new {
             target.state = BlockDefState::new(new.clone());
-            target.notifier.notify(BlockChange::new());
+            target.notifier.notify(&BlockChange::new());
         }
         Ok(())
     }

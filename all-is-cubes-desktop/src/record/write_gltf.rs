@@ -180,7 +180,7 @@ pub(super) fn start_gltf_writing(
                                 })
                                 .collect::<Vec<_>>(),
                         );
-                        status_notifier.notify(super::Status {
+                        status_notifier.notify(&super::Status {
                             frame_number,
                             flaws,
                         });

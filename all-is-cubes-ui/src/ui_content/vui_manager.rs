@@ -379,7 +379,7 @@ impl Vui {
     /// Present the UI visual response to a click (that has already been handled),
     /// either a small indication that a button was pressed or an error message.
     pub fn show_click_result(&self, button: usize, result: Result<(), ToolError>) {
-        self.cue_channel.notify(CueMessage::Clicked(button));
+        self.cue_channel.notify(&CueMessage::Clicked(button));
         match result {
             Ok(()) => {}
             Err(error) => self.show_tool_error(&error),

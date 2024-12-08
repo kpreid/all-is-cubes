@@ -63,7 +63,7 @@ impl<T> ListenableCell<T> {
             .notifier
             .as_ref()
             .expect("can't happen: set() on a constant cell")
-            .notify(());
+            .notify(&());
     }
 
     /// Sets the contained value to the given value iff they are unequal.
@@ -91,7 +91,7 @@ impl<T> ListenableCell<T> {
             .notifier
             .as_ref()
             .expect("can't happen: set() on a constant cell")
-            .notify(());
+            .notify(&());
     }
 
     /// Sets the contained value by modifying a clone of the old value using the provided

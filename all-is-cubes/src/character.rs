@@ -277,7 +277,7 @@ impl Character {
             && slot != self.selected_slots[which_selection]
         {
             self.selected_slots[which_selection] = slot;
-            self.notifier.notify(CharacterChange::Selections);
+            self.notifier.notify(&CharacterChange::Selections);
         }
     }
 
@@ -735,7 +735,7 @@ impl Transaction for CharacterTransaction {
 
         self.inventory
             .commit(&mut target.inventory, inventory_check, &mut |change| {
-                target.notifier.notify(CharacterChange::Inventory(change));
+                target.notifier.notify(&CharacterChange::Inventory(change));
             })
             .map_err(|e| e.context("inventory".into()))?;
 

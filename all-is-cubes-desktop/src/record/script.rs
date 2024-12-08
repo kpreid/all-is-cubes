@@ -215,7 +215,7 @@ impl ScriptRecorder {
         );
 
         // Script recording is trivial so we can immediately notify success
-        self.status_notifier.notify(super::Status {
+        self.status_notifier.notify(&super::Status {
             frame_number: this_frame_number,
             flaws: Flaws::empty(),
         });
