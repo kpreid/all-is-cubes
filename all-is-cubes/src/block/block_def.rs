@@ -231,13 +231,13 @@ impl fmt::Debug for BlockDef {
     }
 }
 
+/// Registers a listener for whenever the result of evaluation of this block definition changes.
+/// Note that this only occurs when the owning [`Universe`] is being stepped.
 impl Listen for BlockDef {
     type Msg = BlockChange;
 
-    /// Registers a listener for whenever the result of evaluation of this block definition changes.
-    /// Note that this only occurs when the owning [`Universe`] is being stepped.
-    fn listen<L: Listener<BlockChange> + 'static>(&self, listener: L) {
-        self.notifier.listen(listener)
+    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
+        self.notifier.listen_raw(listener)
     }
 }
 

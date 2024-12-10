@@ -89,7 +89,7 @@ impl Shaders {
 
 impl listen::Listen for Shaders {
     type Msg = ();
-    fn listen<L: listen::Listener<Self::Msg> + 'static>(&self, listener: L) {
+    fn listen_raw(&self, listener: listen::DynListener<()>) {
         self.modules_changed.listen(listener)
     }
 }

@@ -45,7 +45,20 @@ pub trait Listen {
     /// Note that listeners are removed only via their returning [`false`] from
     /// [`Listener::receive()`]; there is no operation to remove a listener,
     /// nor are subscriptions deduplicated.
-    fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L);
+    fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L)
+    where
+        Self: Sized,
+    {
+        self.listen_raw(listener.erased())
+    }
+
+    /// Subscribe the given [`Listener`] to this source of messages,
+    /// without automatic type conversion.
+    ///
+    /// Note that listeners are removed only via their returning [`false`] from
+    /// [`Listener::receive()`]; there is no operation to remove a listener,
+    /// nor are subscriptions deduplicated.
+    fn listen_raw(&self, listener: DynListener<Self::Msg>);
 }
 
 impl<T: Listen> Listen for &T {
@@ -54,12 +67,18 @@ impl<T: Listen> Listen for &T {
     fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L) {
         (**self).listen(listener)
     }
+    fn listen_raw(&self, listener: DynListener<Self::Msg>) {
+        (**self).listen_raw(listener)
+    }
 }
 impl<T: Listen> Listen for Arc<T> {
     type Msg = T::Msg;
 
     fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L) {
         (**self).listen(listener)
+    }
+    fn listen_raw(&self, listener: DynListener<Self::Msg>) {
+        (**self).listen_raw(listener)
     }
 }
 

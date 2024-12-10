@@ -20,7 +20,7 @@ use crate::character::Spawn;
 use crate::drawing::DrawingPlane;
 use crate::fluff::{self, Fluff};
 use crate::inv::{EphemeralOpaque, InventoryTransaction};
-use crate::listen::{Listen, Listener, Notifier};
+use crate::listen::{self, Listen, Notifier};
 use crate::math::{
     notnan, rgb_const, Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid,
     NotNan, Vol,
@@ -1000,11 +1000,11 @@ impl VisitHandles for Space {
     }
 }
 
+/// Registers a listener for mutations of this space.
 impl Listen for Space {
     type Msg = SpaceChange;
-    /// Registers a listener for mutations of this space.
-    fn listen<L: Listener<SpaceChange> + 'static>(&self, listener: L) {
-        self.change_notifier.listen(listener)
+    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
+        self.change_notifier.listen_raw(listener)
     }
 }
 
@@ -1424,7 +1424,7 @@ impl<'s> Extract<'s> {
 }
 
 // TODO: Tune this buffer size parameter, and validate it isn't overly large on the stack.
-type ChangeBuffer<'notifier> = crate::listen::Buffer<'notifier, SpaceChange, 16>;
+type ChangeBuffer<'notifier> = listen::Buffer<'notifier, SpaceChange, 16>;
 
 /// Argument passed to [`Space`] mutation methods that are used in bulk mutations.
 struct MutationCtx<'a, 'n> {

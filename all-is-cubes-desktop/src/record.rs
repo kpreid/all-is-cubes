@@ -329,9 +329,9 @@ impl Recorder {
 impl listen::Listen for Recorder {
     type Msg = Status;
 
-    fn listen<L: listen::Listener<Self::Msg> + Send + Sync + 'static>(&self, listener: L) {
+    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
         if let Some(notifier) = self.status_notifier.upgrade() {
-            notifier.listen(listener)
+            notifier.listen_raw(listener)
         }
     }
 }

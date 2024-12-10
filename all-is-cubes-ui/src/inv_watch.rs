@@ -184,8 +184,8 @@ impl InventoryWatcher {
 impl listen::Listen for InventoryWatcher {
     type Msg = WatcherChange;
 
-    fn listen<L: listen::Listener<Self::Msg> + 'static>(&self, listener: L) {
-        self.notifier.listen(listener)
+    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
+        self.notifier.listen_raw(listener)
     }
 }
 

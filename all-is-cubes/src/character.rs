@@ -17,7 +17,7 @@ use num_traits::float::Float as _;
 use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
-use crate::listen::{Listen, Listener, Notifier};
+use crate::listen::{self, Listen, Notifier};
 use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector};
 use crate::physics;
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
@@ -521,10 +521,10 @@ impl VisitHandles for Character {
     }
 }
 
+/// Registers a listener for mutations of this character.
 impl Listen for Character {
     type Msg = CharacterChange;
-    /// Registers a listener for mutations of this character.
-    fn listen<L: Listener<CharacterChange> + 'static>(&self, listener: L) {
+    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
         self.notifier.listen(listener)
     }
 }

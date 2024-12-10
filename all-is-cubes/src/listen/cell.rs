@@ -7,7 +7,7 @@ use core::fmt;
 
 use alloc::sync::Arc;
 
-use crate::listen::{Listen, Listener, Notifier};
+use crate::listen::{self, Listen, Notifier};
 use crate::util::maybe_sync::{Mutex, MutexGuard};
 
 /// A interior-mutable container for a value which can notify that the value changed,
@@ -157,9 +157,9 @@ impl<T> Clone for ListenableSource<T> {
 impl<T> Listen for ListenableSource<T> {
     type Msg = ();
 
-    fn listen<L: Listener<Self::Msg> + 'static>(&self, listener: L) {
+    fn listen_raw(&self, listener: listen::DynListener<Self::Msg>) {
         if let Some(notifier) = &self.storage.notifier {
-            notifier.listen(listener);
+            notifier.listen_raw(listener);
         }
     }
 }

@@ -136,10 +136,10 @@ impl<M> Notifier<M> {
     }
 }
 
-impl<M> Listen for Notifier<M> {
+impl<M: 'static> Listen for Notifier<M> {
     type Msg = M;
 
-    fn listen<L: Listener<M> + 'static>(&self, listener: L) {
+    fn listen_raw(&self, listener: DynListener<Self::Msg>) {
         if !listener.receive(&[]) {
             // skip adding it if it's already dead
             return;
