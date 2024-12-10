@@ -68,7 +68,7 @@ dependencies = [
  "flate2",
  "futures-core",
  "futures-util",
- "hashbrown 0.14.5",
+ "hashbrown 0.15.2",
  "indoc",
  "itertools 0.13.0",
  "log",
@@ -130,7 +130,7 @@ dependencies = [
  "criterion",
  "exhaust",
  "futures-core",
- "hashbrown 0.14.5",
+ "hashbrown 0.15.2",
  "itertools 0.13.0",
  "log",
  "macro_rules_attribute",
@@ -163,7 +163,7 @@ dependencies = [
  "futures-core",
  "gilrs",
  "gltf",
- "hashbrown 0.14.5",
+ "hashbrown 0.15.2",
  "indicatif",
  "itertools 0.13.0",
  "kira",
@@ -236,7 +236,7 @@ dependencies = [
  "flume",
  "futures-channel",
  "futures-util",
- "hashbrown 0.14.5",
+ "hashbrown 0.15.2",
  "indoc",
  "itertools 0.13.0",
  "log",
@@ -4431,9 +4431,9 @@ dependencies = [
 
 [[package]]
 name = "pollster"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22686f4785f02a4fcc856d3b3bb19bf6c8160d103f7a99cc258bddd0251dc7f2"
+checksum = "2f3a9f18d041e6d0e102a0a46750538147e5e8992d3b4873aaafee2520b00ce3"
 
 [[package]]
 name = "portable-atomic"
@@ -6131,9 +6131,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.5.2"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e9cd434a998747dd2c4276bc96ee2e0c7a2eadf3cae88e52be55a05fa9053f5"
+checksum = "403fa3b783d4b626a8ad51d766ab03cb6d2dbfc46b1c5d4448395e6628dc9697"
 dependencies = [
  "bitflags 2.6.0",
  "bytes",

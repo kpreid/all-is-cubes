@@ -40,7 +40,7 @@ include_dir = "0.7.2"
 mime_guess = "2.0.4" # also used indirectly by tower-http
 simplelog = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tower-http = { version = "0.5.0", features = ["fs"] }
+tower-http = { version = "0.6.2", features = ["fs"] }
 
 [dev-dependencies]
 async_fn_traits = { workspace = true }
