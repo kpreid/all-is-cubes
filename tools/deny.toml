@@ -14,7 +14,7 @@ allow = [
     "MPL-2.0",
     "BSD-3-Clause",
     "ISC",
-    "Unicode-DFS-2016",
+    "Unicode-3.0",
     "Zlib",
     "CC0-1.0",
 ]
@@ -38,7 +38,6 @@ skip = [
     { name = "wasi" }, # not actually used on our targets
     { name = "syn", version = "1" },
     { name = "libloading" },
-    { name = "libredox", version = "=0.0.2" },
     { name = "redox_syscall", version = "=0.4.1" },
     { name = "base64", version = "0.13.1" }, # old used by `embed-doc-image`
     { name = "heck" }, # old used by strum
