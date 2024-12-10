@@ -176,7 +176,7 @@ impl Pipelines {
             unclipped_depth: false,
             conservative: false,
         };
-        let vertex_buffers = &[WgpuBlockVertex::desc(), WgpuInstanceData::desc()];
+        let vertex_buffers = &[WgpuBlockVertex::LAYOUT, WgpuInstanceData::LAYOUT];
 
         let multisample = fb.linear_scene_multisample_state();
 
@@ -317,7 +317,7 @@ impl Pipelines {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: Some("lines_vertex"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    buffers: &[WgpuLinesVertex::desc()],
+                    buffers: &[WgpuLinesVertex::LAYOUT],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),

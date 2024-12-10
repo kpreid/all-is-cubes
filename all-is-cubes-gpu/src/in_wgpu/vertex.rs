@@ -74,21 +74,17 @@ pub(crate) struct WgpuBlockVertex {
 }
 
 impl WgpuBlockVertex {
-    const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
-        0 => Uint32, // cube_packed
-        1 => Uint32x2, // position_in_cube_and_normal_packed
-        2 => Float32x4, // color_or_texture
-        3 => Uint32x3, // clamp_min_max
-        // location numbers must not clash with WgpuInstanceData
-    ];
-
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: Self::ATTRIBUTE_LAYOUT,
-        }
-    }
+    pub const LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
+        array_stride: size_of::<Self>() as wgpu::BufferAddress,
+        step_mode: wgpu::VertexStepMode::Vertex,
+        attributes: &wgpu::vertex_attr_array![
+            0 => Uint32, // cube_packed
+            1 => Uint32x2, // position_in_cube_and_normal_packed
+            2 => Float32x4, // color_or_texture
+            3 => Uint32x3, // clamp_min_max
+            // location numbers must not clash with WgpuInstanceData
+        ],
+    };
 }
 
 impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
@@ -188,18 +184,16 @@ pub(crate) struct WgpuInstanceData {
 }
 
 impl WgpuInstanceData {
-    const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
-        // location numbers must start after WgpuBlockVertex ends
-        6 => Float32x3,
-    ];
-
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Instance,
-            attributes: Self::ATTRIBUTE_LAYOUT,
-        }
-    }
+    pub const LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
+        array_stride: size_of::<Self>() as wgpu::BufferAddress,
+        step_mode: wgpu::VertexStepMode::Instance,
+        attributes: const {
+            &wgpu::vertex_attr_array![
+                // location numbers must start after WgpuBlockVertex ends
+                6 => Float32x3,
+            ]
+        },
+    };
 
     pub fn new(translation: GridVector) -> Self {
         Self {
@@ -217,18 +211,14 @@ pub(crate) struct WgpuLinesVertex {
 }
 
 impl WgpuLinesVertex {
-    const ATTRIBUTE_LAYOUT: &'static [wgpu::VertexAttribute] = &wgpu::vertex_attr_array![
-        0 => Float32x3,
-        1 => Float32x4,
-    ];
-
-    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: Self::ATTRIBUTE_LAYOUT,
-        }
-    }
+    pub const LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
+        array_stride: size_of::<Self>() as wgpu::BufferAddress,
+        step_mode: wgpu::VertexStepMode::Vertex,
+        attributes: &wgpu::vertex_attr_array![
+            0 => Float32x3,
+            1 => Float32x4,
+        ],
+    };
 }
 
 impl DebugLineVertex for WgpuLinesVertex {

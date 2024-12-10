@@ -98,7 +98,7 @@ where
             module: &shader,
             entry_point: Some("block_vertex_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[WgpuBlockVertex::desc(), WgpuInstanceData::desc()],
+            buffers: &[WgpuBlockVertex::LAYOUT, WgpuInstanceData::LAYOUT],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
