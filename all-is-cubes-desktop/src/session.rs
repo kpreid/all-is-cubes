@@ -21,9 +21,6 @@ use crate::Session;
 /// Wraps a basic [`Session`] to add functionality that is common within
 /// all-is-cubes-desktop's scope of supported usage (such as loading a universe
 /// from disk).
-///
-/// This type guarantees that the `renderer` will be dropped before the `window`;
-/// `unsafe` graphics code may rely on this.
 #[derive(Debug)]
 pub struct DesktopSession<Ren, Win> {
     #[allow(missing_docs)]
@@ -232,48 +229,4 @@ pub enum ClockSource {
     /// Every time [`DesktopSession::advance_time_and_maybe_step`] is called, advance time
     /// by the specified amount.
     Fixed(Duration),
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn drop_order() {
-        use std::sync::mpsc;
-
-        struct DropLogger {
-            sender: mpsc::Sender<&'static str>,
-            message: &'static str,
-        }
-        impl Drop for DropLogger {
-            fn drop(&mut self) {
-                self.sender.send(self.message).unwrap();
-            }
-        }
-        impl crate::glue::Window for DropLogger {
-            fn set_title(&self, _: String) {}
-        }
-
-        let (sender, receiver) = mpsc::channel();
-        drop(DesktopSession::new(
-            crate::Executor::new(tokio::runtime::Handle::current()),
-            DropLogger {
-                sender: sender.clone(),
-                message: "renderer",
-            },
-            DropLogger {
-                sender,
-                message: "window",
-            },
-            Session::builder().build().await,
-            ListenableCell::new(Viewport::ARBITRARY),
-            false,
-        ));
-
-        assert_eq!(
-            receiver.into_iter().collect::<Vec<_>>(),
-            vec!["renderer", "window"]
-        );
-    }
 }
