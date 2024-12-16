@@ -548,7 +548,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             .rebuild_if_changed(&self.device, &self.shaders, &self.fb);
 
         // Identify spaces to be rendered
-        let ws = self.cameras.world_space().snapshot(); // TODO: ugly
+        let ws = self.cameras.world_space().get();
         let spaces_to_render = Layers {
             world: ws.as_ref(),
             ui: self.cameras.ui_space(),

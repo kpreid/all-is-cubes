@@ -45,7 +45,7 @@ async fn renderer_test() {
         Viewport::with_scale(1.0, [256, 256]),
         &universe,
     );
-    let world_space = cameras.world_space().snapshot().unwrap();
+    let world_space = cameras.world_space().get().unwrap();
 
     let mut renderer =
         all_is_cubes_gpu::in_wgpu::headless::Builder::from_adapter("renderer_test", adapter)

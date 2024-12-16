@@ -108,7 +108,7 @@ pub fn create_terminal_session(
             .send(RtRenderer::new(
                 cameras.clone(),
                 Box::new(|v| v),
-                ListenableSource::constant(()),
+                ListenableSource::constant(Arc::new(())),
             ))
             .unwrap();
     }
@@ -241,7 +241,7 @@ fn run(
                     let position =
                         Point2D::new((f64::from(column) - 0.5) * 0.5, f64::from(row) - 0.5);
                     dsession.session.input_processor.mouse_pixel_position(
-                        *dsession.viewport_cell.get(),
+                        dsession.viewport_cell.get(),
                         Some(position),
                         true,
                     );
@@ -272,7 +272,7 @@ fn run(
                 cursor: dsession.session.cursor_result().cloned(),
                 frames_per_second: dsession.session.draw_fps_counter().frames_per_second(),
                 terminal_options: dsession.renderer.options.clone(),
-                inventory: InventoryDisplay::new(dsession.session.character().snapshot()),
+                inventory: InventoryDisplay::new(dsession.session.character().get()),
             })),
             // TODO: Even if we don't have a frame, we might want to update the UI anyway.
             Err(mpsc::TryRecvError::Empty) => {}
@@ -325,7 +325,7 @@ fn sync_viewport(dsession: &mut DesktopSession<TerminalRenderer, TerminalWindow>
         .renderer
         .options
         .viewport_from_terminal_size(rect_size(dsession.window.viewport_position()));
-    if *dsession.viewport_cell.get() != new {
+    if dsession.viewport_cell.get() != new {
         dsession.viewport_cell.set(new);
     }
 }

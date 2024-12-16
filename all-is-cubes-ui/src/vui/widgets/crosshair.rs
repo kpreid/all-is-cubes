@@ -61,7 +61,7 @@ impl vui::WidgetController for CrosshairController {
             SpaceTransaction::set_cube(
                 position,
                 None,
-                Some(if *d.mouselook_mode.get() {
+                Some(if d.mouselook_mode.get() {
                     d.icon.clone()
                 } else {
                     AIR

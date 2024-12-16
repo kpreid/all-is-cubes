@@ -319,10 +319,7 @@ impl<D: Clone + Sync + fmt::Debug> fmt::Debug for ToggleButton<D> {
         f.debug_struct("ToggleButton")
             .field("common", common)
             .field("data_source", data_source)
-            .field(
-                "projection(data_source)",
-                &projection(&data_source.snapshot()),
-            )
+            .field("projection(data_source)", &projection(&data_source.get()))
             .field("action", action)
             .finish()
     }

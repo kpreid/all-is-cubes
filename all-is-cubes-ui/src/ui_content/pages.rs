@@ -190,7 +190,7 @@ pub(crate) fn open_page_button(
         hud_inputs.page_state.clone(),
         {
             let page = page.clone();
-            move |page_state| *page_state == page
+            move |page_state| **page_state == page
         },
         label.into(),
         &hud_inputs.hud_blocks.widget_theme,

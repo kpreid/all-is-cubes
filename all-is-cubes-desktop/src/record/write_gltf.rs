@@ -53,7 +53,7 @@ impl MeshRecorder {
             // TODO: We need to tell the ChunkedSpaceMesh to have an infinite view distance
             // (or at least as much data as we care about).
             csm: ChunkedSpaceMesh::new(
-                cameras.world_space().snapshot().unwrap_or_else(|| {
+                cameras.world_space().get().unwrap_or_else(|| {
                     universe::Handle::new_pending(
                         universe::Name::from("empty-space-placeholder"),
                         Space::builder(GridAab::ORIGIN_EMPTY).build(),

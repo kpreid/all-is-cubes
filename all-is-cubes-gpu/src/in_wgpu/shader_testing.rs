@@ -82,7 +82,7 @@ where
         &device,
         &shaders,
         &fbt,
-        ListenableSource::constant(GraphicsOptions::default()),
+        ListenableSource::constant(Arc::new(GraphicsOptions::default())),
     );
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {

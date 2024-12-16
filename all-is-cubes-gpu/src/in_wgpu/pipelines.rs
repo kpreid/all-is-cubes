@@ -1,4 +1,5 @@
 use std::mem;
+use std::sync::Arc;
 
 use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::listen::{Listen, ListenableSource};
@@ -25,7 +26,7 @@ pub(crate) struct Pipelines {
     /// Tracks whether we need to rebuild pipelines for any reasons.
     dirty: DirtyFlag,
 
-    graphics_options: ListenableSource<GraphicsOptions>,
+    graphics_options: ListenableSource<Arc<GraphicsOptions>>,
 
     /// Layout for the camera buffer.
     pub(crate) camera_bind_group_layout: wgpu::BindGroupLayout,
@@ -83,7 +84,7 @@ impl Pipelines {
         device: &wgpu::Device,
         shaders: &Shaders,
         fb: &FramebufferTextures,
-        graphics_options: ListenableSource<GraphicsOptions>,
+        graphics_options: ListenableSource<Arc<GraphicsOptions>>,
     ) -> Self {
         // TODO: This is a hazard we should remove. `Pipelines` needs to be consistent with
         // other objects (in particular, pipeline versus framebuffer sample_count), and so

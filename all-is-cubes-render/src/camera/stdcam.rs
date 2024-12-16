@@ -1,3 +1,4 @@
+use alloc::sync::Arc;
 use core::fmt;
 
 use all_is_cubes::character::{cursor_raycast, Character, Cursor};
@@ -77,7 +78,7 @@ impl<T> Layers<T> {
 #[derive(Debug)]
 pub struct StandardCameras {
     /// Cameras are synced with this
-    graphics_options: ListenableSource<GraphicsOptions>,
+    graphics_options: ListenableSource<Arc<GraphicsOptions>>,
     graphics_options_dirty: DirtyFlag,
 
     character_source: ListenableSource<Option<Handle<Character>>>,
@@ -88,7 +89,7 @@ pub struct StandardCameras {
     /// TODO: This should be in a `Layers` along with `ui_state`...?
     world_space: ListenableCell<Option<Handle<Space>>>,
 
-    ui_source: ListenableSource<UiViewState>,
+    ui_source: ListenableSource<Arc<UiViewState>>,
     ui_dirty: DirtyFlag,
     ui_space: Option<Handle<Space>>,
 
@@ -103,10 +104,10 @@ impl StandardCameras {
     /// want to discourage use of this directly.
     #[doc(hidden)]
     pub fn new(
-        graphics_options: ListenableSource<GraphicsOptions>,
+        graphics_options: ListenableSource<Arc<GraphicsOptions>>,
         viewport_source: ListenableSource<Viewport>,
         character_source: ListenableSource<Option<Handle<Character>>>,
-        ui_source: ListenableSource<UiViewState>,
+        ui_source: ListenableSource<Arc<UiViewState>>,
     ) -> Self {
         // TODO: Add a unit test that each of these listeners works as intended.
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
@@ -115,7 +116,7 @@ impl StandardCameras {
         let viewport_dirty = DirtyFlag::listening(false, &viewport_source);
 
         let initial_options: &GraphicsOptions = &graphics_options.get();
-        let initial_viewport: Viewport = *viewport_source.get();
+        let initial_viewport: Viewport = viewport_source.get();
 
         let ui_state = ui_source.get();
 
@@ -152,10 +153,10 @@ impl StandardCameras {
         universe: &Universe,
     ) -> Self {
         Self::new(
-            ListenableSource::constant(graphics_options),
+            ListenableSource::constant(Arc::new(graphics_options)),
             ListenableSource::constant(viewport),
             ListenableSource::constant(universe.get_default_character()),
-            ListenableSource::constant(UiViewState::default()),
+            ListenableSource::constant(Default::default()),
         )
     }
 
@@ -175,7 +176,7 @@ impl StandardCameras {
             anything_changed = true;
             self.cameras
                 .world
-                .set_options(self.graphics_options.snapshot());
+                .set_options((*self.graphics_options.get()).clone());
         }
 
         let ui_dirty = self.ui_dirty.get_and_clear();
@@ -186,7 +187,7 @@ impl StandardCameras {
                 view_transform: ui_transform,
                 graphics_options: ui_options,
             } = if self.graphics_options.get().show_ui {
-                self.ui_source.snapshot()
+                (*self.ui_source.get()).clone()
             } else {
                 UiViewState::default()
             };
@@ -201,7 +202,7 @@ impl StandardCameras {
         let viewport_dirty = self.viewport_dirty.get_and_clear();
         if viewport_dirty {
             anything_changed = true;
-            let viewport: Viewport = self.viewport_source.snapshot();
+            let viewport: Viewport = self.viewport_source.get();
             // TODO: this should be a Layers::iter_mut() or something
             self.cameras.world.set_viewport(viewport);
             self.cameras.ui.set_viewport(viewport);
@@ -209,7 +210,7 @@ impl StandardCameras {
 
         if self.character_dirty.get_and_clear() {
             anything_changed = true;
-            self.character = self.character_source.snapshot();
+            self.character = self.character_source.get();
             if self.character.is_none() {
                 // Reset transform so it isn't a *stale* transform.
                 // TODO: set an error flag saying that nothing should be drawn
@@ -229,7 +230,7 @@ impl StandardCameras {
                     }
 
                     // TODO: ListenableCell should make this easier and cheaper
-                    if Option::as_ref(&*self.world_space.get()) != Some(&character.space) {
+                    if Option::as_ref(&self.world_space.get()) != Some(&character.space) {
                         anything_changed = true;
 
                         self.world_space.set(Some(character.space.clone()));
@@ -263,7 +264,7 @@ impl StandardCameras {
 
     /// Returns a clone of the source of graphics options that this [`StandardCameras`]
     /// was created with.
-    pub fn graphics_options_source(&self) -> ListenableSource<GraphicsOptions> {
+    pub fn graphics_options_source(&self) -> ListenableSource<Arc<GraphicsOptions>> {
         self.graphics_options.clone()
     }
 
@@ -410,15 +411,15 @@ mod tests {
     fn cameras_follow_character_and_world() {
         let character_cell = ListenableCell::new(None);
         let mut cameras = StandardCameras::new(
-            ListenableSource::constant(GraphicsOptions::default()),
+            ListenableSource::constant(Arc::new(GraphicsOptions::default())),
             ListenableSource::constant(Viewport::ARBITRARY),
             character_cell.as_source(),
-            ListenableSource::constant(UiViewState::default()),
+            ListenableSource::constant(Arc::new(UiViewState::default())),
         );
 
         let world_source = cameras.world_space();
         let world_flag = DirtyFlag::listening(false, &world_source);
-        assert_eq!(world_source.snapshot().as_ref(), None);
+        assert_eq!(world_source.get().as_ref(), None);
 
         // No redundant notification when world is absent
         let changed = cameras.update();
@@ -439,7 +440,7 @@ mod tests {
         assert!(!world_flag.get_and_clear());
         let changed = cameras.update();
         assert_eq!((changed, world_flag.get_and_clear()), (true, true));
-        assert_eq!(world_source.snapshot().as_ref(), Some(&space_handle));
+        assert_eq!(world_source.get().as_ref(), Some(&space_handle));
 
         // No redundant notification when world is present
         let changed = cameras.update();
@@ -450,19 +451,19 @@ mod tests {
 
     #[test]
     fn cameras_clone() {
-        let options_cell = ListenableCell::new(GraphicsOptions::default());
+        let options_cell = ListenableCell::new(Arc::new(GraphicsOptions::default()));
         let mut cameras = StandardCameras::new(
             options_cell.as_source(),
             ListenableSource::constant(Viewport::ARBITRARY),
             ListenableSource::constant(None),
-            ListenableSource::constant(UiViewState::default()),
+            ListenableSource::constant(Arc::new(UiViewState::default())),
         );
         let mut cameras2 = cameras.clone();
 
         let default_o = GraphicsOptions::default();
         let mut different_o = default_o.clone();
         different_o.debug_chunk_boxes = true;
-        options_cell.set(different_o.clone());
+        options_cell.set(Arc::new(different_o.clone()));
 
         // Each `StandardCameras` has independent updating from the same data sources.
         assert_eq!(cameras.cameras().world.options(), &default_o);

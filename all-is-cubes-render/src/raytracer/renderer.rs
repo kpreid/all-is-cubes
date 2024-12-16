@@ -40,7 +40,7 @@ pub struct RtRenderer<D: RtBlockData = ()> {
     /// The output images will alway
     size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
 
-    custom_options: ListenableSource<D::Options>,
+    custom_options: ListenableSource<Arc<D::Options>>,
     /// Borrowable copy of the value in `custom_options`.
     custom_options_cache: Arc<D::Options>,
 
@@ -61,7 +61,7 @@ where
     pub fn new(
         cameras: StandardCameras,
         size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
-        custom_options: ListenableSource<D::Options>,
+        custom_options: ListenableSource<Arc<D::Options>>,
     ) -> Self {
         RtRenderer {
             rts: Layers::<Option<_>>::default(),
@@ -95,8 +95,8 @@ where
         fn sync_space<D>(
             cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
             optional_space: Option<&Handle<Space>>,
-            graphics_options_source: &ListenableSource<GraphicsOptions>,
-            custom_options_source: &ListenableSource<D::Options>,
+            graphics_options_source: &ListenableSource<Arc<GraphicsOptions>>,
+            custom_options_source: &ListenableSource<Arc<D::Options>>,
             anything_changed: &mut bool,
         ) -> Result<(), RenderError>
         where
@@ -694,9 +694,9 @@ mod tests {
         );
 
         // Change the options after the renderer is created.
-        let custom_options = ListenableCell::new("before");
+        let custom_options = ListenableCell::new(Arc::new("before"));
         let mut renderer = RtRenderer::new(cameras, Box::new(identity), custom_options.as_source());
-        custom_options.set("after");
+        custom_options.set(Arc::new("after"));
 
         // See what options value is used.
         let mut result = [CatchCustomOptions::default()];

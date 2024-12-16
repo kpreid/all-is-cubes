@@ -1,10 +1,12 @@
 #![allow(missing_docs)]
 
-use all_is_cubes::block;
+use std::sync::Arc;
+
 use criterion::{
     black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
 };
 
+use all_is_cubes::block;
 use all_is_cubes::camera::GraphicsOptions;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::listen::ListenableSource;
@@ -60,8 +62,8 @@ fn space_bulk_mutation(c: &mut Criterion) {
                         let rts = std::array::from_fn(|_| {
                             UpdatingSpaceRaytracer::new(
                                 space.clone(),
-                                ListenableSource::constant(GraphicsOptions::default()),
-                                ListenableSource::constant(()),
+                                ListenableSource::constant(Arc::new(GraphicsOptions::default())),
+                                ListenableSource::constant(Arc::new(())),
                             )
                         });
                         // 2. Block definitions

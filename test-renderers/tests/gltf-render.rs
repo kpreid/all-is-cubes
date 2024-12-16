@@ -223,7 +223,7 @@ impl HeadlessRenderer for GltfRend3Renderer {
             // Sync changes to what we should be drawing (exporting)
             self.cameras.update();
 
-            let world_space: Option<Handle<Space>> = self.cameras.world_space().snapshot();
+            let world_space: Option<Handle<Space>> = self.cameras.world_space().get();
             let gltf_path = self.gltf_dir.path().join("scene.gltf");
 
             self.sky = {

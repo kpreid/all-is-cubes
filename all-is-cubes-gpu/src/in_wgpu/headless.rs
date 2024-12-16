@@ -69,7 +69,7 @@ impl Builder {
         );
 
         let viewport_dirty = DirtyFlag::listening(false, &viewport_source);
-        let viewport = viewport_source.snapshot();
+        let viewport = viewport_source.get();
         let color_texture = create_color_texture(&self.device, viewport);
 
         Renderer::wrap(RendererImpl {
@@ -200,7 +200,7 @@ impl RendererImpl {
 
     async fn draw(&mut self, info_text: &str) -> Result<Rendering, RenderError> {
         // TODO: refactor so that this viewport read is done synchronously, outside the RendererImpl
-        let viewport = self.viewport_source.snapshot();
+        let viewport = self.viewport_source.get();
 
         if viewport.is_empty() {
             // GPU doesn't accept zero size, so we have to short-circuit it at this layer or we will

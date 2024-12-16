@@ -3,6 +3,7 @@
     reason = "false positive; TODO: remove after Rust 1.84 is released"
 )]
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::time::Duration;
 use std::collections::{HashMap, HashSet};
@@ -184,7 +185,7 @@ impl InputProcessor {
     /// may lack focus, the application may lack permission, etc.; use
     /// [`InputProcessor::has_pointer_lock`] to report that state.
     pub fn wants_pointer_lock(&self) -> bool {
-        *self.mouselook_mode.get()
+        self.mouselook_mode.get()
     }
 
     /// Use this method to report whether mouse mouse pointer lock/capture/disable is
@@ -309,7 +310,7 @@ impl InputProcessor {
         // TODO: this should be done *after* a session step in addition to before, for lower
         // latency / immediate effects -- but currently this is the only place we have
         // `InputTargets` available.
-        if ui.is_some_and(|ui| ui.should_focus_on_ui()) && *self.mouselook_mode.get() {
+        if ui.is_some_and(|ui| ui.should_focus_on_ui()) && self.mouselook_mode.get() {
             self.mouselook_mode.set(false)
         }
 
@@ -350,7 +351,8 @@ impl InputProcessor {
                 Key::Character('i') => {
                     if let Some(cell) = graphics_options {
                         cell.update_mut(|options| {
-                            options.lighting_display = match options.lighting_display {
+                            Arc::make_mut(options).lighting_display = match options.lighting_display
+                            {
                                 LightingOption::None => LightingOption::Flat,
                                 LightingOption::Flat => LightingOption::Smooth,
                                 LightingOption::Smooth => LightingOption::None,
@@ -361,7 +363,7 @@ impl InputProcessor {
                 }
                 Key::Character('l') => {
                     // TODO: duplicated with fn toggle_mouselook_mode() because of borrow conflicts
-                    let new_state = !*self.mouselook_mode.get();
+                    let new_state = !self.mouselook_mode.get();
                     self.mouselook_mode.set(new_state);
                     if new_state {
                         // Clear delta tracking just in case
@@ -371,7 +373,7 @@ impl InputProcessor {
                 Key::Character('o') => {
                     if let Some(cell) = graphics_options {
                         cell.update_mut(|options| {
-                            options.transparency = match options.transparency {
+                            Arc::make_mut(options).transparency = match options.transparency {
                                 TransparencyOption::Surface => TransparencyOption::Volumetric,
                                 TransparencyOption::Volumetric => {
                                     TransparencyOption::Threshold(zo32(0.5))
@@ -391,7 +393,7 @@ impl InputProcessor {
                 Key::Character('u') => {
                     if let Some(cell) = graphics_options {
                         cell.update_mut(|options| {
-                            options.fog = match options.fog {
+                            Arc::make_mut(options).fog = match options.fog {
                                 FogOption::None => FogOption::Abrupt,
                                 FogOption::Abrupt => FogOption::Compromise,
                                 FogOption::Compromise => FogOption::Physical,
@@ -404,7 +406,7 @@ impl InputProcessor {
                 Key::Character('y') => {
                     if let Some(cell) = graphics_options {
                         cell.update_mut(|options| {
-                            options.render_method = match options.render_method {
+                            Arc::make_mut(options).render_method = match options.render_method {
                                 RenderMethod::Mesh => RenderMethod::Reference,
                                 RenderMethod::Reference => RenderMethod::Mesh,
                                 _ => RenderMethod::Reference,
@@ -440,13 +442,13 @@ impl InputProcessor {
     }
 
     pub(crate) fn toggle_mouselook_mode(&mut self) {
-        self.set_mouselook_mode(!*self.mouselook_mode.get());
+        self.set_mouselook_mode(!self.mouselook_mode.get());
     }
 
     /// Activates or deactivates mouselook mode, identically to user input doing so.
     pub fn set_mouselook_mode(&mut self, active: bool) {
         // Note: duplicated with the keybinding impl because of borrow conflicts
-        let was_active = *self.mouselook_mode.get();
+        let was_active = self.mouselook_mode.get();
         self.mouselook_mode.set(active);
         if active && !was_active {
             // Clear delta tracking just in case
@@ -460,7 +462,7 @@ impl InputProcessor {
     /// Returns [`None`] if the mouse position is out of bounds, the window has lost
     /// focus, or similar conditions under which no cursor should be shown.
     pub fn cursor_ndc_position(&self) -> Option<NdcPoint2> {
-        if *self.mouselook_mode.get() {
+        if self.mouselook_mode.get() {
             Some(NdcPoint2::origin())
         } else {
             self.mouse_ndc_position
@@ -490,7 +492,7 @@ pub(crate) struct InputTargets<'a> {
     pub universe: Option<&'a mut Universe>,
     pub character: Option<&'a Handle<Character>>,
     pub paused: Option<&'a ListenableCell<bool>>,
-    pub graphics_options: Option<&'a ListenableCell<GraphicsOptions>>,
+    pub graphics_options: Option<&'a ListenableCell<Arc<GraphicsOptions>>>,
     // TODO: replace cells with control channel?
     // TODO: make the control channel a type alias?
     pub control_channel: Option<&'a flume::Sender<ControlMessage>>,
@@ -581,7 +583,7 @@ mod tests {
             &InputProcessor::new(),
             ListenableSource::constant(None),
             paused.as_source(),
-            ListenableSource::constant(GraphicsOptions::default()),
+            ListenableSource::constant(Arc::new(GraphicsOptions::default())),
             cctx,
             ListenableSource::constant(Viewport::ARBITRARY),
             ListenableSource::constant(None),
@@ -593,7 +595,7 @@ mod tests {
         // Create input processor and set it to have mouselook mode
         let mut input = InputProcessor::new();
         input.toggle_mouselook_mode();
-        assert!(input.mouselook_mode().snapshot());
+        assert!(input.mouselook_mode().get());
 
         // No effect when unpaused...
         input.apply_input(
@@ -603,7 +605,7 @@ mod tests {
             },
             Tick::arbitrary(),
         );
-        assert!(input.mouselook_mode().snapshot());
+        assert!(input.mouselook_mode().get());
 
         // But when paused, the UI enters the pause menu and, as a consequence, cancels mouselook.
         paused.set(true);
@@ -615,7 +617,7 @@ mod tests {
             },
             Tick::arbitrary(),
         );
-        assert!(!input.mouselook_mode().snapshot());
+        assert!(!input.mouselook_mode().get());
     }
 
     #[test]

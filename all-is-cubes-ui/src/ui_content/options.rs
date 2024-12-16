@@ -158,7 +158,10 @@ fn graphics_toggle_button(
     };
     let button = widgets::ToggleButton::new(
         hud_inputs.graphics_options.clone(),
-        getter.clone(),
+        {
+            let getter = getter.clone();
+            move |arc_opt| getter(arc_opt)
+        },
         label,
         &hud_inputs.hud_blocks.widget_theme,
         {

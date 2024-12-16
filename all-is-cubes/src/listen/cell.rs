@@ -10,8 +10,10 @@ use alloc::sync::Arc;
 use crate::listen::{self, Listen, Notifier};
 use crate::util::maybe_sync::{Mutex, MutexGuard};
 
-/// A interior-mutable container for a value which can notify that the value changed,
-/// and which has reference-counted read-only handles to read it.
+/// A interior-mutable container for a value which can notify that the value changed.
+///
+/// Access to the value requires cloning it, so if the clone is not cheap,
+/// consider wrapping the value with [`Arc`] to reduce the cost to reference count changes.
 pub struct ListenableCell<T> {
     storage: Arc<ListenableCellStorage<T>>,
 }
@@ -21,32 +23,31 @@ pub struct ListenableSource<T> {
     storage: Arc<ListenableCellStorage<T>>,
 }
 struct ListenableCellStorage<T> {
-    /// `Mutex` because it's mutable; `Arc` because we want to be able to clone out of it to
-    /// avoid holding the cell borrowed.
-    /// TODO: Look into strategies to make this cheaper?
-    cell: Mutex<Arc<T>>,
+    /// The current value.
+    cell: Mutex<T>,
 
     /// Notifier to track listeners.
     /// `None` if this is a constant cell.
     ///
     /// TODO: Add ability to diff the value and distribute that.
-    /// TODO: If the `ListenableCell` is dropped, drop this.
+    /// TODO: If the `ListenableCell` is dropped, clear this to denote that nothing will ever
+    /// be sent again.
     notifier: Option<Notifier<()>>,
 }
 
-impl<T> ListenableCell<T> {
+impl<T: Clone> ListenableCell<T> {
     /// Creates a new [`ListenableCell`] containing the given value.
-    pub fn new(value: impl Into<Arc<T>>) -> Self {
+    pub fn new(value: T) -> Self {
         Self {
             storage: Arc::new(ListenableCellStorage {
-                cell: Mutex::new(value.into()),
+                cell: Mutex::new(value),
                 notifier: Some(Notifier::new()),
             }),
         }
     }
 
     /// Returns a reference to the current value of the cell.
-    pub fn get(&self) -> Arc<T> {
+    pub fn get(&self) -> T {
         self.storage.cell.lock().unwrap().clone()
     }
 
@@ -57,8 +58,8 @@ impl<T> ListenableCell<T> {
     ///
     /// Caution: While listeners are *expected* not to have immediate side effects on
     /// notification, this cannot be enforced.
-    pub fn set(&self, value: impl Into<Arc<T>>) {
-        *self.storage.cell.lock().unwrap() = value.into();
+    pub fn set(&self, value: T) {
+        *self.storage.cell.lock().unwrap() = value;
         self.storage
             .notifier
             .as_ref()
@@ -68,6 +69,8 @@ impl<T> ListenableCell<T> {
 
     /// Sets the contained value to the given value iff they are unequal.
     ///
+    /// This avoids sending change notifications in the case where
+    ///
     /// Caution: This executes `PartialEq::eq()` with the lock held; this may delay readers of
     /// the value, or cause permanent failure in the event of a panic.
     #[doc(hidden)] // TODO: good public API?
@@ -75,16 +78,16 @@ impl<T> ListenableCell<T> {
     where
         T: PartialEq,
     {
-        let mut guard: MutexGuard<'_, Arc<T>> = self.storage.cell.lock().unwrap();
-        if value == **guard {
+        let mut guard: MutexGuard<'_, T> = self.storage.cell.lock().unwrap();
+        if value == *guard {
             return;
         }
 
-        *guard = Arc::new(value);
+        *guard = value;
 
         // Don't hold the lock while notifying.
-        // Listeners shouldn't be trying to read immediately, but it's simpler if we don't create
-        // this deadlock opportunity.
+        // Listeners shouldn't be trying to read immediately, but we don't want to create
+        // this deadlock opportunity regardless.
         drop(guard);
 
         self.storage
@@ -98,15 +101,12 @@ impl<T> ListenableCell<T> {
     /// function.
     ///
     /// Note: this function is not atomic, in that other modifications can be made between
-    /// the time this function reads the current value and writes the new one.
-    pub fn update_mut<F>(&self, f: F)
-    where
-        T: Clone,
-        F: FnOnce(&mut T),
-    {
-        let mut arc = self.get();
-        f(Arc::make_mut(&mut arc));
-        self.set(arc);
+    /// the time this function reads the current value and writes the new one. It is not any more
+    /// powerful than calling `get()` followed by `set()`.
+    pub fn update_mut<F: FnOnce(&mut T)>(&self, f: F) {
+        let mut value = self.get();
+        f(&mut value);
+        self.set(value);
     }
 
     /// Returns a [`ListenableSource`] which provides read-only access to the value
@@ -118,31 +118,21 @@ impl<T> ListenableCell<T> {
     }
 }
 
-impl<T> ListenableSource<T> {
+impl<T: Clone> ListenableSource<T> {
     /// Creates a new [`ListenableSource`] containing the given value, which will
     /// never change.
     pub fn constant(value: T) -> Self {
         Self {
             storage: Arc::new(ListenableCellStorage {
-                cell: Mutex::new(Arc::new(value)),
+                cell: Mutex::new(value),
                 notifier: None,
             }),
         }
     }
 
-    /// Returns a reference to the current value of the cell.
-    // TODO: Consider storing a 'local' copy of the Rc so we can borrow it rather than cloning the Arc every time?
-    pub fn get(&self) -> Arc<T> {
-        Arc::clone(&*self.storage.cell.lock().unwrap())
-    }
-
     /// Returns a clone of the current value of the cell.
-    pub fn snapshot(&self) -> T
-    where
-        T: Clone,
-    {
-        // TODO: This was originally written to avoid cloning the Rc if cloning the value is the final goal, but under threading we don't want to hold the lock unnecessarily or possibly cause it to be poisoned due to the clone operation panicking. What's the best option? Should this method just be deleted?
-        T::clone(&*self.get())
+    pub fn get(&self) -> T {
+        T::clone(&*self.storage.cell.lock().unwrap())
     }
 }
 
@@ -165,25 +155,23 @@ impl<T> Listen for ListenableSource<T> {
 }
 
 /// Convenience wrapper around [`ListenableCell`] which allows borrowing the current
-/// value, at the cost of requiring `&mut` access to set it.
+/// value, at the cost of requiring `&mut` access to set it, and storing a clone.
 #[doc(hidden)] // TODO: decide if good API -- currently used by all_is_cubes_gpu
 pub struct ListenableCellWithLocal<T> {
     cell: ListenableCell<T>,
-    value: Arc<T>,
+    value: T,
 }
 
-impl<T> ListenableCellWithLocal<T> {
-    pub fn new(value: impl Into<Arc<T>>) -> Self {
-        let value = value.into();
+impl<T: Clone> ListenableCellWithLocal<T> {
+    pub fn new(value: T) -> Self {
         Self {
             value: value.clone(),
             cell: ListenableCell::new(value),
         }
     }
 
-    pub fn set(&mut self, value: impl Into<Arc<T>>) {
-        let value = value.into();
-        self.cell.set(Arc::clone(&value));
+    pub fn set(&mut self, value: T) {
+        self.cell.set(value.clone());
         self.value = value;
     }
 
@@ -199,7 +187,7 @@ impl<T> ListenableCellWithLocal<T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for ListenableCell<T> {
+impl<T: Clone + fmt::Debug> fmt::Debug for ListenableCell<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("ListenableCell");
         ds.field("value", &self.get());
@@ -207,7 +195,7 @@ impl<T: fmt::Debug> fmt::Debug for ListenableCell<T> {
         ds.finish()
     }
 }
-impl<T: fmt::Debug> fmt::Debug for ListenableSource<T> {
+impl<T: Clone + fmt::Debug> fmt::Debug for ListenableSource<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("ListenableSource");
         ds.field("value", &self.get());
@@ -275,7 +263,7 @@ mod tests {
 
     #[test]
     fn listenable_cell_and_source_debug() {
-        let cell = ListenableCell::<Vec<&str>>::new(Arc::new(vec!["hi"]));
+        let cell = ListenableCell::<Vec<&str>>::new(vec!["hi"]);
         let source = cell.as_source();
         assert_eq!(
             format!("{cell:#?}"),
@@ -330,14 +318,14 @@ mod tests {
 
         assert_eq!(sink.drain(), vec![]);
         cell.set(1);
-        assert_eq!(1, *s.get());
+        assert_eq!(1, s.get());
         assert_eq!(sink.drain(), vec![()]);
     }
 
     #[test]
     fn constant_source_usage() {
         let s = ListenableSource::constant(123);
-        assert_eq!(*s.get(), 123);
+        assert_eq!(s.get(), 123);
         s.listen(Sink::new().listener()); // no panic
     }
 
@@ -347,6 +335,6 @@ mod tests {
         let s = cell.as_source();
         let s = s.clone();
         cell.set(1);
-        assert_eq!(*s.get(), 1);
+        assert_eq!(s.get(), 1);
     }
 }

@@ -51,7 +51,7 @@ impl RaytraceToTexture {
             rtr: RtRenderer::new(
                 cameras,
                 Box::new(raytracer_size_policy),
-                ListenableSource::constant(()),
+                ListenableSource::constant(Arc::new(())),
             ),
             pixel_picker: PixelPicker::new(initial_viewport, false),
             dirty_pixels: initial_viewport.pixel_count().unwrap(),

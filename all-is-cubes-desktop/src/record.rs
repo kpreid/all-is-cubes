@@ -168,7 +168,7 @@ impl Recorder {
                 let export_set = if options.save_all || export_format == Format::AicJson {
                     ExportSet::all_of_universe(universe)
                 } else {
-                    ExportSet::from_spaces(vec![cameras.world_space().snapshot().ok_or_else(
+                    ExportSet::from_spaces(vec![cameras.world_space().get().ok_or_else(
                         || match universe.whence.document_name() {
                             None => {
                                 anyhow::anyhow!("universe contains no default space to export")
@@ -208,7 +208,7 @@ impl Recorder {
                 let mut renderer = RtRenderer::new(
                     rec.cameras.clone(),
                     Box::new(|v| v),
-                    ListenableSource::constant(()),
+                    ListenableSource::constant(Arc::new(())),
                 );
                 renderer.update(None).unwrap();
 

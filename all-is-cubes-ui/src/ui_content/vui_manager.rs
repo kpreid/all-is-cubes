@@ -37,7 +37,7 @@ pub(crate) struct Vui {
 
     /// The space that should be displayed to the user, drawn on top of the world.
     /// The value of this cell is derived from `self.state`.
-    current_view: ListenableCell<UiViewState>,
+    current_view: ListenableCell<Arc<UiViewState>>,
 
     /// The `focus_on_ui` value from the current [`vui::Page`].
     ///
@@ -47,7 +47,7 @@ pub(crate) struct Vui {
 
     /// Identifies which [`Page`] the UI should be showing — what
     /// should be in `current_space`, taken from one of the [`PageInst`]s.
-    state: ListenableCell<VuiPageState>,
+    state: ListenableCell<Arc<VuiPageState>>,
 
     changed_viewport: DirtyFlag,
     viewport_source: ListenableSource<Viewport>,
@@ -93,7 +93,7 @@ impl Vui {
         input_processor: &InputProcessor,
         character_source: ListenableSource<Option<Handle<Character>>>,
         paused: ListenableSource<bool>,
-        graphics_options: ListenableSource<GraphicsOptions>,
+        graphics_options: ListenableSource<Arc<GraphicsOptions>>,
         app_control_channel: flume::Sender<ControlMessage>,
         viewport_source: ListenableSource<Viewport>,
         fullscreen_source: ListenableSource<FullscreenState>,
@@ -116,7 +116,7 @@ impl Vui {
             .unwrap();
 
         let (control_send, control_recv) = flume::bounded(100);
-        let state = ListenableCell::new(VuiPageState::Hud);
+        let state = ListenableCell::new(Arc::new(VuiPageState::Hud));
 
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
         let cue_channel: CueNotifier = Arc::new(Notifier::new());
@@ -124,7 +124,7 @@ impl Vui {
 
         // TODO: terrible mess of tightly coupled parameters
         let changed_viewport = DirtyFlag::listening(false, &viewport_source);
-        let ui_size = UiSize::new(viewport_source.snapshot());
+        let ui_size = UiSize::new(viewport_source.get());
         let hud_inputs = HudInputs {
             hud_blocks,
             cue_channel: cue_channel.clone(),
@@ -154,9 +154,9 @@ impl Vui {
         let mut new_self = Self {
             universe,
 
-            current_view: ListenableCell::new(UiViewState::default()),
+            current_view: ListenableCell::new(Arc::new(UiViewState::default())),
             current_focus_on_ui: false,
-            state: ListenableCell::new(VuiPageState::Hud),
+            state: ListenableCell::new(Arc::new(VuiPageState::Hud)),
 
             changed_viewport,
             viewport_source,
@@ -183,7 +183,7 @@ impl Vui {
 
     /// The space that should be displayed to the user, drawn on top of the world.
     // TODO: It'd be more encapsulating if we could provide a _read-only_ Handle...
-    pub fn view(&self) -> ListenableSource<UiViewState> {
+    pub fn view(&self) -> ListenableSource<Arc<UiViewState>> {
         self.current_view.as_source()
     }
 
@@ -197,7 +197,7 @@ impl Vui {
     }
 
     pub(crate) fn set_state(&mut self, state: impl Into<Arc<VuiPageState>>) {
-        self.state.set(state);
+        self.state.set(state.into());
 
         // Special case: the dump state has to replace the widget tree, and
         // unconditionally because we can't just check if it is equal (WidgetTree: !Eq)
@@ -256,11 +256,11 @@ impl Vui {
         page_layout: vui::PageLayout,
         space: Option<Handle<Space>>,
         inputs: &HudInputs,
-    ) -> UiViewState {
+    ) -> Arc<UiViewState> {
         // TODO: compute the derived graphics options only once
-        let graphics_options = Self::graphics_options(inputs.graphics_options.snapshot());
+        let graphics_options = Self::graphics_options((*inputs.graphics_options.get()).clone());
 
-        UiViewState {
+        Arc::new(UiViewState {
             view_transform: match space.as_ref() {
                 Some(space) => page_layout.view_transform(
                     &space.read().unwrap(), // TODO: eliminate this unwrap
@@ -270,7 +270,7 @@ impl Vui {
             },
             space,
             graphics_options,
-        }
+        })
     }
 
     /// Compute graphics options to render the VUI space given the user's regular options.
@@ -306,7 +306,7 @@ impl Vui {
     fn step_pre_sync(&mut self) {
         // TODO: This should possibly be the responsibility of the TooltipState itself?
         if self.changed_character.get_and_clear() {
-            if let Some(character_handle) = &*self.character_source.get() {
+            if let Some(character_handle) = self.character_source.get() {
                 TooltipState::bind_to_character(&self.tooltip_state, character_handle.clone());
             }
         }
@@ -331,11 +331,11 @@ impl Vui {
         }
 
         if self.changed_viewport.get_and_clear() {
-            let new_viewport = self.viewport_source.snapshot();
+            let new_viewport = self.viewport_source.get();
             let new_size = UiSize::new(new_viewport);
             if new_size != self.last_ui_size {
                 self.last_ui_size = new_size;
-                self.current_view.set(UiViewState::default()); // force reconstruction
+                self.current_view.set(Arc::new(UiViewState::default())); // force reconstruction
                 self.set_space_from_state();
             }
         }
@@ -418,7 +418,7 @@ impl Vui {
     pub fn back(&mut self) {
         match *self.state.get() {
             VuiPageState::Hud => {
-                if !*self.hud_inputs.paused.get() {
+                if !self.hud_inputs.paused.get() {
                     // Pause
                     // TODO: instead of unwrapping, log and visually report the error
                     // (there should be some simple way to do that).
@@ -430,7 +430,7 @@ impl Vui {
                 }
             }
             VuiPageState::Paused => {
-                if *self.hud_inputs.paused.get() {
+                if self.hud_inputs.paused.get() {
                     // Unpause
                     self.hud_inputs
                         .app_control_channel
@@ -490,7 +490,7 @@ impl Vui {
             return Some(VuiPageState::Hud);
         }
 
-        let paused = *self.hud_inputs.paused.get();
+        let paused = self.hud_inputs.paused.get();
         if paused && matches!(current_state, VuiPageState::Hud) {
             // TODO: also do this for lost focus
             Some(VuiPageState::Paused)
@@ -587,7 +587,7 @@ mod tests {
             &InputProcessor::new(),
             ListenableSource::constant(None),
             ListenableSource::constant(paused),
-            ListenableSource::constant(GraphicsOptions::default()),
+            ListenableSource::constant(Arc::new(GraphicsOptions::default())),
             cctx,
             ListenableSource::constant(Viewport::ARBITRARY),
             ListenableSource::constant(None),

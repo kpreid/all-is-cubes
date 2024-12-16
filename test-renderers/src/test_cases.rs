@@ -450,10 +450,10 @@ async fn follow_character_change(context: RenderTestContext) {
     let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
     let character_cell = ListenableCell::new(Some(c1));
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(GraphicsOptions::UNALTERED_COLORS),
+        ListenableSource::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         ListenableSource::constant(COMMON_VIEWPORT),
         character_cell.as_source(),
-        ListenableSource::constant(UiViewState::default()),
+        ListenableSource::constant(Arc::new(UiViewState::default())),
     );
     let mut renderer = context.renderer(cameras);
 
@@ -504,12 +504,12 @@ async fn follow_options_change(mut context: RenderTestContext) {
     options_2.exposure = ExposureOption::Fixed(ps32(1.5));
     options_2.transparency = TransparencyOption::Threshold(zo32(0.1));
 
-    let options_cell = ListenableCell::new(options_1);
+    let options_cell = ListenableCell::new(Arc::new(options_1));
     let cameras: StandardCameras = StandardCameras::new(
         options_cell.as_source(),
         ListenableSource::constant(COMMON_VIEWPORT),
         ListenableSource::constant(universe.get_default_character()),
-        ListenableSource::constant(UiViewState::default()),
+        ListenableSource::constant(Arc::new(UiViewState::default())),
     );
 
     // Render the image once. This isn't that interesting a comparison test,
@@ -520,7 +520,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
         .await;
 
     // Change the graphics options and rerender.
-    options_cell.set(options_2);
+    options_cell.set(Arc::new(options_2));
     context
         .render_comparison_test_with_renderer(1, &mut renderer, Overlays::NONE)
         .await;
@@ -730,14 +730,14 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     options.lighting_display = LightingOption::Flat;
     options.show_ui = show_ui;
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(options.clone()),
+        ListenableSource::constant(Arc::new(options.clone())),
         ListenableSource::constant(COMMON_VIEWPORT),
         ListenableSource::constant(universe.get_default_character()),
-        ListenableSource::constant(UiViewState {
+        ListenableSource::constant(Arc::new(UiViewState {
             space: Some(ui_space(&mut universe)),
             view_transform: ViewTransform::identity(),
             graphics_options: options,
-        }),
+        })),
     );
 
     context
@@ -777,14 +777,14 @@ async fn layers_none_but_text(mut context: RenderTestContext) {
 async fn layers_ui_only(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(GraphicsOptions::UNALTERED_COLORS),
+        ListenableSource::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         ListenableSource::constant(COMMON_VIEWPORT),
         ListenableSource::constant(None),
-        ListenableSource::constant(UiViewState {
+        ListenableSource::constant(Arc::new(UiViewState {
             space: Some(ui_space(&mut universe)),
             view_transform: ViewTransform::identity(),
             graphics_options: GraphicsOptions::UNALTERED_COLORS,
-        }),
+        })),
     );
 
     context
@@ -978,10 +978,10 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let zero = Viewport::with_scale(1.00, [0, 0]);
     let viewport_cell = ListenableCell::new(zero);
     let cameras: StandardCameras = StandardCameras::new(
-        ListenableSource::constant(GraphicsOptions::default()),
+        ListenableSource::constant(Arc::new(GraphicsOptions::default())),
         viewport_cell.as_source(),
         ListenableSource::constant(universe.get_default_character()),
-        ListenableSource::constant(UiViewState::default()),
+        ListenableSource::constant(Arc::new(UiViewState::default())),
     );
     let overlays = Overlays {
         cursor: None,

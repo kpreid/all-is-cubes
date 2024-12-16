@@ -82,7 +82,7 @@ impl InventoryWatcher {
 
         // Check if we have a new inventory owner which we need to install a listener on.
         let new_owner = self.inventory_source.get();
-        let listener_to_install = if *new_owner != self.inventory_owner {
+        let listener_to_install = if new_owner != self.inventory_owner {
             // Listen directly (so we have a dirty flag to consult) and indirectly to wake our
             // client to have them update us.
             let (new_gate, new_listener) = (
@@ -91,7 +91,7 @@ impl InventoryWatcher {
             )
                 .gate();
 
-            self.inventory_owner = Arc::unwrap_or_clone(new_owner);
+            self.inventory_owner = new_owner;
             self.owner_gate = new_gate;
             Some(new_listener)
         } else {

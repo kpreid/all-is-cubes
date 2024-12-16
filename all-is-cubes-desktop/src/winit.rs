@@ -403,7 +403,7 @@ fn handle_window_event<Ren: RendererToWinit>(
             dsession.window.mouse_position = Some(position);
             let position: [f64; 2] = position.into();
             input_processor.mouse_pixel_position(
-                *dsession.viewport_cell.get(),
+                dsession.viewport_cell.get(),
                 Some(Point2D::from(position) / dsession.window.window.scale_factor()),
                 false,
             );
@@ -415,7 +415,7 @@ fn handle_window_event<Ren: RendererToWinit>(
         }
         WindowEvent::CursorLeft { .. } => {
             dsession.window.mouse_position = None;
-            input_processor.mouse_pixel_position(*dsession.viewport_cell.get(), None, false);
+            input_processor.mouse_pixel_position(dsession.viewport_cell.get(), None, false);
         }
         WindowEvent::MouseInput { button, state, .. } => match state {
             ElementState::Pressed => {

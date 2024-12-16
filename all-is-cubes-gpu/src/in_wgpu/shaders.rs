@@ -133,7 +133,7 @@ impl ReloadableShader {
 
     /// For shader testing.
     pub(crate) fn get_source_text(&self) -> Arc<str> {
-        (*self.source.get()).clone()
+        self.source.get()
     }
 
     /// Returns `true` if the current module changed.

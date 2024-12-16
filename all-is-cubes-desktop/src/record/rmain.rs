@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 
 use all_is_cubes::character::{self, Character};
@@ -38,6 +39,7 @@ where
         .session
         .graphics_options_mut()
         .update_mut(|graphics_options| {
+            let graphics_options = Arc::make_mut(graphics_options);
             graphics_options.show_ui = false;
             graphics_options.debug_info_text = false;
         });

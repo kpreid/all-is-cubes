@@ -6,6 +6,7 @@
     reason = "false positive; TODO: remove after Rust 1.84 is released"
 )]
 
+use alloc::sync::Arc;
 use core::fmt;
 use core::mem;
 
@@ -24,8 +25,8 @@ use crate::universe::{Handle, HandleError};
 /// changed.
 pub struct UpdatingSpaceRaytracer<D: RtBlockData> {
     space: Handle<Space>,
-    graphics_options: ListenableSource<GraphicsOptions>,
-    custom_options: ListenableSource<D::Options>,
+    graphics_options: ListenableSource<Arc<GraphicsOptions>>,
+    custom_options: ListenableSource<Arc<D::Options>>,
     state: SpaceRaytracer<D>,
     todo: listen::StoreLock<SrtTodo>,
 }
@@ -57,8 +58,8 @@ where
     /// so the space is accessed on a consistent schedule.)
     pub fn new(
         space: Handle<Space>,
-        graphics_options: ListenableSource<GraphicsOptions>,
-        custom_options: ListenableSource<D::Options>,
+        graphics_options: ListenableSource<Arc<GraphicsOptions>>,
+        custom_options: ListenableSource<Arc<D::Options>>,
     ) -> Self {
         let todo = listen::StoreLock::new(SrtTodo {
             listener: true,
@@ -79,8 +80,8 @@ where
             state: SpaceRaytracer::new_empty(
                 // TODO: checkerboard sky
                 space::Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb()),
-                graphics_options.snapshot(),
-                custom_options.snapshot(),
+                (*graphics_options.get()).clone(),
+                (*custom_options.get()).clone(),
             ),
             space,
             graphics_options,
@@ -128,8 +129,8 @@ where
         if mem::take(&mut todo.everything) {
             self.state = SpaceRaytracer::new(
                 &space,
-                self.graphics_options.snapshot(),
-                self.custom_options.snapshot(),
+                (*self.graphics_options.get()).clone(),
+                (*self.custom_options.get()).clone(),
             );
             todo.blocks.clear();
             todo.cubes.clear();
@@ -240,8 +241,8 @@ mod tests {
     struct EquivalenceTester {
         camera: Camera,
         space: Handle<Space>,
-        graphics_options: ListenableSource<GraphicsOptions>,
-        custom_options: ListenableSource<()>,
+        graphics_options: ListenableSource<Arc<GraphicsOptions>>,
+        custom_options: ListenableSource<Arc<()>>,
         updating: UpdatingSpaceRaytracer<CharacterRtData>,
     }
 
@@ -250,11 +251,11 @@ mod tests {
             let bounds = space.read().unwrap().bounds();
 
             // TODO: add tests of changing the options
-            let graphics_options = ListenableSource::constant(GraphicsOptions::default());
-            let custom_options = ListenableSource::constant(());
+            let graphics_options = ListenableSource::constant(Arc::new(GraphicsOptions::default()));
+            let custom_options = ListenableSource::constant(Arc::new(()));
 
             let mut camera = Camera::new(
-                graphics_options.snapshot(),
+                (*graphics_options.get()).clone(),
                 Viewport {
                     nominal_size: size2(72., 72.),
                     framebuffer_size: size2(72, 36),
@@ -276,7 +277,8 @@ mod tests {
         }
 
         fn update_and_assert(&mut self) -> Result<bool, HandleError> {
-            self.camera.set_options(self.graphics_options.snapshot());
+            self.camera
+                .set_options((*self.graphics_options.get()).clone());
             let changed = self.updating.update()?;
             let image_updating = self
                 .updating
@@ -286,8 +288,8 @@ mod tests {
             #[expect(clippy::unit_arg)]
             let image_fresh = SpaceRaytracer::<CharacterRtData>::new(
                 &self.space.read().unwrap(),
-                self.graphics_options.snapshot(),
-                self.custom_options.snapshot(),
+                (*self.graphics_options.get()).clone(),
+                *self.custom_options.get(),
             )
             .to_text::<CharacterBuf>(&self.camera, "\n")
             .to_string();

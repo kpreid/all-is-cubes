@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use std::sync::Arc;
+
 use criterion::measurement::WallTime;
 use criterion::{criterion_group, criterion_main, Bencher, Criterion};
 
@@ -44,13 +46,13 @@ impl TestData {
         options_fn(&mut options);
         let mut renderer = RtRenderer::new(
             StandardCameras::new(
-                ListenableSource::constant(options),
+                ListenableSource::constant(Arc::new(options)),
                 ListenableSource::constant(Viewport::with_scale(1.0, [64, 16])),
                 ListenableSource::constant(Some(self.character.clone())),
-                ListenableSource::constant(UiViewState::default()),
+                ListenableSource::constant(Arc::new(UiViewState::default())),
             ),
             Box::new(core::convert::identity),
-            ListenableSource::constant(()),
+            ListenableSource::constant(Arc::new(())),
         );
         renderer.update(None).unwrap();
         renderer

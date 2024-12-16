@@ -108,7 +108,7 @@ pub struct Session<I> {
 /// might also be moved to a background task to allow the session stepping to occur independent
 /// of the event loop or other owner of the `Session`.
 struct Shuttle {
-    graphics_options: ListenableCell<GraphicsOptions>,
+    graphics_options: ListenableCell<Arc<GraphicsOptions>>,
 
     game_universe: Universe,
 
@@ -281,17 +281,17 @@ impl<I: time::Instant> Session<I> {
     }
 
     /// What the renderer should be displaying on screen for the UI.
-    pub fn ui_view(&self) -> ListenableSource<UiViewState> {
+    pub fn ui_view(&self) -> ListenableSource<Arc<UiViewState>> {
         self.shuttle().ui_view()
     }
 
     /// Allows reading, and observing changes to, the current graphics options.
-    pub fn graphics_options(&self) -> ListenableSource<GraphicsOptions> {
+    pub fn graphics_options(&self) -> ListenableSource<Arc<GraphicsOptions>> {
         self.shuttle().graphics_options.as_source()
     }
 
     /// Allows setting the current graphics options.
-    pub fn graphics_options_mut(&self) -> &ListenableCell<GraphicsOptions> {
+    pub fn graphics_options_mut(&self) -> &ListenableCell<Arc<GraphicsOptions>> {
         &self.shuttle().graphics_options
     }
 
@@ -331,7 +331,7 @@ impl<I: time::Instant> Session<I> {
             if self.frame_clock.should_step() {
                 let shuttle = self.shuttle.as_mut().expect(SHUTTLE_PANIC_MSG);
                 let u_clock = shuttle.game_universe.clock();
-                let paused = *self.paused.get();
+                let paused = self.paused.get();
                 let ui_tick = u_clock.next_tick(false);
                 let game_tick = u_clock.next_tick(paused);
 
@@ -490,7 +490,7 @@ impl<I: time::Instant> Session<I> {
                         }
                     }
                     ControlMessage::TogglePause => {
-                        self.paused.set(!*self.paused.get());
+                        self.paused.set(!self.paused.get());
                     }
                     ControlMessage::ToggleMouselook => {
                         self.input_processor.toggle_mouselook_mode();
@@ -682,10 +682,10 @@ impl Shuttle {
     }
 
     /// What the renderer should be displaying on screen for the UI.
-    fn ui_view(&self) -> ListenableSource<UiViewState> {
+    fn ui_view(&self) -> ListenableSource<Arc<UiViewState>> {
         match &self.ui {
             Some(ui) => ui.view(),
-            None => ListenableSource::constant(UiViewState::default()), // TODO: cache this to allocate less
+            None => ListenableSource::constant(Arc::new(UiViewState::default())), // TODO: cache this to allocate less
         }
     }
 
@@ -802,7 +802,7 @@ impl<I: time::Instant> SessionBuilder<I> {
         let game_universe = Universe::new();
         let game_character = ListenableCellWithLocal::new(None);
         let input_processor = InputProcessor::new();
-        let graphics_options = ListenableCell::new(GraphicsOptions::default());
+        let graphics_options = ListenableCell::new(Arc::new(GraphicsOptions::default()));
         let paused = ListenableCell::new(false);
         let (control_send, control_recv) = flume::bounded(100);
 
@@ -1438,11 +1438,11 @@ mod tests {
             .ui(ListenableSource::constant(Viewport::ARBITRARY))
             .build()
             .await;
-        assert!(!*session.paused.get());
+        assert!(!session.paused.get());
 
         session.input_processor.key_momentary(Key::Escape); // need to not just use control_channel
         advance_time(&mut session);
 
-        assert!(*session.paused.get());
+        assert!(session.paused.get());
     }
 }

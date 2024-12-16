@@ -1,6 +1,7 @@
 //! Abstraction over renderers (for test purposes only).
 
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::size2;
@@ -80,7 +81,7 @@ impl RendererFactory for RtFactory {
         Box::new(all_is_cubes_render::raytracer::RtRenderer::new(
             cameras,
             Box::new(|v| v),
-            listen::ListenableSource::constant(()),
+            listen::ListenableSource::constant(Arc::new(())),
         ))
     }
 

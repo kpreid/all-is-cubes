@@ -391,7 +391,7 @@ impl WebSession {
 
         if should_draw {
             let viewport = self.gui_helpers.canvas_helper().viewport();
-            if viewport != *self.viewport_cell.get() {
+            if viewport != self.viewport_cell.get() {
                 self.viewport_cell.set(viewport);
             }
             match &mut inner.renderer {
@@ -474,7 +474,7 @@ impl WebSession {
         ));
         i.has_pointer_lock(lock);
         i.mouse_pixel_position(
-            *self.viewport_cell.get(),
+            self.viewport_cell.get(),
             Some(Point2D::new(
                 event.client_x().into(),
                 event.client_y().into(),
@@ -558,7 +558,9 @@ pub(crate) async fn create_session(
         })
         .build()
         .await;
-    session.graphics_options_mut().set(graphics_options);
+    session
+        .graphics_options_mut()
+        .set(Arc::new(graphics_options));
     (session, viewport_cell, fullscreen_cell)
 }
 
