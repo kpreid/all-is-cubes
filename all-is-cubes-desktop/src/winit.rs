@@ -9,7 +9,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::euclid::{Point2D, Size2D};
-use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::listen;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_render::camera::{self, StandardCameras, Viewport};
 
@@ -169,7 +169,7 @@ pub async fn create_winit_wgpu_desktop_session(
     executor: Arc<crate::Executor>,
     session: Session,
     window: WinAndState,
-    viewport_cell: ListenableCell<Viewport>,
+    viewport_cell: listen::Cell<Viewport>,
 ) -> Result<DesktopSession<SurfaceRenderer<Instant>, WinAndState>, anyhow::Error> {
     let start_time = Instant::now();
 

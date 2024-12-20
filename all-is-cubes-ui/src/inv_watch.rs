@@ -42,7 +42,7 @@ pub(crate) struct InventoryWatcher {
 
     /// Flag is set whenever either `inventory_source` or `inventory_owner` send a change
     /// notification, so we know to resynchronize.
-    dirty: listen::DirtyFlag,
+    dirty: listen::Flag,
 }
 
 impl InventoryWatcher {
@@ -54,7 +54,7 @@ impl InventoryWatcher {
         inventory_source: listen::DynSource<Option<Handle<Character>>>,
         _ui_universe: &mut Universe,
     ) -> Self {
-        let dirty = listen::DirtyFlag::new(true);
+        let dirty = listen::Flag::new(true);
 
         inventory_source.listen(dirty.listener());
 
@@ -217,7 +217,7 @@ mod tests {
         universe: Universe,
         space: Handle<Space>,
         character: Handle<Character>,
-        character_cell: listen::ListenableCell<Option<Handle<Character>>>,
+        character_cell: listen::Cell<Option<Handle<Character>>>,
         watcher: InventoryWatcher,
         sink: listen::Sink<WatcherChange>,
     }
@@ -226,7 +226,7 @@ mod tests {
             let mut universe = Universe::new();
             let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
             let character = universe.insert_anonymous(Character::spawn_default(space.clone()));
-            let character_cell = listen::ListenableCell::new(Some(character.clone()));
+            let character_cell = listen::Cell::new(Some(character.clone()));
             let watcher = InventoryWatcher::new(character_cell.as_source(), &mut universe);
 
             // Install listener

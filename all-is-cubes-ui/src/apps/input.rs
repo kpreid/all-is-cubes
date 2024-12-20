@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::{Point2D, Vector2D};
-use all_is_cubes::listen::{self, ListenableCell};
+use all_is_cubes::listen;
 use all_is_cubes::math::{zo32, FreeCoordinate, FreeVector};
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{Handle, Universe};
@@ -56,7 +56,7 @@ pub struct InputProcessor {
     /// Do we *want* pointer lock for mouselook?
     ///
     /// This is listenable so that the UI can react to this state.
-    mouselook_mode: ListenableCell<bool>,
+    mouselook_mode: listen::Cell<bool>,
     /// Do we *have* pointer lock for mouselook? Reported by calling input implementation.
     has_pointer_lock: bool,
 
@@ -84,7 +84,7 @@ impl InputProcessor {
             keys_held: HashSet::new(),
             momentary_timeout: HashMap::new(),
             command_buffer: Vec::new(),
-            mouselook_mode: ListenableCell::new(false), // TODO: might want a parameter
+            mouselook_mode: listen::Cell::new(false), // TODO: might want a parameter
             has_pointer_lock: false,
             mouselook_buffer: Vector2D::zero(),
             mouse_ndc_position: Some(NdcPoint2::origin()),
@@ -491,8 +491,8 @@ impl InputProcessor {
 pub(crate) struct InputTargets<'a> {
     pub universe: Option<&'a mut Universe>,
     pub character: Option<&'a Handle<Character>>,
-    pub paused: Option<&'a ListenableCell<bool>>,
-    pub graphics_options: Option<&'a ListenableCell<Arc<GraphicsOptions>>>,
+    pub paused: Option<&'a listen::Cell<bool>>,
+    pub graphics_options: Option<&'a listen::Cell<Arc<GraphicsOptions>>>,
     // TODO: replace cells with control channel?
     // TODO: make the control channel a type alias?
     pub control_channel: Option<&'a flume::Sender<ControlMessage>>,
@@ -575,7 +575,7 @@ mod tests {
     /// mouselook is ended so the mouse  can interact with the menus.
     #[tokio::test]
     async fn pause_menu_cancels_mouselook() {
-        let paused = ListenableCell::new(false);
+        let paused = listen::Cell::new(false);
         // TODO: This test is both verbose and expensive.
         // We need simpler way to create a cheap Vui for a test, or some abstraction here.
         let (cctx, _) = flume::bounded(1);

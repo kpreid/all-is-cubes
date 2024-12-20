@@ -11,7 +11,7 @@ use anyhow::Context;
 use clap::{CommandFactory as _, Parser as _};
 
 use all_is_cubes::euclid::Size2D;
-use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::listen;
 use all_is_cubes_render::camera::{GraphicsOptions, Viewport};
 
 #[cfg(feature = "record")]
@@ -95,7 +95,7 @@ fn main() -> Result<(), anyhow::Error> {
     // window size. This is a kludge because the `Session`'s `Vui` wants to be able to track
     // the viewport aspect ratio. It would be nice to have a better strategy, but at least
     // this is mostly confined to initialization.
-    let viewport_cell = ListenableCell::new(Viewport::with_scale(
+    let viewport_cell = listen::Cell::new(Viewport::with_scale(
         1.0,
         display_size.unwrap_or_else(Size2D::zero).cast_unit(),
     ));
@@ -180,7 +180,8 @@ fn main() -> Result<(), anyhow::Error> {
                     if graphics_type == GraphicsType::WindowRt {
                         // TODO: improve on this kludge by just having a general cmdline graphics config
                         dsession.session.graphics_options_mut().update_mut(|o| {
-                            Arc::make_mut(o).render_method = all_is_cubes_render::camera::RenderMethod::Reference;
+                            Arc::make_mut(o).render_method =
+                                all_is_cubes_render::camera::RenderMethod::Reference;
                         });
                     }
                     Ok(dsession)

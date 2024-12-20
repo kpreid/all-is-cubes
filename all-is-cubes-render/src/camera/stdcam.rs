@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use core::fmt;
 
 use all_is_cubes::character::{cursor_raycast, Character, Cursor};
-use all_is_cubes::listen::{self, DirtyFlag, ListenableCell};
+use all_is_cubes::listen;
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Universe};
@@ -79,22 +79,22 @@ impl<T> Layers<T> {
 pub struct StandardCameras {
     /// Cameras are synced with this
     graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
-    graphics_options_dirty: DirtyFlag,
+    graphics_options_dirty: listen::Flag,
 
     character_source: listen::DynSource<Option<Handle<Character>>>,
     /// Tracks whether the character was replaced (not whether its view changed).
-    character_dirty: DirtyFlag,
+    character_dirty: listen::Flag,
     character: Option<Handle<Character>>,
     /// Cached and listenable version of character's space.
     /// TODO: This should be in a `Layers` along with `ui_state`...?
-    world_space: ListenableCell<Option<Handle<Space>>>,
+    world_space: listen::Cell<Option<Handle<Space>>>,
 
     ui_source: listen::DynSource<Arc<UiViewState>>,
-    ui_dirty: DirtyFlag,
+    ui_dirty: listen::Flag,
     ui_space: Option<Handle<Space>>,
 
     viewport_source: listen::DynSource<Viewport>,
-    viewport_dirty: DirtyFlag,
+    viewport_dirty: listen::Flag,
 
     cameras: Layers<Camera>,
 }
@@ -112,8 +112,8 @@ impl StandardCameras {
         // TODO: Add a unit test that each of these listeners works as intended.
         // TODO: This is also an awful lot of repetitive code; we should design a pattern
         // to not have it (some kind of "following cell")?
-        let graphics_options_dirty = DirtyFlag::listening(false, &graphics_options);
-        let viewport_dirty = DirtyFlag::listening(false, &viewport_source);
+        let graphics_options_dirty = listen::Flag::listening(false, &graphics_options);
+        let viewport_dirty = listen::Flag::listening(false, &viewport_source);
 
         let initial_options: &GraphicsOptions = &graphics_options.get();
         let initial_viewport: Viewport = viewport_source.get();
@@ -129,13 +129,13 @@ impl StandardCameras {
             graphics_options,
             graphics_options_dirty,
 
-            character_dirty: DirtyFlag::listening(true, &character_source),
+            character_dirty: listen::Flag::listening(true, &character_source),
             character_source,
             character: None, // update() will fix these up
-            world_space: ListenableCell::new(None),
+            world_space: listen::Cell::new(None),
 
             ui_space: ui_state.space.clone(),
-            ui_dirty: DirtyFlag::listening(true, &ui_source),
+            ui_dirty: listen::Flag::listening(true, &ui_source),
             ui_source,
 
             viewport_dirty,
@@ -229,7 +229,7 @@ impl StandardCameras {
                         self.cameras.world.set_view_transform(character.view());
                     }
 
-                    // TODO: ListenableCell should make this easier and cheaper
+                    // TODO: listen::Cell should make this easier and cheaper
                     if Option::as_ref(&self.world_space.get()) != Some(&character.space) {
                         anything_changed = true;
 
@@ -409,7 +409,7 @@ mod tests {
 
     #[test]
     fn cameras_follow_character_and_world() {
-        let character_cell = ListenableCell::new(None);
+        let character_cell = listen::Cell::new(None);
         let mut cameras = StandardCameras::new(
             listen::constant(Arc::new(GraphicsOptions::default())),
             listen::constant(Viewport::ARBITRARY),
@@ -418,7 +418,7 @@ mod tests {
         );
 
         let world_source = cameras.world_space();
-        let world_flag = DirtyFlag::listening(false, &world_source);
+        let world_flag = listen::Flag::listening(false, &world_source);
         assert_eq!(world_source.get().as_ref(), None);
 
         // No redundant notification when world is absent
@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn cameras_clone() {
-        let options_cell = ListenableCell::new(Arc::new(GraphicsOptions::default()));
+        let options_cell = listen::Cell::new(Arc::new(GraphicsOptions::default()));
         let mut cameras = StandardCameras::new(
             options_cell.as_source(),
             listen::constant(Viewport::ARBITRARY),

@@ -32,7 +32,7 @@ use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
-use all_is_cubes::listen::{self, DirtyFlag};
+use all_is_cubes::listen;
 use all_is_cubes::math::{
     Cube, Face6, GridAab, GridCoordinate, GridSize, GridVector, Gridgid, Rgba,
 };
@@ -357,7 +357,7 @@ impl<D> vui::Layoutable for ToggleButton<D> {
 impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::Widget for ToggleButton<D> {
     fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(ToggleButtonController {
-            todo: DirtyFlag::listening(true, &self.data_source),
+            todo: listen::Flag::listening(true, &self.data_source),
             txns: self.common.create_draw_txns(grant),
             definition: self,
             recently_pressed: Arc::new(AtomicU8::new(0)),
@@ -408,7 +408,7 @@ impl ToggleButtonVisualState {
 struct ToggleButtonController<D: Clone + Send + Sync> {
     definition: Arc<ToggleButton<D>>,
     txns: linking::Provider<ToggleButtonVisualState, vui::WidgetTransaction>,
-    todo: DirtyFlag,
+    todo: listen::Flag,
     recently_pressed: Arc<AtomicU8>,
 }
 

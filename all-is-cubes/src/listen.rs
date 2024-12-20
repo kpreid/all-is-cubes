@@ -6,20 +6,14 @@
 // TODO: Get rid of the renames.
 
 pub use ::nosy::{
-    Buffer, Constant, Flag as DirtyFlag, Gate, GateListener, IntoDynListener, Listen, Listener,
-    NullListener, Sink, Source, Store, StoreLock,
+    Buffer, Constant, Flag, Gate, GateListener, IntoDynListener, Listen, Listener, NullListener,
+    Sink, Source, Store, StoreLock,
 };
 
 #[cfg(feature = "std")]
-pub use ::nosy::sync::{
-    constant, Cell as ListenableCell, CellWithLocal as ListenableCellWithLocal, DynListener,
-    DynSource, Notifier,
-};
+pub use ::nosy::sync::{constant, Cell, CellWithLocal, DynListener, DynSource, Notifier};
 #[cfg(not(feature = "std"))]
-pub use ::nosy::unsync::{
-    constant, Cell as ListenableCell, CellWithLocal as ListenableCellWithLocal, DynListener,
-    DynSource, Notifier,
-};
+pub use ::nosy::unsync::{constant, Cell, CellWithLocal, DynListener, DynSource, Notifier};
 
 mod listeners;
 pub use listeners::FnListener;

@@ -24,9 +24,7 @@ use all_is_cubes::arcstr::{self, ArcStr};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
-use all_is_cubes::listen::{
-    self, Listen as _, ListenableCell, ListenableCellWithLocal, Listener as _,
-};
+use all_is_cubes::listen::{self, Listen as _, Listener as _};
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
@@ -84,7 +82,7 @@ pub struct Session<I> {
     /// The `RwLock` is never blocked on.
     task_context_inner: Arc<RwLock<Option<Box<Shuttle>>>>,
 
-    paused: ListenableCell<bool>,
+    paused: listen::Cell<bool>,
 
     /// Messages for controlling the state that aren't via [`InputProcessor`].
     ///
@@ -108,17 +106,17 @@ pub struct Session<I> {
 /// might also be moved to a background task to allow the session stepping to occur independent
 /// of the event loop or other owner of the `Session`.
 struct Shuttle {
-    graphics_options: ListenableCell<Arc<GraphicsOptions>>,
+    graphics_options: listen::Cell<Arc<GraphicsOptions>>,
 
     game_universe: Universe,
 
     /// Subset of information from `game_universe` that is largely immutable and can be
     /// meaningfully listened to.
-    game_universe_info: ListenableCell<SessionUniverseInfo>,
+    game_universe_info: listen::Cell<SessionUniverseInfo>,
 
     /// Character we're designating as “the player character”.
     /// Always a member of `game_universe`.
-    game_character: ListenableCellWithLocal<Option<Handle<Character>>>,
+    game_character: listen::CellWithLocal<Option<Handle<Character>>>,
 
     ui: Option<Vui>,
 
@@ -291,7 +289,7 @@ impl<I: time::Instant> Session<I> {
     }
 
     /// Allows setting the current graphics options.
-    pub fn graphics_options_mut(&self) -> &ListenableCell<Arc<GraphicsOptions>> {
+    pub fn graphics_options_mut(&self) -> &listen::Cell<Arc<GraphicsOptions>> {
         &self.shuttle().graphics_options
     }
 
@@ -800,10 +798,10 @@ impl<I: time::Instant> SessionBuilder<I> {
             _instant: _,
         } = self;
         let game_universe = Universe::new();
-        let game_character = ListenableCellWithLocal::new(None);
+        let game_character = listen::CellWithLocal::new(None);
         let input_processor = InputProcessor::new();
-        let graphics_options = ListenableCell::new(Arc::new(GraphicsOptions::default()));
-        let paused = ListenableCell::new(false);
+        let graphics_options = listen::Cell::new(Arc::new(GraphicsOptions::default()));
+        let paused = listen::Cell::new(false);
         let (control_send, control_recv) = flume::bounded(100);
 
         let space_watch_state = SpaceWatchState::empty();
@@ -832,7 +830,7 @@ impl<I: time::Instant> SessionBuilder<I> {
 
                 graphics_options,
                 game_character,
-                game_universe_info: ListenableCell::new(SessionUniverseInfo {
+                game_universe_info: listen::Cell::new(SessionUniverseInfo {
                     id: game_universe.universe_id(),
                     whence: game_universe.whence.clone(),
                 }),

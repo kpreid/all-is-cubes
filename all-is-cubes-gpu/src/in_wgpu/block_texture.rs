@@ -309,7 +309,7 @@ impl texture::Tile for AtlasTile {
         //
         // * a redundant setting of the AllocatorBacking::dirty flag.
         // * this write() blocking until flush() finishes (this could be fixed with
-        //   making the dirty flag a `DirtyFlag` (atomic bool based) instead of being
+        //   making the dirty flag a `Flag` (atomic bool based) instead of being
         //   inside the lock).
         //
         // It should always be the case that a write() then flush() will actually

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use all_is_cubes::arcstr;
-use all_is_cubes::listen::{DirtyFlag, ListenableCell};
+use all_is_cubes::listen;
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;
 use all_is_cubes::universe::UniverseStepInfo;
@@ -44,7 +44,7 @@ pub struct DesktopSession<Ren, Win> {
     gilrs: Option<gilrs::Gilrs>,
 
     /// The current viewport size linked to the renderer.
-    pub(crate) viewport_cell: ListenableCell<Viewport>,
+    pub(crate) viewport_cell: listen::Cell<Viewport>,
     pub(crate) clock_source: ClockSource,
 
     /// If present, connection to system audio output.
@@ -60,7 +60,7 @@ pub struct DesktopSession<Ren, Win> {
 
     /// Flag for `Session` might have changed its `Universe`, or otherwise done something that
     /// requires the window title to change.
-    session_info_altered: DirtyFlag,
+    session_info_altered: listen::Flag,
 }
 
 impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
@@ -70,7 +70,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         renderer: Ren,
         window: Win,
         session: Session,
-        viewport_cell: ListenableCell<Viewport>,
+        viewport_cell: listen::Cell<Viewport>,
         enable_gamepad_input: bool,
     ) -> Self {
         // TODO: There should be one of this for the whole event loop, not per session
@@ -87,7 +87,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         };
 
         let new_self = Self {
-            session_info_altered: DirtyFlag::listening(false, session.universe_info()),
+            session_info_altered: listen::Flag::listening(false, session.universe_info()),
 
             session,
             executor,

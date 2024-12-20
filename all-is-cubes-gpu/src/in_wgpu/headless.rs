@@ -6,7 +6,7 @@ use futures_channel::oneshot;
 use futures_core::future::BoxFuture;
 
 use all_is_cubes::character::Cursor;
-use all_is_cubes::listen::{self, DirtyFlag};
+use all_is_cubes::listen;
 use all_is_cubes::util::Executor;
 use all_is_cubes_render::camera::{StandardCameras, Viewport};
 use all_is_cubes_render::{Flaws, HeadlessRenderer, RenderError, Rendering};
@@ -68,7 +68,7 @@ impl Builder {
             &self.adapter,
         );
 
-        let viewport_dirty = DirtyFlag::listening(false, &viewport_source);
+        let viewport_dirty = listen::Flag::listening(false, &viewport_source);
         let viewport = viewport_source.get();
         let color_texture = create_color_texture(&self.device, viewport);
 
@@ -105,7 +105,7 @@ struct RendererImpl {
     color_texture: wgpu::Texture,
     everything: super::EverythingRenderer<AdaptedInstant>,
     viewport_source: listen::DynSource<Viewport>,
-    viewport_dirty: DirtyFlag,
+    viewport_dirty: listen::Flag,
     flaws: Flaws,
 }
 

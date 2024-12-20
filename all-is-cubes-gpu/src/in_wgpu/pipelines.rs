@@ -1,7 +1,6 @@
 use std::mem;
 use std::sync::Arc;
 
-use all_is_cubes::listen::DirtyFlag;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
@@ -24,7 +23,7 @@ use crate::in_wgpu::vertex::WgpuLinesVertex;
 #[derive(Debug)]
 pub(crate) struct Pipelines {
     /// Tracks whether we need to rebuild pipelines for any reasons.
-    dirty: DirtyFlag,
+    dirty: listen::Flag,
 
     graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
 
@@ -511,7 +510,7 @@ impl Pipelines {
             ..Default::default()
         });
 
-        let dirty = DirtyFlag::new(false);
+        let dirty = listen::Flag::new(false);
         shaders.listen(dirty.listener());
         graphics_options.listen(dirty.listener());
 

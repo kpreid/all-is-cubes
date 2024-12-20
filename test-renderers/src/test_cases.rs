@@ -13,7 +13,7 @@ use all_is_cubes::block::{Block, Resolution::*, AIR};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::color_block;
 use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Size3D, Vector3D};
-use all_is_cubes::listen::{self, ListenableCell};
+use all_is_cubes::listen;
 use all_is_cubes::math::{
     ps32, rgb_const, rgba_const, zo32, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
     GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol,
@@ -448,7 +448,7 @@ async fn follow_character_change(context: RenderTestContext) {
     };
     let c1 = character_of_a_color(rgb_const!(1.0, 0.0, 0.0));
     let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
-    let character_cell = ListenableCell::new(Some(c1));
+    let character_cell = listen::Cell::new(Some(c1));
     let cameras: StandardCameras = StandardCameras::new(
         listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         listen::constant(COMMON_VIEWPORT),
@@ -504,7 +504,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
     options_2.exposure = ExposureOption::Fixed(ps32(1.5));
     options_2.transparency = TransparencyOption::Threshold(zo32(0.1));
 
-    let options_cell = ListenableCell::new(Arc::new(options_1));
+    let options_cell = listen::Cell::new(Arc::new(options_1));
     let cameras: StandardCameras = StandardCameras::new(
         options_cell.as_source(),
         listen::constant(COMMON_VIEWPORT),
@@ -976,7 +976,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, one_cube_space());
     let zero = Viewport::with_scale(1.00, [0, 0]);
-    let viewport_cell = ListenableCell::new(zero);
+    let viewport_cell = listen::Cell::new(zero);
     let cameras: StandardCameras = StandardCameras::new(
         listen::constant(Arc::new(GraphicsOptions::default())),
         viewport_cell.as_source(),

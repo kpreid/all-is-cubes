@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 
 use all_is_cubes::block::{Block, AIR};
 use all_is_cubes::euclid::size3;
-use all_is_cubes::listen::{self, DirtyFlag};
+use all_is_cubes::listen;
 use all_is_cubes::space::SpaceTransaction;
 
 use crate::vui;
@@ -34,7 +34,7 @@ impl vui::Layoutable for Crosshair {
 impl vui::Widget for Crosshair {
     fn controller(self: Arc<Self>, _: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(CrosshairController {
-            todo: DirtyFlag::listening(false, &self.mouselook_mode),
+            todo: listen::Flag::listening(false, &self.mouselook_mode),
             definition: self,
         })
     }
@@ -44,7 +44,7 @@ impl vui::Widget for Crosshair {
 #[derive(Debug)]
 pub(crate) struct CrosshairController {
     definition: Arc<Crosshair>,
-    todo: DirtyFlag,
+    todo: listen::Flag,
 }
 
 impl vui::WidgetController for CrosshairController {

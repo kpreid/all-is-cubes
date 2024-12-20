@@ -1,21 +1,21 @@
 //! “Hot-reloadable” data sources such as shaders.
 //!
 //! This module builds on top of the `resource` library to add change notification
-//! via a background thread and all-is-cubes's `ListenableCell` mechanism.
+//! via a background thread and all-is-cubes's `listen::Cell` mechanism.
 
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 use std::time::Duration;
 
 use resource::Resource;
 
-use all_is_cubes::listen::{self, ListenableCell};
+use all_is_cubes::listen;
 
 #[derive(Clone)]
 pub(crate) struct Reloadable(Arc<ReloadableInner>);
 
 pub(crate) struct ReloadableInner {
     resource: Mutex<Resource<str>>,
-    cell: ListenableCell<Arc<str>>,
+    cell: listen::Cell<Arc<str>>,
 }
 
 /// `file_path` is relative to the Cargo package root.
@@ -29,7 +29,7 @@ pub(crate) use reloadable_str;
 impl Reloadable {
     pub fn new(resource: Resource<str>) -> Self {
         let this = Reloadable(Arc::new(ReloadableInner {
-            cell: ListenableCell::new(res_arc_str(&resource)),
+            cell: listen::Cell::new(res_arc_str(&resource)),
             resource: Mutex::new(resource),
         }));
 
@@ -46,7 +46,7 @@ impl Reloadable {
             Ok(resource) => {
                 let changed = resource.reload_if_changed();
                 if changed {
-                    // unfortunately ListenableCell wants an Arc with Sized contents
+                    // unfortunately listen::Cell wants an Arc with Sized contents
                     self.0.cell.set(res_arc_str(resource));
                 }
                 changed

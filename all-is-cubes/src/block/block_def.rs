@@ -58,7 +58,7 @@ struct BlockDefState {
     cache: Result<MinEval, EvalBlockError>,
 
     /// Whether the cache needs to be updated.
-    cache_dirty: listen::DirtyFlag,
+    cache_dirty: listen::Flag,
 
     /// Whether we have successfully installed a listener on `self.block`.
     listeners_ok: bool,
@@ -141,7 +141,7 @@ impl BlockDef {
 impl BlockDefState {
     #[inline]
     fn new(block: Block) -> Self {
-        let cache_dirty = listen::DirtyFlag::new(false);
+        let cache_dirty = listen::Flag::new(false);
         let (block_listen_gate, block_listener) =
             Listener::<BlockChange>::gate(cache_dirty.listener());
 

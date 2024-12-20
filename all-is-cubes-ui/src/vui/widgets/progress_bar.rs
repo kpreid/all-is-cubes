@@ -13,7 +13,7 @@ use num_traits::float::FloatCore as _;
 
 use all_is_cubes::block::{self, Block, Composite, CompositeOperator, AIR};
 use all_is_cubes::color_block;
-use all_is_cubes::listen::{self, DirtyFlag};
+use all_is_cubes::listen;
 use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, Rgb, ZeroOne};
 use all_is_cubes::space::SpaceTransaction;
 
@@ -75,7 +75,7 @@ impl vui::Layoutable for ProgressBar {
 impl vui::Widget for ProgressBar {
     fn controller(self: Arc<Self>, position: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         Box::new(ProgressBarController {
-            todo: DirtyFlag::listening(true, &self.source),
+            todo: listen::Flag::listening(true, &self.source),
             definition: self,
             position: position.bounds,
             last_drawn_state: None,
@@ -97,7 +97,7 @@ impl ProgressBarState {
 struct ProgressBarController {
     definition: Arc<ProgressBar>,
     position: GridAab,
-    todo: DirtyFlag,
+    todo: listen::Flag,
     last_drawn_state: Option<InternalState>,
 }
 

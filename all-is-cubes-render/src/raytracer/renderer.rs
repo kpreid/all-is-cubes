@@ -634,7 +634,6 @@ mod eg {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::listen::ListenableCell;
     use all_is_cubes::universe::Universe;
     use all_is_cubes::util::assert_conditional_send_sync;
     use core::convert::identity;
@@ -694,7 +693,7 @@ mod tests {
         );
 
         // Change the options after the renderer is created.
-        let custom_options = ListenableCell::new(Arc::new("before"));
+        let custom_options = listen::Cell::new(Arc::new("before"));
         let mut renderer = RtRenderer::new(cameras, Box::new(identity), custom_options.as_source());
         custom_options.set(Arc::new("after"));
 

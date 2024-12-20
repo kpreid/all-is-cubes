@@ -75,7 +75,7 @@ pub(crate) struct Hub {
 
     /// TODO: kludge to get progress UI up and going; eventually everything should be more dynamic
     /// and be able to display however many progress bars and messages.
-    primary_progress: listen::ListenableCell<ProgressBarState>,
+    primary_progress: listen::Cell<ProgressBarState>,
 
     has_interrupt: bool,
 }
@@ -119,7 +119,7 @@ impl Hub {
     pub fn new() -> Self {
         Self {
             notifications: Vec::new(),
-            primary_progress: listen::ListenableCell::new(ProgressBarState::new(0.0)),
+            primary_progress: listen::Cell::new(ProgressBarState::new(0.0)),
             has_interrupt: false,
         }
     }

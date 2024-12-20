@@ -14,7 +14,7 @@ use web_sys::{
 };
 
 use all_is_cubes::euclid::{Point2D, Vector2D};
-use all_is_cubes::listen::ListenableCell;
+use all_is_cubes::listen;
 use all_is_cubes::universe::{Universe, UniverseStepInfo};
 use all_is_cubes_gpu::in_wgpu;
 use all_is_cubes_port::file::NonDiskFile;
@@ -41,8 +41,8 @@ pub(crate) enum WebRenderer {
 pub(crate) struct WebSession {
     gui_helpers: GuiHelpers,
     static_dom: StaticDom,
-    viewport_cell: ListenableCell<Viewport>,
-    fullscreen_cell: ListenableCell<Option<bool>>,
+    viewport_cell: listen::Cell<Viewport>,
+    fullscreen_cell: listen::Cell<Option<bool>>,
     raf_callback: Closure<dyn FnMut(f64)>,
     step_callback: Closure<dyn FnMut()>,
 
@@ -64,8 +64,8 @@ impl WebSession {
         static_dom: StaticDom,
         session: Session,
         renderer: WebRenderer,
-        viewport_cell: ListenableCell<Viewport>,
-        fullscreen_cell: ListenableCell<Option<bool>>,
+        viewport_cell: listen::Cell<Viewport>,
+        fullscreen_cell: listen::Cell<Option<bool>>,
     ) -> Rc<Self> {
         let self_rc = Rc::new_cyclic(|weak_self| {
             Self {
@@ -536,17 +536,13 @@ impl StaticDom {
 pub(crate) async fn create_session(
     gui_helpers: &GuiHelpers,
     graphics_options: GraphicsOptions,
-) -> (
-    Session,
-    ListenableCell<Viewport>,
-    ListenableCell<Option<bool>>,
-) {
+) -> (Session, listen::Cell<Viewport>, listen::Cell<Option<bool>>) {
     // The main cost of this is constructing the `Vui` instance.
     // TODO: pipe in YieldProgress
 
-    let viewport_cell = ListenableCell::new(gui_helpers.canvas_helper().viewport());
+    let viewport_cell = listen::Cell::new(gui_helpers.canvas_helper().viewport());
 
-    let fullscreen_cell = ListenableCell::new(Some(false)); // TODO: check
+    let fullscreen_cell = listen::Cell::new(Some(false)); // TODO: check
 
     let session = Session::builder()
         .ui(viewport_cell.as_source())

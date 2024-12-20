@@ -13,7 +13,7 @@ use ratatui::layout::Rect;
 
 use all_is_cubes::arcstr::literal_substr;
 use all_is_cubes::euclid::{Point2D, Size2D};
-use all_is_cubes::listen::{self, ListenableCell};
+use all_is_cubes::listen;
 use all_is_cubes::math::Rgba;
 use all_is_cubes_render::camera::{self, Camera, StandardCameras, Viewport};
 use all_is_cubes_render::raytracer::{
@@ -93,7 +93,7 @@ pub fn create_terminal_session(
     executor: Arc<crate::Executor>,
     session: Session,
     options: TerminalOptions,
-    viewport_cell: ListenableCell<Viewport>,
+    viewport_cell: listen::Cell<Viewport>,
 ) -> Result<DesktopSession<TerminalRenderer, TerminalWindow>, anyhow::Error> {
     viewport_cell.set(options.viewport_from_terminal_size(rect_size(Rect::default())));
     let cameras = session.create_cameras(viewport_cell.as_source());

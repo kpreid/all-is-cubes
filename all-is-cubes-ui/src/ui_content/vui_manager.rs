@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::inv::{EphemeralOpaque, Tool, ToolError, ToolInput};
-use all_is_cubes::listen::{self, DirtyFlag, ListenableCell, Notifier};
+use all_is_cubes::listen::{self, Notifier};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
@@ -37,7 +37,7 @@ pub(crate) struct Vui {
 
     /// The space that should be displayed to the user, drawn on top of the world.
     /// The value of this cell is derived from `self.state`.
-    current_view: ListenableCell<Arc<UiViewState>>,
+    current_view: listen::Cell<Arc<UiViewState>>,
 
     /// The `focus_on_ui` value from the current [`vui::Page`].
     ///
@@ -47,9 +47,9 @@ pub(crate) struct Vui {
 
     /// Identifies which [`Page`] the UI should be showing — what
     /// should be in `current_space`, taken from one of the [`PageInst`]s.
-    state: ListenableCell<Arc<VuiPageState>>,
+    state: listen::Cell<Arc<VuiPageState>>,
 
-    changed_viewport: DirtyFlag,
+    changed_viewport: listen::Flag,
     viewport_source: listen::DynSource<Viewport>,
     /// Size computed from `viewport_source` and compared with `PageInst`.
     last_ui_size: UiSize,
@@ -71,7 +71,7 @@ pub(crate) struct Vui {
     /// Our choice of `flume` in particular is just because our other crates use it.
     control_channel: flume::Receiver<VuiMessage>,
     character_source: listen::DynSource<Option<Handle<Character>>>,
-    changed_character: DirtyFlag,
+    changed_character: listen::Flag,
     tooltip_state: Arc<Mutex<TooltipState>>,
     /// Messages from session to UI that don't fit as [`listen::DynSource`] changes.
     cue_channel: CueNotifier,
@@ -116,14 +116,14 @@ impl Vui {
             .unwrap();
 
         let (control_send, control_recv) = flume::bounded(100);
-        let state = ListenableCell::new(Arc::new(VuiPageState::Hud));
+        let state = listen::Cell::new(Arc::new(VuiPageState::Hud));
 
         let tooltip_state = Arc::<Mutex<TooltipState>>::default();
         let cue_channel: CueNotifier = Arc::new(Notifier::new());
         let notif_hub = notification::Hub::new();
 
         // TODO: terrible mess of tightly coupled parameters
-        let changed_viewport = DirtyFlag::listening(false, &viewport_source);
+        let changed_viewport = listen::Flag::listening(false, &viewport_source);
         let ui_size = UiSize::new(viewport_source.get());
         let hud_inputs = HudInputs {
             hud_blocks,
@@ -154,9 +154,9 @@ impl Vui {
         let mut new_self = Self {
             universe,
 
-            current_view: ListenableCell::new(Arc::new(UiViewState::default())),
+            current_view: listen::Cell::new(Arc::new(UiViewState::default())),
             current_focus_on_ui: false,
-            state: ListenableCell::new(Arc::new(VuiPageState::Hud)),
+            state: listen::Cell::new(Arc::new(VuiPageState::Hud)),
 
             changed_viewport,
             viewport_source,
@@ -171,7 +171,7 @@ impl Vui {
             progress_page: PageInst::new(progress_page),
 
             control_channel: control_recv,
-            changed_character: DirtyFlag::listening(false, &character_source),
+            changed_character: listen::Flag::listening(false, &character_source),
             character_source,
             tooltip_state,
             cue_channel,
@@ -190,7 +190,7 @@ impl Vui {
     /// Returns whether the input/output mechanisms for this UI should direct input to the UI
     /// rather than gameplay controls. That is: disable mouselook and direct typing to text input.
     //---
-    // TODO: This should be public and be a ListenableCell, but we don't really know what the name
+    // TODO: This should be public and be a listen::Cell, but we don't really know what the name
     // and data type should be
     pub(crate) fn should_focus_on_ui(&self) -> bool {
         self.current_focus_on_ui

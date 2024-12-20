@@ -11,7 +11,7 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Gray8, Drawable as _};
 use all_is_cubes::euclid::Size2D;
-use all_is_cubes::listen::DirtyFlag;
+use all_is_cubes::listen;
 use all_is_cubes::math::VectorOps as _;
 use all_is_cubes_render::camera::{Layers, RenderMethod, StandardCameras};
 use all_is_cubes_render::info_text_drawable;
@@ -112,7 +112,7 @@ pub struct SurfaceRenderer<I: time::Instant> {
     everything: EverythingRenderer<I>,
 
     /// True if we need to reconfigure the surface.
-    viewport_dirty: DirtyFlag,
+    viewport_dirty: listen::Flag,
 }
 
 impl<I: time::Instant> SurfaceRenderer<I> {
@@ -147,7 +147,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         );
 
         Ok(Self {
-            viewport_dirty: DirtyFlag::listening(true, &viewport_source),
+            viewport_dirty: listen::Flag::listening(true, &viewport_source),
             everything,
             surface,
             device,
