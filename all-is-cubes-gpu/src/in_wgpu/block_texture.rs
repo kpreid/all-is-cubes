@@ -593,9 +593,13 @@ impl AllocatorBacking {
     /// Does not take effect until the next [`Self::flush()`].
     #[cfg(feature = "rerun")]
     pub(crate) fn log_to_rerun(&mut self, destination: rg::Destination) {
+        // Logging an invalid transform signals this should be a disconnected coordinate system.
+        // We're supposed to use an explicit blueprint instead, but those aren't available from
+        // Rust yet.
+        // <https://rerun.io/docs/reference/migration/migration-0-21#disconnectedspace-archetypecomponent-deprecated>
         destination.log_static(
             &rg::entity_path![],
-            &rg::archetypes::DisconnectedSpace::new(rg::components::DisconnectedSpace::default()),
+            &rg::archetypes::Transform3D::from_scale(0.0),
         );
         destination.log(&rg::entity_path![], &rg::archetypes::ViewCoordinates::RUF);
         self.rerun_destination = destination;
