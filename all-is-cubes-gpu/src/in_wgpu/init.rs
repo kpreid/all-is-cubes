@@ -7,6 +7,7 @@ use std::future::Future;
 use std::io::Write as _;
 use std::sync::Arc;
 
+use all_is_cubes::euclid::Size3D;
 use all_is_cubes_render::{camera, Flaws, Rendering};
 
 /// Create a [`wgpu::Instance`] controlled by environment variables.
@@ -154,6 +155,12 @@ pub fn get_image_from_gpu(
     // By making this an explicit `Future` return we avoid capturing the queue and texture
     // references.
 
+    assert_eq!(
+        texture.depth_or_array_layers(),
+        1,
+        "3d textures not supported"
+    );
+
     let size = camera::ImageSize::new(texture.width(), texture.height());
     let data_future = get_texels_from_gpu::<[u8; 4]>(device, queue, texture, 1);
 
@@ -166,7 +173,7 @@ pub fn get_image_from_gpu(
     }
 }
 
-/// Fetch the contents of a 2D texture, assuming that its byte layout is the same as that
+/// Fetch the contents of a 2D or 3D texture, assuming that its byte layout is the same as that
 /// of `[C; components]` and returning a vector of length
 /// `texture.width() * texture.height() * components`.
 ///
@@ -225,16 +232,11 @@ pub fn map_really_async(
 #[allow(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug)]
 pub struct TextureCopyParameters {
-    pub size: camera::ImageSize,
+    pub size: Size3D<u32, camera::ImagePixel>,
     pub byte_size_of_texel: u32,
 }
 impl TextureCopyParameters {
     pub fn from_texture(texture: &wgpu::Texture) -> Self {
-        assert_eq!(
-            texture.depth_or_array_layers(),
-            1,
-            "3d textures not supported"
-        );
         let format = texture.format();
         assert_eq!(
             format.block_dimensions(),
@@ -243,7 +245,11 @@ impl TextureCopyParameters {
         );
 
         Self {
-            size: camera::ImageSize::new(texture.width(), texture.height()),
+            size: Size3D::new(
+                texture.width(),
+                texture.height(),
+                texture.depth_or_array_layers(),
+            ),
             byte_size_of_texel: format
                 .block_copy_size(None)
                 .expect("non-color texture format {format:} not supported"),
@@ -271,7 +277,9 @@ impl TextureCopyParameters {
 
         let temp_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("GPU-to-CPU image copy buffer"),
-            size: u64::from(padded_bytes_per_row) * u64::from(self.size.height),
+            size: u64::from(padded_bytes_per_row)
+                * u64::from(self.size.height)
+                * u64::from(self.size.depth),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: false,
         });
@@ -286,7 +294,7 @@ impl TextureCopyParameters {
                     layout: wgpu::ImageDataLayout {
                         offset: 0,
                         bytes_per_row: Some(padded_bytes_per_row),
-                        rows_per_image: None,
+                        rows_per_image: Some(self.size.height),
                     },
                 },
                 texture.size(),
@@ -310,22 +318,26 @@ impl TextureCopyParameters {
             "Texture format does not match requested format",
         );
 
-        let element_count = camera::area_usize(self.size).unwrap() * components;
+        let element_count = self.size.to_usize().volume() * components;
         // Copy the mapped buffer data into a Rust vector, removing row padding if present
         // by copying it one row at a time.
         let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
         {
             let mapped: &[u8] = &buffer.slice(..).get_mapped_range();
-            for row in 0..self.size.height {
-                let byte_start_of_row = self.padded_bytes_per_row() * row;
+            for row in 0..self.row_count() {
+                let byte_start_of_row = (self.padded_bytes_per_row()) as usize * row;
                 // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.
                 texel_vector.extend(bytemuck::cast_slice::<u8, C>(
-                    &mapped[byte_start_of_row as usize..][..self.dense_bytes_per_row() as usize],
+                    &mapped[byte_start_of_row..][..self.dense_bytes_per_row() as usize],
                 ));
             }
             debug_assert_eq!(texel_vector.len(), element_count);
         }
 
         texel_vector
+    }
+
+    fn row_count(&self) -> usize {
+        self.size.height as usize * self.size.depth as usize
     }
 }
