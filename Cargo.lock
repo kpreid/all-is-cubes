@@ -273,7 +273,7 @@ dependencies = [
  "snapbox",
  "stl_io",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.6",
  "tokio",
 ]
 
