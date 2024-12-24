@@ -186,22 +186,11 @@ where
 
     let tc = TextureCopyParameters::from_texture(texture);
     let temp_buffer = tc.copy_texture_to_new_buffer(device, queue, texture);
-
-    // Start the buffer mapping
-    let (sender, receiver) = futures_channel::oneshot::channel();
-    temp_buffer
-        .slice(..)
-        .map_async(wgpu::MapMode::Read, |result| {
-            let _ = sender.send(result);
-        });
-    super::poll::ensure_polled(Arc::downgrade(device));
+    let buffer_mapped_future = map_really_async(device, &temp_buffer);
 
     // Await the buffer being available and build the image.
     async move {
-        receiver
-            .await
-            .expect("communication failed")
-            .expect("buffer reading failed");
+        buffer_mapped_future.await.expect("buffer reading failed");
 
         let texel_vector = tc.copy_mapped_to_vec(components, &temp_buffer);
 
@@ -210,6 +199,24 @@ where
         temp_buffer.destroy();
 
         texel_vector
+    }
+}
+
+#[doc(hidden)]
+pub fn map_really_async(
+    device: &Arc<wgpu::Device>,
+    buffer: &wgpu::Buffer,
+) -> impl Future<Output = Result<(), wgpu::BufferAsyncError>> {
+    let (sender, receiver) = futures_channel::oneshot::channel();
+    buffer.slice(..).map_async(wgpu::MapMode::Read, |result| {
+        let _ = sender.send(result);
+    });
+    super::poll::ensure_polled(Arc::downgrade(device));
+
+    async move {
+        receiver
+            .await
+            .expect("map_async callback was dropped without call")
     }
 }
 
