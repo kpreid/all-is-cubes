@@ -115,7 +115,12 @@ impl<I: time::Instant> SpaceRenderer<I> {
         block_texture: AtlasAllocator,
         interactive: bool,
     ) -> Self {
-        let light_texture = LightTexture::new(&space_label, device, GridSize::splat(1)); // dummy
+        let light_texture = LightTexture::new(
+            &space_label,
+            device,
+            GridSize::splat(1),
+            wgpu::TextureUsages::empty(),
+        ); // dummy
 
         let camera_buffer = SpaceCameraBuffer::new(&space_label, device, pipelines);
 

@@ -148,7 +148,8 @@ fn light_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance
         // We're reusing one texture across these tests because it has no observable state that
         // influences the benchmark other than the mapped region state,
         // and we're not primarily interested in effects like "the light data isn't in cache".
-        let mut texture = LightTexture::new("lt", &device, bounds.size());
+        let mut texture =
+            LightTexture::new("lt", &device, bounds.size(), wgpu::TextureUsages::empty());
         let space = Space::builder(bounds).build();
 
         b.iter_with_large_drop(|| {
@@ -163,7 +164,8 @@ fn light_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance
     });
 
     g.bench_function("scatter", |b| {
-        let mut texture = LightTexture::new("lt", &device, bounds.size());
+        let mut texture =
+            LightTexture::new("lt", &device, bounds.size(), wgpu::TextureUsages::empty());
         let space = Space::builder(bounds).build();
 
         // update_scatter() will do nothing if not mapped first
