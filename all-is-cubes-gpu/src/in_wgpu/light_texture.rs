@@ -110,7 +110,12 @@ impl LightTexture {
     }
 
     /// Construct a new texture of the specified size with no data.
-    pub fn new(label_prefix: &str, device: &wgpu::Device, size: GridSize) -> Self {
+    pub fn new(
+        label_prefix: &str,
+        device: &wgpu::Device,
+        size: GridSize,
+        additional_usage: wgpu::TextureUsages,
+    ) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             size: size3d_to_extent(size),
             mip_level_count: 1,
@@ -118,7 +123,9 @@ impl LightTexture {
             dimension: wgpu::TextureDimension::D3,
             format: wgpu::TextureFormat::Rgba8Uint,
             view_formats: &[],
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | additional_usage,
             label: Some(&format!("{label_prefix} space light")),
         });
         Self {
@@ -144,7 +151,7 @@ impl LightTexture {
             // deallocated promptly before the new allocation is created, keeping peak usage lower.
             self.texture.destroy();
 
-            *self = Self::new(label_prefix, device, size);
+            *self = Self::new(label_prefix, device, size, self.texture.usage());
         }
     }
 
@@ -398,6 +405,11 @@ impl LightTexture {
         }
 
         total_count
+    }
+
+    #[doc(hidden)] // for tests
+    pub fn texture(&self) -> &wgpu::Texture {
+        &self.texture
     }
 
     pub(crate) fn texture_view(&self) -> &Identified<wgpu::TextureView> {
