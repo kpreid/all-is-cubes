@@ -114,7 +114,7 @@ mutants = { version = "0.0.3", default-features = false }
 noise = { version = "0.9.0", default-features = false }
 nosy = { version = "0.1.0", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
-ordered-float = { version = "4.2.0", default-features = false }
+ordered-float = { version = "4.6.0", default-features = false }
 paste = {version = "1.0.15", default-features = false }
 petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
 png-decoder = { version = "0.1.1", default-features = false } # used by all-is-cubes for no_std-compatible reading pngs
