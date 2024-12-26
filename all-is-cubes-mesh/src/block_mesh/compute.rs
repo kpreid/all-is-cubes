@@ -98,6 +98,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                     point2(1., 1.),
                     coloring,
                     &mut viz,
+                    &mut face_mesh.bounding_box,
                 );
             }
             face_mesh.fully_opaque = is_fully_opaque;
@@ -286,6 +287,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                     vertices,
                     indices_opaque,
                     indices_transparent,
+                    bounding_box,
                     ..
                 } = if layer == 0 {
                     &mut *face_mesh
@@ -346,6 +348,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                         high_corner.map(FreeCoordinate::from),
                         coloring,
                         &mut viz,
+                        bounding_box,
                     );
                 });
             }

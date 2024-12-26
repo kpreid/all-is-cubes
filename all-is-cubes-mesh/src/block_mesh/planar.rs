@@ -6,7 +6,7 @@ use core::ops::Range;
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D};
 use all_is_cubes::math::{
-    rgba_const, Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba,
+    rgba_const, Aab, Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba,
 };
 
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
@@ -214,6 +214,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
     high_corner: Point2D<FreeCoordinate, TexelUnit>,
     coloring: QuadColoring<'_, Tex>,
     viz: &mut Viz,
+    bounding_box: &mut Option<Aab>,
 ) {
     let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
     let half_texel = 0.5;
@@ -244,8 +245,15 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
         QuadColoring::Solid(color) => {
             // Performance note: not using array::map() because, by benchmark, that's slower.
             vertices.extend(position_iter.map(|voxel_grid_point| -> V {
+                let position = transform.transform_position(voxel_grid_point);
+
+                *bounding_box = Some(match *bounding_box {
+                    None => Aab::from_lower_upper(position, position),
+                    Some(aab) => aab.union_point(position),
+                });
+
                 V::from(BlockVertex {
-                    position: transform.transform_position(voxel_grid_point),
+                    position,
                     face,
                     coloring: Coloring::Solid(color),
                 })
@@ -274,8 +282,15 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
             let clamp_max = tile.grid_to_texcoord(clamp_max);
 
             vertices.extend(position_iter.map(|voxel_grid_point| {
+                let position = transform.transform_position(voxel_grid_point);
+
+                *bounding_box = Some(match *bounding_box {
+                    None => Aab::from_lower_upper(position, position),
+                    Some(aab) => aab.union_point(position),
+                });
+
                 V::from(BlockVertex {
-                    position: transform.transform_position(voxel_grid_point),
+                    position,
                     face,
                     coloring: Coloring::Texture {
                         pos: tile.grid_to_texcoord(transform.transform_texture_point(

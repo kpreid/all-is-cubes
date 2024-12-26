@@ -8,10 +8,10 @@ use all_is_cubes::block::{self, Block, Resolution::*, AIR};
 use all_is_cubes::color_block;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::euclid::{point3, Point3D, Vector3D};
-use all_is_cubes::math::{zo32, Cube, Rgb};
 use all_is_cubes::math::{
+    zo32, Aab, Cube,
     Face6::{self, *},
-    FaceMap, FreeCoordinate, GridAab, GridRotation, Rgba,
+    FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
@@ -425,6 +425,10 @@ fn shrunken_box_has_no_extras() {
             v_t([0.750, 0.250, 0.750], PZ, [6.0, 2.0, 5.5]),
         ],
     );
+    assert_eq!(
+        space_rendered.bounding_box(),
+        Some(Aab::from_lower_upper([0.25, 0.25, 0.25], [0.75, 0.75, 0.75]))
+    );
 }
 
 /// Exercise the case where textures are skipped because the color is uniform.
@@ -487,6 +491,10 @@ fn shrunken_box_uniform_color() {
             v_c([0.750, 0.750, 0.750], PZ, [0.0, 1.0, 0.5, 1.0]),
             v_c([0.750, 0.250, 0.750], PZ, [0.0, 1.0, 0.5, 1.0]),
         ],
+    );
+    assert_eq!(
+        space_rendered.bounding_box(),
+        Some(Aab::from_lower_upper([0.25, 0.25, 0.25], [0.75, 0.75, 0.75]))
     );
 }
 

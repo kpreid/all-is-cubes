@@ -7,11 +7,13 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::block::{EvaluatedBlock, VoxelOpacityMask};
-use all_is_cubes::math::{Face7, FaceMap};
+use all_is_cubes::math::{Aab, Face7, FaceMap};
 use all_is_cubes::space::Space;
 use all_is_cubes_render::Flaws;
 
 use crate::texture::{self, Tile as _};
+#[cfg(doc)]
+use crate::SpaceMesh;
 use crate::{GfxVertex, IndexVec, MeshOptions, MeshTypes};
 
 mod analyze;
@@ -27,7 +29,7 @@ mod tests;
 /// A triangle mesh for a single [`Block`].
 ///
 /// Get it from [`BlockMesh::new()`] or [`block_meshes_for_space`].
-/// Pass it to [`SpaceMesh::new()`](super::SpaceMesh::new) to assemble
+/// Pass it to [`SpaceMesh::new()`] to assemble
 /// blocks into an entire scene or chunk.
 ///
 /// The type parameter `M` allows generating meshes suitable for the target graphics API by
@@ -66,7 +68,7 @@ pub struct BlockMesh<M: MeshTypes> {
 /// All triangles which are on the surface of the unit cube (such that they may be omitted
 /// when a [`opaque`](EvaluatedBlock::opaque) block is adjacent) are grouped
 /// under the corresponding face, and all other triangles are grouped under
-/// [`Face7::Within`]. In future versions, the triangulator might be improved so that blocks
+/// [`Face7::Within`]. In future versions, the mesher might be improved so that blocks
 /// with concavities on their faces have the surface of each concavity included in that
 /// face mesh rather than in [`Face7::Within`].
 ///
@@ -76,15 +78,22 @@ pub struct BlockMesh<M: MeshTypes> {
 pub(super) struct BlockFaceMesh<V> {
     /// Vertices, as used by the indices vectors.
     pub(super) vertices: Vec<V>,
+
     /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
     /// in counterclockwise order, for vertices whose coloring is fully opaque (or
     /// textured with binary opacity).
     pub(super) indices_opaque: IndexVec,
+
     /// Indices for partially transparent (alpha neither 0 nor 1) vertices.
     pub(super) indices_transparent: IndexVec,
+
     /// Whether the graphic entirely fills its cube face, such that nothing can be seen
     /// through it and faces of adjacent blocks may be removed.
     pub(super) fully_opaque: bool,
+
+    /// Bounding box of the mesh’s vertices.
+    /// `None` if there are no vertices.
+    bounding_box: Option<Aab>,
 }
 
 impl<M: MeshTypes + 'static> BlockMesh<M> {
@@ -132,6 +141,17 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
             Some(t) => core::slice::from_ref(t),
             None => &[],
         }
+    }
+
+    /// Bounding box of this mesh’s vertices.
+    /// `None` if there are no vertices.
+    ///
+    /// Note that a particular occurrence of this mesh in a [`SpaceMesh`] may have a smaller
+    /// bounding box due to hidden face culling.
+    pub fn bounding_box(&self) -> Option<Aab> {
+        self.all_face_meshes()
+            .filter_map(|(_, fm)| fm.bounding_box())
+            .reduce(Aab::union)
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
@@ -185,7 +205,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
     /// Generate the [`BlockMesh`] for a block's current appearance.
     ///
-    /// This may then be may be used as input to [`SpaceMesh::new`](super::SpaceMesh::new).
+    /// This may then be may be used as input to [`SpaceMesh::new`].
     pub fn new(
         block: &EvaluatedBlock,
         texture_allocator: &M::Alloc,
@@ -225,7 +245,10 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         texture_allocator: &M::Alloc,
         options: &MeshOptions,
     ) {
-        compute::compute_block_mesh(self, block, texture_allocator, options, Viz::disabled())
+        compute::compute_block_mesh(self, block, texture_allocator, options, Viz::disabled());
+
+        #[cfg(debug_assertions)]
+        self.consistency_check();
     }
 
     /// As [`Self::compute()`], but writes details of the algorithm execution to [`viz`].
@@ -238,6 +261,16 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         viz: Viz,
     ) {
         compute::compute_block_mesh(self, block, texture_allocator, options, viz);
+
+        #[cfg(debug_assertions)]
+        self.consistency_check();
+    }
+
+    #[cfg(debug_assertions)]
+    fn consistency_check(&self) {
+        for (_, face_mesh) in self.all_face_meshes() {
+            face_mesh.consistency_check();
+        }
     }
 }
 
@@ -270,11 +303,13 @@ where
             voxel_opacity_mask,
             flaws,
         } = self;
-        *face_vertices == other.face_vertices
-            && *interior_vertices == other.interior_vertices
-            && *texture_used == other.texture_used
-            && *voxel_opacity_mask == other.voxel_opacity_mask
+        // We first check the aggregate properties to have a higher chance of exiting early
+        // without comparing the voxels in detail.
+        *texture_used == other.texture_used
             && *flaws == other.flaws
+            && *face_vertices == other.face_vertices
+            && *interior_vertices == other.interior_vertices
+            && *voxel_opacity_mask == other.voxel_opacity_mask
     }
 }
 
@@ -315,6 +350,7 @@ impl<V> BlockFaceMesh<V> {
         indices_opaque: IndexVec::new(),
         indices_transparent: IndexVec::new(),
         fully_opaque: false,
+        bounding_box: None,
     };
 
     pub fn clear(&mut self) {
@@ -323,15 +359,47 @@ impl<V> BlockFaceMesh<V> {
             indices_opaque,
             indices_transparent,
             fully_opaque,
+            bounding_box,
         } = self;
         vertices.clear();
         indices_opaque.clear();
         indices_transparent.clear();
         *fully_opaque = false;
+        *bounding_box = None;
     }
 
     pub fn is_empty(&self) -> bool {
         self.vertices.is_empty()
+    }
+
+    /// Bounding box of this mesh’s vertices.
+    /// `None` if there are no vertices.
+    ///
+    pub fn bounding_box(&self) -> Option<Aab> {
+        self.bounding_box
+    }
+}
+
+impl<V: GfxVertex> BlockFaceMesh<V> {
+    #[cfg(debug_assertions)]
+    fn consistency_check(&self) {
+        // TODO: check vertex/index consistency like SpaceMesh does
+
+        let mut bounding_box: Option<Aab> = None;
+        for vertex in self.vertices.iter() {
+            let position = vertex
+                .position()
+                .map(|coord| num_traits::ToPrimitive::to_f64(&coord).unwrap());
+            bounding_box = Some(match bounding_box {
+                None => Aab::from_lower_upper(position, position),
+                Some(aab) => aab.union_point(position),
+            });
+        }
+        assert_eq!(
+            bounding_box,
+            self.bounding_box(),
+            "bounding box of vertices ≠ recorded bounding box"
+        );
     }
 }
 
@@ -342,7 +410,7 @@ impl<V> Default for BlockFaceMesh<V> {
 }
 
 /// Computes [`BlockMeshes`] for blocks currently present in a [`Space`].
-/// Pass the result to [`SpaceMesh::new()`](super::SpaceMesh::new) to use it.
+/// Pass the result to [`SpaceMesh::new()`] to use it.
 ///
 /// The resulting array is indexed by the `Space`'s
 /// [`BlockIndex`](all_is_cubes::space::BlockIndex) values.
@@ -364,5 +432,5 @@ where
 
 /// Array of [`BlockMesh`] indexed by a [`Space`]'s block indices; a convenience
 /// alias for the return type of [`block_meshes_for_space`].
-/// Pass it to [`SpaceMesh::new()`](super::SpaceMesh::new) to use it.
+/// Pass it to [`SpaceMesh::new()`] to use it.
 pub type BlockMeshes<M> = Box<[BlockMesh<M>]>;

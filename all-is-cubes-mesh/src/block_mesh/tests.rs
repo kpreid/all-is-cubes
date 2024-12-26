@@ -1,11 +1,12 @@
 //! Stand-alone tests of [`BlockMesh`].
 //! See [`crate::tests`] for additional tests.
 
+use all_is_cubes_render::Flaws;
 use alloc::vec::Vec;
 
 use all_is_cubes::block::{Block, Resolution, AIR};
 use all_is_cubes::color_block;
-use all_is_cubes::math::{Cube, Rgba};
+use all_is_cubes::math::{Aab, Cube, Rgba};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_render::camera::GraphicsOptions;
 
@@ -25,6 +26,8 @@ fn default_is_empty() {
     assert_eq!(mesh.voxel_opacity_mask, None);
     assert!(mesh.textures().is_empty());
     assert_eq!(mesh.count_indices(), 0);
+    assert_eq!(mesh.bounding_box(), None);
+    assert_eq!(mesh.flaws(), Flaws::empty());
 }
 
 #[test]
@@ -38,6 +41,11 @@ fn nonempty() {
 
     assert!(!mesh.is_empty());
     assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
+    assert_eq!(
+        mesh.bounding_box(),
+        Some(Aab::from_lower_upper([0., 0., 0.], [1., 1., 1.]))
+    );
+    assert_eq!(mesh.flaws(), Flaws::empty());
 }
 
 #[test]

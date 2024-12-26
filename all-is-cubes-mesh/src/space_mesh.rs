@@ -8,7 +8,7 @@ use ordered_float::OrderedFloat;
 
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Vol,
+    Aab, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Vol,
 };
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes_render::Flaws;
@@ -122,6 +122,22 @@ impl<M: MeshTypes> SpaceMesh<M> {
         for index in self.indices().iter_u32() {
             assert!(index < self.vertices.len() as u32);
         }
+
+        let mut bounding_box: Option<Aab> = None;
+        for vertex in self.vertices() {
+            let position = vertex
+                .position()
+                .map(|coord| num_traits::ToPrimitive::to_f64(&coord).unwrap());
+            bounding_box = Some(match bounding_box {
+                None => Aab::from_lower_upper(position, position),
+                Some(aab) => aab.union_point(position),
+            });
+        }
+        assert_eq!(
+            bounding_box,
+            self.bounding_box(),
+            "bounding box of vertices ≠ recorded bounding box"
+        );
     }
 
     /// Returns the total memory (not counting allocator overhead) occupied by this
@@ -135,6 +151,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                     opaque_range: _,
                     transparent_ranges: _,
                     textures_used,
+                    bounding_box: _,
                     flaws: _,
                 },
             block_indices_used,
@@ -246,13 +263,16 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 self.meta.flaws |= block_mesh.flaws();
             }
 
+            // translate vertices so lower_bounds of the space is the origin of the mesh.
+            let translation = cube - bounds.lower_bounds().to_vector();
+
             write_block_mesh_to_space_mesh(
                 block_mesh,
-                // translate mesh to be always located at lower_bounds
-                cube - bounds.lower_bounds().to_vector(),
+                translation,
                 &mut self.vertices,
                 &mut self.indices,
                 &mut transparent_indices,
+                &mut self.meta.bounding_box,
                 |face| {
                     let adjacent_cube = cube + face.normal_vector();
                     if let Some(adj_block_index) = space_data_source(adjacent_cube) {
@@ -509,6 +529,7 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 /// Copy and adjust vertices from a [`BlockMesh`] into the storage of a [`SpaceMesh`].
 ///
 /// This does not perform depth sorting and does not account for mesh or texture dependencies.
+/// It does not update `bounding_box` or `flaws`
 ///
 /// * `block_mesh` is the input mesh to copy.
 /// * `cube` is the position passed to `V::instantiate_block()`.
@@ -518,17 +539,19 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 ///   make no difference.
 fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     block_mesh: &BlockMesh<M>,
-    cube: Cube,
+    translation: Cube,
     vertices: &mut Vec<M::Vertex>,
     opaque_indices: &mut IndexVec,
     transparent_indices: &mut IndexVec,
+    bounding_box: &mut Option<Aab>,
     mut neighbor_is_fully_opaque: impl FnMut(Face6) -> bool,
 ) {
     if block_mesh.is_empty() {
         return;
     }
 
-    let inst = M::Vertex::instantiate_block(cube);
+    let inst = M::Vertex::instantiate_block(translation);
+    let bb_translation = translation.lower_bounds().to_f64().to_vector();
 
     for (face, face_mesh) in block_mesh.all_face_meshes() {
         if face_mesh.is_empty() {
@@ -565,6 +588,16 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
                 .iter_u32()
                 .map(|i| i + index_offset),
         );
+
+        if let Some(block_bounding_box) = face_mesh
+            .bounding_box()
+            .map(|bb| bb.translate(bb_translation))
+        {
+            *bounding_box = Some(match *bounding_box {
+                Some(bb) => bb.union(block_bounding_box),
+                None => block_bounding_box,
+            });
+        }
     }
 }
 
@@ -608,6 +641,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 opaque_range: 0..0,
                 transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
+                bounding_box: block_mesh.bounding_box(),
                 flaws: block_mesh.flaws(),
             },
             block_indices_used,
@@ -625,6 +659,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             &mut space_mesh.vertices,
             &mut space_mesh.indices,
             &mut transparent_indices,
+            &mut space_mesh.meta.bounding_box, // redundant, but hard to skip
             |_| false,
         );
         space_mesh.sort_and_store_transparent_indices(transparent_indices);
@@ -766,6 +801,10 @@ pub struct MeshMeta<M: MeshTypes> {
     /// the texture coordinates remain allocated to the intended texels.
     textures_used: Vec<M::Tile>,
 
+    /// Bounding box of this mesh’s vertices.
+    /// `None` if there are no vertices.
+    bounding_box: Option<Aab>,
+
     /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
     //
     // TODO: evaluate whether we should have a dedicated `MeshFlaws`, once we have seen how
@@ -774,6 +813,15 @@ pub struct MeshMeta<M: MeshTypes> {
 }
 
 impl<M: MeshTypes> MeshMeta<M> {
+    /// Returns the bounding box of this mesh’s vertices, or
+    /// `None` if there are no vertices.
+    ///
+    /// Note that this bounding box is not the same as the bounding box of non-fully-transparent
+    /// voxels in the scene; it does not include interior volumes which are omitted from the mesh.
+    pub fn bounding_box(&self) -> Option<Aab> {
+        self.bounding_box
+    }
+
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
     /// fail to accurately represent the scene.
     pub fn flaws(&self) -> Flaws {
@@ -811,11 +859,13 @@ impl<M: MeshTypes> MeshMeta<M> {
             opaque_range,
             transparent_ranges,
             textures_used,
+            bounding_box,
             flaws,
         } = self;
         *opaque_range = 0..0;
         *transparent_ranges = [const { 0..0 }; DepthOrdering::COUNT];
         textures_used.clear();
+        *bounding_box = None;
         *flaws = Flaws::empty();
     }
 }
@@ -829,6 +879,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
             opaque_range: 0..0,
             transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
             textures_used: Vec::new(),
+            bounding_box: None,
             flaws: Flaws::empty(),
         }
     }
@@ -840,9 +891,11 @@ impl<M: MeshTypes> PartialEq for MeshMeta<M> {
             opaque_range,
             transparent_ranges,
             textures_used,
+            bounding_box,
             flaws,
         } = self;
-        *opaque_range == other.opaque_range
+        *bounding_box == other.bounding_box
+            && *opaque_range == other.opaque_range
             && *transparent_ranges == other.transparent_ranges
             && *textures_used == other.textures_used
             && *flaws == other.flaws
@@ -855,12 +908,14 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
             opaque_range,
             transparent_ranges,
             textures_used,
+            bounding_box,
             flaws,
         } = self;
         f.debug_struct("MeshMeta")
             .field("opaque_range", opaque_range)
             .field("transparent_ranges", transparent_ranges)
             .field("textures_used", textures_used)
+            .field("bounding_box", bounding_box)
             .field("flaws", flaws)
             .finish()
     }
@@ -872,6 +927,7 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
             opaque_range: self.opaque_range.clone(),
             transparent_ranges: self.transparent_ranges.clone(),
             textures_used: self.textures_used.clone(),
+            bounding_box: self.bounding_box,
             flaws: self.flaws,
         }
     }
@@ -989,10 +1045,12 @@ impl DepthOrdering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{mesh_blocks_and_space, TexPoint, TextureMt};
-    use crate::BlockVertex;
+    use crate::testing::{mesh_blocks_and_space, NoTextureMt, TexPoint, TextureMt};
+    use crate::texture::NoTextures;
+    use crate::{block_meshes_for_space, BlockVertex};
     use all_is_cubes::color_block;
     use all_is_cubes::math::Rgba;
+    use all_is_cubes_render::camera::GraphicsOptions;
 
     type TestMesh = SpaceMesh<TextureMt>;
 
@@ -1030,6 +1088,33 @@ mod tests {
         assert_eq!(
             source.get_block_mesh(10, Cube::ORIGIN, true),
             Some(BlockMesh::EMPTY_REF)
+        );
+    }
+
+    #[test]
+    fn bounding_box_excludes_hidden_faces() {
+        let mut space = Space::builder(GridAab::from_lower_upper([0, 0, 0], [4, 4, 4])).build();
+        space
+            .fill_uniform(
+                GridAab::from_lower_upper([0, 0, 0], [4, 2, 4]),
+                &color_block!(Rgba::WHITE),
+            )
+            .unwrap();
+
+        let mesh_region = GridAab::from_lower_upper([1, 1, 1], [3, 3, 3]);
+        let options = &MeshOptions::new(&GraphicsOptions::default());
+        let block_meshes = block_meshes_for_space(&space, &NoTextures, options);
+        let space_mesh: SpaceMesh<NoTextureMt> =
+            SpaceMesh::new(&space, mesh_region, options, &*block_meshes);
+
+        // The mesh generated with these bounds has only a +Y face,
+        // so the bounding box should reflect that, not including hidden faces.
+        assert_eq!(
+            space_mesh
+                .bounding_box()
+                .unwrap()
+                .translate(mesh_region.lower_bounds().to_vector().to_f64()),
+            Aab::from_lower_upper([1., 2., 1.], [3., 2., 3.])
         );
     }
 }

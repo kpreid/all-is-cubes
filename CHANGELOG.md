@@ -15,6 +15,10 @@
     - `math::Aab::union_point()`.
     - `op::Operation::Alt` allows operations to try alternatives.
 
+- `all-is-cubes-mesh` library:
+    - `BlockMesh::bounding_box()`
+    - `SpaceMesh::bounding_box()`
+
 ### Changed
 
 - `all-is-cubes` library:
