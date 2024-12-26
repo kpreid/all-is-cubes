@@ -4,6 +4,7 @@
 )]
 
 use all_is_cubes::euclid::Translation3D;
+use all_is_cubes::math::Aab;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
@@ -30,7 +31,9 @@ type MeshCubeSet = hashbrown::HashSet<Point3D<u8, ChunkRelative>>;
 // TODO(instancing): Give this a new, broader-scoped name, like 'DynamicMeshChunk' or something.
 pub struct ChunkMesh<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
     pub(super) position: ChunkPos<CHUNK_SIZE>,
+
     mesh: SpaceMesh<M>,
+
     block_dependencies: Vec<(BlockIndex, dynamic::BlockMeshVersion)>,
 
     /// Cubes which were incorporated into the chunk mesh.
@@ -293,14 +296,32 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     }
 
     pub(crate) fn chunk_debug_lines(&self, output: &mut impl Extend<LineVertex>) {
-        if !self.mesh.is_empty() {
-            let aab = self.position().bounds().to_free();
+        // TODO: distinguishing colors
+
+        if let Some(aab) = self.mesh_bounding_box() {
             aab.wireframe_points(output);
 
             // Additional border that wiggles when updates happen.
             aab.expand(if self.update_debug { -0.05 } else { -0.02 })
                 .wireframe_points(output)
         }
+
+        if let Some(aab) = self.block_instances_bounding_box() {
+            aab.wireframe_points(output);
+        }
+    }
+
+    /// Returns the bounding box of the mesh in this chunk.
+    /// Note that this does not include block instances not merged into the mesh.
+    pub(crate) fn mesh_bounding_box(&self) -> Option<Aab> {
+        self.mesh
+            .meta()
+            .bounding_box()
+            .map(|bb| bb.translate(self.position().bounds().lower_bounds().to_f64().to_vector()))
+    }
+
+    pub(crate) fn block_instances_bounding_box(&self) -> Option<Aab> {
+        self.block_instances.bounding_box()
     }
 }
 

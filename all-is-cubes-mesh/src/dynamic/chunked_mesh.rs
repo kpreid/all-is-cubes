@@ -146,16 +146,24 @@ where
     pub fn iter_in_view<'a>(
         &'a self,
         camera: &'a Camera,
-    ) -> impl DoubleEndedIterator<Item = &'a ChunkMesh<M, CHUNK_SIZE>> + 'a {
-        // TODO: can we make fewer details (like view_direction_mask) public, now that this method exists? Should we?
+    ) -> impl DoubleEndedIterator<Item = InViewChunkRef<'a, M, CHUNK_SIZE>> + 'a {
         self.chunk_chart
             .chunks(self.view_chunk(), camera.view_direction_mask())
-            // Chunk existence lookup is faster than the frustum culling test,
-            // so we do that first.
-            .filter_map(|pos| self.chunk(pos))
-            .filter(|chunk| {
-                !camera.options().use_frustum_culling
-                    || camera.aab_in_view(chunk.position.bounds().to_free())
+            .filter_map(|pos| {
+                let chunk = self.chunk(pos)?;
+                let use_frustum_culling = camera.options().use_frustum_culling;
+                let item = InViewChunkRef {
+                    chunk,
+                    mesh_in_view: !use_frustum_culling
+                        || chunk
+                            .mesh_bounding_box()
+                            .is_some_and(|bb| camera.aab_in_view(bb)),
+                    instances_in_view: !use_frustum_culling
+                        || chunk
+                            .block_instances_bounding_box()
+                            .is_some_and(|bb| camera.aab_in_view(bb)),
+                };
+                (item.mesh_in_view || item.instances_in_view).then_some(item)
             })
     }
 
@@ -573,7 +581,7 @@ where
     #[doc(hidden)] // TODO: good public API?
     pub fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<LineVertex>) {
         for chunk_mesh in self.iter_in_view(camera) {
-            chunk_mesh.chunk_debug_lines(output);
+            chunk_mesh.chunk.chunk_debug_lines(output);
         }
     }
 
@@ -784,4 +792,16 @@ impl<const CHUNK_SIZE: GridCoordinate> listen::Store<SpaceChange> for CsmTodo<CH
             }
         }
     }
+}
+
+/// Output of [`ChunkedSpaceMesh::iter_in_view()`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct InViewChunkRef<'a, M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> {
+    /// The chunk mesh.
+    pub chunk: &'a ChunkMesh<M, CHUNK_SIZE>,
+    /// Whether the chunk’s [`ChunkMesh::mesh()`] is in view of the camera.
+    pub mesh_in_view: bool,
+    /// Whether any of the chunk’s [`ChunkMesh::block_instances()`] are in view of the camera.
+    pub instances_in_view: bool,
 }

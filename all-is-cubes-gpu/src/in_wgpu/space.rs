@@ -562,23 +562,33 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let mut squares_drawn = 0;
         let mut block_instances = dynamic::InstanceCollector::new(); // TODO: reuse across frames
         render_pass.set_pipeline(&pipelines.opaque_render_pipeline);
-        for chunk in csm.iter_in_view(camera) {
+        for dynamic::InViewChunkRef {
+            chunk,
+            mesh_in_view,
+            instances_in_view,
+            ..
+        } in csm.iter_in_view(camera)
+        {
             chunks_drawn += 1;
 
-            if let Some(buffers) = &chunk.render_data {
-                draw_chunk_instance(
-                    chunk.mesh().opaque_range(),
-                    &mut render_pass,
-                    buffers,
-                    &mut instance_data,
-                    chunk.position(),
-                    &mut squares_drawn,
-                );
-            } else {
-                // TODO: If the chunk is missing, draw a blocking shape, possibly?
+            if mesh_in_view {
+                if let Some(buffers) = &chunk.render_data {
+                    draw_chunk_instance(
+                        chunk.mesh().opaque_range(),
+                        &mut render_pass,
+                        buffers,
+                        &mut instance_data,
+                        chunk.position(),
+                        &mut squares_drawn,
+                    );
+                } else {
+                    // TODO: If the chunk is missing, draw a blocking shape, possibly?
+                }
+                flaws |= chunk.mesh().flaws();
             }
-            block_instances.extend(chunk.block_instances());
-            flaws |= chunk.mesh().flaws();
+            if instances_in_view {
+                block_instances.extend(chunk.block_instances());
+            }
         }
 
         // Render opaque block instances, which we just gathered from the chunks.
@@ -616,21 +626,31 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let start_draw_transparent_time = I::now();
         if camera.options().transparency.will_output_alpha() {
             render_pass.set_pipeline(&pipelines.transparent_render_pipeline);
-            for chunk in csm.iter_in_view(camera).rev() {
-                if let Some(buffers) = &chunk.render_data {
-                    draw_chunk_instance(
-                        chunk.mesh().transparent_range(depth_ordering_for_viewing(
+            for dynamic::InViewChunkRef {
+                chunk,
+                mesh_in_view,
+                instances_in_view,
+                ..
+            } in csm.iter_in_view(camera).rev()
+            {
+                if mesh_in_view {
+                    if let Some(buffers) = &chunk.render_data {
+                        draw_chunk_instance(
+                            chunk.mesh().transparent_range(depth_ordering_for_viewing(
+                                chunk.position(),
+                                view_chunk,
+                            )),
+                            &mut render_pass,
+                            buffers,
+                            &mut instance_data,
                             chunk.position(),
-                            view_chunk,
-                        )),
-                        &mut render_pass,
-                        buffers,
-                        &mut instance_data,
-                        chunk.position(),
-                        &mut squares_drawn,
-                    );
+                            &mut squares_drawn,
+                        );
+                    }
+                    flaws |= chunk.mesh().flaws();
                 }
-                flaws |= chunk.mesh().flaws();
+                // TODO: transparent instances support
+                _ = instances_in_view;
             }
         }
 
