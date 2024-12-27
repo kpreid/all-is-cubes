@@ -11,6 +11,8 @@
     - `block::Modifier::Attributes` allows overriding block attributes.
     - `listen::Store` and `listen::StoreLock` help implement `Listener` with less boilerplate.
     - `math::Face6::rotation_from_nz()` produces the same transformation as `Face6::face_transform()`, but expressed as a rotation value.
+    - `math::Aab::union()`.
+    - `math::Aab::union_point()`.
     - `op::Operation::Alt` allows operations to try alternatives.
 
 ### Changed

@@ -211,6 +211,43 @@ impl Aab {
         true
     }
 
+    /// Returns the smallest [`Aab`] which contains every point the two inputs contain,
+    /// including boundary points.
+    #[inline]
+    #[must_use]
+    pub fn union(self, other: Self) -> Self {
+        Self {
+            // No NaN cases here!
+            lower_bounds: self.lower_bounds.min(other.lower_bounds),
+            upper_bounds: self.upper_bounds.max(other.upper_bounds),
+        }
+    }
+
+    /// Extend the bounds of `self` so that `point` is on the interior or edge of this.
+    ///
+    /// If any coordinate is NaN, the box is unchanged on that axis.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Aab, FreePoint};
+    ///
+    /// assert_eq!(
+    ///     Aab::ZERO.union_point(FreePoint::new(2., 5., 10.)),
+    ///     Aab::from_lower_upper([0., 0., 0.], [2., 5., 10.]),
+    /// );
+    /// ```
+    #[inline]
+    #[must_use]
+    pub fn union_point(self, point: FreePoint) -> Self {
+        Self {
+            // Note that Point3D::min returns components from the second argument on NaN
+            lower_bounds: point.min(self.lower_bounds),
+            upper_bounds: point.max(self.upper_bounds),
+        }
+    }
+
     /// Returns a random point within this box, using inclusive ranges
     /// (`lower_bounds[axis] ≤ random_point()[axis] ≤ upper_bounds[axis]`).
     #[allow(clippy::missing_inline_in_public_items)]
@@ -445,6 +482,14 @@ mod tests {
                     5.0..=6.0,
                 )
             "}
+        );
+    }
+
+    #[test]
+    fn union_point_nan() {
+        assert_eq!(
+            Aab::ZERO.union_point(FreePoint::new(2., f64::NAN, 10.)),
+            Aab::from_lower_upper([0., 0., 0.], [2., 0., 10.]),
         );
     }
 
