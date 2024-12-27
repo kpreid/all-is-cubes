@@ -6,7 +6,7 @@ use crate::math::{ps64, zo32, FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne};
 use crate::util::ShowStatus;
 
 #[cfg(doc)]
-use crate::{block::Block, space::Space};
+use crate::{block::Block, camera::Camera, space::Space};
 
 /// Options for controlling rendering (not affecting gameplay except informationally).
 ///
@@ -73,12 +73,6 @@ pub struct GraphicsOptions {
     /// Whether to apply antialiasing techniques.
     pub antialiasing: AntialiasingOption,
 
-    /// Whether to use frustum culling for drawing only in-view chunks and objects.
-    ///
-    /// This option is for debugging and performance testing and should not have any
-    /// visible effects.
-    pub use_frustum_culling: bool,
-
     /// Draw text overlay showing debug information.
     pub debug_info_text: bool,
 
@@ -103,6 +97,13 @@ pub struct GraphicsOptions {
 
     /// Draw the light rays that contribute to the selected block.
     pub debug_light_rays_at_cursor: bool,
+
+    /// Causes [`Camera`] to compute a falsified view frustum which is 1/2 the width and height
+    /// it should be.
+    ///
+    /// This may be used to visualize the effect of frustum culling that is performed via
+    /// [`Camera::aab_in_view()`].
+    pub debug_reduce_view_frustum: bool,
 }
 
 impl GraphicsOptions {
@@ -132,13 +133,13 @@ impl GraphicsOptions {
         transparency: TransparencyOption::Volumetric,
         show_ui: true,
         antialiasing: AntialiasingOption::None,
-        use_frustum_culling: true,
         debug_info_text: true,
         debug_info_text_contents: ShowStatus::DEFAULT,
         debug_behaviors: false,
         debug_chunk_boxes: false,
         debug_collision_boxes: false,
         debug_light_rays_at_cursor: false,
+        debug_reduce_view_frustum: false,
     };
 
     /// Constrain fields to valid/practical values.
@@ -164,13 +165,13 @@ impl fmt::Debug for GraphicsOptions {
             transparency,
             show_ui,
             antialiasing,
-            use_frustum_culling,
             debug_info_text,
             debug_info_text_contents,
             debug_behaviors,
             debug_chunk_boxes,
             debug_collision_boxes,
             debug_light_rays_at_cursor,
+            debug_reduce_view_frustum,
         } = self;
         // This custom impl reduces unnecessary text by stripping off NotNan wrappers.
         f.debug_struct("GraphicsOptions")
@@ -185,13 +186,13 @@ impl fmt::Debug for GraphicsOptions {
             .field("transparency", &transparency)
             .field("show_ui", &show_ui)
             .field("antialiasing", &antialiasing)
-            .field("use_frustum_culling", &use_frustum_culling)
             .field("debug_info_text", &debug_info_text)
             .field("debug_info_text_contents", &debug_info_text_contents)
             .field("debug_behaviors", &debug_behaviors)
             .field("debug_chunk_boxes", &debug_chunk_boxes)
             .field("debug_collision_boxes", &debug_collision_boxes)
             .field("debug_light_rays_at_cursor", &debug_light_rays_at_cursor)
+            .field("debug_reduce_view_frustum", &debug_reduce_view_frustum)
             .finish()
     }
 }
@@ -215,13 +216,13 @@ impl Default for GraphicsOptions {
             transparency: TransparencyOption::Volumetric,
             show_ui: true,
             antialiasing: AntialiasingOption::default(),
-            use_frustum_culling: true,
             debug_info_text: true,
             debug_info_text_contents: ShowStatus::DEFAULT,
             debug_behaviors: false,
             debug_chunk_boxes: false,
             debug_collision_boxes: false,
             debug_light_rays_at_cursor: false,
+            debug_reduce_view_frustum: false,
         }
     }
 }
@@ -486,7 +487,6 @@ mod tests {
                     transparency: Volumetric,
                     show_ui: true,
                     antialiasing: None,
-                    use_frustum_culling: true,
                     debug_info_text: true,
                     debug_info_text_contents: ShowStatus(
                         WORLD | STEP | RENDER | CURSOR,
@@ -495,6 +495,7 @@ mod tests {
                     debug_chunk_boxes: false,
                     debug_collision_boxes: false,
                     debug_light_rays_at_cursor: false,
+                    debug_reduce_view_frustum: false,
                 }"
             }
         );

@@ -151,17 +151,14 @@ where
             .chunks(self.view_chunk(), camera.view_direction_mask())
             .filter_map(|pos| {
                 let chunk = self.chunk(pos)?;
-                let use_frustum_culling = camera.options().use_frustum_culling;
                 let item = InViewChunkRef {
                     chunk,
-                    mesh_in_view: !use_frustum_culling
-                        || chunk
-                            .mesh_bounding_box()
-                            .is_some_and(|bb| camera.aab_in_view(bb)),
-                    instances_in_view: !use_frustum_culling
-                        || chunk
-                            .block_instances_bounding_box()
-                            .is_some_and(|bb| camera.aab_in_view(bb)),
+                    mesh_in_view: chunk
+                        .mesh_bounding_box()
+                        .is_some_and(|bb| camera.aab_in_view(bb)),
+                    instances_in_view: chunk
+                        .block_instances_bounding_box()
+                        .is_some_and(|bb| camera.aab_in_view(bb)),
                 };
                 (item.mesh_in_view || item.instances_in_view).then_some(item)
             })

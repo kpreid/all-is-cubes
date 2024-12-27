@@ -405,15 +405,20 @@ impl Camera {
 
         // Compute the view frustum's corner points,
         // by unprojecting the corners of clip space.
+        let xy_limit = if self.options.debug_reduce_view_frustum {
+            0.5
+        } else {
+            1.
+        };
         self.view_frustum = FrustumPoints {
-            lbn: self.project_ndc3_into_world(point3(-1., -1., 0.)),
-            rbn: self.project_ndc3_into_world(point3(1., -1., 0.)),
-            ltn: self.project_ndc3_into_world(point3(-1., 1., 0.)),
-            rtn: self.project_ndc3_into_world(point3(1., 1., 0.)),
-            lbf: self.project_ndc3_into_world(point3(-1., -1., 1.)),
-            rbf: self.project_ndc3_into_world(point3(1., -1., 1.)),
-            ltf: self.project_ndc3_into_world(point3(-1., 1., 1.)),
-            rtf: self.project_ndc3_into_world(point3(1., 1., 1.)),
+            lbn: self.project_ndc3_into_world(point3(-xy_limit, -xy_limit, 0.)),
+            rbn: self.project_ndc3_into_world(point3(xy_limit, -xy_limit, 0.)),
+            ltn: self.project_ndc3_into_world(point3(-xy_limit, xy_limit, 0.)),
+            rtn: self.project_ndc3_into_world(point3(xy_limit, xy_limit, 0.)),
+            lbf: self.project_ndc3_into_world(point3(-xy_limit, -xy_limit, 1.)),
+            rbf: self.project_ndc3_into_world(point3(xy_limit, -xy_limit, 1.)),
+            ltf: self.project_ndc3_into_world(point3(-xy_limit, xy_limit, 1.)),
+            rtf: self.project_ndc3_into_world(point3(xy_limit, xy_limit, 1.)),
             bounds: Aab::ZERO,
         };
         self.view_frustum.compute_bounds();

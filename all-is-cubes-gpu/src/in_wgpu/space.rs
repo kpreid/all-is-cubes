@@ -12,7 +12,7 @@ use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
     rgba_const, Cube, Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
-    GridSize, GridVector, Rgb, Wireframe as _, ZeroOne,
+    GridSize, GridVector, Rgb, Rgba, Wireframe as _, ZeroOne,
 };
 use all_is_cubes::raycast::Ray;
 #[cfg(feature = "rerun")]
@@ -725,6 +725,18 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let Some(csm) = &self.csm else {
             return;
         };
+
+        if camera.options().debug_reduce_view_frustum {
+            // Draw the modified view frustum, which becomes a viewport box in screen space.
+            // (Note the lines are at risk of being clipped, but in practice are sufficiently
+            // visible but flickery.)
+            camera
+                .view_frustum_geometry()
+                .wireframe_points(&mut crate::map_line_vertices::<WgpuLinesVertex>(
+                    v,
+                    Rgba::WHITE,
+                ));
+        }
 
         if camera.options().debug_chunk_boxes {
             let view_chunk = csm.view_chunk();
