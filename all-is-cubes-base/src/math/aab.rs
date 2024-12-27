@@ -25,6 +25,8 @@ use crate::math::{
 pub struct Aab {
     // TODO: Should we be using NotNan coordinates?
     // The upper > lower checks will reject NaNs anyway.
+    //
+    // TODO: Consider what to do about equality-but-not-equivalence of negative zero.
     lower_bounds: FreePoint,
     upper_bounds: FreePoint,
 }
@@ -350,6 +352,10 @@ impl fmt::Debug for Aab {
             .finish()
     }
 }
+
+/// [`Aab`] rejects NaN values, so it can implement [`Eq`]
+/// even though it contains floats.
+impl Eq for Aab {}
 
 impl Wireframe for Aab {
     #[inline(never)]
