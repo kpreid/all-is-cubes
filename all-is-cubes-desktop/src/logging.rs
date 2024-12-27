@@ -202,6 +202,8 @@ pub fn new_progress_bar(len: u64) -> indicatif::ProgressBar {
 
 /// [`indicatif::ProgressStyle`] for progress bars we display.
 pub fn common_progress_style() -> indicatif::ProgressStyle {
+    #![allow(unknown_lints)] // TODO: Remove in Rust 1.84
+    #![allow(clippy::literal_string_with_formatting_args)]
     indicatif::ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6} {msg:30}")
         .unwrap()
