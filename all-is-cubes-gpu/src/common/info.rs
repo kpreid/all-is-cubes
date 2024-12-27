@@ -262,8 +262,10 @@ pub struct SpaceDrawInfo {
     /// the instance buffer).
     pub(crate) finalize_time: Duration,
 
-    /// Number of chunk meshes drawn.
-    pub(crate) chunks_drawn: usize,
+    /// Number of chunk meshes (not instances) drawn.
+    pub(crate) chunk_meshes_drawn: usize,
+    /// Number of chunks that contributed instances.
+    pub(crate) chunks_with_instances_drawn: usize,
     /// Number of instanced block meshes drawn.
     pub(crate) blocks_drawn: usize,
     /// How many squares (quadrilaterals; sets of 2 triangles = 6 vertices) were used
@@ -281,7 +283,8 @@ impl Fmt<StatusText> for SpaceDrawInfo {
             draw_opaque_blocks_time,
             draw_transparent_time,
             finalize_time,
-            chunks_drawn,
+            chunk_meshes_drawn,
+            chunks_with_instances_drawn,
             blocks_drawn,
             squares_drawn,
             flaws: _, // TODO: include or exclude?
@@ -303,7 +306,9 @@ impl Fmt<StatusText> for SpaceDrawInfo {
         )?;
         writeln!(
             fmt,
-            "Chunks drawn: {chunks_drawn:3} Block insts drawn: {blocks_drawn:3} Quads drawn: {squares_drawn:7}",
+            "Chunk meshes drawn: {chunk_meshes_drawn:3}  \
+            Block insts drawn: {blocks_drawn:3} in {chunks_with_instances_drawn:3} chunks  \
+            Quads drawn: {squares_drawn:7}",
         )?;
         Ok(())
     }

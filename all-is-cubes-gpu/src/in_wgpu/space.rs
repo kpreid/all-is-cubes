@@ -490,7 +490,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 draw_transparent_time: Duration::ZERO,
                 finalize_time: Duration::ZERO,
                 squares_drawn: 0,
-                chunks_drawn: 0,
+                chunk_meshes_drawn: 0,
+                chunks_with_instances_drawn: 0,
                 blocks_drawn: 0,
                 flaws,
             };
@@ -557,7 +558,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // Opaque geometry before other geometry, in front-to-back order.
         // Also collect instances.
         let start_opaque_chunk_draw_time = I::now();
-        let mut chunks_drawn = 0;
+        let mut chunk_meshes_drawn = 0;
+        let mut chunks_with_instances_drawn = 0;
         let mut blocks_drawn = 0;
         let mut squares_drawn = 0;
         let mut block_instances = dynamic::InstanceCollector::new(); // TODO: reuse across frames
@@ -569,9 +571,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
             ..
         } in csm.iter_in_view(camera)
         {
-            chunks_drawn += 1;
-
             if mesh_in_view {
+                chunk_meshes_drawn += 1;
                 if let Some(buffers) = &chunk.render_data {
                     draw_chunk_instance(
                         chunk.mesh().opaque_range(),
@@ -587,6 +588,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 flaws |= chunk.mesh().flaws();
             }
             if instances_in_view {
+                chunks_with_instances_drawn += 1;
                 block_instances.extend(chunk.block_instances());
             }
         }
@@ -701,7 +703,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 .saturating_duration_since(start_draw_transparent_time),
             finalize_time: end_time.saturating_duration_since(start_drop_pass_time),
             squares_drawn,
-            chunks_drawn,
+            chunk_meshes_drawn,
+            chunks_with_instances_drawn,
             blocks_drawn,
             flaws,
         }
