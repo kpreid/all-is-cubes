@@ -250,9 +250,10 @@ impl TextureCopyParameters {
                 texture.height(),
                 texture.depth_or_array_layers(),
             ),
-            byte_size_of_texel: format
-                .block_copy_size(None)
-                .expect("non-color texture format {format:} not supported"),
+            byte_size_of_texel: match format.block_copy_size(None) {
+                Some(val) => val,
+                None => panic!("non-color texture format {format:?} not supported"),
+            },
         }
     }
 
