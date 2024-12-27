@@ -6,7 +6,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use all_is_cubes::math::Cube;
+use all_is_cubes::math::{Aab, Cube};
 use all_is_cubes::space::BlockIndex;
 
 #[cfg(doc)]
@@ -75,7 +75,12 @@ where
 #[derive(Default)]
 pub(crate) struct InstanceMap {
     by_block: hashbrown::HashMap<BlockIndex, hashbrown::HashSet<Cube>>,
+
     by_cube: hashbrown::HashMap<Cube, BlockIndex>,
+
+    /// Note: This could be stored as a `GridAab`, but all the calculations using this
+    /// proceed with `Aab`.
+    bounding_box: Option<Aab>,
 }
 
 impl InstanceMap {
@@ -92,9 +97,14 @@ impl InstanceMap {
     }
 
     pub(crate) fn clear(&mut self) {
-        let Self { by_block, by_cube } = self;
+        let Self {
+            by_block,
+            by_cube,
+            bounding_box,
+        } = self;
         by_block.clear();
         by_cube.clear();
+        *bounding_box = None;
     }
 
     pub(crate) fn insert(&mut self, index: BlockIndex, cube: Cube) {
@@ -122,6 +132,16 @@ impl InstanceMap {
                 self.by_cube.insert(cube, index);
             }
         }
+
+        self.bounding_box = Some(match self.bounding_box {
+            None => cube.aab(),
+            Some(bb) => bb.union(cube.aab()),
+        });
+    }
+
+    /// Returns the bounding box of all instances.
+    pub fn bounding_box(&self) -> Option<Aab> {
+        self.bounding_box
     }
 }
 
@@ -129,6 +149,7 @@ impl fmt::Debug for InstanceMap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("InstanceMap")
             .field("by_block", &self.by_block)
+            .field("bounding_box", &self.bounding_box)
             .finish_non_exhaustive()
     }
 }
