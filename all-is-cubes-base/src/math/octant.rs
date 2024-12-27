@@ -113,8 +113,8 @@ impl Octant {
     /// Ties due to zero components are broken in the positive direction.
     #[inline]
     pub fn from_vector(vector: FreeVector) -> Self {
-        let index = u8::from(vector.x >= 0.) << 2
-            | u8::from(vector.y >= 0.) << 1
+        let index = (u8::from(vector.x >= 0.) << 2)
+            | (u8::from(vector.y >= 0.) << 1)
             | u8::from(vector.z >= 0.);
         Self::from_zmaj_index(index)
     }
