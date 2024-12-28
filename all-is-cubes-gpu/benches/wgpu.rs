@@ -3,13 +3,14 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use all_is_cubes::math::{GridAab, GridSize};
 use criterion::Criterion;
+use tokio::runtime::Runtime;
 
 use all_is_cubes::block;
 use all_is_cubes::character::Character;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::euclid::size3;
+use all_is_cubes::math::{GridAab, GridPoint, GridSize};
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{self, Universe};
@@ -17,8 +18,7 @@ use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::HeadlessRenderer;
 
-use all_is_cubes_gpu::in_wgpu::{headless, init};
-use tokio::runtime::Runtime;
+use all_is_cubes_gpu::in_wgpu::{headless, init, LightTexture};
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
@@ -28,7 +28,7 @@ fn main() {
     let instance = runtime.block_on(init::create_instance_for_test_or_exit());
 
     render_benches(&runtime, &mut criterion, &instance);
-    module_benches(&runtime, &mut criterion, &instance);
+    light_benches(&runtime, &mut criterion, &instance);
 
     criterion.final_summary();
 }
@@ -118,9 +118,9 @@ async fn create_updated_renderer(
     (universe, space, Arc::new(Mutex::new(renderer)))
 }
 
-/// Benchmarks for internal components
-fn module_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance) {
-    let mut g = c.benchmark_group("mod");
+/// Benchmarks for light storage
+fn light_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance) {
+    let mut g = c.benchmark_group("light");
     g.sample_size(400); // increase sample size from default 100 to reduce noise
     g.measurement_time(Duration::from_secs(10));
 
@@ -139,19 +139,38 @@ fn module_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
         })
         .unwrap();
 
-    g.bench_function("light-update", |b| {
-        let size = 64;
-        let bounds = GridAab::from_lower_size([0, 0, 0], [size, size, size]);
+    let bounds = GridAab::from_lower_size(GridPoint::splat(0), GridSize::splat(32));
+    g.throughput(criterion::Throughput::Elements(
+        bounds.volume().unwrap().try_into().unwrap(),
+    ));
+
+    g.bench_function("bulk", |b| {
         // We're reusing one texture across these tests because it has no observable state that
-        // influences the benchmark, and we're not primarily interested in effects like "the light
-        // data isn't in cache".
-        let mut texture =
-            all_is_cubes_gpu::in_wgpu::LightTexture::new("lt", &device, GridSize::splat(size));
-        let space = Space::empty_positive(size, size, size);
+        // influences the benchmark other than the mapped region state,
+        // and we're not primarily interested in effects like "the light data isn't in cache".
+        let mut texture = LightTexture::new("lt", &device, bounds.size());
+        let space = Space::builder(bounds).build();
 
         b.iter_with_large_drop(|| {
             texture.forget_mapped();
             texture.ensure_mapped(&queue, &space, bounds);
+
+            scopeguard::guard((), |()| {
+                // flush wgpu's buffering of copy commands (not sure if this is effective).
+                queue.submit([]);
+            })
+        });
+    });
+
+    g.bench_function("scatter", |b| {
+        let mut texture = LightTexture::new("lt", &device, bounds.size());
+        let space = Space::builder(bounds).build();
+
+        // update_scatter() will do nothing if not mapped first
+        texture.ensure_mapped(&queue, &space, bounds);
+
+        b.iter_with_large_drop(|| {
+            texture.update_scatter(&device, &queue, &space, space.bounds().interior_iter());
 
             scopeguard::guard((), |()| {
                 // flush wgpu's buffering of copy commands (not sure if this is effective).
