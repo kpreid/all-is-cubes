@@ -103,8 +103,7 @@ impl BlockSky {
     /// For example, if `bounds` is from [0, 0, 0] to [5, 5, 5] and `cube` is [-1, 2, 2],
     /// then `cube` is on the -X face of `bounds`.
     ///
-    /// Panics if `cube` is not on the surface of `bounds`.
-    #[track_caller]
+    /// Returns [`PackedLight::UNINITIALIZED_AND_BLACK`] if `cube` is not on the surface of `bounds`.
     pub fn light_outside(&self, bounds: GridAab, cube: Cube) -> PackedLight {
         // Note: cube.upper_bounds() is defined to be maybe panicking, so we can't use it.
         let lower = bounds
@@ -123,7 +122,8 @@ impl BlockSky {
 
             // Cannot be inside the bounds or beyond the surface
             (false, false, false, false, false, false) => {
-                panic!("invalid cube position in BlockSky::light_outside({bounds:?}, {cube:?})");
+                // panic!("invalid cube position in BlockSky::light_outside({bounds:?}, {cube:?})");
+                PackedLight::UNINITIALIZED_AND_BLACK
             }
 
             // If it's at a corner or edge, then make it NO_RAYS, just like the block lighting
