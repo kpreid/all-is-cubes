@@ -1,3 +1,5 @@
+use std::array;
+
 use cfg_if::cfg_if;
 #[cfg(feature = "auto-threads")]
 use rayon::{
@@ -7,11 +9,12 @@ use rayon::{
 
 use all_is_cubes::math::{
     Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord,
+    PositiveSign,
 };
 use all_is_cubes::space::Space;
 use all_is_cubes::{
-    euclid::{Box3D, Vector3D},
-    math::PositiveSign,
+    euclid::{vec3, Box3D, Point3D, Size3D, Vector3D},
+    math::VectorOps,
 };
 use all_is_cubes_render::camera::Camera;
 
@@ -52,6 +55,60 @@ fn visible_light_volume(space_bounds: GridAab, camera: &Camera) -> GridAab {
         .unwrap_or(GridAab::ORIGIN_CUBE)
 }
 
+/// Size of the minimum unit in which we partially update a [`LightTexture`].
+/// This size is not visible outside this module except as the granularity of [`LightChunk`] values.
+const LIGHT_CHUNK_SIZE: GridSize = GridSize::new(16, 1, 1);
+#[allow(clippy::cast_possible_wrap)]
+const LIGHT_CHUNK_SIZE_I32: Size3D<i32, Cube> = Size3D::new(
+    LIGHT_CHUNK_SIZE.width as i32,
+    LIGHT_CHUNK_SIZE.height as i32,
+    LIGHT_CHUNK_SIZE.depth as i32,
+);
+const LIGHT_CHUNK_VOLUME: usize =
+    (LIGHT_CHUNK_SIZE.width * LIGHT_CHUNK_SIZE.height * LIGHT_CHUNK_SIZE.depth) as usize;
+
+/// Coordinates for a chunk of light values in a [`LightTexture`] to update.
+/// These are generally much smaller than mesh chunks.
+///
+/// This may be lossily converted from a [`Cube`] to find the containing chunk.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[doc(hidden)] // public for benchmark
+pub struct LightChunk(Point3D<i32, ()>);
+
+impl LightChunk {
+    pub fn new(cube: Cube) -> Self {
+        LightChunk(
+            cube.lower_bounds()
+                .div_euclid(&LIGHT_CHUNK_SIZE_I32)
+                .cast_unit(),
+        )
+    }
+
+    pub fn first_cube(self) -> Cube {
+        Cube::from(
+            self.0
+                .cast_unit::<Cube>()
+                .to_vector()
+                .zip(LIGHT_CHUNK_SIZE_I32.to_vector(), |coord, scale| {
+                    coord * scale
+                })
+                .to_point(),
+        )
+    }
+
+    /// For testing only. Implemented in a brute-force way because it doesn’t need to be cheaper.
+    pub fn all_in_region(region: GridAab) -> Vec<LightChunk> {
+        let mut chunks: Vec<LightChunk> = region
+            .interior_iter()
+            .map(LightChunk::new)
+            .collect::<std::collections::HashSet<LightChunk>>() // deduplicate
+            .into_iter()
+            .collect();
+        chunks.sort_by_key(|chunk| <[i32; 3]>::from(chunk.first_cube()));
+        chunks
+    }
+}
+
 /// Keeps a 3D [`wgpu::Texture`] up to date with the light data from a [`Space`].
 ///
 /// [`Space`] coordinates are mapped directly to texel coordinates, with modulo wrap-around.
@@ -80,7 +137,7 @@ pub struct LightTexture {
 }
 
 impl LightTexture {
-    const COPY_BUFFER_TEXELS: usize = 1024;
+    const COPY_BUFFER_CHUNKS: usize = 512;
     const COMPONENTS: usize = 4;
 
     /// Compute the appropriate size of light texture for the given conditions.
@@ -92,6 +149,7 @@ impl LightTexture {
         // Extra volume of 1 extra cube around all sides automatically captures sky light.
         let space_size = space_bounds.size() + GridSize::splat(2);
 
+        // Compute the size that we need to accomodate the camera view distance.
         // times 2 for radius, plus one to account for the effect of rounding up points to
         // containing cubes.
         let camera_size = GridSize::splat(
@@ -103,13 +161,24 @@ impl LightTexture {
 
         // The texture need not be bigger than the Space or bigger than the viewable diameter.
         // But it must also be within wgpu's limits.
-        space_size.min(camera_size).clamp(
-            GridSize::splat(1),
-            GridSize::splat(limits.max_texture_dimension_3d),
+        let visually_needed_size = space_size.min(camera_size).max(GridSize::splat(1));
+
+        // Round up to a multiple of LIGHT_CHUNK_SIZE;
+        // this part is for the sake of the implementation of updating rather than because
+        // we need the data.
+        let chunked_size =
+            visually_needed_size.zip(LIGHT_CHUNK_SIZE.cast_unit(), |ss, cs| ss.div_ceil(cs) * cs);
+
+        // Limit to wgpu limits, rounded down to chunk.
+        chunked_size.min(
+            GridSize::splat(limits.max_texture_dimension_3d)
+                .zip(LIGHT_CHUNK_SIZE.cast_unit(), |ss, cs| (ss / cs) * cs),
         )
     }
 
     /// Construct a new texture of the specified size with no data.
+    ///
+    /// The size must be a size returned by [`LightTexture::choose_size()`].
     pub fn new(
         label_prefix: &str,
         device: &wgpu::Device,
@@ -135,7 +204,10 @@ impl LightTexture {
             texture,
             copy_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(&format!("{label_prefix} space light copy buffer")),
-                size: u64::try_from(Self::COPY_BUFFER_TEXELS * Self::COMPONENTS).unwrap(),
+                size: u64::try_from(
+                    Self::COPY_BUFFER_CHUNKS * LIGHT_CHUNK_VOLUME * Self::COMPONENTS,
+                )
+                .unwrap(),
                 usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
                 mapped_at_creation: false,
             }),
@@ -341,29 +413,43 @@ impl LightTexture {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         space: &Space,
-        cubes: impl IntoIterator<Item = Cube>,
+        chunks: impl IntoIterator<Item = LightChunk>,
     ) -> usize {
         let mut total_count = 0;
 
         let texture_size = extent_to_size3d(self.texture.size()).to_i32();
 
         // Filter out out-of-bounds cubes.
-        let cubes = cubes
+        let chunks = chunks
             .into_iter()
-            .filter(|&cube| self.mapped_region.contains_cube(cube));
+            .filter(|&chunk| self.mapped_region.contains_cube(chunk.first_cube()));
 
         // Break into batches of our buffer size.
-        for cube_batch in &itertools::Itertools::chunks(cubes, Self::COPY_BUFFER_TEXELS) {
+        for chunk_batch in &itertools::Itertools::chunks(chunks, Self::COPY_BUFFER_CHUNKS) {
             #[allow(clippy::large_stack_arrays)]
-            let mut data: [Texel; Self::COPY_BUFFER_TEXELS] =
-                [[0; Self::COMPONENTS]; Self::COPY_BUFFER_TEXELS];
+            let mut data: [[Texel; LIGHT_CHUNK_VOLUME]; Self::COPY_BUFFER_CHUNKS] =
+                [[[0; Self::COMPONENTS]; LIGHT_CHUNK_VOLUME]; Self::COPY_BUFFER_CHUNKS];
             let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("space light scatter-copy"),
             });
             let mut batch_count = 0;
 
-            for (index, cube) in cube_batch.into_iter().enumerate() {
-                data[index] = space.get_lighting(cube).as_texel();
+            for (index_in_batch, chunk) in chunk_batch.into_iter().enumerate() {
+                let first_cube = chunk.first_cube();
+                data[index_in_batch] = array::from_fn(|texel_index_in_chunk| {
+                    #[allow(clippy::cast_possible_wrap)] // only as big as LIGHT_CHUNK_VOLUME
+                    let texel_index_in_chunk = texel_index_in_chunk as i32;
+                    let offset = vec3(
+                        texel_index_in_chunk.rem_euclid(LIGHT_CHUNK_SIZE_I32.width),
+                        texel_index_in_chunk
+                            .div_euclid(LIGHT_CHUNK_SIZE_I32.width)
+                            .rem_euclid(LIGHT_CHUNK_SIZE_I32.height),
+                        texel_index_in_chunk
+                            .div_euclid(LIGHT_CHUNK_SIZE_I32.width * LIGHT_CHUNK_SIZE_I32.height),
+                    );
+
+                    space.get_lighting(first_cube + offset).as_texel()
+                });
 
                 // TODO: When compute shaders are available, use a compute shader to do these
                 // scattered writes instead of issuing individual commands.
@@ -371,7 +457,8 @@ impl LightTexture {
                     wgpu::ImageCopyBuffer {
                         buffer: &self.copy_buffer,
                         layout: wgpu::ImageDataLayout {
-                            offset: (index * Self::COMPONENTS) as u64,
+                            offset: (index_in_batch * (LIGHT_CHUNK_VOLUME * Self::COMPONENTS))
+                                as u64,
                             bytes_per_row: None,
                             rows_per_image: None,
                         },
@@ -380,15 +467,11 @@ impl LightTexture {
                         texture: &self.texture,
                         mip_level: 0,
                         origin: point_to_origin(
-                            cube.lower_bounds().rem_euclid(&texture_size).to_u32(),
+                            first_cube.lower_bounds().rem_euclid(&texture_size).to_u32(),
                         ),
                         aspect: wgpu::TextureAspect::All,
                     },
-                    wgpu::Extent3d {
-                        width: 1,
-                        height: 1,
-                        depth_or_array_layers: 1,
-                    },
+                    size3d_to_extent(LIGHT_CHUNK_SIZE),
                 );
 
                 batch_count += 1;
@@ -399,7 +482,11 @@ impl LightTexture {
             // To do this optimally, `StagingBelt` will need to be modified to allow
             // us accessing its buffers to issue a `copy_buffer_to_texture` instead of
             // it issuing a `copy_buffer_to_buffer`.
-            queue.write_buffer(&self.copy_buffer, 0, data[..batch_count].as_flattened());
+            queue.write_buffer(
+                &self.copy_buffer,
+                0,
+                data[..batch_count].as_flattened().as_flattened(),
+            );
 
             queue.submit([encoder.finish()]);
         }

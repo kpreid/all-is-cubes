@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use all_is_cubes::math::GridSize;
+use all_is_cubes::math::{ps64, GridSize, Rgb};
 use all_is_cubes::raycast::scale_to_integer_step;
+use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
-use all_is_cubes_gpu::in_wgpu::{init, LightTexture};
+use all_is_cubes_gpu::in_wgpu::{init, LightChunk, LightTexture};
 
 use crate::harness::run_shader_test;
 use crate::wgsl::{frag_expr, to_wgsl};
@@ -77,10 +78,10 @@ async fn scale_to_integer_step_test() {
 /// Not a shader test per se, but a test that the light texture updates correctly.
 #[tokio::test]
 #[rstest::rstest]
-async fn light_texture_write_read(#[values(false, true)] use_scatter: bool) {
-    use all_is_cubes::math::Rgb;
-    use all_is_cubes::space::Space;
-
+async fn light_texture_write_read(
+    #[values(false, true)] use_scatter: bool,
+    #[values(16, 30, 50)] space_size_param: u32,
+) {
     let ((device, queue), (_universe, space, dark_space)) = tokio::join!(
         async {
             let instance = crate::harness::instance().await;
@@ -94,10 +95,12 @@ async fn light_texture_write_read(#[values(false, true)] use_scatter: bool) {
         },
         async {
             let mut universe = Universe::new();
+            // TODO: the test would be more rigorous with a precise size rather than the rounding
+            // that lighting_bench_space() does.
             let space = all_is_cubes::content::testing::lighting_bench_space(
                 &mut universe,
                 YieldProgress::noop(),
-                GridSize::new(32, 32, 32),
+                GridSize::splat(space_size_param),
             )
             .await
             .unwrap();
@@ -112,7 +115,7 @@ async fn light_texture_write_read(#[values(false, true)] use_scatter: bool) {
     let mut lt = LightTexture::new(
         "light_texture_write_test",
         &device,
-        GridSize::splat(32),
+        LightTexture::choose_size(&device.limits(), space.bounds(), ps64(1e6)),
         wgpu::TextureUsages::COPY_SRC,
     );
 
@@ -120,7 +123,12 @@ async fn light_texture_write_read(#[values(false, true)] use_scatter: bool) {
         // First initialize with black from dark_space, then refresh it using update_scatter().
         lt.ensure_mapped(&queue, &dark_space, space.bounds());
 
-        lt.update_scatter(&device, &queue, &space, space.bounds().interior_iter());
+        lt.update_scatter(
+            &device,
+            &queue,
+            &space,
+            LightChunk::all_in_region(space.bounds()).into_iter(),
+        );
     } else {
         lt.ensure_mapped(&queue, &space, space.bounds());
     }

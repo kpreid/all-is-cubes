@@ -11,8 +11,8 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
-    rgba_const, Cube, Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
-    GridSize, GridVector, Rgb, Rgba, Wireframe as _, ZeroOne,
+    rgba_const, Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, GridSize,
+    GridVector, Rgb, Rgba, Wireframe as _, ZeroOne,
 };
 use all_is_cubes::raycast::Ray;
 #[cfg(feature = "rerun")]
@@ -29,6 +29,7 @@ use all_is_cubes_render::{Flaws, RenderError};
 use crate::in_wgpu::block_texture::BlockTextureViews;
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::glue::{to_wgpu_color, to_wgpu_index_format};
+use crate::in_wgpu::light_texture::LightChunk;
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::skybox;
 use crate::in_wgpu::vertex::{WgpuInstanceData, WgpuLinesVertex};
@@ -1041,7 +1042,7 @@ struct SpaceRendererTodo {
     /// None means do a full space reupload.
     ///
     /// TODO: experiment with different granularities of light invalidation (chunks, dirty rects, etc.)
-    light: Option<HashSet<Cube>>,
+    light: Option<HashSet<LightChunk>>,
 
     sky: bool,
 }
@@ -1065,7 +1066,7 @@ impl listen::Store<SpaceChange> for SpaceRendererTodo {
                 SpaceChange::CubeLight { cube } => {
                     // None means we're already at "update everything"
                     if let Some(set) = &mut self.light {
-                        set.insert(cube);
+                        set.insert(LightChunk::new(cube));
                     }
                 }
                 SpaceChange::CubeBlock { .. } => {}
