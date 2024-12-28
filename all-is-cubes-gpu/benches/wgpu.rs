@@ -18,7 +18,7 @@ use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::HeadlessRenderer;
 
-use all_is_cubes_gpu::in_wgpu::{headless, init, LightTexture};
+use all_is_cubes_gpu::in_wgpu::{headless, init, LightChunk, LightTexture};
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
@@ -168,11 +168,13 @@ fn light_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance
             LightTexture::new("lt", &device, bounds.size(), wgpu::TextureUsages::empty());
         let space = Space::builder(bounds).build();
 
+        let updates = LightChunk::all_in_region(bounds);
+
         // update_scatter() will do nothing if not mapped first
         texture.ensure_mapped(&queue, &space, bounds);
 
         b.iter_with_large_drop(|| {
-            texture.update_scatter(&device, &queue, &space, space.bounds().interior_iter());
+            texture.update_scatter(&device, &queue, &space, updates.iter().copied());
 
             scopeguard::guard((), |()| {
                 // flush wgpu's buffering of copy commands (not sure if this is effective).

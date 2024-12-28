@@ -52,7 +52,7 @@ pub mod headless;
 pub mod init;
 mod light_texture;
 #[doc(hidden)] // public for benchmark
-pub use light_texture::LightTexture;
+pub use light_texture::{LightChunk, LightTexture};
 mod pipelines;
 mod poll;
 mod postprocess;
