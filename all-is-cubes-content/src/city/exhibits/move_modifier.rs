@@ -48,12 +48,10 @@ fn PROJECTILE(ctx: Context<'_>) {
 
     let projectile = &demo_blocks[DemoBlocks::Projectile];
 
-    let moving_in = projectile
-        .clone()
-        .with_modifier(Move::new(Face6::NY, 256, -32));
+    let [move_in, _move_out] = Move::new(Face6::NY, 256, -32).to_paired();
+    let projectile_moving_in = projectile.clone().with_modifier(move_in);
+    // let projectile_moving_out = projectile.clone().with_modifier(move_out);
 
-    // TODO: make the launcher block visibly contain and launch the projectile.
-    // This will require getting `Move` tick actions to cooperate with `Composite`.
     let launcher = Block::builder()
         .display_name(literal!("Launcher"))
         .color(Rgb::UNIFORM_LUMINANCE_RED.with_alpha(zo32(1.0)))
@@ -62,10 +60,28 @@ fn PROJECTILE(ctx: Context<'_>) {
         ))
         .activation_action(Operation::Neighbors(
             [
+                // TODO: We want to animate the projectile exiting;
+                // currently, if we do this, the launcher doesn't work any more,
+                // probably because it is a composite with a left-over Air block.
+                // Improve modifier and compositing semantics so this works.
+                //
+                // (
+                //     Cube::new(0, 0, 0),
+                //     Operation::AddModifiers(Arc::new([Composite::new(
+                //         projectile_moving_out,
+                //         CompositeOperator::Over,
+                //     )
+                //     .reversed()
+                //     .into()])),
+                // ),
+
                 // TODO: Instead of `DestroyTo`, we should have an operation that only
                 // succeeds if there is room to enter empty space here (if the destination
                 // is AIR, for now).
-                (Cube::new(0, 1, 0), Operation::DestroyTo(moving_in)),
+                (
+                    Cube::new(0, 1, 0),
+                    Operation::DestroyTo(projectile_moving_in),
+                ),
             ]
             .into(),
         ))
