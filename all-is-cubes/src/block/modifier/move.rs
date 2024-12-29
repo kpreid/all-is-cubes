@@ -143,15 +143,24 @@ impl Move {
                 matches!(&block.modifiers()[this_modifier_index], Modifier::Move(m) if m == self)
             );
             let mut new_block = block.clone();
-            if let Modifier::Move(Move {
-                distance, velocity, ..
-            }) = &mut new_block.modifiers_mut()[this_modifier_index]
             {
-                *distance = i32::from(*distance)
+                let modifiers = new_block.modifiers_mut();
+
+                // Update the distance for the next step.
+                if let Modifier::Move(Move {
+                    distance, velocity, ..
+                }) = &mut modifiers[this_modifier_index]
+                {
+                    *distance = i32::from(*distance)
                             .saturating_add(i32::from(*velocity))
                             .clamp(0, i32::from(u16::MAX))
                             .try_into()
                             .unwrap(/* clamped to range */);
+                }
+
+                // Do not include any other modifiers.
+                // The modifiers themselves are responsible for doing so.
+                modifiers.truncate(this_modifier_index + 1);
             }
             Some(Operation::Become(new_block))
         } else {
@@ -413,7 +422,6 @@ mod tests {
     /// Check the behavior of a `Move` modifier under a `Rotate` modifier.
     /// In particular, we want to make sure the outcome doesn’t end up doubly-rotated.
     #[test]
-    #[ignore = "TODO: modifier evaluation needs fixing"]
     fn move_inside_rotation() {
         let [base] = make_some_blocks();
         const R: Modifier = Modifier::Rotate(GridRotation::CLOCKWISE);
@@ -477,8 +485,6 @@ mod tests {
     }
 
     /// Test [`Move`] acting within the `source` position of a [`Modifier::Composite`].
-    ///
-    /// TODO: This is not yet implemented, but should be.
     #[test]
     fn move_inside_composite_source() {
         let [base, extra] = make_some_blocks();
@@ -496,22 +502,16 @@ mod tests {
         let expected_after_tick = extra.clone().with_modifier(Composite::new(
             base.clone().with_modifier(Move {
                 direction: Face6::PX,
-                distance: 10,
+                distance: 20,
                 velocity: 10,
                 schedule: time::Schedule::EVERY_TICK,
             }),
             block::CompositeOperator::Over,
         ));
 
-        if false {
-            // This is what we want to happen
-            assert_eq!(
-                block.evaluate().unwrap().attributes.tick_action,
-                Some(TickAction::from(Operation::Become(expected_after_tick)))
-            );
-        } else {
-            // Placeholder to fail if the current behavior changes
-            assert_eq!(block.evaluate().unwrap().attributes.tick_action, None);
-        }
+        assert_eq!(
+            block.evaluate().unwrap().attributes.tick_action,
+            Some(TickAction::from(Operation::Become(expected_after_tick)))
+        );
     }
 }

@@ -522,26 +522,6 @@ impl CompositeOperator {
             mem::swap(&mut source, &mut destination);
         }
 
-        // TODO: We haven't got *consistent* semantics for how modifiers interact with actions,
-        // which is demonstrated when `Composite` and `Move` are stacked.
-        //
-        // This breaks the `move_inside_composite_destination()` test in particular,
-        // because there are two potential semantics for modifiers acting on ops:
-        //
-        // 1. modifiers modify the ops to stack on their effects, and
-        // 2. modifiers are usually inert; the originally provided op applies to
-        //    the whole block,
-        //
-        // and `Move` kind of assumed 2 while `Composite` with the below code would be
-        // (necessarily?) doing 1 in order to incorporate the source block.
-        //
-        // Therefore, the rest of this code is stubbed out because it ends up doubling up
-        // modifiers, which would be potentially very bad, and leaves only the wrong behavior
-        // of ignoring the source’s operation.
-        if true {
-            return destination.cloned();
-        }
-
         // For now, `Become` is the only supported operation.
         // TODO: We should have a warning-reporting path so that this can be debugged when it fails.
         fn require_become(op: Option<&Operation>) -> Option<&Block> {
@@ -590,13 +570,6 @@ impl CompositeOperator {
                 reverse: ctx.was_reversed,
                 disassemblable: ctx.disassemblable,
             }));
-        // Include all modifiers stacked on the original block *following* this Composite modifier.
-        // TODO: This is probably not fully coherent and needs to take into account some of the later modifiers’ semantics.
-        new_block.modifiers_mut().extend(
-            ctx.block.modifiers()[(this_modifier_index + 1)..]
-                .iter()
-                .cloned(),
-        );
 
         Some(Operation::Become(new_block))
     }
@@ -1054,7 +1027,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "TODO: implement operation merge to make this pass"]
         fn activation_action_is_composed() {
             let [result1, result2] = make_some_blocks();
             let b1 = &Block::builder()
@@ -1077,7 +1049,6 @@ mod tests {
         }
 
         #[test]
-        #[ignore = "TODO: implement operation merge to make this pass"]
         fn tick_action_is_composed() {
             let [result1, result2] = make_some_blocks();
             let b1 = &Block::builder()

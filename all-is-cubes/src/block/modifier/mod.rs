@@ -107,6 +107,10 @@ impl Modifier {
     ///
     /// * `block` is the original block value (modifiers do not alter it).
     /// * `this_modifier_index` is the index in `block.modifiers()` of `self`.
+    ///   In cases where the modifier needs to produce another block value,
+    ///   such as generating a [`Modifier::Become`], all modifiers following
+    ///   `this_modifier_index` should be omitted.
+    ///   TODO: Make it easier to comply.
     /// * `value` is the output of the preceding modifier or primitive, which is what the
     ///   current modifier should be applied to.
     /// * `filter` controls evaluation options and listening, and its budget is decremented by
