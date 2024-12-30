@@ -12,9 +12,9 @@ use rand::{Rng, SeedableRng};
 use all_is_cubes::block::{self, Block, Resolution::*, RotationPlacementRule, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::space_from_image;
-use all_is_cubes::content::palette;
+use all_is_cubes::content::{palette, BoxPart, BoxStyle};
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::Size3D;
+use all_is_cubes::euclid::{vec3, Size3D, Vector3D};
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
@@ -91,11 +91,24 @@ enum FloorKind {
 /// Data to use to construct specific dungeon rooms.
 struct DemoTheme {
     dungeon_grid: DungeonGrid,
+
+    /// [`BoxStyle`] for a basic room’s walls, floor, and ceiling.
+    ///
+    /// May sometimes be overridden in part.
+    room_style: BoxStyle,
+
     /// Same coordinate system as `dungeon_grid.room_box`.
-    /// Pick 2 out of 3 axes to define the bounds of a corridor/doorway on the third axis.
+    /// Pick 2 out of 3 axes to define the walkable bounds of a corridor/doorway on the third axis.
     corridor_box: GridAab,
+
+    /// [`BoxStyle`]s with which to carve a corridor and create its walls, one per axis.
+    ///
+    /// The interior of each box should be [`AIR`] or at least passable, as should be the faces on
+    /// the relevant axis.
+    corridor_box_styles: Vector3D<BoxStyle, ()>,
+
     blocks: BlockProvider<DungeonBlocks>,
-    wall_block: Block,
+
     lamp_block: Block,
     // TODO: ought to be part of the BlockProvider
     locked_gate_block: Block,
@@ -111,17 +124,22 @@ impl DemoTheme {
         space: &mut Space,
         interior: GridAab,
     ) -> Result<(), InGenError> {
-        let wall_block = wall_block.unwrap_or(&self.wall_block);
+        let mut alt_style: BoxStyle;
+        let room_style = if let Some(wall_block) = wall_block {
+            alt_style = self.room_style.clone();
+            alt_style[BoxPart::face(Face6::NX)] = Some(wall_block.clone());
+            alt_style[BoxPart::face(Face6::PX)] = Some(wall_block.clone());
+            alt_style[BoxPart::face(Face6::NZ)] = Some(wall_block.clone());
+            alt_style[BoxPart::face(Face6::PZ)] = Some(wall_block.clone());
+            alt_style[BoxPart::face(Face6::PY)] = Some(wall_block.clone());
+            &alt_style
+        } else {
+            &self.room_style
+        };
 
-        crate::BoxStyle::from_whole_blocks_for_walls(
-            Some(wall_block.clone()),
-            Some(self.blocks[FloorTile].clone()),
-            Some(wall_block.clone()),
-            None,
-        )
-        .with_interior(Some(AIR))
-        .create_box(interior.expand(FaceMap::splat(1)))
-        .execute(space, &mut transaction::no_outputs)?;
+        room_style
+            .create_box(interior.expand(FaceMap::splat(1)))
+            .execute(space, &mut transaction::no_outputs)?;
 
         Ok(())
     }
@@ -158,6 +176,8 @@ impl DemoTheme {
 
         let rotate_nz_to_face = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
 
+        // This box is exactly the volume which would ordinarily be impassable if this corridor.
+        // were not being added.
         let doorway_box = {
             let corridor_box = self
                 .corridor_box
@@ -170,23 +190,18 @@ impl DemoTheme {
             GridAab::from_lower_upper(lower, upper)
         };
 
-        // Cut doorway
-        space.fill_uniform(doorway_box, &AIR)?;
-
-        // Add floor and walls
-        space.fill_uniform(
-            doorway_box.abut(Face6::NY, 1).unwrap(),
-            &self.blocks[FloorTile],
-        )?;
-        space.fill_uniform(
-            doorway_box.abut(wall_parallel, 1).unwrap(),
-            &self.wall_block,
-        )?;
-        space.fill_uniform(
-            doorway_box.abut(wall_parallel.opposite(), 1).unwrap(),
-            &self.wall_block,
-        )?;
-        space.fill_uniform(doorway_box.abut(Face6::PY, 1).unwrap(), &self.wall_block)?; // TODO: ceiling block
+        // Place the doorway/corridor’s walls and cut it into the room walls.
+        let doorway_box_for_box_style = doorway_box.expand({
+            // Expand by 1 cube to form the exterior box, except...
+            let mut v = [1; 3];
+            // ...on the passage axis, it meets the room walls instead of sticking into the room.
+            v[passage_axis] = 0;
+            FaceMap::symmetric(v)
+        });
+        self.corridor_box_styles[passage_axis]
+            .create_box(doorway_box_for_box_style)
+            .execute(space, &mut transaction::no_outputs)
+            .unwrap();
 
         // * If !gate_present, we don't generate a gate at all.
         // * If gate_movable, we generate a GatePocket for it to slide into; otherwise it is
@@ -516,7 +531,43 @@ pub(crate) async fn demo_dungeon(
     let dungeon_blocks = BlockProvider::<DungeonBlocks>::using(universe)?;
     let theme = DemoTheme {
         dungeon_grid: dungeon_grid.clone(),
+        room_style: BoxStyle::from_fn(|part| {
+            if part == BoxPart::INTERIOR {
+                Some(AIR)
+            } else if part.is_on_face(Face6::NY) {
+                Some(dungeon_blocks[DungeonBlocks::FloorTile].clone())
+            } else {
+                // TODO: add wall-tile and ceiling-tile blocks
+                Some(landscape_blocks[LandscapeBlocks::Stone].clone())
+            }
+        }),
         corridor_box: GridAab::from_lower_size([3, 0, 3], [3, 3, 3]),
+        corridor_box_styles: {
+            let basic_style = BoxStyle::from_fn(|part| {
+                if part == BoxPart::INTERIOR {
+                    Some(AIR)
+                } else if part.is_on_face(Face6::NY) {
+                    Some(dungeon_blocks[DungeonBlocks::FloorTile].clone())
+                } else {
+                    // TODO: add wall-tile and ceiling-tile blocks
+                    Some(landscape_blocks[LandscapeBlocks::Stone].clone())
+                }
+            });
+
+            vec3(
+                basic_style
+                    .clone()
+                    .with(BoxPart::face(Face6::NX), Some(AIR))
+                    .with(BoxPart::face(Face6::PX), Some(AIR)),
+                basic_style
+                    .clone()
+                    .with(BoxPart::face(Face6::NY), Some(AIR))
+                    .with(BoxPart::face(Face6::PY), Some(AIR)),
+                basic_style
+                    .with(BoxPart::face(Face6::NZ), Some(AIR))
+                    .with(BoxPart::face(Face6::PZ), Some(AIR)),
+            )
+        },
         locked_gate_block: dungeon_blocks[Gate]
             .clone()
             .with_modifier(block::Composite::new(
@@ -524,7 +575,6 @@ pub(crate) async fn demo_dungeon(
                 block::CompositeOperator::Over,
             )),
         // TODO: use more appropriate blocks
-        wall_block: landscape_blocks[LandscapeBlocks::Stone].clone(),
         lamp_block: demo_blocks[DemoBlocks::Lamp(true)].clone(),
         window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
         item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
