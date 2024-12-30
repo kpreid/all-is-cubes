@@ -18,7 +18,6 @@ use crate::transaction::Transactional as _;
 use crate::universe::{Universe, UniverseTransaction};
 
 mod draw_box;
-#[doc(hidden)] // public for exhibit testing
 pub use draw_box::*;
 #[doc(hidden)] // TODO: make public with better API
 pub mod load_image;

@@ -26,13 +26,12 @@ impl Frame {
 
     /// experimental
     #[doc(hidden)]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "consistency and we're not too worried about a couple extra refcounts"
+    )]
     pub fn with_block(block: Block) -> Arc<Self> {
-        Self::new(BoxStyle::from_geometric_categories(
-            Some(block.clone()),
-            Some(block.clone()),
-            Some(block.clone()),
-            Some(block),
-        ))
+        Self::new(BoxStyle::from_fn(|_| Some(block.clone())))
     }
 
     /// Put this frame behind the given widget tree.

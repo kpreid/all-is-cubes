@@ -43,6 +43,9 @@
     - Renamed `block::BlockBuilder` to `block::Builder`.
     - Renamed `space::SpaceBuilder` to `space::Builder`.
 
+- `all-is-cubes-content` library:
+    - `BoxStyle`’s functionality has been expanded; `BoxStyle::from_fn()` and the new companion type `BoxPart` allows constructing arbitrary `BoxStyle`s rather than only the specific patterns supported by previous constructors.
+
 - `all-is-cubes-gpu` library:
     - `in_wgpu::SurfaceRenderer::new()` requires `wgpu::Adapter` instead of `&wgpu::Adapter`.
 

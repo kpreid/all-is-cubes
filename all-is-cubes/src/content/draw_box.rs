@@ -1,15 +1,38 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::ops;
+
+use euclid::{vec3, Vector3D};
 
 use crate::block::{self, Block, Resolution};
-use crate::math::{Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
+use crate::math::{Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::space;
+
+// Bits in [`BoxPart`] and indexes of [`BoxStyle::parts`].
+const LOWER: u8 = 1;
+const UPPER: u8 = 2;
 
 /// Set of blocks used to draw 3D boxes of any size, allowing corners and edges to have
 /// different blocks than faces and the interior.
 ///
+/// Boxes have walls exactly 1 cube thick. Thus, a `BoxStyle` has 64 parts (blocks),
+/// identified by the [`BoxPart`] type:
+///
+/// * interior volume,
+/// * 6 faces,
+/// * 12 edges,
+/// * 8 corners, and
+/// * 38 more parts for the case where the box to be drawn is only one block thick,
+///   thus requiring a block to be both faces simultaneously on one or more axes.
+///
+/// Each part of the box can be absent ([`None`]), which means that when drawn, the existing
+/// block in that place is unchanged.
+///
 /// This can be considered a 3-dimensional analogue of the “9-patch image” concept,
 /// or as a voxel “tile set” (but one with no “inside corner” pieces).
+///
+/// `BoxStyle`’s data is kept behind a reference-counted pointer,
+/// so `BoxStyle` is small and cheap to clone.
 #[derive(Clone, Debug)]
 pub struct BoxStyle {
     /// Contains every type of block that can appear in a box.
@@ -26,7 +49,32 @@ pub struct BoxStyle {
 }
 
 impl BoxStyle {
-    // TODO: Figure out a less complex set of constructors. Allow replacing individual parts.
+    // TODO: Several of these constructors (not `from_fn()`) are overly specific;
+    // figure out better API to offer so callers can do those things easily.
+
+    /// Construct a `BoxStyle` by asking a function for each part.
+    ///
+    /// The order of calls to the function is unspecified and subject to change.
+    pub fn from_fn<F>(mut f: F) -> Self
+    where
+        F: FnMut(BoxPart) -> Option<Block>,
+    {
+        // We care a lot more about keeping build time and binary size low by not duplicating code,
+        // than about the relatively tiny possible savings from inlining and monomorphizing
+        // this code that only participates in expensive rare worldgen operations.
+        #[inline(never)]
+        fn inner(f: &mut dyn FnMut(BoxPart) -> Option<Block>) -> BoxStyle {
+            use core::array::from_fn;
+            // TODO: deduplicate identical Blocks to reduce total number of allocations present
+            BoxStyle {
+                parts: Arc::new(from_fn(|x| {
+                    from_fn(|y| from_fn(|z| f(BoxPart(vec3(x as u8, y as u8, z as u8)))))
+                })),
+            }
+        }
+
+        inner(&mut f)
+    }
 
     /// Construct a `BoxStyle` from a 2D 4×4×1 multiblock whose components on each axis
     /// are in the order `[lower, middle, upper, lower & upper]`; that is, this layout
@@ -90,28 +138,6 @@ impl BoxStyle {
                 .into_iter()
                 .map(move |x_range| GridAab::from_ranges([x_range, y_range.clone(), 0..resolution]))
         })
-    }
-
-    /// Construct a `BoxStyle` that uses the given blocks for
-    /// interior, faces, edges, and corners, never rotated.
-    pub fn from_geometric_categories(
-        interior: Option<Block>,
-        face: Option<Block>,
-        edge: Option<Block>,
-        corner: Option<Block>,
-    ) -> Self {
-        fn level<T: Clone>(inner: T, outer: T) -> [T; 4] {
-            [inner, outer.clone(), outer.clone(), outer]
-        }
-        Self {
-            parts: Arc::new(level(
-                level(
-                    level(interior, face.clone()),
-                    level(face.clone(), edge.clone()),
-                ),
-                level(level(face, edge.clone()), level(edge, corner)),
-            )),
-        }
     }
 
     /// Construct a `BoxStyle` from block types for walls, floor, ceiling, and corners.
@@ -268,123 +294,110 @@ impl BoxStyle {
         let line_z_Xy = line_z_XY.clone().rotate(GridRotation::RXyZ);
         let line_z_xy = line_z_XY.clone().rotate(GridRotation::RxyZ);
 
-        use core::array::from_fn;
-        Self {
-            parts: Arc::new(from_fn(|x| {
-                from_fn(|y| {
-                    from_fn(|z| {
-                        // Decode coordinate index encoding to a more legible form
-                        // (this is just a way of giving names to the conditions).
-                        let on_face = FaceMap {
-                            nx: x & 1 != 0,
-                            ny: y & 1 != 0,
-                            nz: z & 1 != 0,
-                            px: x & 2 != 0,
-                            py: y & 2 != 0,
-                            pz: z & 2 != 0,
-                        };
+        Self::from_fn(|part| {
+            let on_face = part.on_faces();
+            let mut blocks: Vec<&Block> = Vec::new();
 
-                        let mut blocks: Vec<&Block> = Vec::new();
+            // Four Z lines
+            if on_face.nx && on_face.ny {
+                blocks.push(&line_z_XY);
+            }
+            if on_face.px && on_face.ny {
+                blocks.push(&line_z_xY);
+            }
+            if on_face.nx && on_face.py {
+                blocks.push(&line_z_Xy);
+            }
+            if on_face.px && on_face.py {
+                blocks.push(&line_z_xy);
+            }
+            // Four X lines
+            if on_face.nz && on_face.ny {
+                blocks.push(&line_x_YZ);
+            }
+            if on_face.pz && on_face.ny {
+                blocks.push(&line_x_Yz);
+            }
+            if on_face.nz && on_face.py {
+                blocks.push(&line_x_yZ);
+            }
+            if on_face.pz && on_face.py {
+                blocks.push(&line_x_yz);
+            }
+            // Four Y lines
+            if on_face.nz && on_face.nx {
+                blocks.push(&line_y_XZ);
+            }
+            if on_face.pz && on_face.nx {
+                blocks.push(&line_y_Xz);
+            }
+            if on_face.nz && on_face.px {
+                blocks.push(&line_y_xZ);
+            }
+            if on_face.pz && on_face.px {
+                blocks.push(&line_y_xz);
+            }
 
-                        // Four Z lines
-                        if on_face.nx && on_face.ny {
-                            blocks.push(&line_z_XY);
-                        }
-                        if on_face.px && on_face.ny {
-                            blocks.push(&line_z_xY);
-                        }
-                        if on_face.nx && on_face.py {
-                            blocks.push(&line_z_Xy);
-                        }
-                        if on_face.px && on_face.py {
-                            blocks.push(&line_z_xy);
-                        }
-                        // Four X lines
-                        if on_face.nz && on_face.ny {
-                            blocks.push(&line_x_YZ);
-                        }
-                        if on_face.pz && on_face.ny {
-                            blocks.push(&line_x_Yz);
-                        }
-                        if on_face.nz && on_face.py {
-                            blocks.push(&line_x_yZ);
-                        }
-                        if on_face.pz && on_face.py {
-                            blocks.push(&line_x_yz);
-                        }
-                        // Four Y lines
-                        if on_face.nz && on_face.nx {
-                            blocks.push(&line_y_XZ);
-                        }
-                        if on_face.pz && on_face.nx {
-                            blocks.push(&line_y_Xz);
-                        }
-                        if on_face.nz && on_face.px {
-                            blocks.push(&line_y_xZ);
-                        }
-                        if on_face.pz && on_face.px {
-                            blocks.push(&line_y_xz);
-                        }
+            // Eight corners (after the edges so that they can override)
+            if on_face.nx && on_face.ny && on_face.nz {
+                blocks.push(&corner_block);
+            }
+            if on_face.nx && on_face.ny && on_face.pz {
+                blocks.push(&corner_z);
+            }
+            if on_face.nx && on_face.py && on_face.nz {
+                blocks.push(&corner_y);
+            }
+            if on_face.nx && on_face.py && on_face.pz {
+                blocks.push(&corner_yz);
+            }
+            if on_face.px && on_face.ny && on_face.nz {
+                blocks.push(&corner_x);
+            }
+            if on_face.px && on_face.ny && on_face.pz {
+                blocks.push(&corner_xz);
+            }
+            if on_face.px && on_face.py && on_face.nz {
+                blocks.push(&corner_xy);
+            }
+            if on_face.px && on_face.py && on_face.pz {
+                blocks.push(&corner_xyz);
+            }
 
-                        // Eight corners (after the edges so that they can override)
-                        if on_face.nx && on_face.ny && on_face.nz {
-                            blocks.push(&corner_block);
-                        }
-                        if on_face.nx && on_face.ny && on_face.pz {
-                            blocks.push(&corner_z);
-                        }
-                        if on_face.nx && on_face.py && on_face.nz {
-                            blocks.push(&corner_y);
-                        }
-                        if on_face.nx && on_face.py && on_face.pz {
-                            blocks.push(&corner_yz);
-                        }
-                        if on_face.px && on_face.ny && on_face.nz {
-                            blocks.push(&corner_x);
-                        }
-                        if on_face.px && on_face.ny && on_face.pz {
-                            blocks.push(&corner_xz);
-                        }
-                        if on_face.px && on_face.py && on_face.nz {
-                            blocks.push(&corner_xy);
-                        }
-                        if on_face.px && on_face.py && on_face.pz {
-                            blocks.push(&corner_xyz);
-                        }
-
-                        if !blocks.is_empty() {
-                            Some(block::Composite::stack(
-                                block::AIR,
-                                blocks.drain(..).map(|block| {
-                                    block::Composite::new(
-                                        block.clone(),
-                                        block::CompositeOperator::Over,
-                                    )
-                                }),
-                            ))
-                        } else {
-                            None
-                        }
-                    })
-                })
-            })),
-        }
+            if !blocks.is_empty() {
+                Some(block::Composite::stack(
+                    block::AIR,
+                    blocks.drain(..).map(|block| {
+                        block::Composite::new(block.clone(), block::CompositeOperator::Over)
+                    }),
+                ))
+            } else {
+                None
+            }
+        })
     }
 
+    /// Replace a single part of this and return the modified style.
     #[must_use]
-    pub fn with_interior(mut self, interior: Option<Block>) -> Self {
+    pub fn with(mut self, part: BoxPart, block: Option<Block>) -> Self {
         let parts = Arc::make_mut(&mut self.parts);
-        parts[0][0][0] = interior;
+        parts[usize::from(part.0.x)][usize::from(part.0.y)][usize::from(part.0.z)] = block;
         self
     }
 
     /// Applies the given function to every block present in this.
+    /// Does not affect absent blocks.
     #[must_use]
-    pub fn map_blocks(mut self, mut block_fn: impl FnMut(Block) -> Block) -> Self {
+    pub fn map(mut self, mut block_fn: impl FnMut(BoxPart, Block) -> Block) -> Self {
         let parts = Arc::make_mut(&mut self.parts);
-        for block in parts.iter_mut().flatten().flatten() {
-            if let Some(old_block) = block.take() {
-                *block = Some(block_fn(old_block));
+        for (x, plane) in parts.iter_mut().enumerate() {
+            for (y, row) in plane.iter_mut().enumerate() {
+                for (z, block) in row.iter_mut().enumerate() {
+                    if let Some(old_block) = block.take() {
+                        let part = BoxPart(vec3(x as u8, y as u8, z as u8));
+                        *block = Some(block_fn(part, old_block));
+                    }
+                }
             }
         }
         self
@@ -407,29 +420,125 @@ impl BoxStyle {
         })
     }
 
-    /// Returns the block that is the part of this box at the specified `cube`.
+    /// Returns the block that is the part of this box at the specified `cube`
+    /// when the box bounds are `bounds`.
     pub fn cube_at(&self, bounds: GridAab, cube: Cube) -> Option<&Block> {
-        let on_face = on_faces(bounds, cube);
-        self.parts[usize::from(on_face.nx) + usize::from(on_face.px) * 2]
-            [usize::from(on_face.ny) + usize::from(on_face.py) * 2]
-            [usize::from(on_face.nz) + usize::from(on_face.pz) * 2]
-            .as_ref()
+        self[BoxPart::from_cube(bounds, cube)?].as_ref()
     }
 }
 
-/// Returns whether the cube lies within the outermost layer of `bounds`, for each face.
-///
-/// TODO: This seems generally useful; should it be a method on [`GridAab`]?
-fn on_faces(bounds: GridAab, cube: Cube) -> FaceMap<bool> {
-    let lb = bounds.lower_bounds();
-    let ub = bounds.upper_bounds();
-    FaceMap {
-        nx: lb.x == cube.x,
-        ny: lb.y == cube.y,
-        nz: lb.z == cube.z,
-        px: ub.x.checked_sub(1) == Some(cube.x),
-        py: ub.y.checked_sub(1) == Some(cube.y),
-        pz: ub.z.checked_sub(1) == Some(cube.z),
+impl ops::Index<BoxPart> for BoxStyle {
+    type Output = Option<Block>;
+
+    fn index(&self, index: BoxPart) -> &Self::Output {
+        &self.parts[usize::from(index.0.x)][usize::from(index.0.y)][usize::from(index.0.z)]
+    }
+}
+impl ops::IndexMut<BoxPart> for BoxStyle {
+    fn index_mut(&mut self, index: BoxPart) -> &mut Self::Output {
+        &mut Arc::make_mut(&mut self.parts)[usize::from(index.0.x)][usize::from(index.0.y)]
+            [usize::from(index.0.z)]
+    }
+}
+
+/// Identifies one of the 64 parts of a [`BoxStyle`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct BoxPart(
+    /// These positions/bit-flags follow the same indexing scheme as for the [`BoxStyle::parts`]
+    /// field. Only values 0, 1, 2, and 3 are valid.
+    ///
+    /// We could make this representation denser by using a single `u8` bitfield, but that would be
+    /// cryptic to no great gain.
+    Vector3D<u8, ()>,
+);
+
+impl BoxPart {
+    /// The part that is the interior of the box.
+    pub const INTERIOR: Self = Self(vec3(0, 0, 0));
+
+    /// The part that is the whole box when its size is 1×1×1.
+    pub const UNIT: Self = Self(vec3(LOWER | UPPER, LOWER | UPPER, LOWER | UPPER));
+
+    /// Returns the part which is the given face of the box.
+    ///
+    /// Note that this does not include the edges and corners of that face.
+    #[must_use]
+    pub const fn face(face: Face6) -> Self {
+        match face {
+            Face6::NX => Self(vec3(LOWER, 0, 0)),
+            Face6::NY => Self(vec3(0, LOWER, 0)),
+            Face6::NZ => Self(vec3(0, 0, LOWER)),
+            Face6::PX => Self(vec3(UPPER, 0, 0)),
+            Face6::PY => Self(vec3(0, UPPER, 0)),
+            Face6::PZ => Self(vec3(0, 0, UPPER)),
+        }
+    }
+
+    /// Returns the `BoxPart` that denotes the part of `bounds` the given `cube` is on,
+    /// or [`None`] if `cube` is outside `bounds`.
+    pub fn from_cube(bounds: GridAab, cube: Cube) -> Option<Self> {
+        if bounds.contains_cube(cube) {
+            Some(Self::from_on_faces({
+                let lb = bounds.lower_bounds();
+                let ub = bounds.upper_bounds();
+                FaceMap {
+                    nx: lb.x == cube.x,
+                    ny: lb.y == cube.y,
+                    nz: lb.z == cube.z,
+                    px: ub.x.checked_sub(1) == Some(cube.x),
+                    py: ub.y.checked_sub(1) == Some(cube.y),
+                    pz: ub.z.checked_sub(1) == Some(cube.z),
+                }
+            }))
+        } else {
+            None
+        }
+    }
+
+    fn from_on_faces(on_faces: FaceMap<bool>) -> Self {
+        Self(vec3(
+            u8::from(on_faces.nx) + u8::from(on_faces.px) * 2,
+            u8::from(on_faces.ny) + u8::from(on_faces.py) * 2,
+            u8::from(on_faces.nz) + u8::from(on_faces.pz) * 2,
+        ))
+    }
+
+    /// Returns whether this part touches the specified face.
+    ///
+    /// This includes [`BoxPart::face(face)`](BoxPart::face)
+    /// but also all the adjacent edges and corners,
+    /// and the “both faces” case used when the box is 1 block thick on some axis.
+    #[must_use]
+    pub fn is_on_face(self, face: Face6) -> bool {
+        self.0[face.axis()] & if face.is_negative() { LOWER } else { UPPER } != 0
+    }
+
+    /// Returns the same as [`BoxPart::is_on_face()`] but for all faces.
+    pub const fn on_faces(self) -> FaceMap<bool> {
+        let Vector3D { x, y, z, .. } = self.0;
+        FaceMap {
+            nx: x & LOWER != 0,
+            ny: y & LOWER != 0,
+            nz: z & LOWER != 0,
+            px: x & UPPER != 0,
+            py: y & UPPER != 0,
+            pz: z & UPPER != 0,
+        }
+    }
+
+    /// Returns the part which lies in the given direction on that axis and is the
+    /// same as this part on other axes.
+    ///
+    /// This may be used to find an edge or corner starting from a face,
+    /// or to find ends starting from [`UNIT`](Self::UNIT).
+    #[must_use]
+    pub fn push(mut self, direction: Face6) -> Self {
+        self.0[direction.axis()] = if direction.is_negative() {
+            LOWER
+        } else {
+            UPPER
+        };
+        self
     }
 }
 
@@ -452,6 +561,18 @@ mod tests {
         ] {
             let txn = style.create_box(aab);
             assert_eq!(txn.bounds(), if aab.is_empty() { None } else { Some(aab) });
+        }
+    }
+
+    #[test]
+    pub fn part_face_relationships() {
+        for face in Face6::ALL {
+            assert!(BoxPart::face(face).is_on_face(face), "{face:?} is_on_face");
+            assert_eq!(
+                BoxPart::face(face),
+                BoxPart::INTERIOR.push(face),
+                "{face:?} push"
+            );
         }
     }
 }
