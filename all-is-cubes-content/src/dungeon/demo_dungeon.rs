@@ -258,6 +258,7 @@ impl DemoTheme {
     fn actual_room_box(&self, room_position: Cube, room_data: &DemoRoom) -> GridAab {
         if room_data.corridor_only {
             self.corridor_box
+                .expand(FaceMap::symmetric([1, 0, 1]))
                 .translate(self.dungeon_grid.room_translation(room_position))
         } else {
             let eb = room_data.extended_map_bounds();
@@ -554,18 +555,59 @@ pub(crate) async fn demo_dungeon(
                 }
             });
 
-            vec3(
+            let corner_block = |facing_room: Face6, left: bool| {
+                block::Composite::new(
+                    dungeon_blocks[DungeonBlocks::DoorwaySideMask]
+                        .clone()
+                        .rotate(
+                            GridRotation::from_to(Face6::PZ, facing_room, Face6::PY).unwrap()
+                                * if left {
+                                    GridRotation::IDENTITY
+                                } else {
+                                    GridRotation::RxYZ
+                                },
+                        ),
+                    block::CompositeOperator::In,
+                )
+                .reversed()
+                .compose_or_replace(landscape_blocks[LandscapeBlocks::Stone].clone())
+            };
+
+            let on_horizontal_axis = |axis: Axis| {
                 basic_style
                     .clone()
-                    .with(BoxPart::face(Face6::NX), Some(AIR))
-                    .with(BoxPart::face(Face6::PX), Some(AIR)),
+                    .with(BoxPart::face(axis.negative_face()), Some(AIR))
+                    .with(BoxPart::face(axis.positive_face()), Some(AIR))
+                    // TODO: way too repetitive and unclear
+                    .with(
+                        BoxPart::face(axis.positive_face())
+                            .push(axis.positive_face().cross(Face6::PY).try_into().unwrap()),
+                        Some(corner_block(axis.positive_face(), true)),
+                    )
+                    .with(
+                        BoxPart::face(axis.positive_face())
+                            .push(axis.positive_face().cross(Face6::NY).try_into().unwrap()),
+                        Some(corner_block(axis.positive_face(), false)),
+                    )
+                    .with(
+                        BoxPart::face(axis.negative_face())
+                            .push(axis.negative_face().cross(Face6::PY).try_into().unwrap()),
+                        Some(corner_block(axis.negative_face(), true)),
+                    )
+                    .with(
+                        BoxPart::face(axis.negative_face())
+                            .push(axis.negative_face().cross(Face6::NY).try_into().unwrap()),
+                        Some(corner_block(axis.negative_face(), false)),
+                    )
+            };
+
+            vec3(
+                on_horizontal_axis(Axis::X),
                 basic_style
                     .clone()
                     .with(BoxPart::face(Face6::NY), Some(AIR))
                     .with(BoxPart::face(Face6::PY), Some(AIR)),
-                basic_style
-                    .with(BoxPart::face(Face6::NZ), Some(AIR))
-                    .with(BoxPart::face(Face6::PZ), Some(AIR)),
+                on_horizontal_axis(Axis::Z),
             )
         },
         locked_gate_block: dungeon_blocks[Gate]
@@ -775,6 +817,11 @@ pub(crate) enum DungeonBlocks {
     GateLock,
     /// Icon of a tool which can unlock `GateLock`s.
     Key,
+    /// Shape into which to cut blocks [using `CompositeOperator::In`] on the sides of a doorway.
+    ///
+    /// The +X face of this block should be oriented towards the doorway's interior from the left,
+    /// while the +Z face should be oriented towards the room it connects to.
+    DoorwaySideMask,
 }
 impl BlockModule for DungeonBlocks {
     fn namespace() -> &'static str {
@@ -909,6 +956,18 @@ pub async fn install_dungeon_blocks(
                     .voxels_handle(R16, txn.insert_anonymous(space))
                     .build()
             }
+
+            DoorwaySideMask => Block::builder()
+                .display_name("Doorway Side Mask")
+                .voxels_fn(R8, |cube| {
+                    if cube.x + cube.z / 2 < 8 {
+                        color_block!(1.0, 1.0, 1.0, 1.0)
+                    } else {
+                        AIR
+                    }
+                })
+                .unwrap()
+                .build_txn(txn),
         })
     })
     .await?
