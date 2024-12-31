@@ -707,8 +707,9 @@ fn do_for_all_packages(
     if config.scope.includes_main_workspace() {
         ensure_wasm_tools_installed(config, time_log)?;
 
-        // Ensure all-is-cubes-server build that might be looking for the web client files will succeed.
-        if !static_web_app_out_dir(Profile::Dev).exists() {
+        // Ensure all-is-cubes-server build that might be looking for the web client files will
+        // succeed, but don't rebuild it if we're not actually testing its behavior.
+        if !static_web_app_out_dir(Profile::Dev).exists() && op == TestOrCheck::Lint {
             build_web(config, time_log, Profile::Dev)?;
         }
     }
