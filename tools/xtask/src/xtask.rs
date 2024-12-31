@@ -708,7 +708,9 @@ fn do_for_all_packages(
         ensure_wasm_tools_installed(config, time_log)?;
 
         // Ensure all-is-cubes-server build that might be looking for the web client files will succeed.
-        build_web(config, time_log, Profile::Dev)?;
+        if !static_web_app_out_dir(Profile::Dev).exists() {
+            build_web(config, time_log, Profile::Dev)?;
+        }
     }
 
     // Test everything we can with default features and target.
