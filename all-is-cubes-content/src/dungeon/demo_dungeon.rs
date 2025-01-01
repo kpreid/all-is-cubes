@@ -21,7 +21,7 @@ use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
     GridVector, Rgb, Rgba, Vol,
 };
-use all_is_cubes::space::{LightPhysics, Space};
+use all_is_cubes::space::{LightPhysics, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -33,6 +33,7 @@ use crate::dungeon::{build_dungeon, generate_maze, DungeonGrid, MazeRoomKind, Th
 use crate::{tree, DemoBlocks, LandscapeBlocks, TemplateParameters};
 
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
+const TORCH_PATTERN: [GridCoordinate; 2] = [-4, 4];
 
 #[derive(Clone, Debug)]
 struct DemoRoom {
@@ -109,7 +110,6 @@ struct DemoTheme {
 
     blocks: BlockProvider<DungeonBlocks>,
 
-    lamp_block: Block,
     // TODO: ought to be part of the BlockProvider
     locked_gate_block: Block,
     /// TODO: replace window glass with openings that are too small to pass through
@@ -335,17 +335,15 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         let goal_wall = color_block!(0.0, 0.8, 0.0);
 
         let interior = self.actual_room_box(room_position, room_data);
+        let unmodified_room_box = self.dungeon_grid.room_box_at(room_position);
+
         let wall_type = match room_data.maze_kind {
             MazeRoomKind::Start => Some(&start_wall),
             MazeRoomKind::Goal => Some(&goal_wall),
             MazeRoomKind::Path | MazeRoomKind::OffPath => None,
             MazeRoomKind::Unoccupied => unreachable!(),
         };
-        let floor_layer = self
-            .dungeon_grid
-            .room_box_at(room_position)
-            .abut(Face6::NY, 1)
-            .unwrap();
+        let floor_layer = unmodified_room_box.abut(Face6::NY, 1).unwrap();
 
         match pass_index {
             0 => {
@@ -382,32 +380,23 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     }
                 }
 
-                if room_data.lit {
+                // Lit corridors get the magic pyramid light instead of putting a torch in your face
+                if room_data.lit && room_data.corridor_only {
                     let top_middle =
                         Cube::containing(interior.abut(Face6::PY, -1).unwrap().center()).unwrap();
-                    space.set(
-                        top_middle,
-                        if room_data.corridor_only {
-                            &self.blocks[CorridorLight]
-                        } else {
-                            &self.lamp_block
-                        },
-                    )?;
+                    space.set(top_middle, &self.blocks[CorridorLight])?;
                 }
 
-                // Windowed walls
-                let window_y = self
-                    .dungeon_grid
-                    .room_box_at(room_position)
-                    .lower_bounds()
-                    .y
-                    + 1;
+                // Windowed walls and torches on walls
+                let window_y = unmodified_room_box.lower_bounds().y + 1;
+                let torch_y = unmodified_room_box.lower_bounds().y;
                 four_walls(
                     interior.expand(FaceMap::splat(1)),
                     |origin, along_wall, length, wall_excluding_corners_box| {
                         let wall = GridRotation::CLOCKWISE.transform(along_wall); // TODO: make four_walls provide this in a nice name
+                        let midpoint = (length / 2) as GridCoordinate;
+
                         if let WallFeature::Window = room_data.wall_features[wall] {
-                            let midpoint = (length / 2) as GridCoordinate;
                             for step in WINDOW_PATTERN {
                                 let mut window_pos =
                                     origin + along_wall.normal_vector() * (midpoint + step);
@@ -419,7 +408,17 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                     space.fill_uniform(window_box, &self.window_glass_block)?;
                                 }
                             }
+                        } else if room_data.lit && !room_data.corridor_only {
+                            for step in TORCH_PATTERN {
+                                let mut torch_pos = origin
+                                    + along_wall.normal_vector() * (midpoint + step)
+                                    + wall.opposite().normal_vector();
+                                torch_pos.y = torch_y;
+
+                                space.set(torch_pos, &self.blocks[Brazier])?;
+                            }
                         }
+
                         Ok::<(), InGenError>(())
                     },
                 )?;
@@ -616,8 +615,6 @@ pub(crate) async fn demo_dungeon(
                 dungeon_blocks[GateLock].clone(),
                 block::CompositeOperator::Over,
             )),
-        // TODO: use more appropriate blocks
-        lamp_block: demo_blocks[DemoBlocks::Lamp(true)].clone(),
         window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
         item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
         blocks: dungeon_blocks,
@@ -803,8 +800,10 @@ fn generate_dungeon_map(
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub(crate) enum DungeonBlocks {
-    /// A dim light to attach to ceilings.
+    /// A light to attach to corridor ceilings.
     CorridorLight,
+    /// A light to put in rooms.
+    Brazier,
     /// Normal flooring for the dungeon.
     FloorTile,
     /// Spikes for pit traps, facing upward.
@@ -860,6 +859,48 @@ pub async fn install_dungeon_blocks(
                     }
                 })?
                 .build_txn(txn),
+
+            Brazier => Block::builder()
+                .display_name("Brazier")
+                .voxels_handle(resolution, {
+                    let mut space = Space::for_block(resolution).build();
+                    // Use a darker color to dampen the effect of interior light
+                    let body_block = Block::from(palette::STEEL * 0.2);
+                    space.fill(
+                        GridAab::from_lower_upper(
+                            [0, 0, 0],
+                            [resolution_g, resolution_g / 2, resolution_g],
+                        )
+                        .shrink(FaceMap::symmetric([2, 0, 2]))
+                        .unwrap(),
+                        |p| {
+                            let mid =
+                                (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
+                            if mid.x.max(mid.z) + (mid.y / 2) < resolution_g {
+                                Some(&body_block)
+                            } else {
+                                None
+                            }
+                        },
+                    )?;
+                    {
+                        let fire_inset = 4;
+                        let bounds = GridAab::from_lower_upper(
+                            // Vertical overlap will be overwritten, making a bowl shape
+                            [fire_inset, resolution_g / 2 - 2, fire_inset],
+                            [
+                                resolution_g - fire_inset,
+                                resolution_g,
+                                resolution_g - fire_inset,
+                            ],
+                        );
+                        SpaceTransaction::add_behavior(bounds, crate::Fire::new(bounds))
+                            .execute(&mut space, &mut transaction::no_outputs)
+                            .unwrap();
+                    }
+                    txn.insert_anonymous(space)
+                })
+                .build(),
 
             FloorTile => {
                 let resolution = R32;

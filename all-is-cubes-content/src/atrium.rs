@@ -318,7 +318,7 @@ fn map_text_block(
         }
 
         // TODO: These are supposed to be planters
-        b'P' => blocks[AtriumBlocks::Firepot].clone(),
+        b'P' => blocks[AtriumBlocks::Brazier].clone(),
         b'f' => lookup_multiblock_2d(blocks, AtriumBlocks::Pole, [cube.z - 1, 0]),
         _ => panic!(
             "Unrecognized block character {:?}",
@@ -408,7 +408,7 @@ enum AtriumBlocks {
 
     // Decorations
     Pole,
-    Firepot,
+    Brazier,
 }
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 enum BannerColor {
@@ -441,7 +441,7 @@ impl fmt::Display for AtriumBlocks {
             AtriumBlocks::BannerBottomAccent => write!(f, "banner/bottom-accent"),
 
             AtriumBlocks::Pole => write!(f, "pole"),
-            AtriumBlocks::Firepot => write!(f, "firepot"),
+            AtriumBlocks::Brazier => write!(f, "firepot"),
         }
     }
 }
@@ -684,8 +684,8 @@ async fn install_atrium_blocks(
                 .display_name("Pole")
                 .voxels_fn((Resolution::R16 * MULTIBLOCK_SCALE).unwrap(), &pole_fn)?
                 .build_txn(txn),
-            AtriumBlocks::Firepot => Block::builder()
-                .display_name("Firepot")
+            AtriumBlocks::Brazier => Block::builder()
+                .display_name("Brazier")
                 .animation_hint(block::AnimationHint::redefinition(
                     block::AnimationChange::Shape,
                 ))
