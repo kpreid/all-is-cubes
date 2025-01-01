@@ -3,6 +3,7 @@
 use core::fmt;
 
 use euclid::default::Vector3D;
+use euclid::vec3;
 
 /// Acts as polyfill for float methods
 #[cfg(not(any(feature = "std", test)))]
@@ -157,6 +158,23 @@ impl PackedLight {
             status,
         } = self;
         [r, g, b, status as u8]
+    }
+
+    /// Undoes the transformation of [`Self::as_texel()`].
+    /// For testing only.
+    #[doc(hidden)]
+    #[track_caller]
+    pub fn from_texel([r, g, b, s]: [u8; 4]) -> Self {
+        Self {
+            value: vec3(r, g, b),
+            status: match s {
+                0 => LightStatus::Uninitialized,
+                1 => LightStatus::NoRays,
+                128 => LightStatus::Opaque,
+                255 => LightStatus::Visible,
+                _ => panic!("invalid status value {s}"),
+            },
+        }
     }
 
     /// Computes a degree of difference between two [`PackedLight`] values, used to decide

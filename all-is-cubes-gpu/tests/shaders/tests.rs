@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use all_is_cubes::math::{ps64, GridSize, Rgb};
+use all_is_cubes::math::{ps64, GridAab, GridSize, Rgb, Vol};
 use all_is_cubes::raycast::scale_to_integer_step;
-use all_is_cubes::space::Space;
-use all_is_cubes::universe::Universe;
-use all_is_cubes::util::YieldProgress;
+use all_is_cubes::space::{PackedLight, Space};
 
 use all_is_cubes_gpu::in_wgpu::{init, LightChunk, LightTexture};
 
@@ -80,37 +78,32 @@ async fn scale_to_integer_step_test() {
 #[rstest::rstest]
 async fn light_texture_write_read(
     #[values(false, true)] use_scatter: bool,
-    #[values(16, 30, 50)] space_size_param: u32,
+    #[values(16, 19, 30, 50)] space_size_param: u32,
 ) {
-    let ((device, queue), (_universe, space, dark_space)) = tokio::join!(
-        async {
-            let instance = crate::harness::instance().await;
-            let adapter = init::create_adapter_for_test(instance).await;
-            let (device, queue) = adapter
-                .request_device(&wgpu::DeviceDescriptor::default(), None)
-                .await
-                .expect("failed to request_device");
-            let device = Arc::new(device);
-            (device, queue)
-        },
-        async {
-            let mut universe = Universe::new();
-            // TODO: the test would be more rigorous with a precise size rather than the rounding
-            // that lighting_bench_space() does.
-            let space = all_is_cubes::content::testing::lighting_bench_space(
-                &mut universe,
-                YieldProgress::noop(),
-                GridSize::splat(space_size_param),
-            )
-            .await
-            .unwrap();
+    use all_is_cubes::block::AIR;
 
-            // Create a second space which is identical except that it has zero light.
-            let dark_space = Space::builder(space.bounds()).sky_color(Rgb::ZERO).build();
+    let instance = crate::harness::instance().await;
+    let adapter = init::create_adapter_for_test(instance).await;
+    let (device, queue) = adapter
+        .request_device(&wgpu::DeviceDescriptor::default(), None)
+        .await
+        .expect("failed to request_device");
+    let device = Arc::new(device);
 
-            (universe, space, dark_space)
-        }
-    );
+    let bounds = GridAab::from_lower_size([-10, 0, 0], GridSize::splat(space_size_param));
+    // Create a space with well-defined (though nonsensical) light data.
+    let space = Space::builder(bounds)
+        .palette_and_contents(
+            [AIR],
+            Vol::repeat(bounds, 0),
+            Some(Vol::from_fn(bounds, |cube| {
+                PackedLight::from_texel([cube.x as u8, cube.y as u8, cube.z as u8, 255])
+            })),
+        )
+        .unwrap()
+        .build();
+    // Create a second space which is identical except that it has zero light.
+    let dark_space = Space::builder(bounds).sky_color(Rgb::ZERO).build();
 
     let mut lt = LightTexture::new(
         "light_texture_write_test",
