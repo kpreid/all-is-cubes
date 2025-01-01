@@ -166,8 +166,12 @@ impl LightTexture {
         // Round up to a multiple of LIGHT_CHUNK_SIZE;
         // this part is for the sake of the implementation of updating rather than because
         // we need the data.
+        // We also have to add 1 chunk size to allow for separate chunks on opposite faces of
+        // the bounds.
         let chunked_size =
-            visually_needed_size.zip(LIGHT_CHUNK_SIZE.cast_unit(), |ss, cs| ss.div_ceil(cs) * cs);
+            visually_needed_size.zip(LIGHT_CHUNK_SIZE.cast_unit(), |space_size, chunk_size| {
+                (space_size.saturating_add(chunk_size)).div_ceil(chunk_size) * chunk_size
+            });
 
         // Limit to wgpu limits, rounded down to chunk.
         chunked_size.min(
@@ -251,6 +255,8 @@ impl LightTexture {
         else {
             return 0;
         };
+
+        let region = round_up_to_light_chunk_size(region);
 
         match self.mapped_region.intersection_cubes(region) {
             Some(intersection) if !intersection.is_empty() => {
@@ -502,6 +508,26 @@ impl LightTexture {
     pub(crate) fn texture_view(&self) -> &Identified<wgpu::TextureView> {
         &self.texture_view
     }
+}
+
+fn round_up_to_light_chunk_size(region: GridAab) -> GridAab {
+    GridAab::from_lower_upper(
+        region
+            .lower_bounds()
+            .to_vector()
+            .zip(LIGHT_CHUNK_SIZE_I32.to_vector(), |coord, scale| {
+                coord.div_euclid(scale) * scale
+            })
+            .to_point(),
+        region
+            .upper_bounds()
+            .to_vector()
+            .zip(LIGHT_CHUNK_SIZE_I32.to_vector(), |p: i32, scale: i32| {
+                // there is no "div_euclid_ceil" so do it ourselves
+                p.saturating_add(scale - 1).div_euclid(scale) * scale
+            })
+            .to_point(),
+    )
 }
 
 /// Split `space_range` into two parts if needed to provide wrap-around.
