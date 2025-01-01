@@ -686,6 +686,9 @@ async fn install_atrium_blocks(
                 .build_txn(txn),
             AtriumBlocks::Firepot => Block::builder()
                 .display_name("Firepot")
+                .animation_hint(block::AnimationHint::redefinition(
+                    block::AnimationChange::Shape,
+                ))
                 .voxels_handle(resolution, {
                     let mut space = Space::for_block(resolution).build();
                     // Use a darker color to dampen the effect of interior light
@@ -705,9 +708,8 @@ async fn install_atrium_blocks(
                             }
                         },
                     )?;
-                    let fire_inset = 2;
-                    if false {
-                        // TODO: Actually enable the fire. We need graphics optimizations for animation first, or this will swamp chunk updating capacity.
+                    {
+                        let fire_inset = 2;
                         let bounds = GridAab::from_lower_upper(
                             // Vertical overlap will be overwritten, making a bowl shape
                             [fire_inset, resolution_g / 2 - 2, fire_inset],
