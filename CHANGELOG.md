@@ -6,33 +6,61 @@
 
 - `all-is-cubes` library:
     - Block inventories are now more functional.
-        - `block::Block::with_inventory` attaches inventory to a block.
+        - `block::EvaluatedBlock::with_inventory()` attaches inventory to a block.
         - `inv::InvInBlock`, stored in `block::BlockAttributes::inventory`, describes the size and rendering such inventories should have.
+    - `block::EvaluatedBlock::block()` returns the original block that was evaluated.
     - `block::Modifier::Attributes` allows overriding block attributes.
+
     - `listen::Store` and `listen::StoreLock` help implement `Listener` with less boilerplate.
-    - `math::Face6::rotation_from_nz()` produces the same transformation as `Face6::face_transform()`, but expressed as a rotation value.
+    
+    - `math::Aab` now implements `Eq`.
     - `math::Aab::union()`.
     - `math::Aab::union_point()`.
+    - `math::Cube` implements `core::ops::Add<Face6>` to obtain adjacent cubes.
+    - `math::Face6::rotation_from_nz()` produces the same transformation as `Face6::face_transform()`, but expressed as a rotation value.
+    - `math::PositiveSign` is a floating-point numeric type restricted to values which have a positive sign bit.
+    - `math::ZeroOne` is a floating-point numeric type restricted to values between 0.0 and 1.0.
+    
     - `op::Operation::Alt` allows operations to try alternatives.
+    - `op::Operation::Replace` allows replacing a specific block and not any other.
+    - `op::Operation::StartMove` allows setting up an animated move into an adjacent cube.
+
+    - `time::Schedule` describes the timing of repeated events, now used in `block::TickAction` and `block::Move`.
 
 - `all-is-cubes-mesh` library:
+    - Is now `no_std` compatible, if the `dynamic` feature is not enabled.
     - `BlockMesh::bounding_box()`
     - `SpaceMesh::bounding_box()`
 
+- `all-is-cubes-render` library:
+    - `Resolution` implements `RtBlockData`.
+
+- `all-is-cubes-ui` library:
+    - Is now `no_std` compatible, if the `session` feature is not enabled.
+
 ### Changed
+
+- Graphics:
+    - The handling of voxels with light emission is now more consistent.
+      In particular, emission is *not* modified by alpha; it always describes light emitted from the surface of the material regardless of the alpha, or transmittance, of the volume behind that surface.
 
 - `all-is-cubes` library:
     - `block::EvaluatedBlock`’s fields are now private. Use methods instead.
     - `block::EvaluatedBlock::voxel_opacity_mask` now has its own data type, `VoxelOpacityMask`.
     - `block::EvalBlockError` is now a `struct` with an inner `ErrorKind` enum, instead of an enum, and contains more information.
+    - `block::Evoxels` is no longer an enum; use its constructors and accessor functions instead.
     - `block::Move`’s means of construction have been changed to be more systematic and orthogonal. In particular, paired moves are constructed from unpaired ones.
+    - The interactions of `Move` and `Composite` with other block modifiers occurring after them, and attributes such as `tick_action` have been redesigned and should be more consistent, though not yet entirely free of quirks.
+    - `block::TickAction`’s `period` field is now of type `time::Schedule`
 
     - The `listen` module is now a reexport of the separate library [`nosy`](https://docs.rs/nosy).
       Many items have changed in name and signature.
 
     - `math::FaceMap::repeat()` has been renamed to `splat()`, for consistency with the same concept in the `euclid` vector types which we use.
-    * `math::Geometry` is now `math::Wireframe`, and its `translate()` method has been replaced with inherent methods on its implementors.
+    - `math::Geometry` is now `math::Wireframe`, and its `translate()` method has been replaced with inherent methods on its implementors.
     - `math::GridAab::expand()` now takes unsigned values; use `GridAab::shrink()` instead of negative ones. This allows both versions to never panic.
+    - `math::{Rgb, Rgba}` now use more restricted numeric types for their components, `math::PositiveSign` and `math::ZeroOne`.
+      This prevents various arithmetic edge cases from arising.
     - `math::Vol::subdivide()` now returns an array instead of a tuple, and the `Vol<&mut [_]>` version takes a filter function.
       The filter should make it easier to use in cases where the mutable subdivisions need to meet some size condition.
 
@@ -58,6 +86,12 @@
 
 - `all-is-cubes-render` library:
     - The trait method `raytracer::Accumulate::add()` now accepts the surface color via a `ColorBuf` (which acts essentially as a form of premultiplied alpha) rather than `Rgba`. This enables more consistent handling of emissive materials. See the method documentation for details.
+    - Raytracer update operations return whether any changes were actually found.
+      This can be used to avoid rerendering an unchanged scene.
+
+- `all-is-cubes-ui` library:
+    - Visual changes:
+        - Better dialog box backgrounds, and addition of titles.
 
 ### Removed
 
