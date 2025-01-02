@@ -1,6 +1,6 @@
 # Changelog
 
-## Unrelased
+## 0.9.0 (2025-01-01)
 
 ### Added
 
