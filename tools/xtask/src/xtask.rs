@@ -113,8 +113,12 @@ enum XtaskCommand {
         #[arg(default_value = "latest")]
         to: UpdateTo,
 
+        /// Passes `--dry-run` to `cargo update`, causing it not to actually change the lock files.
         #[arg(long)]
         dry_run: bool,
+
+        /// Additional arguments to pass unchanged to each of the `cargo update` commands.
+        additional_args: Vec<String>,
     },
 
     /// Set the version number of all packages and their dependencies on each other.
@@ -327,11 +331,16 @@ fn main() -> Result<(), ActionError> {
 
             build_web(&config, &mut time_log, Profile::Release)?;
         }
-        XtaskCommand::Update { to, dry_run } => {
-            let mut options: Vec<&str> = Vec::new();
+        XtaskCommand::Update {
+            to,
+            dry_run,
+            additional_args,
+        } => {
+            let mut cargo_update_args: Vec<&str> = Vec::new();
             if dry_run {
-                options.push("--dry-run");
+                cargo_update_args.push("--dry-run");
             }
+            cargo_update_args.extend(additional_args.iter().map(|s| s.as_str()));
 
             match to {
                 UpdateTo::Locked => {
@@ -341,7 +350,11 @@ fn main() -> Result<(), ActionError> {
                     config.do_for_all_workspaces(|| {
                         // Note: The `fuzz` workspace lock file is ignored in version control.
                         // But we do want to occasionally update it anyway.
-                        config.cargo().arg("update").args(&options).run()?;
+                        config
+                            .cargo()
+                            .arg("update")
+                            .args(&cargo_update_args)
+                            .run()?;
                         Ok(())
                     })?;
                 }
@@ -350,7 +363,7 @@ fn main() -> Result<(), ActionError> {
                         // can't use cargo() to invoke rustup
                         cmd!(config.sh, "cargo +nightly")
                             .args(["update", "-Zdirect-minimal-versions"])
-                            .args(&options)
+                            .args(&cargo_update_args)
                             .run()?;
                         Ok(())
                     })?;
