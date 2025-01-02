@@ -3,7 +3,7 @@ All is Cubes (Desktop Edition)
 
 A “voxel game” where each block is made out of smaller blocks (one level of recursion).
 
-This is a work in progress; it's my very first project written in Rust, and I am aiming to duplicate and expand on my previous work [Cubes](https://github.com/kpreid/cubes/). For more information about the currently implemented functionality, see the [core library crate `all-is-cubes`.][all-is-cubes]
+This is a work in progress. For more information about the currently implemented functionality, see the [core library crate `all-is-cubes`.][all-is-cubes]
 
 This package is the “desktop edition” that you can build and run to “play the game” on your own computer, as much as there is one right now (you can only admire the scenery, and place and remove blocks). You can also consider running the [web version][all-is-cubes-server].
 
@@ -24,7 +24,7 @@ Your system must have these installed:
 Usage
 -----
 
-By default, running `all-is-cubes` will open a window with a newly created world containing various test cases (there is no saving yet). Run `all-is-cubes --help` to find out options, including different starting templates and different graphics modes (including a terminal-based mode).
+By default, running `all-is-cubes` will open a window with a newly created world containing various test cases. Run `all-is-cubes --help` to find out options, including different starting templates and different graphics modes (including a terminal-based mode).
 
 Stability and versioning
 ------------------------

@@ -52,7 +52,7 @@ Because of the complication of having some wasm-specific code, some commands for
 
 *   Wasm development server: `cargo xtask run-dev`
 
-*   Run the desktop/console game: `cargo run --bin all-is-cubes -- <options>`
+*   Run the desktop game: `cargo run --bin all-is-cubes -- <options>`
 
 *   Run the non-dev-mode game server: `cargo xtask run-game-server`
 

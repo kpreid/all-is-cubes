@@ -3,7 +3,7 @@ All is Cubes (Web Edition)
 
 A “voxel game” where each block is made out of smaller blocks (one level of recursion).
 
-This is a work in progress; it's my very first project written in Rust, and I am aiming to duplicate and expand on my previous work [Cubes](https://github.com/kpreid/cubes/). For more information about the currently implemented functionality, see the [core library crate `all-is-cubes`.][all-is-cubes]
+This is a work in progress. For more information about the currently implemented functionality, see the [core library crate `all-is-cubes`.][all-is-cubes]
 
 This crate is the “web edition”: it currently consists of a simple web server which serves the prebuilt WASM and JavaScript files for the game. Eventually I intend it to become a multiplayer (or at least remotely-saved-data) game server in addition to this, but none of that networking functionality is implemented at the monent.
 

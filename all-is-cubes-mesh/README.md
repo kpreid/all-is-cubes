@@ -6,11 +6,12 @@ Data structures and algorithms for converting [`all-is-cubes`] voxel data to tri
 All of the algorithms are independent of graphics API, but they require providing vertex and texture data types suitable for the API or data format you wish to use.
 
 If you are looking for a renderer which produces images,
-you may use the raytracer built in to [`all-is-cubes`],
-or send the meshes to a GPU with [`all-is-cubes-gpu`].
+you may send the meshes produced by `all-is-cubes-mesh` to a GPU with [`all-is-cubes-gpu`].
+you may use the raytracer in [`all-is-cubes-render`],
 
 [`all-is-cubes`]: https://crates.io/crates/all-is-cubes
 [`all-is-cubes-gpu`]: https://crates.io/crates/all-is-cubes-gpu
+[`all-is-cubes-render`]: https://crates.io/crates/all-is-cubes-render
 
 License
 -------

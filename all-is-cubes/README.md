@@ -3,16 +3,18 @@ All is Cubes
 
 A “voxel game” engine where each block is made out of smaller blocks (one level of recursion).
 
-This is a work in progress; it's my very first project written in Rust, and I am aiming to duplicate and expand on my previous work [Cubes](https://github.com/kpreid/cubes/). Currently implemented:
+This is a work in progress. Currently implemented:
 
 * Core data model of [Blocks] and [Spaces] (subject to change).
-* Rendering using a CPU-only raytracer. (See `all-is-cubes-gpu` for GPU.)
+* Some ways for these things to change and interact with each other.
+* Foundations of rendering using a CPU-only raytracer. (See `all-is-cubes-gpu` for GPU.)
 * 2D drawing into the voxel space, built on top of the [embedded-graphics] library.
 
 For more information on the capabilities, limitations, and requirements of the library,
 please consult [the crate documentation].
 
-This library is intended to be somewhat reusable for working with block/voxel data, but it does not currently have a particularly stable interface as I am still changing it as requirements are discovered.
+This library is intended to be somewhat reusable for working with block/voxel data,
+but its API is not stable and it makes many specific assumptions.
 
 [the crate documentation]: https://docs.rs/all-is-cubes/0.8.0/all_is_cubes/
 [Blocks]: https://docs.rs/all-is-cubes/0.8.0/all_is_cubes/block/enum.Block.html
