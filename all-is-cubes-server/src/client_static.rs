@@ -29,7 +29,7 @@ impl AicClientSource {
 
         Router::new()
             .route("/", static_service.clone())
-            .route("/*path", static_service)
+            .route("/{*path}", static_service)
     }
 }
 
