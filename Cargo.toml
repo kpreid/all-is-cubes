@@ -116,6 +116,8 @@ nosy = { version = "0.1.0", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 ordered-float = { version = "4.2.0", default-features = false }
 paste = {version = "1.0.15", default-features = false }
+# petgraph held back from 0.7.0 because it adds an upper version bound.
+# Should be fixed by unmerged <https://github.com/petgraph/petgraph/pull/714>.
 petgraph = { version = "0.6.2", default-features = false, features = ["graphmap"] }
 png-decoder = { version = "0.1.1", default-features = false } # used by all-is-cubes for no_std-compatible reading pngs
 png = { version = "0.17.6", default-features = false } # used by all-is-cubes-desktop for writing pngs
