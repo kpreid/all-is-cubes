@@ -83,6 +83,9 @@ pub enum Modifier {
     Move(Move),
 
     /// The block has an inventory (e.g. a chest, a dropped item, a machine).
+    ///
+    /// The effects this inventory has on the evaluation of this block are determined by
+    /// the [`InvInBlock`] stored in [`BlockAttributes::inventory`].
     Inventory(inv::Inventory),
 }
 
