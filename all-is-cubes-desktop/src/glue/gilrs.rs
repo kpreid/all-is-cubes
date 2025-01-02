@@ -38,6 +38,7 @@ pub(crate) fn apply_gilrs_events(gilrs: &mut gilrs::Gilrs, input_processor: &mut
                 log::debug!("Gamepad: {event:?}")
             }
             EventType::Dropped => {}
+            _ => {}
         }
     }
 }
