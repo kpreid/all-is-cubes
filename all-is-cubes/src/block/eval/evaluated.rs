@@ -299,6 +299,20 @@ impl EvaluatedBlock {
 
     // --- Other ---
 
+    #[doc(hidden)] // TODO: unclear if good public API, but public for fuzz testing
+    pub fn rotationally_symmetric(&self) -> bool {
+        let Self {
+            block,
+            attributes,
+            voxels,
+            derived: _, // since these are derived, checking them is unnecessary
+            cost: _,
+        } = self;
+        let symmetric = attributes.rotationally_symmetric() && voxels.resolution() == R1;
+        debug_assert!(symmetric || !block.rotationally_symmetric());
+        symmetric
+    }
+
     /// Check that the derived properties are consistent with the fundamental ones.
     ///
     /// This is public because it is used by `fuzz_block_eval`.

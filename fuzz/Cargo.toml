@@ -16,6 +16,7 @@ all-is-cubes-gpu = { path = "../all-is-cubes-gpu" }
 all-is-cubes-mesh = { path = "../all-is-cubes-mesh", features = ["arbitrary"] }
 arbitrary = { version = "1.4.1", features = ["derive"] }
 libfuzzer-sys = "0.4"
+pretty_assertions = { version = "1.2.0" }
 
 [patch.crates-io]
 # Here are some patches we might want to apply for development:
