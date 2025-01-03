@@ -4,12 +4,12 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::f64::consts::TAU;
 use core::fmt;
+use core::num::NonZero;
 
 use exhaust::Exhaust;
 
 use all_is_cubes::block::{self, Block, Resolution, RotationPlacementRule, Zoom, AIR};
 use all_is_cubes::character::Spawn;
-use all_is_cubes::color_block;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
@@ -21,6 +21,7 @@ use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes::{color_block, time};
 
 use crate::alg::{array_of_noise, four_walls, scale_color};
 use crate::Fire;
@@ -28,6 +29,10 @@ use crate::Fire;
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
 const IWALL: GridCoordinate = 1;
 const UWALL: GridSizeCoord = 1;
+
+/// If set, create a constantly moving light source instead of a fixed one.
+/// TODO: Make this a run-time controllable parameter (templates need a way to do that).
+const MOVING_LIGHT: bool = false;
 
 pub(crate) async fn atrium(
     universe: &mut Universe,
@@ -95,16 +100,18 @@ pub(crate) async fn atrium(
         .build();
 
     // "Directional" sky light source
-    space.fill_uniform(
-        space_bounds
-            .abut(Face6::PY, -1)
-            .unwrap()
-            .abut(Face6::PX, -6)
-            .unwrap()
-            .abut(Face6::PZ, -30) // TODO: we can shrink this once we manage to have denser ray distribution
-            .unwrap(),
-        &blocks[AtriumBlocks::Sun],
-    )?;
+    if !MOVING_LIGHT {
+        space.fill_uniform(
+            space_bounds
+                .abut(Face6::PY, -1)
+                .unwrap()
+                .abut(Face6::PX, -6)
+                .unwrap()
+                .abut(Face6::PZ, -30) // TODO: we can shrink this once we manage to have denser ray distribution
+                .unwrap(),
+            &blocks[AtriumBlocks::Sun],
+        )?;
+    }
 
     // Outer walls
     four_walls(
@@ -220,6 +227,24 @@ pub(crate) async fn atrium(
             )
         },
     )?;
+
+    if MOVING_LIGHT {
+        let mut movement = block::Move::new(Face6::PZ, 16, 16);
+        movement.schedule = time::Schedule::from_period(NonZero::new(2).unwrap());
+        let tick_action = block::TickAction {
+            operation: crate::animation::back_and_forth_movement(movement),
+            schedule: time::Schedule::from_period(NonZero::new(1).unwrap()),
+        };
+
+        space.set(
+            [0, 5, -10],
+            Block::builder()
+                .color(Rgba::WHITE)
+                .light_emission(rgb_const!(10., 10., 10.))
+                .tick_action(tick_action)
+                .build(),
+        )?;
+    }
 
     space.fast_evaluate_light();
 

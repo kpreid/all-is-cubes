@@ -1,6 +1,7 @@
 //! Algorithms for animating blocks.
 
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use core::f64::consts::TAU;
 use core::fmt;
 use core::time::Duration;
@@ -8,15 +9,17 @@ use core::time::Duration;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
-use all_is_cubes::behavior;
-use all_is_cubes::block::{Block, BlockCollision, AIR};
+use all_is_cubes::block::{self, Block, BlockCollision, AIR};
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{rgba_const, Cube, GridAab, GridPoint, GridVector, Rgba, Vol};
+use all_is_cubes::math::{
+    rgba_const, Cube, GridAab, GridPoint, GridRotation, GridVector, Rgba, Vol,
+};
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
+use all_is_cubes::{behavior, op};
 
 #[cfg(doc)]
 use all_is_cubes::time::TickSchedule;
@@ -306,4 +309,14 @@ impl behavior::Behavior<Space> for Clock {
 
 impl VisitHandles for Clock {
     fn visit_handles(&self, _visitor: &mut dyn HandleVisitor) {}
+}
+
+/// Returns an [`op::Operation`] which, if used as a [`block::TickAction`], causes the block
+/// to move back and forth between whatever obstacles it hits.
+pub(crate) fn back_and_forth_movement(movement: block::Move) -> op::Operation {
+    op::Operation::Alt(Arc::new([
+        op::Operation::StartMove(movement),
+        // If unable to move, turn around.
+        op::Operation::AddModifiers(Arc::new([block::Modifier::Rotate(GridRotation::RxYz)])),
+    ]))
 }
