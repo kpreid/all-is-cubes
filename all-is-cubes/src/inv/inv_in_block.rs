@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 
-use euclid::{Point3D, Vector3D};
+use euclid::Point3D;
 
 use crate::block::Resolution;
 use crate::math::{GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid};
@@ -135,7 +135,7 @@ impl InvInBlock {
             icon_resolution,
             icon_rows: icon_rows
                 .into_iter()
-                .map(|row| row.rotate(transform))
+                .filter_map(|row| row.rotate(transform))
                 .collect(),
         }
     }
@@ -186,18 +186,18 @@ impl crate::universe::VisitHandles for InvInBlock {
 }
 
 impl IconRow {
-    fn rotate(self, transform: Gridgid) -> Self {
+    /// Rotate this row.
+    /// Returns [`None`] if rotating it would cause numeric overflow.
+    fn rotate(self, transform: Gridgid) -> Option<Self> {
         // TODO: The icons themselves (not their positions) need to be rotated,
         // but this is not supported yet.
-        Self {
+        Some(Self {
             first_slot: self.first_slot,
             count: self.count,
-            origin: transform.transform_point(self.origin), // TODO: does not account for size of icon
-            stride: transform.rotation.transform_vector(
-                // Kludge: clamped to avoid numeric overflow of `i32::MIN`
-                self.stride.max(Vector3D::splat(-i32::MAX)),
-            ),
-        }
+            // TODO: does not account for size of icon
+            origin: transform.checked_transform_point(self.origin)?,
+            stride: transform.rotation.checked_transform_vector(self.stride)?,
+        })
     }
 }
 
@@ -281,6 +281,20 @@ mod tests {
                 (1, point3(0, 0, 5)),
                 (2, point3(5, 0, 5)),
             ]
+        );
+    }
+
+    #[test]
+    fn rotate_row_overflow() {
+        assert_eq!(
+            IconRow {
+                first_slot: 0,
+                count: 10,
+                origin: GridPoint::new(1397969747, -2147483648, 255827,),
+                stride: GridVector::new(134767872, 2820644, 7285711,),
+            }
+            .rotate(Gridgid::from_rotation_about_origin(GridRotation::Rxyz)),
+            None,
         );
     }
 }
