@@ -305,10 +305,13 @@ impl Operation {
                 // TODO: cheaper placeholder value, like an Operation::Nop
                 let mut placeholder = Operation::Become(AIR);
                 for (cube_ref, op_ref) in Arc::make_mut(&mut neighbors) {
-                    *cube_ref = rotation
-                        .transform_vector(cube_ref.lower_bounds().to_vector())
-                        .to_point()
-                        .into();
+                    match rotation.checked_transform_vector(cube_ref.lower_bounds().to_vector()) {
+                        Some(vector) => *cube_ref = vector.to_point().into(),
+                        // TODO: instead of silently making the operation impossible,
+                        // have a path to flag this numeric overflow error
+                        None => return Operation::Alt(Arc::new([])),
+                    }
+
                     let op = mem::replace(op_ref, placeholder);
                     placeholder = mem::replace(op_ref, op.rotate(rotation));
                 }
