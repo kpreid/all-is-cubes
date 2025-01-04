@@ -1,6 +1,8 @@
-use crate::math::{Cube, GridMatrix, GridPoint, GridRotation, GridVector};
+use euclid::Vector3D;
+
 #[cfg(doc)]
-use crate::math::{GridAab, GridCoordinate};
+use crate::math::GridAab;
+use crate::math::{Cube, GridCoordinate, GridMatrix, GridPoint, GridRotation, GridVector};
 
 /// A [rigid transformation] that is composed of a [`GridRotation`] followed by an
 /// integer-valued translation.
@@ -69,8 +71,27 @@ impl Gridgid {
     /// Note that a point is not a unit cube; if the point identifies a cube then use
     /// [`Gridgid::transform_cube()`] instead.
     #[inline]
+    #[track_caller]
     pub fn transform_point(self, point: GridPoint) -> GridPoint {
-        (self.rotation.transform_vector(point.to_vector()) + self.translation).to_point()
+        self.checked_transform_point(point)
+            .expect("transformed point overflowed")
+    }
+
+    /// Applies this transform to the given point.
+    /// Returns [`None`] if the resulting point is out of bounds.
+    ///
+    /// Note that a point is not a unit cube; if the point identifies a cube then use
+    /// [`Gridgid::transform_cube()`] instead.
+    #[inline]
+    pub fn checked_transform_point(self, point: GridPoint) -> Option<GridPoint> {
+        Some(
+            transpose_vector_option(
+                self.rotation
+                    .checked_transform_vector(point.to_vector())?
+                    .zip(self.translation, GridCoordinate::checked_add),
+            )?
+            .to_point(),
+        )
     }
 
     /// Equivalent to temporarily applying an offset of `[0.5, 0.5, 0.5]` while
@@ -146,6 +167,10 @@ impl From<Gridgid> for GridMatrix {
     fn from(value: Gridgid) -> Self {
         value.to_matrix()
     }
+}
+
+fn transpose_vector_option<T, U>(v: Vector3D<Option<T>, U>) -> Option<Vector3D<T, U>> {
+    Some(Vector3D::new(v.x?, v.y?, v.z?))
 }
 
 #[cfg(test)]

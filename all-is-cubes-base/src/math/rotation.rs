@@ -395,27 +395,31 @@ impl GridRotation {
     #[inline]
     #[track_caller]
     pub fn transform_vector(self, vector: GridVector) -> GridVector {
-        #[inline(always)]
-        fn inner(rotation: GridRotation, vector: GridVector) -> Option<GridVector> {
-            let basis = rotation.to_basis();
-
-            let mut result = GridVector::zero();
-            result[basis.x.axis()] = vector.x.checked_mul(basis.x.signum())?;
-            result[basis.y.axis()] = vector.y.checked_mul(basis.y.signum())?;
-            result[basis.z.axis()] = vector.z.checked_mul(basis.z.signum())?;
-
-            Some(result)
-        }
-
         // Shared handling to print the vector, and also to generate only one set of panic code
         // rather than three.
         // TODO: when overflow_checks disabled, don't panic
-        match inner(self, vector) {
+        match self.checked_transform_vector(vector) {
             Some(v) => v,
             None => panic!(
                 "overflow due to sign change in GridVector::transform_vector({self:?}, {vector:?})"
             ),
         }
+    }
+
+    /// Rotate the vector by this rotation.
+    ///
+    /// Returns [`None`] if `vector` has any components equal to [`GridCoordinate::MIN`],
+    /// which would overflow.
+    #[inline]
+    pub fn checked_transform_vector(self, vector: GridVector) -> Option<GridVector> {
+        let basis = self.to_basis();
+
+        let mut result = GridVector::zero();
+        result[basis.x.axis()] = vector.x.checked_mul(basis.x.signum())?;
+        result[basis.y.axis()] = vector.y.checked_mul(basis.y.signum())?;
+        result[basis.z.axis()] = vector.z.checked_mul(basis.z.signum())?;
+
+        Some(result)
 
         // Implementation note: The following code would seem to be simpler and avoid
         // a zero initialization,
