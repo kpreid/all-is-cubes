@@ -513,7 +513,7 @@ pub async fn install_demo_blocks(
                 .tick_action(TickAction {
                     operation: Operation::Alt(
                         [
-                            Operation::StartMove(block::Move::new(Face6::PY, 0, 32)),
+                            Operation::StartMove(block::Move::new(Face6::PY, 32, 32)),
                             // if we can't move, vanish
                             Operation::Become(AIR),
                         ]
