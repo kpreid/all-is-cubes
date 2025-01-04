@@ -610,7 +610,7 @@ pub(in crate::block) fn render_inventory(
     let config = input.attributes().inventory.clone();
 
     for (slot_index, icon_position) in config.icon_positions(inventory.slots.len()) {
-        let Some(placed_icon_bounds) = GridAab::from_lower_size(
+        let Some(placed_icon_bounds) = GridAab::checked_from_lower_size(
             icon_position,
             GridSize::splat(
                 (config.icon_resolution / config.icon_scale)
@@ -618,7 +618,8 @@ pub(in crate::block) fn render_inventory(
                     .into(),
             ),
         )
-        .intersection_cubes(GridAab::for_block(config.icon_resolution)) else {
+        .ok()
+        .and_then(|b| b.intersection_cubes(GridAab::for_block(config.icon_resolution))) else {
             // Icon's position doesn't intersect the block's bounds.
             continue;
         };
