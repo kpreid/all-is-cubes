@@ -256,15 +256,21 @@ impl Operation {
         }
     }
 
+    /// Returns whether this operation has the same effect regardless of how the
+    /// [`Operation`] is transformed before being applied to the blocks.
     pub(crate) fn rotationally_symmetric(&self) -> bool {
         match self {
-            // TODO: should ask if contained blocks are relevantly symmetric
             Operation::Alt(ops) => ops.iter().all(Operation::rotationally_symmetric),
-            Operation::Become(_) => false,
-            Operation::DestroyTo(_) => false,
-            Operation::Replace { .. } => false,
-            Operation::AddModifiers(_) => true, // TODO: there is not a general notion of rotating a modifier, but probably there should be
-            Operation::StartMove(_) => true,    // all moves are directional
+            Operation::Become(block) => block.rotationally_symmetric(),
+            Operation::DestroyTo(block) => block.rotationally_symmetric(),
+            Operation::Replace {
+                old,
+                new,
+                conserved: _,
+                optional: _,
+            } => old.rotationally_symmetric() && new.rotationally_symmetric(),
+            Operation::AddModifiers(_) => false, // TODO: We need to ask modifiers if they are symmetric (*not* Modifier::does_not_introduce_asymmetry)
+            Operation::StartMove(_) => false,
             Operation::Neighbors(_) => false,
         }
     }
@@ -619,4 +625,6 @@ mod tests {
             ),
         );
     }
+
+    // TODO: Add tests for Operation::rotationally_symmetric(), preferably systematic ones.
 }
