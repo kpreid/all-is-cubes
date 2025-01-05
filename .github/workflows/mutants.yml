@@ -8,6 +8,8 @@ on: [workflow_dispatch]
 
 env:
   CARGO_TERM_COLOR: always
+  # This will cause a test to fail if it has a dependence on a system/user config file.
+  AIC_DO_NOT_USE_CONFIG_FILES_IN_TESTS: 1
 
 jobs:
   mutants:

@@ -10,6 +10,7 @@ fn gltf_round_trip_test(args: &[&str]) {
     let gltf_path = temp_dir.path().join("output.gltf");
 
     let output = process::Command::new(env!("CARGO_BIN_EXE_all-is-cubes"))
+        .env("AIC_DO_NOT_USE_CONFIG_FILES_IN_TESTS", "1")
         .arg("--no-config-files")
         .arg("--graphics=record")
         .arg("--output")

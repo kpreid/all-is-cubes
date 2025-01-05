@@ -35,6 +35,8 @@ env:
   # artifacts, so they won't be useful for anything (other than maybe the exhaustive
   # builds with different features).
   CARGO_INCREMENTAL: 0
+  # This will cause a test to fail if it has a dependence on a system/user config file.
+  AIC_DO_NOT_USE_CONFIG_FILES_IN_TESTS: 1
 
 jobs:
   build:
