@@ -34,13 +34,14 @@ where
     // Modify graphics options to suit recording
     // TODO: Find a better place to put this policy, and in particular allow the user to
     // override it if they do want to record the UI.
-    dsession
-        .session
-        .settings()
-        .mutate_graphics_options(|graphics_options| {
-            graphics_options.show_ui = false;
-            graphics_options.debug_info_text = false;
-        });
+    let settings = dsession.session.settings();
+    // TODO: instead of blanket disinheriting, there should be a way to set explicitly ephemeral
+    // settings.
+    settings.disinherit();
+    settings.mutate_graphics_options(|graphics_options| {
+        graphics_options.show_ui = false;
+        graphics_options.debug_info_text = false;
+    });
 
     Ok(())
 }

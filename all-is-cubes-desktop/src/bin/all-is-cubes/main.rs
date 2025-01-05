@@ -13,6 +13,7 @@ use clap::{CommandFactory as _, Parser as _};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen;
 use all_is_cubes_render::camera::{GraphicsOptions, Viewport};
+use all_is_cubes_ui::apps::Settings;
 
 #[cfg(feature = "record")]
 use all_is_cubes_desktop::record;
@@ -81,8 +82,8 @@ fn main() -> Result<(), anyhow::Error> {
             }
         })?;
 
-    let graphics_options = if no_config_files {
-        GraphicsOptions::default()
+    let settings = if no_config_files {
+        Settings::new(Arc::new(GraphicsOptions::default()))
     } else {
         load_config().context("Error loading configuration files")?
     };
@@ -104,14 +105,13 @@ fn main() -> Result<(), anyhow::Error> {
     let mut session = runtime.block_on(
         Session::builder()
             .ui(viewport_cell.as_source())
+            .settings_from(settings)
             .quit(Arc::new(|| {
                 // TODO: command the event loop to exit instead
                 std::process::exit(0)
             }))
             .build(),
     );
-    // TODO: this code should live in the lib
-    session.settings().set_graphics_options(graphics_options);
     universe_task.attach_to_session(&mut session);
     let session_done_time = Instant::now();
     log::debug!(
