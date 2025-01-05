@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `all-is-cubes-ui` library:
+    - `apps::Settings` manages user-editable settings that eventually will be more than just the graphics options.
+    - `apps::SessionBuilder::settings()` links a possibly-shared `Settings` to the created session.
+
+### Changed
+
+- `all-is-cubes-ui` library:
+    - `apps::Session::settings()` replaces `graphics_options_mut()`.
+
 ## 0.9.0 (2025-01-01)
 
 ### Added

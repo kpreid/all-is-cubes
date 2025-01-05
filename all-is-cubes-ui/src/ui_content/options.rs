@@ -169,13 +169,10 @@ fn graphics_toggle_button(
             move || {
                 let getter = getter.clone();
                 let setter = setter.clone();
-                let _ignore_errors = cc.send(ControlMessage::ModifyGraphicsOptions(Box::new(
-                    move |mut g| {
-                        let mg = Arc::make_mut(&mut g);
-                        setter(mg, !getter(mg));
-                        g
-                    },
-                )));
+                let _ignore_errors =
+                    cc.send(ControlMessage::ModifySettings(Box::new(move |settings| {
+                        settings.mutate_graphics_options(|go| setter(go, !getter(go)))
+                    })));
             }
         },
     );
@@ -219,14 +216,11 @@ fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'stati
                             let cc = hud_inputs.app_control_channel.clone();
                             move || {
                                 let value = value2.clone();
-                                let _ignore_errors =
-                                    cc.send(ControlMessage::ModifyGraphicsOptions(Box::new(
-                                        move |mut g| {
-                                            let mg = Arc::make_mut(&mut g);
-                                            setter(mg, value);
-                                            g
-                                        },
-                                    )));
+                                let _ignore_errors = cc.send(ControlMessage::ModifySettings(
+                                    Box::new(move |settings| {
+                                        settings.mutate_graphics_options(|go| setter(go, value))
+                                    }),
+                                ));
                             }
                         },
                     );

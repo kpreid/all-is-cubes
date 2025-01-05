@@ -3,7 +3,6 @@
     reason = "false positive; TODO: remove after Rust 1.84 is released"
 )]
 
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::time::Duration;
 use std::collections::{HashMap, HashSet};
@@ -15,11 +14,10 @@ use all_is_cubes::math::{zo32, FreeCoordinate, FreeVector};
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes_render::camera::{
-    FogOption, GraphicsOptions, LightingOption, NdcPoint2, NominalPixel, RenderMethod,
-    TransparencyOption, Viewport,
+    FogOption, LightingOption, NdcPoint2, NominalPixel, RenderMethod, TransparencyOption, Viewport,
 };
 
-use crate::apps::ControlMessage;
+use crate::apps::{ControlMessage, Settings};
 
 type MousePoint = Point2D<f64, NominalPixel>;
 
@@ -295,7 +293,7 @@ impl InputProcessor {
             universe,
             character: character_opt,
             paused: paused_opt,
-            graphics_options,
+            settings,
             control_channel,
             ui,
         } = targets;
@@ -349,10 +347,9 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('i') => {
-                    if let Some(cell) = graphics_options {
-                        cell.update_mut(|options| {
-                            Arc::make_mut(options).lighting_display = match options.lighting_display
-                            {
+                    if let Some(settings) = settings {
+                        settings.mutate_graphics_options(|options| {
+                            options.lighting_display = match options.lighting_display {
                                 LightingOption::None => LightingOption::Flat,
                                 LightingOption::Flat => LightingOption::Smooth,
                                 LightingOption::Smooth => LightingOption::None,
@@ -371,9 +368,9 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('o') => {
-                    if let Some(cell) = graphics_options {
-                        cell.update_mut(|options| {
-                            Arc::make_mut(options).transparency = match options.transparency {
+                    if let Some(settings) = settings {
+                        settings.mutate_graphics_options(|options| {
+                            options.transparency = match options.transparency {
                                 TransparencyOption::Surface => TransparencyOption::Volumetric,
                                 TransparencyOption::Volumetric => {
                                     TransparencyOption::Threshold(zo32(0.5))
@@ -391,9 +388,9 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('u') => {
-                    if let Some(cell) = graphics_options {
-                        cell.update_mut(|options| {
-                            Arc::make_mut(options).fog = match options.fog {
+                    if let Some(settings) = settings {
+                        settings.mutate_graphics_options(|options| {
+                            options.fog = match options.fog {
                                 FogOption::None => FogOption::Abrupt,
                                 FogOption::Abrupt => FogOption::Compromise,
                                 FogOption::Compromise => FogOption::Physical,
@@ -404,9 +401,9 @@ impl InputProcessor {
                     }
                 }
                 Key::Character('y') => {
-                    if let Some(cell) = graphics_options {
-                        cell.update_mut(|options| {
-                            Arc::make_mut(options).render_method = match options.render_method {
+                    if let Some(settings) = settings {
+                        settings.mutate_graphics_options(|options| {
+                            options.render_method = match options.render_method {
                                 RenderMethod::Mesh => RenderMethod::Reference,
                                 RenderMethod::Reference => RenderMethod::Mesh,
                                 _ => RenderMethod::Reference,
@@ -492,7 +489,7 @@ pub(crate) struct InputTargets<'a> {
     pub universe: Option<&'a mut Universe>,
     pub character: Option<&'a Handle<Character>>,
     pub paused: Option<&'a listen::Cell<bool>>,
-    pub graphics_options: Option<&'a listen::Cell<Arc<GraphicsOptions>>>,
+    pub settings: Option<&'a Settings>,
     // TODO: replace cells with control channel?
     // TODO: make the control channel a type alias?
     pub control_channel: Option<&'a flume::Sender<ControlMessage>>,
@@ -534,7 +531,7 @@ mod tests {
                 universe: Some(universe),
                 character: Some(character),
                 paused: None,
-                graphics_options: None,
+                settings: None,
                 control_channel: None,
                 ui: None,
             },
@@ -583,7 +580,7 @@ mod tests {
             &InputProcessor::new(),
             listen::constant(None),
             paused.as_source(),
-            listen::constant(Arc::new(GraphicsOptions::default())),
+            listen::constant(Default::default()),
             cctx,
             listen::constant(Viewport::ARBITRARY),
             listen::constant(None),

@@ -554,9 +554,7 @@ pub(crate) async fn create_session(
         })
         .build()
         .await;
-    session
-        .graphics_options_mut()
-        .set(Arc::new(graphics_options));
+    session.settings().set_graphics_options(graphics_options);
     (session, viewport_cell, fullscreen_cell)
 }
 

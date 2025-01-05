@@ -37,7 +37,7 @@ use all_is_cubes_render::camera::{
     GraphicsOptions, Layers, StandardCameras, UiViewState, Viewport,
 };
 
-use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets};
+use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets, Settings};
 use crate::ui_content::notification::{self, Notification};
 use crate::ui_content::Vui;
 
@@ -106,7 +106,7 @@ pub struct Session<I> {
 /// might also be moved to a background task to allow the session stepping to occur independent
 /// of the event loop or other owner of the `Session`.
 struct Shuttle {
-    graphics_options: listen::Cell<Arc<GraphicsOptions>>,
+    settings: Settings,
 
     game_universe: Universe,
 
@@ -159,7 +159,7 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
             return Ok(());
         };
         let Shuttle {
-            graphics_options,
+            settings,
             game_universe,
             game_universe_info,
             game_character,
@@ -175,7 +175,7 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
         f.debug_struct("Session")
             .field("frame_clock", frame_clock)
             .field("input_processor", input_processor)
-            .field("graphics_options", graphics_options)
+            .field("settings", settings)
             .field("game_universe", game_universe)
             .field("game_universe_info", game_universe_info)
             .field("game_character", game_character)
@@ -285,12 +285,14 @@ impl<I: time::Instant> Session<I> {
 
     /// Allows reading, and observing changes to, the current graphics options.
     pub fn graphics_options(&self) -> listen::DynSource<Arc<GraphicsOptions>> {
-        self.shuttle().graphics_options.as_source()
+        self.shuttle().settings.as_source()
     }
 
-    /// Allows setting the current graphics options.
-    pub fn graphics_options_mut(&self) -> &listen::Cell<Arc<GraphicsOptions>> {
-        &self.shuttle().graphics_options
+    /// Allows changing the settings associated with this session.
+    ///
+    /// Note that these settings may be shared with other sessions.
+    pub fn settings(&self) -> &Settings {
+        &self.shuttle().settings
     }
 
     /// Returns a [`StandardCameras`] which may be used in rendering a view of this session,
@@ -340,7 +342,7 @@ impl<I: time::Instant> Session<I> {
                         universe: Some(&mut shuttle.game_universe),
                         character: shuttle.game_character.get().as_ref(),
                         paused: Some(&self.paused),
-                        graphics_options: Some(&shuttle.graphics_options),
+                        settings: Some(&shuttle.settings),
                         control_channel: Some(&self.control_channel_sender),
                         ui: shuttle.ui.as_ref(),
                     },
@@ -493,11 +495,8 @@ impl<I: time::Instant> Session<I> {
                     ControlMessage::ToggleMouselook => {
                         self.input_processor.toggle_mouselook_mode();
                     }
-                    ControlMessage::ModifyGraphicsOptions(f) => {
-                        let shuttle = self.shuttle();
-                        shuttle
-                            .graphics_options
-                            .set(f(shuttle.graphics_options.get()));
+                    ControlMessage::ModifySettings(function) => {
+                        function(&self.shuttle().settings);
                     }
                 },
                 Err(TryRecvError::Empty) => break,
@@ -632,8 +631,8 @@ impl<I: time::Instant> Session<I> {
         let fopt = StatusText {
             show: self
                 .shuttle()
-                .graphics_options
-                .get()
+                .settings
+                .get_graphics_options()
                 .debug_info_text_contents,
         };
 
@@ -766,6 +765,8 @@ pub struct SessionBuilder<I> {
     fullscreen_state: listen::DynSource<FullscreenState>,
     set_fullscreen: FullscreenSetter,
 
+    settings: Option<Settings>,
+
     quit: Option<QuitFn>,
 
     _instant: PhantomData<I>,
@@ -777,6 +778,7 @@ impl<I> Default for SessionBuilder<I> {
             viewport_for_ui: None,
             fullscreen_state: listen::constant(None),
             set_fullscreen: None,
+            settings: None,
             quit: None,
             _instant: PhantomData,
         }
@@ -794,13 +796,16 @@ impl<I: time::Instant> SessionBuilder<I> {
             viewport_for_ui,
             fullscreen_state,
             set_fullscreen,
+            settings,
             quit: quit_fn,
             _instant: _,
         } = self;
+
+        let settings = settings.unwrap_or_else(|| Settings::new(Default::default()));
+
         let game_universe = Universe::new();
         let game_character = listen::CellWithLocal::new(None);
         let input_processor = InputProcessor::new();
-        let graphics_options = listen::Cell::new(Arc::new(GraphicsOptions::default()));
         let paused = listen::Cell::new(false);
         let (control_send, control_recv) = flume::bounded(100);
 
@@ -816,7 +821,7 @@ impl<I: time::Instant> SessionBuilder<I> {
                             &input_processor,
                             game_character.as_source(),
                             paused.as_source(),
-                            graphics_options.as_source(),
+                            settings.as_source(),
                             control_send.clone(),
                             viewport,
                             fullscreen_state,
@@ -828,7 +833,7 @@ impl<I: time::Instant> SessionBuilder<I> {
                     None => None,
                 },
 
-                graphics_options,
+                settings,
                 game_character,
                 game_universe_info: listen::Cell::new(SessionUniverseInfo {
                     id: game_universe.universe_id(),
@@ -880,6 +885,15 @@ impl<I: time::Instant> SessionBuilder<I> {
         self
     }
 
+    /// Enable reading and writing user settings.
+    ///
+    /// If this is not called, then the session will have all default settings,
+    /// and they will not be persisted.
+    pub fn settings(mut self, settings: Settings) -> Self {
+        self.settings = Some(settings);
+        self
+    }
+
     /// Enable a “quit”/“exit” command in the session's user interface.
     ///
     /// This does not cause the session to self-destruct; rather, the provided callback
@@ -915,8 +929,7 @@ pub(crate) enum ControlMessage {
 
     ToggleMouselook,
 
-    /// TODO: this should be "modify user preferences", from which graphics options are derived.
-    ModifyGraphicsOptions(Box<dyn FnOnce(Arc<GraphicsOptions>) -> Arc<GraphicsOptions> + Send>),
+    ModifySettings(Box<dyn FnOnce(&Settings) + Send>),
 }
 
 impl fmt::Debug for ControlMessage {
@@ -929,9 +942,7 @@ impl fmt::Debug for ControlMessage {
             Self::EnterDebug => write!(f, "EnterDebug"),
             Self::TogglePause => write!(f, "TogglePause"),
             Self::ToggleMouselook => write!(f, "ToggleMouselook"),
-            Self::ModifyGraphicsOptions(_func) => f
-                .debug_struct("ModifyGraphicsOptions")
-                .finish_non_exhaustive(),
+            Self::ModifySettings(_func) => f.debug_struct("ModifySettings").finish_non_exhaustive(),
         }
     }
 }
@@ -1124,7 +1135,7 @@ impl MainTaskContext {
     pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
         self.with_ref(|shuttle| {
             StandardCameras::new(
-                shuttle.graphics_options.as_source(),
+                shuttle.settings.as_source(),
                 viewport_source,
                 shuttle.game_character.as_source(),
                 shuttle.ui_view(),
@@ -1146,6 +1157,13 @@ impl MainTaskContext {
         self.with_mut(|shuttle| {
             shuttle.set_universe(universe);
         })
+    }
+
+    /// Allows reading or changing the settings of this session.
+    ///
+    /// Note that these settings may be shared with other sessions.
+    pub fn settings(&self) -> Settings {
+        self.with_ref(|shuttle| shuttle.settings.clone())
     }
 
     /// Invoke the [`SessionBuilder::quit()`] callback as if the user clicked a quit button inside

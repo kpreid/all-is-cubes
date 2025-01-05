@@ -111,9 +111,7 @@ fn main() -> Result<(), anyhow::Error> {
             .build(),
     );
     // TODO: this code should live in the lib
-    session
-        .graphics_options_mut()
-        .set(Arc::new(graphics_options));
+    session.settings().set_graphics_options(graphics_options);
     universe_task.attach_to_session(&mut session);
     let session_done_time = Instant::now();
     log::debug!(
@@ -179,9 +177,8 @@ fn main() -> Result<(), anyhow::Error> {
                         .context("failed to create session")?;
                     if graphics_type == GraphicsType::WindowRt {
                         // TODO: improve on this kludge by just having a general cmdline graphics config
-                        dsession.session.graphics_options_mut().update_mut(|o| {
-                            Arc::make_mut(o).render_method =
-                                all_is_cubes_render::camera::RenderMethod::Reference;
+                        dsession.session.settings().mutate_graphics_options(|o| {
+                            o.render_method = all_is_cubes_render::camera::RenderMethod::Reference;
                         });
                     }
                     Ok(dsession)
