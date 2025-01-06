@@ -113,9 +113,8 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             // Note that this does NOT use the session's viewport_cell, so that the recording can
             // have a consistent, as-requested size, regardless of what other rendering might be
             // doing. (Of course, the UI will fail to adapt, but there isn't much to do about that.)
-            let recording_cameras = ctx.create_cameras(all_is_cubes::listen::constant(
-                record_options.viewport(),
-            ));
+            let recording_cameras =
+                ctx.create_cameras(all_is_cubes::listen::constant(record_options.viewport()));
 
             let recorder = ctx.with_universe(|universe| {
                 record::configure_universe_for_recording(

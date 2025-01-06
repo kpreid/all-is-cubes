@@ -14,8 +14,11 @@ pub fn load_config() -> Result<GraphicsOptions, anyhow::Error> {
     // TODO: allow users of this library function to pick their own config dir
 
     if std::env::var("AIC_DO_NOT_USE_CONFIG_FILES_IN_TESTS").is_ok() {
-        panic!("tests should be hermetic and not touch user config files \
-        (environment variable AIC_DO_NOT_USE_CONFIG_FILES_IN_TESTS set but --no-config-files not passed)");
+        panic!(
+            "tests should be hermetic and not touch user config files \
+            (environment variable AIC_DO_NOT_USE_CONFIG_FILES_IN_TESTS set, \
+            but --no-config-files not passed)"
+        );
     }
 
     let project_dirs = ProjectDirs::from("org.switchb", "", "all-is-cubes")

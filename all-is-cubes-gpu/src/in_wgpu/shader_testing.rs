@@ -140,7 +140,12 @@ where
         &device,
         &pipelines,
         &texture_view,
-        &in_wgpu::LightTexture::new("shader test space", &device, GridSize::splat(1), wgpu::TextureUsages::empty()),
+        &in_wgpu::LightTexture::new(
+            "shader test space",
+            &device,
+            GridSize::splat(1),
+            wgpu::TextureUsages::empty(),
+        ),
         in_wgpu::skybox::Skybox::new(&device, "shader test space").texture_view(),
     );
 
