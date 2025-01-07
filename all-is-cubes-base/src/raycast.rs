@@ -1,13 +1,5 @@
 use euclid::Vector3D;
 
-/// Acts as polyfill for float methods
-#[cfg(not(any(feature = "std", test)))]
-#[allow(
-    unused_imports,
-    reason = "unclear why this warns even though it is needed"
-)]
-use num_traits::float::Float as _;
-
 #[cfg(not(any(feature = "std", test)))]
 #[allow(
     unused_imports,
