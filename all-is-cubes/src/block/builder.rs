@@ -144,17 +144,23 @@ impl<P, Txn> Builder<P, Txn> {
     ///
     /// This will replace any previous color **or voxels.**
     pub fn color(self, color: impl Into<Rgba>) -> Builder<Atom, ()> {
+        let Self {
+            attributes,
+            primitive_builder: _,
+            modifiers,
+            transaction: _,
+        } = self;
         Builder {
-            attributes: self.attributes,
+            attributes,
             primitive_builder: Atom {
                 color: color.into(),
                 emission: Rgb::ZERO,
                 collision: BlockCollision::Hard,
             },
-            modifiers: Vec::new(),
+            modifiers,
             // TODO: This might not be the right thing in more general transaction usage.
             // For now, it's OK that we discard the transaction because it can only ever be
-            // inserting a `Space`.
+            // inserting a `Space` we are not going to use any more.
             transaction: (),
         }
     }
@@ -167,14 +173,23 @@ impl<P, Txn> Builder<P, Txn> {
         resolution: Resolution,
         space: Handle<Space>,
     ) -> Builder<Voxels, ()> {
+        let Self {
+            attributes,
+            primitive_builder: _,
+            modifiers,
+            transaction: _,
+        } = self;
         Builder {
-            attributes: self.attributes,
+            attributes,
             primitive_builder: Voxels {
                 space,
                 resolution,
                 offset: GridPoint::origin(),
             },
-            modifiers: Vec::new(),
+            modifiers,
+            // TODO: This might not be the right thing in more general transaction usage.
+            // For now, it's OK that we discard the transaction because it can only ever be
+            // inserting a `Space` we are not going to use any more.
             transaction: (),
         }
     }
@@ -260,7 +275,13 @@ impl<P, Txn> Builder<P, Txn> {
             })
         }
 
-        voxels_fn_impl(self.attributes, self.modifiers, resolution, &mut |cube| {
+        let Self {
+            attributes,
+            primitive_builder: _,
+            modifiers,
+            transaction: _,
+        } = self;
+        voxels_fn_impl(attributes, modifiers, resolution, &mut |cube| {
             function(cube).into()
         })
     }
@@ -630,5 +651,30 @@ mod tests {
             .unwrap();
 
         assert_eq!(universe.iter_by_type::<Space>().count(), 1);
+    }
+
+    #[test]
+    fn modifier_before_color_is_equivalent() {
+        assert_eq!(
+            Block::builder()
+                .modifier(Modifier::Rotate(GridRotation::RXYz))
+                .color(Rgba::WHITE),
+            Block::builder()
+                .color(Rgba::WHITE)
+                .modifier(Modifier::Rotate(GridRotation::RXYz))
+        );
+    }
+
+    #[test]
+    fn modifier_before_voxels_is_equivalent() {
+        let h = Handle::new_gone(Name::Pending);
+        assert_eq!(
+            Block::builder()
+                .modifier(Modifier::Rotate(GridRotation::RXYz))
+                .voxels_handle(R8, h.clone()),
+            Block::builder()
+                .voxels_handle(R8, h)
+                .modifier(Modifier::Rotate(GridRotation::RXYz))
+        );
     }
 }
