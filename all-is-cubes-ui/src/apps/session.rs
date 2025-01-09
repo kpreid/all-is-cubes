@@ -882,10 +882,12 @@ impl<I: time::Instant> SessionBuilder<I> {
 
     /// Enable reading and writing user settings.
     ///
+    /// The session will get a new [`Settings`] object which inherits the given settings.
+    ///
     /// If this is not called, then the session will have all default settings,
     /// and they will not be persisted.
-    pub fn settings(mut self, settings: Settings) -> Self {
-        self.settings = Some(settings);
+    pub fn settings_from(mut self, settings: Settings) -> Self {
+        self.settings = Some(Settings::inherit(settings));
         self
     }
 
