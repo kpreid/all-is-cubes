@@ -7,7 +7,7 @@ use indicatif::ProgressBar;
 use rand::Rng as _;
 use tokio::sync::oneshot;
 
-//use all_is_cubes::transaction::{self, Merge, Transaction};
+use all_is_cubes::arcstr::literal;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
@@ -59,9 +59,11 @@ impl UniverseSource {
                     universe_progress_bar.set_message(String::from(info.label_str()));
 
                     if let Some(notification) = notif_rx.lock().unwrap().try_borrow() {
-                        notification.set_content(notification::NotificationContent::Progress(
-                            ProgressBarState::new(info.fraction().into()),
-                        ));
+                        notification.set_content(notification::NotificationContent::Progress {
+                            title: literal!("Loading..."),
+                            progress: ProgressBarState::new(info.fraction().into()),
+                            part: info.label_str().into(),
+                        });
                     }
                 })
                 .build()

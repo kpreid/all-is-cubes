@@ -6,14 +6,16 @@ use alloc::sync::Arc;
 use all_is_cubes::arcstr::{literal, ArcStr};
 use all_is_cubes::block::Resolution::*;
 use all_is_cubes::euclid::size3;
+use all_is_cubes::listen::Source as _;
 use all_is_cubes::math::Face6;
 use all_is_cubes::universe::Universe;
 
 use crate::logo::logo_text;
+use crate::notification::NotificationContent;
 use crate::ui_content::hud::HudInputs;
 use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
 use crate::ui_content::{notification, VuiMessage, VuiPageState};
-use crate::vui::widgets::ButtonLabel;
+use crate::vui::widgets::{ButtonLabel, ProgressBarState};
 use crate::vui::{self, parts, widgets, InstallVuiError, LayoutTree, UiBlocks, Widget, WidgetTree};
 
 // TODO: Disentangle general UI from the concept of "HUD" — i.e. the input accepted should be
@@ -78,24 +80,51 @@ pub(super) fn new_progress_page(
     theme: &widgets::WidgetTheme,
     hub: &notification::Hub,
 ) -> vui::Page {
-    let children = vec![
-        // impose desired width. TODO: better way to add a constraint
-        LayoutTree::spacer(vui::LayoutRequest {
-            minimum: size3(10, 0, 0),
-        }),
-        vui::leaf_widget(widgets::ProgressBar::new(
-            theme,
-            Face6::PX,
-            hub.primary_progress(),
-        )),
-    ];
+    let title_widget = vui::leaf_widget(widgets::TextBox::dynamic_label(
+        Arc::new(hub.primary_content().map(|c| match c {
+            Some(NotificationContent::Progress {
+                title,
+                progress: _,
+                part: _,
+            }) => title,
+            // This case should not be visible
+            None => literal!(""),
+        })),
+        size3(10, 1, 1),
+    ));
 
-    // TODO: should have a title sourced from the notification data
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
-        children,
+        children: vec![
+            vui::leaf_widget(widgets::ProgressBar::new(
+                theme,
+                Face6::PX,
+                Arc::new(hub.primary_content().map(|c| match c {
+                    Some(NotificationContent::Progress {
+                        title: _,
+                        progress,
+                        part: _,
+                    }) => progress,
+                    // This case should not be visible
+                    None => ProgressBarState::new(0.0),
+                })),
+            )),
+            vui::leaf_widget(widgets::TextBox::dynamic_label(
+                Arc::new(hub.primary_content().map(|c| match c {
+                    Some(NotificationContent::Progress {
+                        title: _,
+                        progress: _,
+                        part,
+                    }) => part,
+                    // This case should not be visible
+                    None => literal!(""),
+                })),
+                size3(10, 1, 1),
+            )),
+        ],
     });
-    vui::Page::new_modal_dialog(theme, literal!("Progress"), None, contents)
+
+    vui::Page::new_modal_dialog_with_title_widget(theme, title_widget, None, contents)
 }
 
 pub(super) fn new_options_widget_tree(hud_inputs: &HudInputs) -> vui::Page {

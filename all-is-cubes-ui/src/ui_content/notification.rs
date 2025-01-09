@@ -4,6 +4,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use std::sync::Mutex;
 
+use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::listen;
 
 #[cfg(doc)]
@@ -24,7 +25,17 @@ pub enum NotificationContent {
     // TODO: Not implemented:
     // /// The message may be multi-line.
     // Message(ArcStr),
-    Progress(ProgressBarState),
+    Progress {
+        /// The activity this is the progress of.
+        title: ArcStr,
+
+        /// The amount of progress.
+        progress: ProgressBarState,
+
+        /// The particular piece of the overall work that is currently being done
+        /// (or was just finished, if that is all that is available).
+        part: ArcStr,
+    },
 }
 
 // impl From<ArcStr> for NotificationContent {
@@ -74,8 +85,8 @@ pub(crate) struct Hub {
     notifications: Vec<Receiver>,
 
     /// TODO: kludge to get progress UI up and going; eventually everything should be more dynamic
-    /// and be able to display however many progress bars and messages.
-    primary_progress: listen::Cell<ProgressBarState>,
+    /// and be able to display however many notifications.
+    primary_content: listen::Cell<Option<NotificationContent>>,
 
     has_interrupt: bool,
 }
@@ -119,31 +130,23 @@ impl Hub {
     pub fn new() -> Self {
         Self {
             notifications: Vec::new(),
-            primary_progress: listen::Cell::new(ProgressBarState::new(0.0)),
+            primary_content: listen::Cell::new(None),
             has_interrupt: false,
         }
     }
 
     pub(crate) fn update(&mut self) {
-        let mut progress = None;
+        let mut primary = None;
         self.notifications.retain(|n| {
             if let Some(content) = n.read_content() {
-                match content {
-                    // NotificationContent::Message(_) => {}
-                    NotificationContent::Progress(p) => {
-                        if progress.is_none() {
-                            progress = Some(p);
-                        }
-                    }
-                }
+                primary = Some(content);
                 true
             } else {
                 false
             }
         });
-        self.has_interrupt = progress.is_some();
-        self.primary_progress
-            .set(progress.unwrap_or(ProgressBarState::new(0.0)));
+        self.has_interrupt = primary.is_some();
+        self.primary_content.set_if_unequal(primary);
     }
 
     pub(crate) fn insert(&mut self, content: NotificationContent) -> Notification {
@@ -153,12 +156,20 @@ impl Hub {
         notification
     }
 
-    // TODO: should be optional but ProgressBar isn't friendly to that. We really need a listen::DynSource::map()
-    pub(crate) fn primary_progress(&self) -> listen::DynSource<ProgressBarState> {
-        self.primary_progress.as_source()
+    pub(crate) fn primary_content(&self) -> listen::DynSource<Option<NotificationContent>> {
+        self.primary_content.as_source()
     }
 
     pub(crate) fn has_interrupt(&self) -> bool {
         self.has_interrupt
     }
 }
+
+// fn dummy_content() -> NotificationContent {
+//     // TODO: should be not Progress but that is all we have right now
+//     NotificationContent::Progress {
+//         title: ArcStr::new(),
+//         progress: ProgressBarState::new(0.0),
+//         part: ArcStr::new(),
+//     }
+// }

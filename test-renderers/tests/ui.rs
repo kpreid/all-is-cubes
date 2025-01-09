@@ -93,15 +93,19 @@ async fn session_page_progress(mut context: RenderTestContext) {
     let mut session = create_session().await;
 
     let n = session
-        .show_notification(NotificationContent::Progress(
-            widgets::ProgressBarState::new(0.25),
-        ))
+        .show_notification(NotificationContent::Progress {
+            title: literal!("A Progress Notification"),
+            progress: widgets::ProgressBarState::new(0.25),
+            part: literal!("A Progress Part 1/2"),
+        })
         .unwrap();
     advance_time(&mut session);
     // exercise updates not just initial state
-    n.set_content(NotificationContent::Progress(
-        widgets::ProgressBarState::new(0.75),
-    ));
+    n.set_content(NotificationContent::Progress {
+        title: literal!("A Progress Notification"),
+        progress: widgets::ProgressBarState::new(0.75),
+        part: literal!("A Progress Part 2/2"),
+    });
     advance_time(&mut session);
 
     context.compare_image(0, render_session(&session));

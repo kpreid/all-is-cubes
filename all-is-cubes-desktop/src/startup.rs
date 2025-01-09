@@ -4,6 +4,7 @@ use std::mem;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use all_is_cubes::arcstr::literal;
 use all_is_cubes_content::TemplateParameters;
 use anyhow::Context as _;
 
@@ -263,9 +264,11 @@ impl UniverseTask {
     }
 
     pub fn attach_to_session(&mut self, session: &mut crate::Session) {
-        if let Ok(n) = session.show_notification(notification::NotificationContent::Progress(
-            ProgressBarState::new(0.0),
-        )) {
+        if let Ok(n) = session.show_notification(notification::NotificationContent::Progress {
+            title: literal!("Loading..."),
+            progress: ProgressBarState::new(0.0),
+            part: literal!(""),
+        }) {
             // Ignore send error because the process might have finished and dropped the receiver.
             _ = self
                 .progress_notification_handoff_tx
