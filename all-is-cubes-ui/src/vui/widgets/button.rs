@@ -467,6 +467,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
             } else {
                 SpaceTransaction::default()
             },
+            // TODO: use waking
             vui::Then::Step,
         ))
     }

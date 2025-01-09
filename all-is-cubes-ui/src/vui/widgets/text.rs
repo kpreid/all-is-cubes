@@ -1,3 +1,4 @@
+use all_is_cubes::listen;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
@@ -11,10 +12,12 @@ use all_is_cubes::drawing::embedded_graphics::{
     Drawable,
 };
 use all_is_cubes::drawing::{rectangle_to_aab, VoxelBrush};
-use all_is_cubes::math::{GridAab, Gridgid};
+use all_is_cubes::math::{GridAab, GridSize, Gridgid};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 
 use crate::vui::{self, widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Widget which draws text using a block per font pixel.
 ///
@@ -85,11 +88,13 @@ impl Widget for LargeText {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Widget which draws a static [`Text`](BlockText) for use as a text label in UI.
 ///
 /// It is also used as part of [`ButtonLabel`](crate::vui::widgets::ButtonLabel)s.
 ///
-/// It cannot be used for dynamic text.
+/// For changing text, use [`TextBox`] instead.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Label {
     text: ArcStr,
@@ -170,6 +175,105 @@ impl From<ArcStr> for Label {
         Self::new(value)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Widget which draws [`Text`](BlockText) that can change, to be used for textual content,
+/// or labels which change.
+///
+// TODO: And editable text, eventually.
+///
+/// For text which does not change, use [`Label`] instead.
+//---
+// TODO: better name
+// TODO: have some common styling/layout structure we can share with Label
+#[derive(Clone, Debug)]
+pub struct TextBox {
+    text_source: listen::DynSource<ArcStr>,
+    font: text::Font,
+    positioning: Option<text::Positioning>,
+    // TODO: offer minimum size in terms of a sample string?
+    minimum_size: GridSize,
+    // TODO: framed: bool,
+}
+
+impl TextBox {
+    /// Constructs a [`TextBox`] that draws the given text, with the standard UI label font
+    /// and no border.
+    pub fn dynamic_label(text_source: listen::DynSource<ArcStr>, minimum_size: GridSize) -> Self {
+        Self {
+            text_source,
+            font: text::Font::System16,
+            positioning: None,
+            minimum_size,
+        }
+    }
+}
+
+impl Layoutable for TextBox {
+    fn requirements(&self) -> LayoutRequest {
+        LayoutRequest {
+            minimum: self.minimum_size,
+        }
+    }
+}
+
+impl Widget for TextBox {
+    fn controller(self: Arc<Self>, grant: &LayoutGrant) -> Box<dyn WidgetController> {
+        Box::new(TextBoxController {
+            todo: listen::Flag::listening(false, &self.text_source),
+            grant: *grant,
+            definition: self,
+        })
+    }
+}
+
+/// [`WidgetController`] for [`TextBox`].
+#[derive(Debug)]
+struct TextBoxController {
+    definition: Arc<TextBox>,
+    todo: listen::Flag,
+    grant: LayoutGrant,
+}
+
+impl TextBoxController {
+    fn draw_txn(&self) -> vui::WidgetTransaction {
+        draw_text_txn(
+            &text_for_widget(
+                self.definition.text_source.get(),
+                self.definition.font.clone(),
+                self.definition
+                    .positioning
+                    .unwrap_or_else(|| gravity_to_positioning(self.grant.gravity, true)),
+            ),
+            &self.grant,
+            false, // overwrite any previous text
+        )
+    }
+}
+
+impl WidgetController for TextBoxController {
+    fn initialize(
+        &mut self,
+        _: &vui::WidgetContext<'_>,
+    ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
+        Ok(self.draw_txn())
+    }
+
+    fn step(&mut self, _: &vui::WidgetContext<'_>) -> Result<vui::StepSuccess, vui::StepError> {
+        Ok((
+            if self.todo.get_and_clear() {
+                self.draw_txn()
+            } else {
+                SpaceTransaction::default()
+            },
+            // TODO: use waking
+            vui::Then::Step,
+        ))
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 fn text_for_widget(text: ArcStr, font: text::Font, positioning: text::Positioning) -> text::Text {
     text::Text::builder()
