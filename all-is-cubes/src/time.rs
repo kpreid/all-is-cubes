@@ -271,8 +271,8 @@ mod tests {
     fn clock_phase_advance() {
         let mut clock = Clock::new(TickSchedule::per_second(3), 0);
         assert_eq!(
-            (0..10)
-                .map(|_| clock.advance(false).prev_phase())
+            std::iter::repeat_with(|| clock.advance(false).prev_phase())
+                .take(10)
                 .collect::<Vec<_>>(),
             vec![0, 1, 2, 0, 1, 2, 0, 1, 2, 0],
         );

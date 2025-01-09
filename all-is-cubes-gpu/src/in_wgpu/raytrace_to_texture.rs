@@ -167,9 +167,8 @@ impl Inner {
         let render_viewport = self.render_viewport;
 
         #[allow(clippy::needless_collect, reason = "needed with rayon and not without")]
-        let this_frame_pixels: Vec<Point> = (0..self.rays_per_frame)
-            .map(|_i| self.pixel_picker.next().unwrap())
-            .collect();
+        let this_frame_pixels: Vec<Point> =
+            (&mut self.pixel_picker).take(self.rays_per_frame).collect();
 
         self.dirty_pixels = self.dirty_pixels.saturating_sub(this_frame_pixels.len());
 

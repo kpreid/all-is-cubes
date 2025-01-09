@@ -177,9 +177,10 @@ fn overflow_evaluate() {
     let too_many_modifiers: u32 = block::Budget::default().components;
 
     let mut block = AIR;
-    block
-        .modifiers_mut()
-        .extend((0..too_many_modifiers).map(|_| Modifier::Rotate(GridRotation::CLOCKWISE)));
+    block.modifiers_mut().extend(std::iter::repeat_n(
+        Modifier::Rotate(GridRotation::CLOCKWISE),
+        too_many_modifiers as usize,
+    ));
     assert_eq!(
         block.evaluate(),
         Err(EvalBlockError {
