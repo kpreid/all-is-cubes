@@ -5,11 +5,6 @@
     clippy::large_stack_arrays,
     reason = "effectively-false positive on Arbitrary derive"
 )]
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use core::marker::PhantomData;
 use core::ops::Mul;
 

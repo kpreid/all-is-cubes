@@ -1,8 +1,3 @@
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use core::fmt;
 
 use all_is_cubes::euclid::Vector3D;

@@ -1,8 +1,3 @@
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use all_is_cubes::euclid::Translation3D;
 use all_is_cubes::math::Aab;
 use alloc::sync::Arc;

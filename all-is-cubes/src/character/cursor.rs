@@ -2,11 +2,6 @@
 //!
 //! TODO: It's unclear what the scope of this module should be.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use core::fmt;
 
 use euclid::point3;

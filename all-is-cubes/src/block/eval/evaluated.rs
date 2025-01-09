@@ -1,10 +1,5 @@
 //! [`EvaluatedBlock`] and [`Evoxel`].
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use alloc::boxed::Box;
 use core::{fmt, ptr};
 

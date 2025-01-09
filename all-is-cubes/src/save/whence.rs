@@ -15,10 +15,6 @@ use crate::util::YieldProgress;
 ///
 /// This trait is object-safe so that it can be stored in a [`Universe`] as `dyn WhenceUniverse`.
 /// Therefore, all its `async` methods use boxed futures.
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
 pub trait WhenceUniverse: fmt::Debug + Send + Sync + downcast_rs::Downcast + 'static {
     /// Returns a string suitable for use as a window title or other user interface element
     /// identifying this universe-document.

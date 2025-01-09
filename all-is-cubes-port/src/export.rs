@@ -1,8 +1,3 @@
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 #[allow(unused_imports)]
 use std::path::{Path, PathBuf};
 #[allow(unused_imports)]

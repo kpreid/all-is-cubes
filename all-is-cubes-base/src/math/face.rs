@@ -1,11 +1,6 @@
 //! Axis-aligned unit vectors: the [`Face6`] and [`Face7`] types.
 //! This module is private but reexported by its parent.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use core::fmt;
 use core::ops;
 

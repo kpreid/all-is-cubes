@@ -1,11 +1,6 @@
 //! Integer-coordinate matrices.
 //! This module is private but reexported by its parent.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use core::cmp::Ordering;
 use core::ops;
 

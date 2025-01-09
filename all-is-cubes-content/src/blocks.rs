@@ -1,11 +1,6 @@
 //! Block definitions that are specific to the demo/initial content and not fundamental
 //! or UI.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use alloc::sync::Arc;
 use core::fmt;
 use core::num::NonZeroU16;

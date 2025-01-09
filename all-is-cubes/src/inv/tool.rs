@@ -1,10 +1,5 @@
 //! [`Tool`] and related.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;

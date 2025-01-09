@@ -5,11 +5,6 @@
 //! it does not contain the elements that are evaluated
 //! ([`crate::block::Primitive`] and [`crate::block::Modifier`])
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 mod control;
 #[cfg(test)]
 pub(crate) use control::ErrorKind;

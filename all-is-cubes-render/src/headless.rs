@@ -1,8 +1,3 @@
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use alloc::vec::Vec;
 
 use embedded_graphics::mono_font::iso_8859_1::FONT_7X13_BOLD;

@@ -1,11 +1,6 @@
 //! Note: This module is hidden, and its contents re-exported as `all_is_cubes_render::raytracer`.
 //! It is located in this crate so that it can be used by unit tests.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -54,6 +49,7 @@ mod updating;
 
 /// Precomputed data for raytracing a single frame of a single [`Space`], and bearer of
 /// the methods for actually performing raytracing.
+#[allow(clippy::module_name_repetitions, reason = "TODO: find better name")]
 pub struct SpaceRaytracer<D: RtBlockData> {
     blocks: Vec<TracingBlock<D>>,
     cubes: Vol<Box<[TracingCubeData]>>,

@@ -1,10 +1,5 @@
 //! Options controlling recording.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use std::ops::RangeInclusive;
 use std::path::PathBuf;
 use std::time::Duration;

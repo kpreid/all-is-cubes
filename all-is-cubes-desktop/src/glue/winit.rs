@@ -141,10 +141,6 @@ pub fn map_key(key: winit::keyboard::PhysicalKey) -> Option<all_is_cubes_ui::app
     })
 }
 
-#[allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
 pub fn cursor_icon_to_winit(icon: &all_is_cubes_ui::apps::CursorIcon) -> winit::window::CursorIcon {
     use all_is_cubes_ui::apps::CursorIcon as A;
     use winit::window::CursorIcon as W;

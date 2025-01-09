@@ -1,10 +1,5 @@
 //! [`BlockAttributes`] and closely related types.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use core::{fmt, ops};
 
 use arcstr::ArcStr;

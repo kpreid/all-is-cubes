@@ -1,10 +1,5 @@
 //! First-run game content.
 
-#![allow(
-    clippy::module_name_repetitions,
-    reason = "false positive; TODO: remove after Rust 1.84 is released"
-)]
-
 use alloc::boxed::Box;
 use alloc::string::{String, ToString as _};
 use alloc::sync::Arc;
