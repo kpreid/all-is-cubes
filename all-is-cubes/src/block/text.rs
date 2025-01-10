@@ -7,6 +7,8 @@
 
 use alloc::boxed::Box;
 use core::iter;
+use eg::mono_font::MonoFont;
+use embedded_graphics::mono_font::mapping::GlyphMapping;
 
 use arcstr::ArcStr;
 use embedded_graphics as eg;
@@ -612,12 +614,21 @@ pub enum Font {
 impl Font {
     /// Do not use. This will be removed if and when we change font renderers.
     #[doc(hidden)]
-    pub fn eg_font(&self) -> &eg::mono_font::MonoFont<'static> {
+    pub fn eg_font(&self) -> &MonoFont<'static> {
         use eg::mono_font::iso_8859_1 as f;
         match self {
-            Self::System16 => &f::FONT_8X13_BOLD,
-            Self::Logo => &f::FONT_9X15_BOLD,
-            Self::SmallerBodyText => &f::FONT_6X10,
+            Self::System16 => &MonoFont {
+                glyph_mapping: &RemapTo8859_1(f::FONT_8X13_BOLD.glyph_mapping),
+                ..f::FONT_8X13_BOLD
+            },
+            Self::Logo => &MonoFont {
+                glyph_mapping: &RemapTo8859_1(f::FONT_9X15_BOLD.glyph_mapping),
+                ..f::FONT_9X15_BOLD
+            },
+            Self::SmallerBodyText => &MonoFont {
+                glyph_mapping: &RemapTo8859_1(f::FONT_6X10.glyph_mapping),
+                ..f::FONT_6X10
+            },
         }
     }
 }
@@ -844,6 +855,20 @@ impl Brush {
                 .into_iter(),
             ),
         }
+    }
+}
+
+// Kludge to pretend to have slightly greater character coverage than the fonts actually do:
+// remap selected Unicode characters to the `iso_8859_1` subset.
+struct RemapTo8859_1<'a>(&'a dyn GlyphMapping);
+
+impl GlyphMapping for RemapTo8859_1<'_> {
+    fn index(&self, c: char) -> usize {
+        self.0.index(match c {
+            '‘' | '’' => '\'',
+            '“' | '”' => '"',
+            c => c,
+        })
     }
 }
 
