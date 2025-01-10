@@ -30,12 +30,6 @@ cfg_if::cfg_if! {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
-    } else {
-    }
-}
-
 /// Wrapper around [`core::cell::RefCell`] or [`std::sync::Mutex`] depending on whether
 /// the `std` feature is enabled.
 ///
