@@ -76,7 +76,7 @@ arrayvec = { version = "0.7.4", default-features = false }
 async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bitflags = { version = "2.6.0", default-features = false }
-bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
+bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.19.0", default-features = false, features = ["derive", "must_cast"] }
 cfg-if = { version = "1.0.0", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
@@ -107,7 +107,7 @@ imgref = { version = "1.10.1", default-features = false }
 indoc = { version = "2.0.1", default-features = false }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 libm = { version = "0.2.8", default-features = false }
-log = { version = "0.4.17", default-features = false }
+log = { version = "0.4.22", default-features = false }
 macro_rules_attribute = { version = "0.2.0", default-features = false }
 manyfmt = { version = "0.1.0", default-features = false }
 mutants = { version = "0.0.3", default-features = false }
@@ -126,7 +126,7 @@ pollster = { version = "0.4.0", default-features = false }
 pretty_assertions = { version = "1.2.0" }
 rand = { version = "0.8.3", default-features = false }
 rand_xoshiro = { version = "0.6.0", default-features = false }
-rayon = { version = "1.8.0", default-features = false }
+rayon = { version = "1.10.0", default-features = false }
 re_log_types = { version = "0.21.0", default-features = false }
 re_sdk = { version = "0.21.0", default-features = false }
 re_types = { version = "0.21.0", default-features = false }

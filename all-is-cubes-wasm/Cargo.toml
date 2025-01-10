@@ -44,7 +44,7 @@ futures-core = { version = "0.3.31", default-features = false, features = ["allo
 # as well as our direct dependency
 getrandom = { version = "0.2.7", features = ["js"] }
 js-sys = "0.3.73"
-log = { version = "0.4.17", default-features = false }
+log = { version = "0.4.22", default-features = false }
 rand = { version = "0.8.3", default-features = false, features = ["std", "std_rng"] }
 send_wrapper = { version = "0.6.0", default-features = false }
 wasm-bindgen = "0.2.96"
