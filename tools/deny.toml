@@ -13,6 +13,7 @@ allow = [
     "Apache-2.0",
     "MPL-2.0",
     "BSD-3-Clause",
+    "BSL-1.0",
     "ISC",
     "Unicode-3.0",
     "Zlib",
@@ -32,9 +33,8 @@ allow-wildcard-paths = true
 # external-default-features = "warn"
 
 skip = [
-    { name = "sync_wrapper" },
+    { name = "core-foundation", version = "0.9.4" }, # old used by `winit`
     { name = "cfg_aliases" }, # winit and wgpu use different versions
-    { name = "base64", version = "0.13.1" }, # old used by `embed-doc-image`
     { name = "unicode-width", version = "0.1" }, # old used by `codespan-reporting` via `wgpu`
 ]
 
@@ -47,6 +47,7 @@ skip-tree = [
     { name = "windows-sys", depth = 2 },
     { name = "windows-targets", depth = 2 },
     { name = "proc-macro-crate" },
+    { name = "test-renderers" }, # test-only code not published
 ]
 
 [sources]

@@ -1,9 +1,7 @@
 //! Copies and compresses an image file from the test-renderers output directory
 //! to the `expected/` directory.
-//!
-//! Requires the `pngcrush` command-line program to be installed.
 
-use std::process::Command;
+use std::num::NonZeroU8;
 
 use clap::Parser as _;
 
@@ -27,7 +25,19 @@ struct BlessArgs {
     test_names: Vec<String>,
 }
 
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
+    {
+        use simplelog::LevelFilter::{Info, Off, Trace};
+        simplelog::WriteLogger::init(
+            Info,
+            simplelog::ConfigBuilder::new()
+                .set_target_level(Trace)
+                .set_location_level(Off)
+                .build(),
+            std::io::stderr(),
+        )?;
+    }
+
     let BlessArgs {
         specific,
         suite_id,
@@ -61,15 +71,28 @@ fn main() {
             test_renderers::Version::ExpectedSrc,
         );
 
-        let status = Command::new("pngcrush")
-            .arg("-brute")
-            .arg(src_path)
-            .arg(dst_path)
-            .status()
-            .expect("failed to spawn `pngcrush`");
-        if !status.success() {
-            eprintln!("pngcrush returned an error; exiting.");
-            std::process::exit(status.code().unwrap_or(1));
-        }
+        oxipng::optimize(
+            &oxipng::InFile::Path(src_path),
+            &oxipng::OutFile::from_path(dst_path),
+            &oxipng::Options {
+                // Even if no optimization is found, write the file to the new path.
+                force: true,
+
+                fix_errors: false,
+                optimize_alpha: false,
+                color_type_reduction: true,
+                palette_reduction: true,
+                grayscale_reduction: true,
+                idat_recoding: true,
+                deflate: oxipng::Deflaters::Zopfli {
+                    iterations: NonZeroU8::new(15).unwrap(),
+                },
+                fast_evaluation: false,
+                timeout: None,
+                ..oxipng::Options::default()
+            },
+        )?;
     }
+
+    Ok(())
 }

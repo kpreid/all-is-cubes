@@ -64,6 +64,7 @@ all-is-cubes-gpu = { workspace = true, features = ["wgpu"] }
 all-is-cubes-port = { workspace = true, optional = true, features = ["export", "gltf"] }
 all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
 all-is-cubes-ui = { workspace = true, features = ["session"] }
+anyhow = { workspace = true }
 async_fn_traits = { workspace = true }
 bytemuck = { workspace = true, optional = true }
 # Using clap for parsing test command-line arguments
@@ -76,6 +77,8 @@ image = { workspace = true, features = ["png"] }
 imgref = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+# Used to compress images when those images are to be stored in the repository.
+oxipng = { version = "=9.1.3", default-features = false, features = ["parallel", "zopfli"] }
 rendiff = { workspace = true }
 send_wrapper = { workspace = true }
 serde = { workspace = true }
