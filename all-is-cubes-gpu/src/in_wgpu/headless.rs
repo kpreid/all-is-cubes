@@ -217,13 +217,14 @@ impl RendererImpl {
         }
 
         let draw_info = self.everything.draw_frame_linear(&self.queue);
-        let post_flaws = self.everything.add_info_text_and_postprocess(
+        let (post_cmd, post_flaws) = self.everything.add_info_text_and_postprocess(
             &self.queue,
             &self
                 .color_texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
             info_text,
         );
+        self.queue.submit([post_cmd]);
         let image = init::get_image_from_gpu(
             &self.device,
             &self.queue,

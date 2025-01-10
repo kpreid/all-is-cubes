@@ -162,9 +162,8 @@ impl PostprocessUniforms {
 pub(crate) fn postprocess<I: time::Instant>(
     // TODO: instead of accepting `EverythingRenderer`, pass smaller (but not too numerous) things
     ev: &mut super::EverythingRenderer<I>,
-    queue: &wgpu::Queue,
     output: &wgpu::TextureView,
-) -> Flaws {
+) -> (wgpu::CommandBuffer, Flaws) {
     let mut encoder = ev
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -173,7 +172,7 @@ pub(crate) fn postprocess<I: time::Instant>(
 
     let Some(postprocess_render_pipeline) = ev.postprocess_render_pipeline.get() else {
         // This shouldn't happen, but if it does, don't panic.
-        return Flaws::UNFINISHED;
+        return (encoder.finish(), Flaws::UNFINISHED);
     };
 
     // Render pass
@@ -239,7 +238,5 @@ pub(crate) fn postprocess<I: time::Instant>(
         render_pass.draw(0..3, 0..1);
     }
 
-    queue.submit(std::iter::once(encoder.finish()));
-
-    Flaws::empty()
+    (encoder.finish(), Flaws::empty())
 }

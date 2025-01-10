@@ -413,6 +413,9 @@ impl AllocatorBacking {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) -> (Group<Arc<Identified<wgpu::TextureView>>>, BlockTextureInfo) {
+        // TODO: Consider replacing all the queued texture writes and copies with `StagingBelt`.
+        // Will need to teach `StagingBelt` about copying to textures.
+
         let mut backing_lock_guard = backing_mutex.lock().unwrap();
         let backing = &mut *backing_lock_guard;
 
@@ -486,6 +489,8 @@ impl AllocatorBacking {
                     copy(&mut encoder, oe, ne);
                 }
 
+                // TODO(efficiency): Eliminate this separated submit, without breaking things
+                // by reordering the copy_texture_to_texture() after the following write_texture()s.
                 queue.submit([encoder.finish()]);
             }
 

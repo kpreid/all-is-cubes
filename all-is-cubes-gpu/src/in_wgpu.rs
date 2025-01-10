@@ -242,9 +242,9 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         };
 
         // Render info and postprocessing step.
-        // TODO: We should record the amount of time this takes, then display that
-        // next frame.
-        info.flaws |= self.everything.add_info_text_and_postprocess(
+        // TODO: We should record the amount of time this takes, then display that next frame.
+        // TODO(efficiency): combine draw_frame_linear and postprocess into one submission.
+        let (post_cmd, post_flaws) = self.everything.add_info_text_and_postprocess(
             &self.queue,
             &output.texture.create_view(&TextureViewDescriptor {
                 format: Some(surface_view_format(self.everything.config.format)),
@@ -252,6 +252,8 @@ impl<I: time::Instant> SurfaceRenderer<I> {
             }),
             &info_text_fn(&info),
         );
+        info.flaws |= post_flaws;
+        self.queue.submit([post_cmd]);
         output.present();
         Ok(info)
     }
@@ -840,6 +842,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
         // let postprocess_to_submit_time = Instant::now();
 
+        // TODO(efficiency): allow this submit to happen externally and be combined with others
+        // (postprocessing, in particular).
         queue.submit(std::iter::once(encoder.finish()));
         self.staging_belt.recall();
 
@@ -864,7 +868,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         queue: &wgpu::Queue,
         output: &wgpu::TextureView,
         mut text: &str,
-    ) -> Flaws {
+    ) -> (wgpu::CommandBuffer, Flaws) {
         // Apply info text option
         if !self.cameras.cameras().world.options().debug_info_text {
             text = "";
@@ -880,12 +884,12 @@ impl<I: time::Instant> EverythingRenderer<I> {
             info_text_texture.upload(queue);
         }
 
-        let flaws = postprocess::postprocess(self, queue, output);
+        let (postprocess_cmd, flaws) = postprocess::postprocess(self, output);
 
         #[cfg(feature = "rerun")]
         self.rerun_image.finish_frame();
 
-        flaws
+        (postprocess_cmd, flaws)
     }
 
     /// Activate logging performance information to a Rerun stream.
