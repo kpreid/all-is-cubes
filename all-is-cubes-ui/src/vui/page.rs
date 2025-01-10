@@ -128,7 +128,20 @@ impl Page {
         corner_button: Option<WidgetTree>,
         contents: WidgetTree,
     ) -> Self {
-        let title_widget = vui::leaf_widget(widgets::Label::new(title));
+        Self::new_modal_dialog_with_title_widget(
+            theme,
+            vui::leaf_widget(widgets::Label::new(title)),
+            corner_button,
+            contents,
+        )
+    }
+
+    pub fn new_modal_dialog_with_title_widget(
+        theme: &widgets::WidgetTheme,
+        title_widget: WidgetTree,
+        corner_button: Option<WidgetTree>,
+        contents: WidgetTree,
+    ) -> Self {
         let tree = Arc::new(LayoutTree::Stack {
             direction: Face6::PZ,
             children: vec![
