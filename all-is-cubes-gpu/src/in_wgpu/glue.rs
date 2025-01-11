@@ -98,17 +98,17 @@ pub fn extent_to_size3d(size: wgpu::Extent3d) -> GridSize {
     GridSize::new(size.width, size.height, size.depth_or_array_layers)
 }
 
-pub(crate) struct BeltWritingParts<'sh, 'mu> {
-    pub device: &'sh wgpu::Device,
-    pub belt: &'mu mut wgpu::util::StagingBelt,
-    pub encoder: &'mu mut wgpu::CommandEncoder,
+/// The ingredients to make use of a [`wgpu::util::StagingBelt`].
+pub(crate) struct BeltWritingParts<'a> {
+    pub device: &'a wgpu::Device,
+    pub belt: &'a mut wgpu::util::StagingBelt,
+    pub encoder: &'a mut wgpu::CommandEncoder,
 }
 
-impl<'sh, 'mu> BeltWritingParts<'sh, 'mu> {
-    pub fn reborrow<'r>(&'r mut self) -> BeltWritingParts<'sh, 'r>
-    where
-        'mu: 'r,
-    {
+impl BeltWritingParts<'_> {
+    /// Borrow `self` to produce another `BeltWritingParts` that can be consumed (moved)
+    /// without losing this one.
+    pub fn reborrow(&mut self) -> BeltWritingParts<'_> {
         BeltWritingParts {
             device: self.device,
             belt: self.belt,
@@ -145,7 +145,7 @@ impl ResizingBuffer {
     /// if the existing buffer is used. TODO: Provide a means of lazy loading the label.
     pub(crate) fn write_with_resizing(
         &mut self,
-        mut bwp: BeltWritingParts<'_, '_>,
+        mut bwp: BeltWritingParts<'_>,
         descriptor: &wgpu::util::BufferInitDescriptor<'_>,
     ) {
         let new_size: u64 = descriptor.contents.len().try_into().unwrap();

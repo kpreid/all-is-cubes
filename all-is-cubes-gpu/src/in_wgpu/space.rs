@@ -287,7 +287,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         queue: &wgpu::Queue,
         pipelines: &Pipelines,
         camera: &Camera,
-        mut bwp: BeltWritingParts<'_, '_>,
+        mut bwp: BeltWritingParts<'_>,
     ) -> Result<SpaceUpdateInfo, RenderError> {
         let start_time = I::now();
 
@@ -957,7 +957,7 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
     reason = "https://github.com/rust-lang/rust-clippy/issues/12525"
 )]
 fn update_chunk_buffers<I: time::Instant>(
-    mut bwp: BeltWritingParts<'_, '_>,
+    mut bwp: BeltWritingParts<'_>,
     update: RenderDataUpdate<'_, WgpuMt<I>>,
     space_label: &str,
 ) {
