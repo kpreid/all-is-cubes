@@ -43,6 +43,8 @@ fn MOVED_BLOCKS(_: Context<'_>) {
     placement: Placement::Surface,
 )]
 fn PROJECTILE(ctx: Context<'_>) {
+    let launch_automatically = false;
+
     let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let txn = ExhibitTransaction::default();
 
@@ -52,39 +54,47 @@ fn PROJECTILE(ctx: Context<'_>) {
     let projectile_moving_in = projectile.clone().with_modifier(move_in);
     // let projectile_moving_out = projectile.clone().with_modifier(move_out);
 
+    let launch_operation = Operation::Neighbors(
+        [
+            // TODO: We want to animate the projectile exiting;
+            // currently, if we do this, the launcher doesn't work any more,
+            // probably because it is a composite with a left-over Air block.
+            // Improve modifier and compositing semantics so this works.
+            //
+            // (
+            //     Cube::new(0, 0, 0),
+            //     Operation::AddModifiers(Arc::new([Composite::new(
+            //         projectile_moving_out,
+            //         CompositeOperator::Over,
+            //     )
+            //     .reversed()
+            //     .into()])),
+            // ),
+
+            // TODO: Instead of `DestroyTo`, we should have an operation that only
+            // succeeds if there is room to enter empty space here (if the destination
+            // is AIR, for now).
+            (
+                Cube::new(0, 1, 0),
+                Operation::DestroyTo(projectile_moving_in),
+            ),
+        ]
+        .into(),
+    );
+
+    let tick_action = launch_automatically.then(|| block::TickAction {
+        operation: launch_operation.clone(),
+        schedule: time::Schedule::from_period(NonZero::new(60).unwrap()),
+    });
+
     let launcher = Block::builder()
         .display_name(literal!("Launcher"))
         .color(Rgb::UNIFORM_LUMINANCE_RED.with_alpha(zo32(1.0)))
         .animation_hint(block::AnimationHint::replacement(
             block::AnimationChange::Shape,
         ))
-        .activation_action(Operation::Neighbors(
-            [
-                // TODO: We want to animate the projectile exiting;
-                // currently, if we do this, the launcher doesn't work any more,
-                // probably because it is a composite with a left-over Air block.
-                // Improve modifier and compositing semantics so this works.
-                //
-                // (
-                //     Cube::new(0, 0, 0),
-                //     Operation::AddModifiers(Arc::new([Composite::new(
-                //         projectile_moving_out,
-                //         CompositeOperator::Over,
-                //     )
-                //     .reversed()
-                //     .into()])),
-                // ),
-
-                // TODO: Instead of `DestroyTo`, we should have an operation that only
-                // succeeds if there is room to enter empty space here (if the destination
-                // is AIR, for now).
-                (
-                    Cube::new(0, 1, 0),
-                    Operation::DestroyTo(projectile_moving_in),
-                ),
-            ]
-            .into(),
-        ))
+        .activation_action(launch_operation)
+        .tick_action(tick_action)
         .build();
 
     let space = Space::builder(GridAab::ORIGIN_CUBE)

@@ -5,6 +5,7 @@ pub(super) use alloc::sync::Arc;
 pub(super) use alloc::vec::Vec;
 pub(super) use core::convert::{identity, TryFrom as _};
 pub(super) use core::f64::consts::PI;
+pub(super) use core::num::NonZero;
 
 pub(super) use exhaust::Exhaust as _;
 pub(super) use rand::SeedableRng as _;
@@ -34,6 +35,7 @@ pub(super) use all_is_cubes::math::{
 };
 pub(super) use all_is_cubes::op::Operation;
 pub(super) use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};
+pub(super) use all_is_cubes::time;
 pub(super) use all_is_cubes::transaction::{self, Transaction as _};
 pub(super) use all_is_cubes::{color_block, include_image};
 
