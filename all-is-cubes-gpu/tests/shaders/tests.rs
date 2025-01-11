@@ -116,12 +116,25 @@ async fn light_texture_write_read(
         // First initialize with black from dark_space, then refresh it using update_scatter().
         lt.ensure_mapped(&queue, &dark_space, space.bounds());
 
+        let mut staging_belt = wgpu::util::StagingBelt::new(2048);
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("lt update encoder"),
+        });
+        let bwp = all_is_cubes_gpu::in_wgpu::BeltWritingParts {
+            device: &device,
+            belt: &mut staging_belt,
+            encoder: &mut encoder,
+        };
+
         lt.update_scatter(
-            &device,
-            &queue,
+            bwp,
             &space,
             LightChunk::all_in_region(space.bounds()).into_iter(),
         );
+
+        staging_belt.finish();
+        queue.submit([encoder.finish()]);
+        staging_belt.recall();
     } else {
         lt.ensure_mapped(&queue, &space, space.bounds());
     }

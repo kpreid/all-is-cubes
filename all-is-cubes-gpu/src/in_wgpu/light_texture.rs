@@ -1,6 +1,6 @@
 use alloc::format;
 use alloc::vec::Vec;
-use core::array;
+use core::{array, num::NonZero};
 
 use cfg_if::cfg_if;
 #[cfg(feature = "auto-threads")]
@@ -22,7 +22,9 @@ use all_is_cubes_render::camera::Camera;
 
 use crate::{
     Identified,
-    in_wgpu::glue::{extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab},
+    in_wgpu::glue::{
+        BeltWritingParts, extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab,
+    },
 };
 
 type Texel = [u8; LightTexture::COMPONENTS];
@@ -133,6 +135,10 @@ pub struct LightTexture {
     texture_view: Identified<wgpu::TextureView>,
 
     /// Temporary storage for updated light texels to be copied into the texture.
+    ///
+    /// Performance note: I tried using [`wgpu::util::StagingBelt`] staging buffers directly
+    /// instead of this specialized buffer, and that did not turn out to be more efficient despite
+    /// theoretically having one fewer copy.
     copy_buffer: wgpu::Buffer,
 
     /// The region of `Space` cube coordinates which are currently represented by the texture
@@ -424,10 +430,10 @@ impl LightTexture {
     ///
     /// Any cubes not within the current mapped region (determined by [`Self::ensure_mapped()`] or
     /// [`Self::ensure_visible_is_mapped()`]) are ignored.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn update_scatter(
         &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        mut bwp: BeltWritingParts<'_>,
         space: &Space,
         chunks: impl IntoIterator<Item = LightChunk>,
     ) -> usize {
@@ -445,9 +451,11 @@ impl LightTexture {
             #[allow(clippy::large_stack_arrays)]
             let mut data: [[Texel; LIGHT_CHUNK_VOLUME]; Self::COPY_BUFFER_CHUNKS] =
                 [[[0; Self::COMPONENTS]; LIGHT_CHUNK_VOLUME]; Self::COPY_BUFFER_CHUNKS];
-            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("space light scatter-copy"),
-            });
+            let mut encoder = bwp
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("space light scatter-copy"),
+                });
             let mut batch_count = 0;
 
             for (index_in_batch, chunk) in chunk_batch.into_iter().enumerate() {
@@ -494,15 +502,16 @@ impl LightTexture {
                 total_count += 1;
             }
 
-            // TODO(efficiency): use `StagingBelt` to write buffer instead, once
-            // https://github.com/gfx-rs/wgpu/pull/6900 makes it into a release.
-            queue.write_buffer(
-                &self.copy_buffer,
-                0,
-                data[..batch_count].as_flattened().as_flattened(),
-            );
-
-            queue.submit([encoder.finish()]);
+            // Note: Using [`wgpu::util::StagingBelt`] instead of this write_buffer() did not
+            // turn out to be more efficient.
+            let data: &[u8] = data[..batch_count].as_flattened().as_flattened();
+            bwp.reborrow()
+                .write_buffer(
+                    &self.copy_buffer,
+                    0,
+                    wgpu::BufferSize::new(data.len() as u64).unwrap(),
+                )
+                .copy_from_slice(data);
         }
 
         total_count
