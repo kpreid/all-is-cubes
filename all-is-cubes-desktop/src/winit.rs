@@ -41,6 +41,10 @@ pub struct WinAndState {
     cursor_grab_mode: CursorGrabMode,
 
     ignore_next_mouse_move: bool,
+
+    /// Whether we have not yet completed the first rendering frame.
+    /// Used to log how long it took to render that frame.
+    first_frame: bool,
 }
 
 impl WinAndState {
@@ -97,6 +101,7 @@ impl WinAndState {
             mouse_position: None,
             cursor_grab_mode: CursorGrabMode::None,
             ignore_next_mouse_move: false,
+            first_frame: true,
         })
     }
 
@@ -179,7 +184,6 @@ pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
     Ok(event_loop.run_app(&mut Handler {
         loop_start_time: Instant::now(),
         startup_params: Some((inner_params, dsession_fn)),
-        first_frame: true,
         dsession: None,
     })?)
 }
@@ -250,7 +254,6 @@ type SessionFn<Ren> = Box<
 
 struct Handler<Ren> {
     loop_start_time: Instant,
-    first_frame: bool,
     startup_params: Option<(crate::InnerMainParams, SessionFn<Ren>)>,
     dsession: Option<DesktopSession<Ren, WinAndState>>,
 }
@@ -294,18 +297,7 @@ impl<Ren: RendererToWinit> winit::application::ApplicationHandler for Handler<Re
             return;
         }
 
-        // TODO: this placement makes no sense and should be after handling redraw
-        if self.first_frame {
-            self.first_frame = false;
-            log::debug!(
-                "First frame completed in {:.3} s",
-                Instant::now()
-                    .duration_since(self.loop_start_time)
-                    .as_secs_f32()
-            );
-        }
-
-        handle_window_event(event, dsession)
+        handle_window_event(event, dsession, self.loop_start_time)
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
@@ -367,6 +359,7 @@ impl<Ren: RendererToWinit> winit::application::ApplicationHandler for Handler<Re
 fn handle_window_event<Ren: RendererToWinit>(
     event: WindowEvent,
     dsession: &mut DesktopSession<Ren, WinAndState>,
+    loop_start_time: Instant,
 ) {
     let input_processor = &mut dsession.session.input_processor;
     match event {
@@ -392,6 +385,14 @@ fn handle_window_event<Ren: RendererToWinit>(
                 .redraw(&dsession.session, &dsession.window.window);
 
             dsession.session.frame_clock.did_draw();
+
+            if dsession.window.first_frame {
+                dsession.window.first_frame = false;
+                log::debug!(
+                    "Loop start to first frame completed in {:.3} s",
+                    Instant::now().duration_since(loop_start_time).as_secs_f32()
+                );
+            }
         }
 
         // Keyboard input
