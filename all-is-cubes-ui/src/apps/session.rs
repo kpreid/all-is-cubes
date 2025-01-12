@@ -432,7 +432,7 @@ impl<I: time::Instant> Session<I> {
     }
 
     fn process_control_messages_and_stuff(&mut self) {
-        'handle_message: loop {
+        loop {
             match self.control_channel.try_recv() {
                 Ok(msg) => match msg {
                     ControlMessage::Back => {
@@ -474,13 +474,11 @@ impl<I: time::Instant> Session<I> {
                                     "{}",
                                     all_is_cubes::util::ErrorChain(&*e)
                                 ));
-                                continue 'handle_message;
                             }
                             None => {
                                 self.show_modal_message(
                                     "unsupported: saving did not complete synchronously".into(),
                                 );
-                                continue 'handle_message;
                             }
                         }
                     }
