@@ -51,24 +51,45 @@ impl WinAndState {
         requested_size: Option<Size2D<u32, camera::NominalPixel>>,
         fullscreen: bool,
     ) -> Result<WinAndState, winit::error::OsError> {
-        // Pick a window size.
-        let inner_size = if let Some(size) = requested_size {
+        // Pick a window size *without* knowledge of monitor size
+        // (because we don’t know what monitor the window is going to appear on).
+        let mut guessed_monitor = false;
+        let inner_size: Size2D<u32, camera::NominalPixel> = if let Some(size) = requested_size {
             size
         } else {
-            // TODO: Does this strategy actually best reflect what monitor the window is
-            // going to appear on?
+            // Guess which monitor we will get.
             let maybe_monitor = event_loop
                 .primary_monitor()
                 .or_else(|| event_loop.available_monitors().next());
-            choose_graphical_window_size(maybe_monitor.as_ref().map(monitor_size_for_window))
+            choose_graphical_window_size(match maybe_monitor {
+                Some(monitor) => {
+                    guessed_monitor = true;
+                    Some(monitor_size_for_window(&monitor))
+                }
+                None => None,
+            })
         };
 
         let window = event_loop.create_window(
             Window::default_attributes()
                 .with_inner_size(to_logical_size(inner_size))
                 .with_title(window_title)
-                .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None))),
+                .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None)))
+                .with_visible(!guessed_monitor),
         )?;
+
+        // If we picked a size based on guessing the monitor, resize based on which monitor we
+        // now know we got, then show the window.
+        if guessed_monitor {
+            if let Some(monitor) = window.current_monitor() {
+                _ = window.request_inner_size(to_logical_size(choose_graphical_window_size(Some(
+                    monitor_size_for_window(&monitor),
+                ))));
+
+                // TODO: Reposition the window too.
+            }
+            window.set_visible(true);
+        }
 
         Ok(WinAndState {
             window: Arc::new(window),
