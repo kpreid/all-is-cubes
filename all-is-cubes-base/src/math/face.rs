@@ -909,7 +909,7 @@ where
 }
 
 macro_rules! impl_binary_operator_for_facemap {
-    ($trait:ident :: $method:ident) => {
+    ($trait:ident :: $method:ident, $assign_trait:ident :: $assign_method:ident) => {
         impl<V: ops::$trait> ops::$trait for FaceMap<V> {
             type Output = FaceMap<V::Output>;
             /// Apply the operator pairwise to the values for all six faces.
@@ -918,16 +918,29 @@ macro_rules! impl_binary_operator_for_facemap {
                 self.zip(other, |_, a, b| <V as ops::$trait>::$method(a, b))
             }
         }
+
+        impl<V: ops::$assign_trait> ops::$assign_trait for FaceMap<V> {
+            /// Apply the operator pairwise to the values for all six faces.
+            #[inline]
+            fn $assign_method(&mut self, rhs: Self) {
+                self.nx.$assign_method(rhs.nx);
+                self.ny.$assign_method(rhs.ny);
+                self.nz.$assign_method(rhs.nz);
+                self.px.$assign_method(rhs.px);
+                self.py.$assign_method(rhs.py);
+                self.pz.$assign_method(rhs.pz);
+            }
+        }
     };
 }
-impl_binary_operator_for_facemap!(BitAnd::bitand);
-impl_binary_operator_for_facemap!(BitOr::bitor);
-impl_binary_operator_for_facemap!(BitXor::bitxor);
-impl_binary_operator_for_facemap!(Add::add);
-impl_binary_operator_for_facemap!(Mul::mul);
-impl_binary_operator_for_facemap!(Sub::sub);
-impl_binary_operator_for_facemap!(Div::div);
-impl_binary_operator_for_facemap!(Rem::rem);
+impl_binary_operator_for_facemap!(BitAnd::bitand, BitAndAssign::bitand_assign);
+impl_binary_operator_for_facemap!(BitOr::bitor, BitOrAssign::bitor_assign);
+impl_binary_operator_for_facemap!(BitXor::bitxor, BitXorAssign::bitxor_assign);
+impl_binary_operator_for_facemap!(Add::add, AddAssign::add_assign);
+impl_binary_operator_for_facemap!(Mul::mul, MulAssign::mul_assign);
+impl_binary_operator_for_facemap!(Sub::sub, SubAssign::sub_assign);
+impl_binary_operator_for_facemap!(Div::div, DivAssign::div_assign);
+impl_binary_operator_for_facemap!(Rem::rem, RemAssign::rem_assign);
 
 /// The combination of a [`Cube`] and [`Face7`] identifying one face of it or the interior.
 /// This pattern appears in cursor selection and collision detection.
