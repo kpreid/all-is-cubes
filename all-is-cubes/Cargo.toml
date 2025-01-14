@@ -44,6 +44,10 @@ name = "space"
 harness = false
 
 [[example]]
+name = "light-tree"
+required-features = ["rerun"]
+
+[[example]]
 name = "visualize-raycast"
 required-features = ["rerun"]
 
@@ -142,12 +146,6 @@ re_types = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["alloc", "derive", "rc"] }
 unicode-segmentation = { workspace = true }
 yield-progress = { workspace = true, features = ["sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
-
-[build-dependencies]
-all-is-cubes-base = { workspace = true }
-bytemuck = { workspace = true, features = ["derive"] }
-euclid = { workspace = true }
-num-traits = { workspace = true }
 
 [dev-dependencies]
 allocation-counter = { workspace = true }

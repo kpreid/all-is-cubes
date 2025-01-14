@@ -6,7 +6,6 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::{fmt, mem};
 
-use euclid::Vector3D;
 use manyfmt::Fmt;
 
 #[cfg(feature = "auto-threads")]
@@ -17,10 +16,8 @@ use crate::block::{self, EvaluatedBlock};
 use crate::math::{
     Cube, CubeFace, Face6, Face7, FaceMap, OpacityCategory, PositiveSign, Rgb, Rgba, Vol,
 };
-use crate::raycast::Ray;
-use crate::space::light::{
-    LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority, chart::LightChart,
-};
+use crate::space::light::debug::LightUpdateRayInfo;
+use crate::space::light::{LightUpdateQueue, LightUpdateRequest, Priority, chart};
 use crate::space::palette::Palette;
 use crate::space::{
     BlockIndex, BlockSky, ChangeBuffer, GridAab, LightPhysics, LightStatus, PackedLight,
@@ -367,13 +364,12 @@ impl LightStorage {
     where
         D: LightComputeOutput,
     {
-        let mut cube_buffer = LightBuffer::new();
-        let mut info_rays = D::RayInfoBuffer::default();
-
         let maximum_distance = match self.physics {
             LightPhysics::None => 0,
             LightPhysics::Rays { maximum_distance } => maximum_distance,
         };
+        let mut cube_buffer = LightBuffer::new(maximum_distance);
+        let mut info_rays = D::RayInfoBuffer::default();
 
         let ev_origin = uc.get_evaluated(cube);
         let origin_is_opaque = ev_origin.opaque() == FaceMap::splat(true);
@@ -387,59 +383,18 @@ impl LightStorage {
                 FaceMap::from_fn(|face| uc.get_evaluated(cube + face.normal_vector()));
             let direction_weights = directions_to_seek_light(ev_origin, ev_neighbors);
 
-            for (ray_info, relative_cube_sequence) in LightChart::get().rays(maximum_distance) {
-                // TODO: Theoretically we should weight light rays by the cosine but that has caused poor behavior in the past.
-                let ray_weight_by_faces = ray_info
-                    .face_cosines()
-                    .zip(direction_weights, |_face, ray_cosine, reflects| {
-                        ray_cosine * reflects
-                    })
-                    .into_values_iter()
-                    .sum::<f32>();
-                if ray_weight_by_faces <= 0.0 {
-                    continue;
-                }
-                let mut ray_state =
-                    LightRayState::new(cube, ray_info.direction.into(), ray_weight_by_faces);
-
-                // Stores the light value that might have been fetched, if it was, from the previous
-                // step's cube_ahead, which is the current step's cube_behind.
-                let mut light_behind_cache: Option<PackedLight> = None;
-
-                'raycast: for step in relative_cube_sequence {
-                    let cube_face = step
-                        .relative_cube_face()
-                        .translate(cube.lower_bounds().to_vector());
-
-                    cube_buffer.cost += 1;
-                    if !self.contents.bounds().contains_cube(cube_face.cube) {
-                        // Stop (and display the sky) if we exit the space bounds.
-                        break 'raycast;
-                    }
-
-                    let mut light_ahead_cache = None;
-                    cube_buffer.traverse::<D>(
-                        &mut ray_state,
-                        &mut info_rays,
-                        self,
-                        step.relative_cube_face()
-                            .translate(cube.lower_bounds().to_vector()),
-                        f64::from(step.distance), // TODO: this will be sloppy
-                        uc.get_evaluated(cube_face.cube),
-                        &mut light_ahead_cache,
-                        light_behind_cache,
-                    );
-                    if ray_state.alpha.partial_cmp(&0.0) != Some(Ordering::Greater) {
-                        break;
-                    }
-
-                    light_behind_cache = light_ahead_cache;
-                }
-                // Rays that didn't hit anything close enough will be treated
-                // as sky. TODO: We should have a better policy in case of large
-                // indoor spaces.
-                cube_buffer.end_of_ray(&ray_state, &self.sky);
-            }
+            self.walk_ray_tree::<D>(
+                uc,
+                &mut info_rays,
+                &mut cube_buffer,
+                cube,
+                cube,
+                Face7::Within,
+                chart::get(),
+                0,
+                None,
+                LightRayState::new(direction_weights),
+            );
         }
 
         let new_light_value = cube_buffer.finish(origin_is_opaque);
@@ -451,6 +406,118 @@ impl LightStorage {
             cost: cube_buffer.cost,
             debug: D::new(cube, new_light_value, info_rays),
         }
+    }
+
+    /// Traverse space according to the light propagation chart, which describes bundles of light rays.
+    ///
+    /// * `light_from_previous_cube` is the light value fetched, if it was, from the previous
+    ///   step (parent tree node).
+    /// * `ray_state` describes TODO
+    ///
+    /// Returns the total weight that was added to `cube_buffer.total_ray_weight`
+    #[expect(clippy::too_many_arguments)]
+    fn walk_ray_tree<D: LightComputeOutput>(
+        &self,
+        uc: UpdateCtx<'_>,
+        info_rays: &mut D::RayInfoBuffer,
+        cube_buffer: &mut LightBuffer,
+        origin_cube: Cube,
+        cube_entered: Cube,
+        face_entered: Face7,
+        chart: &[chart::FlatNode],
+        node_index: usize,
+        light_from_previous_cube: Option<PackedLight>,
+        mut ray_state: LightRayState,
+    ) -> f32 {
+        let node: &chart::FlatNode = &chart[node_index];
+
+        let ray_bundle_weight = (node.weight() * ray_state.direction_weights).sum();
+        if ray_bundle_weight <= 0.0 {
+            // This direction has zero effective weight, so it contributes nothing. Stop recursing.
+            return ray_bundle_weight;
+        }
+
+        let distance_squared = (cube_entered.midpoint() - origin_cube.midpoint()).square_length();
+        if distance_squared > cube_buffer.maximum_distance_squared {
+            cube_buffer.end_of_ray(
+                &ray_state,
+                &self.block_sky,
+                ray_bundle_weight,
+                node.weight(),
+            );
+            return ray_bundle_weight;
+        }
+
+        cube_buffer.cost += 1;
+        if !self.contents.bounds().contains_cube(cube_entered) {
+            // Stop (and display the sky) if we exit the space bounds.
+
+            // Rays that didn't hit anything close enough will be treated
+            // as sky. TODO: We should have a better policy in case of large
+            // indoor spaces.
+            cube_buffer.end_of_ray(
+                &ray_state,
+                &self.block_sky,
+                ray_bundle_weight,
+                node.weight(),
+            );
+            return ray_bundle_weight;
+        }
+
+        let mut light_ahead_cache = None;
+        cube_buffer.traverse::<D>(
+            &mut ray_state,
+            info_rays,
+            self,
+            CubeFace {
+                cube: cube_entered,
+                face: face_entered,
+            },
+            uc.get_evaluated(cube_entered),
+            &mut light_ahead_cache,
+            light_from_previous_cube,
+            node.weight(),
+        );
+        if ray_state.alpha.partial_cmp(&0.0) != Some(Ordering::Greater) {
+            cube_buffer.end_of_ray(
+                &ray_state,
+                &self.block_sky,
+                ray_bundle_weight,
+                node.weight(),
+            );
+            return ray_bundle_weight;
+        }
+
+        let mut child_weight_sum: f32 = 0.0;
+        for (child_direction, child_index) in node.children() {
+            if let Some(child_index) = child_index {
+                // Note we pass ray_state, *not* &mut ray_state.
+                // This way, each branch of the tree gets its own.
+                child_weight_sum += self.walk_ray_tree::<D>(
+                    uc,
+                    info_rays,
+                    cube_buffer,
+                    origin_cube,
+                    cube_entered + child_direction,
+                    child_direction.opposite().into(),
+                    chart,
+                    child_index.get() as usize,
+                    light_ahead_cache,
+                    ray_state,
+                );
+            }
+        }
+
+        // Some or all of the rays in the tree-branch/bundle may have ended.
+        // Their total weight is however much of this node’s weight is not accounted for
+        // by its children.
+        cube_buffer.end_of_ray(
+            &ray_state,
+            &self.block_sky,
+            (ray_bundle_weight - child_weight_sum).max(0.0),
+            node.weight(),
+        );
+        ray_bundle_weight
     }
 
     /// Clear and recompute light data and update queue, in a way which gets fast approximate
@@ -622,53 +689,55 @@ struct LightBuffer {
     /// Approximation of CPU cost of doing the calculation, with one unit defined as
     /// one raycast step.
     cost: usize,
+
+    /// Maximum distance to traverse.
+    maximum_distance_squared: f64,
 }
 
-/// Companion to [`LightBuffer`] that tracks state for a single ray that makes part of
+/// Companion to [`LightBuffer`] that tracks state for a ray-bundle that makes part of
 /// the sum.
+#[derive(Clone, Copy, Debug)]
 struct LightRayState {
     /// Fraction of the light value that is to be determined by future, rather than past,
     /// tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
     alpha: f32,
 
-    /// Weighting factor for how much this ray contributes to the total light.
-    /// If zero, this will not be counted as a ray at all.
+    /// Weighting factors (from [`directions_to_seek_light`], currently either 1 or 0) that
+    /// are to be multiplied by the weights in the chart to determine the final weight.
+    ///
+    /// It is split up by faces because the light chart bundles many rays in different directions;
+    /// multiplying this by the chart's weights and summing produces the actual weight to use.
     ///
     /// Note that this is unrelated to alpha — it is *not* reduced by opacity.
     /// It determines what proportion of the final light value is produced by this ray
     /// relative to other rays.
-    ray_weight_by_faces: f32,
-
-    /// The ray we're casting; remembered for debugging and sky light sampling.
-    translated_ray: Ray,
+    direction_weights: FaceMap<f32>,
 }
 
 impl LightRayState {
-    /// * `origin_cube`: cube we are actually starting from
-    /// * `abstract_ray`: ray as if we were lighting the [0, 0, 0] cube
     /// * `ray_weight_by_faces`: how much influence this ray should have on the
     ///   total illumination
-    fn new(origin_cube: Cube, direction: Vector3D<f32, Cube>, ray_weight_by_faces: f32) -> Self {
-        let translated_ray = Ray::new(origin_cube.midpoint(), direction.map(f64::from));
+    fn new(direction_weights: FaceMap<f32>) -> Self {
         LightRayState {
             alpha: 1.0,
-            ray_weight_by_faces,
-            translated_ray,
+            direction_weights,
         }
     }
 }
 
 impl LightBuffer {
-    fn new() -> Self {
+    fn new(maximum_distance: u8) -> Self {
+        let maximum_distance = f64::from(maximum_distance);
         Self {
             incoming_light: Rgb::ZERO,
             total_ray_weight: 0.0,
             dependencies: Vec::new(),
             cost: 0,
+            maximum_distance_squared: maximum_distance * maximum_distance,
         }
     }
 
-    /// Process a ray intersecting a single cube.
+    /// Process a ray (or bundle of rays) intersecting a single cube.
     ///
     /// The caller should check `ray_state.alpha` to decide when to stop calling this.
     ///
@@ -682,10 +751,10 @@ impl LightBuffer {
         info: &mut D::RayInfoBuffer,
         current_light: &LightStorage,
         hit: CubeFace,
-        distance: f64,
         ev_hit: &EvaluatedBlock,
         light_ahead_cache: &mut Option<PackedLight>,
         light_behind_cache: Option<PackedLight>,
+        chart_weights: FaceMap<f32>,
     ) where
         D: LightComputeOutput,
     {
@@ -719,7 +788,7 @@ impl LightBuffer {
 
             // Setting the weight to 0 cancels its future effect,
             // and there were no past effects.
-            ray_state.ray_weight_by_faces = 0.0;
+            ray_state.direction_weights = FaceMap::splat(0.0);
             ray_state.alpha = 0.0;
             return;
         }
@@ -744,8 +813,9 @@ impl LightBuffer {
             let light_from_struck_face =
                 ev_hit.light_emission() + hit_surface_color.reflect(stored_light.value());
 
-            self.incoming_light +=
-                light_from_struck_face * ray_state.alpha * ray_state.ray_weight_by_faces;
+            self.incoming_light += light_from_struck_face
+                * ray_state.alpha
+                * (ray_state.direction_weights * chart_weights).sum();
 
             self.cost += 10;
             if self.dependencies.last() != Some(&light_cube) {
@@ -762,8 +832,8 @@ impl LightBuffer {
                 // Diagnostics:
                 // Iff this is the hit that terminates the ray, record it.
                 // TODO: Record transparency too.
+                _ = info;
                 D::push_ray(info, || LightUpdateRayInfo {
-                    ray: ray_state.translated_ray.scale_direction(distance),
                     trigger_cube: hit.cube,
                     value_cube: light_cube,
                     value: stored_light,
@@ -792,8 +862,9 @@ impl LightBuffer {
             // reflection/transmission. It's perfectly okay to have a totally transparent (alpha
             // equals zero), yet emissive, block.
             let light_from_traversed_block = ev_hit.light_emission() + stored_light * hit_alpha;
-            self.incoming_light +=
-                light_from_traversed_block * ray_state.alpha * ray_state.ray_weight_by_faces;
+            self.incoming_light += light_from_traversed_block
+                * ray_state.alpha
+                * (ray_state.direction_weights * chart_weights).sum();
 
             self.cost += 10;
             self.dependencies.push(light_cube);
@@ -803,18 +874,35 @@ impl LightBuffer {
     }
 
     /// The raycast exited the world or hit an opaque block; finish up by applying
-    /// sky and incrementing the count.
-    fn end_of_ray(&mut self, ray_state: &LightRayState, sky: &Sky) {
+    /// sky and adding to the total weight.
+    #[inline]
+    fn end_of_ray(
+        &mut self,
+        ray_state: &LightRayState,
+        block_sky: &BlockSky,
+        ray_bundle_weight: f32,
+        chart_weights: FaceMap<f32>,
+    ) {
         // TODO: set *info even if we hit the sky
 
         // Note: this condition is key to allowing some cases to
         // not count this as a successful ray.
         // TODO: clarify signaling flow?
-        if ray_state.ray_weight_by_faces > 0. {
+        if ray_bundle_weight > 0. {
+            // Compute the incoming sky light using the BlockSky. Note: This is a flawed
+            // approximate sampling because it includes the entire face direction, even if the
+            // current ray bundle is a much narrower cone.
+            let sky_light: Rgb = (FaceMap::from_fn(|face| {
+                block_sky.in_direction(face).value() * (chart_weights[face])
+            }))
+            .sum()
+                * chart_weights.sum().recip();
+
             // Note that if ray_state.alpha has reached zero, the sky color has no effect.
             self.add_weighted_light(
-                sky.sample(ray_state.translated_ray.direction) * ray_state.alpha,
-                ray_state.ray_weight_by_faces,
+                // TODO: this is the wrong set of weights, we should be using the chart's weights
+                sky_light * ray_state.alpha,
+                ray_bundle_weight,
             );
         }
     }

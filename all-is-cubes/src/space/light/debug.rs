@@ -6,7 +6,7 @@
 
 use alloc::vec::Vec;
 
-use crate::math::{Cube, LineVertex, Rgb};
+use crate::math::{Cube, LineVertex, Rgb, Wireframe};
 use crate::raycast::Ray;
 use crate::space::PackedLight;
 use crate::util::MapExtend;
@@ -48,7 +48,7 @@ pub struct LightUpdateCubeInfo {
     pub(crate) rays: Vec<LightUpdateRayInfo>,
 }
 
-impl crate::math::Wireframe for LightUpdateCubeInfo {
+impl Wireframe for LightUpdateCubeInfo {
     fn wireframe_points<E>(&self, output: &mut E)
     where
         E: Extend<LineVertex>,
@@ -57,7 +57,7 @@ impl crate::math::Wireframe for LightUpdateCubeInfo {
         self.cube.aab().expand(0.1).wireframe_points(output);
         // Draw rays
         for ray_info in self.rays.iter() {
-            ray_info.wireframe_points(output);
+            ray_info.wireframe_points(self.cube, output);
         }
     }
 }
@@ -65,12 +65,6 @@ impl crate::math::Wireframe for LightUpdateCubeInfo {
 #[derive(Clone, Copy, Debug)]
 #[expect(unnameable_types)] //
 pub struct LightUpdateRayInfo {
-    pub(crate) ray: Ray,
-
-    #[expect(
-        dead_code,
-        reason = "field used for Debug printing but not visualized yet"
-    )]
     pub(crate) trigger_cube: Cube,
 
     pub(crate) value_cube: Cube,
@@ -87,17 +81,25 @@ pub struct LightUpdateRayInfo {
     pub(crate) light_from_struck_face: Rgb,
 }
 
-impl crate::math::Wireframe for LightUpdateRayInfo {
-    fn wireframe_points<E>(&self, output: &mut E)
+impl LightUpdateRayInfo {
+    fn wireframe_points<E>(&self, lit_cube: Cube, output: &mut E)
     where
         E: Extend<LineVertex>,
     {
         // TODO: Visualize trigger_cube and value.
+
+        // We used to have precise rays, but we don't have them any more.
+        // Approximate them using the involved cubes.
+        let hit_point = self
+            .trigger_cube
+            .midpoint()
+            .lerp(self.value_cube.midpoint(), 0.5);
+        let ray = Ray::new(lit_cube.midpoint(), hit_point - lit_cube.midpoint());
+
         self.value_cube.aab().expand(0.01).wireframe_points(output);
-        self.ray
-            .wireframe_points(&mut MapExtend::new(output, |mut v: LineVertex| {
-                v.color = Some(self.light_from_struck_face.with_alpha_one());
-                v
-            }))
+        ray.wireframe_points(&mut MapExtend::new(output, |mut v: LineVertex| {
+            v.color = Some(self.light_from_struck_face.with_alpha_one());
+            v
+        }))
     }
 }

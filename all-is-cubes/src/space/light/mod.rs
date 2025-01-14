@@ -3,13 +3,16 @@ pub use data::PackedLight;
 pub(crate) use data::{LightStatus, PackedLightScalar};
 
 mod debug;
+pub(crate) use debug::LightComputeOutput;
 #[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
 pub use debug::LightUpdateCubeInfo;
-pub(crate) use debug::{LightComputeOutput, LightUpdateRayInfo};
 
 mod queue;
 pub(crate) use queue::{LightUpdateQueue, LightUpdateRequest, Priority};
 
+#[cfg(feature = "rerun")]
+pub mod chart;
+#[cfg(not(feature = "rerun"))]
 mod chart;
 
 mod updater;

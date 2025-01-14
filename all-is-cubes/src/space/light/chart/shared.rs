@@ -1,138 +1,44 @@
-//! The single purpose of this file is to be used by both the regular crate code
-//! and the build script to share some binary structure layouts.
-//!
-//! This is the most efficient way I could think of to store and transfer the
-//! pre-computed light ray chart data.
+use core::num::NonZero;
 
-use all_is_cubes_base::math::{Face7, FaceMap};
+use all_is_cubes_base::math::FaceMap;
 
-// conditionally defined to be equal to f32 except in the build script
-use super::TargetEndian;
+// TODO: try using f16 for compactness.
+pub(crate) type Weight = f32;
 
-/// Information about a single one of the bundle of light rays that we follow
-/// from a struck block towards light sources.
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+/// Represents the information in `RayTreeNode` in a `Vec<FlatTreeNode>` rather than
+/// a tree with `Box`es.
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
-pub(crate) struct OneRay {
-    /// Unit direction vector specifying the ray direction.
-    pub direction: [TargetEndian<f32>; 3],
+#[doc(hidden)] // public only for debugging with examples/light-tree.rs
+pub struct FlatNode {
+    /// Total weight of all rays that take this path.
+    /// This is the sum of the weights of children plus the weight of rays that
+    /// terminate in this cube.
+    weight: FaceMap<Weight>,
 
-    /// `FaceMap` data which stores the cosine (rescaled to 0-255)
-    /// between each face normal and this ray.
-    pub face_cosines: PodFaceMap<u8>,
-
-    /// Guaranteed zero padding to make up a multiple of 4 bytes.
-    pub _padding: [u8; 2],
+    /// Children according to the step direction they take and identified by index in the table.
+    ///
+    /// `None` means no child.
+    ///
+    /// If all are empty, then this node is the last step in one or more raycasts.
+    children: FaceMap<Option<NonZero<u32>>>,
 }
 
-/// The pre-computed sequence of cubes which is traversed by a [`OneRay`].
-/// This format is used only while computing them.
-#[derive(Clone, Debug)]
-#[allow(dead_code)]
-#[repr(C)]
-pub(crate) struct Steps {
-    pub info: OneRay,
-    pub relative_cube_sequence: ::alloc::vec::Vec<Step>,
-}
+impl FlatNode {
+    pub fn new(weight: FaceMap<Weight>, children: FaceMap<Option<NonZero<u32>>>) -> Self {
+        Self { weight, children }
+    }
 
-/// The pre-computed sequence of cubes which is traversed by a [`OneRay`].
-/// This format is used in the static pre-computed data.
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
-pub(crate) struct IndirectSteps {
-    pub info: OneRay,
-    /// Sequence of steps to take, specified by an inclusive-exclusive range of a slice of
-    /// separately stored [`Step`]s.
-    pub relative_cube_sequence: [TargetEndian<u32>; 2],
-}
+    pub fn weight(&self) -> FaceMap<Weight> {
+        self.weight
+    }
 
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
-pub(crate) struct Step {
-    /// Cube we just hit, relative to the origin of rays
-    /// (the block we're computing light for).
-    pub relative_cube: [TargetEndian<i8>; 3],
-
-    /// Distance from ray origin that has been traversed so far to strike this cube,
-    /// rounded up.
-    pub distance: u8,
-
-    /// Face struck.
-    pub face: Face7Safe,
-}
-
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C)]
-pub(crate) struct Ray {
-    pub origin: [TargetEndian<f64>; 3],
-    pub direction: [TargetEndian<f64>; 3],
-}
-
-impl From<Ray> for all_is_cubes_base::raycast::Ray {
-    fn from(value: Ray) -> Self {
-        Self::new(value.origin.map(f64::from), value.direction.map(f64::from))
+    pub fn children(&self) -> FaceMap<Option<NonZero<u32>>> {
+        self.children
     }
 }
-
-/// [`Face6`] but without an enum's validity invariant.
-/// Panics on unsuccessful conversion.
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(transparent)]
-pub(crate) struct Face7Safe(u8);
-impl From<Face7Safe> for Face7 {
-    fn from(value: Face7Safe) -> Self {
-        match value.0 {
-            0 => Face7::Within,
-            1 => Face7::NX,
-            2 => Face7::NY,
-            3 => Face7::NZ,
-            4 => Face7::PX,
-            5 => Face7::PY,
-            6 => Face7::PZ,
-            _ => {
-                if cfg!(debug_assertions) {
-                    panic!("invalid {value:?}");
-                } else {
-                    // avoid generating a panic branch
-                    Face7::Within
-                }
-            }
-        }
+impl Default for FlatNode {
+    fn default() -> Self {
+        Self::new(FaceMap::splat(0.0), FaceMap::splat(None))
     }
 }
-impl From<Face7> for Face7Safe {
-    fn from(value: Face7) -> Self {
-        Self(value as u8)
-    }
-}
-
-/// Variant of [`FaceMap`] that can implement `bytemuck::Pod` because it is `repr(packed)`.
-/// (The regular `FaceMap` could too, *unsafely*, but I don't want to do that unsafe yet.)
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-#[repr(C, packed)]
-pub(crate) struct PodFaceMap<T> {
-    nx: T,
-    ny: T,
-    nz: T,
-    pz: T,
-    py: T,
-    px: T,
-}
-impl<T> From<FaceMap<T>> for PodFaceMap<T> {
-    #[rustfmt::skip]
-    fn from(value: FaceMap<T>) -> Self {
-        let FaceMap { nx, ny, nz, px, py, pz } = value;
-        Self { nx, ny, nz, pz, py, px }
-    }
-}
-impl<T> From<PodFaceMap<T>> for FaceMap<T> {
-    #[rustfmt::skip]
-    fn from(value: PodFaceMap<T>) -> Self {
-        let PodFaceMap { nx, ny, nz, pz, py, px } = value;
-        FaceMap { nx, ny, nz, px, py, pz }
-    }
-}
-
-// Note: Most of the methods are either only used for reading or only used for writing,
-// so they're defined in the respective crates to reduce complications like what they depend on,
-// how `TargetEndian` is defined, and dead code warnings.
