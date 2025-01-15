@@ -98,7 +98,7 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
             if let Some(texture) = &self.texture {
                 let full_width = self.local_buffer.size().width;
                 queue.write_texture(
-                    wgpu::ImageCopyTexture {
+                    wgpu::TexelCopyTextureInfo {
                         texture,
                         mip_level: 0,
                         origin: wgpu::Origin3d {
@@ -113,7 +113,7 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
                             * dirty_rect.top_left.y as usize
                             + dirty_rect.top_left.x as usize..],
                     ),
-                    wgpu::ImageDataLayout {
+                    wgpu::TexelCopyBufferLayout {
                         offset: 0,
                         bytes_per_row: Some(u32::try_from(size_of::<Out>()).unwrap() * full_width),
                         rows_per_image: None,

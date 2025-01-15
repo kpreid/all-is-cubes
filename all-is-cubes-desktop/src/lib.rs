@@ -8,6 +8,8 @@
 //! so that additional development tools can reuse the same UI code. Use at your own risk.
 //! Documentation is lacking.
 
+// Increase recursion limit for deeply nested wgpu types
+#![recursion_limit = "256"]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 

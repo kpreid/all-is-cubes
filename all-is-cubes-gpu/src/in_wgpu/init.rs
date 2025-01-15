@@ -17,9 +17,9 @@ use all_is_cubes_render::{camera, Flaws, Rendering};
 #[doc(hidden)]
 pub async fn create_instance_for_test_or_exit() -> wgpu::Instance {
     let stderr = &mut std::io::stderr();
-    let backends = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
+    let backends = wgpu::Backends::from_env().unwrap_or_else(wgpu::Backends::all);
 
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends,
         ..Default::default()
     });
@@ -97,7 +97,7 @@ pub async fn try_create_adapter_for_test(
         ));
         adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::util::power_preference_from_env()
+                power_preference: wgpu::PowerPreference::from_env()
                     .unwrap_or(wgpu::PowerPreference::HighPerformance),
                 compatible_surface: surface.as_ref(),
                 force_fallback_adapter: false,
@@ -290,9 +290,9 @@ impl TextureCopyParameters {
                 device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
             encoder.copy_texture_to_buffer(
                 texture.as_image_copy(),
-                wgpu::ImageCopyBuffer {
+                wgpu::TexelCopyBufferInfo {
                     buffer: &temp_buffer,
-                    layout: wgpu::ImageDataLayout {
+                    layout: wgpu::TexelCopyBufferLayout {
                         offset: 0,
                         bytes_per_row: Some(padded_bytes_per_row),
                         rows_per_image: Some(self.size.height),

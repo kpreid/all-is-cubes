@@ -292,6 +292,7 @@ fn bloom_mip_view(mip_level: u32, bloom_texture: &wgpu::Texture) -> wgpu::Textur
         label: Some(&format!("BloomResources bloom[{mip_level}]")),
         format: None,
         dimension: None,
+        usage: None,
         aspect: wgpu::TextureAspect::default(),
         base_mip_level: mip_level,
         mip_level_count: Some(1),

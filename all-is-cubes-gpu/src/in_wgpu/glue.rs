@@ -57,14 +57,14 @@ pub fn write_texture_by_aab<T: Pod, U>(
     let size = region.size();
 
     queue.write_texture(
-        wgpu::ImageCopyTexture {
+        wgpu::TexelCopyTextureInfo {
             texture,
             mip_level: 0,
             origin: point_to_origin(region.min),
             aspect: wgpu::TextureAspect::All,
         },
         bytemuck::must_cast_slice::<T, u8>(data),
-        wgpu::ImageDataLayout {
+        wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(size_of::<T>() as u32 * size.width),
             rows_per_image: Some(size.height),

@@ -196,7 +196,7 @@ async fn init_wgpu(
     backends: wgpu::Backends,
 ) -> Result<(wgpu::Surface<'static>, wgpu::Adapter), Box<dyn core::error::Error>> {
     let (surface, request_adapter_future) = {
-        let wgpu_instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let wgpu_instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends,
             ..Default::default()
         });

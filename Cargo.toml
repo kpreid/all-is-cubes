@@ -75,9 +75,9 @@ arbitrary = { version = "1.4.1", features = ["derive"] }
 arrayvec = { version = "0.7.4", default-features = false }
 async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
-bitflags = { version = "2.6.0", default-features = false }
+bitflags = { version = "2.8.0", default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
-bytemuck = { version = "1.19.0", default-features = false, features = ["derive", "must_cast"] }
+bytemuck = { version = "1.21.0", default-features = false, features = ["derive", "must_cast"] }
 cfg-if = { version = "1.0.0", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.2.4", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
@@ -157,7 +157,7 @@ unicode-width = { version = "0.2", default-features = false }
 # explicitly enabling "std" needed for <https://github.com/rustwasm/wasm-bindgen/issues/4303>
 wasm-bindgen-futures = { version = "0.4.50", default-features = false, features = ["std"] }
 web-time = { version = "1.1.0", default-features = false }
-wgpu = { version = "23.0.0", default-features = false, features = ["wgsl"] }
+wgpu = { version = "24.0.0", default-features = false, features = ["wgsl"] }
 yield-progress = { version = "0.1.6", default-features = false }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.

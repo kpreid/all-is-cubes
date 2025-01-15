@@ -137,7 +137,7 @@ fn compute_skybox(queue: &wgpu::Queue, texture: &wgpu::Texture, sky: &Sky) {
     queue.write_texture(
         texture.as_image_copy(),
         bytemuck::must_cast_slice::<[Component; CHANNELS], u8>(&data[..]),
-        wgpu::ImageDataLayout {
+        wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(resolution * (size_of::<Component>() * CHANNELS) as u32),
             rows_per_image: Some(resolution),
