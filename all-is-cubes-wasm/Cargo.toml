@@ -43,12 +43,12 @@ futures-core = { version = "0.3.31", default-features = false, features = ["allo
 # Feature enabling for indirect dependency all-is-cubes → rand → getrandom,
 # as well as our direct dependency
 getrandom = { version = "0.2.7", features = ["js"] }
-js-sys = "0.3.73"
+js-sys = "0.3.77"
 log = { version = "0.4.22", default-features = false }
 rand = { version = "0.8.3", default-features = false, features = ["std", "std_rng"] }
 send_wrapper = { version = "0.6.0", default-features = false }
-wasm-bindgen = "0.2.96"
-wasm-bindgen-futures = "0.4.46"
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
 web-time = { version = "1.1.0" }
 # Must be the same version as in the main workspace, i.e. as in all-is-cubes-gpu.
 wgpu = { version = "23.0.0", default-features = false, features = ["webgpu", "webgl"] }
@@ -56,7 +56,7 @@ wgpu = { version = "23.0.0", default-features = false, features = ["webgpu", "we
 yield-progress = { version = "0.1.6", features = ["log_hiccups"] }
 
 [dependencies.web-sys]
-version = "0.3.73"
+version = "0.3.77"
 features = [
   "console",
   "AddEventListenerOptions",

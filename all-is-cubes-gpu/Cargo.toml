@@ -78,7 +78,7 @@ resource = "0.5.0"
 send_wrapper = { workspace = true, features = ["futures"] }
 wasm-bindgen-futures = { workspace = true }
 # For initializing tests on web. (This is not a dev-dependency because some of said tests are not in this package.)
-web-sys = { version = "0.3.73", features = ["OffscreenCanvas"] }
+web-sys = { version = "0.3.77", features = ["OffscreenCanvas"] }
 web-time = { workspace = true }
 wgpu = { workspace = true, optional = true }
 
