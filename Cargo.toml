@@ -75,7 +75,7 @@ arbitrary = { version = "1.4.1", features = ["derive"] }
 arrayvec = { version = "0.7.4", default-features = false }
 async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
-bitflags = { version = "2.6.0", default-features = false }
+bitflags = { version = "2.8.0", default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.19.0", default-features = false, features = ["derive", "must_cast"] }
 cfg-if = { version = "1.0.0", default-features = false }
