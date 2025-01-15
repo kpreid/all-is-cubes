@@ -34,7 +34,6 @@ allow-wildcard-paths = true
 
 skip = [
     { name = "core-foundation", version = "0.9.4" }, # old used by `winit`
-    { name = "cfg_aliases" }, # winit and wgpu use different versions
     { name = "unicode-width", version = "0.1" }, # old used by `codespan-reporting` via `wgpu`
 ]
 
