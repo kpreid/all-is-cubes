@@ -147,14 +147,7 @@ mod chart_schema {
             let face_cosines = face_cosines.map(|_, cosine| (cosine * 255.0).round() as u8);
             Self {
                 direction: direction.map(TargetEndian::from).into(),
-                face_cosines: [
-                    face_cosines.nx,
-                    face_cosines.ny,
-                    face_cosines.nz,
-                    face_cosines.px,
-                    face_cosines.py,
-                    face_cosines.pz,
-                ],
+                face_cosines: face_cosines.into(),
                 _padding: [0; 2],
             }
         }

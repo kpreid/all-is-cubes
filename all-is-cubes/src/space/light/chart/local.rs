@@ -6,16 +6,7 @@ use crate::space::light::chart;
 
 impl chart::OneRay {
     pub fn face_cosines(&self) -> FaceMap<f32> {
-        let [nx, ny, nz, px, py, pz] = self.face_cosines;
-        FaceMap {
-            nx,
-            ny,
-            nz,
-            px,
-            py,
-            pz,
-        }
-        .map(|_, byte| f32::from(byte) / 255.0f32)
+        FaceMap::from(self.face_cosines).map(|_, byte| f32::from(byte) / 255.0f32)
     }
 }
 

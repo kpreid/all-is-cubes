@@ -4,7 +4,7 @@
 //! This is the most efficient way I could think of to store and transfer the
 //! pre-computed light ray chart data.
 
-use all_is_cubes_base::math::Face7;
+use all_is_cubes_base::math::{Face7, FaceMap};
 
 // conditionally defined to be equal to f32 except in the build script
 use super::TargetEndian;
@@ -19,7 +19,7 @@ pub(crate) struct OneRay {
 
     /// `FaceMap` data which stores the cosine (rescaled to 0-255)
     /// between each face normal and this ray.
-    pub face_cosines: [u8; 6],
+    pub face_cosines: PodFaceMap<u8>,
 
     /// Guaranteed zero padding to make up a multiple of 4 bytes.
     pub _padding: [u8; 2],
@@ -103,6 +103,33 @@ impl From<Face7Safe> for Face7 {
 impl From<Face7> for Face7Safe {
     fn from(value: Face7) -> Self {
         Self(value as u8)
+    }
+}
+
+/// Variant of [`FaceMap`] that can implement `bytemuck::Pod` because it is `repr(packed)`.
+/// (The regular `FaceMap` could too, *unsafely*, but I don't want to do that unsafe yet.)
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C, packed)]
+pub(crate) struct PodFaceMap<T> {
+    nx: T,
+    ny: T,
+    nz: T,
+    pz: T,
+    py: T,
+    px: T,
+}
+impl<T> From<FaceMap<T>> for PodFaceMap<T> {
+    #[rustfmt::skip]
+    fn from(value: FaceMap<T>) -> Self {
+        let FaceMap { nx, ny, nz, px, py, pz } = value;
+        Self { nx, ny, nz, pz, py, px }
+    }
+}
+impl<T> From<PodFaceMap<T>> for FaceMap<T> {
+    #[rustfmt::skip]
+    fn from(value: PodFaceMap<T>) -> Self {
+        let PodFaceMap { nx, ny, nz, pz, py, px } = value;
+        FaceMap { nx, ny, nz, px, py, pz }
     }
 }
 
