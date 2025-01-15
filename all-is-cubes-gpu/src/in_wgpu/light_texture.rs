@@ -460,16 +460,16 @@ impl LightTexture {
                 // TODO: When compute shaders are available, use a compute shader to do these
                 // scattered writes instead of issuing individual commands.
                 encoder.copy_buffer_to_texture(
-                    wgpu::ImageCopyBuffer {
+                    wgpu::TexelCopyBufferInfo {
                         buffer: &self.copy_buffer,
-                        layout: wgpu::ImageDataLayout {
+                        layout: wgpu::TexelCopyBufferLayout {
                             offset: (index_in_batch * (LIGHT_CHUNK_VOLUME * Self::COMPONENTS))
                                 as u64,
                             bytes_per_row: None,
                             rows_per_image: None,
                         },
                     },
-                    wgpu::ImageCopyTexture {
+                    wgpu::TexelCopyTextureInfo {
                         texture: &self.texture,
                         mip_level: 0,
                         origin: point_to_origin(

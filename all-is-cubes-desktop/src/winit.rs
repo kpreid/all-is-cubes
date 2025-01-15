@@ -203,8 +203,8 @@ pub async fn create_winit_wgpu_desktop_session(
         window.window.inner_size(),
     ));
 
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-        backends: wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all),
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        backends: wgpu::Backends::from_env().unwrap_or_else(wgpu::Backends::all),
         ..Default::default()
     });
 
@@ -215,7 +215,7 @@ pub async fn create_winit_wgpu_desktop_session(
         wgpu::util::initialize_adapter_from_env(&instance, Some(&surface));
     if adapter.is_none() {
         let request_adapter_future = instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::util::power_preference_from_env()
+            power_preference: wgpu::PowerPreference::from_env()
                 .unwrap_or(wgpu::PowerPreference::HighPerformance),
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
