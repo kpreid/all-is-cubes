@@ -82,7 +82,7 @@ gilrs = { workspace = true }
 hashbrown = { workspace = true }
 indicatif = { version = "0.17.0", default-features = false }
 itertools = { workspace = true }
-kira = { version = "0.9.4", optional = true, default-features = false, features = ["cpal"] }
+kira = { version = "0.10.1", optional = true, default-features = false, features = ["cpal"] }
 log = { workspace = true }
 png = { workspace = true, optional = true }
 rand = { workspace = true, features = ["std", "std_rng"] }
