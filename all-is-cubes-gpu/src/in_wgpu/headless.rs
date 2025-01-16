@@ -21,14 +21,13 @@ use crate::in_wgpu::{self, init};
 #[derive(Clone, Debug)]
 pub struct Builder {
     executor: Arc<dyn Executor>,
-    adapter: Arc<wgpu::Adapter>,
-    device: Arc<wgpu::Device>,
-    queue: Arc<wgpu::Queue>,
+    adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
 }
 
 impl Builder {
     /// Create a [`Builder`] by obtaining a new [`wgpu::Device`] from the given adapter.
-    #[cfg_attr(target_family = "wasm", expect(clippy::arc_with_non_send_sync))]
     pub async fn from_adapter(
         label: &str,
         adapter: wgpu::Adapter,
@@ -43,9 +42,9 @@ impl Builder {
             )
             .await?;
         Ok(Self {
-            device: Arc::new(device),
-            queue: Arc::new(queue),
-            adapter: Arc::new(adapter),
+            device,
+            queue,
+            adapter,
             executor: Arc::new(()),
         })
     }
@@ -100,8 +99,8 @@ pub struct Renderer {
 /// Internals of [`Renderer`] to actually do the rendering.
 #[derive(Debug)]
 struct RendererImpl {
-    device: Arc<wgpu::Device>,
-    queue: Arc<wgpu::Queue>,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
     color_texture: wgpu::Texture,
     everything: super::EverythingRenderer<AdaptedInstant>,
     viewport_source: listen::DynSource<Viewport>,

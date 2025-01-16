@@ -106,7 +106,7 @@ pub fn device_descriptor(
 #[derive(Debug)]
 pub struct SurfaceRenderer<I: time::Instant> {
     surface: wgpu::Surface<'static>,
-    device: Arc<wgpu::Device>,
+    device: wgpu::Device,
     queue: wgpu::Queue,
 
     everything: EverythingRenderer<I>,
@@ -134,8 +134,6 @@ impl<I: time::Instant> SurfaceRenderer<I> {
             None,
         );
         let (device, queue) = request_device_future.await?;
-        #[cfg_attr(target_family = "wasm", expect(clippy::arc_with_non_send_sync))]
-        let device = Arc::new(device);
 
         let viewport_source = cameras.viewport_source();
         let everything = EverythingRenderer::new(
@@ -156,7 +154,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     }
 
     /// Returns a clonable handle to the device this renderer owns.
-    pub fn device(&self) -> &Arc<wgpu::Device> {
+    pub fn device(&self) -> &wgpu::Device {
         &self.device
     }
 
@@ -271,7 +269,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
 struct EverythingRenderer<I: time::Instant> {
     executor: Arc<dyn Executor>,
 
-    device: Arc<wgpu::Device>,
+    device: wgpu::Device,
 
     staging_belt: wgpu::util::StagingBelt,
 
@@ -369,7 +367,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
     pub fn new(
         executor: Arc<dyn Executor>,
-        device: Arc<wgpu::Device>,
+        device: wgpu::Device,
         cameras: StandardCameras,
         surface_format: wgpu::TextureFormat,
         adapter: &wgpu::Adapter,

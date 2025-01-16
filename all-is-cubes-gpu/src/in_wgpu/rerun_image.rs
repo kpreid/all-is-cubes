@@ -1,7 +1,6 @@
 //! Exports the rendered image to Rerun.
 
 use std::num::NonZeroU64;
-use std::sync::Arc;
 
 use futures_core::future::BoxFuture;
 
@@ -14,7 +13,7 @@ use crate::in_wgpu::pipelines::Pipelines;
 use crate::Memo;
 
 pub(crate) struct RerunImageExport {
-    device: Arc<wgpu::Device>,
+    device: wgpu::Device,
 
     destination: rg::Destination,
     image_copy_future: Option<BoxFuture<'static, RerunImageCopyOutput>>,
@@ -37,7 +36,7 @@ struct Resources {
 }
 
 impl RerunImageExport {
-    pub fn new(device: Arc<wgpu::Device>) -> Self {
+    pub fn new(device: wgpu::Device) -> Self {
         Self {
             resources: Memo::new(),
             device,
@@ -249,7 +248,7 @@ type RerunImageCopyOutput = (
 );
 
 fn perform_image_copy(
-    device: &Arc<wgpu::Device>,
+    device: &wgpu::Device,
     queue: &wgpu::Queue,
     srgb_scene_texture: &wgpu::Texture,
     depth_texture: &wgpu::Texture,

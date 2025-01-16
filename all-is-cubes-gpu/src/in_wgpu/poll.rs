@@ -1,24 +1,29 @@
-use std::collections::HashSet;
-use std::sync::{OnceLock, Weak};
+use std::collections::HashMap;
+use std::sync::{Arc, OnceLock, Weak};
 
 use cfg_if::cfg_if;
 #[cfg(target_family = "wasm")]
 use futures_util::StreamExt as _;
 
-/// Start polling the given [`wgpu::Device`] until it is dropped or its queue is empty,
-/// as reported by [`wgpu::Device::poll()`], to ensure that callbacks are invoked promptly.
-///
-/// This should be called immediately *after* each operation of interest, such as
-/// [`wgpu::BufferView::map_async()`].
+/// Start polling the given [`wgpu::Device`] in the background until the returned guard is dropped.
 ///
 /// Calling this function again with the same device will not create redundant work.
 /// It may block briefly if demand is high or if a callback function takes a long time
 /// (which they should avoid).
-pub(crate) fn ensure_polled(device: Weak<wgpu::Device>) {
+pub(crate) fn start_polling(device: wgpu::Device) -> Poller {
+    let poller = Poller(Arc::new(device));
+
     // (The wgpu docs say polling is automatic “on web” but they mean WebGPU, not WebGL,
     // so we need to do this on all platforms.)
-    inner::ensure_polled(device)
+    inner::send_to_poller_task(Arc::downgrade(&poller.0));
+
+    poller
 }
+
+/// As long as this guard is not dropped,
+/// the contained [`wgpu::Device`] will be polled periodically.
+#[derive(Debug)]
+pub(crate) struct Poller(Arc<wgpu::Device>);
 
 #[cfg(not(target_family = "wasm"))]
 mod inner {
@@ -26,7 +31,7 @@ mod inner {
 
     static POLLER_CHANNEL: OnceLock<flume::Sender<Weak<wgpu::Device>>> = OnceLock::new();
 
-    pub(super) fn ensure_polled(device: Weak<wgpu::Device>) {
+    pub(super) fn send_to_poller_task(device: Weak<wgpu::Device>) {
         POLLER_CHANNEL
             .get_or_init(init_poller_task)
             .send(device)
@@ -58,7 +63,7 @@ mod inner {
             const { OnceLock::new() };
     }
 
-    pub(super) fn ensure_polled(device: Weak<wgpu::Device>) {
+    pub(super) fn send_to_poller_task(device: Weak<wgpu::Device>) {
         POLLER_CHANNEL.with(|ch| ch.get_or_init(init_poller_task).send(device).unwrap())
     }
 
@@ -71,7 +76,8 @@ mod inner {
     }
 }
 
-/// Polls all [`wgpu::Device`]s delivered to it on `POLLING_CHANNEL`.
+/// Polls all [`wgpu::Device`]s delivered to it on `POLLING_CHANNEL`,
+/// as long as each device has at least one weak handle to it.
 /// To be run on a thread or async task as the platform permits.
 #[expect(clippy::infinite_loop)]
 async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
@@ -79,45 +85,37 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
     // non-realtime headless rendering.
     let polling_interval = core::time::Duration::from_millis(10);
 
-    let mut to_poll: HashSet<WeakIdentityDevice> = HashSet::new();
-    let mut to_drop: Vec<WeakIdentityDevice> = Vec::new();
+    // We want to poll each device only once per polling interval, but there may be multiple
+    // requests to poll the same device. This table has devices as keys and requests as values.
+    let mut to_poll: HashMap<wgpu::Device, Vec<Weak<wgpu::Device>>> = HashMap::new();
+
     #[cfg(target_family = "wasm")]
     let mut tick_stream =
         gloo_timers::future::IntervalStream::new(polling_interval.as_millis().try_into().unwrap())
             .fuse();
 
     loop {
+        // Prune dropped requests and their devices.
+        to_poll.retain(|_, requests| {
+            requests.retain(|request| Weak::upgrade(request).is_some());
+            !requests.is_empty()
+        });
+
         // Poll all the devices to poll.
         // eprintln!("poller: polling {}", to_poll.len());
-        for device_ref in to_poll.iter() {
-            match device_ref.0.upgrade() {
-                Some(device) => {
-                    // Kludge: As of wgpu 0.18, using Maintain::Poll doesn't actually have any
-                    // effect (doesn't cause the map callbacks to run) on WebGL on Firefox.
-                    // So, for now, use Maintain::Wait (which also doesn't actually do any waiting
-                    // (wgpu bug), but *does* trigger the callbacks).
-                    // TODO: See if we can remove this in the next wgpu version.
-                    let maintain = if cfg!(target_family = "wasm") {
-                        wgpu::Maintain::Wait
-                    } else {
-                        wgpu::Maintain::Poll
-                    };
+        for device in to_poll.keys() {
+            // Kludge: As of wgpu 0.18, using Maintain::Poll doesn't actually have any
+            // effect (doesn't cause the map callbacks to run) on WebGL on Firefox.
+            // So, for now, use Maintain::Wait (which also doesn't actually do any waiting
+            // (wgpu bug), but *does* trigger the callbacks).
+            // TODO: See if we can remove this in the next wgpu version.
+            let maintain = if cfg!(target_family = "wasm") {
+                wgpu::Maintain::Wait
+            } else {
+                wgpu::Maintain::Poll
+            };
 
-                    let queue_empty = device.poll(maintain).is_queue_empty();
-                    if queue_empty {
-                        to_drop.push(device_ref.clone());
-                    }
-                }
-                None => to_drop.push(device_ref.clone()),
-            }
-        }
-
-        // Remove no-longer-necessary entries.
-        // if !to_drop.is_empty() {
-        //     eprintln!("poller: dropping {}", to_drop.len());
-        // }
-        for device_ref in to_drop.drain(..) {
-            to_poll.remove(&device_ref);
+            device.poll(maintain);
         }
 
         // While waiting for it to be time to poll again, check for incoming requests.
@@ -147,12 +145,17 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
         };
 
         match recv_result {
-            Ok(device) => {
-                // eprintln!("poller: got another device");
-                to_poll.insert(WeakIdentityDevice(device));
+            Ok(request) => {
+                if let Some(device) = request.upgrade() {
+                    // eprintln!("poller: got request for {device:?}");
+                    to_poll
+                        .entry(wgpu::Device::clone(&*device))
+                        .or_default()
+                        .push(request);
+                }
             }
             Err(flume::RecvTimeoutError::Disconnected) => {
-                // This shouldn't happen because the sender is never dropped
+                // This shouldn't happen because the sender is static and never dropped
                 log::warn!("shouldn't happen: wgpu poller channel disconnected");
             }
             Err(flume::RecvTimeoutError::Timeout) => {
@@ -160,22 +163,5 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
                 // continue to poll
             }
         }
-    }
-}
-
-/// Compare a `Weak<wgpu::Device>` by pointer identity.
-#[derive(Clone, Debug)]
-struct WeakIdentityDevice(Weak<wgpu::Device>);
-
-impl PartialEq for WeakIdentityDevice {
-    fn eq(&self, other: &Self) -> bool {
-        Weak::ptr_eq(&self.0, &other.0)
-    }
-}
-impl Eq for WeakIdentityDevice {}
-impl std::hash::Hash for WeakIdentityDevice {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let ptr: *const wgpu::Device = self.0.as_ptr();
-        ptr.hash(state);
     }
 }

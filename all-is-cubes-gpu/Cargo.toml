@@ -54,7 +54,7 @@ all-is-cubes-mesh = { workspace = true, features = ["dynamic"] }
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }
-# Used to implement ensure_polled(). Also a `wgpu` dependency already.
+# Used to implement start_polling(). Also a `wgpu` dependency already.
 flume = { workspace = true }
 futures-channel = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
@@ -69,7 +69,7 @@ half = { workspace = true, features = ["bytemuck"] }
 itertools = { workspace = true }
 log = { workspace = true }
 num-traits = { workspace = true }
-# Used to implement ensure_polled on non-Wasm targets, and in the `rerun` support.
+# Used to implement start_polling() on non-Wasm targets, and in the `rerun` support.
 pollster = { workspace = true }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }

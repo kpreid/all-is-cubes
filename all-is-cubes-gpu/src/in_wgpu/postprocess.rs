@@ -3,17 +3,13 @@
 //! * screen-space effects such as bloom
 //! * tone mapping
 
-use std::sync::Arc;
-
 use all_is_cubes::time;
 use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator};
 use all_is_cubes_render::Flaws;
 
 use crate::in_wgpu::shaders::Shaders;
 
-pub(crate) fn create_postprocess_bind_group_layout(
-    device: &Arc<wgpu::Device>,
-) -> wgpu::BindGroupLayout {
+pub(crate) fn create_postprocess_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         entries: &[
             // Binding for info_text_texture

@@ -5,7 +5,6 @@
 
 use std::future::Future;
 use std::io::Write as _;
-use std::sync::Arc;
 
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes_render::{camera, Flaws, Rendering};
@@ -147,7 +146,7 @@ fn shortened_adapter_info(info: &wgpu::AdapterInfo) -> String {
 /// Panics if the pixel type or viewport size are incorrect.
 #[doc(hidden)]
 pub fn get_image_from_gpu(
-    device: &Arc<wgpu::Device>,
+    device: &wgpu::Device,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     flaws: Flaws,
@@ -180,7 +179,7 @@ pub fn get_image_from_gpu(
 /// Panics if the provided sizes are incorrect.
 #[doc(hidden)]
 pub fn get_texels_from_gpu<C>(
-    device: &Arc<wgpu::Device>,
+    device: &wgpu::Device,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
     components: usize,
@@ -193,7 +192,7 @@ where
 
     let tc = TextureCopyParameters::from_texture(texture);
     let temp_buffer = tc.copy_texture_to_new_buffer(device, queue, texture);
-    let buffer_mapped_future = map_really_async(device, &temp_buffer);
+    let buffer_mapped_future = map_really_async(device.clone(), &temp_buffer);
 
     // Await the buffer being available and build the image.
     async move {
@@ -211,16 +210,17 @@ where
 
 #[doc(hidden)]
 pub fn map_really_async(
-    device: &Arc<wgpu::Device>,
+    device: wgpu::Device,
     buffer: &wgpu::Buffer,
 ) -> impl Future<Output = Result<(), wgpu::BufferAsyncError>> {
     let (sender, receiver) = futures_channel::oneshot::channel();
     buffer.slice(..).map_async(wgpu::MapMode::Read, |result| {
         let _ = sender.send(result);
     });
-    super::poll::ensure_polled(Arc::downgrade(device));
+    let poller = super::poll::start_polling(device);
 
     async move {
+        let _poller = poller;
         receiver
             .await
             .expect("map_async callback was dropped without call")
