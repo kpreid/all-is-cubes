@@ -615,8 +615,6 @@ struct LightBuffer {
     /// Accumulator of incoming light encountered.
     /// TODO: Make this a vector of `f32` to save NaN checks?
     incoming_light: Rgb,
-    /// Number of rays contributing to `incoming_light`.
-    total_rays: usize,
     /// Number of rays, weighted by the ray angle versus local cube faces.
     total_ray_weight: f32,
     /// Cubes whose lighting value contributed to the `incoming_light` value.
@@ -658,7 +656,6 @@ impl LightBuffer {
     fn new() -> Self {
         Self {
             incoming_light: Rgb::ZERO,
-            total_rays: 0,
             total_ray_weight: 0.0,
             dependencies: Vec::new(),
             cost: 0,
@@ -810,21 +807,18 @@ impl LightBuffer {
         }
     }
 
-    /// Add the given color to the sum counting it as having the given weight,
-    /// as if it was an entire ray's contribution
-    /// (that is, incrementing `self.total_rays`).
+    /// Add the given color to the sum counting it as having the given weight.
     fn add_weighted_light(&mut self, color: Rgb, weight: f32) {
         self.incoming_light += color * weight;
-        self.total_rays += 1;
         self.total_ray_weight += weight;
     }
 
     /// Return the [`PackedLight`] value accumulated here
     fn finish(&self, origin_is_opaque: bool) -> PackedLight {
-        // if total_rays is zero then incoming_light is zero so the result will be zero.
+        // if total_ray_weight is zero then incoming_light is zero so the result will be zero.
         // We just need to avoid dividing by zero.
         let scale = PositiveSign::<f32>::new_clamped(1.0 / self.total_ray_weight.max(1.0));
-        let new_light_value: PackedLight = if self.total_rays > 0 {
+        let new_light_value: PackedLight = if self.total_ray_weight > 0.0 {
             PackedLight::some(self.incoming_light * scale)
         } else if origin_is_opaque {
             PackedLight::OPAQUE
