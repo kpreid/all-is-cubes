@@ -110,6 +110,7 @@ hashbrown = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+macro_rules_attribute = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
 nosy = { workspace = true }

@@ -49,6 +49,7 @@ dependencies = [
  "indoc",
  "itertools",
  "log",
+ "macro_rules_attribute",
  "manyfmt",
  "mutants",
  "nosy",

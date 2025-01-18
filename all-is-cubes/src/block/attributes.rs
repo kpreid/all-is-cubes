@@ -7,6 +7,7 @@ use arcstr::ArcStr;
 use crate::inv::InvInBlock;
 use crate::math::{Face6, GridRotation};
 use crate::op::Operation;
+use crate::universe::{HandleVisitor, VisitHandles};
 
 use crate::block::Modifier;
 use crate::time;
@@ -17,12 +18,140 @@ use crate::{
     time::TickSchedule,
 };
 
+/// This single-use macro takes the [`BlockAttributes`] struct declaration and derives various
+/// items so that fewer other things need to be updated when an attribute is added or changed.
+macro_rules! derive_attribute_helpers {
+    ($(#[$_:meta])* pub struct BlockAttributes {
+        $(
+            $(#[doc = $field_doc:literal])*
+            #[custom(
+                arbitrary_type = $arbitrary_type:ty,
+                builder_param_style = $builder_param_style:tt,
+            )]
+            pub $field_name:ident: $field_type:ty,
+        )*
+    }) => {
+        impl fmt::Debug for BlockAttributes {
+            /// Only attributes which differ from the default are shown.
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                if self == Self::DEFAULT_REF {
+                    // Avoid the braceless formatting that `debug_struct` uses
+                    // if no fields are given.
+                    write!(f, "BlockAttributes {{}}")
+                } else {
+                    let Self {
+                        $($field_name,)*
+                    } = self;
+
+                    let mut debug_struct = f.debug_struct("BlockAttributes");
+                    $(
+                        if *$field_name != Self::DEFAULT_REF.$field_name {
+                            debug_struct.field(stringify!($field_name), $field_name);
+                        }
+                    )*
+                    debug_struct.finish()
+                }
+            }
+        }
+
+        impl VisitHandles for BlockAttributes {
+            fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+                let Self { $( $field_name, )* } = self;
+                $(
+                    <$field_type as VisitHandles>::visit_handles($field_name, visitor);
+                )*
+            }
+        }
+
+        #[cfg(feature = "arbitrary")]
+        #[mutants::skip]
+        impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
+            fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+                Ok(BlockAttributes {
+                    $(
+                        $field_name:
+                            <$arbitrary_type as arbitrary::Arbitrary>::arbitrary(u)?.into(),
+                    )*
+                })
+            }
+
+            fn size_hint(depth: usize) -> (usize, Option<usize>) {
+                Self::try_size_hint(depth).unwrap_or_default()
+            }
+            fn try_size_hint(
+                depth: usize,
+            ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+                arbitrary::size_hint::try_recursion_guard(depth, |depth| {
+                    Ok(arbitrary::size_hint::and_all(&[
+                        $(
+                            <$arbitrary_type as arbitrary::Arbitrary>::try_size_hint(depth)?,
+                        )*
+                    ]))
+                })
+            }
+        }
+
+        /// Methods for setting [attributes](BlockAttributes) of the block.
+        impl<P, Txn> crate::block::Builder<P, Txn> {
+            $(
+                attribute_builder_method!($(#[doc = $field_doc] )* $builder_param_style $field_name: $field_type);
+            )*
+        }
+    };
+}
+
+#[rustfmt::skip] // avoid bug <https://github.com/rust-lang/rustfmt/issues/5489>
+macro_rules! attribute_builder_method {
+    // Custom name for the `inventory` field.
+    ($(#[doc = $field_doc:literal] )* exact inventory: $field_type:ty) => {
+        #[doc = concat!(
+            "Sets the value for [`BlockAttributes::inventory`], which is:",
+        )]
+        #[doc = ""]
+        $(#[doc = concat!("> ", $field_doc)] )*
+        pub fn inventory_config(mut self, value: crate::inv::InvInBlock) -> Self {
+            self.attributes.inventory = value.into();
+            self
+        }
+    };
+
+    // These two rules are identical except for the type of the method’s value parameter.
+    ($(#[doc = $field_doc:literal] )* exact $field_name:ident: $field_type:ty) => {
+        #[doc = concat!(
+            "Sets the value for [`BlockAttributes::",
+            stringify!($field_name),
+            "`], which is:",
+        )]
+        #[doc = ""]
+        $(#[doc = concat!("> ", $field_doc)] )*
+        pub fn $field_name(mut self, value: $field_type) -> Self {
+            self.attributes.$field_name = value;
+            self
+        }
+    };
+    ($(#[doc = $field_doc:literal] )* into $field_name:ident: $field_type:ty) => {
+        #[doc = concat!(
+            "Sets the value for [`BlockAttributes::",
+            stringify!($field_name),
+            "`], which is:",
+        )]
+        #[doc = ""]
+        $(#[doc = concat!("> ", $field_doc)] )*
+        pub fn $field_name(mut self, value: impl Into<$field_type>) -> Self {
+            self.attributes.$field_name = value.into();
+            self
+        }
+    };
+}
+
 /// Miscellaneous properties of blocks that are not the block’s voxels.
 ///
 /// `BlockAttributes::default()` will produce a reasonable set of defaults for “ordinary”
 /// blocks.
 #[derive(Clone, Eq, Hash, PartialEq)]
-#[expect(clippy::exhaustive_structs)] // TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via block::Builder.
+#[expect(clippy::exhaustive_structs)]
+// TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via block::Builder.
+#[macro_rules_attribute::derive(derive_attribute_helpers!)]
 pub struct BlockAttributes {
     /// The name that should be displayed to players.
     ///
@@ -31,15 +160,27 @@ pub struct BlockAttributes {
     //---
     // Design note: The use of `ArcStr` allows cloning a `BlockAttributes` to be O(1)
     // allocate no additional memory.
+    #[custom(
+        arbitrary_type = alloc::string::String,
+        builder_param_style = into,
+    )]
     pub display_name: ArcStr,
 
     /// Whether players' [cursors](crate::character::Cursor) target it or pass through it.
     ///
     /// The default value is `true`.
+    #[custom(
+        arbitrary_type = bool,
+        builder_param_style = exact,
+    )]
     pub selectable: bool,
 
     /// Definition of, if this block has an attached [`Modifier::Inventory`],
     /// what size and rendering it has.
+    #[custom(
+        arbitrary_type = InvInBlock,
+        builder_param_style = exact,
+    )]
     pub inventory: InvInBlock,
 
     /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
@@ -48,18 +189,34 @@ pub struct BlockAttributes {
     /// The default value is [`RotationPlacementRule::Never`].
     //---
     // TODO: Replace this with `placement_action` features?
+    #[custom(
+        arbitrary_type = RotationPlacementRule,
+        builder_param_style = exact,
+    )]
     pub rotation_rule: RotationPlacementRule,
 
     /// Something to do instead of placing this block in a [`Space`].
     //---
     // TODO: Should this not be optional, instead having a value that expresses the default
     // block placement behavior?
+    #[custom(
+        arbitrary_type = Option<PlacementAction>,
+        builder_param_style = into,
+    )]
     pub placement_action: Option<PlacementAction>,
 
     /// Something this block does when time passes.
+    #[custom(
+        arbitrary_type =  Option<TickAction>,
+        builder_param_style = into,
+    )]
     pub tick_action: Option<TickAction>,
 
     /// Something this block does when activated with [`Activate`](crate::inv::Tool::Activate).
+    #[custom(
+        arbitrary_type = Option<Operation>,
+        builder_param_style = into,
+    )]
     pub activation_action: Option<Operation>,
 
     /// Advice to the renderer about how to expect this block to change, and hence
@@ -67,58 +224,11 @@ pub struct BlockAttributes {
     ///
     /// Note: This is automatically augmented for [`Primitive::Recur`] blocks if they
     /// contain voxels with animation hints themselves.
+    #[custom(
+        arbitrary_type = AnimationHint,
+        builder_param_style = exact,
+    )]
     pub animation_hint: AnimationHint,
-    //
-    // Reminder: When adding new fields, add them to block::Builder too.
-}
-
-impl fmt::Debug for BlockAttributes {
-    /// Only attributes which differ from the default are shown.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self == Self::DEFAULT_REF {
-            // Avoid the braceless formatting that `debug_struct` uses if no fields are given.
-            write!(f, "BlockAttributes {{}}")
-        } else {
-            let Self {
-                display_name,
-                selectable,
-                inventory,
-                rotation_rule,
-                placement_action,
-                tick_action,
-                activation_action,
-                animation_hint,
-            } = self;
-
-            let mut s = f.debug_struct("BlockAttributes");
-            if *display_name != Self::DEFAULT_REF.display_name {
-                // Unwrap the `Cow` for tidier formatting.
-                s.field("display_name", &&**display_name);
-            }
-            if *selectable != Self::DEFAULT_REF.selectable {
-                s.field("selectable", selectable);
-            }
-            if *inventory != Self::DEFAULT_REF.inventory {
-                s.field("inventory", inventory);
-            }
-            if *rotation_rule != Self::DEFAULT_REF.rotation_rule {
-                s.field("rotation_rule", rotation_rule);
-            }
-            if *placement_action != Self::DEFAULT_REF.placement_action {
-                s.field("placement_action", placement_action);
-            }
-            if *tick_action != Self::DEFAULT_REF.tick_action {
-                s.field("tick_action", tick_action);
-            }
-            if *activation_action != Self::DEFAULT_REF.activation_action {
-                s.field("activation_action", activation_action);
-            }
-            if *animation_hint != Self::DEFAULT_REF.animation_hint {
-                s.field("animation_hint", animation_hint);
-            }
-            s.finish()
-        }
-    }
 }
 
 impl BlockAttributes {
@@ -204,62 +314,6 @@ impl Default for BlockAttributes {
     }
 }
 
-// `ArcStr` and `GridPoint` don't implement `Arbitrary`
-#[cfg(feature = "arbitrary")]
-#[mutants::skip]
-impl<'a> arbitrary::Arbitrary<'a> for BlockAttributes {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(BlockAttributes {
-            display_name: u.arbitrary::<alloc::string::String>()?.into(),
-            selectable: u.arbitrary()?,
-            inventory: u.arbitrary()?,
-            rotation_rule: u.arbitrary()?,
-            placement_action: u.arbitrary()?,
-            tick_action: u.arbitrary()?,
-            activation_action: u.arbitrary()?,
-            animation_hint: u.arbitrary()?,
-        })
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        Self::try_size_hint(depth).unwrap_or_default()
-    }
-    fn try_size_hint(
-        depth: usize,
-    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
-        arbitrary::size_hint::try_recursion_guard(depth, |depth| {
-            Ok(arbitrary::size_hint::and_all(&[
-                alloc::string::String::try_size_hint(depth)?,
-                bool::try_size_hint(depth)?,
-                InvInBlock::try_size_hint(depth)?,
-                RotationPlacementRule::try_size_hint(depth)?,
-                Option::<PlacementAction>::try_size_hint(depth)?,
-                Option::<TickAction>::try_size_hint(depth)?,
-                AnimationHint::try_size_hint(depth)?,
-            ]))
-        })
-    }
-}
-
-impl crate::universe::VisitHandles for BlockAttributes {
-    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
-        let Self {
-            display_name: _,
-            selectable: _,
-            inventory,
-            rotation_rule: _,
-            placement_action,
-            tick_action,
-            activation_action,
-            animation_hint: _,
-        } = self;
-        inventory.visit_handles(visitor);
-        placement_action.visit_handles(visitor);
-        tick_action.visit_handles(visitor);
-        activation_action.visit_handles(visitor);
-    }
-}
-
 impl From<BlockAttributes> for Modifier {
     /// Converts [`BlockAttributes`] to a modifier that applies them to a block.
     fn from(value: BlockAttributes) -> Self {
@@ -331,6 +385,10 @@ impl RotationPlacementRule {
         }
         self
     }
+}
+
+impl VisitHandles for RotationPlacementRule {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
 }
 
 /// Specifies how a [`Block`] might change in the very near future, for the benefit
@@ -413,6 +471,10 @@ impl ops::BitOrAssign for AnimationHint {
     fn bitor_assign(&mut self, rhs: Self) {
         *self = *self | rhs;
     }
+}
+
+impl VisitHandles for AnimationHint {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
 }
 
 /// Component of [`AnimationHint`], describing the type of change predicted.
@@ -513,8 +575,8 @@ impl From<Operation> for TickAction {
     }
 }
 
-impl crate::universe::VisitHandles for TickAction {
-    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
+impl VisitHandles for TickAction {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Self {
             operation,
             schedule: _,
@@ -556,8 +618,8 @@ impl PlacementAction {
     }
 }
 
-impl crate::universe::VisitHandles for PlacementAction {
-    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
+impl VisitHandles for PlacementAction {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         let Self {
             operation,
             in_front: _,

@@ -64,6 +64,14 @@ impl<T: VisitHandles, const N: usize> VisitHandles for [T; N] {
     }
 }
 
+// The following no-op VisitHandles implementations allow simpler code in BlockAttributes.
+impl VisitHandles for arcstr::ArcStr {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
+}
+impl VisitHandles for bool {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {}
+}
+
 #[cfg(test)]
 pub(crate) fn list_handles<T: VisitHandles + 'static>(target: &T) -> Vec<super::Name> {
     let mut names: Vec<super::Name> = Vec::new();

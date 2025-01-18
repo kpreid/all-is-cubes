@@ -4,13 +4,10 @@ use alloc::borrow::Cow;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use arcstr::ArcStr;
-
 use crate::block::{
-    self, AnimationHint, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier,
-    Primitive, Resolution, RotationPlacementRule, AIR,
+    self, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier, Primitive,
+    Resolution, AIR,
 };
-use crate::inv;
 use crate::math::{Cube, GridAab, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::transaction::{self, Merge, Transaction};
@@ -43,7 +40,8 @@ use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
 pub struct Builder<P, Txn> {
-    attributes: BlockAttributes,
+    // public so that `BlockAttributes`'s macros can define methods for us
+    pub(in crate::block) attributes: BlockAttributes,
     primitive_builder: P,
     modifiers: Vec<Modifier>,
 
@@ -81,54 +79,6 @@ impl<P, Txn> Builder<P, Txn> {
     /// This replaces individual attribute values set using other builder methods.
     pub fn attributes(mut self, value: BlockAttributes) -> Self {
         self.attributes = value;
-        self
-    }
-
-    /// Sets the value for [`BlockAttributes::display_name`].
-    pub fn display_name(mut self, value: impl Into<ArcStr>) -> Self {
-        self.attributes.display_name = value.into();
-        self
-    }
-
-    /// Sets the value for [`BlockAttributes::selectable`].
-    pub const fn selectable(mut self, value: bool) -> Self {
-        self.attributes.selectable = value;
-        self
-    }
-
-    /// Sets the value for [`BlockAttributes::inventory`].
-    pub fn inventory_config(mut self, value: inv::InvInBlock) -> Self {
-        self.attributes.inventory = value;
-        self
-    }
-
-    /// Sets the value for [`BlockAttributes::rotation_rule`].
-    pub const fn rotation_rule(mut self, value: RotationPlacementRule) -> Self {
-        self.attributes.rotation_rule = value;
-        self
-    }
-
-    /// Sets the value for [`BlockAttributes::placement_action`].
-    pub fn placement_action(mut self, value: impl Into<Option<super::PlacementAction>>) -> Self {
-        self.attributes.placement_action = value.into();
-        self
-    }
-
-    /// Sets the value for [`BlockAttributes::tick_action`].
-    pub fn tick_action(mut self, value: impl Into<Option<super::TickAction>>) -> Self {
-        self.attributes.tick_action = value.into();
-        self
-    }
-
-    /// Sets the value for [`BlockAttributes::activation_action`].
-    pub fn activation_action(mut self, value: impl Into<Option<crate::op::Operation>>) -> Self {
-        self.attributes.activation_action = value.into();
-        self
-    }
-
-    /// Sets the value for [`BlockAttributes::animation_hint`].
-    pub fn animation_hint(mut self, value: AnimationHint) -> Self {
-        self.attributes.animation_hint = value;
         self
     }
 
@@ -491,8 +441,8 @@ mod tests {
     fn every_field_nondefault() {
         let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
         let emission = Rgb::new(0.1, 3.0, 0.1);
-        let inventory = inv::InvInBlock::new_placeholder();
-        let rotation_rule = RotationPlacementRule::Attach { by: Face6::NZ };
+        let inventory = crate::inv::InvInBlock::new_placeholder();
+        let rotation_rule = block::RotationPlacementRule::Attach { by: Face6::NZ };
         let placement_action = Some(block::PlacementAction {
             operation: Operation::Become(color_block!(1.0, 0.0, 1.0)),
             in_front: false,
@@ -511,7 +461,9 @@ mod tests {
                 .placement_action(placement_action.clone())
                 .tick_action(tick_action.clone())
                 .activation_action(activation_action.clone())
-                .animation_hint(AnimationHint::replacement(block::AnimationChange::Shape))
+                .animation_hint(block::AnimationHint::replacement(
+                    block::AnimationChange::Shape
+                ))
                 .modifier(Modifier::Rotate(GridRotation::CLOCKWISE))
                 .build(),
             Block::from(block::Atom {
@@ -527,7 +479,7 @@ mod tests {
                 rotation_rule,
                 tick_action,
                 activation_action,
-                animation_hint: AnimationHint::replacement(block::AnimationChange::Shape),
+                animation_hint: block::AnimationHint::replacement(block::AnimationChange::Shape),
             })
             .with_modifier(Modifier::Rotate(GridRotation::CLOCKWISE))
         );
