@@ -13,6 +13,10 @@
 
 ### Changed
 
+- `all-is-cubes` library:
+    - `block::BlockAttributes` is now a non-exhaustive struct.
+      `BlockAttributes` literals should be replaced with `block::Builder::build_attributes()`.
+
 - `all-is-cubes-ui` library:
     - `apps::Session::settings()` replaces `graphics_options_mut()`.
 

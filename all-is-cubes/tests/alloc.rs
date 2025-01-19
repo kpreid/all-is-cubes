@@ -11,28 +11,30 @@ use all_is_cubes::universe::Universe;
 
 #[test]
 fn clone_block_attributes() {
-    let original = BlockAttributes {
+    // TODO: Ideally this would be a struct literal with every field,
+    // but we define BlockAttributes as #[non_exhaustive]. Find a way to prove this is complete.
+    let original: BlockAttributes = block::Block::builder()
+        //
         // These fields are refcounted or `Copy` and will not allocate when cloned
-        display_name: arcstr::literal!("hello"),
-        selectable: true,
-        animation_hint: block::AnimationHint::UNCHANGING,
-
-        placement_action: Some(block::PlacementAction {
+        .display_name(arcstr::literal!("hello"))
+        .selectable(true)
+        .animation_hint(block::AnimationHint::UNCHANGING)
+        .placement_action(block::PlacementAction {
             operation: Operation::Become(block::AIR),
             in_front: false,
-        }),
-        tick_action: Some(block::TickAction::from(Operation::Become(block::AIR))),
-        activation_action: Some(Operation::Become(block::AIR)),
-
+        })
+        .tick_action(block::TickAction::from(Operation::Become(block::AIR)))
+        .activation_action(Operation::Become(block::AIR))
+        //
         // TODO(inventory): This field will allocate when cloned if it is nonempty,
         // and we should fix that and test it.
-        inventory: inv::InvInBlock::default(),
-
+        .inventory_config(inv::InvInBlock::default())
+        //
         // These fields currently will never allocate when cloned
-        rotation_rule: block::RotationPlacementRule::Never,
-    };
-    let mut clone = None;
+        .rotation_rule(block::RotationPlacementRule::Never)
+        .build_attributes();
 
+    let mut clone = None;
     assert_no_alloc(|| {
         clone = Some(original.clone());
     });

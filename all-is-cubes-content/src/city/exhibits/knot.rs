@@ -69,10 +69,11 @@ fn KNOT(ctx: Context<'_>) {
         resolution,
         txn.insert_anonymous(drawing_space),
         &mut |block| {
-            block.with_modifier(BlockAttributes {
-                display_name: ctx.exhibit.name.into(),
-                ..BlockAttributes::default()
-            })
+            block.with_modifier(
+                Block::builder()
+                    .display_name(ctx.exhibit.name)
+                    .build_attributes(),
+            )
         },
     )?;
     Ok((space, txn))

@@ -12,8 +12,7 @@ pub(super) use rand::SeedableRng as _;
 
 pub(super) use all_is_cubes::arcstr::{self, literal};
 pub(super) use all_is_cubes::block::{
-    self, space_to_blocks, text, Block, BlockAttributes, BlockCollision, Composite,
-    CompositeOperator, Move,
+    self, space_to_blocks, text, Block, BlockCollision, Composite, CompositeOperator, Move,
     Resolution::{self, *},
     RotationPlacementRule, Zoom, AIR,
 };

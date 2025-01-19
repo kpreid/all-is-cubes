@@ -149,8 +149,7 @@ macro_rules! attribute_builder_method {
 /// `BlockAttributes::default()` will produce a reasonable set of defaults for “ordinary”
 /// blocks.
 #[derive(Clone, Eq, Hash, PartialEq)]
-#[expect(clippy::exhaustive_structs)]
-// TODO: Make this non_exhaustive but give users a way to construct it easily, possibly via block::Builder.
+#[non_exhaustive]
 #[macro_rules_attribute::derive(derive_attribute_helpers!)]
 pub struct BlockAttributes {
     /// The name that should be displayed to players.

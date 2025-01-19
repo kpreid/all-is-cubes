@@ -7,7 +7,8 @@ use itertools::Itertools;
 use rand::seq::SliceRandom as _;
 use rand::{Rng, SeedableRng as _};
 
-use all_is_cubes::block::{self, text::Font, BlockAttributes, Resolution::*, AIR};
+use all_is_cubes::arcstr::literal;
+use all_is_cubes::block::{self, text::Font, Resolution::*, AIR};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
@@ -569,11 +570,10 @@ fn place_one_exhibit<I: Instant>(
                     bounds_for_info_voxels,
                     universe.insert_anonymous(exhibit_info_space),
                     info_resolution,
-                    [BlockAttributes {
-                        display_name: "Exhibit Name".into(),
-                        ..Default::default()
-                    }
-                    .into()],
+                    [block::Block::builder()
+                        .display_name(literal!("Exhibit Name"))
+                        .build_attributes()
+                        .into()],
                 ))),
             ],
         });

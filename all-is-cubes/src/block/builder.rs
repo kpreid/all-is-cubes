@@ -15,8 +15,12 @@ use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 
 /// Tool for constructing [`Block`] values conveniently.
 ///
+/// It can also be used to construct [`BlockAttributes`] values.
+///
 /// To create one, call [`Block::builder()`].
 /// ([`Builder::default()`] is also available.)
+///
+/// # Example
 ///
 /// ```
 /// use all_is_cubes::block::{Block, EvaluatedBlock};
@@ -40,9 +44,11 @@ use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
 pub struct Builder<P, Txn> {
-    // public so that `BlockAttributes`'s macros can define methods for us
+    /// public so that `BlockAttributes`'s macros can define methods for us
     pub(in crate::block) attributes: BlockAttributes,
+
     primitive_builder: P,
+
     modifiers: Vec<Modifier>,
 
     /// If this is a [`UniverseTransaction`], then it must be produced for the caller to execute.
@@ -65,6 +71,21 @@ impl Builder<NeedsPrimitive, ()> {
             modifiers: Vec::new(),
             transaction: (),
         }
+    }
+
+    /// Returns a [`BlockAttributes`] instead of building a block with those attributes.
+    ///
+    /// Panics if any modifiers were added to the builder.
+    #[track_caller]
+    pub fn build_attributes(self) -> BlockAttributes {
+        let Self {
+            attributes,
+            primitive_builder: NeedsPrimitive,
+            modifiers,
+            transaction: (),
+        } = self;
+        assert_eq!(modifiers, []);
+        attributes
     }
 }
 
