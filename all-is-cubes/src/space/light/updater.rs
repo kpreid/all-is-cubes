@@ -630,9 +630,15 @@ struct LightRayState {
     /// Fraction of the light value that is to be determined by future, rather than past,
     /// tracing; starts at 1.0 and decreases as opaque surfaces are encountered.
     alpha: f32,
+
     /// Weighting factor for how much this ray contributes to the total light.
     /// If zero, this will not be counted as a ray at all.
+    ///
+    /// Note that this is unrelated to alpha — it is *not* reduced by opacity.
+    /// It determines what proportion of the final light value is produced by this ray
+    /// relative to other rays.
     ray_weight_by_faces: f32,
+
     /// The ray we're casting; remembered for debugging and sky light sampling.
     translated_ray: Ray,
 }
@@ -807,7 +813,12 @@ impl LightBuffer {
         }
     }
 
-    /// Add the given color to the sum counting it as having the given weight.
+    /// Add the given color to the sum counting it as having the weight of the given
+    /// [`LightRayState`].
+    ///
+    /// Note that this does not mean this is the sole contribution of that ray;
+    /// and it must be called only once per ray (to avoid double-counting weight)
+    /// even when the ray passes through transparent blocks that reflect or emit light.
     fn add_weighted_light(&mut self, color: Rgb, weight: f32) {
         self.incoming_light += color * weight;
         self.total_ray_weight += weight;
