@@ -745,6 +745,21 @@ impl<V> FaceMap<V> {
         self.into_values().into_iter()
     }
 
+    /// Calculates the sum of all values.
+    ///
+    /// This is semantically equivalent to `.into_values_iter().sum()` but computes the sum
+    /// using the [`ops::Add`] trait. It may be more efficient than involving iterators.
+    #[inline]
+    pub fn sum(self) -> V
+    where
+        V: ops::Add<Output = V>,
+    {
+        // I don’t know what addition order is best for minimizing error,
+        // but this is at least more “balanced” than some.
+        // Perhaps there is a better algorithm?
+        (self.nx + self.px) + (self.ny + self.py) + (self.nz + self.pz)
+    }
+
     /// Transform values.
     pub fn map<U>(self, mut f: impl FnMut(Face6, V) -> U) -> FaceMap<U> {
         FaceMap {

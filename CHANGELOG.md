@@ -7,6 +7,9 @@
 - Functionality:
     - In the desktop version, changes to graphics options are now persisted across launches.
 
+- `all-is-cubes` library:
+    - `math::FaceMap::sum()`
+
 - `all-is-cubes-ui` library:
     - `apps::Settings` manages user-editable settings that eventually will be more than just the graphics options.
     - `apps::SessionBuilder::settings()` links a possibly-shared `Settings` to the created session.
