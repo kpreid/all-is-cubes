@@ -180,7 +180,9 @@ impl UniverseTemplate {
                 Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), params).await),
                 Islands => Some(islands(&mut universe, p.take().unwrap(), params).await),
                 Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
-                CornellBox => Some(cornell_box()),
+                CornellBox => Some(cornell_box(
+                    params.size.unwrap_or(GridSize::new(57, 57, 57)),
+                )),
                 MengerSponge => Some(menger_sponge(&mut universe, 4)),
                 LightingBench => Some(
                     all_is_cubes::content::testing::lighting_bench_space(
@@ -381,12 +383,14 @@ async fn islands(
 }
 
 #[rustfmt::skip]
-fn cornell_box() -> Result<Space, InGenError> {
-    // Coordinates are set up based on this dimension because, being blocks, we're not
-    // going to *exactly* replicate the original data, but we might want to adjust the
-    // scale to something else entirely.
-    let box_size: GridSizeCoord = 55;
-    let box_size_c: GridCoordinate = 55;
+fn cornell_box(requested_size: GridSize) -> Result<Space, InGenError> {
+    let box_size: GridSizeCoord =
+        (requested_size.width
+            .min(requested_size.height)
+            .min(requested_size.depth))
+        .saturating_sub(2)
+        .min(64); // TODO: tie this to max light chart size
+    let box_size_c: GridCoordinate = box_size as GridCoordinate;
 
     // Add one block to all sides for wall thickness.
     let bounds = GridAab::from_lower_size(
@@ -414,7 +418,7 @@ fn cornell_box() -> Result<Space, InGenError> {
     let light: Block = Block::builder()
         .display_name("Light")
         .color(Rgba::new(1.0, 1.0, 1.0, 1.0))
-        .light_emission(Rgb::ONE * 8.0)
+        .light_emission(Rgb::ONE * (1.07 * (box_size as f32).sqrt()))
         .build();
 
     // Floor.
@@ -422,7 +426,12 @@ fn cornell_box() -> Result<Space, InGenError> {
     // Ceiling.
     space.fill_uniform(GridAab::from_lower_size([0, box_size_c, 0], [box_size, 1, box_size]), &white)?;
     // Light in ceiling.
-    space.fill_uniform(GridAab::from_lower_upper([21, box_size_c, 23], [34, box_size_c + 1, 33]), &light)?;
+    space.fill_uniform(
+        GridAab::from_lower_upper([21, 55, 23], [34, 55, 33])
+            .multiply(box_size_c).divide(55)
+            .abut(Face6::PY, 1).unwrap(),
+        &light,
+    )?;
     // Back wall.
     space.fill_uniform(GridAab::from_lower_size([0, 0, -1], [box_size, box_size, 1]), &white)?;
     // Right wall (green).
@@ -431,9 +440,9 @@ fn cornell_box() -> Result<Space, InGenError> {
     space.fill_uniform(GridAab::from_lower_size([-1, 0, 0], [1, box_size, box_size]), &red)?;
 
     // Block #1
-    space.fill_uniform(GridAab::from_lower_size([29, 0, 36], [16, 16, 15]), &white)?;
+    space.fill_uniform(GridAab::from_lower_size([29, 0, 36], [16, 16, 15]).multiply(box_size_c).divide(55), &white)?;
     // Block #2
-    space.fill_uniform(GridAab::from_lower_size([10, 0, 13], [18, 33, 15]), &white)?;
+    space.fill_uniform(GridAab::from_lower_size([10, 0, 13], [18, 33, 15]).multiply(box_size_c).divide(55), &white)?;
 
     // This won't figure out the correct light values, but it will reset everything to
     // uninitialized, which will help the updater get going faster.
