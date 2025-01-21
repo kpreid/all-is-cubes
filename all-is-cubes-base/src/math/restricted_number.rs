@@ -473,6 +473,12 @@ impl<T: FloatCore + ops::Add<Output = T>> ops::Add for PositiveSign<T> {
         Self(self.0 + rhs.0)
     }
 }
+impl<T: FloatCore + ops::Add<Output = T>> ops::AddAssign for PositiveSign<T> {
+    #[inline]
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
 
 impl<T: FloatCore + ops::Mul<Output = T>> ops::Mul for PositiveSign<T> {
     type Output = Self;
@@ -504,6 +510,18 @@ impl<T: FloatCore + ops::Mul<Output = T>> ops::Mul for ZeroOne<T> {
         // of range for the arguments.
         let value = self.0 * rhs.0;
         Self(value)
+    }
+}
+impl<T: FloatCore + ops::Mul<Output = T>> ops::MulAssign for PositiveSign<T> {
+    #[inline]
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = *self * rhs;
+    }
+}
+impl<T: FloatCore + ops::Mul<Output = T>> ops::MulAssign for ZeroOne<T> {
+    #[inline]
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = *self * rhs;
     }
 }
 
