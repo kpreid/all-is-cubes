@@ -957,6 +957,26 @@ impl_binary_operator_for_facemap!(Sub::sub, SubAssign::sub_assign);
 impl_binary_operator_for_facemap!(Div::div, DivAssign::div_assign);
 impl_binary_operator_for_facemap!(Rem::rem, RemAssign::rem_assign);
 
+impl<V> IntoIterator for FaceMap<V> {
+    type Item = (Face6, V);
+
+    // TODO: use a custom iterator type if this gets more than one-off use
+    type IntoIter = <[(Face6, V); 6] as IntoIterator>::IntoIter;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        [
+            (Face6::NX, self.nx),
+            (Face6::NY, self.ny),
+            (Face6::NZ, self.nz),
+            (Face6::PX, self.px),
+            (Face6::PY, self.py),
+            (Face6::PZ, self.pz),
+        ]
+        .into_iter()
+    }
+}
+
 /// The combination of a [`Cube`] and [`Face7`] identifying one face of it or the interior.
 /// This pattern appears in cursor selection and collision detection.
 #[derive(Clone, Copy, Hash, Eq, PartialEq)]

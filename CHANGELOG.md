@@ -9,6 +9,7 @@
 
 - `all-is-cubes` library:
     - `math::FaceMap::sum()`
+    - `impl IntoIterator for math::FaceMap`
 
 - `all-is-cubes-ui` library:
     - `apps::Settings` manages user-editable settings that eventually will be more than just the graphics options.
