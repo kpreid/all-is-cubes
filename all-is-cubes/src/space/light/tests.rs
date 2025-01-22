@@ -191,16 +191,17 @@ fn light_source_self_illumination_opaque() {
     assert_eq!(
         adjacents,
         // TODO: make this test less fragile. The asymmetry isn't even wanted;
-        // I think it's probably due to exactly diagonal rays.
+        // I think it's probably due to exactly diagonal rays having to make a choice
+        // of which neighbors to pass through.
         // Some of the values also differ due to our current choice of discarding
         // light updates with priority 1.
         FaceMap {
-            nx: Rgb::new(0.13053422, 0.26106843, 0.52213687),
-            ny: Rgb::new(0.16210495, 0.3242099, 0.6484198),
-            nz: Rgb::new(0.20131129, 0.40262258, 0.80524516),
-            px: Rgb::new(0.13053422, 0.26106843, 0.52213687),
-            py: Rgb::new(0.16210495, 0.3242099, 0.6484198),
-            pz: Rgb::new(0.20131129, 0.40262258, 0.80524516),
+            nx: Rgb::new(0.13631347, 0.27262694, 0.5452539),
+            ny: Rgb::new(0.16928194, 0.3385639, 0.6771278),
+            nz: Rgb::new(0.2102241, 0.4204482, 0.8408964),
+            px: Rgb::new(0.13631347, 0.27262694, 0.5452539),
+            py: Rgb::new(0.16928194, 0.3385639, 0.6771278),
+            pz: Rgb::new(0.2102241, 0.4204482, 0.8408964),
         },
     );
 }

@@ -45,9 +45,8 @@ pub(crate) enum LightStatus {
     Visible = 255,
 }
 
-/// Lighting within a [`Space`]; an [`Rgb`] value stored with reduced precision and range.
-///
-/// TODO: This now stores additional information. Rename to '`SpaceLight`' or some such.
+/// A single cube of light within a [`Space`]; an [`Rgb`] value stored with reduced precision and
+/// range, plus metadata about the applicability of the result.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PackedLight {
     // LightStatus being other than Visible is mutually exclusive with value being nonzero,
@@ -202,8 +201,9 @@ impl PackedLight {
 
     #[inline(always)]
     fn scalar_in(value: PositiveSign<f32>) -> PackedLightScalar {
-        // Note that `as` is a saturating cast.
-        (value.into_inner().log2() * Self::LOG_SCALE + Self::LOG_OFFSET) as PackedLightScalar
+        // Note that `as` is a saturating cast, so out of range values will be clamped.
+        (value.into_inner().log2() * Self::LOG_SCALE + Self::LOG_OFFSET).round()
+            as PackedLightScalar
     }
 
     /// Convert a `PackedLightScalar` value to a linear color component value.
@@ -436,6 +436,21 @@ mod tests {
             ],
             [0, 0, 0, 255, 255],
         );
+    }
+
+    #[test]
+    fn packed_light_rounds_to_nearest() {
+        for i in PackedLightScalar::MIN..PackedLightScalar::MAX {
+            let value = PackedLight::scalar_out_ps(i);
+            assert_eq!(
+                (
+                    PackedLight::scalar_in(value * ps32(0.9999)),
+                    i,
+                    PackedLight::scalar_in(value * ps32(1.0001)),
+                ),
+                (i, i, i)
+            );
+        }
     }
 
     #[test]
