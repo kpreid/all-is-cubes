@@ -90,12 +90,6 @@ impl Builder<NeedsPrimitive, ()> {
 }
 
 impl<P, Txn> Builder<P, Txn> {
-    // TODO: When #![feature(const_precise_live_drops)] becomes stable, we can make
-    // this builder mostly usable in const contexts.
-    // https://github.com/rust-lang/rust/issues/73255
-    // Doing that will also require creating non-trait-using alternate methods,
-    // until const traits https://github.com/rust-lang/rust/issues/67792 is also available.
-
     /// Sets the [`BlockAttributes`] the block will have.
     /// This replaces individual attribute values set using other builder methods.
     pub fn attributes(mut self, value: BlockAttributes) -> Self {
