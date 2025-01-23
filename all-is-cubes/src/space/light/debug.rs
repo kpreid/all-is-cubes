@@ -6,7 +6,7 @@
 
 use alloc::vec::Vec;
 
-use crate::math::{Cube, LineVertex};
+use crate::math::{Cube, LineVertex, Rgb};
 use crate::raycast::Ray;
 use crate::space::PackedLight;
 use crate::util::MapExtend;
@@ -66,13 +66,25 @@ impl crate::math::Wireframe for LightUpdateCubeInfo {
 #[expect(unnameable_types)] //
 pub struct LightUpdateRayInfo {
     pub(crate) ray: Ray,
+
     #[expect(
         dead_code,
         reason = "field used for Debug printing but not visualized yet"
     )]
     pub(crate) trigger_cube: Cube,
+
     pub(crate) value_cube: Cube,
+
+    /// Value *stored* in the cube we're reading data from.
+    #[expect(
+        dead_code,
+        reason = "field used for Debug printing but not visualized yet"
+    )]
     pub(crate) value: PackedLight,
+
+    /// Value *considered as outgoing from* the cube we're reading data from.
+    /// This differs from `value` in that it includes surface color.
+    pub(crate) light_from_struck_face: Rgb,
 }
 
 impl crate::math::Wireframe for LightUpdateRayInfo {
@@ -80,10 +92,11 @@ impl crate::math::Wireframe for LightUpdateRayInfo {
     where
         E: Extend<LineVertex>,
     {
+        // TODO: Visualize trigger_cube and value.
         self.value_cube.aab().expand(0.01).wireframe_points(output);
         self.ray
             .wireframe_points(&mut MapExtend::new(output, |mut v: LineVertex| {
-                v.color = Some(self.value.value().with_alpha_one());
+                v.color = Some(self.light_from_struck_face.with_alpha_one());
                 v
             }))
     }

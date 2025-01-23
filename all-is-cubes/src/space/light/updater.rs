@@ -762,6 +762,7 @@ impl LightBuffer {
                     trigger_cube: hit.cube,
                     value_cube: light_cube,
                     value: stored_light,
+                    light_from_struck_face,
                 });
             } else {
                 // Account for surface alpha in the future of this ray's state
