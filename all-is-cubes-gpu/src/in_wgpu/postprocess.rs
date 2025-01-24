@@ -125,31 +125,41 @@ pub(crate) fn create_postprocess_pipeline(
 pub(crate) struct PostprocessUniforms {
     tone_mapping_id: i32,
 
+    maximum_intensity: f32,
+
     /// 0 or 1 boolean indicating whether or not the `linear_scene_texture` was actually
     /// written this frame. If zero, the postprocessing shader should display a “no data”
     /// indication instead of reading the scene texture.
     texture_is_valid: i32,
 
     bloom_intensity: f32,
-
-    /// pad out to multiple of vec4<something32>
-    _padding: f32,
 }
 
 impl PostprocessUniforms {
     pub(crate) fn new(options: &GraphicsOptions, texture_is_valid: bool) -> Self {
         Self {
-            tone_mapping_id: match options.tone_mapping {
-                ToneMappingOperator::Clamp => 0,
-                ToneMappingOperator::Reinhard => 1,
-                ref tmo => panic!("Missing implementation for tone mapping operator {tmo:?}"),
+            tone_mapping_id: if options.maximum_intensity.is_finite() {
+                match options.tone_mapping {
+                    ToneMappingOperator::Clamp => 0,
+                    ToneMappingOperator::Reinhard => 1,
+                    ref tmo => {
+                        panic!("Missing implementation for tone mapping operator {tmo:?}")
+                    }
+                }
+            } else {
+                // If the maximum intensity is unrestricted, tone mapping cannot do anything,
+                // so reset the operator to `Clamp` so the other operators don’t have to deal
+                // with infinity.
+                0
             },
+
+            // Remove infinity because, if I understand correctly, GPUs often don't promise
+            // conformant arithmetic on it, and we already disabled the operator above.
+            maximum_intensity: options.maximum_intensity.into_inner().min(f32::MAX),
 
             texture_is_valid: i32::from(texture_is_valid),
 
             bloom_intensity: options.bloom_intensity.into_inner(),
-
-            _padding: Default::default(),
         }
     }
 }

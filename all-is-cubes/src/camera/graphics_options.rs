@@ -33,10 +33,34 @@ pub struct GraphicsOptions {
     pub fog: FogOption,
 
     /// Field of view, in degrees from top to bottom edge of the viewport.
+    ///
+    /// Values ≥ 180° are ignored.
+    // --
+    // TODO: make deserialization not break on infinity
     pub fov_y: PositiveSign<FreeCoordinate>,
 
     /// Method to use to remap colors to fit within the displayable range.
+    ///
+    /// In order for tone mapping to take effect, [`maximum_intensity`](Self::maximum_intensity)
+    /// must be set to an appropriate finite value.
     pub tone_mapping: ToneMappingOperator,
+
+    /// Maximum value to allow in the output image’s color channels.
+    ///
+    /// * If the output format/device supports HDR (high dynamic range; color channel values greater
+    ///   than 1.0),
+    ///   this should be set to the maximum representable (or desired) value.
+    /// * If the output format is HDR and no specific limit is known or desired, use ∞.
+    ///   Note that this disables tone mapping.
+    /// * If the output format is not HDR (SDR), use 1.0.
+    /// * If no information is available, use ∞.
+    ///
+    /// The chosen [`tone_mapping`](ToneMappingOperator) will use this information to map to the
+    /// available range.
+    ///
+    /// The default value is ∞.
+    #[cfg_attr(feature = "save", serde(with = "serialize_infinity_as_none"))]
+    pub maximum_intensity: PositiveSign<f32>,
 
     /// “Camera exposure” value: a scaling factor from scene luminance to displayed
     /// luminance. Note that the exact interpretation of this depends on the chosen
@@ -48,8 +72,9 @@ pub struct GraphicsOptions {
     pub bloom_intensity: ZeroOne<f32>,
 
     /// Distance, in unit cubes, from the camera to the farthest visible point.
-    ///
+    //---
     /// TODO: Implement view distance limit (and fog) in raytracer.
+    /// TODO: make deserialization not break on infinity
     pub view_distance: PositiveSign<FreeCoordinate>,
 
     /// Style in which to draw the lighting of [`Space`](crate::space::Space)s.
@@ -126,6 +151,7 @@ impl GraphicsOptions {
         fov_y: ps64(90.),
         // TODO: Change tone mapping default once we have a good implementation.
         tone_mapping: ToneMappingOperator::Clamp,
+        maximum_intensity: PositiveSign::<f32>::INFINITY,
         exposure: ExposureOption::Fixed(PositiveSign::<f32>::ONE),
         bloom_intensity: zo32(0.),
         view_distance: ps64(200.),
@@ -158,6 +184,7 @@ impl fmt::Debug for GraphicsOptions {
             fog,
             fov_y,
             tone_mapping,
+            maximum_intensity,
             exposure,
             bloom_intensity,
             view_distance,
@@ -179,6 +206,7 @@ impl fmt::Debug for GraphicsOptions {
             .field("fog", fog)
             .field("fov_y", &fov_y.into_inner())
             .field("tone_mapping", &tone_mapping)
+            .field("maximum_intensity", &maximum_intensity)
             .field("exposure", &exposure)
             .field("bloom_intensity", &bloom_intensity.into_inner())
             .field("view_distance", &view_distance.into_inner())
@@ -209,6 +237,7 @@ impl Default for GraphicsOptions {
             fov_y: ps64(90.),
             // TODO: Change tone mapping default once we have a good implementation.
             tone_mapping: ToneMappingOperator::Clamp,
+            maximum_intensity: PositiveSign::<f32>::INFINITY,
             exposure: ExposureOption::default(),
             bloom_intensity: zo32(0.125),
             view_distance: ps64(200.),
@@ -294,14 +323,21 @@ pub enum ToneMappingOperator {
 impl ToneMappingOperator {
     /// Apply this operator to the given high-dynamic-range color value.
     #[inline]
-    pub fn apply(&self, input: Rgb) -> Rgb {
+    pub fn apply(&self, maximum_intensity: PositiveSign<f32>, input: Rgb) -> Rgb {
+        if !maximum_intensity.is_finite() {
+            // Can't operate without an upper bound.
+            return input;
+        }
         match self {
-            ToneMappingOperator::Clamp => input.clamp(<_>::ONE),
+            ToneMappingOperator::Clamp => input.clamp(maximum_intensity),
             // From <https://64.github.io/tonemapping/>, this will cut brightness
             // too much, but the better versions require a parameter of max scene brightness,
             // or more likely for our use case, we'll hook this up to a model of eye
             // adaptation to average brightness.
-            ToneMappingOperator::Reinhard => input * (1.0 + input.luminance()).recip(),
+            ToneMappingOperator::Reinhard => {
+                let scale = (1.0 + input.luminance() / maximum_intensity.into_inner()).recip();
+                input * scale
+            }
         }
     }
 }
@@ -463,6 +499,34 @@ impl AntialiasingOption {
     }
 }
 
+/// Kludge: `serde_json`, which we generally use, serializes infinity as null, but then
+/// does not accept it in deserialization. Work around this by adding an `Option`.
+/// Arguably this should be done in `PositiveSign` itself, but I don’t want to do this to more
+/// general types.
+#[cfg(feature = "save")]
+mod serialize_infinity_as_none {
+    use crate::math::PositiveSign;
+    use serde::{Deserialize, Serialize};
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub(super) fn serialize<S: serde::Serializer>(
+        &value: &PositiveSign<f32>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let value: Option<PositiveSign<f32>> = value.is_finite().then_some(value);
+        value.serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<PositiveSign<f32>, D::Error> {
+        match Option::<PositiveSign<f32>>::deserialize(deserializer)? {
+            Some(value) => Ok(value),
+            None => Ok(PositiveSign::<f32>::INFINITY),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -480,6 +544,7 @@ mod tests {
                     fog: Abrupt,
                     fov_y: 90.0,
                     tone_mapping: Clamp,
+                    maximum_intensity: inf,
                     exposure: Fixed(1),
                     bloom_intensity: 0.125,
                     view_distance: 200.0,

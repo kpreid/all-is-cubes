@@ -1344,6 +1344,8 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
 /// Options to go with [`light_test_universe`].
 fn tone_mapping_test_options() -> GraphicsOptions {
     let mut options = GraphicsOptions::UNALTERED_COLORS;
+    // Must set the maximum intensity in order to get any tone mapping.
+    options.maximum_intensity = ps32(1.0);
     // Smooth lighting is a complicating factor increasing the number of small errors,
     // and also makes it harder to visually judge overexposure, so use flat.
     options.lighting_display = LightingOption::Flat;

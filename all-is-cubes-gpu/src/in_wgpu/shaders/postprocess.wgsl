@@ -3,9 +3,9 @@
 // Mirrors `struct PostprocessUniforms` on the Rust side.
 struct PostprocessUniforms {
     tone_mapping_id: i32,
+    maximum_intensity: f32,
     scene_texture_valid: i32,
     bloom_intensity: f32,
-    padding: f32,
 };
 
 
@@ -46,13 +46,13 @@ fn luminance(linear_rgb: vec3<f32>) -> f32 {
 fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
     switch camera.tone_mapping_id {
         default: { // or case 0
-            // Clamp (implicitly)
-            return linear_rgb;
+            // Clamp
+            return clamp(linear_rgb, vec3(0.0), vec3(camera.maximum_intensity));
         }
         case 1 {
             // Reinhard
             // TODO: Explain exactly which Reinhard, citation, etc
-            return linear_rgb / (1.0 + luminance(linear_rgb));
+            return linear_rgb / (1.0 + luminance(linear_rgb) / camera.maximum_intensity);
         }
     }
 }

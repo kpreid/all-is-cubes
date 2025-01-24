@@ -12,6 +12,9 @@
     - `impl IntoIterator for math::FaceMap`
     - `math::PositiveSign::INFINITY`
 
+- `all-is-cubes-render` library:
+    - `camera::GraphicsOptions::maximum_intensity` may be used to specify the maximum brightness of the output device and thus properly apply tone mapping to HDR output. It may also be used to choose to restrict output to SDR.
+
 - `all-is-cubes-ui` library:
     - `apps::Settings` manages user-editable settings that eventually will be more than just the graphics options.
     - `apps::SessionBuilder::settings()` links a possibly-shared `Settings` to the created session.

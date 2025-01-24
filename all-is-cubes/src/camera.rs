@@ -366,7 +366,11 @@ impl Camera {
     ///
     /// [HDR]: https://en.wikipedia.org/wiki/High_dynamic_range
     pub fn post_process_color(&self, color: Rgba) -> Rgba {
-        color.map_rgb(|rgb| self.options.tone_mapping.apply(rgb * self.exposure()))
+        color.map_rgb(|rgb| {
+            self.options
+                .tone_mapping
+                .apply(self.options.maximum_intensity, rgb * self.exposure())
+        })
     }
 }
 
