@@ -30,9 +30,20 @@ impl BloomPipelines {
                     },
                     count: None,
                 },
-                // Binding for linear_sampler
+                // Binding for "higher" texture
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                // Binding for linear_sampler
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
@@ -137,6 +148,7 @@ impl BloomPipelines {
         &self,
         device: &wgpu::Device,
         input_texture_view: &wgpu::TextureView,
+        higher_texture_view: &wgpu::TextureView,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &self.bind_group_layout,
@@ -147,6 +159,10 @@ impl BloomPipelines {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
+                    resource: wgpu::BindingResource::TextureView(higher_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
                     resource: wgpu::BindingResource::Sampler(&self.linear_sampler),
                 },
             ],
@@ -177,10 +193,17 @@ impl BloomResources {
         config: &super::frame_texture::FbtConfig,
         scene_texture: &wgpu::TextureView,
     ) -> Self {
+        let bloom_texture_size = size_for_bloom(config.size);
+
         // TODO: how should bloom radius relate to viewport size? This sets a fixed
         // radius while keeping it within the valid range.
-        let log_size = config.size.width.min(config.size.height).ilog2();
-        let mip_level_count: u32 = 5.min(log_size + 1);
+        let mip_level_count: u32 = {
+            let log_size = bloom_texture_size
+                .width
+                .min(bloom_texture_size.height)
+                .ilog2();
+            6.min(log_size + 1)
+        };
 
         // TODO: create bloom texture only if graphics options say bloom
         let bloom_texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -197,60 +220,75 @@ impl BloomResources {
         let mut render_bundles =
             Vec::with_capacity(usize::try_from(mip_level_count).unwrap() * 2 - 1);
 
-        // Generate downsampling stages.
-        for output_mip in 0..mip_level_count {
-            let input_texture_view_owned;
-            let input_texture_view = if output_mip == 0 {
-                scene_texture
-            } else {
-                let input_mip = output_mip - 1;
-                input_texture_view_owned = bloom_mip_view(input_mip, &bloom_texture);
-                &input_texture_view_owned
-            };
-            let input_bind_group = pipelines.bind_group(device, input_texture_view);
+        // Repeat the downsample-upsample several times.
+        // This gives us a larger bloom radius without excessive downsampling artifacts.
+        for repetition in 0..3 {
+            // Generate downsampling stages.
+            for output_mip in 0..mip_level_count {
+                if repetition != 0 && output_mip == 0 {
+                    // skip this pass so that we write mip 1 from the previous repetition's mip 0
+                    // instead of restarting from the input texture.
+                    continue;
+                }
 
-            let mut encoder =
-                device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
-                    label: None,
-                    color_formats: &[Some(config.linear_scene_texture_format)],
-                    depth_stencil: None,
-                    sample_count: 1,
-                    multiview: None,
+                let input_texture_view = if output_mip == 0 {
+                    scene_texture
+                } else {
+                    let input_mip = output_mip - 1;
+                    &bloom_mip_view(input_mip, &bloom_texture)
+                };
+                let input_bind_group =
+                    pipelines.bind_group(device, input_texture_view, input_texture_view);
+
+                let mut encoder =
+                    device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
+                        label: None,
+                        color_formats: &[Some(config.linear_scene_texture_format)],
+                        depth_stencil: None,
+                        sample_count: 1,
+                        multiview: None,
+                    });
+                encoder.set_pipeline(&pipelines.downsample_pipeline);
+                encoder.set_bind_group(0, &input_bind_group, &[]);
+                // Using the instance ID to communicate which downsample stage this is.
+                encoder.draw(0..3, output_mip..(output_mip + 1));
+
+                let label = format!("BloomResources rep {repetition} downsample {output_mip}");
+                let bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
+                    label: Some(&label),
                 });
-            encoder.set_pipeline(&pipelines.downsample_pipeline);
-            encoder.set_bind_group(0, &input_bind_group, &[]);
-            encoder.draw(0..3, 0..1);
+                render_bundles.push((label, bundle, bloom_mip_view(output_mip, &bloom_texture)));
+            }
 
-            let label = format!("BloomResources downsample {output_mip}");
-            let bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
-                label: Some(&label),
-            });
-            render_bundles.push((label, bundle, bloom_mip_view(output_mip, &bloom_texture)));
-        }
+            // Generate upsampling stages.
+            for output_mip in (0..mip_level_count - 1).rev() {
+                let input_mip = output_mip + 1;
+                let higher_mip = output_mip.checked_sub(1).unwrap_or(input_mip);
+                let input_bind_group = pipelines.bind_group(
+                    device,
+                    &bloom_mip_view(input_mip, &bloom_texture),
+                    &bloom_mip_view(higher_mip, &bloom_texture),
+                );
 
-        // Generate upsampling stages.
-        for output_mip in (0..mip_level_count - 1).rev() {
-            let input_mip = output_mip + 1;
-            let input_bind_group =
-                pipelines.bind_group(device, &bloom_mip_view(input_mip, &bloom_texture));
+                let mut encoder =
+                    device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
+                        label: None,
+                        color_formats: &[Some(config.linear_scene_texture_format)],
+                        depth_stencil: None,
+                        sample_count: 1,
+                        multiview: None,
+                    });
+                encoder.set_pipeline(&pipelines.upsample_pipeline);
+                encoder.set_bind_group(0, &input_bind_group, &[]);
+                // Using the instance ID to communicate which upsample stage this is.
+                encoder.draw(0..3, output_mip..(output_mip + 1));
 
-            let mut encoder =
-                device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
-                    label: None,
-                    color_formats: &[Some(config.linear_scene_texture_format)],
-                    depth_stencil: None,
-                    sample_count: 1,
-                    multiview: None,
+                let label = format!("BloomResources rep {repetition} upsample {output_mip}");
+                let bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
+                    label: Some(&label),
                 });
-            encoder.set_pipeline(&pipelines.upsample_pipeline);
-            encoder.set_bind_group(0, &input_bind_group, &[]);
-            encoder.draw(0..3, 0..1);
-
-            let label = format!("BloomResources upsample {output_mip}");
-            let bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
-                label: Some(&label),
-            });
-            render_bundles.push((label, bundle, bloom_mip_view(output_mip, &bloom_texture)));
+                render_bundles.push((label, bundle, bloom_mip_view(output_mip, &bloom_texture)));
+            }
         }
 
         Self {

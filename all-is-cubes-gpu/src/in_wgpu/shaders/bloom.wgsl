@@ -1,14 +1,16 @@
 // --- Interface declarations --------------------------------------------------
 
 // This group is named bloom_bind_group_layout in the code.
-@group(0) @binding(0) var input: texture_2d<f32>;
-@group(0) @binding(1) var linear_sampler: sampler;
+@group(0) @binding(0) var previous_stage_input: texture_2d<f32>;
+@group(0) @binding(1) var higher_stage_input: texture_2d<f32>;
+@group(0) @binding(2) var linear_sampler: sampler;
 
 // --- Vertex shader -----------------------------------------------------------
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) texcoord: vec2<f32>,
+    @location(1) output_stage: u32,
 };
 
 fn vertex_position(vertex_index: u32) -> vec4<f32> {
@@ -23,13 +25,16 @@ fn vertex_position(vertex_index: u32) -> vec4<f32> {
 @vertex
 fn bloom_vertex(
     @builtin(vertex_index) in_vertex_index: u32,
+    @builtin(instance_index) in_instance_index: u32,
 ) -> VertexOutput {
     let position = vertex_position(in_vertex_index);
 
     // scale clip coordinates to 0-1 coordinates and flip Y
     let texcoord: vec2<f32> = position.xy * vec2<f32>(0.5, -0.5) + 0.5;
 
-    return VertexOutput(position, texcoord);
+    // instance index is used to signal the output mip level,
+    // which corresponds to the stage of processing we are at.
+    return VertexOutput(position, texcoord, in_instance_index);
 }
 
 // --- Fragment shader; doing the actual bloom scaling work -------------------
@@ -45,7 +50,7 @@ fn input_pixel(in: VertexOutput, offset: vec2<f32>) -> vec4<f32> {
     let derivatives = vec2<f32>(dpdx(in.texcoord.x), dpdy(in.texcoord.y));
 
     return textureSampleLevel(
-        input,
+        previous_stage_input,
         linear_sampler,
         in.texcoord + offset * derivatives,
         // The mip level here is always 0 because selecting the actual mip level will be
@@ -66,6 +71,10 @@ fn bloom_downsample_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 
 @fragment
 fn bloom_upsample_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+    // This value controls how much we blend in from the *next higher downsampling* level,
+    // to recover some of the high-spatial-frequency information we lost by downsampling so much.
+    let higher_weight = 5.0 * pow(1.5, -f32(in.output_stage));
+
     return (
         2.0 * input_pixel(in, vec2<f32>(0.5, 0.5))
         + 2.0 * input_pixel(in, vec2<f32>(0.5, -0.5))
@@ -75,5 +84,6 @@ fn bloom_upsample_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         + input_pixel(in, vec2<f32>(0.0, -1.0))
         + input_pixel(in, vec2<f32>(-1.0, 0.0))
         + input_pixel(in, vec2<f32>(1.0, 0.0))
-    ) / 12.0;
+        + higher_weight * textureSampleLevel(higher_stage_input, linear_sampler, in.texcoord, 0.0)
+    ) / (12.0 + higher_weight);
 }
