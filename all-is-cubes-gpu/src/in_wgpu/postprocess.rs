@@ -3,6 +3,7 @@
 //! * screen-space effects such as bloom
 //! * tone mapping
 
+use all_is_cubes::math::PositiveSign;
 use all_is_cubes::time;
 use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator};
 use all_is_cubes_render::Flaws;
@@ -136,7 +137,11 @@ pub(crate) struct PostprocessUniforms {
 }
 
 impl PostprocessUniforms {
-    pub(crate) fn new(options: &GraphicsOptions, texture_is_valid: bool) -> Self {
+    pub(crate) fn new(
+        options: &GraphicsOptions,
+        texture_is_valid: bool,
+        surface_maximum_intensity: PositiveSign<f32>,
+    ) -> Self {
         Self {
             tone_mapping_id: if options.maximum_intensity.is_finite() {
                 match options.tone_mapping {
@@ -153,9 +158,15 @@ impl PostprocessUniforms {
                 0
             },
 
-            // Remove infinity because, if I understand correctly, GPUs often don't promise
-            // conformant arithmetic on it, and we already disabled the operator above.
-            maximum_intensity: options.maximum_intensity.into_inner().min(f32::MAX),
+            maximum_intensity: {
+                // Remove infinity because, if I understand correctly, GPUs often don't promise
+                // conformant arithmetic on it, and we already disabled the operator above.
+                options
+                    .maximum_intensity
+                    .min(surface_maximum_intensity)
+                    .into_inner()
+                    .min(f32::MAX)
+            },
 
             texture_is_valid: i32::from(texture_is_valid),
 

@@ -817,6 +817,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 bytemuck::bytes_of(&PostprocessUniforms::new(
                     self.cameras.graphics_options(),
                     !output_needs_clearing,
+                    self.fb.config().maximum_intensity,
                 )),
             );
         }
