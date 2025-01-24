@@ -296,7 +296,7 @@ impl ToneMappingOperator {
     #[inline]
     pub fn apply(&self, input: Rgb) -> Rgb {
         match self {
-            ToneMappingOperator::Clamp => input.clamp(),
+            ToneMappingOperator::Clamp => input.clamp(<_>::ONE),
             // From <https://64.github.io/tonemapping/>, this will cut brightness
             // too much, but the better versions require a parameter of max scene brightness,
             // or more likely for our use case, we'll hook this up to a model of eye

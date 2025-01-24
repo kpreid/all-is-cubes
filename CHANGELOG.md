@@ -21,6 +21,8 @@
 - `all-is-cubes` library:
     - `block::BlockAttributes` is now a non-exhaustive struct.
       `BlockAttributes` literals should be replaced with `block::Builder::build_attributes()`.
+    
+    - `math::Rgb::clamp()` now takes a parameter for the upper bound.
 
 - `all-is-cubes-ui` library:
     - `apps::Session::settings()` replaces `graphics_options_mut()`.

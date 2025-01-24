@@ -226,11 +226,11 @@ impl Rgb {
         ))
     }
 
-    /// Clamp each component to lie within the range 0 to 1, inclusive.
+    /// Clamp each component to lie within the range 0 to `maximum`, inclusive.
     #[inline]
     #[must_use]
-    pub fn clamp(self) -> Self {
-        Self(self.0.map(|c| c.clamp(PS0, PS1)))
+    pub fn clamp(self, maximum: PositiveSign<f32>) -> Self {
+        Self(self.0.map(|c| c.clamp(PS0, maximum)))
     }
 
     /// Subtract `other` from `self`; if any component would be negative, it is zero instead.
@@ -410,7 +410,7 @@ impl Rgba {
     #[must_use]
     pub fn clamp(self) -> Self {
         Self {
-            rgb: self.rgb.clamp(),
+            rgb: self.rgb.clamp(PS1),
             alpha: self.alpha,
         }
     }
