@@ -142,6 +142,9 @@ impl<T: FloatCore + num_traits::ConstZero + num_traits::ConstOne> ZeroOne<T> {
 macro_rules! non_generic_impls {
     ($t:ty) => {
         impl PositiveSign<$t> {
+            /// Positive infinity (∞).
+            pub const INFINITY: Self = Self(<$t>::INFINITY);
+
             /// Wraps the given value in `PositiveSign`.
             ///
             /// * If `value` is positive (including positive infinity), returns wrapped `value`.
@@ -787,7 +790,7 @@ mod tests {
 
     #[test]
     fn ps_closed_under_multiplication() {
-        assert_eq!(ps32(0.0) * ps32(f32::INFINITY), ps32(0.0));
+        assert_eq!(ps32(0.0) * PositiveSign::<f32>::INFINITY, ps32(0.0));
     }
 
     #[test]

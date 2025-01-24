@@ -436,7 +436,7 @@ mod tests {
                 PackedLight::scalar_in(ps32(0.0)),
                 PackedLight::scalar_in(ps32(1e-30)),
                 PackedLight::scalar_in(ps32(1e+30)),
-                PackedLight::scalar_in(ps32(f32::INFINITY)),
+                PackedLight::scalar_in(PositiveSign::<f32>::INFINITY),
             ],
             [0, 0, 0, 255, 255],
         );
