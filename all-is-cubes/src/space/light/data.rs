@@ -231,7 +231,11 @@ impl PackedLight {
         if value == 0 {
             0.0
         } else {
-            ((f32::from(value) - Self::LOG_OFFSET) / Self::LOG_SCALE).exp2()
+            // Use pure-Rust implementation from `libm` to avoid platform-dependent rounding
+            // which would be inconsistent with our hardcoded lookup table.
+            // This function is supposed to
+            // *define* what belongs in the lookup table.
+            libm::exp2f((f32::from(value) - Self::LOG_OFFSET) / Self::LOG_SCALE)
         }
     }
 }

@@ -71,6 +71,7 @@ dependencies = [
  "hashbrown 0.15.2",
  "indoc",
  "itertools 0.13.0",
+ "libm",
  "log",
  "macro_rules_attribute",
  "manyfmt",

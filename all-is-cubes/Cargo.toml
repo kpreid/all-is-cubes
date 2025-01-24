@@ -109,6 +109,7 @@ futures-core = { workspace = true }
 hashbrown = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
+libm = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }
 manyfmt = { workspace = true }

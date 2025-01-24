@@ -48,6 +48,7 @@ dependencies = [
  "hashbrown",
  "indoc",
  "itertools",
+ "libm",
  "log",
  "macro_rules_attribute",
  "manyfmt",
