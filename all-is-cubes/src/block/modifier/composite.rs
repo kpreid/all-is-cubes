@@ -5,7 +5,8 @@ use crate::block::{
     self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
 };
 use crate::math::{
-    Cube, GridAab, GridCoordinate, GridRotation, GridSize, PositiveSign, Rgb, Vol, ZeroOne,
+    Cube, GridAab, GridCoordinate, GridPoint, GridRotation, GridSize, GridVector, PositiveSign,
+    Rgb, Vol, ZeroOne,
 };
 use crate::op::Operation;
 use crate::universe;
@@ -636,13 +637,25 @@ pub(in crate::block) fn render_inventory(
                 .finish(icon.clone(), filter.budget.get().to_cost())
         };
 
-        // TODO(inventory): We should be downsampling the icons (or more precisely,
+        // TODO(inventory): Instead of roughly downsampling the icons here, we should be
         // asking evaluation to generate a lower resolution as per `config.icon_resolution`).
-        // For now, we just always generate the resolution-1 form.
-        let icon_voxel = Evoxel::from_block(&icon_evaluated);
+        let resample_scale = GridCoordinate::from(icon_evaluated.voxels.resolution())
+            * GridCoordinate::from(config.icon_scale)
+            / GridCoordinate::from(config.icon_resolution);
+        let resample_point_offset = GridVector::splat(resample_scale / 2);
         icon_evaluated.voxels = Evoxels::from_many(
             config.icon_resolution,
-            Vol::repeat(placed_icon_bounds, icon_voxel),
+            Vol::from_fn(placed_icon_bounds, |render_cube| {
+                // Translate to the coordinate system with the icon's lower corner as origin.
+                let translated: Cube = render_cube - placed_icon_bounds.lower_bounds().to_vector();
+                // Scale to the icon's voxels' resolution.
+                let translated_and_scaled: Cube =
+                    Cube::from(GridPoint::from(translated) * resample_scale);
+                icon_evaluated
+                    .voxels
+                    .get(translated_and_scaled + resample_point_offset)
+                    .unwrap_or(Evoxel::AIR)
+            }),
         );
 
         input = evaluate_composition(
