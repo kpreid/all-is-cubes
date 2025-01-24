@@ -111,14 +111,15 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         ],
     );
     c.insert_variants(
-        "tone_mapping",
-        &u("tone_mapping", tone_mapping_test_universe()),
-        tone_mapping,
+        "tone_map",
+        &u("tone_map", tone_mapping_test_universe()),
+        tone_map,
         [
-            (ToneMappingOperator::Clamp, 0.5),
-            (ToneMappingOperator::Clamp, 2.0),
-            (ToneMappingOperator::Reinhard, 0.5),
-            (ToneMappingOperator::Reinhard, 2.0),
+            (ToneMappingOperator::Clamp, 1.0, 0.5),
+            (ToneMappingOperator::Clamp, 1.0, 2.0),
+            (ToneMappingOperator::Reinhard, 1.0, 0.5),
+            (ToneMappingOperator::Reinhard, 0.5, 0.5),
+            (ToneMappingOperator::Reinhard, 1.0, 2.0),
         ],
     );
     c.insert_variants("transparent_one", &None, transparent_one, ["surf", "vol"]);
@@ -927,9 +928,13 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
         .await;
 }
 
-async fn tone_mapping(mut context: RenderTestContext, (tmo, exposure): (ToneMappingOperator, f32)) {
+async fn tone_map(
+    mut context: RenderTestContext,
+    (tmo, maximum_intensity, exposure): (ToneMappingOperator, f32, f32),
+) {
     let mut options = tone_mapping_test_options();
     options.tone_mapping = tmo;
+    options.maximum_intensity = ps32(maximum_intensity);
     options.exposure = ExposureOption::Fixed(ps32(exposure));
     let scene = StandardCameras::from_constant_for_test(
         options,
