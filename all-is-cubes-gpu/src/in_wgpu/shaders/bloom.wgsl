@@ -10,7 +10,7 @@
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) texcoord: vec2<f32>,
-    @location(1) output_stage: u32,
+    @location(1) @interpolate(flat) output_stage: u32,
 };
 
 fn vertex_position(vertex_index: u32) -> vec4<f32> {
