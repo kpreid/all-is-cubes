@@ -6,7 +6,7 @@ use core::fmt;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{self, point2, vec2};
-use all_is_cubes::listen;
+use all_is_cubes::listen::{self, Source as _};
 use all_is_cubes::math::{Rgba, ZeroOne};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Handle;
@@ -35,6 +35,9 @@ pub struct RtRenderer<D: RtBlockData = ()> {
     /// The output images will alway
     size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
 
+    // TODO: this oughta be just provided by `StandardCameras`
+    ui_graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
+
     custom_options: listen::DynSource<Arc<D::Options>>,
     /// Borrowable copy of the value in `custom_options`.
     custom_options_cache: Arc<D::Options>,
@@ -60,6 +63,11 @@ where
     ) -> Self {
         RtRenderer {
             rts: Layers::<Option<_>>::default(),
+            ui_graphics_options: Arc::new(
+                cameras
+                    .ui_view_source()
+                    .map(|view| Arc::new(view.graphics_options.clone())),
+            ),
             cameras,
             size_policy,
             custom_options_cache: custom_options.get(),
@@ -90,7 +98,7 @@ where
         fn sync_space<D>(
             cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
             optional_space: Option<&Handle<Space>>,
-            graphics_options_source: &listen::DynSource<Arc<GraphicsOptions>>,
+            graphics_options_source: listen::DynSource<Arc<GraphicsOptions>>,
             custom_options_source: &listen::DynSource<Arc<D::Options>>,
             anything_changed: &mut bool,
         ) -> Result<(), RenderError>
@@ -108,7 +116,7 @@ where
                     *anything_changed = true;
                     *rt = Some(UpdatingSpaceRaytracer::new(
                         space.clone(),
-                        graphics_options_source.clone(),
+                        graphics_options_source,
                         custom_options_source.clone(),
                     ));
                 }
@@ -121,18 +129,17 @@ where
             }
             Ok(())
         }
-        let gs = self.cameras.graphics_options_source();
         sync_space(
             &mut self.rts.world,
             Option::as_ref(&self.cameras.world_space().get()),
-            &gs,
+            self.cameras.graphics_options_source(),
             &self.custom_options,
             &mut anything_changed,
         )?;
         sync_space(
             &mut self.rts.ui,
             self.cameras.ui_space(),
-            &gs,
+            self.ui_graphics_options.clone(),
             &self.custom_options,
             &mut anything_changed,
         )?;
@@ -279,7 +286,8 @@ where
         let Self {
             rts,
             cameras,
-            size_policy: _, // can't print a function
+            size_policy: _,         // can't print a function
+            ui_graphics_options: _, // derived
             custom_options,
             custom_options_cache: _, // not printed because its value is not meaningful when not in use
             had_cursor,

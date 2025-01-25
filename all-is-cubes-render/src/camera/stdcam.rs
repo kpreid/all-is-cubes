@@ -258,12 +258,16 @@ impl StandardCameras {
     }
 
     /// Returns current graphics options as of the last [`update()`](Self::update).
+    ///
+    /// These options are to be used for the world and not the UI.
     pub fn graphics_options(&self) -> &GraphicsOptions {
         self.cameras.world.options()
     }
 
     /// Returns a clone of the source of graphics options that this [`StandardCameras`]
     /// was created with.
+    ///
+    /// These options are to be used for the world and not the UI.
     pub fn graphics_options_source(&self) -> listen::DynSource<Arc<GraphicsOptions>> {
         self.graphics_options.clone()
     }
@@ -296,6 +300,13 @@ impl StandardCameras {
     /// TODO: Make this also a [`listen::DynSource`]
     pub fn ui_space(&self) -> Option<&Handle<Space>> {
         self.ui_space.as_ref()
+    }
+
+    // TODO: unclear if good API; added so that we can get Source access to the graphics options,
+    // and *something* of the sort should be public, but I don't know if exposing UiViewState
+    // directly, as opposed to a source of a Camera, is right.
+    pub(crate) fn ui_view_source(&self) -> listen::DynSource<Arc<UiViewState>> {
+        self.ui_source.clone()
     }
 
     /// Returns the current viewport.
