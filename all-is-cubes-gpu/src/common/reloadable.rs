@@ -3,8 +3,10 @@
 //! This module builds on top of the `resource` library to add change notification
 //! via a background thread and all-is-cubes's `listen::Cell` mechanism.
 
-use std::sync::{Arc, LazyLock, Mutex, PoisonError};
-use std::time::Duration;
+use alloc::vec::Vec;
+use alloc::sync::Arc;
+use core::time::Duration;
+use std::sync::{LazyLock, Mutex, PoisonError};
 
 use resource::Resource;
 

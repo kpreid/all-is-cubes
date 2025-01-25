@@ -1,6 +1,8 @@
-use std::fmt;
-use std::mem;
-use std::sync::Arc;
+use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::fmt;
+use core::mem;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;

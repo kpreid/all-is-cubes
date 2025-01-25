@@ -1,6 +1,10 @@
 //! Implementation of [`HeadlessRenderer`] using [`wgpu`].
 
-use std::sync::Arc;
+use alloc::borrow::ToOwned as _;
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use futures_channel::oneshot;
 use futures_core::future::BoxFuture;

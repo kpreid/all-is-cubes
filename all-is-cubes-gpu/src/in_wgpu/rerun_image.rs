@@ -1,6 +1,8 @@
 //! Exports the rendered image to Rerun.
 
-use std::num::NonZeroU64;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use core::num::NonZeroU64;
 
 use futures_core::future::BoxFuture;
 

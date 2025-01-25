@@ -1,10 +1,17 @@
 //! Manages meshes for rendering a [`Space`].
 
-use std::collections::HashSet;
-use std::mem;
-use std::sync::{atomic, mpsc, Arc, Mutex};
-use std::time::Duration;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::mem;
+use core::sync::atomic;
+use core::time::Duration;
+use std::sync::{mpsc, Mutex};
 
+use hashbrown::HashSet;
 use itertools::Itertools as _;
 
 use all_is_cubes::chunking::ChunkPos;

@@ -1,6 +1,8 @@
 //! Drawing to a CPU-side image buffer which is going to be transferred to the GPU.
 
-use std::marker::PhantomData;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::marker::PhantomData;
 
 use all_is_cubes::drawing::embedded_graphics::{
     draw_target::DrawTarget,

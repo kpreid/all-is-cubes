@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Face7, FreePoint, LineVertex, Rgba, Wireframe};

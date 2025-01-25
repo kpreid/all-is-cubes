@@ -1,11 +1,11 @@
 //! DIY replacement for the `wgpu` `.global_id()` functionality which is being removed
 //! in `wgpu` version 23.
 
-use std::fmt;
-use std::marker::PhantomData;
-use std::ops;
-use std::sync::atomic::{self, Ordering};
-use std::sync::Arc;
+use alloc::sync::Arc;
+use core::fmt;
+use core::marker::PhantomData;
+use core::ops;
+use core::sync::atomic::{self, Ordering};
 
 /// Adds a globally unique identifier to a value.
 ///

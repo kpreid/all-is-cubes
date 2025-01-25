@@ -1,3 +1,6 @@
+use alloc::boxed::Box;
+use alloc::vec;
+use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
 use core::ops::{self, Range};
@@ -654,6 +657,7 @@ fn expsize(size_exponent: u8) -> TreeCoord {
 mod tests {
     use super::*;
     use all_is_cubes::block::Resolution::*;
+    use std::dbg;
 
     #[track_caller]
     fn check_no_overlaps(

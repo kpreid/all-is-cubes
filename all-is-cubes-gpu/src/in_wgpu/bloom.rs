@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use alloc::format;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use crate::in_wgpu::shaders::Shaders;
 

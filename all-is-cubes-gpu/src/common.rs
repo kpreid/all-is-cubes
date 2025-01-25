@@ -1,7 +1,7 @@
 //! Items not specific to a particular GPU API.
 
-use std::ops;
-use std::time::Duration;
+use core::ops;
+use core::time::Duration;
 
 use all_is_cubes_render::camera::Layers;
 

@@ -1,5 +1,5 @@
-use std::fmt;
-use std::sync::atomic::AtomicBool;
+use core::fmt;
+use core::sync::atomic::AtomicBool;
 
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
 use all_is_cubes::euclid::Size2D;

@@ -1,9 +1,12 @@
 //! Runs the software raytracer and writes the results into a texture.
 
-use std::sync::{Arc, Mutex};
+use alloc::sync::Arc;
 // TODO: if not using threads, don't even use a Mutex as it's entirely wasted
+use alloc::boxed::Box;
 #[cfg(feature = "auto-threads")]
-use std::sync::Weak;
+use alloc::sync::Weak;
+use alloc::vec::Vec;
+use std::sync::Mutex;
 
 use half::f16;
 use rand::prelude::SliceRandom as _;

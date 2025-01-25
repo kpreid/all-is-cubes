@@ -1,5 +1,5 @@
-use std::mem;
-use std::sync::Arc;
+use alloc::sync::Arc;
+use core::mem;
 
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};

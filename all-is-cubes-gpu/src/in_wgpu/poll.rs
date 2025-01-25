@@ -1,9 +1,11 @@
-use std::collections::HashMap;
-use std::sync::{Arc, OnceLock, Weak};
+use alloc::sync::{Arc, Weak};
+use alloc::vec::Vec;
+use std::sync::OnceLock;
 
 use cfg_if::cfg_if;
 #[cfg(target_family = "wasm")]
 use futures_util::StreamExt as _;
+use hashbrown::HashMap;
 
 /// Start polling the given [`wgpu::Device`] in the background until the returned guard is dropped.
 ///
@@ -55,7 +57,7 @@ mod inner {
 mod inner {
     use super::*;
 
-    thread_local! {
+    std::thread_local! {
         /// On Wasm there is only one thread (or more precisely, `wgpu` only supports running in the
         /// event loop thread, not a worker), so we make the channel thread-local to avoid the unmet
         /// bound `wgpu::Device: Send`.

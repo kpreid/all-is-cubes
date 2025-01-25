@@ -1,4 +1,6 @@
-use std::array;
+use alloc::format;
+use alloc::vec::Vec;
+use core::array;
 
 use cfg_if::cfg_if;
 #[cfg(feature = "auto-threads")]
@@ -578,11 +580,11 @@ fn split_axis(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use all_is_cubes::euclid::vec3;
     use all_is_cubes::math::ps64;
     use all_is_cubes_render::camera::{GraphicsOptions, ViewTransform, Viewport};
-
-    use super::*;
+    use std::eprintln;
 
     #[test]
     fn visible_volume_always_fits_in_size() {

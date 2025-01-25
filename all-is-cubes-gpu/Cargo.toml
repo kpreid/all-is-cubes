@@ -66,6 +66,7 @@ futures-util = { workspace = true, features = [
 ] }
 # f16 support for working with floating point textures.
 half = { workspace = true, features = ["bytemuck"] }
+hashbrown = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 num-traits = { workspace = true }

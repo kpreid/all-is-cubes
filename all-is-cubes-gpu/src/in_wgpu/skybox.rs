@@ -1,3 +1,7 @@
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use half::f16;
 
 use all_is_cubes::euclid::vec3;

@@ -1,9 +1,11 @@
 //! Hot-reloadable shader loading.
 
-use std::borrow::Cow;
-use std::sync::Arc;
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::sync::Arc;
+use core::task;
 use std::sync::LazyLock as Lazy;
-use std::task;
 
 use futures_core::future::BoxFuture;
 use futures_util::task::noop_waker_ref;

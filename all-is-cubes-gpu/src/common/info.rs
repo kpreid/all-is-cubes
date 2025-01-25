@@ -1,5 +1,5 @@
-use std::time::Duration;
-use std::{fmt, ops};
+use core::time::Duration;
+use core::{fmt, ops};
 
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
@@ -177,6 +177,8 @@ impl SpaceUpdateInfo {
 
     #[cfg(feature = "rerun")]
     pub(crate) fn write_to_rerun(&self, destination: &rg::Destination) {
+        use alloc::string::ToString as _;
+
         destination.log(
             &"info".into(),
             &rg::archetypes::TextDocument::new(self.refmt(&StatusText::ALL).to_string())

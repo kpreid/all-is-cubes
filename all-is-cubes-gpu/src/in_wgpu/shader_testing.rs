@@ -8,7 +8,10 @@
 //! The code in this module is located here so that we do not need to make many pieces
 //! of the infrastructure, like `FramebufferTextures`, `pub`, but only this module.
 
-use std::sync::Arc;
+use alloc::string::{String, ToString as _};
+use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use wgpu::util::DeviceExt as _;
 

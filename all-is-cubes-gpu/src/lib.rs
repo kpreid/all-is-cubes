@@ -6,9 +6,14 @@
 //!
 //! [All is Cubes]: all_is_cubes
 
+// wgpu is not no_std but is working towards it, so we shall too, for a better wasm target someday.
+#![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 // * TODO: warn(missing_docs), eventually.
 #![forbid(unsafe_code)]
+
+extern crate alloc;
+extern crate std;
 
 #[cfg_attr(not(feature = "wgpu"), allow(unused))]
 mod common;

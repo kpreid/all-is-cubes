@@ -1,7 +1,8 @@
 //! Rendering via the [`wgpu`] WebGPU-in-Rust graphics library.
 
-use std::marker::PhantomData;
-use std::sync::Arc;
+use alloc::string::String;
+use alloc::sync::Arc;
+use core::marker::PhantomData;
 
 use wgpu::TextureViewDescriptor;
 

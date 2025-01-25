@@ -3,7 +3,10 @@
 //! These are appropriate for the all-is-cubes project's tests, but may not be appropriate
 //! for downstream users of the libraries.
 
-use std::future::Future;
+use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
+use core::future::Future;
 use std::io::Write as _;
 
 use all_is_cubes::euclid::Size3D;

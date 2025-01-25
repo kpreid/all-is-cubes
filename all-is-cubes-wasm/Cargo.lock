@@ -121,6 +121,7 @@ dependencies = [
  "futures-util",
  "gloo-timers",
  "half",
+ "hashbrown",
  "itertools",
  "log",
  "num-traits",

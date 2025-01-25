@@ -1,6 +1,6 @@
 //! Functions for generating test case WGSL code.
 
-use std::fmt;
+use core::fmt;
 
 use all_is_cubes::util::{Fmt, Refmt as _};
 
