@@ -388,6 +388,34 @@ impl<T: fmt::Display> fmt::Display for ZeroOne<T> {
 impl<T: PartialEq> Eq for PositiveSign<T> {}
 impl<T: PartialEq> Eq for ZeroOne<T> {}
 
+// Allow comparison with the contents.
+// Note: These cannot generalize to `<T: Trait<U>, U> Trait<U> for PositiveSign<T>`,
+// because that would have potential overlap.
+impl<T: PartialEq> PartialEq<T> for PositiveSign<T> {
+    #[inline]
+    fn eq(&self, other: &T) -> bool {
+        self.0 == *other
+    }
+}
+impl<T: PartialEq> PartialEq<T> for ZeroOne<T> {
+    #[inline]
+    fn eq(&self, other: &T) -> bool {
+        self.0 == *other
+    }
+}
+impl<T: PartialOrd> PartialOrd<T> for PositiveSign<T> {
+    #[inline]
+    fn partial_cmp(&self, other: &T) -> Option<core::cmp::Ordering> {
+        self.0.partial_cmp(other)
+    }
+}
+impl<T: PartialOrd> PartialOrd<T> for ZeroOne<T> {
+    #[inline]
+    fn partial_cmp(&self, other: &T) -> Option<core::cmp::Ordering> {
+        self.0.partial_cmp(other)
+    }
+}
+
 #[allow(clippy::derive_ord_xor_partial_ord)]
 impl<T: FloatCore + PartialOrd> Ord for PositiveSign<T> {
     #[inline]
