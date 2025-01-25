@@ -128,7 +128,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             label: Some(label),
             required_features: wgpu::Features::empty(),
             required_limits: wgpu::Limits {
-                max_inter_stage_shader_components: 32, // number used by blocks-and-lines shader
+                max_inter_stage_shader_components: 33, // number used by blocks-and-lines shader
                 ..wgpu::Limits::downlevel_webgl2_defaults().using_resolution(available_limits)
             },
             memory_hints: wgpu::MemoryHints::default(), // TODO: consider setting

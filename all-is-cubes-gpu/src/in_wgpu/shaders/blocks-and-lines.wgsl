@@ -129,6 +129,9 @@ struct BlockFragmentInput {
     // Direction vector, in the world coordinate system, which points
     // from the camera position to this fragment.
     @location(10) camera_ray_direction: vec3<f32>,
+
+    @interpolate(flat, either)
+    @location(11) resolution: f32,
 };
 
 @vertex
@@ -164,8 +167,9 @@ fn block_vertex_main(
         default: {}
     }
 
-    // Note: position_in_cube_and_normal_and_resolution_packed also contains the texture
-    // resolution, but this is not yet used so we don't unpack it.
+    // Unpack resolution.
+    let resolution =
+        pow(2.0, f32((input.position_in_cube_and_normal_and_resolution_packed >> 28u) & 0xFu));
 
     // Unpack clamp rectangle coordinates.
     let clamp_min_fixpoint = input.clamp_min_max & vec3<u32>(0x0000FFFFu);
@@ -203,6 +207,7 @@ fn block_vertex_main(
         // Note that we do not normalize this vector: by keeping things linear, we
         // allow linear interpolation between vertices to get the right answer.
         world_position - camera.view_position, // camera_ray_direction
+        resolution,
     );
 }
 
@@ -525,7 +530,94 @@ fn shade_uniform_volumetric(in: BlockFragmentInput) -> vec4<f32> {
     let light_from_lit_surface: vec3f =
         material.reflectance.rgb * lighting(in) * material.reflectance.a + material.emission;
     return vec4f(light_from_lit_surface, material.reflectance.a);
+}
 
+// Perform ray-marching along the path through this transparent block.
+//
+// TODO: This algorithm is flawed in several ways, and is therefore not yet used.
+//
+// * Performing the full lighting algorithm per step is too expensive; we should obtain a local
+//   light environment at the vertex shader stage and pass it along instead.
+// * We should use the Amanatides & Woo algorithm to precisely step through the voxels instead of
+//   using a fixed step size.
+// * Instead of patching the input's texture coordinates, the mesh generator should produce an
+//   appropriate mesh to start with.
+// * The brightness of the output is wrong without an arbitrary nonsensical scale factor.
+// * `get_material()` does more work than necessary given that we know we are doing a texture
+//   lookup.
+fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
+    // Undo the 0.5 middle-voxel offset that the texture coordinates do.
+    // TODO: Instead of doing this here, it should be done by the mesh generator,
+    // having a special mode for generating meshes for volumetric tracing.
+    var in = in_original;
+    in.color_or_texture = vec4f(in.color_or_texture.xyz + in.normal * 0.5, in.color_or_texture.w);
+
+     // Unclamp the texture to enable 3D traversal -- TODO: mesh generator should give good data to start.
+    in.clamp_min = vec3f(0.0);
+    in.clamp_max = vec3f(102400.0);
+
+    let step_length = 1.0/32.0;
+    let march_step = normalize(in.camera_ray_direction) * (step_length);
+
+    // Accumulated light along the ray's path.
+    var accum_light = vec3f(0.0);
+    // How much *future* light accumulation should be reduced due to absorption.
+    // When this decays to zero, we have hit opacity and can stop.
+    var accum_transmittance = 1.0;
+    // Point we march.
+    var march_position_in_cube = in.position_in_cube + march_step;
+    var step_count: u32 = 0;
+
+    while accum_transmittance > 1e-4 
+            && all((march_position_in_cube > vec3(0.0)) & (march_position_in_cube < vec3(1.0))) {
+        step_count += 1;
+        if step_count > 100 {
+            // oops, not making progress; abort
+            return vec4f(1.0, 0.0, 0.0, 1.0);
+        }
+
+        let relative_to_original_position = (march_position_in_cube - in.position_in_cube.xyz);
+        var offset_input: BlockFragmentInput = in;
+        offset_input.color_or_texture = vec4(
+            in.color_or_texture.xyz + relative_to_original_position * in.resolution,
+            in.color_or_texture.w
+        );
+        offset_input.world_position += relative_to_original_position;
+        offset_input.position_in_cube += relative_to_original_position;
+        var material = get_material(offset_input);
+
+        if material.reflectance.a == 0.0 {
+            // Transparent voxels mean we exited the meshed volume;
+            // stop marching so we don't reenter it.
+            break;
+        }
+
+        // Apply effect of material to accumulation.
+        // TODO: Deduplicate this code with shade_uniform_volumetric().
+        let mat_unit_transmittance = 1.0 - material.reflectance.a;
+        let mat_depth_transmittance = pow(mat_unit_transmittance, step_length);
+
+        // Compute how the emission should be scaled to account for internal absorption and thickness.
+        if mat_unit_transmittance == 1.0 {
+            material.emission *= step_length;
+        } else {
+            material.emission *= (mat_depth_transmittance - 1.0) / (mat_unit_transmittance - 1.0);
+        }
+
+        accum_light += accum_transmittance * (
+            material.reflectance.rgb 
+                * lighting(offset_input)
+                * material.reflectance.a 
+            + material.emission
+        );
+        accum_transmittance *= mat_depth_transmittance;
+
+        march_position_in_cube += march_step;
+    }
+
+    let alpha = 1.0 - accum_transmittance;
+    // TODO: Something is wrong; this scaling makes no sense but gives right-looking answers
+    return vec4f(accum_light / 16.0, alpha);
 }
 
 // --- Entry points for block fragment shading -----------------------------------------------------
@@ -561,9 +653,13 @@ fn block_fragment_transparent_surface(in: BlockFragmentInput) -> @location(0) ve
 // Returns premultiplied alpha.
 @fragment
 fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0) vec4<f32> {
-    // TODO: handle non-uniform blocks
-    let light_from_lit_surface_and_alpha: vec4f = shade_uniform_volumetric(in);
-
+    var light_from_lit_surface_and_alpha: vec4f;
+    // TODO: This condition is forced true because raymarch_volumetric is not yet fit for use.
+    if (true || in.color_or_texture[3] > -0.5) {
+        light_from_lit_surface_and_alpha = shade_uniform_volumetric(in);
+    } else {
+        light_from_lit_surface_and_alpha = raymarch_volumetric(in);
+    }
     let exposed = apply_fog_and_exposure(
         light_from_lit_surface_and_alpha.rgb, in.fog_mix, in.camera_ray_direction);
     return vec4f(exposed, light_from_lit_surface_and_alpha.a);
