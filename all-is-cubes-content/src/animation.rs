@@ -105,7 +105,6 @@ pub(crate) struct Fire {
     blocks: [Block; 4],
     /// The bounds of this array determine the affected blocks.
     // TODO: should be using the attachment bounds instead of internally stored bounds
-    #[expect(clippy::struct_field_names)]
     fire_state: Vol<Box<[u8]>>,
     rng: Xoshiro256Plus,
     /// Time accumulation not yet equal to a whole frame.

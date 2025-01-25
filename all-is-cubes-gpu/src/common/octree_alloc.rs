@@ -562,7 +562,6 @@ impl<A> fmt::Debug for AlloctreeHandle<A> {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-#[allow(clippy::struct_field_names)]
 pub(crate) struct Info {
     /// Total volume, whether free or allocated.
     pub total_volume: usize,
