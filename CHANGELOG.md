@@ -27,6 +27,8 @@
     
     - `math::Rgb::clamp()` now takes a parameter for the upper bound.
 
+    - Renamed `block::Move::to_paired()` to `into_paired()`.
+
 - `all-is-cubes-ui` library:
     - `apps::Session::settings()` replaces `graphics_options_mut()`.
 

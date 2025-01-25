@@ -58,7 +58,7 @@ impl Move {
     //
     // TODO: This would be a good candidate for an example, once doctests are not so slow.
     #[must_use]
-    pub fn to_paired(self) -> [Self; 2] {
+    pub fn into_paired(self) -> [Self; 2] {
         let complement = self.complement();
         [self, complement]
     }
@@ -375,7 +375,7 @@ mod tests {
     fn move_block_test(direction: Face6, velocity: i16, checker: impl FnOnce(&Space, &Block)) {
         let [block] = make_some_blocks();
         let mut space = Space::empty(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]));
-        let [move_out, move_in] = Move::new(direction, 0, velocity).to_paired();
+        let [move_out, move_in] = Move::new(direction, 0, velocity).into_paired();
         space
             .set([0, 0, 0], block.clone().with_modifier(move_out))
             .unwrap();
