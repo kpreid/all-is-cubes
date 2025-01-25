@@ -103,6 +103,13 @@ pub(crate) fn graphics_options_widgets(
         graphics_toggle_button(
             hud_inputs,
             style,
+            UiBlocks::DebugPixelPerformanceButtonLabel,
+            |g| g.debug_pixel_cost,
+            |g, v| g.debug_pixel_cost = v,
+        ),
+        graphics_toggle_button(
+            hud_inputs,
+            style,
             UiBlocks::DebugBehaviorsButtonLabel,
             |g| g.debug_behaviors,
             |g, v| g.debug_behaviors = v,

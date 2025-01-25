@@ -4,8 +4,8 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::fmt;
 use core::marker::PhantomData;
+use core::{fmt, mem};
 
 use euclid::{vec3, Vector3D};
 use manyfmt::Fmt;
@@ -201,6 +201,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                 Rgba::TRANSPARENT
             },
             &self.sky_data,
+            self.graphics_options.debug_pixel_cost,
         )
     }
 
@@ -531,7 +532,12 @@ impl<P: Accumulate> TracingState<P> {
         }
     }
 
-    fn finish(mut self, sky_color: Rgba, sky_data: &P::BlockData) -> (P, RaytraceInfo) {
+    fn finish(
+        mut self,
+        sky_color: Rgba,
+        sky_data: &P::BlockData,
+        debug_steps: bool,
+    ) -> (P, RaytraceInfo) {
         if self.cubes_traced == 0 {
             // Didn't intersect the world at all.
             // Inform the accumulator of this in case it wants to do something different.
@@ -541,15 +547,20 @@ impl<P: Accumulate> TracingState<P> {
         self.accumulator.add(sky_color.into(), sky_data);
 
         // Debug visualization of number of raytracing steps.
-        // TODO: Make this togglable and less of a kludge — we'd like to be able to mix with
+        // TODO: Make this less of a kludge — we'd like to be able to mix with
         // the regular color view, but Accumulate doesn't make that easy.
-        const DEBUG_STEPS: bool = false;
-        if DEBUG_STEPS && self.accumulator.opaque() {
-            self.accumulator = Default::default();
+        if debug_steps {
+            let original_accum: P = mem::take(&mut self.accumulator);
+            #[allow(clippy::used_underscore_items)]
+            let original_color: Rgba = original_accum
+                ._unstable_get_original_color()
+                .unwrap_or(Rgba::BLACK);
+
             self.accumulator.add(
-                (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32)
-                    .with_alpha_one()
-                    .into(),
+                (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32
+                    + rgb_const!(0.0, 0.0, 0.2) * original_color.luminance())
+                .with_alpha_one()
+                .into(),
                 sky_data,
             );
         }

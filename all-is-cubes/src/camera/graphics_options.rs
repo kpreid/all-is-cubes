@@ -123,6 +123,21 @@ pub struct GraphicsOptions {
     /// Draw the light rays that contribute to the selected block.
     pub debug_light_rays_at_cursor: bool,
 
+    /// Visualize the cost of rendering each pixel, rather than the color of the scene.
+    ///
+    /// Note that the current implementations of this in All is Cubes’ standard renderers do not
+    /// measure actual execution cost, but quantities correlated with it.
+    /// The color channels are used as follows:
+    ///
+    /// * In the raytracer,
+    ///     * Red-yellow: number of steps taken
+    ///     * Blue: original scene luminance
+    /// * In the GPU mesh renderer:
+    ///     * Red: number of opaque fragment shader executions
+    ///     * Green: number of transparent fragment shader executions
+    ///     * Blue: number of triangles rasterized, including ones discarded by depth test
+    pub debug_pixel_cost: bool,
+
     /// Causes [`Camera`] to compute a falsified view frustum which is 1/2 the width and height
     /// it should be.
     ///
@@ -165,6 +180,7 @@ impl GraphicsOptions {
         debug_chunk_boxes: false,
         debug_collision_boxes: false,
         debug_light_rays_at_cursor: false,
+        debug_pixel_cost: false,
         debug_reduce_view_frustum: false,
     };
 
@@ -198,6 +214,7 @@ impl fmt::Debug for GraphicsOptions {
             debug_chunk_boxes,
             debug_collision_boxes,
             debug_light_rays_at_cursor,
+            debug_pixel_cost,
             debug_reduce_view_frustum,
         } = self;
         // This custom impl reduces unnecessary text by stripping off NotNan wrappers.
@@ -220,6 +237,7 @@ impl fmt::Debug for GraphicsOptions {
             .field("debug_chunk_boxes", &debug_chunk_boxes)
             .field("debug_collision_boxes", &debug_collision_boxes)
             .field("debug_light_rays_at_cursor", &debug_light_rays_at_cursor)
+            .field("debug_pixel_cost", &debug_pixel_cost)
             .field("debug_reduce_view_frustum", &debug_reduce_view_frustum)
             .finish()
     }
@@ -251,6 +269,7 @@ impl Default for GraphicsOptions {
             debug_chunk_boxes: false,
             debug_collision_boxes: false,
             debug_light_rays_at_cursor: false,
+            debug_pixel_cost: false,
             debug_reduce_view_frustum: false,
         }
     }
@@ -560,6 +579,7 @@ mod tests {
                     debug_chunk_boxes: false,
                     debug_collision_boxes: false,
                     debug_light_rays_at_cursor: false,
+                    debug_pixel_cost: false,
                     debug_reduce_view_frustum: false,
                 }"
             }

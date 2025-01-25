@@ -555,6 +555,13 @@ fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0)
     return vec4f(exposed.rgb, material.reflectance.a);
 }
 
+@fragment
+fn block_fragment_visualize_overdraw(in: BlockFragmentInput) -> @location(0) vec4<f32> {
+    // Note that we are not doing the mathematically-simple thing of emitting 1.0 and rescaling
+    // later, because that would not work if we only have Rgba8UnormSrgb render target support.
+    return vec4f(vec3f(1.0/32.0), 1.0);
+}
+
 // --- Lines shader ------------------------------------------------------------
 //
 // This is in the same shader source file as the block shader so that it can share

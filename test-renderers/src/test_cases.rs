@@ -37,6 +37,7 @@ use crate::{
 
 /// Function to be called by the custom test harness to find all tests.
 pub fn all_tests(c: &mut TestCaseCollector<'_>) {
+    let fog_test_universe = &u("fog", fog_test_universe());
     let light_test_universe = &u("light", light_test_universe());
 
     if false {
@@ -56,6 +57,11 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert_variants("bloom", light_test_universe, bloom, [0.0, 0.25]);
     c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
+    c.insert(
+        "debug_pixel_cost",
+        fog_test_universe.clone(),
+        debug_pixel_cost,
+    );
     c.insert("emission", None, emission);
     c.insert_variants("emission_only", &None, emission_only, ["surf", "vol"]);
     c.insert_variants("emission_semi", &None, emission_semi, ["surf", "vol"]);
@@ -67,7 +73,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert_variants(
         "fog",
-        &u("fog", fog_test_universe()),
+        fog_test_universe,
         fog,
         [
             FogOption::None,
@@ -241,6 +247,16 @@ async fn cursor_basic(mut context: RenderTestContext) {
     // but everything else should be exact.
     context
         .render_comparison_test(COLOR_ROUNDING_MAX_DIFF, cameras, overlays)
+        .await;
+}
+
+async fn debug_pixel_cost(mut context: RenderTestContext) {
+    let mut options = GraphicsOptions::UNALTERED_COLORS;
+    options.debug_pixel_cost = true;
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
+    context
+        .render_comparison_test(Threshold::new([(2, 500), (15, 100)]), scene, Overlays::NONE)
         .await;
 }
 

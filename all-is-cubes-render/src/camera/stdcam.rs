@@ -305,6 +305,7 @@ impl StandardCameras {
     // TODO: unclear if good API; added so that we can get Source access to the graphics options,
     // and *something* of the sort should be public, but I don't know if exposing UiViewState
     // directly, as opposed to a source of a Camera, is right.
+    #[cfg(feature = "raytracer")] // not used otherwise
     pub(crate) fn ui_view_source(&self) -> listen::DynSource<Arc<UiViewState>> {
         self.ui_source.clone()
     }

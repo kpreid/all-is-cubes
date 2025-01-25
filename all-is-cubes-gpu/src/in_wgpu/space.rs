@@ -456,7 +456,9 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let mut flaws = Flaws::empty();
 
         let clear_op = if draw_sky {
-            if self.csm.is_none() {
+            if camera.options().debug_pixel_cost {
+                wgpu::LoadOp::Clear(wgpu::Color::BLACK)
+            } else if self.csm.is_none() {
                 // There will be no skybox, so use the NO_WORLD color.
                 // TODO: Refactor so that we can draw the skybox anyway, and have
                 // a fancy error-display one.
@@ -552,7 +554,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             }
         }
 
-        if draw_sky {
+        if draw_sky && !camera.options().debug_pixel_cost {
             // Render skybox.
             // TODO: Ideally, we would do this after drawing other opaque geometry, but that requires
             // smarter depth test setup.
@@ -561,15 +563,61 @@ impl<I: time::Instant> SpaceRenderer<I> {
             render_pass.draw(0..3, 0..1);
         }
 
+        if camera.options().debug_pixel_cost {
+            // Draw everything, transparent or opaque, an extra time with no depth testing.
+            // This visualizes the number of fragments which had to be checked against the
+            // depth buffer, regardless of whether they passed;
+            // it is the cost of rasterization as opposed to the cost of the depth buffer.
+            //
+            // Because this is a debug visualization, we skip updating any of the info numbers.
+            //
+            // This section of the code omits block instances; we'll do that inside the opaque
+            // block instance section, instead.
+
+            render_pass.set_pipeline(&pipelines.depthless_overdraw_render_pipeline);
+            for dynamic::InViewChunkRef {
+                chunk,
+                mesh_in_view,
+                ..
+            } in csm.iter_in_view(camera)
+            {
+                if mesh_in_view {
+                    if let Some(buffers) = &chunk.render_data {
+                        draw_chunk_instance(
+                            chunk.mesh().opaque_range(),
+                            &mut render_pass,
+                            buffers,
+                            &mut instance_data,
+                            chunk.position(),
+                            &mut 0,
+                        );
+                        draw_chunk_instance(
+                            chunk.mesh().transparent_range(DepthOrdering::Any),
+                            &mut render_pass,
+                            buffers,
+                            &mut instance_data,
+                            chunk.position(),
+                            &mut 0,
+                        );
+                    }
+                }
+            }
+        }
+
         // Opaque geometry before other geometry, in front-to-back order.
         // Also collect instances.
+        let pipeline_for_opaque = if camera.options().debug_pixel_cost {
+            &pipelines.opaque_overdraw_render_pipeline
+        } else {
+            &pipelines.opaque_render_pipeline
+        };
         let start_opaque_chunk_draw_time = I::now();
         let mut chunk_meshes_drawn = 0;
         let mut chunks_with_instances_drawn = 0;
         let mut blocks_drawn = 0;
         let mut squares_drawn = 0;
         let mut block_instances = dynamic::InstanceCollector::new(); // TODO: reuse across frames
-        render_pass.set_pipeline(&pipelines.opaque_render_pipeline);
+        render_pass.set_pipeline(pipeline_for_opaque);
         for dynamic::InViewChunkRef {
             chunk,
             mesh_in_view,
@@ -628,12 +676,31 @@ impl<I: time::Instant> SpaceRenderer<I> {
             );
             blocks_drawn += cubes_len;
             squares_drawn += meta.opaque_range().len() / 6;
+
+            // If we are doing overdraw visualization, run the depthless overdraw visualization.
+            // We do this here so that we can take advantage of the state in this loop, even though
+            // it forces a lot of pipeline switches, because `debug_pixel_cost` isn't about
+            // *measuring performance* but about *cost*.
+            if camera.options().debug_pixel_cost {
+                render_pass.set_pipeline(&pipelines.depthless_overdraw_render_pipeline);
+                render_pass.draw_indexed(
+                    to_wgpu_index_range(meta.opaque_range()),
+                    0,
+                    first_instance_index..(first_instance_index + cubes_len as u32),
+                );
+                // Restore previous pipeline
+                render_pass.set_pipeline(pipeline_for_opaque);
+            }
         }
 
         // Transparent geometry after opaque geometry, in back-to-front order
         let start_draw_transparent_time = I::now();
         if camera.options().transparency.will_output_alpha() {
-            render_pass.set_pipeline(&pipelines.transparent_render_pipeline);
+            render_pass.set_pipeline(if camera.options().debug_pixel_cost {
+                &pipelines.transparent_overdraw_render_pipeline
+            } else {
+                &pipelines.transparent_render_pipeline
+            });
             for dynamic::InViewChunkRef {
                 chunk,
                 mesh_in_view,

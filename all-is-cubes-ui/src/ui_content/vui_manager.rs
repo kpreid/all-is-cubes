@@ -283,6 +283,7 @@ impl Vui {
 
         // clutter
         options.debug_chunk_boxes = false;
+        options.debug_pixel_cost = false;
 
         options
     }

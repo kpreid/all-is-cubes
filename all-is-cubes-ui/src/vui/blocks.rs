@@ -36,6 +36,7 @@ pub enum UiBlocks {
     DebugChunkBoxesButtonLabel,
     DebugCollisionBoxesButtonLabel,
     DebugLightRaysButtonLabel,
+    DebugPixelPerformanceButtonLabel,
 }
 
 impl BlockModule for UiBlocks {
@@ -65,6 +66,10 @@ impl fmt::Display for UiBlocks {
                 write!(f, "debug-collision-boxes-button")
             }
             UiBlocks::DebugLightRaysButtonLabel => write!(f, "debug-light-rays-button"),
+
+            UiBlocks::DebugPixelPerformanceButtonLabel => {
+                write!(f, "debug-pixel-performance-button")
+            }
         }
     }
 }
@@ -149,6 +154,12 @@ impl UiBlocks {
                     txn,
                     "Debug: Light Rays at Cursor",
                     ButtonIcon::Icon(include_image!("icons/button-debug-light-rays.png")),
+                )?,
+
+                UiBlocks::DebugPixelPerformanceButtonLabel => make_button_label_block(
+                    txn,
+                    "Debug: Pixel Performance",
+                    ButtonIcon::Icon(include_image!("icons/button-debug-pixel-performance.png")),
                 )?,
             })
         })

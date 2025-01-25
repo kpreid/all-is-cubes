@@ -105,6 +105,12 @@ pub trait Accumulate: Default {
     /// Combine multiple completed buffers into one, such as multiple samples for
     /// antialiasing.
     fn mean<const N: usize>(items: [Self; N]) -> Self;
+
+    /// For debugging. Do not implement this method.
+    #[doc(hidden)]
+    fn _unstable_get_original_color(self) -> Option<Rgba> {
+        None
+    }
 }
 
 /// Precomputed data about a [`Space`]'s blocks that may be used by [`Accumulate`] implementations.
@@ -218,6 +224,10 @@ impl Accumulate for ColorBuf {
                 / (N as f32),
             transmittance: items.iter().map(|cb| cb.transmittance).sum::<f32>() / (N as f32),
         }
+    }
+
+    fn _unstable_get_original_color(self) -> Option<Rgba> {
+        Some(Rgba::from(self))
     }
 }
 

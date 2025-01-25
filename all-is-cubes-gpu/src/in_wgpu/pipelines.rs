@@ -48,6 +48,12 @@ pub(crate) struct Pipelines {
     /// Pipeline for drawing transparent (alpha ≠ 1) blocks.
     pub(crate) transparent_render_pipeline: wgpu::RenderPipeline,
 
+    // Pipelines for visualizing overdraw (and perhaps at some point other properties)
+    // rather than scene content.
+    pub(crate) opaque_overdraw_render_pipeline: wgpu::RenderPipeline,
+    pub(crate) transparent_overdraw_render_pipeline: wgpu::RenderPipeline,
+    pub(crate) depthless_overdraw_render_pipeline: wgpu::RenderPipeline,
+
     /// Pipeline for drawing the skybox; similar to the block pipelines, but generates its own
     /// geometry instead of using vertex buffers.
     pub(crate) skybox_render_pipeline: wgpu::RenderPipeline,
@@ -180,16 +186,36 @@ impl Pipelines {
 
         let multisample = fb.linear_scene_multisample_state();
 
+        let vertex_state_for_blocks = wgpu::VertexState {
+            module: shaders.blocks_and_lines.get(),
+            entry_point: Some("block_vertex_main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            buffers: vertex_buffers,
+        };
+
+        let depth_state_for_opaque = wgpu::DepthStencilState {
+            format: FramebufferTextures::DEPTH_FORMAT,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::Less,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        };
+        let depth_state_for_transparent = wgpu::DepthStencilState {
+            format: FramebufferTextures::DEPTH_FORMAT,
+            // Transparent geometry is written sorted back-to-front, so writing the
+            // depth buffer is not useful, but we do *compare* depth so that existing
+            // opaque geometry obscures all transparent geometry behind it.
+            depth_write_enabled: false,
+            depth_compare: wgpu::CompareFunction::Less,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        };
+
         let opaque_render_pipeline =
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("Pipelines::opaque_render_pipeline"),
                 layout: Some(&block_render_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: shaders.blocks_and_lines.get(),
-                    entry_point: Some("block_vertex_main"),
-                    compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    buffers: vertex_buffers,
-                },
+                vertex: vertex_state_for_blocks.clone(),
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: Some("block_fragment_opaque"),
@@ -201,13 +227,7 @@ impl Pipelines {
                     })],
                 }),
                 primitive: block_primitive_state,
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: FramebufferTextures::DEPTH_FORMAT,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
-                    stencil: wgpu::StencilState::default(),
-                    bias: wgpu::DepthBiasState::default(),
-                }),
+                depth_stencil: Some(depth_state_for_opaque.clone()),
                 multisample,
                 multiview: None,
                 cache,
@@ -217,12 +237,7 @@ impl Pipelines {
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("Pipelines::transparent_render_pipeline"),
                 layout: Some(&block_render_pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: shaders.blocks_and_lines.get(),
-                    entry_point: Some("block_vertex_main"),
-                    compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    buffers: vertex_buffers,
-                },
+                vertex: vertex_state_for_blocks.clone(),
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: Some(match current_graphics_options.transparency {
@@ -251,13 +266,88 @@ impl Pipelines {
                     })],
                 }),
                 primitive: block_primitive_state,
+                depth_stencil: Some(depth_state_for_transparent.clone()),
+                multisample,
+                multiview: None,
+                cache,
+            });
+
+        // Overdraw visualization pipelines draw everything in a fixed color with additive blending.
+        let overdraw_blend = Some(wgpu::BlendState {
+            color: wgpu::BlendComponent {
+                operation: wgpu::BlendOperation::Add,
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::One,
+            },
+            alpha: wgpu::BlendComponent::REPLACE, // ignored due to write_mask
+        });
+        let opaque_overdraw_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Pipelines::opaque_overdraw_render_pipeline"),
+                layout: Some(&block_render_pipeline_layout),
+                vertex: vertex_state_for_blocks.clone(),
+                fragment: Some(wgpu::FragmentState {
+                    module: shaders.blocks_and_lines.get(),
+                    entry_point: Some("block_fragment_visualize_overdraw"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: fb.linear_scene_texture_format(),
+                        blend: overdraw_blend,
+                        // Visualize opaque overdraw using red
+                        write_mask: wgpu::ColorWrites::RED,
+                    })],
+                }),
+                primitive: block_primitive_state,
+                depth_stencil: Some(depth_state_for_opaque.clone()),
+                multisample,
+                multiview: None,
+                cache,
+            });
+        let transparent_overdraw_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Pipelines::transparent_overdraw_render_pipeline"),
+                layout: Some(&block_render_pipeline_layout),
+                vertex: vertex_state_for_blocks.clone(),
+                fragment: Some(wgpu::FragmentState {
+                    module: shaders.blocks_and_lines.get(),
+                    entry_point: Some("block_fragment_visualize_overdraw"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: fb.linear_scene_texture_format(),
+                        blend: overdraw_blend,
+                        // Visualize transparent overdraw using green.
+                        write_mask: wgpu::ColorWrites::GREEN,
+                    })],
+                }),
+                primitive: block_primitive_state,
+                depth_stencil: Some(depth_state_for_transparent),
+                multisample,
+                multiview: None,
+                cache,
+            });
+        // Rendering without the depth buffer tells us how many fragments had to be depth tested.
+        // This is executed on *all* content, transparent and opaque.
+        let depthless_overdraw_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Pipelines::depthless_overdraw_render_pipeline"),
+                layout: Some(&block_render_pipeline_layout),
+                vertex: vertex_state_for_blocks,
+                fragment: Some(wgpu::FragmentState {
+                    module: shaders.blocks_and_lines.get(),
+                    entry_point: Some("block_fragment_visualize_overdraw"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: fb.linear_scene_texture_format(),
+                        blend: overdraw_blend,
+                        // Visualize pre-depth-test overdraw using blue.
+                        write_mask: wgpu::ColorWrites::BLUE,
+                    })],
+                }),
+                primitive: block_primitive_state,
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: FramebufferTextures::DEPTH_FORMAT,
-                    // Transparent geometry is written sorted back-to-front, so writing the
-                    // depth buffer is not useful, but we do *compare* depth so that existing
-                    // opaque geometry obscures all transparent geometry behind it.
                     depth_write_enabled: false,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_compare: wgpu::CompareFunction::Always,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -523,6 +613,9 @@ impl Pipelines {
             block_render_pipeline_layout,
             opaque_render_pipeline,
             transparent_render_pipeline,
+            opaque_overdraw_render_pipeline,
+            transparent_overdraw_render_pipeline,
+            depthless_overdraw_render_pipeline,
             skybox_render_pipeline,
             frame_copy_layout,
             frame_copy_pipeline,
