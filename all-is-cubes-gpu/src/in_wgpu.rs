@@ -593,7 +593,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             time::Deadline::At(update_prep_to_space_update_time + frame_budget.update_meshes.world);
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
-        let space_infos: Layers<SpaceUpdateInfo> = if is_raytracing(&self.cameras) {
+        let space_infos: Layers<SpaceUpdateInfo> = if should_raytrace(&self.cameras) {
             self.rt.update(cursor_result).unwrap(); // TODO: don't unwrap
 
             // TODO: convey update info
@@ -670,7 +670,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let lines_to_submit_time = I::now();
 
         // Do raytracing
-        if is_raytracing(&self.cameras) {
+        if should_raytrace(&self.cameras) {
             self.rt.prepare_frame(
                 &self.device,
                 queue,
@@ -724,49 +724,52 @@ impl<I: time::Instant> EverythingRenderer<I> {
         // not read the texture.
         let mut output_needs_clearing = true;
 
-        let world_draw_info: SpaceDrawInfo = if let (true, Some(rt_bind_group)) = (
-            is_raytracing(&self.cameras),
-            self.rt.frame_copy_bind_group(),
-        ) {
-            // Copy the raytracing target texture (incrementally updated) to the linear scene
-            // texture. This is the simplest way to get it fed into both bloom and postprocessing
-            // passes.
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("rt to scene copy"),
-                color_attachments: &[Some(
-                    self.fb
-                        .color_attachment_for_scene(wgpu::LoadOp::Clear(wgpu::Color::BLUE)),
-                )],
-                ..Default::default()
-            });
-            render_pass.set_bind_group(0, rt_bind_group, &[]);
-            render_pass.set_pipeline(&self.pipelines.frame_copy_pipeline);
-            render_pass.draw(0..3, 0..1);
-            drop(render_pass);
-            output_needs_clearing = false;
+        let (world_draw_info, is_raytracing): (SpaceDrawInfo, bool) =
+            if let (true, Some(rt_bind_group)) = (
+                should_raytrace(&self.cameras),
+                self.rt.frame_copy_bind_group(),
+            ) {
+                // Copy the raytracing target texture (incrementally updated) to the linear scene
+                // texture. This is the simplest way to get it fed into both bloom and postprocessing
+                // passes.
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("rt to scene copy"),
+                    color_attachments: &[Some(
+                        self.fb
+                            .color_attachment_for_scene(wgpu::LoadOp::Clear(wgpu::Color::BLUE)),
+                    )],
+                    ..Default::default()
+                });
+                render_pass.set_bind_group(0, rt_bind_group, &[]);
+                render_pass.set_pipeline(&self.pipelines.frame_copy_pipeline);
+                render_pass.draw(0..3, 0..1);
+                drop(render_pass);
+                output_needs_clearing = false;
 
-            SpaceDrawInfo::default()
-        } else {
-            // Not raytracing, so render the meshes
+                (SpaceDrawInfo::default(), true)
+            } else {
+                // Not raytracing, so render the meshes
 
-            let camera = &self.cameras.cameras().world;
-            let sr = &self.space_renderers.world;
-            sr.draw(
-                &self.fb,
-                queue,
-                &mut encoder,
-                &self.pipelines,
-                camera,
-                mem::take(&mut output_needs_clearing),
-                // We need to store the depth buffer if and only if we are going to do
-                // the lines pass or read the scene afterward
-                match self.lines_vertex_count > 0 || self.fb.copy_out_enabled() {
-                    true => wgpu::StoreOp::Store,
-                    false => wgpu::StoreOp::Discard,
-                },
-                false,
-            )
-        };
+                let camera = &self.cameras.cameras().world;
+                let sr = &self.space_renderers.world;
+                let info = sr.draw(
+                    &self.fb,
+                    queue,
+                    &mut encoder,
+                    &self.pipelines,
+                    camera,
+                    mem::take(&mut output_needs_clearing),
+                    // We need to store the depth buffer if and only if we are going to do
+                    // the lines pass or read the scene afterward
+                    match self.lines_vertex_count > 0 || self.fb.copy_out_enabled() {
+                        true => wgpu::StoreOp::Store,
+                        false => wgpu::StoreOp::Discard,
+                    },
+                    false,
+                );
+
+                (info, false)
+            };
         let world_to_lines_time = I::now();
 
         // Lines pass (if there are any lines)
@@ -796,16 +799,20 @@ impl<I: time::Instant> EverythingRenderer<I> {
         }
 
         let lines_to_ui_time = I::now();
-        let ui_draw_info = self.space_renderers.ui.draw(
-            &self.fb,
-            queue,
-            &mut encoder,
-            &self.pipelines,
-            &self.cameras.cameras().ui,
-            mem::take(&mut output_needs_clearing),
-            wgpu::StoreOp::Discard, // nothing uses the ui depth buffer
-            true,
-        );
+        let ui_draw_info = if !is_raytracing {
+            self.space_renderers.ui.draw(
+                &self.fb,
+                queue,
+                &mut encoder,
+                &self.pipelines,
+                &self.cameras.cameras().ui,
+                mem::take(&mut output_needs_clearing),
+                wgpu::StoreOp::Discard, // nothing uses the ui depth buffer
+                true,
+            )
+        } else {
+            SpaceDrawInfo::default()
+        };
         let ui_to_postprocess_time = I::now();
 
         // Write the postprocess camera data.
@@ -919,7 +926,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
     }
 }
 
-fn is_raytracing(cameras: &StandardCameras) -> bool {
+fn should_raytrace(cameras: &StandardCameras) -> bool {
     match cameras.graphics_options().render_method {
         RenderMethod::Preferred => false,
         RenderMethod::Mesh => false,
