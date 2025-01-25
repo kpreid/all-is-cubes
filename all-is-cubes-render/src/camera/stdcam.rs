@@ -122,7 +122,7 @@ impl StandardCameras {
 
         let mut new_self = Self {
             cameras: Layers {
-                ui: Camera::new(ui_state.graphics_options.clone(), initial_viewport),
+                ui: Camera::new((*ui_state.graphics_options).clone(), initial_viewport),
                 world: Camera::new(initial_options.clone(), initial_viewport),
             },
 
@@ -192,7 +192,7 @@ impl StandardCameras {
                 UiViewState::default()
             };
             self.ui_space = space;
-            self.cameras.ui.set_options(ui_options);
+            self.cameras.ui.set_options((*ui_options).clone());
             self.cameras.ui.set_view_transform(ui_transform);
         }
 
@@ -392,15 +392,21 @@ impl Clone for StandardCameras {
 /// TODO: This struct needs a better name. And is it good for non-UI, too?
 /// Note that we may wish to revise this bundle if we start having continuously changing
 /// `view_transform`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[expect(clippy::exhaustive_structs)]
 pub struct UiViewState {
     /// The [`Space`] to render as the UI.
     pub space: Option<Handle<Space>>,
+
     /// The viewpoint to render the `space` from.
     pub view_transform: ViewTransform,
+
     /// The graphics options to render the `space` with.
-    pub graphics_options: GraphicsOptions, // TODO: may be big; should we Arc it?
+    //---
+    // Design note: This is an `Arc` not because it strongly needs to be,
+    // but because other parts of the system pass around `Arc`ed graphics options
+    // and we want to be efficiently compatible with them.
+    pub graphics_options: Arc<GraphicsOptions>,
 }
 
 impl Default for UiViewState {

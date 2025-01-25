@@ -66,7 +66,7 @@ where
             ui_graphics_options: Arc::new(
                 cameras
                     .ui_view_source()
-                    .map(|view| Arc::new(view.graphics_options.clone())),
+                    .map(|view| view.graphics_options.clone()),
             ),
             cameras,
             size_policy,

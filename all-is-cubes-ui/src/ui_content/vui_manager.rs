@@ -12,9 +12,7 @@ use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::{Handle, Universe, UniverseStepInfo, UniverseTransaction};
-use all_is_cubes_render::camera::{
-    FogOption, GraphicsOptions, UiViewState, ViewTransform, Viewport,
-};
+use all_is_cubes_render::camera::{FogOption, GraphicsOptions, UiViewState, Viewport};
 
 use crate::apps::{
     ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, QuitCancelled, QuitFn,
@@ -48,6 +46,11 @@ pub(crate) struct Vui {
     /// Identifies which [`Page`] the UI should be showing — what
     /// should be in `current_space`, taken from one of the [`PageInst`]s.
     state: listen::Cell<Arc<VuiPageState>>,
+
+    /// Listens to the provided user graphics options.
+    changed_graphics_options: listen::Flag,
+    /// Modified version of the user graphics options for rendering UI.
+    ui_graphics_options: listen::Cell<Arc<GraphicsOptions>>,
 
     changed_viewport: listen::Flag,
     viewport_source: listen::DynSource<Viewport>,
@@ -122,6 +125,11 @@ impl Vui {
         let cue_channel: CueNotifier = Arc::new(Notifier::new());
         let notif_hub = notification::Hub::new();
 
+        let changed_graphics_options = listen::Flag::listening(false, &graphics_options);
+        let ui_graphics_options = listen::Cell::new(Arc::new(Self::graphics_options(
+            (*graphics_options.get()).clone(),
+        )));
+
         // TODO: terrible mess of tightly coupled parameters
         let changed_viewport = listen::Flag::listening(false, &viewport_source);
         let ui_size = UiSize::new(viewport_source.get());
@@ -158,6 +166,9 @@ impl Vui {
             current_focus_on_ui: false,
             state: listen::Cell::new(Arc::new(VuiPageState::Hud)),
 
+            changed_graphics_options,
+            ui_graphics_options,
+
             changed_viewport,
             viewport_source,
             last_ui_size: ui_size,
@@ -177,7 +188,7 @@ impl Vui {
             cue_channel,
             notif_hub,
         };
-        new_self.set_space_from_state();
+        new_self.compute_view_state();
         new_self
     }
 
@@ -213,11 +224,11 @@ impl Vui {
             self.dump_page = PageInst::new(content);
         }
 
-        self.set_space_from_state();
+        self.compute_view_state();
     }
 
     /// Update `self.current_space` from `self.state` and the source of the selected space.
-    fn set_space_from_state(&mut self) {
+    fn compute_view_state(&mut self) {
         let size = self.last_ui_size;
         let universe = &mut self.universe;
 
@@ -235,14 +246,20 @@ impl Vui {
             } => &mut self.dump_page,
         };
         let next_space: Handle<Space> = next_page.get_or_create_space(size, universe);
-        let layout = next_page.page().layout;
+        let page_layout = next_page.page().layout;
+        let graphics_options = self.ui_graphics_options.get();
 
-        if Some(&next_space) != Option::as_ref(&self.current_view.get().space) {
-            self.current_view.set(Self::view_state_for(
-                layout,
-                Some(next_space),
-                &self.hud_inputs,
-            ));
+        let new_view_state = UiViewState {
+            view_transform: page_layout.view_transform(
+                &next_space.read().unwrap(), // TODO: eliminate this unwrap
+                graphics_options.fov_y.into_inner(),
+            ),
+            space: Some(next_space),
+            graphics_options,
+        };
+
+        if new_view_state != *self.current_view.get() {
+            self.current_view.set(Arc::new(new_view_state));
             self.current_focus_on_ui = next_page.page().focus_on_ui;
             log::trace!(
                 "UI switched to {:?} ({:?})",
@@ -250,27 +267,6 @@ impl Vui {
                 self.state.get()
             );
         }
-    }
-
-    fn view_state_for(
-        page_layout: vui::PageLayout,
-        space: Option<Handle<Space>>,
-        inputs: &HudInputs,
-    ) -> Arc<UiViewState> {
-        // TODO: compute the derived graphics options only once
-        let graphics_options = Self::graphics_options((*inputs.graphics_options.get()).clone());
-
-        Arc::new(UiViewState {
-            view_transform: match space.as_ref() {
-                Some(space) => page_layout.view_transform(
-                    &space.read().unwrap(), // TODO: eliminate this unwrap
-                    graphics_options.fov_y.into_inner(),
-                ),
-                None => ViewTransform::identity(),
-            },
-            space,
-            graphics_options,
-        })
     }
 
     /// Compute graphics options to render the VUI space given the user's regular options.
@@ -304,6 +300,16 @@ impl Vui {
 
     #[inline(never)]
     fn step_pre_sync(&mut self) {
+        let mut anything_changed = false;
+
+        if self.changed_graphics_options.get_and_clear() {
+            anything_changed = true;
+            self.ui_graphics_options
+                .set_if_unequal(Arc::new(Self::graphics_options(
+                    (*self.hud_inputs.graphics_options.get()).clone(),
+                )));
+        }
+
         // TODO: This should possibly be the responsibility of the TooltipState itself?
         if self.changed_character.get_and_clear() {
             if let Some(character_handle) = self.character_source.get() {
@@ -334,9 +340,9 @@ impl Vui {
             let new_viewport = self.viewport_source.get();
             let new_size = UiSize::new(new_viewport);
             if new_size != self.last_ui_size {
+                anything_changed = true;
                 self.last_ui_size = new_size;
                 self.current_view.set(Arc::new(UiViewState::default())); // force reconstruction
-                self.set_space_from_state();
             }
         }
 
@@ -346,6 +352,10 @@ impl Vui {
         // Decide what state we should be in (based on all the stuff we just checked).
         if let Some(new_state) = self.choose_new_page_state(&self.state.get()) {
             self.set_state(new_state);
+        } else if anything_changed {
+            // We need to update the view state even though it isn't changing what Space it looks
+            // at.
+            self.compute_view_state();
         }
     }
 

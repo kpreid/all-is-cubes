@@ -737,7 +737,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
         listen::constant(Arc::new(UiViewState {
             space: Some(ui_space(&mut universe)),
             view_transform: ViewTransform::identity(),
-            graphics_options: options,
+            graphics_options: Arc::new(options),
         })),
     );
 
@@ -784,7 +784,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
         listen::constant(Arc::new(UiViewState {
             space: Some(ui_space(&mut universe)),
             view_transform: ViewTransform::identity(),
-            graphics_options: GraphicsOptions::UNALTERED_COLORS,
+            graphics_options: Arc::new(GraphicsOptions::UNALTERED_COLORS),
         })),
     );
 
