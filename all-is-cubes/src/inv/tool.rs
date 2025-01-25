@@ -522,6 +522,7 @@ impl ToolError {
     ///
     /// TODO: This should have spatial information (located at the cursor target or the
     /// character's "hand" or other).
+    #[allow(clippy::unused_self, reason = "will be used in the future")]
     pub fn fluff(&self) -> impl Iterator<Item = Fluff> + use<> {
         core::iter::once(Fluff::Beep)
     }

@@ -17,6 +17,7 @@ use crate::vui::widgets::{make_button_label_block, ButtonIcon};
 /// Blocks that are used as part of the UI content.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[doc(hidden)] // public for testing only
+#[allow(clippy::enum_variant_names)]
 #[non_exhaustive]
 pub enum UiBlocks {
     /// Label of the action button for navigating “back” in the user interface (closing

@@ -122,6 +122,7 @@ impl Schedule {
     }
 
     /// If this schedule is of the form “every N ticks”, return N.
+    #[expect(clippy::unnecessary_wraps, reason = "the None cases don't exist yet")]
     pub fn to_period(self) -> Option<NonZeroU16> {
         Some(self.period)
     }

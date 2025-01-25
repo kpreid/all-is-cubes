@@ -694,6 +694,10 @@ impl GridAab {
     /// The `Option` return is not currently used.
     #[must_use]
     #[inline]
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "TODO: fail nicely on numeric overflow"
+    )]
     pub fn transform(self, transform: Gridgid) -> Option<Self> {
         let mut p1 = transform.transform_point(self.lower_bounds());
         let mut p2 = transform.transform_point(self.upper_bounds());

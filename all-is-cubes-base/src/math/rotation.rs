@@ -30,7 +30,7 @@ use crate::math::GridAab;
 ///
 #[doc = include_str!("../serde-warning.md")]
 #[rustfmt::skip]
-#[expect(clippy::exhaustive_enums)]
+#[expect(clippy::exhaustive_enums, clippy::upper_case_acronyms)]
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]

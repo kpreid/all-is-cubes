@@ -1,3 +1,7 @@
+# We haven’t reached the point of making any non-breaking releases,
+# so let’s hear about breaking changes.
+avoid-breaking-exported-api = false
+
 doc-valid-idents = ["glTF", "sRGB", "DirectX", "MagicaVoxel", "NaN", "OpenGL", "WebGL", "WebGPU"]
 enforced-import-renames = [
     { path = "all_is_cubes::rerun_glue", rename = "rg" },

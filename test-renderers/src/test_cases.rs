@@ -127,6 +127,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("viewport_prime", None, viewport_prime);
 }
 
+#[expect(clippy::unnecessary_wraps, reason = "convenient where it is used")]
 pub fn u(
     label: &str,
     f: impl Future<Output = Arc<Universe>> + Send + 'static,

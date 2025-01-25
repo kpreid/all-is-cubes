@@ -196,6 +196,7 @@ impl Camera {
 
     /// Returns the position of the near plane of the view frustum.
     /// This is not currently configurable.
+    #[allow(clippy::unused_self)]
     pub fn near_plane_distance(&self) -> PositiveSign<FreeCoordinate> {
         // half a voxel at resolution=16
         ps64((32.0f64).recip())

@@ -560,6 +560,7 @@ impl TestCaseCollector<'_> {
 
     /// Generate an independent test case for each item of `values`.
     /// The items must serialize to strings.
+    #[allow(clippy::ref_option)]
     pub fn insert_variants<I, F>(
         &mut self,
         name: &str,
