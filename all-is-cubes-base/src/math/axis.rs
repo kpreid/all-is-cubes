@@ -33,7 +33,7 @@ impl Axis {
     /// * Z = blue
     #[mutants::skip]
     #[inline]
-    pub fn color(&self) -> Rgb {
+    pub fn color(self) -> Rgb {
         match self {
             Axis::X => Rgb::UNIFORM_LUMINANCE_RED,
             Axis::Y => Rgb::UNIFORM_LUMINANCE_GREEN,
@@ -43,7 +43,7 @@ impl Axis {
 
     /// Returns the [`Face6`] value which corresponds to the positive direction on this axis.
     #[inline]
-    pub fn positive_face(&self) -> Face6 {
+    pub fn positive_face(self) -> Face6 {
         match self {
             Axis::X => Face6::PX,
             Axis::Y => Face6::PY,
@@ -53,7 +53,7 @@ impl Axis {
 
     /// Returns the [`Face6`] value which corresponds to the negative direction on this axis.
     #[inline]
-    pub fn negative_face(&self) -> Face6 {
+    pub fn negative_face(self) -> Face6 {
         match self {
             Axis::X => Face6::NX,
             Axis::Y => Face6::NY,

@@ -108,7 +108,7 @@ impl PackedLight {
 
     /// Returns the light level.
     #[inline]
-    pub fn value(&self) -> Rgb {
+    pub fn value(self) -> Rgb {
         Rgb::new_ps(
             Self::scalar_out_ps(self.value.x),
             Self::scalar_out_ps(self.value.y),

@@ -181,7 +181,7 @@ impl Channels {
     }
 
     /// Returns whether this includes RGB emission channels.
-    pub fn has_emission(&self) -> bool {
+    pub fn has_emission(self) -> bool {
         match self {
             Channels::Reflectance => false,
             Channels::ReflectanceEmission => true,
