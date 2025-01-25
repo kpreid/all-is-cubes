@@ -5,9 +5,9 @@ use std::sync::{atomic, mpsc};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::listen::Listener;
 
-use kira::manager::error::PlaySoundError;
-use kira::manager::AudioManager;
 use kira::sound::static_sound::StaticSoundData;
+use kira::AudioManager;
+use kira::PlaySoundError;
 
 use crate::Session;
 
@@ -32,8 +32,8 @@ enum AudioCommand {
 }
 
 pub(crate) fn init_sound(session: &Session) -> Result<AudioOut, anyhow::Error> {
-    let manager = AudioManager::<kira::manager::backend::cpal::CpalBackend>::new(
-        kira::manager::AudioManagerSettings::default(),
+    let manager = AudioManager::<kira::backend::cpal::CpalBackend>::new(
+        kira::AudioManagerSettings::default(),
     )?;
 
     let (sender, receiver) = mpsc::sync_channel(256);
@@ -111,12 +111,12 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
                     play_fluff(&mut manager, happened.clone())
                 }
                 Fluff::BlockImpact { velocity, .. } => {
-                    let velocity = f64::from(velocity.into_inner());
+                    let velocity: f32 = velocity.into_inner();
 
-                    let volume = (velocity * 0.01).clamp(0.0, 1.0);
+                    let amplitude = (velocity * 0.01).clamp(0.0, 1.0);
 
                     let mut sound = thump.clone();
-                    sound.settings.volume = kira::Volume::Amplitude(volume).into();
+                    sound.settings.volume = kira::Decibels(amplitude.log10() * 20.0).into();
                     play_fluff(&mut manager, sound)
                 }
                 Fluff::BlockFault(_) => {}
