@@ -95,7 +95,7 @@ impl Text {
     }
 
     /// Converts this into a [`TextBuilder`] so that it may be modified.
-    pub fn to_builder(self) -> TextBuilder {
+    pub fn into_builder(self) -> TextBuilder {
         let Self {
             string,
             font,
