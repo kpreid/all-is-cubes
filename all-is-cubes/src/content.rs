@@ -118,10 +118,6 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
                 GridAab::for_block(resolution)
                     .shrink(
                         FaceMap::splat(0)
-                            // Legacy compatibility -- nudge downward 1 voxel to keep the old text
-                            // layout. Not sure why this is different but we'll be revisiting text
-                            // layout in the future anyway.
-                            .with(Face6::PY, 1)
                             // The font currently in use has an odd width even though the digits
                             // are laid out in an even width of ink, and by nudging it
                             // positiveward the result is balanced (and preserves old layout

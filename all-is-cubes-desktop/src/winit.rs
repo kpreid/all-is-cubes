@@ -49,6 +49,8 @@ pub struct WinAndState {
 
 impl WinAndState {
     /// Creates a window.
+    ///
+    /// The window is created invisible, to avoid a flash before anything is drawn.
     pub fn new(
         event_loop: &ActiveEventLoop,
         window_title: String,
@@ -79,7 +81,7 @@ impl WinAndState {
                 .with_inner_size(to_logical_size(inner_size))
                 .with_title(window_title)
                 .with_fullscreen(fullscreen.then_some(winit::window::Fullscreen::Borderless(None)))
-                .with_visible(!guessed_monitor),
+                .with_visible(false),
         )?;
 
         // If we picked a size based on guessing the monitor, resize based on which monitor we
@@ -92,7 +94,6 @@ impl WinAndState {
 
                 // TODO: Reposition the window too.
             }
-            window.set_visible(true);
         }
 
         Ok(WinAndState {
@@ -234,7 +235,19 @@ pub async fn create_winit_wgpu_desktop_session(
     )
     .await?;
 
-    let dsession = DesktopSession::new(executor, renderer, window, session, viewport_cell, true);
+    let mut dsession =
+        DesktopSession::new(executor, renderer, window, session, viewport_cell, true);
+
+    // Now that we have a session ready, draw immediately, before waiting for a redraw event.
+    // This minimizes the flash of blank window, provided the window system is one
+    // that lets us draw to invisible windows.
+    // (However, it's not perfect, because the renderer won't necessarily finish its work
+    // in one frame; perhaps we should ask it to stretch its frame budget.)
+    dsession
+        .renderer
+        .redraw(&dsession.session, &dsession.window.window);
+    // Now that the window has proper contents (if possible), make it visible.
+    dsession.window.window.set_visible(true);
 
     let ready_time = Instant::now();
     log::debug!(

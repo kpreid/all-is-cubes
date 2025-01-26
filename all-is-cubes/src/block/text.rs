@@ -334,7 +334,7 @@ impl Text {
             },
             match line_y {
                 PositioningY::BodyBottom | PositioningY::Baseline => lb.lower_bounds().y,
-                PositioningY::BodyMiddle => lb.center().y as GridCoordinate,
+                PositioningY::BodyMiddle => libm::round(lb.center().y - 0.75) as GridCoordinate,
                 PositioningY::BodyTop => lb.upper_bounds().y - 1,
             },
             match positioning_z {
