@@ -14,7 +14,7 @@ use all_is_cubes_base::math::{self, Face6, FaceMap, FreePoint, FreeVector};
 use all_is_cubes_base::raycast::Ray;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/space/light/chart/shared.rs");
+    println!("cargo::rerun-if-changed=src/space/light/chart/shared.rs");
 
     let rays = generate_light_ray_pattern();
     let chart = generate_light_propagation_chart(&rays);
