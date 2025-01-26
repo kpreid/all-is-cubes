@@ -327,7 +327,9 @@ impl Text {
         let layout_offset = vec3(
             match positioning_x {
                 PositioningX::Left => lb.lower_bounds().x,
-                PositioningX::Center => lb.center().x as GridCoordinate,
+                // 0.75 is a fudge factor that empirically gets the *rounding* behavior we want.
+                // though I'm still suspicious that we need to account for the text width too
+                PositioningX::Center => libm::round(lb.center().x - 0.75) as GridCoordinate,
                 PositioningX::Right => lb.upper_bounds().x - 1,
             },
             match line_y {
@@ -1046,6 +1048,54 @@ mod tests {
             text.bounding_voxels(),
             GridAab::from_lower_upper([8, 19, 31], [32, 32, 32])
         );
+    }
+
+    /// Test the rounding behavior of text positioning.
+    ///
+    /// Includes left and right even though only centering is really hairy.
+    ///
+    /// Note that for odd&even cases, we primarily care about the choice of “round down” vs.
+    /// “round up” options in that they shouldn’t *change without notice*.
+    ///
+    /// * If `odd_font` is true, the string is 27 voxels wide. If false, 48 voxels wide.
+    /// * If `odd_bounds` is true, the `layout_bounds` is 15 voxels wide. false, 16 voxels.
+    #[rstest::rstest]
+    #[case(PositioningX::Left, false, 0..16, 0..48)]
+    #[case(PositioningX::Right, false, 0..16, -32..16)]
+    #[case(PositioningX::Center, false, 0..16, -16..32)]
+    #[case(PositioningX::Center, true, 0..16, -6..21)]
+    #[case(PositioningX::Center, false, 0..15, -16..32)]
+    #[case(PositioningX::Center, true, 0..15, -6..21)]
+    #[case(PositioningX::Center, false, 1..16, -15..33)]
+    #[case(PositioningX::Center, true, 1..16, -5..22)]
+    fn positioning_x(
+        #[case] pos: PositioningX,
+        #[case] odd_font: bool,
+        #[case] bounds_range: core::ops::Range<i32>,
+        #[case] expected: core::ops::Range<i32>,
+    ) {
+        let text = Text::builder()
+            .string(if odd_font {
+                // must have an odd number of characters
+                literal!("abc")
+            } else {
+                literal!("abcdef")
+            })
+            // TODO: when we have custom fonts, use custom fonts instead of depending on properties
+            // of fonts with other intents.
+            .font(if odd_font { Font::Logo } else { Font::System16 })
+            .layout_bounds(
+                Resolution::R16,
+                GridAab::from_ranges([bounds_range, 0..16, 0..16]),
+            )
+            .positioning(Positioning {
+                x: pos,
+                line_y: PositioningY::BodyMiddle,
+                z: PositioningZ::Back,
+            })
+            .build();
+
+        assert_eq!(text.bounding_voxels().x_range(), expected);
     }
 
     #[test]
