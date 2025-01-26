@@ -2,13 +2,13 @@ use super::prelude::*;
 
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
-    name: "Transparency",
+    name: "Full Block Transparency",
     subtitle:
         "Test depth sorting and blending.\n\
         Lighting of volumes still needs work.",
     placement: Placement::Surface,
 )]
-fn TRANSPARENCY_LARGE(_: Context<'_>) {
+fn TRANSPARENCY_WHOLE_BLOCK(_: Context<'_>) {
     let mut space = Space::empty(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]));
 
     let colors = [
@@ -34,13 +34,13 @@ fn TRANSPARENCY_LARGE(_: Context<'_>) {
 
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
-    name: "Voxel Transparency WIP",
+    name: "Complex Voxel Transparency",
     subtitle:
         "Transparency in complex blocks is not correctly implemented.\n\
-        We also need something for surface properties.",
+        We also need something for refraction.",
     placement: Placement::Surface,
 )]
-fn TRANSPARENCY_SMALL(_: Context<'_>) {
+fn TRANSPARENCY_GLASS_AND_WATER(_: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     let footprint = GridAab::from_lower_size([0, 0, 0], [7, 4, 7]);
@@ -117,6 +117,40 @@ fn TRANSPARENCY_SMALL(_: Context<'_>) {
     space.set([3, 1, 3], floater)?;
 
     Ok((space, txn))
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Simple Transparent Voxels",
+    subtitle: "",
+    placement: Placement::Surface,
+)]
+fn TRANSPARENCY_VOX(ctx: Context<'_>) {
+    // The previous voxel transparency exhibit proved too hard to reach conclusions from.
+    // This one has blatantly obvious geometry and strong but not 100% opacity.
+
+    let mut txn = ExhibitTransaction::default();
+
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
+    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
+
+    let resolution = R4;
+    let block = Block::builder()
+        .voxels_fn(resolution, |cube| {
+            if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == point3(0, 0, 0) {
+                color_block!(1.0, 0.0, 0.0, 0.9)
+            } else if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == point3(1, 1, 1) {
+                color_block!(0.0, 0.0, 1.0, 0.9)
+            } else {
+                color_block!(1.0, 1.0, 1.0, 0.12)
+            }
+        })?
+        .build_txn(&mut txn);
+
+    let mut exhibit_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 1])).build();
+    stack(&mut exhibit_space, [0, 0, 0], [pedestal, &block])?;
+
+    Ok((exhibit_space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]

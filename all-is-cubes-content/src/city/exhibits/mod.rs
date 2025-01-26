@@ -30,9 +30,10 @@ mod zoom;
 pub(crate) static DEMO_CITY_EXHIBITS: &[prelude::Exhibit] = &[
     elevator::ELEVATOR,
     inventory::INVENTORY,
+    transparency::TRANSPARENCY_VOX,
     knot::KNOT,
-    transparency::TRANSPARENCY_LARGE,
-    transparency::TRANSPARENCY_SMALL,
+    transparency::TRANSPARENCY_WHOLE_BLOCK,
+    transparency::TRANSPARENCY_GLASS_AND_WATER,
     collision::COLLISION,
     resolutions::RESOLUTIONS,
     move_modifier::PROJECTILE,

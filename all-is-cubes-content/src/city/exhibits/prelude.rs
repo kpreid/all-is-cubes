@@ -23,7 +23,7 @@ pub(super) use all_is_cubes::drawing::embedded_graphics::{
 };
 pub(super) use all_is_cubes::drawing::VoxelBrush;
 pub(super) use all_is_cubes::euclid::{
-    size3, vec3, Point3D, Rotation2D, Size3D, Vector2D, Vector3D,
+    point3, size3, vec3, Point3D, Rotation2D, Size3D, Vector2D, Vector3D,
 };
 pub(super) use all_is_cubes::linking::{BlockProvider, InGenError};
 pub(super) use all_is_cubes::listen;
