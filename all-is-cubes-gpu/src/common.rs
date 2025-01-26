@@ -47,6 +47,21 @@ impl FrameBudget {
             ui: VERY_LONG,
         },
     };
+
+    /// Create a [`FrameBudget`] presumed to be a good choice when the period between frames
+    /// (reciprocal of frame rate) is this long.
+    pub fn from_frame_period(frame_period: Duration) -> Self {
+        // The fraction of the frame period not accounted for here is time left for:
+        // * the simulation, and
+        // * everything in rendering that is not explicitly budgeted.
+        // TODO: In principle we should also be negotiating with the simulation.
+        Self {
+            update_meshes: Layers {
+                world: frame_period.mul_f32(0.3),
+                ui: frame_period.mul_f32(0.2),
+            },
+        }
+    }
 }
 
 /// A Duration long enough that it is not interesting in questions of rendering, but not

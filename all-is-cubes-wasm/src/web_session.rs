@@ -16,7 +16,7 @@ use web_sys::{
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen;
 use all_is_cubes::universe::{Universe, UniverseStepInfo};
-use all_is_cubes_gpu::in_wgpu;
+use all_is_cubes_gpu::{in_wgpu, FrameBudget};
 use all_is_cubes_port::file::NonDiskFile;
 use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes_ui::apps::{CursorIcon, Key};
@@ -419,7 +419,11 @@ impl WebSession {
                 WebRenderer::Wgpu(renderer) => {
                     // note: info text is HTML on web, so no string passed here
                     renderer
-                        .render_frame(inner.session.cursor_result(), |_| String::new())
+                        .render_frame(
+                            inner.session.cursor_result(),
+                            &FrameBudget::SIXTY_FPS, // TODO: try to estimate real refresh rate
+                            |_| String::new(),
+                        )
                         .expect("error in render_frame")
                 }
             };

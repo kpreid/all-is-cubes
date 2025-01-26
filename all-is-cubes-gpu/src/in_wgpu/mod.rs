@@ -166,13 +166,12 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     pub fn render_frame(
         &mut self,
         cursor_result: Option<&Cursor>,
+        frame_budget: &FrameBudget,
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
     ) -> Result<RenderInfo, RenderError> {
-        let update_info = self.everything.update(
-            &self.queue,
-            cursor_result,
-            &FrameBudget::SIXTY_FPS, // TODO: figure out what we're vsyncing to, instead
-        )?;
+        let update_info = self
+            .everything
+            .update(&self.queue, cursor_result, frame_budget)?;
 
         if self.viewport_dirty.get_and_clear() {
             // Test because wgpu insists on nonzero values -- we'd rather be inconsistent

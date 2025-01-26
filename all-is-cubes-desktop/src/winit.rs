@@ -2,7 +2,7 @@
 
 use std::mem;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use winit::event::{DeviceEvent, ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
@@ -11,6 +11,7 @@ use winit::window::{CursorGrabMode, Window};
 use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
+use all_is_cubes_gpu::FrameBudget;
 use all_is_cubes_render::camera::{self, StandardCameras, Viewport};
 
 use all_is_cubes_ui::apps::InputProcessor;
@@ -534,9 +535,19 @@ impl RendererToWinit for SurfaceRenderer<Instant> {
         self.cameras()
     }
 
-    fn redraw(&mut self, session: &Session, _window: &Window) {
+    fn redraw(&mut self, session: &Session, window: &Window) {
+        let frame_budget = FrameBudget::from_frame_period(
+            match window
+                .current_monitor()
+                .and_then(|m| m.refresh_rate_millihertz())
+            {
+                Some(mhz) => Duration::from_secs_f32(1000.0 / mhz as f32),
+                None => Duration::from_millis(16), // assume ~60 Hz
+            },
+        );
+
         let _info = self
-            .render_frame(session.cursor_result(), |render_info| {
+            .render_frame(session.cursor_result(), &frame_budget, |render_info| {
                 format!("{}", session.info_text(render_info))
             })
             .unwrap();
