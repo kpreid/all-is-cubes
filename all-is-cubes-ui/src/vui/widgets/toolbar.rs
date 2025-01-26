@@ -6,6 +6,8 @@ use std::sync::Mutex;
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, text, Block, Resolution};
 use all_is_cubes::character::Character;
+use all_is_cubes::color_block;
+use all_is_cubes::content::palette;
 use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::math::{
@@ -59,6 +61,8 @@ impl Toolbar {
             cue_channel,
             slot_count,
             slot_info_text_template: text::Text::builder()
+                .foreground(color_block!(palette::HUD_TEXT_FILL))
+                .outline(Some(color_block!(palette::HUD_TEXT_STROKE)))
                 .resolution(Resolution::R32)
                 .font(text::Font::SmallerBodyText)
                 .positioning(text::Positioning {
@@ -162,7 +166,7 @@ impl ToolbarController {
                                     .count()
                                 {
                                     0 | 1 => arcstr::ArcStr::default(),
-                                    count => arcstr::format!("{count}"),
+                                    count => arcstr::format!("{count}×"),
                                 },
                             )
                             .build()
