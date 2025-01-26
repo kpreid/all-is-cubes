@@ -46,6 +46,7 @@ impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
                 pos: tc,
                 clamp_min: _,
                 clamp_max: _,
+                resolution: _,
             } => {
                 // Temporarily pack the contents of the texture allocation info into our
                 // vertex fields. TODO: Not actually sufficient yet.

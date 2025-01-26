@@ -2,6 +2,7 @@
 
 use core::fmt;
 
+use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, Rgba};
 use all_is_cubes::util::{ConciseDebug, Fmt, Refmt as _};
@@ -36,10 +37,12 @@ impl<T: Clone> BlockVertex<T> {
                 pos,
                 clamp_min: _,
                 clamp_max: _,
+                resolution,
             } => Coloring::Texture {
                 clamp_min: pos.clone(),
                 clamp_max: pos.clone(),
                 pos,
+                resolution,
             },
             other @ Coloring::Solid(_) => other,
         };
@@ -62,11 +65,13 @@ pub enum Coloring<T> {
         /// Texture coordinates for this vertex.
         pos: T,
         /// Lower bounds for clamping the entire surface's texture coordinates.
-        /// Used to avoid texture bleed.
+        /// May be used to avoid texture bleed.
         clamp_min: T,
         /// Upper bounds for clamping the entire surface's texture coordinates.
-        /// Used to avoid texture bleed.
+        /// May be used to avoid texture bleed.
         clamp_max: T,
+        /// Resolution of the voxels the texture was created from.
+        resolution: Resolution,
     },
 }
 

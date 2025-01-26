@@ -4,7 +4,11 @@ use alloc::vec::Vec;
 
 use pretty_assertions::assert_eq;
 
-use all_is_cubes::block::{self, Block, Resolution::*, AIR};
+use all_is_cubes::block::{
+    self, Block,
+    Resolution::{self, *},
+    AIR,
+};
 use all_is_cubes::color_block;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::euclid::{point3, Point3D, Vector3D};
@@ -35,7 +39,12 @@ fn v_c<T>(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockV
 }
 
 /// Shorthand for writing out an entire [`BlockVertex`] with texturing.
-fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [f32; 3]) -> BlockVertex<TexPoint> {
+fn v_t(
+    position: [FreeCoordinate; 3],
+    face: Face6,
+    resolution: Resolution,
+    texture: [f32; 3],
+) -> BlockVertex<TexPoint> {
     let texture = texture.into();
     BlockVertex {
         position: position.into(),
@@ -44,6 +53,7 @@ fn v_t(position: [FreeCoordinate; 3], face: Face6, texture: [f32; 3]) -> BlockVe
             pos: texture,
             clamp_min: texture,
             clamp_max: texture,
+            resolution,
         },
     }
 }
@@ -184,7 +194,8 @@ fn animated_atom_uses_texture() {
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
             clamp_min: point3(0.5, 0.5, 0.5),
-            clamp_max: point3(0.5, 0.5, 0.5)
+            clamp_max: point3(0.5, 0.5, 0.5),
+            resolution: R1,
         }
     )
 }
@@ -214,7 +225,8 @@ fn animated_voxels_uses_texture() {
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
             clamp_min: point3(0.5, 0.5, 0.5),
-            clamp_max: point3(0.5, 1.5, 1.5)
+            clamp_max: point3(0.5, 1.5, 1.5),
+            resolution: R2,
         }
     )
 }
@@ -242,7 +254,8 @@ fn emissive_atom_uses_texture() {
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
             clamp_min: point3(0.5, 0.5, 0.5),
-            clamp_max: point3(0.5, 0.5, 0.5)
+            clamp_max: point3(0.5, 0.5, 0.5),
+            resolution: R1,
         }
     )
 }
@@ -270,7 +283,8 @@ fn emissive_only_atom() {
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
             clamp_min: point3(0.5, 0.5, 0.5),
-            clamp_max: point3(0.5, 0.5, 0.5)
+            clamp_max: point3(0.5, 0.5, 0.5),
+            resolution: R1,
         }
     )
 }
@@ -394,35 +408,35 @@ fn shrunken_box_has_no_extras() {
     assert_eq!(
         space_rendered.vertices().iter().map(|&v| v.remove_clamps()).collect::<Vec<_>>(),
         vec![
-            v_t([0.250, 0.250, 0.250], NX, [2.5, 2.0, 2.0]),
-            v_t([0.250, 0.250, 0.750], NX, [2.5, 2.0, 6.0]),
-            v_t([0.250, 0.750, 0.250], NX, [2.5, 6.0, 2.0]),
-            v_t([0.250, 0.750, 0.750], NX, [2.5, 6.0, 6.0]),
+            v_t([0.250, 0.250, 0.250], NX, resolution, [2.5, 2.0, 2.0]),
+            v_t([0.250, 0.250, 0.750], NX, resolution, [2.5, 2.0, 6.0]),
+            v_t([0.250, 0.750, 0.250], NX, resolution, [2.5, 6.0, 2.0]),
+            v_t([0.250, 0.750, 0.750], NX, resolution, [2.5, 6.0, 6.0]),
 
-            v_t([0.250, 0.250, 0.250], NY, [2.0, 2.5, 2.0]),
-            v_t([0.750, 0.250, 0.250], NY, [6.0, 2.5, 2.0]),
-            v_t([0.250, 0.250, 0.750], NY, [2.0, 2.5, 6.0]),
-            v_t([0.750, 0.250, 0.750], NY, [6.0, 2.5, 6.0]),
+            v_t([0.250, 0.250, 0.250], NY, resolution, [2.0, 2.5, 2.0]),
+            v_t([0.750, 0.250, 0.250], NY, resolution, [6.0, 2.5, 2.0]),
+            v_t([0.250, 0.250, 0.750], NY, resolution, [2.0, 2.5, 6.0]),
+            v_t([0.750, 0.250, 0.750], NY, resolution, [6.0, 2.5, 6.0]),
 
-            v_t([0.250, 0.250, 0.250], NZ, [2.0, 2.0, 2.5]),
-            v_t([0.250, 0.750, 0.250], NZ, [2.0, 6.0, 2.5]),
-            v_t([0.750, 0.250, 0.250], NZ, [6.0, 2.0, 2.5]),
-            v_t([0.750, 0.750, 0.250], NZ, [6.0, 6.0, 2.5]),
+            v_t([0.250, 0.250, 0.250], NZ, resolution, [2.0, 2.0, 2.5]),
+            v_t([0.250, 0.750, 0.250], NZ, resolution, [2.0, 6.0, 2.5]),
+            v_t([0.750, 0.250, 0.250], NZ, resolution, [6.0, 2.0, 2.5]),
+            v_t([0.750, 0.750, 0.250], NZ, resolution, [6.0, 6.0, 2.5]),
 
-            v_t([0.750, 0.750, 0.250], PX, [5.5, 6.0, 2.0]),
-            v_t([0.750, 0.750, 0.750], PX, [5.5, 6.0, 6.0]),
-            v_t([0.750, 0.250, 0.250], PX, [5.5, 2.0, 2.0]),
-            v_t([0.750, 0.250, 0.750], PX, [5.5, 2.0, 6.0]),
+            v_t([0.750, 0.750, 0.250], PX, resolution, [5.5, 6.0, 2.0]),
+            v_t([0.750, 0.750, 0.750], PX, resolution, [5.5, 6.0, 6.0]),
+            v_t([0.750, 0.250, 0.250], PX, resolution, [5.5, 2.0, 2.0]),
+            v_t([0.750, 0.250, 0.750], PX, resolution, [5.5, 2.0, 6.0]),
 
-            v_t([0.750, 0.750, 0.250], PY, [6.0, 5.5, 2.0]),
-            v_t([0.250, 0.750, 0.250], PY, [2.0, 5.5, 2.0]),
-            v_t([0.750, 0.750, 0.750], PY, [6.0, 5.5, 6.0]),
-            v_t([0.250, 0.750, 0.750], PY, [2.0, 5.5, 6.0]),
+            v_t([0.750, 0.750, 0.250], PY, resolution, [6.0, 5.5, 2.0]),
+            v_t([0.250, 0.750, 0.250], PY, resolution, [2.0, 5.5, 2.0]),
+            v_t([0.750, 0.750, 0.750], PY, resolution, [6.0, 5.5, 6.0]),
+            v_t([0.250, 0.750, 0.750], PY, resolution, [2.0, 5.5, 6.0]),
 
-            v_t([0.250, 0.750, 0.750], PZ, [2.0, 6.0, 5.5]),
-            v_t([0.250, 0.250, 0.750], PZ, [2.0, 2.0, 5.5]),
-            v_t([0.750, 0.750, 0.750], PZ, [6.0, 6.0, 5.5]),
-            v_t([0.750, 0.250, 0.750], PZ, [6.0, 2.0, 5.5]),
+            v_t([0.250, 0.750, 0.750], PZ, resolution, [2.0, 6.0, 5.5]),
+            v_t([0.250, 0.250, 0.750], PZ, resolution, [2.0, 2.0, 5.5]),
+            v_t([0.750, 0.750, 0.750], PZ, resolution, [6.0, 6.0, 5.5]),
+            v_t([0.750, 0.250, 0.750], PZ, resolution, [6.0, 2.0, 5.5]),
         ],
     );
     assert_eq!(
@@ -765,6 +779,7 @@ fn texture_clamp_coordinate_ordering() {
                     pos,
                     clamp_min,
                     clamp_max,
+                    resolution: _,
                 } => {
                     had_any_textured = true;
                     assert!(

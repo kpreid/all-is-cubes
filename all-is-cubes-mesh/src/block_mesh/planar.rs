@@ -298,6 +298,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                         )),
                         clamp_min,
                         clamp_max,
+                        resolution: transform.resolution,
                     },
                 })
             }));

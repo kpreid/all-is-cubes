@@ -118,6 +118,7 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 pos: TexPoint { tc, atlas_id },
                 clamp_min,
                 clamp_max,
+                resolution: _,
             } => Self {
                 cube_packed,
                 position_in_cube_and_normal_packed,
