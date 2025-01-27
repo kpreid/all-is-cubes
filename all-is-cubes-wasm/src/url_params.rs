@@ -8,15 +8,14 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use all_is_cubes_content::UniverseTemplate;
-use all_is_cubes_render::camera::GraphicsOptions;
 
 #[derive(Clone, Debug, PartialEq)]
 #[expect(clippy::derive_partial_eq_without_eq)]
 pub struct OptionsInUrl {
     pub template: UniverseTemplate,
     pub seed: Option<u64>,
-    pub graphics_options: GraphicsOptions,
     pub renderer: RendererOption,
+    // TODO: Add the ability to override selected settings rather than using persistent settings
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -57,7 +56,6 @@ where
             }
             t.ok()
         }),
-        graphics_options: GraphicsOptions::default(), // TODO: offer graphics options
         renderer: params
             .get("renderer")
             .and_then(|s| {
@@ -85,7 +83,6 @@ mod tests {
             OptionsInUrl {
                 template: UniverseTemplate::default(),
                 seed: None,
-                graphics_options: GraphicsOptions::default(),
                 renderer: RendererOption::Wgpu,
             },
         )

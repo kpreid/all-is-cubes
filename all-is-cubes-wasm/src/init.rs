@@ -103,14 +103,13 @@ async fn start_game_with_dom(
     let OptionsInUrl {
         template,
         seed,
-        graphics_options,
         renderer: renderer_option,
     } = options_from_query_string(query_string.trim_start_matches('?').as_bytes());
 
     static_dom.append_to_loading_log("\nInitializing application...");
     app_progress.progress(0.2).await;
-    let (session, viewport_cell, fullscreen_cell) =
-        create_session(&gui_helpers, graphics_options).await;
+    let settings = crate::settings::load_settings_from_local_storage_if_possible();
+    let (session, viewport_cell, fullscreen_cell) = create_session(&gui_helpers, settings).await;
 
     static_dom.append_to_loading_log("\nInitializing graphics...");
     app_progress.progress(0.4).await;

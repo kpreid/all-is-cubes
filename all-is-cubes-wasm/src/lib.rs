@@ -14,6 +14,8 @@ mod init;
 #[cfg(target_family = "wasm")]
 #[doc(hidden)] // public for testing
 pub mod js_bindings;
+#[cfg(target_family = "wasm")]
+mod settings;
 #[cfg(any(target_family = "wasm", test))]
 mod url_params;
 #[cfg_attr(not(target_family = "wasm"), expect(unused))]

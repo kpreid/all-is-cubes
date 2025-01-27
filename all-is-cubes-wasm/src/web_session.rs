@@ -18,8 +18,8 @@ use all_is_cubes::listen;
 use all_is_cubes::universe::{Universe, UniverseStepInfo};
 use all_is_cubes_gpu::{in_wgpu, FrameBudget};
 use all_is_cubes_port::file::NonDiskFile;
-use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
-use all_is_cubes_ui::apps::{CursorIcon, Key};
+use all_is_cubes_render::camera::{StandardCameras, Viewport};
+use all_is_cubes_ui::apps::{CursorIcon, Key, Settings};
 
 use crate::js_bindings::GuiHelpers;
 
@@ -539,7 +539,7 @@ impl StaticDom {
 
 pub(crate) async fn create_session(
     gui_helpers: &GuiHelpers,
-    graphics_options: GraphicsOptions,
+    settings: Settings,
 ) -> (Session, listen::Cell<Viewport>, listen::Cell<Option<bool>>) {
     // The main cost of this is constructing the `Vui` instance.
     // TODO: pipe in YieldProgress
@@ -549,6 +549,7 @@ pub(crate) async fn create_session(
     let fullscreen_cell = listen::Cell::new(Some(false)); // TODO: check
 
     let session = Session::builder()
+        .settings_from(settings)
         .ui(viewport_cell.as_source())
         .fullscreen(fullscreen_cell.as_source(), {
             let canvas_helper = SendWrapper::new(gui_helpers.canvas_helper());
@@ -558,7 +559,6 @@ pub(crate) async fn create_session(
         })
         .build()
         .await;
-    session.settings().set_graphics_options(graphics_options);
     (session, viewport_cell, fullscreen_cell)
 }
 
