@@ -52,24 +52,25 @@ fn read_or_create_default_json_file<V: DeserializeOwned + Serialize>(
     match File::open(path) {
         Ok(file) => match serde_json::from_reader(BufReader::new(file)) {
             Ok(value) => {
-                log::trace!("Loaded {} from {}", description, path.to_string_lossy());
+                log::trace!(
+                    "Loaded {description} from {path}",
+                    path = path.to_string_lossy()
+                );
                 value
             }
             Err(e) => {
                 log::warn!(
-                    "Syntax error in {} loaded from {}; using default values. Error: {}",
-                    description,
-                    path.to_string_lossy(),
-                    e
+                    "Syntax error in {description} loaded from {path}; \
+                    using default values. Error: {e}",
+                    path = path.to_string_lossy(),
                 );
                 default()
             }
         },
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             log::info!(
-                "No {} file found; creating {}",
-                description,
-                path.to_string_lossy()
+                "No {description} file found; creating {path}",
+                path = path.to_string_lossy()
             );
             let value = default();
             let json_text = serde_json::to_string_pretty(&value).unwrap();
@@ -78,10 +79,8 @@ fn read_or_create_default_json_file<V: DeserializeOwned + Serialize>(
         }
         Err(e) => {
             log::error!(
-                "Error while reading {} file {}: {}",
-                description,
-                path.to_string_lossy(),
-                e
+                "Error while reading {description} file {path}: {e}",
+                path = path.to_string_lossy(),
             );
             default()
         }
@@ -91,22 +90,21 @@ fn read_or_create_default_json_file<V: DeserializeOwned + Serialize>(
 fn write_json_file<V: Serialize>(description: &str, path: &Path, value: &V) {
     match fs::OpenOptions::new().write(true).truncate(true).open(path) {
         Ok(file) => match serde_json::to_writer_pretty(file, &value) {
-            Ok(()) => log::trace!("Wrote {} to {}", description, path.to_string_lossy()),
+            Ok(()) => log::trace!(
+                "Wrote {description} to {path}",
+                path = path.to_string_lossy()
+            ),
             Err(e) => {
                 log::error!(
-                    "Error while writing {} file {}: {}",
-                    description,
-                    path.to_string_lossy(),
-                    e
+                    "Error while writing {description} file {path}: {e}",
+                    path = path.to_string_lossy(),
                 );
             }
         },
         Err(e) => {
             log::error!(
-                "Error while opening {} file {}: {}",
-                description,
-                path.to_string_lossy(),
-                e
+                "Error while opening {description} file {path}: {e}",
+                path = path.to_string_lossy(),
             );
         }
     }
