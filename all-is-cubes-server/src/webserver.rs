@@ -10,7 +10,13 @@ use std::net::SocketAddr;
 pub async fn start_server(
     bind_addr: SocketAddr,
     client_source: &crate::client_static::AicClientSource,
-) -> Result<(String, impl Future<Output = Result<(), anyhow::Error>>), anyhow::Error> {
+) -> Result<
+    (
+        String,
+        impl Future<Output = Result<(), anyhow::Error>> + use<>,
+    ),
+    anyhow::Error,
+> {
     let static_router = client_source.client_router();
 
     // TODO: serve static at well defined subdir separate from root, so that we have
