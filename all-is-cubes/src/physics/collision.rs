@@ -522,7 +522,7 @@ pub(crate) trait CollisionSpace {
 
     /// Recursion helper for [`escape_along_ray()`].
     fn recurse_escape(cube: Cube, aab: Aab, ray: Ray, cell: &Self::Cell)
-        -> Option<CollisionRayEnd>;
+    -> Option<CollisionRayEnd>;
 }
 
 impl CollisionSpace for Space {

@@ -578,10 +578,12 @@ fn indirect_equivalence() {
 fn indirect_has_derived_value_cache_internally() {
     let mut universe = Universe::new();
     let block = Block::from(universe.insert_anonymous(BlockDef::new(AIR)));
-    assert!(block
-        .evaluate_impl(&block::EvalFilter::default())
-        .unwrap()
-        .has_derived());
+    assert!(
+        block
+            .evaluate_impl(&block::EvalFilter::default())
+            .unwrap()
+            .has_derived()
+    );
 }
 
 /// Fuzz-discovered test case for panic during evaluation,

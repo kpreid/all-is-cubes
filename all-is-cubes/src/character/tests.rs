@@ -123,11 +123,7 @@ fn transaction_systematic() {
 
     fn rassert(condition: bool, msg: &'static str) -> transaction::PredicateRes {
         // TODO: put this helper function somewhere? call it a better name?
-        if condition {
-            Ok(())
-        } else {
-            Err(msg.into())
-        }
+        if condition { Ok(()) } else { Err(msg.into()) }
     }
     TransactionTester::new()
         // Set space

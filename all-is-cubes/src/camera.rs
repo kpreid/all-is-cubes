@@ -524,11 +524,7 @@ impl Viewport {
     #[inline]
     pub fn nominal_aspect_ratio(&self) -> FreeCoordinate {
         let ratio = self.nominal_size.width / self.nominal_size.height;
-        if ratio.is_finite() {
-            ratio
-        } else {
-            1.0
-        }
+        if ratio.is_finite() { ratio } else { 1.0 }
     }
 
     /// Convert an *x* coordinate from the range `0..self.framebuffer_size.x` (upper exclusive)

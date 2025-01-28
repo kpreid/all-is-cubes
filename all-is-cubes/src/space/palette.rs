@@ -459,9 +459,9 @@ impl SpaceBlockData {
     where
         L: listen::Listener<BlockChange>,
         listen::GateListener<L>: listen::IntoDynListener<
-            BlockChange,
-            <listen::Notifier<BlockChange> as listen::Listen>::Listener,
-        >,
+                BlockChange,
+                <listen::Notifier<BlockChange> as listen::Listen>::Listener,
+            >,
     {
         // Note: Block evaluation also happens in `Space::step()`.
 

@@ -360,16 +360,20 @@ impl TerminalState {
                 Term color: N   Term chars: M\n\
                 Quit: ^C, or ^D";
 
-            let [viewport_rect_tmp, toolbar_rect, gfx_info_rect, cursor_and_help_rect] =
-                *Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Min(1),
-                        Constraint::Length(3),
-                        Constraint::Length(2),
-                        Constraint::Length(3),
-                    ])
-                    .split(f.area())
+            let [
+                viewport_rect_tmp,
+                toolbar_rect,
+                gfx_info_rect,
+                cursor_and_help_rect,
+            ] = *Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Min(1),
+                    Constraint::Length(3),
+                    Constraint::Length(2),
+                    Constraint::Length(3),
+                ])
+                .split(f.area())
             else {
                 unreachable!()
             };
