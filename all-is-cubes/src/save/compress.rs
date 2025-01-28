@@ -169,6 +169,9 @@ mod tests {
 
     #[test]
     fn proof_of_compression() {
-        assert_round_trip::<[u8; 2]>(&vec![[123, 45]; 10000], "H4sIAAAAAAAE/+3QAQ0AAAiAsEQmtLyzBvtIwHdEgAABAgQIECBAgAABAgQI1AX8ESBAgAABAgQIECBAgAABAn0BhwQIECBAgAABAgQIECBAgEBfwCEBAgQIECBAgAABAgQIECDQF3BIgAABAgQIECBAgAABAgRe4ADS7V+aIE4AAA");
+        assert_round_trip::<[u8; 2]>(
+            &vec![[123, 45]; 10000],
+            "H4sIAAAAAAAE/+3QAQ0AAAiAsEQmtLyzBvtIwHdEgAABAgQIECBAgAABAgQI1AX8ESBAgAABAgQIECBAgAABAn0BhwQIECBAgAABAgQIECBAgEBfwCEBAgQIECBAgAABAgQIECDQF3BIgAABAgQIECBAgAABAgRe4ADS7V+aIE4AAA",
+        );
     }
 }

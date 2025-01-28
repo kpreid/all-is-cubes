@@ -463,7 +463,9 @@ impl AlloctreeNode {
                     // Vec::remove() is O(n) but n is in practice going to be small here.
                     occupied.remove(index);
                 } else {
-                    panic!("Alloctree::free: expected range starting with {rlc_on_axis} not found in {occupied:?}")
+                    panic!(
+                        "Alloctree::free: expected range starting with {rlc_on_axis} not found in {occupied:?}"
+                    )
                 }
 
                 if occupied.is_empty() {

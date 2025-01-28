@@ -384,7 +384,9 @@ mod tests {
             let actual_size = UiSize::new(camera::Viewport::with_scale(1.0, nominal_viewport)).size;
             let actual_size: [u32; 2] = actual_size.into();
             if actual_size != expected_size {
-                println!("{nominal_viewport:?} expected to produce {expected_size:?}; got {actual_size:?}");
+                println!(
+                    "{nominal_viewport:?} expected to produce {expected_size:?}; got {actual_size:?}"
+                );
                 failed += 1;
             }
         }

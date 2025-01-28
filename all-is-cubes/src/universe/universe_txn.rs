@@ -97,7 +97,9 @@ where
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         if self.target != other.target {
             // This is a panic because it indicates a programming error.
-            panic!("TransactionInUniverse cannot have multiple targets; use UniverseTransaction instead");
+            panic!(
+                "TransactionInUniverse cannot have multiple targets; use UniverseTransaction instead"
+            );
         }
         self.transaction.check_merge(&other.transaction)
     }
