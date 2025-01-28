@@ -3,12 +3,12 @@
 
 #![allow(clippy::arc_with_non_send_sync, reason = "wgpu on wasm")]
 
-use alloc::format;
 use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
-use alloc::string::String;
 use std::sync::{Mutex, MutexGuard};
 
 #[cfg(feature = "rerun")]
