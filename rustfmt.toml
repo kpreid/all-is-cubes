@@ -1,7 +1,7 @@
 use_field_init_shorthand = true
 
 # Temporarily don't use style edition 2024, to reduce likelihood of merge conflicts.
-style_edition = "2021"
+style_edition = "2024"
 
 # Currently unstable options I'd like to set:
 #
