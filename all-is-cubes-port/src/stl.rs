@@ -7,14 +7,13 @@ use stl_io::Triangle;
 
 use all_is_cubes::block;
 use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::math::{zo32, Cube, FreeCoordinate};
+use all_is_cubes::math::{Cube, FreeCoordinate, zo32};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::PartialUniverse;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{
-    self as mesh,
+    self as mesh, BlockVertex,
     texture::{NoTexture, NoTextures},
-    BlockVertex,
 };
 use all_is_cubes_render::camera::GraphicsOptions;
 

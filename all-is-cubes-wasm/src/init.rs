@@ -3,18 +3,18 @@
 use std::sync::Arc;
 
 use js_sys::Error;
-use rand::{thread_rng, Rng as _};
+use rand::{Rng as _, thread_rng};
 use send_wrapper::SendWrapper;
-use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
+use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 
-use web_sys::{console, Document};
+use web_sys::{Document, console};
 
 use all_is_cubes_gpu::in_wgpu;
 
-use crate::js_bindings::{make_all_static_gui_helpers, GuiHelpers};
-use crate::url_params::{options_from_query_string, OptionsInUrl, RendererOption};
+use crate::js_bindings::{GuiHelpers, make_all_static_gui_helpers};
+use crate::url_params::{OptionsInUrl, RendererOption, options_from_query_string};
 use crate::web_glue::yield_to_event_loop;
-use crate::web_session::{create_session, StaticDom, WebRenderer, WebSession};
+use crate::web_session::{StaticDom, WebRenderer, WebSession, create_session};
 
 /// Entry point for normal game-in-a-web-page operation.
 #[wasm_bindgen]

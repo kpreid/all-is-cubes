@@ -6,7 +6,7 @@ use all_is_cubes::block;
 use all_is_cubes::universe::{Handle, Name};
 use all_is_cubes::util::yield_progress_for_testing;
 
-use crate::{export_to_path, load_universe_from_file, ExportSet};
+use crate::{ExportSet, export_to_path, load_universe_from_file};
 
 #[tokio::test]
 async fn import_export_native_format() {

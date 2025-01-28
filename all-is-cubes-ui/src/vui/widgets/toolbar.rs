@@ -4,7 +4,7 @@ use core::error::Error;
 use std::sync::Mutex;
 
 use all_is_cubes::arcstr;
-use all_is_cubes::block::{self, text, Block, Resolution};
+use all_is_cubes::block::{self, Block, Resolution, text};
 use all_is_cubes::character::Character;
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
@@ -19,7 +19,7 @@ use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{Handle, Universe};
 
 use crate::inv_watch::InventoryWatcher;
-use crate::ui_content::{hud::HudBlocks, CueMessage, CueNotifier};
+use crate::ui_content::{CueMessage, CueNotifier, hud::HudBlocks};
 use crate::vui::widgets::{ToolbarButtonState, WidgetBlocks};
 use crate::vui::{
     self, InstallVuiError, LayoutRequest, Layoutable, Widget, WidgetController, WidgetTransaction,

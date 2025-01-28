@@ -6,8 +6,8 @@ use core::ops;
 
 use euclid::Vector3D;
 
-use manyfmt::formats::Unquote;
 use manyfmt::Refmt as _;
+use manyfmt::formats::Unquote;
 
 use crate::math::{
     Axis, ConciseDebug, Cube, FreeCoordinate, FreeVector, GridCoordinate, GridPoint, GridRotation,

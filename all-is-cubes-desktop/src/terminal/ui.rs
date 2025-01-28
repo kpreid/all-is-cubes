@@ -4,16 +4,16 @@ use std::io::{self, Write as _};
 use std::sync::mpsc;
 
 use anyhow::Context as _;
+use crossterm::QueueableCommand as _;
 use crossterm::cursor::{self, MoveTo};
 use crossterm::style::{Attribute, Color, Colors, SetAttribute, SetColors};
-use crossterm::QueueableCommand as _;
+use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color as TuiColor, Modifier, Style};
 use ratatui::text::Span;
 use ratatui::widgets::{Borders, Paragraph};
-use ratatui::Terminal;
 
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::euclid::Vector2D;
@@ -21,8 +21,8 @@ use all_is_cubes::inv;
 use all_is_cubes::universe::Handle;
 use all_is_cubes::util::{Refmt as _, StatusText};
 
-use crate::terminal::chars::{image_patch_to_character, write_colored_and_measure};
 use crate::terminal::TextRayImage;
+use crate::terminal::chars::{image_patch_to_character, write_colored_and_measure};
 
 /// Fills the window slot of [`DesktopSession`](crate::DesktopSession) for terminal sessions.
 ///

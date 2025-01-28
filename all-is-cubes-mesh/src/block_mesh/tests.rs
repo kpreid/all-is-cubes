@@ -4,7 +4,7 @@
 use all_is_cubes_render::Flaws;
 use alloc::vec::Vec;
 
-use all_is_cubes::block::{Block, Resolution, AIR};
+use all_is_cubes::block::{AIR, Block, Resolution};
 use all_is_cubes::color_block;
 use all_is_cubes::math::{Aab, Cube, Rgba};
 use all_is_cubes::universe::Universe;

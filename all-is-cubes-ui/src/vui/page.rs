@@ -2,11 +2,11 @@ use alloc::sync::Arc;
 use alloc::vec;
 
 use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::block::{text, AIR};
+use all_is_cubes::block::{AIR, text};
 use all_is_cubes::block::{Block, Resolution};
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
-use all_is_cubes::euclid::{size2, Size2D};
+use all_is_cubes::euclid::{Size2D, size2};
 use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba,
 };
@@ -16,8 +16,8 @@ use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes_render::camera::{self, ViewTransform};
 
 use crate::vui::{
-    self, install_widgets, widgets, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest,
-    LayoutTree, Layoutable, Widget, WidgetTree,
+    self, Align, Gravity, InstallVuiError, LayoutGrant, LayoutRequest, LayoutTree, Layoutable,
+    Widget, WidgetTree, install_widgets, widgets,
 };
 
 /// Bounds for UI display; a choice of scale and aspect ratio based on the viewport size

@@ -590,9 +590,9 @@ mod tests {
     use super::*;
     use crate::math::GridPoint;
     use crate::util::MultiFailure;
+    use Face6::*;
     use num_traits::One;
     use std::collections::HashSet;
-    use Face6::*;
 
     #[test]
     fn identity() {

@@ -4,11 +4,11 @@ use alloc::sync::Arc;
 
 use all_is_cubes::{
     arcstr::literal,
-    block::{text::Font, Block},
+    block::{Block, text::Font},
     content::palette,
     drawing::{
-        embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder},
         VoxelBrush,
+        embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder},
     },
 };
 

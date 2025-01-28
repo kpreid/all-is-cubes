@@ -12,12 +12,12 @@ use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
 use crate::block::{
-    self, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution, AIR,
+    self, AIR, AnimationChange, AnimationHint, Block, BlockDef, Modifier, Resolution,
 };
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
 use crate::inv::{self, EphemeralOpaque, Inventory, Tool};
-use crate::math::{notnan, Cube, Face6, GridAab, GridRotation, Rgb, Rgba};
+use crate::math::{Cube, Face6, GridAab, GridRotation, Rgb, Rgba, notnan};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};

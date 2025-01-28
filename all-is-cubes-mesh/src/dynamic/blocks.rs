@@ -14,9 +14,9 @@ use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
-use crate::dynamic::{self, job, DynamicMeshTypes};
-use crate::{texture, GfxVertex, MeshMeta};
+use crate::dynamic::{self, DynamicMeshTypes, job};
 use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh};
+use crate::{GfxVertex, MeshMeta, texture};
 
 #[derive(Debug)]
 pub(crate) struct VersionedBlockMeshes<M: DynamicMeshTypes> {

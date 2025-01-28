@@ -1,7 +1,7 @@
 //! TODO: Maybe this file is too small
 
-use alloc::collections::btree_map::Entry::*;
 use alloc::collections::BTreeMap;
+use alloc::collections::btree_map::Entry::*;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -14,7 +14,7 @@ use crate::fluff::Fluff;
 use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid};
 use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
-    no_outputs, CommitError, Equal, Merge, NoOutput, Transaction, Transactional,
+    CommitError, Equal, Merge, NoOutput, Transaction, Transactional, no_outputs,
 };
 use crate::util::{ConciseDebug, Refmt as _};
 

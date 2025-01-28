@@ -1,8 +1,8 @@
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 
-use rand::seq::{IteratorRandom as _, SliceRandom as _};
 use rand::SeedableRng;
+use rand::seq::{IteratorRandom as _, SliceRandom as _};
 
 use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridSize, Vol};
 

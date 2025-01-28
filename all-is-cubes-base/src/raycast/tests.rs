@@ -1,7 +1,7 @@
 use super::*;
 use crate::math::{Aab, FaceMap};
 use alloc::vec::Vec;
-use euclid::{point3, vec3, Point3D};
+use euclid::{Point3D, point3, vec3};
 use rand::SeedableRng as _;
 
 /// Alternative to [`RaycastStep`] which contains optional data so partial assertions

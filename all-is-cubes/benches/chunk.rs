@@ -1,9 +1,9 @@
 #![allow(missing_docs)]
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
 use all_is_cubes::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
-use all_is_cubes::chunking::{reset_chunk_chart_cache, ChunkChart, ChunkPos};
+use all_is_cubes::chunking::{ChunkChart, ChunkPos, reset_chunk_chart_cache};
 use all_is_cubes::math::{Cube, FreeVector, GridAab, OctantMask};
 
 fn chunk_chart_bench(c: &mut Criterion) {

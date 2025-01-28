@@ -5,13 +5,13 @@ use core::fmt;
 
 use itertools::Itertools as _;
 
-use crate::block::{self, Block, BlockChange, EvaluatedBlock, AIR, AIR_EVALUATED};
+use crate::block::{self, AIR, AIR_EVALUATED, Block, BlockChange, EvaluatedBlock};
 use crate::listen::{self, IntoDynListener as _, Listener as _};
 use crate::math::{self, OpacityCategory};
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::time::Instant;
-use crate::util::maybe_sync::Mutex;
 use crate::util::TimeStats;
+use crate::util::maybe_sync::Mutex;
 
 #[cfg(doc)]
 use crate::space;

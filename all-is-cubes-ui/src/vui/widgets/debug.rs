@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use all_is_cubes::block::{self, text, Block, Resolution::R64};
+use all_is_cubes::block::{self, Block, Resolution::R64, text};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt};
 

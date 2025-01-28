@@ -16,7 +16,7 @@ use all_is_cubes::util::maybe_sync::{self, SendSyncIfStd};
 // reused for WidgetController
 pub use all_is_cubes::behavior::Then;
 
-use crate::vui::{validate_widget_transaction, LayoutGrant, Layoutable, Positioned};
+use crate::vui::{LayoutGrant, Layoutable, Positioned, validate_widget_transaction};
 
 /// Transaction type produced by [`WidgetController`]s.
 /// Placeholder for likely wanting to change this later.

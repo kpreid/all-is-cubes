@@ -705,7 +705,7 @@ pub(crate) fn nudge_on_ray(
 mod tests {
     use super::*;
     use crate::block::Resolution::*;
-    use crate::block::{Block, AIR};
+    use crate::block::{AIR, Block};
     use crate::content::{make_slab, make_some_blocks};
     use crate::raytracer::print_space;
     use crate::universe::Universe;

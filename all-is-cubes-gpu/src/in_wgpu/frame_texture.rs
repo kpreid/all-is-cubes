@@ -3,9 +3,9 @@ use core::sync::atomic::AtomicBool;
 
 use all_is_cubes::drawing::embedded_graphics::prelude::{OriginDimensions, Size};
 use all_is_cubes::euclid::Size2D;
-use all_is_cubes::math::{ps32, PositiveSign};
-use all_is_cubes_render::camera::{GraphicsOptions, ImagePixel};
+use all_is_cubes::math::{PositiveSign, ps32};
 use all_is_cubes_render::Flaws;
+use all_is_cubes_render::camera::{GraphicsOptions, ImagePixel};
 
 use super::bloom;
 use crate::in_wgpu::shaders::Shaders;

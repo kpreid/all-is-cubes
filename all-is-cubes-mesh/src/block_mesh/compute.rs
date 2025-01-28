@@ -12,9 +12,9 @@ use all_is_cubes::math::{
 use all_is_cubes_render::Flaws;
 
 use crate::block_mesh::planar::{
-    greedy_mesh, push_quad, GmRect, QuadColoring, QuadTransform, VisualVoxel,
+    GmRect, QuadColoring, QuadTransform, VisualVoxel, greedy_mesh, push_quad,
 };
-use crate::block_mesh::{analyze::analyze, BlockFaceMesh};
+use crate::block_mesh::{BlockFaceMesh, analyze::analyze};
 use crate::texture::{self, Tile as _};
 use crate::{BlockMesh, MeshOptions, MeshTypes, Viz};
 

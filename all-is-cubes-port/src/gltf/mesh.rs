@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::mem::{offset_of, size_of};
 
+use gltf_json::Index;
 use gltf_json::buffer::Stride;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::validation::USize64;
-use gltf_json::Index;
 
 use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
@@ -251,7 +251,7 @@ impl Materials {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gltf::{tests::gltf_mesh, GltfDataDestination};
+    use crate::gltf::{GltfDataDestination, tests::gltf_mesh};
     use all_is_cubes::color_block;
     use all_is_cubes::math::GridAab;
     use all_is_cubes::space::Space;

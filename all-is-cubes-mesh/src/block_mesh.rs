@@ -11,9 +11,9 @@ use all_is_cubes::math::{Aab, Face7, FaceMap};
 use all_is_cubes::space::Space;
 use all_is_cubes_render::Flaws;
 
-use crate::texture::{self, Tile as _};
 #[cfg(doc)]
 use crate::SpaceMesh;
+use crate::texture::{self, Tile as _};
 use crate::{GfxVertex, IndexVec, MeshOptions, MeshTypes};
 
 mod analyze;

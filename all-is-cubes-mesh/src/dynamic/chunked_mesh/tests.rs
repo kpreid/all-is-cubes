@@ -3,18 +3,18 @@
 use alloc::vec::Vec;
 use std::sync::Mutex;
 
-use all_is_cubes::block::{self, Block, BlockDef, BlockDefTransaction, AIR};
+use all_is_cubes::block::{self, AIR, Block, BlockDef, BlockDefTransaction};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_blocks;
-use all_is_cubes::euclid::{point3, Point3D, Scale};
+use all_is_cubes::euclid::{Point3D, Scale, point3};
 use all_is_cubes::listen::Store as _;
-use all_is_cubes::math::{zo32, Cube, GridAab, GridCoordinate, GridPoint};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, zo32};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Universe};
-use all_is_cubes_render::camera::{Camera, GraphicsOptions, TransparencyOption, Viewport};
 use all_is_cubes_render::Flaws;
+use all_is_cubes_render::camera::{Camera, GraphicsOptions, TransparencyOption, Viewport};
 
 use crate::texture::NoTextures;
 use crate::{dynamic, testing};

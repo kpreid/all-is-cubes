@@ -10,7 +10,7 @@ use core::future::Future;
 use std::io::Write as _;
 
 use all_is_cubes::euclid::Size3D;
-use all_is_cubes_render::{camera, Flaws, Rendering};
+use all_is_cubes_render::{Flaws, Rendering, camera};
 
 /// Create a [`wgpu::Instance`] controlled by environment variables.
 /// Then, check if the instance has any usable adapters,

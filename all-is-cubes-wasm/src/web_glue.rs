@@ -5,8 +5,8 @@ use std::sync::Mutex;
 
 use futures_core::future::BoxFuture;
 use js_sys::{Error, Function};
-use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast; // dyn_into()
+use wasm_bindgen::prelude::Closure;
 use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Text};
 use web_time::{Duration, Instant};
 

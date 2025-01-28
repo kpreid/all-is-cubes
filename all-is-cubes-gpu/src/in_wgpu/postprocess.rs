@@ -4,8 +4,8 @@
 //! * tone mapping
 
 use all_is_cubes::math::PositiveSign;
-use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator};
 use all_is_cubes_render::Flaws;
+use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator};
 
 use crate::in_wgpu::everything::InfoTextTexture;
 use crate::in_wgpu::frame_texture;

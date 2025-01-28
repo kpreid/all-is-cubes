@@ -10,7 +10,7 @@ use core::num::NonZeroU16;
 use euclid::Vector3D;
 use indoc::indoc;
 
-use crate::block::{self, Block, BlockDef, BlockDefTransaction, Resolution::*, TickAction, AIR};
+use crate::block::{self, AIR, Block, BlockDef, BlockDefTransaction, Resolution::*, TickAction};
 use crate::color_block;
 use crate::content::make_some_blocks;
 use crate::fluff::{self, Fluff};

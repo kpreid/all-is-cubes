@@ -14,7 +14,7 @@ use ordered_float::NotNan;
 use num_traits::float::Float as _;
 
 use super::collision::{
-    aab_raycast, collide_along_ray, escape_along_ray, find_colliding_cubes, nudge_on_ray, Contact,
+    Contact, aab_raycast, collide_along_ray, escape_along_ray, find_colliding_cubes, nudge_on_ray,
 };
 use crate::block::{BlockCollision, Resolution};
 use crate::camera::Eye;
@@ -26,9 +26,9 @@ use crate::fluff::Fluff;
 )]
 use crate::math::Euclid as _;
 use crate::math::{
-    notnan, Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign,
+    Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, notnan,
 };
-use crate::physics::{StopAt, Velocity, POSITION_EPSILON};
+use crate::physics::{POSITION_EPSILON, StopAt, Velocity};
 use crate::raycast::Ray;
 use crate::space::Space;
 use crate::time::Tick;

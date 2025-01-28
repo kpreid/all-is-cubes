@@ -4,7 +4,7 @@
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use all_is_cubes::block::Resolution;
-use all_is_cubes::euclid::{point2, vec2, vec3, Point2D, Scale, Transform3D};
+use all_is_cubes::euclid::{Point2D, Scale, Transform3D, point2, vec2, vec3};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FreeVector, GridAab, GridRotation, GridSizeCoord, Gridgid, Rgba,
 };

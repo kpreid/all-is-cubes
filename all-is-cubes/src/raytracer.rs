@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 use core::{fmt, mem};
 
-use euclid::{vec3, Vector3D};
+use euclid::{Vector3D, vec3};
 use manyfmt::Fmt;
 /// Acts as polyfill for float methods
 #[cfg(not(any(feature = "std", test)))]
@@ -20,7 +20,7 @@ use num_traits::float::Float as _;
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
-use crate::block::{Evoxels, Resolution, AIR};
+use crate::block::{AIR, Evoxels, Resolution};
 use crate::camera::NdcPoint2;
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 #[cfg(not(any(feature = "std", test)))]
@@ -30,8 +30,8 @@ use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
 )]
 use crate::math::Euclid as _;
 use crate::math::{
-    rgb_const, smoothstep, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab,
-    GridMatrix, Intensity, Rgb, Rgba, Vol, ZeroOne,
+    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, GridAab, GridMatrix, Intensity, Rgb,
+    Rgba, Vol, ZeroOne, rgb_const, smoothstep,
 };
 use crate::raycast::{self, Ray, RayIsh};
 use crate::space::{BlockIndex, BlockSky, PackedLight, Sky, Space, SpaceBlockData};
@@ -702,7 +702,7 @@ pub(crate) struct EvalTrace {
 
 #[cfg(feature = "auto-threads")]
 mod rayon_helper {
-    use core::iter::{empty, once, Sum};
+    use core::iter::{Sum, empty, once};
     use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator as _};
 
     /// Implements [`ParallelExtend`] to just sum things, so that

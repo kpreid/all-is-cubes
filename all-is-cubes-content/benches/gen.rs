@@ -5,7 +5,7 @@
 
 #![allow(missing_docs)]
 
-use criterion::{async_executor::FuturesExecutor, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, async_executor::FuturesExecutor, criterion_group, criterion_main};
 
 use std::time::Duration;
 

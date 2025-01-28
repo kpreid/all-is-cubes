@@ -1,9 +1,9 @@
 use alloc::sync::Arc;
 
-use euclid::{point3, Vector3D};
+use euclid::{Vector3D, point3};
 
 use crate::block::AIR;
-use crate::character::{cursor_raycast, Character, CharacterChange, CharacterTransaction, Spawn};
+use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn, cursor_raycast};
 use crate::color_block;
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listen as _, Sink};

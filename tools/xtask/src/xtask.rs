@@ -30,7 +30,7 @@ use std::time::Instant;
 use anyhow::Context as _;
 use anyhow::Error as ActionError;
 use cargo_metadata::PackageId;
-use xshell::{cmd, Cmd, Shell};
+use xshell::{Cmd, Shell, cmd};
 
 mod fs_ops;
 use fs_ops::{directory_tree_contents, newer_than};

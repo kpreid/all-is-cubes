@@ -6,7 +6,7 @@ use core::ops::Range;
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D};
 use all_is_cubes::math::{
-    rgba_const, Aab, Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba,
+    Aab, Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba, rgba_const,
 };
 
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};

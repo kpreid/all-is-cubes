@@ -2,8 +2,8 @@
 
 #![expect(clippy::module_name_repetitions)] // TODO: consider renaming relevant items
 
-use std::sync::mpsc::{self, TrySendError};
 use std::sync::Arc;
+use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
@@ -20,9 +20,9 @@ use all_is_cubes_render::raytracer::{
     Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer,
 };
 
+use crate::Session;
 use crate::glue::crossterm::{event_to_key, map_mouse_button};
 use crate::session::DesktopSession;
-use crate::Session;
 
 mod chars;
 mod options;

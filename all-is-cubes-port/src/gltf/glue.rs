@@ -4,8 +4,8 @@ use std::fmt;
 
 use all_is_cubes::euclid;
 
-use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
+use gltf_json::validation::Checked::Valid;
 
 /// For a [`gltf_json::Accessor`], find the elementwise minimum and maximum values
 /// in a slice of arrays of some kind of value.
