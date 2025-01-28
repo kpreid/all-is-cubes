@@ -3,11 +3,11 @@
 //! Note: This is *not* a code sample to be imitated, as it uses unstable/pseudo-private APIs.
 //! It is listed as an “example” because it is a program that only makes sense to run manually.
 
-use all_is_cubes::math::{Face6, FaceMap, GridAab, Rgb, Rgba};
 use pollster::block_on;
 
 use all_is_cubes::block::{self, Block, EvaluatedBlock, Resolution};
 use all_is_cubes::linking::BlockProvider;
+use all_is_cubes::math::{Face6, FaceMap, GridAab, Rgb, Rgba};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -30,34 +30,15 @@ fn main() {
     destination.log_initialization();
 
     let mut universe = Universe::new();
-    {
-        let mut install_txn = UniverseTransaction::default();
-        block_on(content::install_demo_blocks(
-            &mut install_txn,
-            YieldProgress::noop(),
-        ))
-        .unwrap();
-        install_txn
-            .execute(&mut universe, &mut transaction::no_outputs)
-            .unwrap();
-    }
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(&universe).unwrap();
-
-    let blocks = [
-        content::make_slab(&mut universe, 8, Resolution::R16),
-        demo_blocks[DemoBlocks::Signboard].clone(),
-        demo_blocks[DemoBlocks::LamppostBase].clone(),
-        demo_blocks[DemoBlocks::Arrow].clone(),
-        demo_blocks[DemoBlocks::Pedestal].clone(),
-        make_transparent_block(&mut universe),
-    ];
+    let blocks = make_example_blocks(&mut universe);
 
     std::thread::scope(|scope| {
-        let mut x = 0.;
+        let mut next_x = 0.;
         for (i, block) in blocks.iter().enumerate() {
             let evaluated = block.evaluate().unwrap();
 
-            x += f32::from(evaluated.resolution()) + 4.0;
+            let x = next_x;
+            next_x += f32::from(evaluated.resolution()) + 4.0;
 
             let destination = destination.child(&rg::entity_path![format!("{i}")]);
             scope.spawn(move || show(destination, x, &evaluated));
@@ -80,6 +61,49 @@ fn show(destination: rg::Destination, x: f32, evaluated: &EvaluatedBlock) {
         &mesh::MeshOptions::new(&GraphicsOptions::default()),
         mesh::Viz::new(destination),
     );
+}
+
+fn make_example_blocks(universe: &mut Universe) -> Vec<Block> {
+    {
+        let mut install_txn = UniverseTransaction::default();
+        block_on(content::install_demo_blocks(
+            &mut install_txn,
+            YieldProgress::noop(),
+        ))
+        .unwrap();
+        install_txn
+            .execute(universe, &mut transaction::no_outputs)
+            .unwrap();
+    }
+    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe).unwrap();
+
+    let mut blocks = vec![
+        content::make_slab(universe, 8, Resolution::R16),
+        demo_blocks[DemoBlocks::Signboard].clone(),
+        demo_blocks[DemoBlocks::LamppostBase].clone(),
+        demo_blocks[DemoBlocks::Arrow].clone(),
+        demo_blocks[DemoBlocks::Pedestal].clone(),
+        make_transparent_block(universe),
+    ];
+
+    // Generate a set of blocks which exercise different types of corner.
+    let indexing = GridAab::for_block(Resolution::R2).to_vol().unwrap();
+    for i in [0b111, 0b10111, 0b01010011, 0b01111111, 0b01011111] {
+        blocks.push(
+            Block::builder()
+                .voxels_fn(Resolution::R2, |cube| {
+                    if i & (1 << (indexing.index(cube).unwrap() as u8)) != 0 {
+                        color_block!(0.5, 0.5, 0.5)
+                    } else {
+                        block::AIR
+                    }
+                })
+                .unwrap()
+                .build_into(universe),
+        );
+    }
+
+    blocks
 }
 
 /// A block containing transparent and emissive surfaces, that also meet opaque ones.
