@@ -93,7 +93,7 @@ impl UniverseSource {
             }
             UniverseSource::Template(template, TemplateParameters { seed, size }) => {
                 let seed: u64 = seed.unwrap_or_else(|| {
-                    let seed = rand::thread_rng().gen();
+                    let seed = rand::thread_rng().r#gen();
                     log::info!("Randomly chosen universe seed: {seed}");
                     seed
                 });
