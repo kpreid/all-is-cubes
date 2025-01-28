@@ -241,10 +241,10 @@ impl<I: time::Instant> Session<I> {
     pub fn set_main_task<F>(&mut self, task_ctor: F)
     where
         F: async_fn_traits::AsyncFnOnce1<
-            MainTaskContext,
-            Output = ExitMainTask,
-            OutputFuture: Send + 'static,
-        >,
+                MainTaskContext,
+                Output = ExitMainTask,
+                OutputFuture: Send + 'static,
+            >,
     {
         let context = MainTaskContext {
             shuttle: self.task_context_inner.clone(),

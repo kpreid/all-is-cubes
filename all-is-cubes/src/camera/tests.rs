@@ -61,10 +61,12 @@ fn projection_depth() {
     });
 
     dbg!(expected_ndc_depths, actual_ndc_depths);
-    assert!(actual_ndc_depths
-        .into_iter()
-        .zip(expected_ndc_depths)
-        .all(|(a, e)| (a - e).abs() < 1e-8));
+    assert!(
+        actual_ndc_depths
+            .into_iter()
+            .zip(expected_ndc_depths)
+            .all(|(a, e)| (a - e).abs() < 1e-8)
+    );
 }
 
 #[test]

@@ -67,13 +67,13 @@ impl mesh::GfxVertex for Vertex {
     }
 
     fn instantiate_vertex(&mut self, offset: Self::BlockInst) {
-        let model_pos = Point3D::from(self.position.0 .0);
+        let model_pos = Point3D::from(self.position.0.0);
         let new_pos: [f32; 3] = (model_pos + offset).into();
         self.position = rg::components::Position3D::from(new_pos);
     }
 
     fn position(&self) -> Point3D<f32, Cube> {
-        Point3D::from(self.position.0 .0)
+        Point3D::from(self.position.0.0)
     }
 }
 

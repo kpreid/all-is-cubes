@@ -813,11 +813,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
                     let t = exhibit.subtitle;
                     // TODO: rectangle_to_aab() fails when the empty string is drawn;
                     // when that's fixed, remove this condition
-                    if t.is_empty() {
-                        " "
-                    } else {
-                        t
-                    }
+                    if t.is_empty() { " " } else { t }
                 }
                 .into(),
                 font: Font::SmallerBodyText,
