@@ -444,8 +444,7 @@ impl ToolInput {
     ) -> Result<UniverseTransaction, ToolError> {
         // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
 
-        let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail
-                                     // if this returns None?
+        let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail if this returns None?
         let character_guard: Option<UBorrow<Character>> =
             self.character.as_ref().map(|c| c.read()).transpose()?;
 
