@@ -8,17 +8,17 @@ use rand::seq::SliceRandom as _;
 use rand::{Rng, SeedableRng as _};
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::block::{self, text::Font, Resolution::*, AIR};
+use all_is_cubes::block::{self, AIR, Resolution::*, text::Font};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder};
 use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::drawing::embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder};
 use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    rgba_const, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize,
-    GridSizeCoord, GridVector, Gridgid, VectorOps,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
+    GridVector, Gridgid, VectorOps, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{self, LightPhysics, Space, SpacePhysics};
@@ -29,9 +29,9 @@ use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
-use crate::alg::{space_to_space_copy, walk};
 use crate::TemplateParameters;
-use crate::{clouds::clouds, wavy_landscape, DemoBlocks, LandscapeBlocks};
+use crate::alg::{space_to_space_copy, walk};
+use crate::{DemoBlocks, LandscapeBlocks, clouds::clouds, wavy_landscape};
 
 mod exhibit;
 use exhibit::{Context, Exhibit, Placement};

@@ -2,10 +2,10 @@ use core::fmt;
 
 use itertools::Itertools as _;
 use petgraph::visit::EdgeRef as _;
-use rand::seq::SliceRandom as _;
 use rand::Rng as _;
+use rand::seq::SliceRandom as _;
 
-use all_is_cubes::block::{self, Block, AIR};
+use all_is_cubes::block::{self, AIR, Block};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Vol,

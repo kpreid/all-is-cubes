@@ -1,10 +1,10 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use crate::math::{self, rgba_const, Axis, Rgb};
+use crate::math::{self, Axis, Rgb, rgba_const};
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
-pub use re_log_types::{entity_path, EntityPath};
+pub use re_log_types::{EntityPath, entity_path};
 pub use re_sdk::{RecordingStream, RecordingStreamBuilder, RecordingStreamResult};
 pub use re_types::datatypes;
 pub use re_types::external::arrow2::types::f16;

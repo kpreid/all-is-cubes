@@ -2,7 +2,7 @@
 
 use all_is_cubes_base::math::ps64;
 use euclid::{
-    point3, vec3, Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D,
+    Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D, point3, vec3,
 };
 use itertools::Itertools as _;
 use num_traits::ConstOne as _;

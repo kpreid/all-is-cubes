@@ -14,11 +14,11 @@ use all_is_cubes::math::{GridAab, GridPoint, GridSize};
 use all_is_cubes::space::{Space, SpaceTransaction};
 use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{self, Universe};
-use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::HeadlessRenderer;
+use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 
-use all_is_cubes_gpu::in_wgpu::{headless, init, LightChunk, LightTexture};
+use all_is_cubes_gpu::in_wgpu::{LightChunk, LightTexture, headless, init};
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();

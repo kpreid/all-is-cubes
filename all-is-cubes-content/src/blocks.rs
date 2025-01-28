@@ -9,8 +9,8 @@ use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{
-    self, AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution::*,
-    RotationPlacementRule, TickAction, AIR,
+    self, AIR, AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution::*,
+    RotationPlacementRule, TickAction,
 };
 use all_is_cubes::color_block;
 use all_is_cubes::drawing::embedded_graphics::{
@@ -20,8 +20,8 @@ use all_is_cubes::drawing::embedded_graphics::{
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    rgb_const, rgba_const, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation,
-    GridSizeCoord, GridVector, Gridgid, Rgb, Rgba,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
+    Gridgid, Rgb, Rgba, rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
@@ -30,7 +30,7 @@ use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 
-use crate::alg::{gradient_lookup, scale_color, square_radius, NoiseFnExt as _};
+use crate::alg::{NoiseFnExt as _, gradient_lookup, scale_color, square_radius};
 use crate::landscape::install_landscape_blocks;
 use crate::palette;
 
@@ -162,7 +162,7 @@ pub async fn install_demo_blocks(
                 // Use the image as a source of color palettes, not an image.
                 // TODO: use hash of coord instead of rng
 
-                use all_is_cubes::content::load_image::{default_srgb, PngAdapter};
+                use all_is_cubes::content::load_image::{PngAdapter, default_srgb};
 
                 let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3458679152340);
 

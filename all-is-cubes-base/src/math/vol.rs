@@ -6,7 +6,7 @@ use core::ops::{Deref, DerefMut};
 #[cfg(doc)]
 use alloc::vec::Vec;
 
-use euclid::{vec3, Point3D};
+use euclid::{Point3D, vec3};
 use manyfmt::Refmt as _;
 
 use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector};

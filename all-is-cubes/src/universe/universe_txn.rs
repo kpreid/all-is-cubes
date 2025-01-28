@@ -955,8 +955,8 @@ mod tests {
     //! (where they are parallel with non-transaction behavior tests).
 
     use super::*;
-    use crate::block::BlockDef;
     use crate::block::AIR;
+    use crate::block::BlockDef;
     use crate::content::make_some_blocks;
     use crate::math::Cube;
     use crate::space::CubeConflict;

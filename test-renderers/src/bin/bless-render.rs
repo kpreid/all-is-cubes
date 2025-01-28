@@ -5,7 +5,7 @@ use std::num::NonZeroU8;
 
 use clap::Parser as _;
 
-use test_renderers::{image_path, ImageId, RendererId, SuiteId, TestId};
+use test_renderers::{ImageId, RendererId, SuiteId, TestId, image_path};
 
 #[derive(Debug, clap::Parser)]
 #[command(author, about, version)]

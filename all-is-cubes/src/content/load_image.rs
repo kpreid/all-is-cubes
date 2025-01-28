@@ -6,14 +6,14 @@ use alloc::vec::Vec;
 
 use hashbrown::HashMap;
 
+use embedded_graphics::Drawable;
 use embedded_graphics::image::ImageDrawable;
 use embedded_graphics::prelude::{Dimensions as _, DrawTarget, Point, Size};
 use embedded_graphics::primitives::{PointsIter, Rectangle};
-use embedded_graphics::Drawable;
 use png_decoder::PngHeader;
 
-use crate::block::{Block, AIR};
-use crate::drawing::{rectangle_to_aab, VoxelBrush};
+use crate::block::{AIR, Block};
+use crate::drawing::{VoxelBrush, rectangle_to_aab};
 use crate::math::{GridAab, GridCoordinate, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
 

@@ -7,7 +7,7 @@ use alloc::boxed::Box;
 
 use hashbrown::HashSet;
 
-use all_is_cubes::block::{Atom, Block, Primitive, Resolution, AIR};
+use all_is_cubes::block::{AIR, Atom, Block, Primitive, Resolution};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
     Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
@@ -229,8 +229,8 @@ pub(crate) fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordina
 /// TODO: If useful, allow specifying style of traversal — which axis first, or longest
 /// axis first, or evenly distributed (Bresenham).
 pub(crate) fn walk(start: Cube, end: Cube) -> impl Iterator<Item = CubeFace> + Clone {
-    use itertools::repeat_n;
     use Face6::*;
+    use itertools::repeat_n;
     let delta = end - start;
     let dists = delta.abs().cast::<usize>();
 
@@ -288,9 +288,9 @@ where
 mod tests {
     use super::*;
     use crate::make_some_blocks;
+    use Resolution::*;
     use all_is_cubes::math::Face7;
     use itertools::Itertools as _;
-    use Resolution::*;
 
     #[test]
     fn gradient_lookup_cases() {

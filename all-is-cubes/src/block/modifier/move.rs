@@ -1,6 +1,6 @@
 use crate::block::TickAction;
 use crate::block::{
-    self, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16, AIR,
+    self, AIR, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution::R16,
 };
 use crate::math::{Face6, GridAab, GridCoordinate, GridRotation, GridVector, Vol};
 use crate::op::Operation;
@@ -240,7 +240,7 @@ mod tests {
     use super::*;
     use crate::block::{Composite, EvaluatedBlock, Resolution::*, VoxelOpacityMask};
     use crate::content::make_some_blocks;
-    use crate::math::{rgba_const, zo32, FaceMap, GridPoint, OpacityCategory, Rgb, Rgba};
+    use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba, rgba_const, zo32};
     use crate::space::Space;
     use crate::universe::Universe;
     use pretty_assertions::assert_eq;

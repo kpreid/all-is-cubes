@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::io;
 
 use ratatui::backend::Backend;
-use ratatui::crossterm::style::{Color, Colors, SetColors};
 use ratatui::crossterm::QueueableCommand as _;
+use ratatui::crossterm::style::{Color, Colors, SetColors};
 use ratatui::layout::Position;
 
 use all_is_cubes::euclid::Vector2D;
@@ -296,7 +296,7 @@ mod tests {
     use super::*;
     use crate::terminal::TerminalOptions;
     use all_is_cubes::euclid::size2;
-    use all_is_cubes_render::camera::{area_usize, ImageSize, Viewport};
+    use all_is_cubes_render::camera::{ImageSize, Viewport, area_usize};
     use all_is_cubes_render::raytracer::RaytraceInfo;
 
     fn test_image(

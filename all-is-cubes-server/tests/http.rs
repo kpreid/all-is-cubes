@@ -2,8 +2,8 @@
 
 use std::process::Stdio;
 
-use reqwest::header::HeaderValue;
 use reqwest::Url;
+use reqwest::header::HeaderValue;
 use tokio::io::AsyncBufReadExt;
 
 async fn with_server<F: AsyncFnOnce(Url)>(client_source: &'static str, f: F) {

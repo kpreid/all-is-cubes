@@ -183,8 +183,8 @@ impl<'a> arbitrary::Arbitrary<'a> for Spawn {
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         use arbitrary::{
-            size_hint::{and, and_all},
             Arbitrary,
+            size_hint::{and, and_all},
         };
         and(
             and(GridAab::size_hint(depth), bool::size_hint(depth)),

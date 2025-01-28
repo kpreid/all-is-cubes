@@ -4,7 +4,7 @@ use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{rgba_const, Cube, GridAab, GridCoordinate, GridPoint, GridSize};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridSize, rgba_const};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::Universe;
 

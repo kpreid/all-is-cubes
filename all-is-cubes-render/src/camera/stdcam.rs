@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use core::fmt;
 
-use all_is_cubes::character::{cursor_raycast, Character, Cursor};
+use all_is_cubes::character::{Character, Cursor, cursor_raycast};
 use all_is_cubes::listen;
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::space::Space;

@@ -15,13 +15,13 @@ use all_is_cubes::block::{
     Resolution::{self, *},
 };
 use all_is_cubes::color_block;
-use all_is_cubes::content::load_image::{default_srgb, DecodedPng, PngAdapter};
+use all_is_cubes::content::load_image::{DecodedPng, PngAdapter, default_srgb};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{
+    Drawable,
     image::Image as EgImage,
     prelude::{Dimensions, PixelColor, Point, Size},
     primitives::{Primitive, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment},
-    Drawable,
 };
 use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::euclid::vec3;

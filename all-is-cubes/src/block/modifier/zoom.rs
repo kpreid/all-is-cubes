@@ -170,7 +170,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Zoom {
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::{size_hint::and_all, Arbitrary};
+        use arbitrary::{Arbitrary, size_hint::and_all};
         and_all(&[
             <Resolution as Arbitrary>::size_hint(depth),
             <[GridCoordinate; 3] as Arbitrary>::size_hint(depth),

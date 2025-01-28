@@ -2,11 +2,11 @@
 
 use pretty_assertions::assert_eq;
 
-use super::{data::LightStatus, LightUpdatesInfo, PackedLight, Priority};
-use crate::block::{self, Block, AIR};
+use super::{LightUpdatesInfo, PackedLight, Priority, data::LightStatus};
+use crate::block::{self, AIR, Block};
 use crate::color_block;
 use crate::listen::{Listen as _, Listener, Sink};
-use crate::math::{rgb_const, Cube, Face6, FaceMap, GridPoint, Rgb, Rgba};
+use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgba, rgb_const};
 use crate::space::{GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
 use crate::time;
 

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 
 use anyhow::Context;
 
@@ -11,10 +11,10 @@ use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
 use all_is_cubes::{listen, time, universe};
 use all_is_cubes_mesh as mesh;
-use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshId};
 use all_is_cubes_mesh::MeshTypes;
+use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshId};
 use all_is_cubes_port::gltf::{
-    json as gltf_json, GltfMt, GltfTextureAllocator, GltfWriter, MeshInstance,
+    GltfMt, GltfTextureAllocator, GltfWriter, MeshInstance, json as gltf_json,
 };
 use all_is_cubes_render::camera;
 

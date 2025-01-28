@@ -4,7 +4,7 @@ use core::fmt;
 
 use exhaust::Exhaust;
 
-use all_is_cubes::block::{Block, Resolution::*, AIR};
+use all_is_cubes::block::{AIR, Block, Resolution::*};
 use all_is_cubes::content::load_image::{default_srgb, space_from_image};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;

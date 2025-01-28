@@ -426,17 +426,17 @@ pub(crate) enum DepthStep<'a, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Block, Resolution::*, AIR};
+    use crate::block::{AIR, Block, Resolution::*};
     use crate::camera::GraphicsOptions;
     use crate::content;
-    use crate::math::{rgba_const, GridAab};
+    use crate::math::{GridAab, rgba_const};
     use crate::raycast::{self, Ray};
     use crate::space::Space;
     use crate::universe::Universe;
+    use TraceStep::{EnterBlock, EnterSurface, Invisible};
     use alloc::vec::Vec;
     use euclid::point3;
     use pretty_assertions::assert_eq;
-    use TraceStep::{EnterBlock, EnterSurface, Invisible};
 
     type SurfaceIterR<'a> = SurfaceIter<'a, (), raycast::Raycaster>;
 

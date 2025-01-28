@@ -13,7 +13,7 @@ use all_is_cubes::space::Space;
 use all_is_cubes::util::{ConciseDebug, Fmt};
 use all_is_cubes_render::camera::GraphicsOptions;
 
-use crate::{block_meshes_for_space, texture, BlockMeshes, BlockVertex, MeshTypes, SpaceMesh};
+use crate::{BlockMeshes, BlockVertex, MeshTypes, SpaceMesh, block_meshes_for_space, texture};
 
 /// Generic [`MeshTypes`] implementor for tests to use.
 #[derive(Debug)]

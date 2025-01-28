@@ -6,7 +6,7 @@ use all_is_cubes::character::Character;
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::inv;
 use all_is_cubes::listen;
-use all_is_cubes::math::{zo32, FreeCoordinate, FreeVector};
+use all_is_cubes::math::{FreeCoordinate, FreeVector, zo32};
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes_render::camera::{

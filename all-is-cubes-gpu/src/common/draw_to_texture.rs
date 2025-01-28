@@ -5,11 +5,11 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use all_is_cubes::drawing::embedded_graphics::{
+    Pixel,
     draw_target::DrawTarget,
     pixelcolor::{self, PixelColor},
     prelude::{OriginDimensions, Point, RgbColor, Size},
     primitives::Rectangle,
-    Pixel,
 };
 
 /// Storage for an image which can be written to using [`DrawTarget`].

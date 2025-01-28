@@ -24,9 +24,9 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{time, transaction};
 
 use crate::fractal::menger_sponge;
+use crate::{LandscapeBlocks, wavy_landscape};
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
 use crate::{free_editing_starter_inventory, palette};
-use crate::{wavy_landscape, LandscapeBlocks};
 
 /// Generate a `#[test]` function for each element of [`UniverseTemplate`].
 /// This macro is used as a derive macro via [`macro_rules_derive`].

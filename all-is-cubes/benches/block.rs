@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use all_is_cubes::block::{EvaluatedBlock, Modifier};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};

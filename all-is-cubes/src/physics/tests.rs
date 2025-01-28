@@ -1,18 +1,18 @@
 use alloc::vec::Vec;
 use std::collections::VecDeque;
 
-use euclid::{point3, vec3, Vector3D};
+use euclid::{Vector3D, point3, vec3};
 use ordered_float::NotNan;
 use rand::prelude::SliceRandom as _;
 use rand::{Rng as _, SeedableRng as _};
 
 use crate::block::{
-    Resolution::{self, R2},
     AIR,
+    Resolution::{self, R2},
 };
 use crate::content::{make_slab, make_some_blocks};
 use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, GridAab};
-use crate::physics::{Body, Contact, Velocity, POSITION_EPSILON, VELOCITY_MAGNITUDE_LIMIT};
+use crate::physics::{Body, Contact, POSITION_EPSILON, VELOCITY_MAGNITUDE_LIMIT, Velocity};
 use crate::space::{Space, SpacePhysics};
 use crate::time::Tick;
 use crate::universe::Universe;

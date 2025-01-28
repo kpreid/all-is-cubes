@@ -13,7 +13,7 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
-use all_is_cubes::euclid::{size2, Size2D};
+use all_is_cubes::euclid::{Size2D, size2};
 use all_is_cubes_render::camera;
 
 #[cfg(feature = "audio")]

@@ -5,7 +5,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 
-use all_is_cubes::euclid::{self, size3, Size3D, Vector3D};
+use all_is_cubes::euclid::{self, Size3D, Vector3D, size3};
 use all_is_cubes::math::{Axis, Cube, Face6, FaceMap, GridAab, GridPoint, GridSize};
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _, Transaction as _};

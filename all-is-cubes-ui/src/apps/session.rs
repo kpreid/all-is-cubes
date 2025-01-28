@@ -32,8 +32,8 @@ use all_is_cubes_render::camera::{
 };
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets, Settings};
-use crate::ui_content::notification::{self, Notification};
 use crate::ui_content::Vui;
+use crate::ui_content::notification::{self, Notification};
 
 const LOG_FIRST_FRAMES: bool = false;
 

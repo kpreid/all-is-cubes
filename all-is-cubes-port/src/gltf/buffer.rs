@@ -7,10 +7,10 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use gltf_json::validation::USize64;
 use gltf_json::Index;
+use gltf_json::validation::USize64;
 
-use super::glue::{create_accessor, Lef32};
+use super::glue::{Lef32, create_accessor};
 
 /// Designates the location where glTF buffer data (meshes, textures) should be written
 /// (either to disk files or inline in the glTF JSON).

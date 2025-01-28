@@ -7,13 +7,13 @@ use core::fmt;
 use core::ops;
 use core::time::Duration;
 
-use euclid::{vec3, Vector3D};
+use euclid::{Vector3D, vec3};
 use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
 use manyfmt::Fmt;
 
 use crate::behavior::BehaviorSetStepInfo;
 use crate::behavior::{self, BehaviorSet};
-use crate::block::{Block, EvaluatedBlock, Resolution, TickAction, AIR, AIR_EVALUATED_REF};
+use crate::block::{AIR, AIR_EVALUATED_REF, Block, EvaluatedBlock, Resolution, TickAction};
 #[cfg(doc)]
 use crate::character::Character;
 use crate::character::Spawn;
@@ -22,8 +22,8 @@ use crate::fluff::{self, Fluff};
 use crate::inv::{EphemeralOpaque, InventoryTransaction};
 use crate::listen::{self, Listen, Notifier};
 use crate::math::{
-    notnan, rgb_const, Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid,
-    NotNan, Vol,
+    Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid, NotNan, Vol, notnan,
+    rgb_const,
 };
 use crate::physics::Acceleration;
 use crate::time;

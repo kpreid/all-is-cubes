@@ -7,14 +7,14 @@ use pretty_assertions::assert_eq;
 use rstest::rstest;
 
 use crate::block::{
-    self, modifier, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision,
+    self, AIR, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision,
     BlockDef, Cost, EvKey, EvaluatedBlock, Evoxel, Evoxels, Modifier, Primitive,
     Resolution::{self, *},
-    VoxelOpacityMask, AIR,
+    VoxelOpacityMask, modifier,
 };
 use crate::math::{
-    zo32, Cube, Face6, FaceMap, GridAab, GridPoint, GridVector, Intensity, OpacityCategory, Rgb,
-    Rgba, Vol,
+    Cube, Face6, FaceMap, GridAab, GridPoint, GridVector, Intensity, OpacityCategory, Rgb, Rgba,
+    Vol, zo32,
 };
 use crate::space::Space;
 use crate::universe::Universe;

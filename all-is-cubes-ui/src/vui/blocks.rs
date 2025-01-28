@@ -12,7 +12,7 @@ use all_is_cubes::linking::{BlockModule, BlockProvider};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 
-use crate::vui::widgets::{make_button_label_block, ButtonIcon};
+use crate::vui::widgets::{ButtonIcon, make_button_label_block};
 
 /// Blocks that are used as part of the UI content.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]

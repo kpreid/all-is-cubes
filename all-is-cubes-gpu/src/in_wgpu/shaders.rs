@@ -11,8 +11,8 @@ use futures_core::future::BoxFuture;
 
 use all_is_cubes::listen;
 
-use crate::reloadable::{reloadable_str, Reloadable};
 use crate::Identified;
+use crate::reloadable::{Reloadable, reloadable_str};
 
 /// All shaders that are built into the source code of this crate.
 pub(crate) struct Shaders {

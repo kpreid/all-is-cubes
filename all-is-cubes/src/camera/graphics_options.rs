@@ -2,7 +2,7 @@ use core::fmt;
 
 use num_traits::ConstOne as _;
 
-use crate::math::{ps64, zo32, FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne};
+use crate::math::{FreeCoordinate, PositiveSign, Rgb, Rgba, ZeroOne, ps64, zo32};
 use crate::util::ShowStatus;
 
 #[cfg(doc)]
@@ -549,7 +549,7 @@ mod serialize_infinity_as_none {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::{rgba_const, zo32, OpacityCategory};
+    use crate::math::{OpacityCategory, rgba_const, zo32};
     use pretty_assertions::assert_eq;
 
     #[test]

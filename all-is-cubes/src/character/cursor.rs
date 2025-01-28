@@ -306,11 +306,11 @@ impl crate::math::Wireframe for Cursor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Resolution::*, AIR};
+    use crate::block::{AIR, Resolution::*};
     use crate::content::{make_slab, make_some_blocks};
     use crate::math::{GridAab, Rgba};
     use crate::universe::Universe;
-    use euclid::{vec3, Point3D, Vector3D};
+    use euclid::{Point3D, Vector3D, vec3};
 
     fn test_space<const N: usize>(universe: &mut Universe, blocks: [&Block; N]) -> Handle<Space> {
         let mut space =

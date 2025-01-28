@@ -22,8 +22,8 @@ use crate::block::{Block, BlockDef};
 use crate::space::{SetCubeError, SpaceTransaction};
 use crate::transaction::ExecuteError;
 use crate::universe::{Handle, InsertError, Name, Universe, UniverseTransaction};
-use crate::util::maybe_sync;
 use crate::util::YieldProgress;
+use crate::util::maybe_sync;
 
 #[cfg(doc)]
 use crate::block::Primitive;
@@ -489,7 +489,7 @@ impl From<ExecuteError<SpaceTransaction>> for InGenError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Quote, Resolution::*, AIR};
+    use crate::block::{AIR, Quote, Resolution::*};
     use crate::content::make_some_blocks;
     use crate::math::GridAab;
     use crate::transaction::Transactional as _;

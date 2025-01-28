@@ -2,7 +2,7 @@ use std::ops;
 
 use ratatui::crossterm::style::Color;
 
-use all_is_cubes::euclid::{size2, Size2D, Vector2D, Vector3D};
+use all_is_cubes::euclid::{Size2D, Vector2D, Vector3D, size2};
 use all_is_cubes::math::Rgba;
 use all_is_cubes_render::camera::{ImagePixel, Viewport};
 

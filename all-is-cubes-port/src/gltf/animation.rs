@@ -1,8 +1,8 @@
 use std::io;
 use std::time::Duration;
 
-use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
+use gltf_json::validation::Checked::Valid;
 
 use super::buffer::create_buffer_and_accessor;
 use super::glue::convert_quaternion;

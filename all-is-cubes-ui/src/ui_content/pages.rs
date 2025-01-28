@@ -3,7 +3,7 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 
-use all_is_cubes::arcstr::{literal, ArcStr};
+use all_is_cubes::arcstr::{ArcStr, literal};
 use all_is_cubes::block::Resolution::*;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::Source as _;
@@ -13,10 +13,10 @@ use all_is_cubes::universe::Universe;
 use crate::logo::logo_text;
 use crate::notification::NotificationContent;
 use crate::ui_content::hud::HudInputs;
-use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
-use crate::ui_content::{notification, VuiMessage, VuiPageState};
+use crate::ui_content::options::{OptionsStyle, graphics_options_widgets, pause_toggle_button};
+use crate::ui_content::{VuiMessage, VuiPageState, notification};
 use crate::vui::widgets::{ButtonLabel, ProgressBarState};
-use crate::vui::{self, parts, widgets, InstallVuiError, LayoutTree, UiBlocks, Widget, WidgetTree};
+use crate::vui::{self, InstallVuiError, LayoutTree, UiBlocks, Widget, WidgetTree, parts, widgets};
 
 // TODO: Disentangle general UI from the concept of "HUD" — i.e. the input accepted should be
 // not a `HudInputs` should become less specific, since this isn't actually part of the HUD.

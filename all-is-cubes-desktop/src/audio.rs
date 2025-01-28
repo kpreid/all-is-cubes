@@ -5,9 +5,9 @@ use std::sync::{atomic, mpsc};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::listen::Listener;
 
-use kira::sound::static_sound::StaticSoundData;
 use kira::AudioManager;
 use kira::PlaySoundError;
+use kira::sound::static_sound::StaticSoundData;
 
 use crate::Session;
 

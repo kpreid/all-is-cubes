@@ -5,8 +5,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use crate::block::{
-    self, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier, Primitive,
-    Resolution, AIR,
+    self, AIR, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier, Primitive,
+    Resolution,
 };
 use crate::math::{Cube, GridAab, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};

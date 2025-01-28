@@ -11,8 +11,8 @@ use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen;
-use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_gpu::FrameBudget;
+use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
 use all_is_cubes_render::camera::{self, StandardCameras, Viewport};
 
 use all_is_cubes_ui::apps::InputProcessor;
@@ -22,7 +22,7 @@ use crate::glue::winit::{
     physical_size_to_viewport, to_logical_size,
 };
 use crate::session::DesktopSession;
-use crate::{choose_graphical_window_size, Session};
+use crate::{Session, choose_graphical_window_size};
 
 /// Wrapper for [`::winit::window::Window`] that carries the extra state we need to track.
 ///

@@ -11,9 +11,9 @@ use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 use all_is_cubes_port::{ExportSet, Format};
+use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::StandardCameras;
 use all_is_cubes_render::raytracer::RtRenderer;
-use all_is_cubes_render::Flaws;
 use all_is_cubes_ui::apps::MainTaskContext;
 
 mod options;
