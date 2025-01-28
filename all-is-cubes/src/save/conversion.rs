@@ -1257,7 +1257,7 @@ mod universe {
                 Name::Pending => {
                     return Err(serde::ser::Error::custom(
                         "cannot serialize a pending Handle",
-                    ))
+                    ));
                 }
             }
             .serialize(serializer)

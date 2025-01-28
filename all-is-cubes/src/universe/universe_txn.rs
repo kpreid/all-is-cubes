@@ -696,7 +696,7 @@ impl MemberTxn {
                         return Err(MemberMismatch::Insert(InsertError {
                             name: name.clone(),
                             kind: InsertErrorKind::InvalidName,
-                        }))
+                        }));
                     }
                 }
 

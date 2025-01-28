@@ -507,7 +507,7 @@ impl Universe {
                 return Err(InsertError {
                     name,
                     kind: InsertErrorKind::InvalidName,
-                })
+                });
             }
             Name::Specific(_) | Name::Anonym(_) => {}
         }

@@ -293,7 +293,7 @@ impl<T: 'static> Handle<T> {
                 return Err(InsertError {
                     name: Name::Pending,
                     kind: InsertErrorKind::Poisoned,
-                })
+                });
             }
         }
 
@@ -328,7 +328,7 @@ impl<T: 'static> Handle<T> {
                 return Err(InsertError {
                     name,
                     kind: InsertErrorKind::InUse,
-                })
+                });
             }
             Err(HandleError::NotReady(_)) => {
                 unreachable!("tried to insert a Handle from deserialization via transaction")
@@ -337,7 +337,7 @@ impl<T: 'static> Handle<T> {
                 return Err(InsertError {
                     name,
                     kind: InsertErrorKind::Gone,
-                })
+                });
             }
         }
 
@@ -357,20 +357,20 @@ impl<T: 'static> Handle<T> {
                 return Err(InsertError {
                     name: name.clone(),
                     kind: InsertErrorKind::Gone,
-                })
+                });
             }
             State::Member { name, .. } => {
                 return Err(InsertError {
                     name: name.clone(),
                     kind: InsertErrorKind::AlreadyInserted,
-                })
+                });
             }
             #[cfg(feature = "save")]
             State::Deserializing { name, .. } => {
                 return Err(InsertError {
                     name: name.clone(),
                     kind: InsertErrorKind::AlreadyInserted,
-                })
+                });
             }
             State::Pending { name, strong } => (strong.clone(), universe.allocate_name(name)?),
         };

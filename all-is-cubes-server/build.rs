@@ -12,7 +12,7 @@ fn main() {
         profile_dir_name = match &*std::env::var("PROFILE").unwrap() {
             "debug" => "dev",
             "release" => "release",
-            other => panic!("unexpected PROFILE={other}")
+            other => panic!("unexpected PROFILE={other}"),
         },
     );
 }

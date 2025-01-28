@@ -353,7 +353,7 @@ pub fn determine_record_format(
             // When updating this match, also update the docs for output_file!
             // TODO: RecordFormat and port::Format should be merged?
             Some("alliscubesjson" | "ALLISCUBESJSON") => {
-                return Ok(RecordFormat::Export(Format::AicJson))
+                return Ok(RecordFormat::Export(Format::AicJson));
             }
             Some("png" | "PNG") => return Ok(RecordFormat::PngOrApng),
             Some("apng" | "APNG") => return Ok(RecordFormat::PngOrApng),
