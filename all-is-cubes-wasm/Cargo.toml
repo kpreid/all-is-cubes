@@ -5,7 +5,7 @@
 name = "all-is-cubes-wasm"
 version = "0.9.0"
 authors = ["Kevin Reid <kpreid@switchb.org>"]
-edition = "2021"
+edition = "2024"
 rust-version = "1.85"
 description = "Web client for the recursive voxel game All is Cubes."
 # TODO: add homepage = "..." when we have one

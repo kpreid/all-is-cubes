@@ -163,7 +163,7 @@ async fn start_game_with_dom(
             universe_progress,
             all_is_cubes_content::TemplateParameters {
                 seed: Some(seed.unwrap_or_else(|| {
-                    let seed: u64 = thread_rng().gen();
+                    let seed: u64 = thread_rng().r#gen();
                     log::info!("Randomly chosen universe seed: {seed}");
                     seed
                 })),

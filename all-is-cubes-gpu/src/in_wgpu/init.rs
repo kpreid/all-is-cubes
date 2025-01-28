@@ -215,7 +215,7 @@ where
 pub fn map_really_async(
     device: wgpu::Device,
     buffer: &wgpu::Buffer,
-) -> impl Future<Output = Result<(), wgpu::BufferAsyncError>> {
+) -> impl Future<Output = Result<(), wgpu::BufferAsyncError>> + use<> {
     let (sender, receiver) = futures_channel::oneshot::channel();
     buffer.slice(..).map_async(wgpu::MapMode::Read, |result| {
         let _ = sender.send(result);
