@@ -16,6 +16,7 @@ use {
     all_is_cubes::rerun_glue as rg,
     alloc::vec::Vec,
     core::iter,
+    core::mem,
     itertools::Itertools as _,
 };
 
@@ -45,6 +46,10 @@ pub struct Inner {
     data_bounds: Option<GridAab>,
 
     analysis: Analysis,
+    analysis_vertices: Vec<rg::datatypes::Vec3D>,
+    /// Tracks whether we have new vertices, to reduce the amount of logged data
+    /// TODO: Do this for the other things too.
+    analysis_vertices_dirty: bool,
 
     destination: rg::Destination,
     window_voxels_path: rg::EntityPath,
@@ -52,6 +57,7 @@ pub struct Inner {
     layer_path: rg::EntityPath,
     mesh_surface_path: rg::EntityPath,
     mesh_edges_path: rg::EntityPath,
+    analysis_vertices_path: rg::EntityPath,
 
     // These two together make up the mesh edge display entity's data
     mesh_edge_positions: Vec<rg::components::LineStrip3D>,
@@ -88,9 +94,12 @@ impl Viz {
                 layer_path: rg::entity_path!["progress", "mesh_plane"],
                 mesh_surface_path: rg::entity_path!["mesh", "surface"],
                 mesh_edges_path: rg::entity_path!["mesh", "edges"],
+                analysis_vertices_path: rg::entity_path!["analysis_vertices"],
                 resolution: None,
                 data_bounds: None,
                 analysis: Analysis::empty(),
+                analysis_vertices: Vec::new(),
+                analysis_vertices_dirty: false,
                 mesh_edge_positions: Vec::new(),
                 mesh_edge_classes: Vec::new(),
                 mesh_vertex_positions: Vec::new(),
@@ -273,6 +282,16 @@ impl Viz {
             );
         }
     }
+
+    pub(crate) fn add_analysis_vertex(&mut self, #[allow(unused)] point: GridPoint) {
+        #[cfg(feature = "rerun")]
+        if let Self::Enabled(state) = self {
+            state
+                .analysis_vertices
+                .push(rg::convert_vec(point.to_vector()));
+            state.analysis_vertices_dirty = true;
+        }
+    }
 }
 
 #[cfg(feature = "rerun")]
@@ -281,18 +300,38 @@ impl Inner {
         self.analysis.occupied_plane_box(face, layer).unwrap()
     }
 
-    fn log_analysis(&self) {
-        let iter = Face6::ALL.into_iter().flat_map(|face| {
-            self.analysis
-                .occupied_planes(face)
-                .map(move |(layer, _)| self.layer_box(face, layer))
-        });
-        self.destination.log(
-            &self.occupied_path,
-            &rg::convert_grid_aabs(iter)
-                .with_class_ids([rg::ClassId::MeshVizOccupiedPlane])
-                .with_radii([OCCUPIED_RADIUS]),
-        );
+    /// Logs the current contents of the [`Analysis`], replacing any prior data.
+    fn log_analysis(&mut self) {
+        // Log occupied_planes
+        {
+            let iter = Face6::ALL.into_iter().flat_map(|face| {
+                self.analysis.occupied_planes(face).map({
+                    let this = &*self;
+                    move |(layer, _)| this.layer_box(face, layer)
+                })
+            });
+            self.destination.log(
+                &self.occupied_path,
+                &rg::convert_grid_aabs(iter)
+                    .with_class_ids([rg::ClassId::MeshVizOccupiedPlane])
+                    .with_radii([OCCUPIED_RADIUS]),
+            );
+        }
+
+        // Log analysis_vertices (not technically part of `Analysis` *yet*)
+        if mem::take(&mut self.analysis_vertices_dirty) {
+            self.destination.log(
+                &self.analysis_vertices_path,
+                // We use `Ellipsoids3D` instead of `Points3D`, even though these are semantically
+                // points, to get better rendering.
+                &rg::archetypes::Ellipsoids3D::from_centers_and_radii(
+                    self.analysis_vertices.iter().copied(),
+                    [0.15],
+                )
+                .with_colors([rg::components::Color::from_rgb(80, 80, 255)])
+                .with_fill_mode(rg::components::FillMode::Solid),
+            )
+        }
     }
 
     fn log_voxels(

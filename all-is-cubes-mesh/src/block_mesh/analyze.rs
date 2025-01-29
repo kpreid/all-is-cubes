@@ -162,7 +162,7 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
 
     for (center, window_voxels) in windows(voxels) {
         viz.window(center, voxels);
-        analyze_one_window(&mut analysis, center, window_voxels);
+        analyze_one_window(&mut analysis, center, window_voxels, viz);
         viz.analysis_in_progress(&analysis);
     }
     viz.clear_window();
@@ -172,7 +172,12 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
 
 /// Take one of the outputs of [`windows()`] and compute its contribution to [`analysis`].
 #[inline]
-fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, window: OctantMap<&Evoxel>) {
+fn analyze_one_window(
+    analysis: &mut Analysis,
+    center: GridPoint,
+    window: OctantMap<&Evoxel>,
+    viz: &mut Viz,
+) {
     use Face6::*;
     const ALL: OctantMask = OctantMask::ALL;
     const NONE: OctantMask = OctantMask::NONE;
@@ -195,28 +200,53 @@ fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, window: Octant
                 .map(|voxel| (voxel.color, voxel.emission))
                 .all_equal();
 
+        // Bitmask of which axes are going to have a visible surface
+        let mut axes_involved = 0;
+
         // For each direction, check if any of the voxels in the deeper side are visible
         // and not covered by a voxel of the same or stronger category in the shallower side,
         // and mark that plane as occupied if so.
         //
         // `unflatten()` undoes the axis dropping/swapping this code does.
         if uncovered(opaque, PX) || uncovered(renderable, PX) {
+            axes_involved |= 0b1;
             analysis.expand_rect(NX, center.x, center.yz());
         }
         if uncovered(opaque, PY) || uncovered(renderable, PY) {
+            axes_involved |= 0b10;
             analysis.expand_rect(NY, center.y, center.xz());
         }
         if uncovered(opaque, PZ) || uncovered(renderable, PZ) {
+            axes_involved |= 0b100;
             analysis.expand_rect(NZ, center.z, center.xy());
         }
         if uncovered(opaque, NX) || uncovered(renderable, NX) {
+            axes_involved |= 0b1;
             analysis.expand_rect(PX, resolution_coord - center.x, center.yz());
         }
         if uncovered(opaque, NY) || uncovered(renderable, NY) {
+            axes_involved |= 0b10;
             analysis.expand_rect(PY, resolution_coord - center.y, center.xz());
         }
         if uncovered(opaque, NZ) || uncovered(renderable, NZ) {
+            axes_involved |= 0b100;
             analysis.expand_rect(PZ, resolution_coord - center.z, center.xy());
+        }
+
+        if axes_involved == 0b111 {
+            // If all three axes have visible surfaces at this point, then this must become a
+            // vertex of the mesh. We need to record such vertices as part of the analysis,
+            // because not all such vertices are identifiable by being corners in a 2D slice of
+            // the volume — there are also vertices where an edge on one plane meets a corner on
+            // another plane, and we must consistently treat them as vertices to avoid
+            // “T-junctions”: places where an edge of one triangle meets a vertex of other
+            // triangles, which are subject to numerical error during rendering that causes visible
+            // gaps.
+            //
+            // TODO: Currently, this information is not used (except by `Viz`).
+            // We should store it in `analysis` or return it in a separate buffer,
+            // but only once it is actually going to be used.
+            viz.add_analysis_vertex(center);
         }
     }
 }
@@ -388,7 +418,8 @@ mod tests {
         let mut u = Universe::new();
 
         let block = Block::builder()
-            .voxels_fn(Resolution::R4, |_| color_block!(0.0, 0.0, 0.0, 0.5)).unwrap()
+            .voxels_fn(Resolution::R4, |_| color_block!(0.0, 0.0, 0.0, 0.5))
+            .unwrap()
             .build_into(&mut u);
         let ev = block.evaluate().unwrap();
         let analysis = analyze(
