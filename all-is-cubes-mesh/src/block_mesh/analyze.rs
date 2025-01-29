@@ -196,29 +196,35 @@ fn analyze_one_window(analysis: &mut Analysis, center: GridPoint, window: Octant
                 .all_equal();
 
         // For each direction, check if any of the voxels in the deeper side are visible
-        // and not covered by opaque blocks in the shallower side,
+        // and not covered by a voxel of the same or stronger category in the shallower side,
         // and mark that plane as occupied if so.
         //
         // `unflatten()` undoes the axis dropping/swapping this code does.
-        if renderable & ALL.shift(PX) & !opaque.shift(PX) != NONE {
+        if uncovered(opaque, PX) || uncovered(renderable, PX) {
             analysis.expand_rect(NX, center.x, center.yz());
         }
-        if renderable & ALL.shift(PY) & !opaque.shift(PY) != NONE {
+        if uncovered(opaque, PY) || uncovered(renderable, PY) {
             analysis.expand_rect(NY, center.y, center.xz());
         }
-        if renderable & ALL.shift(PZ) & !opaque.shift(PZ) != NONE {
+        if uncovered(opaque, PZ) || uncovered(renderable, PZ) {
             analysis.expand_rect(NZ, center.z, center.xy());
         }
-        if renderable & ALL.shift(NX) & !opaque.shift(NX) != NONE {
+        if uncovered(opaque, NX) || uncovered(renderable, NX) {
             analysis.expand_rect(PX, resolution_coord - center.x, center.yz());
         }
-        if renderable & ALL.shift(NY) & !opaque.shift(NY) != NONE {
+        if uncovered(opaque, NY) || uncovered(renderable, NY) {
             analysis.expand_rect(PY, resolution_coord - center.y, center.xz());
         }
-        if renderable & ALL.shift(NZ) & !opaque.shift(NZ) != NONE {
+        if uncovered(opaque, NZ) || uncovered(renderable, NZ) {
             analysis.expand_rect(PZ, resolution_coord - center.z, center.xy());
         }
     }
+}
+
+/// Returns whether any bits in the more `face`ward side of `mask` are set while the
+/// corresponding bits on the opposite side are *not* set.
+fn uncovered(mask: OctantMask, face: Face6) -> bool {
+    mask & OctantMask::ALL.shift(face) & !mask.shift(face) != OctantMask::NONE
 }
 
 /// Iterates over all 2×2×2 windows that intersect at least one voxel, and returns their center
@@ -258,9 +264,10 @@ fn windows<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::block::Block;
+    use all_is_cubes::color_block;
     use all_is_cubes::euclid::{point2, size2};
     use all_is_cubes::math::{rgba_const, GridAab, Rgb, Rgba, ZMaj};
-
     use all_is_cubes::universe::Universe;
     use alloc::sync::Arc;
     use alloc::vec::Vec;
@@ -373,5 +380,32 @@ mod tests {
         );
 
         assert!(analysis.occupied_planes(Face6::NX).next().is_some());
+    }
+
+    /// Regression test: don’t consider the insides of partially-transparent volumes occupied.
+    #[test]
+    fn analyze_transparent_interior() {
+        let mut u = Universe::new();
+
+        let block = Block::builder()
+            .voxels_fn(Resolution::R4, |_| color_block!(0.0, 0.0, 0.0, 0.5)).unwrap()
+            .build_into(&mut u);
+        let ev = block.evaluate().unwrap();
+        let analysis = analyze(
+            ev.resolution(),
+            ev.voxels().as_vol_ref(),
+            &mut Viz::disabled(),
+        );
+
+        let occupied_planes = FaceMap::from_fn(|f| analysis.occupied_planes(f).collect_vec());
+
+        // Occupancy is at the surface only, with no interior planes.
+        assert_eq!(
+            occupied_planes,
+            FaceMap::splat(vec![(
+                0,
+                Rect::from_origin_and_size(point2(0, 0), size2(4, 4))
+            )])
+        );
     }
 }
