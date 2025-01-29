@@ -197,6 +197,19 @@ impl<I: time::Instant> SurfaceRenderer<I> {
                     ..RenderInfo::default()
                 });
             }
+            Err(e @ wgpu::SurfaceError::Outdated | e @ wgpu::SurfaceError::Lost) => {
+                // Reconfigure and try again next frame.
+                // NOTE: wgpu::SurfaceError::Outdated is very common with tiling window manager.
+                log::error!(
+                    "Error from wgpu::Surface::get_current_texture(): {e:?}. Skipping this frame."
+                );
+                self.surface
+                    .configure(&self.device, self.everything.config());
+                return Ok(RenderInfo {
+                    flaws: Flaws::UNFINISHED,
+                    ..RenderInfo::default()
+                });
+            }
             Err(e) => {
                 panic!(
                     "error from wgpu::Surface::get_current_texture(): {e:?}; \
