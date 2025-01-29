@@ -10,14 +10,18 @@ use all_is_cubes::universe::Universe;
 
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|input: ([FreeCoordinate; 3], [FreeCoordinate; 3], Space)| {
+fuzz_target!(|input: (
+    [NotNan<FreeCoordinate>; 3],
+    [NotNan<FreeCoordinate>; 3],
+    Space
+)| {
     let (position, velocity, space) = input;
 
     let interesting_bounds_aab = space.bounds().to_free().expand(10.0);
 
     // TODO: write a proper Arbitrary impl on a wrapper
-    let position: math::FreePoint = position.into();
-    let velocity: Vector3D<_, _> = velocity.into();
+    let position: math::FreePoint = position.map(NotNan::into_inner).into();
+    let velocity: Vector3D<_, _> = velocity.map(NotNan::into_inner).into();
     if space.physics().gravity.map(NotNan::into_inner).length() > 100. {
         return;
     }
