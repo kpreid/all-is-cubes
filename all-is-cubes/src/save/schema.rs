@@ -422,8 +422,9 @@ pub(crate) enum OperationSer<'a> {
 #[serde(tag = "type")]
 pub(crate) enum BodySer {
     BodyV1 {
-        position: [f64; 3],
-        velocity: [f64; 3],
+        // TODO: NotNan is not strict enough. If an infinity sneaks in, this will fail to deserialize.
+        position: [NotNan<f64>; 3],
+        velocity: [NotNan<f64>; 3],
         collision_box: Aab,
         occupying: Aab,
         flying: bool,

@@ -18,7 +18,7 @@ use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
 use crate::listen;
-use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector};
+use crate::math::{notnan, Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector};
 use crate::physics;
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
 #[cfg(feature = "save")]
@@ -319,8 +319,9 @@ impl Character {
             Vector3D::new(10.8, 0., 10.8)
         }; // TODO constants/tables...
 
-        let control_delta_v =
-            (velocity_target - initial_body_velocity).component_mul(stiffness) * dt;
+        let control_delta_v = ((velocity_target - initial_body_velocity).component_mul(stiffness)
+            * dt)
+            .map(|c| NotNan::new(c).unwrap_or(notnan!(0.0)));
 
         self.last_step_info = if let Ok(space) = self.space.read() {
             self.exposure.step(&space, self.view(), dt);

@@ -276,30 +276,20 @@ fn no_passing_through_blocks() {
     }
 }
 
+// TODO: Ignoring NaNs is an interim solution.
+// Eventually they should be just prohibited by type, but with a solution more convenient to use
+// than `Vector3D<NotNan<f64>>`.
 #[test]
-fn position_nan() {
-    let space = Space::empty_positive(1, 1, 1);
+fn position_nan_ignored() {
     let mut body = test_body();
     body.set_position(point3(FreeCoordinate::NAN, 0., 0.));
-    body.set_velocity(vec3(1., 0., 0.));
-
-    body.step(Tick::from_seconds(2.0), Some(&space), collision_noop);
-    // TODO: We would like to have some recovery strategy.
-    // For now, this is just a "doesn't panic" test.
+    assert_eq!(body.position(), point3(0., 2., 0.));
 }
-
 #[test]
-fn velocity_nan() {
-    let space = Space::empty_positive(1, 1, 1);
+fn velocity_nan_ignored() {
     let mut body = test_body();
-    body.set_position(point3(1., 0., 0.));
     body.set_velocity(vec3(1., FreeCoordinate::NAN, 0.));
-
-    body.step(Tick::from_seconds(2.0), Some(&space), collision_noop);
-
-    // Velocity is zeroed and position is unchanged.
     assert_eq!(body.velocity(), vec3(0., 0., 0.));
-    assert_eq!(body.position(), point3(1., 0., 0.));
 }
 
 #[test]

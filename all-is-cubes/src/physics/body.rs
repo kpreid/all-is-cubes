@@ -2,7 +2,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use euclid::Vector3D;
+use euclid::{Point3D, Vector3D};
 use ordered_float::NotNan;
 
 /// Acts as polyfill for float methods
@@ -25,7 +25,9 @@ use crate::fluff::Fluff;
     reason = "unclear why this warns even though it is needed"
 )]
 use crate::math::Euclid as _;
-use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign};
+use crate::math::{
+    notnan, Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign,
+};
 use crate::physics::{StopAt, Velocity, POSITION_EPSILON};
 use crate::raycast::Ray;
 use crate::space::Space;
@@ -37,7 +39,7 @@ use crate::util::{ConciseDebug, Fmt, Refmt as _, StatusText};
 use crate::rerun_glue as rg;
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
-const VELOCITY_EPSILON_SQUARED: FreeCoordinate = 1e-6 * 1e-6;
+const VELOCITY_EPSILON_SQUARED: NotNan<FreeCoordinate> = notnan!(1e-12);
 
 /// Velocities larger than this (in cubes per second) are clamped.
 ///
@@ -56,10 +58,17 @@ pub struct Body {
     ///
     /// Invariant: `self.occupying` must be updated to fit whenever this is changed.
     /// `self.occupying` must always contain `self.position`.
-    position: FreePoint,
+    //---
+    // TODO: The NotNan was added in a hurry and is not integrated as well as it ought to be.
+    // Also, we really want a type that does not have signed zeroes for consistency (see
+    // <https://github.com/kpreid/all-is-cubes/issues/537>) and it might be even better to use
+    // fixed-point positions instead of floating-point.
+    position: Point3D<NotNan<FreeCoordinate>, Cube>,
 
     /// Velocity, in position units per second.
-    velocity: Vector3D<FreeCoordinate, Velocity>,
+    //---
+    // TODO: NaN should be prohibited here too
+    velocity: Vector3D<NotNan<FreeCoordinate>, Velocity>,
 
     /// Volume that this body attempts to occupy, in coordinates relative to `self.position`.
     ///
@@ -159,14 +168,23 @@ impl Fmt<StatusText> for Body {
 
 impl Body {
     /// Constructs a [`Body`] requiring only information that can't be reasonably defaulted.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any component of `position` is NaN or infinite.
+    #[track_caller]
     pub fn new_minimal(position: impl Into<FreePoint>, collision_box: impl Into<Aab>) -> Self {
         let position = position.into();
+        assert!(position.is_finite(), "body’s position must be finite");
+        let position = position.map(|c| NotNan::new(c).unwrap()); // NotNan is a weaker condition
+
         let collision_box = collision_box.into();
         Self {
             position,
             velocity: Vector3D::zero(),
             collision_box,
-            occupying: collision_box.translate(position.to_vector()),
+            // TODO: should be able to translate by NotNan
+            occupying: collision_box.translate(position.map(|c| c.into_inner()).to_vector()),
             flying: false,
             noclip: false,
             yaw: 0.0,
@@ -207,7 +225,7 @@ impl Body {
     pub(crate) fn step_with_rerun<CC>(
         &mut self,
         tick: Tick,
-        external_delta_v: Vector3D<FreeCoordinate, Velocity>,
+        external_delta_v: Vector3D<NotNan<FreeCoordinate>, Velocity>,
         mut colliding_space: Option<&Space>,
         mut collision_callback: CC,
         #[cfg(feature = "rerun")] rerun_destination: &crate::rerun_glue::Destination,
@@ -216,7 +234,7 @@ impl Body {
         CC: FnMut(Contact),
     {
         let velocity_before_gravity_and_collision = self.velocity;
-        let dt = tick.delta_t().as_secs_f64();
+        let dt = NotNan::new(tick.delta_t().as_secs_f64()).unwrap();
         let mut move_segments = [MoveSegment::default(); 3];
         let mut move_segment_index = 0;
         let mut already_colliding = None;
@@ -252,7 +270,7 @@ impl Body {
 
         if !self.flying && !tick.paused() {
             if let Some(space) = colliding_space {
-                self.velocity += space.physics().gravity.map(|c| c.into_inner()).cast_unit() * dt;
+                self.velocity += space.physics().gravity.cast_unit() * dt;
             }
         }
 
@@ -277,12 +295,14 @@ impl Body {
                 move_segments,
                 delta_v: self.velocity - velocity_before_gravity_and_collision,
             };
-        } else if velocity_magnitude_squared > VELOCITY_MAGNITUDE_LIMIT_SQUARED {
-            self.velocity *= VELOCITY_MAGNITUDE_LIMIT / velocity_magnitude_squared.sqrt();
+        } else if velocity_magnitude_squared.into_inner() > VELOCITY_MAGNITUDE_LIMIT_SQUARED {
+            self.velocity *=
+                NotNan::new(VELOCITY_MAGNITUDE_LIMIT / velocity_magnitude_squared.sqrt()).unwrap();
         }
 
         // TODO: correct integration of acceleration due to gravity
-        let unobstructed_delta_position: FreeVector = self.velocity.cast_unit() * dt;
+        let unobstructed_delta_position: Vector3D<_, _> =
+            self.velocity.map(NotNan::into_inner).cast_unit() * dt.into_inner();
 
         // Do collision detection and resolution.
         #[cfg(feature = "rerun")]
@@ -306,7 +326,7 @@ impl Body {
                 move_segment_index += 1;
             }
         } else {
-            self.set_position(self.position + unobstructed_delta_position);
+            self.set_position(self.position.map(NotNan::into_inner) + unobstructed_delta_position);
             move_segments[0] = MoveSegment {
                 delta_position: unobstructed_delta_position,
                 stopped_by: None,
@@ -401,8 +421,11 @@ impl Body {
             // Log body collision box
             rerun_destination.log(
                 &rg::entity_path!["collision_box"],
-                &rg::convert_aabs([self.collision_box], self.position.to_vector())
-                    .with_class_ids([rg::ClassId::BodyCollisionBox]),
+                &rg::convert_aabs(
+                    [self.collision_box],
+                    self.position.map(NotNan::into_inner).to_vector(),
+                )
+                .with_class_ids([rg::ClassId::BodyCollisionBox]),
             );
             rerun_destination.log(
                 &rg::entity_path!["occupying"],
@@ -422,10 +445,9 @@ impl Body {
                     &rg::archetypes::Arrows3D::from_vectors(
                         arrow_offsets().map(|_| rg::convert_vec(push_out_vector)),
                     )
-                    .with_origins(
-                        arrow_offsets()
-                            .map(|offset| rg::convert_point(position_before_push_out + offset)),
-                    ),
+                    .with_origins(arrow_offsets().map(|offset| {
+                        rg::convert_point(position_before_push_out.map(NotNan::into_inner) + offset)
+                    })),
                 ),
                 None => rerun_destination.clear_recursive(&rg::entity_path!["push_out"]),
             }
@@ -442,7 +464,7 @@ impl Body {
                     }))
                     .with_origins(arrow_offsets().flat_map(|offset| {
                         move_segments.iter().scan(
-                            position_before_move_segments + offset,
+                            position_before_move_segments.map(NotNan::into_inner) + offset,
                             |pos, seg| {
                                 let arrow_origin = rg::convert_point(*pos);
                                 *pos += seg.delta_position;
@@ -468,7 +490,8 @@ impl Body {
     where
         CC: FnMut(Contact),
     {
-        let movement_ignoring_collision = Ray::new(self.position, delta_position);
+        let movement_ignoring_collision =
+            Ray::new(self.position.map(NotNan::into_inner), delta_position);
         let collision = collide_along_ray(
             space,
             movement_ignoring_collision,
@@ -494,7 +517,7 @@ impl Body {
                 true,
             );
             let unobstructed_delta_position = motion_segment.direction;
-            self.set_position(self.position + unobstructed_delta_position);
+            self.set_position(self.position.map(NotNan::into_inner) + unobstructed_delta_position);
             // Figure the distance we have have left.
             delta_position -= unobstructed_delta_position;
             // Convert it to sliding movement for the axes we didn't collide in.
@@ -503,7 +526,7 @@ impl Body {
             // Zero the velocity in that direction.
             // (This is the velocity part of collision response. That is, if we supported bouncy
             // objects, we'd do something different here.)
-            self.velocity[axis] = 0.0;
+            self.velocity[axis] = notnan!(0.0);
 
             (
                 delta_position,
@@ -514,7 +537,7 @@ impl Body {
             )
         } else {
             // We did not hit anything for the length of the raycast. Proceed unobstructed.
-            self.set_position(self.position + delta_position);
+            self.set_position(self.position.map(NotNan::into_inner) + delta_position);
             (
                 Vector3D::zero(),
                 MoveSegment {
@@ -533,7 +556,7 @@ impl Body {
             .next()
             .is_some();
         if colliding {
-            let exit_backwards: FreeVector = -self.velocity.cast_unit(); // don't care about magnitude
+            let exit_backwards: FreeVector = -self.velocity.map(NotNan::into_inner).cast_unit(); // don't care about magnitude
             let shortest_push_out = (-1..=1)
                 .flat_map(move |dx| {
                     (-1..=1).flat_map(move |dy| {
@@ -553,7 +576,7 @@ impl Body {
                 .min_by_key(|(_, distance)| *distance);
 
             if let Some((new_position, _)) = shortest_push_out {
-                let old_position = self.position;
+                let old_position: FreePoint = self.position.map(NotNan::into_inner);
                 self.set_position(new_position);
                 return Some(new_position - old_position);
             }
@@ -580,7 +603,7 @@ impl Body {
                 return None;
             }
 
-            let ray = Ray::new(self.position, direction);
+            let ray = Ray::new(self.position.map(NotNan::into_inner), direction);
 
             let end = escape_along_ray(
                 space,
@@ -594,7 +617,7 @@ impl Body {
                 NotNan::new(nudged_distance).ok()?,
             ))
         } else {
-            let ray = Ray::new(self.position, direction);
+            let ray = Ray::new(self.position.map(NotNan::into_inner), direction);
             // TODO: upper bound on distance to try
             'raycast: for ray_step in
                 aab_raycast(self.collision_box /* TODO: use occupying */, ray, true)
@@ -638,7 +661,7 @@ impl Body {
     ///
     /// If you are interested in the space it occupies, use [`Self::collision_box_abs()`] instead.
     pub fn position(&self) -> FreePoint {
-        self.position
+        self.position.map(NotNan::into_inner)
     }
 
     /// Sets the position of the body, disregarding collision.
@@ -653,29 +676,43 @@ impl Body {
             return;
         }
 
-        self.position = position;
+        self.position = position.map(|c| NotNan::new(c).unwrap());
 
         // This new box might collide with the `Space`, but (TODO: not implemented yet)
         // stepping will recover from that if possible.
-        self.occupying = self.collision_box.translate(self.position.to_vector());
+        self.occupying = self
+            .collision_box
+            .translate(self.position.map(NotNan::into_inner).to_vector());
     }
 
     /// Returns the body’s current velocity.
     pub fn velocity(&self) -> Vector3D<f64, Velocity> {
-        self.velocity
+        self.velocity.map(NotNan::into_inner)
     }
 
     /// Adds the given value to the body’s velocity.
+    ///
+    /// If `Δv` contains any component which is infinite or NaN, this function does nothing.
+    /// This behavior may change in the future.
     #[allow(non_snake_case)]
     pub fn add_velocity(&mut self, Δv: Vector3D<f64, Velocity>) {
-        // TODO: NaN/infinity checks?
-        self.velocity += Δv;
+        if !Δv.is_finite() {
+            return;
+        }
+
+        self.velocity += Δv.map(|c| NotNan::new(c).unwrap());
     }
 
     /// Replaces the body’s velocity with the given value.
+    ///
+    /// If `Δv` contains any component which is infinite or NaN, this function does nothing.
+    /// This behavior may change in the future.
     pub fn set_velocity(&mut self, v: Vector3D<f64, Velocity>) {
-        // TODO: NaN/infinity checks?
-        self.velocity = v;
+        if !v.is_finite() {
+            return;
+        }
+
+        self.velocity = v.map(|c| NotNan::new(c).unwrap());
     }
 
     /// Returns the body's configured collision box in coordinates relative to [`Self::position()`].
@@ -823,7 +860,7 @@ pub struct BodyStepInfo {
     pub move_segments: [MoveSegment; 3],
 
     /// Change in velocity during this step.
-    pub(crate) delta_v: Vector3D<f64, Velocity>,
+    pub(crate) delta_v: Vector3D<NotNan<f64>, Velocity>,
 }
 
 impl Fmt<ConciseDebug> for BodyStepInfo {
@@ -840,7 +877,7 @@ impl Fmt<ConciseDebug> for BodyStepInfo {
 
 impl BodyStepInfo {
     pub(crate) fn impact_fluff(&self) -> Option<Fluff> {
-        let velocity = self.delta_v.length();
+        let velocity = self.delta_v.map(NotNan::into_inner).length();
         // don't emit anything for slow change or movement in the air
         if velocity >= 0.25 && self.move_segments.iter().any(|s| s.stopped_by.is_some()) {
             Some(Fluff::BlockImpact {
@@ -1048,10 +1085,9 @@ impl fmt::Display for BodyConflict {
 /// Note: Tests which involve both body and collision code are currently in the parent module.
 #[cfg(test)]
 mod tests {
-    use euclid::{point3, vec3};
-
     use super::*;
     use crate::transaction::{PredicateRes, TransactionTester};
+    use euclid::{point3, vec3};
 
     fn test_body() -> Body {
         Body {
@@ -1090,12 +1126,12 @@ mod tests {
     fn body_transaction_systematic() {
         fn check_position(expected: FreePoint) -> impl Fn(&Body, &Body) -> PredicateRes {
             move |_, after| {
-                let actual = after.position;
+                let actual = after.position.map(NotNan::into_inner);
                 if actual != expected {
                     return Err(format!("expected position {expected:#?}, got {actual:#?}").into());
                 }
-                if !after.occupying.contains(after.position) {
-                    return Err("bad collision box".into());
+                if !after.occupying.contains(actual) {
+                    return Err("bad occupying".into());
                 }
                 Ok(())
             }
