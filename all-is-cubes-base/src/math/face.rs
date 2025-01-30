@@ -917,7 +917,7 @@ where
             dm.entry(&"+x".refmt(&Unquote), px);
             dm.entry(&"+y".refmt(&Unquote), py);
             dm.entry(&"+z".refmt(&Unquote), pz);
-        };
+        }
 
         dm.finish()
     }
