@@ -34,7 +34,7 @@ use crate::math::{
 use crate::save::compress::{GzSerde, Leu16};
 use crate::time::Schedule;
 use crate::universe::Handle;
-use crate::{behavior, block, character, inv, op, space, universe};
+use crate::{behavior, block, character, inv, op, space, tag, universe};
 
 /// Placeholder type for when we want to serialize the *contents* of a `Handle`,
 /// without cloning or referencing those contents immediately.
@@ -198,6 +198,9 @@ pub(crate) enum ModifierSer<'a> {
     AttributesV1 {
         #[serde(flatten)]
         attributes: BlockAttributesV1Ser,
+    },
+    TagV1 {
+        tag: tag::Tag,
     },
     QuoteV1 {
         suppress_ambient: bool,
@@ -495,6 +498,21 @@ pub(crate) enum LightPhysicsSerV1 {
 }
 
 //------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `tag` module
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum TagSer {
+    TagHandleV1 { handle: Handle<tag::TagDef> },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum TagDefSer {
+    TagDefV1 {},
+}
+
+//------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `time` module
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -511,16 +529,19 @@ pub(crate) enum ScheduleSer {
 /// case vs. the deserialization case.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum UniverseSchema<C, S> {
+pub(crate) enum UniverseSchema<C, S, T> {
     UniverseV1 {
         /// Note: We are currently targeting JSON output, which cannot use non-string keys.
         /// Therefore, this is not expressed as a map.
-        members: Vec<MemberEntrySer<MemberSchema<C, S>>>,
+        members: Vec<MemberEntrySer<MemberSchema<C, S, T>>>,
     },
 }
-pub(crate) type UniverseSer =
-    UniverseSchema<SerializeHandle<character::Character>, SerializeHandle<space::Space>>;
-pub(crate) type UniverseDe = UniverseSchema<character::Character, space::Space>;
+pub(crate) type UniverseSer = UniverseSchema<
+    SerializeHandle<character::Character>,
+    SerializeHandle<space::Space>,
+    SerializeHandle<tag::TagDef>,
+>;
+pub(crate) type UniverseDe = UniverseSchema<character::Character, space::Space, tag::TagDef>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct MemberEntrySer<T> {
@@ -531,14 +552,18 @@ pub(crate) struct MemberEntrySer<T> {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "member_type")]
-pub(crate) enum MemberSchema<C, S> {
+pub(crate) enum MemberSchema<C, S, T> {
     Block { value: Block },
     Character { value: C },
     Space { value: S },
+    Tag { value: T },
 }
-pub(crate) type MemberSer =
-    MemberSchema<SerializeHandle<character::Character>, SerializeHandle<space::Space>>;
-pub(crate) type MemberDe = MemberSchema<character::Character, space::Space>;
+pub(crate) type MemberSer = MemberSchema<
+    SerializeHandle<character::Character>,
+    SerializeHandle<space::Space>,
+    SerializeHandle<tag::TagDef>,
+>;
+pub(crate) type MemberDe = MemberSchema<character::Character, space::Space, tag::TagDef>;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]

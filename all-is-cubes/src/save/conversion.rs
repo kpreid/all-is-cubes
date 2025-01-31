@@ -85,6 +85,7 @@ mod block {
         TickAction, Zoom,
     };
     use crate::math::{Rgb, Rgba};
+    use crate::tag;
     use schema::{BlockSer, ModifierSer};
 
     impl Serialize for Block {
@@ -383,6 +384,7 @@ mod block {
                 Modifier::Attributes(ref attributes) => ModifierSer::AttributesV1 {
                     attributes: (&**attributes).into(),
                 },
+                Modifier::Tag(tag::Be(ref tag)) => ModifierSer::TagV1 { tag: tag.clone() },
                 Modifier::Quote(Quote { suppress_ambient }) => {
                     ModifierSer::QuoteV1 { suppress_ambient }
                 }
@@ -413,6 +415,7 @@ mod block {
                 ModifierSer::AttributesV1 { attributes } => {
                     Modifier::Attributes(Arc::new(attributes.into()))
                 }
+                ModifierSer::TagV1 { tag } => Modifier::Tag(tag::Be(tag)),
                 ModifierSer::QuoteV1 { suppress_ambient } => {
                     Modifier::Quote(Quote { suppress_ambient })
                 }
@@ -1009,6 +1012,56 @@ mod space {
     }
 }
 
+mod tag {
+    use super::*;
+    use crate::tag::{Tag, TagDef};
+
+    impl Serialize for Tag {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            match self {
+                Tag::Handle(handle) => schema::TagSer::TagHandleV1 {
+                    handle: handle.clone(),
+                },
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Tag {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            match schema::TagSer::deserialize(deserializer)? {
+                schema::TagSer::TagHandleV1 { handle } => Ok(Tag::Handle(handle)),
+            }
+        }
+    }
+    impl Serialize for TagDef {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let TagDef = *self;
+            schema::TagDefSer::TagDefV1 {}.serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for TagDef {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            match schema::TagDefSer::deserialize(deserializer)? {
+                schema::TagDefSer::TagDefV1 {} => Ok(TagDef),
+            }
+        }
+    }
+}
+
 mod time {
     use super::*;
     use crate::time;
@@ -1040,6 +1093,7 @@ mod universe {
     use crate::character::Character;
     use crate::save::schema::MemberEntrySer;
     use crate::space::Space;
+    use crate::tag::TagDef;
     use crate::time;
     use crate::universe::{self, Handle, Name, PartialUniverse, UBorrow, Universe};
     use core::cell::RefCell;
@@ -1059,6 +1113,7 @@ mod universe {
                 blocks,
                 characters,
                 spaces,
+                tags,
             } = self;
 
             let blocks = blocks.iter().map(|member_handle: &Handle<BlockDef>| {
@@ -1088,11 +1143,20 @@ mod universe {
                     },
                 })
             });
+            let tags = tags.iter().map(|member_handle: &Handle<TagDef>| {
+                Ok(MemberEntrySer {
+                    name: member_handle.name(),
+                    value: schema::MemberSer::Tag {
+                        value: schema::SerializeHandle(member_handle.clone()),
+                    },
+                })
+            });
 
             schema::UniverseSer::UniverseV1 {
                 members: blocks
                     .chain(characters)
                     .chain(spaces)
+                    .chain(tags)
                     .collect::<Result<Vec<MemberEntrySer<schema::MemberSer>>, S::Error>>()?,
             }
             .serialize(serializer)
@@ -1128,6 +1192,9 @@ mod universe {
                             }
                             MemberDe::Space { value: space } => {
                                 universe.insert_deserialized(name, space)
+                            }
+                            MemberDe::Tag { value: tag_def } => {
+                                universe.insert_deserialized(name, tag_def)
                             }
                         }
                         .expect("insertion from deserialization failed");

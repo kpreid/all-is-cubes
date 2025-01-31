@@ -111,15 +111,24 @@ async fn export_to_dot_vox_data(
                 blocks: block_defs,
                 spaces: to_export,
                 characters: _,
+                tags,
             },
     } = source;
 
-    // If block def list is nonempty, fail.
+    // If there are any unsupported types, fail.
+    // TODO: Deduplicate this code in this and other exporters.
     if let Some(first) = block_defs.first() {
         return Err(ExportError::NotRepresentable {
             format: Format::DotVox,
             name: Some(first.name()),
             reason: "Exporting BlockDefs to .vox is not yet supported".into(),
+        });
+    }
+    if let Some(first) = tags.first() {
+        return Err(ExportError::NotRepresentable {
+            format: Format::DotVox,
+            name: Some(first.name()),
+            reason: "Exporting tag definitions to .vox is not possible".into(),
         });
     }
 

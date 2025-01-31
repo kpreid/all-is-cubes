@@ -11,6 +11,8 @@ ignore-interior-mutability = [
     "all_is_cubes::block::Block", # contains ArcStr
     "all_is_cubes::block::BlockAttributes", # contains ArcStr
     "all_is_cubes::block::EvaluatedBlock", # contains ArcStr
+    "all_is_cubes::tag::Tag", # not sure why this is needed and marking Handle is not sufficient
+    "all_is_cubes::universe::Handle",
     "arcstr::ArcStr",
     "arcstr::SubStr",
     "test_renderers::harness::UniverseFuture", # contains futures::Shared but does not use it as key

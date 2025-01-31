@@ -13,6 +13,7 @@ use core::fmt;
 use crate::block::BlockDef;
 use crate::character::Character;
 use crate::space::Space;
+use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
     universe_txn as ut, ErasedHandle, Handle, InsertError, Name, PartialUniverse, RootHandle,
@@ -402,7 +403,12 @@ macro_rules! member_enums_and_impls {
 //    Universe::gc
 //    Universe::step
 //    transaction::universe_txn::*
-member_enums_and_impls!((BlockDef, blocks), (Character, characters), (Space, spaces),);
+member_enums_and_impls!(
+    (BlockDef, blocks),
+    (Character, characters),
+    (Space, spaces),
+    (TagDef, tags),
+);
 
 impl AsRef<dyn ErasedHandle> for AnyHandle {
     fn as_ref(&self) -> &dyn ErasedHandle {

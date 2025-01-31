@@ -23,7 +23,7 @@ use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};
 use crate::transaction::Transaction as _;
 use crate::universe::{Handle, Name, PartialUniverse, Universe};
-use crate::{behavior, color_block, op};
+use crate::{behavior, color_block, op, tag};
 
 #[track_caller]
 /// Serialize and deserialize and assert the value is equal.
@@ -822,9 +822,12 @@ fn space_light_queue_remembered() {
 fn universe_with_one_of_each() -> Universe {
     let mut universe = Universe::new();
 
+    let tag = tag::Tag::Handle(universe.insert("a_tag".into(), tag::TagDef).unwrap());
+
     // Keep things simple but slightly distinguishable, because this is NOT a test
     // of the individual types' serializations.
-    let [block] = make_some_blocks();
+    let [mut block] = make_some_blocks();
+    block.modifiers_mut().push(Modifier::Tag(tag::Be(tag)));
     let block_handle = universe
         .insert("a_block".into(), BlockDef::new(block))
         .unwrap();
@@ -859,8 +862,15 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                         {
                             "type": "AttributesV1",
                             "display_name": "0",
-                        }
-                    ]
+                        },
+                        {
+                            "type": "TagV1",
+                            "tag": {
+                                "type": "TagHandleV1",
+                                "handle": {"type": "HandleV1", "Specific": "a_tag"},
+                            },
+                        },
+                    ],
                 }
             },
             {
@@ -957,6 +967,13 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                     "light": null,
                 }
             },
+            {
+                "name": {"Specific": "a_tag"},
+                "member_type": "Tag",
+                "value": {
+                    "type": "TagDefV1",
+                }
+            }
         ],
     })
 }

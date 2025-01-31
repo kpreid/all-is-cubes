@@ -621,11 +621,13 @@ impl Universe {
             blocks,
             characters,
             spaces,
+            tags,
         } = &mut self.tables;
 
         blocks.remove(name).is_some()
             || characters.remove(name).is_some()
             || spaces.remove(name).is_some()
+            || tags.remove(name).is_some()
     }
 
     /// Delete all anonymous members which have no handles to them.
@@ -637,6 +639,7 @@ impl Universe {
             blocks,
             characters,
             spaces,
+            tags,
         } = &mut self.tables;
 
         // TODO: We need a real GC algorithm. For now, let's perform non-cyclic collection by
@@ -650,6 +653,7 @@ impl Universe {
         gc_members(blocks);
         gc_members(characters);
         gc_members(spaces);
+        gc_members(tags);
     }
 
     /// Traverse all members and find [`Handle`]s that were deserialized in disconnected form.
@@ -665,11 +669,13 @@ impl Universe {
             blocks,
             characters,
             spaces,
+            tags,
         } = &self.tables;
 
         fix_handles_in_members(visitor, blocks)?;
         fix_handles_in_members(visitor, characters)?;
         fix_handles_in_members(visitor, spaces)?;
+        fix_handles_in_members(visitor, tags)?;
 
         fn fix_handles_in_members<T: VisitHandles + 'static>(
             visitor: &mut dyn HandleVisitor,
@@ -943,6 +949,7 @@ pub struct PartialUniverse {
     pub blocks: Vec<Handle<block::BlockDef>>,
     pub characters: Vec<Handle<Character>>,
     pub spaces: Vec<Handle<Space>>,
+    pub tags: Vec<Handle<crate::tag::TagDef>>,
 }
 
 impl PartialUniverse {
@@ -951,6 +958,7 @@ impl PartialUniverse {
             blocks: universe.iter_by_type().map(|(_, r)| r).collect(),
             characters: universe.iter_by_type().map(|(_, r)| r).collect(),
             spaces: universe.iter_by_type().map(|(_, r)| r).collect(),
+            tags: universe.iter_by_type().map(|(_, r)| r).collect(),
         }
     }
 
@@ -969,7 +977,8 @@ impl PartialUniverse {
             blocks,
             characters,
             spaces,
+            tags,
         } = self;
-        blocks.len() + characters.len() + spaces.len()
+        blocks.len() + characters.len() + spaces.len() + tags.len()
     }
 }

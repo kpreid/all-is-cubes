@@ -366,15 +366,24 @@ pub(crate) async fn export_gltf(
                 blocks: block_defs,
                 spaces,
                 characters,
+                tags,
             },
     } = source;
 
-    // If unsupported list is nonempty, fail.
+    // If there are any unsupported types, fail.
+    // TODO: Deduplicate this code in this and other exporters.
     if let Some(first) = characters.first() {
         return Err(ExportError::NotRepresentable {
             format: Format::Gltf,
             name: Some(first.name()),
             reason: "Exporting characters to glTF is not yet supported".into(),
+        });
+    }
+    if let Some(first) = tags.first() {
+        return Err(ExportError::NotRepresentable {
+            format: Format::Gltf,
+            name: Some(first.name()),
+            reason: "Exporting tag definitions to glTF is not yet supported".into(),
         });
     }
 

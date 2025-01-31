@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use crate::block::{self, Block, BlockAttributes, Evoxels, MinEval};
 use crate::inv;
 use crate::math::{GridRotation, Vol};
+use crate::tag;
 use crate::universe::{HandleVisitor, VisitHandles};
 
 mod composite;
@@ -63,6 +64,9 @@ pub enum Modifier {
     // `Arc` specifically is used so cloning does not allocate.
     Attributes(Arc<BlockAttributes>),
 
+    /// Applies the given tag to this block.
+    Tag(tag::Be),
+
     /// Suppresses all behaviors of the [`Block`] that might affect the space around it,
     /// (or itself).
     Quote(Quote),
@@ -95,6 +99,7 @@ impl core::fmt::Debug for Modifier {
         // are identifying enough.
         match self {
             Self::Attributes(a) => a.fmt(f),
+            Self::Tag(t) => t.fmt(f),
             Self::Quote(q) => q.fmt(f),
             Self::Rotate(r) => write!(f, "Rotate({r:?})"),
             Self::Composite(c) => c.fmt(f),
@@ -133,6 +138,12 @@ impl Modifier {
             // We will need a new schema (possibly a set of individual modifiers) for that.
             Modifier::Attributes(ref attributes) => {
                 value.set_attributes(BlockAttributes::clone(attributes));
+                value
+            }
+
+            Modifier::Tag(_) => {
+                // For now, the tag modifier does nothing — it is only examined directly to match
+                // `Block` values.
                 value
             }
 
@@ -193,6 +204,8 @@ impl Modifier {
         match self {
             Modifier::Attributes(_) => ModifierUnspecialize::Keep,
 
+            Modifier::Tag(_) => ModifierUnspecialize::Keep,
+
             Modifier::Quote(_) => ModifierUnspecialize::Keep,
 
             Modifier::Rotate(_) => ModifierUnspecialize::Pop,
@@ -228,6 +241,9 @@ impl Modifier {
     pub(crate) fn does_not_introduce_asymmetry(&self) -> bool {
         match self {
             Modifier::Attributes(attr) => attr.rotationally_symmetric(),
+            // TODO: I am pretty sure I want tags to be able to identify faces/rotations
+            // but they don't currently
+            Modifier::Tag(_) => true,
             // Quote has no asymmetry
             Modifier::Quote(_) => true,
             // Rotate may change existing asymmetry but does not introduce it
@@ -254,6 +270,9 @@ impl Modifier {
             Modifier::Attributes(a) => {
                 Modifier::Attributes(Arc::new((*a).clone().rotate(rotation)))
             }
+            // TODO: I am pretty sure I want tags to be able to identify faces/rotations
+            // but they don't currently
+            m @ Modifier::Tag(_) => m,
             Modifier::Rotate(r) => Modifier::Rotate(rotation * r * rotation.inverse()), // TODO: no test this is correct yet
             Modifier::Composite(c) => Modifier::Composite(c.rotate(rotation)),
             Modifier::Zoom(z) => Modifier::Zoom(z.rotate(rotation)),
@@ -267,6 +286,7 @@ impl VisitHandles for Modifier {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         match self {
             Modifier::Attributes(a) => a.visit_handles(visitor),
+            Modifier::Tag(t) => t.visit_handles(visitor),
             Modifier::Quote(m) => m.visit_handles(visitor),
             Modifier::Rotate(_) => {}
             Modifier::Composite(m) => m.visit_handles(visitor),

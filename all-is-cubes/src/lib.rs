@@ -178,6 +178,7 @@ pub mod raytracer;
 pub mod rerun_glue;
 pub mod save;
 pub mod space;
+pub mod tag;
 pub mod time;
 pub mod transaction;
 pub mod universe;

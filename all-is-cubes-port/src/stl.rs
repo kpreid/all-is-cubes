@@ -29,6 +29,7 @@ pub(crate) async fn export_stl(
                 blocks: block_defs,
                 spaces,
                 characters: _,
+                tags: _,
             },
     } = &source;
 
