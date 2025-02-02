@@ -115,22 +115,9 @@ async fn export_to_dot_vox_data(
             },
     } = source;
 
-    // If there are any unsupported types, fail.
-    // TODO: Deduplicate this code in this and other exporters.
-    if let Some(first) = block_defs.first() {
-        return Err(ExportError::NotRepresentable {
-            format: Format::DotVox,
-            name: Some(first.name()),
-            reason: "Exporting BlockDefs to .vox is not yet supported".into(),
-        });
-    }
-    if let Some(first) = tags.first() {
-        return Err(ExportError::NotRepresentable {
-            format: Format::DotVox,
-            name: Some(first.name()),
-            reason: "Exporting tag definitions to .vox is not possible".into(),
-        });
-    }
+    // TODO: I forget; is there a reason we just ignore instead of erroring on characters?
+    crate::reject_unsupported_members(Format::DotVox, block_defs)?;
+    crate::reject_unsupported_members(Format::DotVox, tags)?;
 
     let mut palette: Vec<dot_vox::Color> = Vec::new();
     let mut models: Vec<dot_vox::Model> = Vec::with_capacity(to_export.len());
@@ -502,8 +489,8 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            ExportError::NotRepresentable {
-                name: Some(name),
+            ExportError::MemberTypeNotRepresentable {
+                name,
                 ..
             }
          if name == "x".into()));

@@ -117,6 +117,26 @@ impl ExportSet {
     }
 }
 
+/// Helper for exporters to reject [`ExportSet`] members they don’t support at all.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "convenient given how it is used"
+)]
+pub(crate) fn reject_unsupported_members<T: 'static>(
+    format: Format,
+    handles: Vec<Handle<T>>,
+) -> Result<(), ExportError> {
+    if let Some(handle) = handles.first() {
+        Err(ExportError::MemberTypeNotRepresentable {
+            format,
+            name: handle.name(),
+            member_type_name: core::any::type_name::<T>(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
 /// Fatal errors that may be encountered during an export operation.
 ///
 /// TODO: Define non-fatal export flaws reporting, and link to it here.
@@ -159,9 +179,26 @@ pub enum ExportError {
         /// Format that cannot represent it.
         format: Format,
         /// Name of the item being exported.
+        // TODO: This has no reason to be optional, and is missing from the Display.
         name: Option<universe::Name>,
         /// The reason why it cannot be represented.
         reason: String,
+    },
+
+    /// The requested [`ExportSet`] contained members of a type that cannot be represented in the
+    /// requested [`Format`], regardless of their specific value.
+    #[error(
+        "cannot export {member_type_name} such as {name} to {format}",
+        format = .format.descriptive_name())
+    ]
+    MemberTypeNotRepresentable {
+        /// Format that cannot represent it.
+        format: Format,
+        /// Name of the universe member being exported.
+        name: universe::Name,
+        /// The [`std::any::type_name()`] (TODO: have something better) of the
+        /// member that cannot be exported.
+        member_type_name: &'static str,
     },
 }
 

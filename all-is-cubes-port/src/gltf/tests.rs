@@ -148,8 +148,8 @@ async fn export_character_not_supported() {
     .unwrap_err();
     assert!(matches!(
         error,
-        ExportError::NotRepresentable {
-            name: Some(name),
+        ExportError::MemberTypeNotRepresentable {
+            name,
             ..
         }
      if name == "x".into()));

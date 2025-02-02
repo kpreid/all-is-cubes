@@ -370,22 +370,8 @@ pub(crate) async fn export_gltf(
             },
     } = source;
 
-    // If there are any unsupported types, fail.
-    // TODO: Deduplicate this code in this and other exporters.
-    if let Some(first) = characters.first() {
-        return Err(ExportError::NotRepresentable {
-            format: Format::Gltf,
-            name: Some(first.name()),
-            reason: "Exporting characters to glTF is not yet supported".into(),
-        });
-    }
-    if let Some(first) = tags.first() {
-        return Err(ExportError::NotRepresentable {
-            format: Format::Gltf,
-            name: Some(first.name()),
-            reason: "Exporting tag definitions to glTF is not yet supported".into(),
-        });
-    }
+    crate::reject_unsupported_members(Format::Gltf, characters)?;
+    crate::reject_unsupported_members(Format::Gltf, tags)?;
 
     let [block_def_progress, space_progress] = progress.split(0.5); // TODO: ratio
 
