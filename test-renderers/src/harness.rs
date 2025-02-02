@@ -426,7 +426,7 @@ where
                 print!("test {name:20} ...");
             }
             Format::Terse => {}
-        };
+        }
         let outcome_for_report = match (comparison_failure, outcome) {
             (None, Ok(case_time)) => {
                 match format {

@@ -53,7 +53,7 @@ where
 {
     /// * `cameras`: Scene to draw.
     /// * `size_policy`: Modifier to the `cameras`' provided viewport to control how many
-    ///    pixels are actually traced.
+    ///   pixels are actually traced.
     /// * `custom_options`: The custom options for the `D` block data type; see
     ///   [`RtBlockData`].
     pub fn new(

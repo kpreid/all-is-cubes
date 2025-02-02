@@ -107,7 +107,7 @@ impl ExportSet {
                 universe::Name::Specific(s) => new_file_name.push(&*s),
                 universe::Name::Anonym(n) => new_file_name.push(n.to_string()),
                 universe::Name::Pending => todo!(),
-            };
+            }
             new_file_name.push(".");
             new_file_name.push(base_path.extension().expect("extension missing"));
 

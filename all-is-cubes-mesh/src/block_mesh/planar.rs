@@ -302,7 +302,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                 })
             }));
         }
-    };
+    }
 
     indices.extend(QUAD_INDICES.iter().map(|&i| index_origin + i));
 }

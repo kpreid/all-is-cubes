@@ -78,7 +78,7 @@ impl RaytraceToTexture {
                             Tracing will proceed synchronously."
                     )
                 }
-            };
+            }
         }
 
         Self {

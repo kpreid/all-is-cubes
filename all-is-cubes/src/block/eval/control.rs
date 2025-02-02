@@ -287,7 +287,7 @@ impl fmt::Display for EvalBlockError {
 impl core::error::Error for EvalBlockError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.kind {
-            ErrorKind::BudgetExceeded { .. } => None,
+            ErrorKind::BudgetExceeded => None,
             ErrorKind::PriorBudgetExceeded { .. } => None,
             ErrorKind::Handle(e) => Some(e),
         }
@@ -333,7 +333,7 @@ impl EvalBlockError {
             ErrorKind::PriorBudgetExceeded { budget, used } => {
                 InEvalError::PriorBudgetExceeded { budget, used }
             }
-            ErrorKind::BudgetExceeded { .. } => InEvalError::BudgetExceeded,
+            ErrorKind::BudgetExceeded => InEvalError::BudgetExceeded,
             ErrorKind::Handle(e) => InEvalError::Handle(e),
         }
     }

@@ -719,7 +719,7 @@ fn generate_dungeon_map(
         // Optional high ceiling
         if !corridor_only && rng.gen_bool(0.25) {
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::PY, 1));
-        };
+        }
         // Floor pit
         let floor = if !corridor_only && is_not_end && rng.gen_bool(0.25) {
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));

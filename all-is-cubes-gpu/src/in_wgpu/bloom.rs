@@ -344,8 +344,8 @@ fn bloom_mip_view(mip_level: u32, bloom_texture: &wgpu::Texture) -> wgpu::Textur
 
 fn size_for_bloom(size: wgpu::Extent3d) -> wgpu::Extent3d {
     wgpu::Extent3d {
-        width: (size.width + 1) / 2,
-        height: (size.height + 1) / 2,
+        width: size.width.div_ceil(2),
+        height: size.height.div_ceil(2),
         depth_or_array_layers: 1,
     }
 }

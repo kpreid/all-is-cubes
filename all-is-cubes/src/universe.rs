@@ -351,7 +351,7 @@ impl Universe {
             // TODO: Need to report these failures back to the source
             // ... and perhaps in the UniverseStepInfo
             log::info!("Transaction failure: {}", e);
-        };
+        }
 
         // Compute how to divide time among spaces, based on the previous srep
         let budget_per_space: Option<time::Duration> = deadline

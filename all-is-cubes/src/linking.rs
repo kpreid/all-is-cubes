@@ -111,7 +111,7 @@ where
                     progress.finish().await;
                 }
                 Err(e) => return Err(GenError::failure(e, name_in_module(&key))),
-            };
+            }
         }
         Ok(Self { map })
     }

@@ -67,7 +67,7 @@ pub fn cursor_raycast(
                     continue;
                 }
             }
-        };
+        }
 
         return Some(Cursor {
             space: space_handle.clone(),
