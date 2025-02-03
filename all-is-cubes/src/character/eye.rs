@@ -16,7 +16,7 @@ use bevy_ecs::schedule::IntoScheduleConfigs;
 use euclid::Vector3D;
 
 use crate::camera::ViewTransform;
-use crate::character::{ParentSpace, exposure};
+use crate::character::{self, ParentSpace, exposure};
 use crate::math::{Cube, FreeCoordinate, FreeVector};
 use crate::physics::{Body, Velocity};
 use crate::space;
@@ -35,7 +35,7 @@ use crate::universe;
 /// * A suggestion for camera automatic exposure / eye-adaptation simulation, based on the light
 ///   around it.
 #[derive(Clone, Default, ecs::Component)]
-#[require(exposure::State)]
+#[require(exposure::State, character::ambient_sound::State)]
 pub(crate) struct CharacterEye {
     /// Offset to be added to the body position to produce the drawn eye (camera) position.
     displacement_pos: Vector3D<FreeCoordinate, Cube>,
@@ -70,10 +70,9 @@ pub(crate) fn add_eye_systems(world: &mut ecs::World) {
         // TODO(ecs): Consider whether we should arrange for possible parallel execution
         // (exposure being computed using last frame's data).
         (
-            step_eye_position
-                .after(crate::physics::step::BodyPhysicsSet)
-                .before(step_exposure),
-            step_exposure,
+            step_eye_position.after(crate::physics::step::BodyPhysicsSet),
+            step_exposure.after(step_eye_position),
+            step_ambient_sound.after(step_eye_position),
         )
             .chain(),
     );
@@ -129,6 +128,40 @@ fn step_exposure(
     // TODO(ecs): This'll be a good candidate for parallel execution *if* we have many characters.
     // In any case, maybe hold off until we have reconciled Bevy and Rayon’s thread pools, or
     // have some profiling available to see how it performs.
+
+    // TODO: Skip characters that are not actually using exposure for anything.
+    // The simplest way to do this would be to omit the `exposure::State` component,
+    // but we would need plumbing for when to add/remove it.
+
+    for (ParentSpace(space_handle), eye, mut exposure) in eyes {
+        let Ok(space) = space_handle.read_from_query(&spaces) else {
+            continue;
+        };
+        let Some(view_transform) = eye.view_transform else {
+            continue;
+        };
+
+        exposure.step(&space, view_transform, dt);
+    }
+
+    Ok(())
+}
+
+fn step_ambient_sound(
+    current_step: ecs::Res<universe::CurrentStep>,
+    eyes: ecs::Query<(
+        &ParentSpace,
+        &CharacterEye,
+        &mut character::ambient_sound::State,
+    )>,
+    spaces: universe::HandleReadQuery<space::Space>,
+) -> ecs::Result {
+    let tick = current_step.get()?.tick;
+    let dt = tick.delta_t().as_secs_f64();
+
+    // TODO: Skip characters that are not actually using ambient sound for anything.
+    // The simplest way to do this would be to omit the `ambient_sound::State` component,
+    // but we would need plumbing for when to add/remove it.
 
     for (ParentSpace(space_handle), eye, mut exposure) in eyes {
         let Ok(space) = space_handle.read_from_query(&spaces) else {

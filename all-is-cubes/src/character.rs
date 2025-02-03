@@ -20,6 +20,7 @@ use crate::physics::{self, Body, BodyTransaction, step::PhysicsOutputs};
 use crate::rerun_glue as rg;
 #[cfg(feature = "save")]
 use crate::save::schema;
+use crate::sound;
 use crate::space::Space;
 use crate::transaction::{self, Equal, Merge, Transaction, Transactional};
 use crate::universe::{
@@ -28,6 +29,8 @@ use crate::universe::{
 use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
 // -------------------------------------------------------------------------------------------------
+
+mod ambient_sound;
 
 mod cursor;
 pub use cursor::*;
@@ -317,6 +320,7 @@ impl universe::SealedMember for Character {
         &'static ParentSpace,
         &'static InventoryComponent,
         &'static PhysicsOutputs,
+        &'static ambient_sound::State,
     );
 
     fn register_all_member_components(world: &mut ecs::World) {
@@ -333,18 +337,20 @@ impl universe::SealedMember for Character {
             space: &value.space,
             inventory: &value.inventory,
             physics: None,
+            ambient_sound: &sound::SpatialAmbient::SILENT,
         }
     }
     fn read_from_query(
         data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
     ) -> <Self as universe::UniverseMember>::Read<'_> {
-        let (core, body, ParentSpace(space), inventory, physics) = data;
+        let (core, body, ParentSpace(space), inventory, physics, sound_state) = data;
         Read {
             core,
             body,
             space,
             inventory,
             physics: Some(physics),
+            ambient_sound: sound_state.sound_average(),
         }
     }
     fn read_from_entity_ref(
@@ -356,6 +362,7 @@ impl universe::SealedMember for Character {
             space: &entity.get::<ParentSpace>()?.0,
             inventory: entity.get::<InventoryComponent>()?,
             physics: entity.get::<PhysicsOutputs>(),
+            ambient_sound: entity.get::<ambient_sound::State>()?.sound_average(),
         })
     }
     fn into_bundle(value: Box<Self>) -> Self::Bundle {
@@ -438,6 +445,7 @@ impl serde::Serialize for Read<'_> {
             space,
             inventory,
             physics: _,
+            ambient_sound: _,
         } = self;
         schema::CharacterSer::CharacterV1 {
             space: space.clone(),
@@ -494,6 +502,7 @@ pub struct Read<'ticket> {
     space: &'ticket Handle<Space>,
     inventory: &'ticket InventoryComponent,
     physics: Option<&'ticket PhysicsOutputs>,
+    ambient_sound: &'ticket sound::SpatialAmbient,
 }
 
 impl<'t> Read<'t> {
@@ -521,6 +530,11 @@ impl<'t> Read<'t> {
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu and fuzz_physics
     pub fn physics(&self) -> Option<&PhysicsOutputs> {
         self.physics
+    }
+
+    /// Returns the character’s current ambient (continuous, spatial) sound environment.
+    pub fn ambient_sound(&self) -> &sound::SpatialAmbient {
+        self.ambient_sound
     }
 }
 

@@ -1,4 +1,6 @@
 //! Analyzes the scene around a character to choose a camera “exposure” (brightness scale) value.
+//!
+//! See also [`super::ambient_sound`], which collects sound instead of light in a similar way.
 
 use bevy_ecs::prelude as ecs;
 use euclid::{Point3D, vec3};

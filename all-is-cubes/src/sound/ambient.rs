@@ -2,8 +2,6 @@
 //!
 //! Ambient sound is sound that is not explicitly emitted by a simulated event, but is presented
 //! to any listener based on their position in space.
-//!
-//! TODO: This module and functionality is highly incomplete.
 
 use core::fmt;
 use core::ops;
@@ -228,10 +226,6 @@ impl Ambient {
     /// Given a direction in which this sound lies, in the [`camera::Eye`] listener-relative
     /// coordinate system,
     /// construct the corresponding [`SpatialAmbient`] for the listener.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "TODO: ambient sound system is incomplete")
-    )]
     pub(crate) fn pan(self, direction: Vector3D<f64, camera::Eye>) -> SpatialAmbient {
         const LEFT_EAR: Vector3D<f64, camera::Eye> = vec3(-1., 0., 0.);
         const RIGHT_EAR: Vector3D<f64, camera::Eye> = vec3(1., 0., 0.);
@@ -284,9 +278,47 @@ impl SpatialAmbient {
         left: Ambient::SILENT,
         right: Ambient::SILENT,
     };
+
+    /// Replace the value of `self` with a weighted sum of `self` and all elements of `iter`,
+    /// divided by the total weight.
+    ///
+    /// The weight of `self` is `existing_value_weight`, and
+    /// the weight of each element of `iter` is 1.
+    pub(crate) fn set_to_weighted_sum_of<'i>(
+        &mut self,
+        existing_value_weight: PositiveSign<f32>,
+        iter: impl Iterator<Item = &'i SpatialAmbient> + Clone,
+    ) {
+        let Self {
+            left: Ambient {
+                noise_bands: left_noise,
+            },
+            right: Ambient {
+                noise_bands: right_noise,
+            },
+        } = self;
+
+        // Apply existing_value_weight
+        *left_noise *= existing_value_weight;
+        *right_noise *= existing_value_weight;
+
+        // Sum elements
+        let mut count: f32 = existing_value_weight.into_inner();
+        for element in iter {
+            *left_noise += element.left.noise_bands;
+            *right_noise += element.right.noise_bands;
+            count += 1.0;
+        }
+
+        // Normalize
+        let scale = PositiveSign::<f32>::try_from(count.recip()).unwrap_or(PositiveSign::ZERO);
+        *left_noise *= scale;
+        *right_noise *= scale;
+    }
 }
 
 impl<'a> From<&'a Ambient> for SpatialAmbient {
+    /// Mono-to-stereo conversion.
     fn from(value: &'a Ambient) -> Self {
         Self {
             left: value.clone(),
