@@ -5,7 +5,7 @@ use super::prelude::*;
     name: "Resolutions",
     subtitle:
         "Voxel blocks can be subdivided into\n\
-        powers of 2 from 2 to 256.",
+        powers of 2 from 2 to 128.",
     placement: Placement::Surface,
 )]
 fn RESOLUTIONS(ctx: Context<'_>) {
