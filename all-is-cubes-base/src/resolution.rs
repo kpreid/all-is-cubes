@@ -60,6 +60,23 @@ impl Resolution {
     pub const fn to_grid(self) -> GridCoordinate {
         1 << self as GridCoordinate
     }
+
+    /// Returns the logarithm base 2 of this resolution.
+    ///
+    /// This is always an exact integer value; all resolutions are powers of 2.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use all_is_cubes_base::resolution::Resolution;
+    ///
+    /// assert_eq!(Resolution::R1.log2(), 0);
+    /// assert_eq!(Resolution::R16.log2(), 4);
+    /// ```
+    #[inline]
+    pub const fn log2(self) -> u8 {
+        self as u8
+    }
 }
 
 impl fmt::Debug for Resolution {
