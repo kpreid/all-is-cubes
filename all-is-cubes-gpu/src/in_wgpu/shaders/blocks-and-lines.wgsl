@@ -486,37 +486,8 @@ fn volumetric_thickness(in: BlockFragmentInput) -> f32 {
     return exit_t * length(in.camera_ray_direction);
 }
 
-// Entry point for opaque geometry.
-//
-// Always returns alpha = 1.
-@fragment
-fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
-    let material = get_material(in);
-    let light_from_lit_surface: vec3f = material.reflectance.rgb * lighting(in) + material.emission;
-    return vec4<f32>(
-        apply_fog_and_exposure(light_from_lit_surface, in.fog_mix, in.camera_ray_direction),
-        1.0, // material alpha is ignored
-    );
-}
-
-// Entry point for transparency under TransparencyOption::Surface.
-//
-// Returns premultiplied alpha.
-@fragment
-fn block_fragment_transparent_surface(in: BlockFragmentInput) -> @location(0) vec4<f32> {
-    let material = get_material(in);
-    let light_from_lit_surface: vec3f =
-        material.reflectance.rgb * lighting(in) * material.reflectance.a + material.emission;
-    let exposed =
-        apply_fog_and_exposure(light_from_lit_surface, in.fog_mix, in.camera_ray_direction);
-    return vec4f(exposed.rgb, material.reflectance.a);
-}
-
-// Entry point for transparency under TransparencyOption::Volumetric.
-//
-// Returns premultiplied alpha.
-@fragment
-fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0) vec4<f32> {
+/// Render a cube of uniform transparent material.
+fn shade_uniform_volumetric(in: BlockFragmentInput) -> vec4<f32> {
     var material = get_material(in);
 
     let thickness = volumetric_thickness(in);
@@ -550,9 +521,49 @@ fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0)
 
     let light_from_lit_surface: vec3f =
         material.reflectance.rgb * lighting(in) * material.reflectance.a + material.emission;
+    return vec4f(light_from_lit_surface, material.reflectance.a);
+
+}
+
+// --- Entry points for block fragment shading -----------------------------------------------------
+
+// Entry point for opaque geometry.
+//
+// Always returns alpha = 1.
+@fragment
+fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
+    let material = get_material(in);
+    let light_from_lit_surface: vec3f = material.reflectance.rgb * lighting(in) + material.emission;
+    return vec4<f32>(
+        apply_fog_and_exposure(light_from_lit_surface, in.fog_mix, in.camera_ray_direction),
+        1.0, // material alpha is ignored
+    );
+}
+
+// Entry point for transparency under TransparencyOption::Surface.
+//
+// Returns premultiplied alpha.
+@fragment
+fn block_fragment_transparent_surface(in: BlockFragmentInput) -> @location(0) vec4<f32> {
+    let material = get_material(in);
+    let light_from_lit_surface: vec3f =
+        material.reflectance.rgb * lighting(in) * material.reflectance.a + material.emission;
     let exposed =
         apply_fog_and_exposure(light_from_lit_surface, in.fog_mix, in.camera_ray_direction);
     return vec4f(exposed.rgb, material.reflectance.a);
+}
+
+// Entry point for transparency under TransparencyOption::Volumetric.
+//
+// Returns premultiplied alpha.
+@fragment
+fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0) vec4<f32> {
+    // TODO: handle non-uniform blocks
+    let light_from_lit_surface_and_alpha: vec4f = shade_uniform_volumetric(in);
+
+    let exposed = apply_fog_and_exposure(
+        light_from_lit_surface_and_alpha.rgb, in.fog_mix, in.camera_ray_direction);
+    return vec4f(exposed, light_from_lit_surface_and_alpha.a);
 }
 
 @fragment
