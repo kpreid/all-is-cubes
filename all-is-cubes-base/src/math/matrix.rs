@@ -18,10 +18,9 @@ use crate::math::{
 };
 
 /// A 4×3 affine transformation matrix in [`GridCoordinate`]s.
-///
-/// TODO: The operators implemented for this are very incomplete.
-///
-/// TODO(euclid migration): Can we dispose of this type now?
+//---
+// Design note: It would be nice to just use `euclid` types, but that doesn't get us the
+// exact semantics we want, particularly checked arithmetic.
 #[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct GridMatrix {
@@ -208,32 +207,7 @@ impl GridMatrix {
             translation: self.w,
         })
     }
-}
 
-impl ops::Mul<Self> for GridMatrix {
-    type Output = Self;
-    #[inline]
-    fn mul(self, rhs: Self) -> Self::Output {
-        // Delegate to Transform implementation
-        self.concat(&rhs)
-    }
-}
-
-impl One for GridMatrix {
-    #[inline]
-    #[rustfmt::skip]
-    fn one() -> Self {
-        Self::new(
-            1, 0, 0,
-            0, 1, 0,
-            0, 0, 1,
-            0, 0, 0,
-        )
-    }
-}
-
-/// TODO(euclid migration): this used to be a `cgmath::Transform` impl; clean up
-impl GridMatrix {
     /// Transform (rotate and scale) the given vector.
     /// The translation part of this matrix is ignored.
     #[inline]
@@ -330,6 +304,28 @@ impl GridMatrix {
             z: try_round(fi[2], 0.0)?,
             w: try_round(fi[3], 1.0)?,
         })
+    }
+}
+
+impl ops::Mul<Self> for GridMatrix {
+    type Output = Self;
+    #[inline]
+    fn mul(self, rhs: Self) -> Self::Output {
+        // Delegate to Transform implementation
+        self.concat(&rhs)
+    }
+}
+
+impl One for GridMatrix {
+    #[inline]
+    #[rustfmt::skip]
+    fn one() -> Self {
+        Self::new(
+            1, 0, 0,
+            0, 1, 0,
+            0, 0, 1,
+            0, 0, 0,
+        )
     }
 }
 

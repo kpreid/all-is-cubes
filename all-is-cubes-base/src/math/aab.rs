@@ -20,13 +20,11 @@ use crate::math::{
 /// [`GridAab`].
 ///
 #[doc = include_str!("../serde-warning.md")]
-// TODO(euclid migration): Replace this with `euclid` box type? Probably not.
 #[derive(Copy, Clone, PartialEq)]
 pub struct Aab {
-    // TODO: Should we be using NotNan coordinates?
-    // The upper > lower checks will reject NaNs anyway.
-    //
-    // TODO: Consider what to do about equality-but-not-equivalence of negative zero.
+    // We enforce that `lower_bounds.* < upper_bounds.*`, and thus also that none of them are NaN.
+    // TODO: Express that by using `NotNan` components?
+    // TODO: Address the equality-but-not-equivalence of negative zero.
     lower_bounds: FreePoint,
     upper_bounds: FreePoint,
 }
