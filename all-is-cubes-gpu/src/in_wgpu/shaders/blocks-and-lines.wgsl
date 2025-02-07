@@ -19,7 +19,7 @@ struct ShaderSpaceCamera {
 // Mirrors `struct WgpuBlockVertex` on the Rust side.
 struct WgpuBlockVertex {
     @location(0) cube_packed: u32,
-    @location(1) position_in_cube_and_normal_packed: vec2<u32>,
+    @location(1) position_in_cube_and_normal_packed: u32,
     @location(2) color_or_texture: vec4<f32>,
     @location(3) clamp_min_max: vec3<u32>,
 };
@@ -143,18 +143,18 @@ fn block_vertex_main(
         (input.cube_packed >> 16u) & 0xFFu
     );
 
-    // Unpack position_in_cube (three u16s represented as two u32s).
+    // Unpack position_in_cube (three u8s represented as one u32).
     let position_in_cube_fixed = vec3<u32>(
-        input.position_in_cube_and_normal_packed[0] & 0xFFFFu,
-        (input.position_in_cube_and_normal_packed[0] >> 16u) & 0xFFFFu,
-        input.position_in_cube_and_normal_packed[1] & 0xFFFFu
+        input.position_in_cube_and_normal_packed & 0xFFu,
+        (input.position_in_cube_and_normal_packed >> 8u) & 0xFFu,
+        (input.position_in_cube_and_normal_packed >> 16u) & 0xFFu
     );
-    // Undo fixed-point scale by 256.
-    let position_in_cube = vec3<f32>(position_in_cube_fixed) / 256.0;
+    // Undo fixed-point scale.
+    let position_in_cube = vec3<f32>(position_in_cube_fixed) / 128.0;
 
     // Unpack normal.
     var normal = vec3<f32>(1.0);
-    switch ((input.position_in_cube_and_normal_packed[1] >> 16u) & 0xFFFFu) {
+    switch ((input.position_in_cube_and_normal_packed >> 24u) & 0xFFu) {
         case 1u { normal = vec3<f32>(-1.0, 0.0, 0.0); }
         case 2u { normal = vec3<f32>(0.0, -1.0, 0.0); }
         case 3u { normal = vec3<f32>(0.0, 0.0, -1.0); }

@@ -20,38 +20,41 @@ pub struct TexPoint {
 #[doc(hidden)]
 pub enum AtlasTexel {}
 
-/// Coordinate system for within-cube positions divided by 256.
-pub(crate) enum CubeFix256 {}
+/// Coordinate system for within-cube positions divided by 128.
+pub(crate) enum CubeFix128 {}
 
 /// Triangle mesh vertex type that is used for rendering [blocks].
+///
+/// `u32` is the smallest size of integer that we are currently allowed to use in WGSL, so
+/// several pieces of data are manually packed into `u32`s to save memory.
+/// (We could in principle use smaller fields here on the Rust side, but that would
+/// make the WGSL code endianness-sensitive.)
 ///
 /// [blocks]: all_is_cubes::block::Block
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct WgpuBlockVertex {
     /// Chunk-relative position of the cube containing the triangle this vertex belongs to,
-    /// packed into a u32 as `x | (y << 8) | (z << 16)`.
+    /// packed into a u32 as `x | (y << 8) | (z << 16)`. The uppermost 8 bits are not used.
     ///
     /// Note that this is not the same as `floor()` of the final coordinates, since a
     /// block's mesh coordinates range from 0 to 1 inclusive.
     cube_packed: u32,
 
     /// Vertex position within the cube, fixed point; and vertex normal in [`Face7`] format.
+    /// A packed form of four values:
+    /// `(x * 128) | ((y * 128) << 8) | ((z * 128) << 16) | (face << 24)`.
     ///
-    /// * The first `u32` is a bitwise combination of two u16s:
-    ///   `(position.x * 256) | (position.y * 256) << 16`.
-    ///   The scale factor 256 is chosen as being greater than the smallest [`Resolution`]
-    ///   available. (Equal would also work.)
-    /// * The second `u32` is
-    ///   `position.z * 256 | (face << 16)`
-    ///   where `face` is a `Face6` converted to integer.
+    /// * The lowest 24 bits are the position within the cube, in fixed point.
+    ///   The scale factor 128 is equal to the finest [`Resolution`] available;
+    ///   it must be less than 2^8 because coordinates range from 0 to 1 inclusive, so
+    ///   0..128 is okay but 0..256 would overflow into neighboring fields.
     ///
-    /// Vertex position is added to `cube` to make the true vertex position.
+    ///   This block-relative vertex position is added to `cube_packed` to obtain the chunk-relative
+    ///   vertex position.
     ///
-    /// There is no reason that the position and normal are packed together other than
-    /// convenience and making efficient use of `u32` bits. (`u32` is the minimum size
-    /// of integer that WGSL allows.)
-    position_in_cube_and_normal_packed: [u32; 2],
+    /// * The upper 8 bits indicate the normal of the face, a `Face6` converted to integer.
+    position_in_cube_and_normal_packed: u32,
 
     /// Packed format:
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
@@ -59,7 +62,7 @@ pub(crate) struct WgpuBlockVertex {
     ///   stored in texel units rather than normalized 0-1 units, and the fourth component
     ///   is the `(-1 - atlas_id)` where `atlas_id` identifies which texture atlas to use.
     ///
-    /// TODO: we don't need `f32` precision here.
+    /// Design note: It would be adequate to use `f16` here, but that's a WebGPU optional extension.
     color_or_texture: [f32; 4],
 
     /// Interpolated texture coordinates are clamped to be within these ranges,
@@ -68,8 +71,7 @@ pub(crate) struct WgpuBlockVertex {
     /// Each `u32` is two packed [`FixTexCoord`], `min | (max << 16)`.
     ///
     /// Design note: It would be more straightforward to use `f16` here, but that's a
-    /// WebGPU optional extension; and there are no `[f16; 3]` vectors so it would still
-    /// require some data shuffling.
+    /// WebGPU optional extension.
     clamp_min_max: [u32; 3],
 }
 
@@ -79,7 +81,7 @@ impl WgpuBlockVertex {
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &wgpu::vertex_attr_array![
             0 => Uint32, // cube_packed
-            1 => Uint32x2, // position_in_cube_and_normal_packed
+            1 => Uint32, // position_in_cube_and_normal_packed
             2 => Float32x4, // color_or_texture
             3 => Uint32x3, // clamp_min_max
             // location numbers must not clash with WgpuInstanceData
@@ -90,17 +92,17 @@ impl WgpuBlockVertex {
 impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
     #[inline]
     fn from(vertex: BlockVertex<TexPoint>) -> Self {
-        let position_in_cube_fixed: Point3D<u32, CubeFix256> = vertex
+        let position_in_cube_fixed: Point3D<u32, CubeFix128> = vertex
             .position
-            .map(|coord| (coord * 256.) as u32)
+            .map(|coord| (coord * 128.) as u32)
             .cast_unit();
         let cube_packed = 0; // will be overwritten later by instantiate_vertex()
         let normal = vertex.face as u32;
 
-        let position_in_cube_and_normal_packed = [
-            position_in_cube_fixed.x | (position_in_cube_fixed.y << 16),
-            position_in_cube_fixed.z | (normal << 16),
-        ];
+        let position_in_cube_and_normal_packed = position_in_cube_fixed.x
+            | (position_in_cube_fixed.y << 8)
+            | (position_in_cube_fixed.z << 16)
+            | (normal << 24);
         match vertex.coloring {
             Coloring::Solid(color) => {
                 let mut color_attribute: [f32; 4] = color.into();
@@ -164,11 +166,11 @@ impl GfxVertex for WgpuBlockVertex {
         );
         let pos_packed = self.position_in_cube_and_normal_packed;
         let position_in_cube_fixed = Vector3D::new(
-            pos_packed[0] & 0xFFFF,
-            (pos_packed[0] >> 16) & 0xFFFF,
-            pos_packed[1] & 0xFFFF,
+            pos_packed & 0xFF,
+            (pos_packed >> 8) & 0xFF,
+            (pos_packed >> 16) & 0xFF,
         );
-        cube.map(|c| c as f32) + position_in_cube_fixed.map(|c| c as f32 / 256.)
+        cube.map(|c| c as f32) + position_in_cube_fixed.map(|c| c as f32 / 128.)
     }
 }
 
@@ -271,7 +273,7 @@ mod tests {
     /// the struct is designed to have a fixed layout communicating to the shader anyway.
     #[test]
     fn vertex_size() {
-        assert_eq!(size_of::<WgpuBlockVertex>(), 40);
+        assert_eq!(size_of::<WgpuBlockVertex>(), 36);
         assert_eq!(size_of::<WgpuLinesVertex>(), 28);
     }
 
