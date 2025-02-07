@@ -41,9 +41,10 @@ pub(crate) struct WgpuBlockVertex {
     /// block's mesh coordinates range from 0 to 1 inclusive.
     cube_packed: u32,
 
-    /// Vertex position within the cube, fixed point; and vertex normal in [`Face7`] format.
-    /// A packed form of four values:
-    /// `(x * 128) | ((y * 128) << 8) | ((z * 128) << 16) | (face << 24)`.
+    /// Vertex position within the cube, fixed point; vertex normal in [`Face7`] format;
+    /// and the resolution of the texture data.
+    /// A packed form of five values:
+    /// `(x * 128) | ((y * 128) << 8) | ((z * 128) << 16) | (face << 24) | (log2(resolution) << 28)`.
     ///
     /// * The lowest 24 bits are the position within the cube, in fixed point.
     ///   The scale factor 128 is equal to the finest [`Resolution`] available;
@@ -53,8 +54,12 @@ pub(crate) struct WgpuBlockVertex {
     ///   This block-relative vertex position is added to `cube_packed` to obtain the chunk-relative
     ///   vertex position.
     ///
-    /// * The upper 8 bits indicate the normal of the face, a `Face6` converted to integer.
-    position_in_cube_and_normal_packed: u32,
+    /// * Bits 24..28 indicate the normal of the face, a `Face6` converted to integer.
+    ///   (There is an unused high bit here.)
+    ///
+    /// * Bits 28..32 indicate the logarithm of the resolution of the texture data.
+    ///   (There is an unused high bit here.)
+    position_in_cube_and_normal_and_resolution_packed: u32,
 
     /// Packed format:
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
@@ -81,7 +86,7 @@ impl WgpuBlockVertex {
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &wgpu::vertex_attr_array![
             0 => Uint32, // cube_packed
-            1 => Uint32, // position_in_cube_and_normal_packed
+            1 => Uint32, // position_in_cube_and_normal_and_resolution_packed
             2 => Float32x4, // color_or_texture
             3 => Uint32x3, // clamp_min_max
             // location numbers must not clash with WgpuInstanceData
@@ -111,7 +116,8 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 color_attribute[3] = color_attribute[3].clamp(0., 1.);
                 Self {
                     cube_packed,
-                    position_in_cube_and_normal_packed,
+                    position_in_cube_and_normal_and_resolution_packed:
+                        position_in_cube_and_normal_packed,
                     color_or_texture: color_attribute,
                     clamp_min_max: [0, 0, 0],
                 }
@@ -120,10 +126,11 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
                 pos: TexPoint { tc, atlas_id },
                 clamp_min,
                 clamp_max,
-                resolution: _,
+                resolution,
             } => Self {
                 cube_packed,
-                position_in_cube_and_normal_packed,
+                position_in_cube_and_normal_and_resolution_packed:
+                    position_in_cube_and_normal_packed | (u32::from(resolution.log2()) << 28),
                 color_or_texture: [
                     tc.x.into(),
                     tc.y.into(),
@@ -164,7 +171,7 @@ impl GfxVertex for WgpuBlockVertex {
             (self.cube_packed >> 8) & 0xFF,
             (self.cube_packed >> 16) & 0xFF,
         );
-        let pos_packed = self.position_in_cube_and_normal_packed;
+        let pos_packed = self.position_in_cube_and_normal_and_resolution_packed;
         let position_in_cube_fixed = Vector3D::new(
             pos_packed & 0xFF,
             (pos_packed >> 8) & 0xFF,
