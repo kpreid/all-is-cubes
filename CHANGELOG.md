@@ -26,6 +26,7 @@
 - `all-is-cubes` library:
     - `block::BlockAttributes` is now a non-exhaustive struct.
       `BlockAttributes` literals should be replaced with `block::Builder::build_attributes()`.
+    - `block::EvaluatedBlock::with_inventory()` now accepts `IntoIterator` instead of `Iterator`.
     
     - Inventories are now indexed using the new type `inv::Ix`.
     - `inv::Inventory` no longer has public fields. Use the new accessor functions `slots()` or `get()` instead.

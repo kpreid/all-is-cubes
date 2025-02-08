@@ -37,16 +37,13 @@ fn INVENTORY(ctx: Context<'_>) {
         ))
         .build_txn(&mut txn);
 
-    let has_items_block = inventory_display_block.evaluate().unwrap().with_inventory(
-        [
-            inv::Tool::Block(demo_blocks[DemoBlocks::ExhibitBackground].clone()).into(),
-            inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
-            inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_GREEN)).into(),
-            inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_BLUE)).into(),
-            inv::Tool::Block(demo_blocks[DemoBlocks::Lamp(true)].clone()).into(),
-        ]
-        .into_iter(),
-    );
+    let has_items_block = inventory_display_block.evaluate().unwrap().with_inventory([
+        inv::Tool::Block(demo_blocks[DemoBlocks::ExhibitBackground].clone()).into(),
+        inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
+        inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_GREEN)).into(),
+        inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_BLUE)).into(),
+        inv::Tool::Block(demo_blocks[DemoBlocks::Lamp(true)].clone()).into(),
+    ]);
 
     stack(&mut space, [0, 0, 0], [pedestal, &has_items_block])?;
 

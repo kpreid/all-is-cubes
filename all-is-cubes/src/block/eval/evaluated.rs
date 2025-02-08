@@ -278,12 +278,12 @@ impl EvaluatedBlock {
     // TODO(inventory): Decide what happens when `config.size == 0`.
     // Should we refrain from adding the modifier?
     #[must_use]
-    pub fn with_inventory(self, contents: impl Iterator<Item = inv::Slot>) -> Block {
+    pub fn with_inventory(self, contents: impl IntoIterator<Item = inv::Slot>) -> Block {
         let config = &self.attributes.inventory;
 
         let inventory = inv::Inventory::from_slots(
             itertools::Itertools::zip_longest(
-                contents,
+                contents.into_iter(),
                 core::iter::repeat_n(inv::Slot::Empty, usize::from(config.size)),
             )
             .map(|z| z.into_left())
