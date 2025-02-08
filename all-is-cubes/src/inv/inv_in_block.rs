@@ -9,9 +9,11 @@ use crate::inv::Ix;
 use crate::math::{GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid};
 
 #[cfg(doc)]
-use crate::block::{Block, Modifier};
+use crate::block::{self, Block, Modifier};
 
 /// Defines how a [`Modifier::Inventory`] should be configured and displayed within a [`Block`].
+///
+/// Attach this to a block using [`block::Builder::inventory_config()`].
 //---
 // TODO(inventory): better name?
 // TODO(inventory): needs accessors or public fields
@@ -42,6 +44,7 @@ pub struct InvInBlock {
 /// Positioning of a displayed row of inventory icons; part of [`InvInBlock`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct IconRow {
+    // visible for serialization -- TODO: improve on that
     pub(crate) first_slot: Ix,
     pub(crate) count: Ix,
     pub(crate) origin: GridPoint,
@@ -56,6 +59,31 @@ impl InvInBlock {
         icon_resolution: Resolution::R1, // arbitrary
         icon_rows: Vec::new(),
     };
+
+    /// Constructs a [`InvInBlock`].
+    ///
+    /// * `inventory_size` is the number of slots the inventory should have.
+    /// * `icon_scale` is the scale factor by which to scale down the inventory icon blocks,
+    ///   relative to the bounds of the block in which they are being displayed.
+    /// * `icon_resolution` is the maximum resolution of inventory icons, and resolution in which
+    ///   the `icon_rows`’ position coordinatess are expressed.
+    ///   [`Modifier::Inventory`] is guaranteed not to increase the block resolution
+    ///   beyond this resolution.
+    /// * `icon_rows` specifies where in the block the inventory icons should be displayed.
+    ///   It may be empty in order to keep the inventory invisible.
+    pub fn new(
+        inventory_size: Ix,
+        icon_scale: Resolution,
+        icon_resolution: Resolution,
+        icon_rows: impl IntoIterator<Item = IconRow>,
+    ) -> Self {
+        Self {
+            size: inventory_size,
+            icon_scale,
+            icon_resolution,
+            icon_rows: icon_rows.into_iter().collect(),
+        }
+    }
 
     // TODO(inventory): this substitutes for the lack of ability to actually construct one publicly
     #[doc(hidden)]
@@ -187,6 +215,29 @@ impl crate::universe::VisitHandles for InvInBlock {
 }
 
 impl IconRow {
+    /// Constructs an `IconRow`.
+    ///
+    /// * `slot_range` is the the portion of the inventory that is displayed.
+    /// * `origin` is the lower corner of the location within the voxels where the first slot
+    ///   in `slot_range` is to be displayed.
+    /// * `stride` is the translation between adjacent slots.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `slot_range` has `end` less than `start`.
+    #[track_caller]
+    pub fn new(slot_range: core::ops::Range<Ix>, origin: GridPoint, stride: GridVector) -> Self {
+        Self {
+            first_slot: slot_range.start,
+            count: slot_range
+                .end
+                .checked_sub(slot_range.start)
+                .expect("slot_range must not be reversed"),
+            origin,
+            stride,
+        }
+    }
+
     /// Rotate this row.
     /// Returns [`None`] if rotating it would cause numeric overflow.
     fn rotate(self, transform: Gridgid) -> Option<Self> {

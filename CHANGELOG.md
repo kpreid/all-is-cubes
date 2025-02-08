@@ -9,6 +9,7 @@
 
 - `all-is-cubes` library:
     - `inv::Ix`
+    - `inv::InvInBlock` and `inv::IconRow` now have public `new()` functions.
     - `math::FaceMap::sum()`
     - `impl IntoIterator for math::FaceMap`
     - `math::PositiveSign::INFINITY`
