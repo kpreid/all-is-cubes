@@ -1,12 +1,12 @@
 //! [`Operation`]s that modify the world due to player or world actions.
 
-use all_is_cubes_base::math::GridAab;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::mem;
 
 use crate::block::{self, Block, AIR};
-use crate::inv::{Inventory, InventoryTransaction};
-use crate::math::{Cube, GridRotation, Gridgid};
+use crate::inv::{self, Inventory, InventoryTransaction};
+use crate::math::{Cube, Face6, GridAab, GridRotation, Gridgid};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::transaction::Merge;
 use crate::universe::VisitHandles;
@@ -89,6 +89,21 @@ pub enum Operation {
     // a general pattern-matching system for operations.
     // TODO: If the block already has a non-animated move modifier, then advance it?
     StartMove(block::Move),
+
+    /// Move the contents of the target block’s inventory.
+    ///
+    /// Currently, this always performs a shift forward 1 slot of the contents of every slot.
+    /// If the last slot is full, then:
+    ///
+    /// * If `transfer_into_adjacent` is set, and the adjacent block has an inventory with space
+    ///   in its first slot, the shift happens and the contents of the last slot are moved to the
+    ///   adjacent block’s inventory.
+    /// * Otherwise, the operation fails.
+    MoveInventory {
+        /// Attempt to transfer inventory items to the block that is adjacent to this face of
+        /// the target block.
+        transfer_into_adjacent: Option<Face6>,
+    },
 
     /// Apply the given operations to the cubes offset from this one.
     //---
@@ -241,6 +256,97 @@ impl Operation {
 
                 Ok((space_txn, InventoryTransaction::default()))
             }
+            &Operation::MoveInventory {
+                transfer_into_adjacent,
+            } => {
+                let target_cube = transform.transform_cube(Cube::ORIGIN);
+                let old_block = &space[target_cube];
+
+                let Some((inventory_index, inventory)) = find_inventory(old_block) else {
+                    // If the inventory is absent, there are no slots to move.
+                    return Ok(Default::default());
+                };
+                let Some(last_slot) = inventory.slots().last() else {
+                    // If the inventory is zero-sized, there are no slots to move.
+                    return Ok(Default::default());
+                };
+
+                let mut space_txn = SpaceTransaction::default();
+
+                // Check whether the last slot in our inventory has any items.
+                if last_slot.count() != 0 {
+                    if let Some(direction) = transfer_into_adjacent {
+                        // If the last slot is not zero, then we need to modify the adjacent inventory;
+                        // if that fails, we are full and do nothing.
+                        let adjacent_cube = transform.transform_cube(Cube::ORIGIN + direction);
+                        let adjacent_block = &space[adjacent_cube];
+                        let Some((adjacent_inventory_index, adjacent_inventory)) =
+                            find_inventory(adjacent_block)
+                        else {
+                            // TODO: if no inventory exists, should we just create it? Need a general policy. Probably the answer should be yes, but we refrain for now.
+                            return Err(OperationError::BlockInventoryFull {
+                                cube: adjacent_cube,
+                            });
+                        };
+
+                        if adjacent_inventory
+                            .get(0)
+                            .is_some_and(|slot| *slot == inv::Slot::Empty)
+                        {
+                            // There is room in the adjacent block, so create a transaction to transfer
+                            // this slot.
+                            // TODO: We should have the option of transferring into the first available
+                            // slot and merging stacks, instead of *only* the first slot.
+
+                            let mut new_adj_inventory_contents: Vec<inv::Slot> =
+                                adjacent_inventory.slots().to_vec();
+                            new_adj_inventory_contents[0] = last_slot.clone();
+
+                            *space_txn.at(adjacent_cube) = CubeTransaction::replacing(
+                                Some(adjacent_block.clone()),
+                                Some({
+                                    let mut new_adj_block = adjacent_block.clone();
+                                    new_adj_block.modifiers_mut()[adjacent_inventory_index] =
+                                        block::Modifier::Inventory(Inventory::from_slots(
+                                            new_adj_inventory_contents,
+                                        ));
+                                    new_adj_block
+                                }),
+                            )
+                        } else {
+                            // Adjacent block has no room in its inventory.
+                            return Err(OperationError::BlockInventoryFull {
+                                cube: adjacent_cube,
+                            });
+                        }
+                    } else {
+                        // We have no `transfer_into_adjacent` and the last slot is full.
+                        return Err(OperationError::BlockInventoryFull { cube: target_cube });
+                    }
+                }
+
+                // If we reach here, then either the last slot is empty or `space_txn`
+                // is going to write it to the adjacent block. Shift the other items forward,
+                // discarding the last one.
+
+                // TODO: Add an option to compact items rather than just "stopping the conveyor belt".
+
+                let mut new_inventory_contents: Vec<inv::Slot> = inventory.slots().to_vec();
+                new_inventory_contents.rotate_right(1);
+                new_inventory_contents[0] = inv::Slot::Empty; // erase the item we
+
+                // If the inventory actually changed, put the change in the transaction
+                if &new_inventory_contents[..] != inventory.slots() {
+                    // TODO: In order to avoid merge conflicts with neighbors, we need to be able to stuff an actual InventoryTransaction into a CubeTransaction so that multiple insertions and moves can happen at once.
+                    let mut new_block = old_block.clone();
+                    new_block.modifiers_mut()[inventory_index] =
+                        block::Modifier::Inventory(Inventory::from_slots(new_inventory_contents));
+                    *space_txn.at(target_cube) =
+                        CubeTransaction::replacing(Some(old_block.clone()), Some(new_block));
+                }
+
+                Ok((space_txn, InventoryTransaction::default()))
+            }
             Operation::Neighbors(neighbors) => {
                 let mut txns = OpTxn::default();
                 for &(cube, ref op) in neighbors.iter() {
@@ -271,6 +377,9 @@ impl Operation {
             } => old.rotationally_symmetric() && new.rotationally_symmetric(),
             Operation::AddModifiers(_) => false, // TODO: We need to ask modifiers if they are symmetric (*not* Modifier::does_not_introduce_asymmetry)
             Operation::StartMove(_) => false,
+            Operation::MoveInventory {
+                transfer_into_adjacent,
+            } => transfer_into_adjacent.is_none(),
             Operation::Neighbors(_) => false,
         }
     }
@@ -307,6 +416,11 @@ impl Operation {
                 optional,
             },
             Operation::StartMove(m) => Operation::StartMove(m.rotate(rotation)),
+            Operation::MoveInventory {
+                transfer_into_adjacent,
+            } => Operation::MoveInventory {
+                transfer_into_adjacent: transfer_into_adjacent.map(|dir| rotation.transform(dir)),
+            },
             Operation::Neighbors(mut neighbors) => {
                 // TODO: cheaper placeholder value, like an Operation::Nop
                 let mut placeholder = Operation::Become(AIR);
@@ -343,6 +457,9 @@ impl VisitHandles for Operation {
             }
             Operation::AddModifiers(modifier) => modifier.visit_handles(visitor),
             Operation::StartMove(modifier) => modifier.visit_handles(visitor),
+            Operation::MoveInventory {
+                transfer_into_adjacent: _,
+            } => {}
             Operation::Neighbors(neighbors) => {
                 for (_, op) in neighbors.iter() {
                     op.visit_handles(visitor);
@@ -364,6 +481,9 @@ pub(crate) enum OperationError {
 
     /// operation would exit the bounds of the space, {space:?}
     OutOfBounds { operation: GridAab, space: GridAab },
+
+    /// block’s inventory is full at {cube:?}
+    BlockInventoryFull { cube: Cube },
 }
 
 impl core::error::Error for OperationError {
@@ -372,7 +492,26 @@ impl core::error::Error for OperationError {
             Self::InternalConflict(e) => Some(e),
             Self::Unmatching => None,
             Self::OutOfBounds { .. } => None,
+            Self::BlockInventoryFull { .. } => None,
         }
+    }
+}
+
+fn find_inventory(block: &Block) -> Option<(usize, &Inventory)> {
+    match block
+        .modifiers()
+        .iter()
+        .enumerate()
+        .rev()
+        // TODO: we need a general theory of which modifiers we definitely should not
+        // traverse past, or maybe block evaluation should produce a derived field for
+        // "this is the modifier index of my inventory that I functionally posess"
+        .take_while(|(_, m)| !matches!(m, block::Modifier::Quote(_)))
+        .find(|(_, m)| matches!(m, block::Modifier::Inventory(_)))
+    {
+        Some((index, block::Modifier::Inventory(inventory))) => Some((index, inventory)),
+        Some((_index, wrong_modifier)) => unreachable!("wrong modifier {wrong_modifier:?}"),
+        None => None,
     }
 }
 

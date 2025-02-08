@@ -413,6 +413,9 @@ pub(crate) enum OperationSer<'a> {
     StartMoveV1 {
         modifier: MoveSer,
     },
+    MoveInventoryV1 {
+        transfer_into_adjacent: Option<Face6>,
+    },
     NeighborsV1 {
         neighbors: Cow<'a, [([i32; 3], op::Operation)]>,
     },

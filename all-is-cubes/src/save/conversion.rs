@@ -789,6 +789,11 @@ mod op {
                 op::Operation::StartMove(m) => {
                     schema::OperationSer::StartMoveV1 { modifier: m.into() }
                 }
+                &op::Operation::MoveInventory {
+                    transfer_into_adjacent,
+                } => schema::OperationSer::MoveInventoryV1 {
+                    transfer_into_adjacent,
+                },
                 op::Operation::Neighbors(neighbors) => schema::OperationSer::NeighborsV1 {
                     // TODO: arrange to be able to borrow here
                     neighbors: Cow::Owned(
@@ -832,6 +837,11 @@ mod op {
                 schema::OperationSer::StartMoveV1 { modifier: m } => {
                     op::Operation::StartMove(m.into())
                 }
+                schema::OperationSer::MoveInventoryV1 {
+                    transfer_into_adjacent,
+                } => op::Operation::MoveInventory {
+                    transfer_into_adjacent,
+                },
                 schema::OperationSer::NeighborsV1 { neighbors } => op::Operation::Neighbors(
                     cow_into_iter(neighbors)
                         .map(|(offset, op)| (offset.into(), op))
