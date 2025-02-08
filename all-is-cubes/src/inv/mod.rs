@@ -16,3 +16,13 @@ pub use tool::*;
 /// number of usable mouse-buttons (or equivalent) that the user has. This constant
 /// documents that assumption.
 pub const TOOL_SELECTIONS: usize = 3;
+
+/// Index/address of an inventory slot, or the maximum size of an inventory.
+///
+/// This is currently a type alias, but future versions may make it a struct.
+/// It will always be convertible to [`usize`].
+//---
+// Design note: Hopefully u16 is big enough for all reasonable inventories and small enough
+// that it avoids practically-unbounded computations and memory usage. But ideally we’d have
+// a limit chosen purposefully rather than by machine integers.
+pub type Ix = u16;

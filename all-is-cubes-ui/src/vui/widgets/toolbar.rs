@@ -8,7 +8,7 @@ use all_is_cubes::block::{self, text, Block, Resolution};
 use all_is_cubes::character::Character;
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
-use all_is_cubes::inv::{Slot, TOOL_SELECTIONS};
+use all_is_cubes::inv;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::math::{
     Cube, GridAab, GridCoordinate, GridPoint, GridSize, GridSizeCoord, GridVector,
@@ -95,7 +95,7 @@ impl Widget for Toolbar {
         let bounds = grant.bounds;
 
         let todo_more = listen::StoreLock::new(ToolbarTodo {
-            button_pressed_decay: [Duration::ZERO; TOOL_SELECTIONS],
+            button_pressed_decay: [Duration::ZERO; inv::TOOL_SELECTIONS],
         });
         self.cue_channel.listen(todo_more.listener());
 
@@ -130,7 +130,7 @@ impl ToolbarController {
     /// but only the given inputs.
     fn write_items(
         &self,
-        slots: &[Slot],
+        slots: &[inv::Slot],
     ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         let mut txn = SpaceTransaction::default();
         for (index, stack) in (0..).zip(slots.iter()) {
@@ -162,7 +162,7 @@ impl ToolbarController {
                             .string(
                                 match slots
                                     .get(usize::from(index))
-                                    .unwrap_or(&Slot::Empty)
+                                    .unwrap_or(&inv::Slot::Empty)
                                     .count()
                                 {
                                     0 | 1 => arcstr::ArcStr::default(),
@@ -183,17 +183,14 @@ impl ToolbarController {
     /// Returns a transaction to draw the selected-slot pointers.
     fn write_pointers(
         &self,
-        selected_slots: &[usize],
-        pressed: [bool; TOOL_SELECTIONS],
+        selected_slots: &[inv::Ix],
+        pressed: [bool; inv::TOOL_SELECTIONS],
     ) -> WidgetTransaction {
         let mut txn = SpaceTransaction::default();
         for index in 0..self.definition.slot_count {
             let position = self.slot_position(index);
             let this_slot_selected_mask = core::array::from_fn(|sel| {
-                if selected_slots
-                    .get(sel)
-                    .is_some_and(|&i| i == usize::from(index))
-                {
+                if selected_slots.get(sel).is_some_and(|&i| i == index) {
                     if pressed[sel] {
                         ToolbarButtonState::Pressed
                     } else {
@@ -282,7 +279,7 @@ impl WidgetController for ToolbarController {
         context: &vui::WidgetContext<'_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
         // Extract button pressed state from todo (don't hold the lock more than necessary)
-        let mut pressed_buttons: [bool; TOOL_SELECTIONS] = [false; TOOL_SELECTIONS];
+        let mut pressed_buttons: [bool; inv::TOOL_SELECTIONS] = [false; inv::TOOL_SELECTIONS];
         let mut should_update_pointers = false;
         {
             let todo = &mut self.todo_more.lock();
@@ -323,7 +320,7 @@ impl WidgetController for ToolbarController {
 
 #[derive(Debug)]
 struct ToolbarTodo {
-    button_pressed_decay: [Duration; TOOL_SELECTIONS],
+    button_pressed_decay: [Duration; inv::TOOL_SELECTIONS],
 }
 
 impl listen::Store<CueMessage> for ToolbarTodo {

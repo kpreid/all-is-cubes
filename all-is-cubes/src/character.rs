@@ -86,7 +86,7 @@ pub struct Character {
     inventory: Inventory,
 
     /// Indices into [`Self::inventory`] slots.
-    selected_slots: [usize; inv::TOOL_SELECTIONS],
+    selected_slots: [inv::Ix; inv::TOOL_SELECTIONS],
 
     /// Notifier for modifications.
     notifier: listen::Notifier<CharacterChange>,
@@ -148,12 +148,12 @@ impl Character {
         // * The knowledge "toolbar has 10 items" shouldn't be needed exactly here.
         // * And we shouldn't have special slots identified solely by number.
         // * And not every character should have a CopyFromSpace.
-        const SLOT_COUNT: usize = 11;
-        const INVISIBLE_SLOT: usize = SLOT_COUNT - 1;
-        let mut inventory = vec![Slot::Empty; SLOT_COUNT].into_boxed_slice();
-        inventory[INVISIBLE_SLOT] = Tool::CopyFromSpace.into();
-        let mut free = 0;
-        let mut ordinary_tool_selection = 0;
+        const SLOT_COUNT: inv::Ix = 11;
+        const INVISIBLE_SLOT: inv::Ix = SLOT_COUNT - 1;
+        let mut inventory = vec![Slot::Empty; usize::from(SLOT_COUNT)].into_boxed_slice();
+        inventory[usize::from(INVISIBLE_SLOT)] = Tool::CopyFromSpace.into();
+        let mut free: usize = 0;
+        let mut ordinary_tool_selection: inv::Ix = 0;
         'fill: for item in spawn.inventory.iter() {
             while inventory[free] != Slot::Empty {
                 free += 1;
@@ -167,7 +167,7 @@ impl Character {
             if matches!(
                 item,
                 Slot::Stack(_, Tool::RemoveBlock { .. } | Tool::Jetpack { .. })
-            ) && ordinary_tool_selection == free
+            ) && usize::from(ordinary_tool_selection) == free
             {
                 ordinary_tool_selection += 1;
             }
@@ -267,12 +267,12 @@ impl Character {
     ///
     /// The indices of this array are buttons (e.g. mouse buttons), and the values are
     /// inventory slot indices.
-    pub fn selected_slots(&self) -> [usize; inv::TOOL_SELECTIONS] {
+    pub fn selected_slots(&self) -> [inv::Ix; inv::TOOL_SELECTIONS] {
         self.selected_slots
     }
 
     /// Changes which inventory slot is currently selected.
-    pub fn set_selected_slot(&mut self, which_selection: usize, slot: usize) {
+    pub fn set_selected_slot(&mut self, which_selection: usize, slot: inv::Ix) {
         if which_selection < self.selected_slots.len()
             && slot != self.selected_slots[which_selection]
         {
@@ -851,16 +851,12 @@ pub enum CharacterChange {
     Selections,
 }
 
-fn find_jetpacks(inventory: &Inventory) -> impl Iterator<Item = (usize, bool)> + '_ {
-    inventory
-        .slots
-        .iter()
-        .enumerate()
-        .filter_map(|(index, slot)| {
-            if let Slot::Stack(_, Tool::Jetpack { active }) = *slot {
-                Some((index, active))
-            } else {
-                None
-            }
-        })
+fn find_jetpacks(inventory: &Inventory) -> impl Iterator<Item = (inv::Ix, bool)> + '_ {
+    inventory.slots.iter().zip(0..).filter_map(|(slot, index)| {
+        if let Slot::Stack(_, Tool::Jetpack { active }) = *slot {
+            Some((index, active))
+        } else {
+            None
+        }
+    })
 }

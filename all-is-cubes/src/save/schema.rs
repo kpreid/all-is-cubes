@@ -302,7 +302,7 @@ pub(crate) enum CharacterSer<'a> {
         space: Handle<space::Space>,
         body: Cow<'a, crate::physics::Body>,
         inventory: Cow<'a, inv::Inventory>,
-        selected_slots: [usize; 3],
+        selected_slots: [inv::Ix; 3],
         #[serde(default, skip_serializing_if = "behavior::BehaviorSet::is_empty")]
         behaviors: Cow<'a, behavior::BehaviorSet<character::Character>>,
     },
@@ -354,7 +354,7 @@ pub(crate) enum ToolSer {
 #[serde(tag = "type")]
 pub(crate) enum InvInBlockSer {
     InvInBlockV1 {
-        size: usize, // TODO: use platform-independent max size
+        size: inv::Ix,
         icon_scale: block::Resolution,
         icon_resolution: block::Resolution,
         icon_rows: Vec<IconRowSerV1>,
@@ -368,8 +368,8 @@ impl Default for InvInBlockSer {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub(crate) struct IconRowSerV1 {
-    pub(crate) first_slot: usize,
-    pub(crate) count: usize,
+    pub(crate) first_slot: inv::Ix,
+    pub(crate) count: inv::Ix,
     pub(crate) origin: [i32; 3],
     pub(crate) stride: [i32; 3],
 }

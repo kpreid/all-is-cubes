@@ -9,7 +9,7 @@ use core::num::NonZeroU16;
 
 use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
-use crate::inv::{Icons, Tool, ToolError, ToolInput};
+use crate::inv::{Icons, Ix, Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
 use crate::transaction::{CommitError, Merge, Transaction};
 use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
@@ -38,17 +38,19 @@ impl Inventory {
     /// Construct an [`Inventory`] with the specified number of slots.
     ///
     /// Ordinary user actions cannot change the number of slots.
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: Ix) -> Self {
         Inventory {
-            slots: vec![Slot::Empty; size].into_boxed_slice(),
+            slots: vec![Slot::Empty; size.into()].into_boxed_slice(),
         }
     }
 
     /// TODO: temporary interface, reevaluate design
+    #[track_caller]
     pub(crate) fn from_slots(items: impl Into<Box<[Slot]>>) -> Self {
-        Inventory {
-            slots: items.into(),
-        }
+        let slots = items.into();
+        Ix::try_from(slots.len())
+            .expect("input has more slots than an inventory is allowed to have");
+        Inventory { slots }
     }
 
     /// Returns whether all slots in this inventory are empty.
@@ -61,6 +63,21 @@ impl Inventory {
         &self.slots
     }
 
+    /// Returns the number of slots in the inventory.
+    ///
+    /// This is equal in value to `self.slots().len()`.
+    pub fn size(&self) -> Ix {
+        // cannot overflow because we checked on construction
+        self.slots.len() as Ix
+    }
+
+    /// Returns the contents of the slot in this inventory with the given index.
+    ///
+    /// Returns `None` if, and only if, `slot_index >= self.size()`.
+    pub fn get(&self, slot_index: Ix) -> Option<&Slot> {
+        self.slots.get(usize::from(slot_index))
+    }
+
     /// Use a tool stored in this inventory.
     ///
     /// `character` must be the character containing the inventory. TODO: Bad API
@@ -68,9 +85,9 @@ impl Inventory {
         &self,
         cursor: Option<&Cursor>,
         character: Handle<Character>,
-        slot_index: usize,
+        slot_index: Ix,
     ) -> Result<UniverseTransaction, ToolError> {
-        let original_slot = self.slots.get(slot_index);
+        let original_slot = self.get(slot_index);
         match original_slot {
             None | Some(Slot::Empty) => Err(ToolError::NoTool),
             Some(Slot::Stack(count, original_tool)) => {
@@ -332,7 +349,7 @@ impl StackLimit {
 #[expect(clippy::derive_partial_eq_without_eq)]
 #[must_use]
 pub struct InventoryTransaction {
-    replace: BTreeMap<usize, (Slot, Slot)>,
+    replace: BTreeMap<Ix, (Slot, Slot)>,
     insert: Vec<Slot>,
 }
 
@@ -357,7 +374,7 @@ impl InventoryTransaction {
     ///
     /// TODO: Right now, this requires an exact match. In the future, we should be able
     /// to compose multiple modifications like "add 1 item to stack" ×2 into "add 2 items".
-    pub fn replace(slot: usize, old: Slot, new: Slot) -> Self {
+    pub fn replace(slot: Ix, old: Slot, new: Slot) -> Self {
         let mut replace = BTreeMap::new();
         replace.insert(slot, (old, new));
         InventoryTransaction {
@@ -390,7 +407,7 @@ impl Transaction for InventoryTransaction {
 
         // Check and apply .replace, explicit slot replacements
         for (&index, (old, new)) in self.replace.iter() {
-            match slots.get_mut(index) {
+            match slots.get_mut(usize::from(index)) {
                 None => {
                     return Err(InventoryMismatch::OutOfBounds);
                 }
@@ -407,7 +424,7 @@ impl Transaction for InventoryTransaction {
         // Find locations for .insert items
         for new_stack in self.insert.iter() {
             let mut new_stack = new_stack.clone();
-            for (index, slot) in slots.iter_mut().enumerate() {
+            for (slot, index) in slots.iter_mut().zip(0..) {
                 if new_stack == Slot::Empty {
                     break;
                 }
@@ -482,7 +499,7 @@ pub enum InventoryMismatch {
     OutOfBounds,
 
     /// contents of slot {0} not as expected
-    UnexpectedSlot(usize),
+    UnexpectedSlot(Ix),
 }
 
 /// Transaction conflict error type for an [`InventoryTransaction`].
@@ -493,7 +510,7 @@ pub enum InventoryConflict {
     #[displaydoc("tried to replace the same inventory slot, {slot}, twice")]
     #[non_exhaustive]
     #[allow(missing_docs)]
-    ReplaceSameSlot { slot: usize },
+    ReplaceSameSlot { slot: Ix },
 }
 
 impl core::error::Error for InventoryMismatch {}
@@ -504,7 +521,7 @@ impl core::error::Error for InventoryConflict {}
 #[non_exhaustive]
 pub struct InventoryChange {
     /// Which slots of the inventory have been changed.
-    pub slots: Arc<[usize]>,
+    pub slots: Arc<[Ix]>,
 }
 
 #[cfg(test)]

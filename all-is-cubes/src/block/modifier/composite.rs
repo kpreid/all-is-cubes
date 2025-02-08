@@ -605,7 +605,7 @@ pub(in crate::block) fn render_inventory(
     // TODO(inventory): clone necessary to avoid a borrow conflict
     let config = input.attributes().inventory.clone();
 
-    for (slot_index, icon_position) in config.icon_positions(inventory.slots.len()) {
+    for (slot_index, icon_position) in config.icon_positions(inventory.size()) {
         let Some(placed_icon_bounds) = GridAab::checked_from_lower_size(
             icon_position,
             GridSize::splat(
@@ -622,7 +622,6 @@ pub(in crate::block) fn render_inventory(
 
         // TODO(inventory): icon_only_if_intrinsic is a kludge
         let Some(icon): Option<&Block> = inventory
-            .slots
             .get(slot_index)
             .and_then(|slot| slot.icon_only_if_intrinsic())
         else {

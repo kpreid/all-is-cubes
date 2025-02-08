@@ -17,7 +17,7 @@ use ratatui::Terminal;
 
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::euclid::Vector2D;
-use all_is_cubes::inv::Slot;
+use all_is_cubes::inv;
 use all_is_cubes::universe::Handle;
 use all_is_cubes::util::{Refmt as _, StatusText};
 
@@ -411,8 +411,7 @@ impl TerminalState {
                     .split(toolbar_rect);
 
                 let selected_slots = ui_frame.inventory.selected_slots;
-                for ((i, &rect), slot) in
-                    slot_rects.iter().enumerate().zip(&ui_frame.inventory.slots)
+                for ((&rect, i), slot) in slot_rects.iter().zip(0..).zip(&ui_frame.inventory.slots)
                 {
                     let slot_info: Vec<Span<'_>> = vec![
                         if selected_slots[0] == i {
@@ -433,11 +432,11 @@ impl TerminalState {
                     f.render_widget(
                         match slot {
                             // TODO: Use item icon text -- we need a way to access the predefined icons from here
-                            Slot::Empty => Paragraph::new(""),
-                            Slot::Stack(count, item) if count.get() == 1 => {
+                            inv::Slot::Empty => Paragraph::new(""),
+                            inv::Slot::Stack(count, item) if count.get() == 1 => {
                                 Paragraph::new(format!("{item:?}"))
                             }
-                            Slot::Stack(count, item) => {
+                            inv::Slot::Stack(count, item) => {
                                 Paragraph::new(format!("{count} × {item:?}"))
                             }
 
@@ -520,8 +519,8 @@ impl TerminalState {
 /// Snapshot of a [`Character`] inventory for the UI.
 #[derive(Clone, Debug)]
 pub(super) struct InventoryDisplay {
-    slots: [Slot; Self::SLOTS],
-    selected_slots: [usize; 3],
+    slots: [inv::Slot; Self::SLOTS],
+    selected_slots: [inv::Ix; 3],
 }
 
 impl InventoryDisplay {
@@ -534,14 +533,16 @@ impl InventoryDisplay {
                 let slots = character.inventory().slots();
 
                 return Self {
-                    slots: std::array::from_fn(|i| slots.get(i).unwrap_or(&Slot::Empty).clone()),
+                    slots: std::array::from_fn(|i| {
+                        slots.get(i).unwrap_or(&inv::Slot::Empty).clone()
+                    }),
                     selected_slots: character.selected_slots(),
                 };
             }
         }
 
         Self {
-            slots: std::array::from_fn(|_| Slot::Empty),
+            slots: std::array::from_fn(|_| inv::Slot::Empty),
             selected_slots: [0; 3],
         }
     }

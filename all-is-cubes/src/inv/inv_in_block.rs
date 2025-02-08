@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 use euclid::Point3D;
 
 use crate::block::Resolution;
+use crate::inv::Ix;
 use crate::math::{GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid};
 
 #[cfg(doc)]
@@ -18,7 +19,7 @@ use crate::block::{Block, Modifier};
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct InvInBlock {
     /// Number of slots the inventory should have.
-    pub(crate) size: usize, // TODO: use platform-independent max size
+    pub(crate) size: Ix,
 
     /// Scale factor by which to scale down the inventory icon blocks,
     /// relative to the bounds of the block in which they are being displayed.
@@ -41,8 +42,8 @@ pub struct InvInBlock {
 /// Positioning of a displayed row of inventory icons; part of [`InvInBlock`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct IconRow {
-    pub(crate) first_slot: usize,
-    pub(crate) count: usize,
+    pub(crate) first_slot: Ix,
+    pub(crate) count: Ix,
     pub(crate) origin: GridPoint,
     pub(crate) stride: GridVector,
 }
@@ -94,15 +95,15 @@ impl InvInBlock {
     /// the inventory.
     pub(crate) fn icon_positions(
         &self,
-        inventory_size: usize,
-    ) -> impl Iterator<Item = (usize, GridPoint)> + '_ {
+        inventory_size: Ix,
+    ) -> impl Iterator<Item = (Ix, GridPoint)> + '_ {
         self.icon_rows.iter().flat_map(move |row| {
             (0..row.count).map_while(move |sub_index| {
                 let slot_index = row.first_slot.checked_add(sub_index)?;
                 if slot_index >= inventory_size {
                     return None;
                 }
-                let index_coord = GridCoordinate::try_from(sub_index).ok()?;
+                let index_coord = GridCoordinate::from(sub_index);
                 let position: GridPoint = transpose_point_option(
                     row.origin
                         .to_vector()

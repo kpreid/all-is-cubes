@@ -8,6 +8,7 @@
     - In the desktop version, changes to graphics options are now persisted across launches.
 
 - `all-is-cubes` library:
+    - `inv::Ix`
     - `math::FaceMap::sum()`
     - `impl IntoIterator for math::FaceMap`
     - `math::PositiveSign::INFINITY`
@@ -25,7 +26,8 @@
     - `block::BlockAttributes` is now a non-exhaustive struct.
       `BlockAttributes` literals should be replaced with `block::Builder::build_attributes()`.
     
-    - `inv::Inventory` no longer has public fields. Use the new accessor function `slots()` instead.
+    - Inventories are now indexed using the new type `inv::Ix`.
+    - `inv::Inventory` no longer has public fields. Use the new accessor functions `slots()` or `get()` instead.
 
     - `math::Rgb::clamp()` now takes a parameter for the upper bound.
 

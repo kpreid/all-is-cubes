@@ -7,6 +7,7 @@ use all_is_cubes::block::{self, text, Block};
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::size3;
+use all_is_cubes::inv;
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
 use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::universe::Handle;
@@ -85,8 +86,8 @@ impl TooltipState {
                     .selected_slots()
                     .get(1)
                     .copied()
-                    .unwrap_or(usize::MAX);
-                if let Some(tool) = character.inventory().slots().get(selected_slot).cloned() {
+                    .unwrap_or(inv::Ix::MAX);
+                if let Some(tool) = character.inventory().get(selected_slot).cloned() {
                     let new_text = match tool.icon(&hud_blocks.icons).evaluate().ok() {
                         Some(ev_block) => ev_block.attributes().display_name.clone(),
                         None => literal!(""),
@@ -144,7 +145,7 @@ enum TooltipContents {
     Blanked,
     Message(ArcStr),
     InventoryItem {
-        source_slot: usize,
+        source_slot: inv::Ix,
         text: ArcStr,
     },
 }

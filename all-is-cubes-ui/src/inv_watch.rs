@@ -7,7 +7,7 @@
 use alloc::sync::Arc;
 
 use all_is_cubes::character::{Character, CharacterChange};
-use all_is_cubes::inv::{Inventory, TOOL_SELECTIONS};
+use all_is_cubes::inv;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
 use all_is_cubes::universe::{Handle, HandleError, Universe};
 
@@ -28,11 +28,11 @@ pub(crate) struct InventoryWatcher {
 
     /// Last inventory gotten from `inventory_owner`
     /// as of the last call to `update()`.
-    inventory: Inventory,
+    inventory: inv::Inventory,
 
     /// Last selected slots gotten from `inventory_owner`
     /// as of the last call to `update()`.
-    selected_slots: [usize; TOOL_SELECTIONS],
+    selected_slots: [inv::Ix; inv::TOOL_SELECTIONS],
 
     /// Listener gate to cancel the listening when we change [`Owner`]s.
     owner_gate: listen::Gate,
@@ -61,8 +61,8 @@ impl InventoryWatcher {
         let mut new_self = Self {
             inventory_source,
             inventory_owner: None, // will be replaced
-            inventory: Inventory::new(0),
-            selected_slots: [usize::MAX; TOOL_SELECTIONS],
+            inventory: inv::Inventory::new(0),
+            selected_slots: [inv::Ix::MAX; inv::TOOL_SELECTIONS],
             owner_gate: listen::Gate::default(),
             notifier: Arc::new(listen::Notifier::new()),
             dirty,
@@ -99,7 +99,10 @@ impl InventoryWatcher {
         };
 
         // Consult the inventory owner, and install a listener if needed.
-        let empty_inventory = (&Inventory::new(0), [usize::MAX; TOOL_SELECTIONS]);
+        let empty_inventory = (
+            &inv::Inventory::new(0),
+            [inv::Ix::MAX; inv::TOOL_SELECTIONS],
+        );
         let character_guard;
         let (new_inventory, new_selections) = match &self.inventory_owner {
             Some(character_handle) => {
@@ -168,7 +171,7 @@ impl InventoryWatcher {
     }
 
     /// Returns the current contents of the watched inventory, as of the last [`Self::update()`].
-    pub fn inventory(&self) -> &Inventory {
+    pub fn inventory(&self) -> &inv::Inventory {
         &self.inventory
     }
 
@@ -176,7 +179,7 @@ impl InventoryWatcher {
     ///
     /// If the inventory is not a type that has selections, returns `[usize::MAX; TOOL_SELECTIONS]`.
     /// TODO: Better API
-    pub fn selected_slots(&self) -> [usize; TOOL_SELECTIONS] {
+    pub fn selected_slots(&self) -> [inv::Ix; inv::TOOL_SELECTIONS] {
         self.selected_slots
     }
 }

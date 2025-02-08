@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use all_is_cubes::character::Character;
 use all_is_cubes::euclid::{Point2D, Vector2D};
+use all_is_cubes::inv;
 use all_is_cubes::listen;
 use all_is_cubes::math::{zo32, FreeCoordinate, FreeVector};
 use all_is_cubes::time::Tick;
@@ -412,7 +413,7 @@ impl InputProcessor {
                     }
                 }
                 Key::Character(numeral) if numeral.is_ascii_digit() => {
-                    let digit = numeral.to_digit(10).unwrap() as usize;
+                    let digit = numeral.to_digit(10).unwrap() as inv::Ix;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
                     if let Some(character_ref) = character_opt {
                         character_ref

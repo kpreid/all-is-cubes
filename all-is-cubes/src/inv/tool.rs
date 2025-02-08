@@ -693,7 +693,7 @@ mod tests {
             let index = 0;
             let insert_txn = CharacterTransaction::inventory(InventoryTransaction::replace(
                 index,
-                self.character().inventory().slots[index].clone(),
+                self.character().inventory().slots[usize::from(index)].clone(),
                 stack.into(),
             ));
             self.character_handle.execute(&insert_txn).unwrap();
