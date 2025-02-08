@@ -28,12 +28,10 @@ use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct Inventory {
-    /// TODO: This probably shouldn't be public forever.
-    // ---
     // Design note: This is a boxed slice to keep the size of the type small,
-    // and because inventories have sizes determined by game mechanics,
-    // so they do not need to resize to accomodate their contents.
-    pub slots: Box<[Slot]>,
+    // and because inventories have sizes determined by game mechanics separately from their
+    // contents, so they do not need to resize to accomodate their contents expanding.
+    pub(crate) slots: Box<[Slot]>,
 }
 
 impl Inventory {
@@ -56,6 +54,11 @@ impl Inventory {
     /// Returns whether all slots in this inventory are empty.
     pub fn is_empty(&self) -> bool {
         self.slots.iter().all(|slot| matches!(slot, Slot::Empty))
+    }
+
+    /// Returns a view of all slots in this inventory.
+    pub fn slots(&self) -> &[Slot] {
+        &self.slots
     }
 
     /// Use a tool stored in this inventory.

@@ -25,6 +25,8 @@
     - `block::BlockAttributes` is now a non-exhaustive struct.
       `BlockAttributes` literals should be replaced with `block::Builder::build_attributes()`.
     
+    - `inv::Inventory` no longer has public fields. Use the new accessor function `slots()` instead.
+
     - `math::Rgb::clamp()` now takes a parameter for the upper bound.
 
     - Renamed `block::Move::to_paired()` to `into_paired()`.

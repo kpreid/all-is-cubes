@@ -86,7 +86,7 @@ impl TooltipState {
                     .get(1)
                     .copied()
                     .unwrap_or(usize::MAX);
-                if let Some(tool) = character.inventory().slots.get(selected_slot).cloned() {
+                if let Some(tool) = character.inventory().slots().get(selected_slot).cloned() {
                     let new_text = match tool.icon(&hud_blocks.icons).evaluate().ok() {
                         Some(ev_block) => ev_block.attributes().display_name.clone(),
                         None => literal!(""),

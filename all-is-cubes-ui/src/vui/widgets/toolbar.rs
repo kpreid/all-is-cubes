@@ -303,7 +303,7 @@ impl WidgetController for ToolbarController {
         let should_update_inventory = true;
 
         let slots_txn = if should_update_inventory {
-            self.write_items(&watcher.inventory().slots)?
+            self.write_items(watcher.inventory().slots())?
         } else {
             WidgetTransaction::default()
         };

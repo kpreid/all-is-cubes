@@ -531,7 +531,7 @@ impl InventoryDisplay {
         // TODO: reimplement character inventory viewing in a safely asynchronous way
         if let Some(character_handle) = character_handle {
             if let Ok(character) = character_handle.read() {
-                let slots = &character.inventory().slots;
+                let slots = character.inventory().slots();
 
                 return Self {
                     slots: std::array::from_fn(|i| slots.get(i).unwrap_or(&Slot::Empty).clone()),

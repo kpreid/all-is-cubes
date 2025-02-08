@@ -8,9 +8,9 @@ use crate::block::Resolution;
 use crate::math::{GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid};
 
 #[cfg(doc)]
-use crate::block::Modifier;
+use crate::block::{Block, Modifier};
 
-/// Defines how a [`Modifier::Inventory`] should be configured and displayed within a block.
+/// Defines how a [`Modifier::Inventory`] should be configured and displayed within a [`Block`].
 //---
 // TODO(inventory): better name?
 // TODO(inventory): needs accessors or public fields
