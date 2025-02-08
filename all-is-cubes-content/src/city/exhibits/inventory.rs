@@ -5,7 +5,7 @@ use super::prelude::*;
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Modifier::Inventory",
-    subtitle: "(pipes do nothing yet)",
+    subtitle: "",
     placement: Placement::Surface,
 )]
 fn INVENTORY(ctx: Context<'_>) {
@@ -100,8 +100,6 @@ fn INVENTORY(ctx: Context<'_>) {
 }
 
 fn make_pipe_blocks(txn: &mut ExhibitTransaction) -> (Block, Block) {
-    // TODO: These pipe blocks are supposed to automatically move items through them.
-    // The operation for doing that isn’t ready yet.
     // TODO: Move this to `DemoBlocks`?
 
     let pipe_corner_material = color_block!(0.6, 0.2, 0.2);
@@ -155,6 +153,20 @@ fn make_pipe_blocks(txn: &mut ExhibitTransaction) -> (Block, Block) {
                 vec3(0, 0, 4),
             )],
         ))
+        .tick_action(block::TickAction {
+            operation: Operation::Alt(
+                [
+                    Operation::MoveInventory {
+                        transfer_into_adjacent: Some(Face6::PZ),
+                    },
+                    // This turns failures to move into do-nothing successes.
+                    // TODO: there should be a simple empty operation.
+                    Operation::Neighbors([].into()),
+                ]
+                .into(),
+            ),
+            schedule: time::Schedule::from_period(NonZero::new(6).unwrap()),
+        })
         .animation_hint(block::AnimationHint::replacement(
             block::AnimationChange::Shape,
         ))
@@ -173,7 +185,7 @@ fn make_pipe_blocks(txn: &mut ExhibitTransaction) -> (Block, Block) {
         .inventory_config(inv::InvInBlock::new(
             pipe_slots,
             pipe_scale,
-            resolution,
+            R32,
             // pipe slots overlap by half to allow a smoothish movement
             vec![
                 inv::IconRow::new(0..(pipe_slots / 2), point3(12, 12, 0), vec3(0, 0, 4)),
@@ -184,6 +196,20 @@ fn make_pipe_blocks(txn: &mut ExhibitTransaction) -> (Block, Block) {
                 ),
             ],
         ))
+        .tick_action(block::TickAction {
+            operation: Operation::Alt(
+                [
+                    Operation::MoveInventory {
+                        transfer_into_adjacent: Some(Face6::NX),
+                    },
+                    // This turns failures to move into do-nothing successes.
+                    // TODO: there should be a simple empty operation.
+                    Operation::Neighbors([].into()),
+                ]
+                .into(),
+            ),
+            schedule: time::Schedule::from_period(NonZero::new(6).unwrap()),
+        })
         .animation_hint(block::AnimationHint::replacement(
             block::AnimationChange::Shape,
         ))
