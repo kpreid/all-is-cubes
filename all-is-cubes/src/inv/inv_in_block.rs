@@ -85,36 +85,6 @@ impl InvInBlock {
         }
     }
 
-    // TODO(inventory): this substitutes for the lack of ability to actually construct one publicly
-    #[doc(hidden)]
-    pub fn new_placeholder() -> Self {
-        Self {
-            size: 1,
-            icon_scale: Resolution::R4,
-            icon_resolution: Resolution::R16,
-            icon_rows: vec![
-                IconRow {
-                    first_slot: 0,
-                    count: 3,
-                    origin: GridPoint::new(1, 1, 1),
-                    stride: GridVector::new(5, 0, 0),
-                },
-                IconRow {
-                    first_slot: 3,
-                    count: 3,
-                    origin: GridPoint::new(1, 1, 6),
-                    stride: GridVector::new(5, 0, 0),
-                },
-                IconRow {
-                    first_slot: 6,
-                    count: 3,
-                    origin: GridPoint::new(1, 1, 11),
-                    stride: GridVector::new(5, 0, 0),
-                },
-            ],
-        }
-    }
-
     /// Returns which inventory slots should be rendered as icons, and the lower corners
     /// of the icons.
     ///
@@ -280,13 +250,21 @@ impl<'a> arbitrary::Arbitrary<'a> for IconRow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use euclid::point3;
+    use euclid::{point3, vec3};
     use pretty_assertions::assert_eq;
 
     #[test]
     fn icon_positions_output() {
-        // TODO: this test should be revised to create a specific `InvInBlock` value for testing
-        let iib = InvInBlock::new_placeholder();
+        let iib = InvInBlock::new(
+            9,
+            Resolution::R4,
+            Resolution::R16,
+            vec![
+                IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
+                IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
+                IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
+            ],
+        );
         assert_eq!(
             iib.icon_positions(999).take(100).collect::<Vec<_>>(),
             vec![

@@ -421,9 +421,11 @@ impl BuildPrimitive for Voxels {
 #[cfg(test)]
 mod tests {
     use alloc::boxed::Box;
+    use euclid::{point3, vec3};
 
     use crate::block::{self, Resolution::*, TickAction};
     use crate::content::palette;
+    use crate::inv;
     use crate::math::{Face6, GridRotation, Vol};
     use crate::op::Operation;
     use crate::space::SpacePhysics;
@@ -456,7 +458,16 @@ mod tests {
     fn every_field_nondefault() {
         let color = Rgba::new(0.1, 0.2, 0.3, 0.4);
         let emission = Rgb::new(0.1, 3.0, 0.1);
-        let inventory = crate::inv::InvInBlock::new_placeholder();
+        let inventory = inv::InvInBlock::new(
+            9,
+            R4,
+            R16,
+            vec![
+                inv::IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
+                inv::IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
+                inv::IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
+            ],
+        );
         let rotation_rule = block::RotationPlacementRule::Attach { by: Face6::NZ };
         let placement_action = Some(block::PlacementAction {
             operation: Operation::Become(color_block!(1.0, 0.0, 1.0)),

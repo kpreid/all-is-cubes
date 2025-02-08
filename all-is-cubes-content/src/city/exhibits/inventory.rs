@@ -25,7 +25,16 @@ fn INVENTORY(ctx: Context<'_>) {
                 &AIR
             }
         })?
-        .inventory_config(inv::InvInBlock::new_placeholder())
+        .inventory_config(inv::InvInBlock::new(
+            9,
+            R4,
+            R16,
+            vec![
+                inv::IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
+                inv::IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
+                inv::IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
+            ],
+        ))
         .build_txn(&mut txn);
 
     let has_items_block = inventory_display_block.evaluate().unwrap().with_inventory(

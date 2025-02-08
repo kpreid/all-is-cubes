@@ -3,11 +3,11 @@
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use arcstr::literal;
 use core::fmt;
 use core::num::NonZeroU16;
 
-use euclid::vec3;
+use arcstr::literal;
+use euclid::{point3, vec3};
 use pretty_assertions::assert_eq;
 use serde_json::{from_value, json, to_value};
 
@@ -172,7 +172,16 @@ fn block_atom_with_all_attributes() {
             .collision(block::BlockCollision::None)
             .display_name("foo")
             .selectable(false)
-            .inventory_config(inv::InvInBlock::new_placeholder())
+            .inventory_config(inv::InvInBlock::new(
+                1,
+                Resolution::R4,
+                Resolution::R16,
+                vec![
+                    inv::IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
+                    inv::IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
+                    inv::IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
+                ],
+            ))
             .rotation_rule(block::RotationPlacementRule::Attach { by: Face6::PX })
             .tick_action(Some(block::TickAction {
                 operation: op::Operation::Become(AIR),
