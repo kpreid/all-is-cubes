@@ -128,13 +128,15 @@ impl InvInBlock {
             icon_rows,
         } = self;
         let transform = rotation.to_positive_octant_transform(icon_resolution.into());
+        let icon_size =
+            GridCoordinate::from((icon_resolution / icon_scale).unwrap_or(Resolution::R1));
         Self {
             size,
             icon_scale,
             icon_resolution,
             icon_rows: icon_rows
                 .into_iter()
-                .filter_map(|row| row.rotate(transform))
+                .filter_map(|row| row.rotate(transform, icon_size))
                 .collect(),
         }
     }
@@ -210,14 +212,18 @@ impl IconRow {
 
     /// Rotate this row.
     /// Returns [`None`] if rotating it would cause numeric overflow.
-    fn rotate(self, transform: Gridgid) -> Option<Self> {
-        // TODO: The icons themselves (not their positions) need to be rotated,
+    fn rotate(self, transform: Gridgid, icon_size: GridCoordinate) -> Option<Self> {
+        // TODO: The icons themselves (not only their positions) need to be rotated,
         // but this is not supported yet.
         Some(Self {
             first_slot: self.first_slot,
             count: self.count,
-            // TODO: does not account for size of icon
-            origin: transform.checked_transform_point(self.origin)?,
+
+            // Taking the minimum of opposing corners accounts for which direction the
+            // block extends.
+            origin: transform.checked_transform_point(self.origin)?.min(
+                transform.checked_transform_point(self.origin + GridVector::splat(icon_size))?,
+            ),
             stride: transform.rotation.checked_transform_vector(self.stride)?,
         })
     }
@@ -315,6 +321,25 @@ mod tests {
     }
 
     #[test]
+    fn rotated_positions() {
+        assert_eq!(
+            IconRow {
+                first_slot: 0,
+                count: 10,
+                origin: GridPoint::new(2, 2, 0),
+                stride: GridVector::new(0, 0, 4),
+            }
+            .rotate(GridRotation::Rxyz.to_positive_octant_transform(8), 4),
+            Some(IconRow {
+                first_slot: 0,
+                count: 10,
+                origin: GridPoint::new(2, 2, 4),
+                stride: GridVector::new(0, 0, -4),
+            }),
+        );
+    }
+
+    #[test]
     fn rotate_row_overflow() {
         assert_eq!(
             IconRow {
@@ -323,7 +348,7 @@ mod tests {
                 origin: GridPoint::new(1397969747, -2147483648, 255827,),
                 stride: GridVector::new(134767872, 2820644, 7285711,),
             }
-            .rotate(Gridgid::from_rotation_about_origin(GridRotation::Rxyz)),
+            .rotate(Gridgid::from_rotation_about_origin(GridRotation::Rxyz,), 1),
             None,
         );
     }
