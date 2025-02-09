@@ -503,6 +503,24 @@ impl BoxPart {
         ))
     }
 
+    /// Returns whether this part is a face, in the polyhedron sense
+    /// (i.e. touches only one side of the box, or one side and its opposite).
+    pub fn is_face(self) -> bool {
+        self.count_touched_axes() == 1
+    }
+
+    /// Returns whether this part is an edge, in the polyhedron sense
+    /// (i.e. touches two adjacent sides of the box, or the perimeter of a flat box).
+    pub fn is_edge(self) -> bool {
+        self.count_touched_axes() == 2
+    }
+
+    /// Returns whether this part is a corner, in the polyhedron sense
+    /// (i.e. touches three adjacent sides of the box
+    pub fn is_corner(self) -> bool {
+        self.count_touched_axes() == 3
+    }
+
     /// Returns whether this part touches the specified face.
     ///
     /// This includes [`BoxPart::face(face)`](BoxPart::face)
@@ -539,6 +557,12 @@ impl BoxPart {
             UPPER
         };
         self
+    }
+
+    /// Counts how many box faces this part touches, such that a face and its opposite face
+    /// only counts once.
+    fn count_touched_axes(self) -> u8 {
+        u8::from(self.0.x != 0) + u8::from(self.0.y != 0) + u8::from(self.0.z != 0)
     }
 }
 
