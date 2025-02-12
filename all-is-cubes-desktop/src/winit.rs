@@ -4,6 +4,7 @@ use std::mem;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use anyhow::Context as _;
 use winit::event::{DeviceEvent, ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::window::{CursorGrabMode, Window};
@@ -210,7 +211,9 @@ pub async fn create_winit_wgpu_desktop_session(
         ..Default::default()
     });
 
-    let surface = instance.create_surface(Arc::clone(&window.window))?;
+    let surface = instance
+        .create_surface(Arc::clone(&window.window))
+        .context("failed to obtain graphics surface from new session’s window")?;
 
     // Pick an adapter.
     let mut adapter: Option<wgpu::Adapter> =
@@ -225,7 +228,7 @@ pub async fn create_winit_wgpu_desktop_session(
         adapter = request_adapter_future.await;
     }
     let adapter = adapter
-        .ok_or_else(|| anyhow::format_err!("Could not request suitable graphics adapter"))?;
+        .ok_or_else(|| anyhow::format_err!("could not request suitable graphics adapter"))?;
     log::debug!("Adapter: {:?}", adapter.get_info());
 
     let renderer = SurfaceRenderer::new(
@@ -234,7 +237,8 @@ pub async fn create_winit_wgpu_desktop_session(
         adapter,
         executor.clone(),
     )
-    .await?;
+    .await
+    .context("failed to obtain graphics device for new session’s window")?;
 
     let mut dsession =
         DesktopSession::new(executor, renderer, window, session, viewport_cell, true);
@@ -281,16 +285,26 @@ impl<Ren: RendererToWinit> winit::application::ApplicationHandler for Handler<Re
             // surface until they are resumed.”
             // — <https://docs.rs/winit/0.29.10/winit/event/enum.Event.html#variant.Resumed>
 
-            // TODO: Ideally, any of the errors occurring here would be handled by putting up
-            // a dialog box before exiting.
-            let ds = dsession_fn(&inner_params, event_loop).unwrap();
+            let dsession = match dsession_fn(&inner_params, event_loop) {
+                Ok(dsession) => dsession,
+                Err(error) => {
+                    // TODO: Use a dialog box, not just stderr (at least, if we are not attached
+                    // to a terminal).
+                    eprintln!(
+                        "{error}",
+                        error = all_is_cubes::util::ErrorChain(error.as_ref())
+                    );
+                    event_loop.exit();
+                    return;
+                }
+            };
             crate::inner_main(
                 inner_params,
                 |ds| {
                     self.dsession = Some(ds);
                     Ok(())
                 },
-                ds,
+                dsession,
             )
             .unwrap();
         }
@@ -303,7 +317,8 @@ impl<Ren: RendererToWinit> winit::application::ApplicationHandler for Handler<Re
         event: WindowEvent,
     ) {
         let Some(dsession) = &mut self.dsession else {
-            log::error!("event for a window we aren't managing: {event:?}");
+            // We might get here if we hit an error in resumed() and are exiting.
+            // So, be silent.
             return;
         };
         if dsession.window.window.id() != window_id {
