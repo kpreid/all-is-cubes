@@ -602,6 +602,8 @@ pub(in crate::block) fn render_inventory(
         return Ok(input);
     }
 
+    let original_attributes = input.attributes().clone();
+
     // TODO(inventory): clone necessary to avoid a borrow conflict
     let config = input.attributes().inventory.clone();
 
@@ -670,6 +672,14 @@ pub(in crate::block) fn render_inventory(
             },
         )?;
     }
+
+    // Reset block attributes to the contained attributes; don't let the icons contribute anything.
+    // TODO: Instead of resetting the attributes, pass an option to `evaluate_composition`
+    // to not modify them in the first place (except where appropriate, like the animation hint).
+    input.set_attributes(block::BlockAttributes {
+        animation_hint: input.attributes().animation_hint,
+        ..original_attributes
+    });
 
     Ok(input)
 }

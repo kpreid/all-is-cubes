@@ -9,6 +9,8 @@ use crate::universe::{HandleVisitor, VisitHandles};
 
 mod composite;
 pub use composite::*;
+#[cfg(test)]
+mod inventory_tests;
 mod r#move;
 pub use r#move::*;
 mod quote;
