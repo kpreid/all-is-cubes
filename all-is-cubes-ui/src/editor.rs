@@ -1,5 +1,6 @@
 //! VUI components related to allowing the user to inspect universe contents.
 
+use all_is_cubes::tag;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -145,7 +146,7 @@ fn inspect_modifier(block: &Block, modifier_index: usize) -> vui::WidgetTree {
 
     let (name, details) = match modifier {
         block::Modifier::Attributes(a) => {
-            (literal!("Attributes"), paragraph(arcstr::format!("{a:?}")))
+            (literal!("Attributes"), paragraph(arcstr::format!("{a:#?}")))
         }
         block::Modifier::Quote(q) => (literal!("Quote"), paragraph(arcstr::format!("{q:?}"))),
         block::Modifier::Rotate(rotation) => (
@@ -198,6 +199,15 @@ fn inspect_modifier(block: &Block, modifier_index: usize) -> vui::WidgetTree {
                 "{direction:?} distance {distance:?} velocity {velocity:?}"
             )),
         ),
+        block::Modifier::Tag(tag::Be(tag)) => {
+            (literal!("Tag"), paragraph(arcstr::format!("{tag:?}")))
+        }
+        // TODO: truncate inventory if large
+        block::Modifier::Inventory(inventory) => (
+            literal!("Inventory"),
+            paragraph(arcstr::format!("{:#?}", inventory.slots())),
+        ),
+
         _ => (literal!("<unknown>"), vui::LayoutTree::empty()),
     };
 
