@@ -1,8 +1,11 @@
 //! Configuration of inventories owned by blocks ([`Modifier::Inventory`]).
 
+use core::fmt;
+
 use alloc::vec::Vec;
 
 use euclid::Point3D;
+use manyfmt::Refmt;
 
 use crate::block::Resolution;
 use crate::inv::Ix;
@@ -10,6 +13,7 @@ use crate::math::{GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid};
 
 #[cfg(doc)]
 use crate::block::{self, Block, Modifier};
+use crate::util::ConciseDebug;
 
 /// Defines how a [`Modifier::Inventory`] should be configured and displayed within a [`Block`].
 ///
@@ -42,7 +46,7 @@ pub struct InvInBlock {
 }
 
 /// Positioning of a displayed row of inventory icons; part of [`InvInBlock`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct IconRow {
     // visible for serialization -- TODO: improve on that
     pub(crate) first_slot: Ix,
@@ -229,6 +233,24 @@ impl IconRow {
     }
 }
 
+impl fmt::Debug for IconRow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let &Self {
+            first_slot,
+            count,
+            origin,
+            stride,
+        } = self;
+        write!(
+            f,
+            "IconRow({slot_range:?} @ {origin} + {stride})",
+            slot_range = (first_slot..(first_slot + count)),
+            origin = origin.refmt(&ConciseDebug),
+            stride = stride.refmt(&ConciseDebug)
+        )
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for IconRow {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
@@ -258,6 +280,37 @@ mod tests {
     use super::*;
     use euclid::{point3, vec3};
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn inv_in_block_debug() {
+        let iib = InvInBlock::new(
+            9,
+            Resolution::R4,
+            Resolution::R16,
+            vec![
+                IconRow::new(0..3, point3(1, 1, 1), vec3(5, 0, 0)),
+                IconRow::new(3..6, point3(1, 1, 6), vec3(5, 0, 0)),
+                IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
+            ],
+        );
+
+        assert_eq!(
+            format!("{iib:#?}"),
+            indoc::indoc! {
+                "
+                InvInBlock {
+                    size: 9,
+                    icon_scale: 4,
+                    icon_resolution: 16,
+                    icon_rows: [
+                        IconRow(0..3 @ (+1, +1, +1) + (+5, +0, +0)),
+                        IconRow(3..6 @ (+1, +1, +6) + (+5, +0, +0)),
+                        IconRow(6..9 @ (+1, +1, +11) + (+5, +0, +0)),
+                    ],
+                }"
+            },
+        );
+    }
 
     #[test]
     fn icon_positions_output() {
