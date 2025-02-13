@@ -5,6 +5,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::fmt;
 use core::num::NonZeroU16;
 
 use crate::block::Block;
@@ -170,7 +171,7 @@ impl VisitHandles for Inventory {
 }
 
 /// The direct child of [`Inventory`]; a container for any number of identical [`Tool`]s.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub enum Slot {
@@ -288,6 +289,18 @@ impl Slot {
             unreachable!();
         }
         true
+    }
+}
+
+impl fmt::Debug for Slot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Empty => write!(f, "Empty"),
+            Self::Stack(count, tool) => {
+                write!(f, "{count} × ")?;
+                tool.fmt(f) // pass through formatter options
+            }
+        }
     }
 }
 
