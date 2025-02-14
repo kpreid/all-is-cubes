@@ -25,10 +25,12 @@ pub(crate) enum CubeFix128 {}
 
 /// Triangle mesh vertex type that is used for rendering [blocks].
 ///
-/// `u32` is the smallest size of integer that we are currently allowed to use in WGSL, so
-/// several pieces of data are manually packed into `u32`s to save memory.
+/// `u32` is the smallest size of integer that is currently supported everywhere we want to run
+/// (the implementation of WebGPU on Chrome 132.0.6834.160 does not allow `u8` or `u16`),
+/// so several pieces of data are manually packed into `u32`s to save memory.
 /// (We could in principle use smaller fields here on the Rust side, but that would
-/// make the WGSL code endianness-sensitive.)
+/// make the relationship between the two struct definitions endianness-sensitive,
+/// which is much worse.)
 ///
 /// [blocks]: all_is_cubes::block::Block
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
