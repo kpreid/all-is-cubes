@@ -49,7 +49,7 @@ pub(super) fn image_patch_to_character(
                     (false, false) => " ", // U+0020 SPACE
                 },
                 CharacterMode::Shapes => {
-                    let avg_lum = ((lum1 + lum2) / 2.0).clamp(0.0, 1.0);
+                    let avg_lum = lum1.midpoint(lum2).clamp(0.0, 1.0);
 
                     if (lum1 - lum2).abs() < 0.05 {
                         [" ", "░", "▒", "▓", "█"][(avg_lum * 4.999) as usize]
