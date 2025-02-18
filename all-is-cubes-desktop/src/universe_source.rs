@@ -41,7 +41,6 @@ impl UniverseSource {
 
         // TODO: figure out a cleaner way to wrangle this rx hookup
         let notif_rx = Mutex::new(TryRecvKeep::Rx(notif_rx));
-        #[allow(unknown_lints)] // TODO: Remove in Rust 1.85
         #[allow(clippy::literal_string_with_formatting_args)]
         let universe_progress_bar = logging::new_progress_bar(100)
             .with_style(
