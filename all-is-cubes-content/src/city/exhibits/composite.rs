@@ -110,7 +110,7 @@ fn DASHED_BOXES(_: Context<'_>) {
             }
         })?
         .build_txn(&mut txn);
-    let style = crate::BoxStyle::from_composited_corner_and_edge(corner, line_segment);
+    let style = BoxStyle::from_composited_corner_and_edge(corner, line_segment);
 
     let mut space = Space::empty_positive(7, 3, 3);
     // Unit sized box

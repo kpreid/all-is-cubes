@@ -163,7 +163,7 @@ fn COLOR_LIGHTS(_: Context<'_>) {
         .build_txn(&mut txn);
 
     // Construct room.
-    crate::BoxStyle::from_whole_blocks_for_walls(
+    BoxStyle::from_whole_blocks_for_walls(
         Some(wall_block.clone()),
         Some(wall_block.clone()),
         Some(wall_block.clone()),
@@ -249,7 +249,7 @@ fn COLORED_BOUNCE(_: Context<'_>) {
     // --- Blocks ---
 
     let reflecting_block = {
-        let rbbs = crate::BoxStyle::from_whole_blocks_for_walls(
+        let rbbs = BoxStyle::from_whole_blocks_for_walls(
             Some(rgba_const!(1.0, 0.0, 0.0, 1.0).into()),
             Some(rgba_const!(0.0, 1.0, 0.0, 1.0).into()),
             Some(rgba_const!(0.0, 0.0, 1.0, 1.0).into()),

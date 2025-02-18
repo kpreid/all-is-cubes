@@ -41,5 +41,6 @@ pub(super) use all_is_cubes::{color_block, include_image};
 pub(super) use crate::alg::{self, four_walls, stack};
 pub(super) use crate::city::exhibit::{exhibit, Context, Exhibit, ExhibitTransaction, Placement};
 pub(super) use crate::{
-    make_some_blocks, make_some_voxel_blocks_txn, palette, tree, DemoBlocks, Fire, LandscapeBlocks,
+    make_some_blocks, make_some_voxel_blocks_txn, palette, tree, BoxStyle, DemoBlocks, Fire,
+    LandscapeBlocks,
 };
