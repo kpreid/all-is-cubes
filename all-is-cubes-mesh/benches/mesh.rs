@@ -27,12 +27,20 @@ fn block_mesh_benches(c: &mut Criterion) {
     let mut g = c.benchmark_group("block");
     let options = &MeshOptions::new(&GraphicsOptions::default());
 
+    // Exercise the code paths that only apply to resolution 1;
+    // all the other benchmarks use larger resolutions.
+    g.bench_function("r1-new", |b| {
+        iter_new_block_mesh(b, options, &Block::builder().color(Rgba::WHITE).build());
+    });
+    g.bench_function("r1-reused", |b| {
+        iter_reused_block_mesh(b, options, &Block::builder().color(Rgba::WHITE).build());
+    });
+
     g.bench_function("checker-new", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(&mut universe, &[AIR, color_block!(Rgba::WHITE)]);
         iter_new_block_mesh(b, options, &block);
     });
-
     g.bench_function("checker-reused", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(&mut universe, &[AIR, color_block!(Rgba::WHITE)]);
