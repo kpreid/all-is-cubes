@@ -12,6 +12,7 @@ use crate::block_mesh::analyze::Analysis;
 #[cfg(feature = "rerun")]
 use {
     all_is_cubes::block::Resolution,
+    all_is_cubes::euclid::Vector3D,
     all_is_cubes::math::{Cube, GridAab, GridVector},
     all_is_cubes::rerun_glue as rg,
     alloc::vec::Vec,
@@ -53,11 +54,12 @@ pub struct Inner {
 
     destination: rg::Destination,
     window_voxels_path: rg::EntityPath,
-    occupied_path: rg::EntityPath,
     layer_path: rg::EntityPath,
+    occupied_path: rg::EntityPath,
     mesh_surface_path: rg::EntityPath,
     mesh_edges_path: rg::EntityPath,
     analysis_vertices_path: rg::EntityPath,
+    analysis_transparent_box_path: rg::EntityPath,
 
     // These two together make up the mesh edge display entity's data
     mesh_edge_positions: Vec<rg::components::LineStrip3D>,
@@ -90,11 +92,12 @@ impl Viz {
             Self::Enabled(Inner {
                 destination,
                 window_voxels_path: rg::entity_path!["progress", "analysis_window"],
-                occupied_path: rg::entity_path!["occupied_planes"],
                 layer_path: rg::entity_path!["progress", "mesh_plane"],
+                occupied_path: rg::entity_path!["occupied_planes"],
                 mesh_surface_path: rg::entity_path!["mesh", "surface"],
                 mesh_edges_path: rg::entity_path!["mesh", "edges"],
-                analysis_vertices_path: rg::entity_path!["analysis_vertices"],
+                analysis_vertices_path: rg::entity_path!["analysis", "vertices"],
+                analysis_transparent_box_path: rg::entity_path!["analysis", "transparent_box"],
                 resolution: None,
                 data_bounds: None,
                 analysis: Analysis::EMPTY,
@@ -315,6 +318,14 @@ impl Inner {
                 &rg::convert_grid_aabs(iter)
                     .with_class_ids([rg::ClassId::MeshVizOccupiedPlane])
                     .with_radii([OCCUPIED_RADIUS]),
+            );
+        }
+
+        if let Some(bbox) = self.analysis.transparent_bounding_box {
+            self.destination.log(
+                &self.analysis_transparent_box_path,
+                &rg::convert_aabs([bbox.to_free()], Vector3D::zero())
+                    .with_class_ids([rg::ClassId::MeshVizTransparentBounds]),
             );
         }
 

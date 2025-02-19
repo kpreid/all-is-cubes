@@ -129,7 +129,12 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             return;
         }
 
-        let analysis = analyze(resolution, voxels_array, &mut viz);
+        let analysis = analyze(
+            resolution,
+            voxels_array,
+            options.transparency_format(),
+            &mut viz,
+        );
 
         compute_block_mesh_from_analysis(
             output,

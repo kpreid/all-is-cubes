@@ -66,7 +66,7 @@ mod tests;
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct MeshOptions {
-    /// Input to [`TransparencyOption::limit_alpha()`].
+    /// Input to [`TransparencyOption::limit_alpha()`] applied to all vertex colors and voxels.
     transparency: TransparencyOption,
 
     /// Ignore blocks' [`voxels`] data and use only the overall color.
@@ -91,6 +91,28 @@ impl MeshOptions {
         Self {
             transparency: TransparencyOption::Volumetric,
             ignore_voxels: false,
+        }
+    }
+
+    /// Determines what geometry should be produced when a mesh contains transparent voxels,
+    /// after filtering by [`TransparencyOption::limit_alpha()`].
+    pub(crate) fn transparency_format(&self) -> TransparencyFormat {
+        // TODO(volumetric): Bounding box mode does not yet work correctly, so it is disabled.
+        if true {
+            TransparencyFormat::Surfaces
+        } else {
+            match self.transparency {
+                TransparencyOption::Surface => TransparencyFormat::Surfaces,
+                TransparencyOption::Volumetric => TransparencyFormat::BoundingBox,
+                TransparencyOption::Threshold(_) => TransparencyFormat::Surfaces,
+                ref o => {
+                    if cfg!(debug_assertions) {
+                        unreachable!("missing support for transparency option {o:?}");
+                    } else {
+                        TransparencyFormat::Surfaces
+                    }
+                }
+            }
         }
     }
 }
@@ -123,4 +145,20 @@ pub trait MeshTypes: 'static {
     type Tile: texture::Tile<Point = <Self::Alloc as texture::Allocator>::Point>
         + fmt::Debug
         + 'static;
+}
+
+/// Determines what geometry should be produced when a mesh contains transparent voxels.
+///
+/// Currently, this is always derived from [`GraphicsOptions::transparency`].
+/// If necessary, it may be made a public option.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[non_exhaustive]
+pub(crate) enum TransparencyFormat {
+    /// Generate triangles for transparent surfaces just like opaque ones.
+    Surfaces,
+
+    /// Generate a single bounding box for all transparent voxels.
+    /// Assume that shading will take care of rendering all details within that box.
+    BoundingBox,
 }

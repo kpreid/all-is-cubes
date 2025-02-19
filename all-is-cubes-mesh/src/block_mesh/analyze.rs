@@ -3,13 +3,11 @@ use itertools::Itertools;
 use all_is_cubes::block::{Evoxel, Resolution};
 use all_is_cubes::euclid::{Point2D, point3};
 use all_is_cubes::math::{
-    Axis, Cube, Face6, FaceMap, GridCoordinate, GridPoint, OctantMap, OctantMask, OpacityCategory,
-    Vol,
+    Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, Octant, OctantMap, OctantMask,
+    OpacityCategory, Vol,
 };
 
-#[cfg(feature = "rerun")]
-use all_is_cubes::math::GridAab;
-
+use crate::TransparencyFormat;
 use crate::block_mesh::viz::Viz;
 
 /// Maximum number of occupied planes/layers in any block.
@@ -47,6 +45,10 @@ pub(crate) struct Analysis {
     /// The boxes' thickness happens to be equal to the layer position but this is coincidental.
     occupied_planes: FaceMap<[PlaneBox; MAX_PLANES]>,
 
+    /// If there are any transparent voxels, and `transparency_format` is
+    /// [`TransparencyFormat::BoundingBox`], this is their bounding box.
+    pub(crate) transparent_bounding_box: Option<GridAab>,
+
     resolution: Resolution,
 
     /// Whether there are any adjacent visible voxels that have different colors, and therefore
@@ -71,6 +73,7 @@ impl Analysis {
     pub const EMPTY: Self = {
         Analysis {
             occupied_planes: FaceMap::splat_copy([EMPTY_PLANE_BOX; MAX_PLANES]),
+            transparent_bounding_box: None,
             needs_texture: false,
             resolution: Resolution::R1,
         }
@@ -151,7 +154,12 @@ impl Analysis {
 /// Analyze a block's voxel array and find characteristics its mesh will have.
 ///
 /// This is a preliminary step before creating the actual vertices and texture of a `BlockMesh`.
-pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut Viz) -> Analysis {
+pub(crate) fn analyze(
+    resolution: Resolution,
+    voxels: Vol<&[Evoxel]>,
+    transparency: TransparencyFormat,
+    viz: &mut Viz,
+) -> Analysis {
     let mut analysis = Analysis::EMPTY;
     analysis.resolution = resolution;
     viz.analysis_in_progress(&analysis);
@@ -162,7 +170,7 @@ pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut 
 
     for (center, window_voxels) in windows(voxels) {
         viz.window(center, voxels);
-        analyze_one_window(&mut analysis, center, window_voxels, viz);
+        analyze_one_window(&mut analysis, center, window_voxels, transparency, viz);
         viz.analysis_in_progress(&analysis);
     }
     viz.clear_window();
@@ -176,6 +184,7 @@ fn analyze_one_window(
     analysis: &mut Analysis,
     center: GridPoint,
     window: OctantMap<&Evoxel>,
+    transparency: TransparencyFormat,
     viz: &mut Viz,
 ) {
     use Face6::*;
@@ -183,8 +192,37 @@ fn analyze_one_window(
     const NONE: OctantMask = OctantMask::NONE;
 
     let opaque = window.to_mask(|voxel| voxel.opacity_category() == OpacityCategory::Opaque);
-    let semitransparent =
-        window.to_mask(|voxel| voxel.opacity_category() == OpacityCategory::Partial);
+    let semitransparent = match transparency {
+        TransparencyFormat::Surfaces => {
+            window.to_mask(|voxel| voxel.opacity_category() == OpacityCategory::Partial)
+        }
+        TransparencyFormat::BoundingBox => {
+            if window[Octant::Ppp].opacity_category() == OpacityCategory::Partial
+                && transparency == TransparencyFormat::BoundingBox
+            {
+                let cube = Cube::from(center);
+                match &mut analysis.transparent_bounding_box {
+                    Some(v) => {
+                        *v = {
+                            // If there is more than one voxel involved, assume we need a texture.
+                            // We have to check this separately from the regular needs_texture check
+                            // below because in this mode we disable having it look at transparent
+                            // voxels.
+                            // In principle we should check color uniformity too,
+                            // but making use of that will also require extra support.
+                            analysis.needs_texture = true;
+
+                            v.union_cube(cube)
+                        }
+                    }
+                    v @ None => *v = Some(cube.grid_aab()),
+                }
+            }
+
+            // If using bounding box format, disregard transparent voxel surfaces.
+            NONE
+        }
+    };
     let renderable = opaque | semitransparent;
 
     // First, quickly check if there are any visible surfaces at all here.
@@ -333,9 +371,10 @@ mod tests {
     #[test]
     fn analysis_size() {
         let plane_box_size = 16; // 4 × i32
+        assert_eq!(size_of::<PlaneBox>(), plane_box_size);
         let planes_per_face = MAX_PLANES;
         let faces = Face6::ALL.len();
-        let other_fields = 16; // 2 byte-sized fields, aligned to 16
+        let other_fields = 32; // One GridAab + 2 byte-sized fields, aligned to 16
         assert_eq!(
             dbg!(size_of::<Analysis>()),
             plane_box_size * planes_per_face * faces + other_fields
@@ -352,6 +391,7 @@ mod tests {
         let analysis = analyze(
             ev.resolution(),
             ev.voxels().as_vol_ref(),
+            TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
         );
 
@@ -406,10 +446,39 @@ mod tests {
         let analysis = analyze(
             Resolution::R1,
             Vol::from_elements(GridAab::for_block(Resolution::R1), [voxel].as_slice()).unwrap(),
+            TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
         );
 
         assert!(analysis.occupied_planes(Face6::NX).next().is_some());
+    }
+
+    // TODO: We have no test coverage for uniform-color transparent blocks
+    #[test]
+    fn transparent_volume_counts_as_needs_texture() {
+        let mut u = Universe::new();
+
+        let block = Block::builder()
+            .voxels_fn(Resolution::R4, |cube| {
+                Block::from(Rgba::new(cube.x as f32 * 0.1, 0.0, 0.0, 0.5))
+            })
+            .unwrap()
+            .build_into(&mut u);
+        let ev = block.evaluate().unwrap();
+        let analysis = analyze(
+            ev.resolution(),
+            ev.voxels().as_vol_ref(),
+            TransparencyFormat::BoundingBox,
+            &mut Viz::disabled(),
+        );
+
+        // No occupied planes, but...
+        assert_eq!(
+            FaceMap::from_fn(|f| analysis.occupied_planes(f).collect_vec()),
+            FaceMap::splat(vec![]),
+        );
+        // ...still needs the texture.
+        assert!(analysis.needs_texture);
     }
 
     /// Regression test: don’t consider the insides of partially-transparent volumes occupied.
@@ -425,6 +494,7 @@ mod tests {
         let analysis = analyze(
             ev.resolution(),
             ev.voxels().as_vol_ref(),
+            TransparencyFormat::Surfaces,
             &mut Viz::disabled(),
         );
 

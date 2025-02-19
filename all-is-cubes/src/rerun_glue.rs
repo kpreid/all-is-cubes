@@ -121,6 +121,7 @@ pub enum ClassId {
     // These are used by `all_is_cubes_mesh`'s mesh generation debug visualization.
     MeshVizBlockBounds,
     MeshVizVoxelBounds,
+    MeshVizTransparentBounds,
     MeshVizOccupiedPlane,
     MeshVizWipWindow,
     MeshVizWipPlane,
@@ -151,6 +152,7 @@ fn annotation_context() -> archetypes::AnnotationContext {
 
         (C::MeshVizBlockBounds, "", rgba_const!(0.15, 0.15, 0.15, 1.0)),
         (C::MeshVizVoxelBounds, "", rgba_const!(0.15, 0.15, 0.15, 1.0)),
+        (C::MeshVizTransparentBounds, "", rgba_const!(0.15, 1.0, 0.15, 1.0)),
         (C::MeshVizOccupiedPlane, "", rgba_const!(0.3, 0.3, 0.0, 1.0)),
         (C::MeshVizWipWindow, "", rgba_const!(1.0, 0.0, 1.0, 1.0)),
         (C::MeshVizWipPlane, "", rgba_const!(1.0, 0.0, 1.0, 1.0)),
