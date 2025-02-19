@@ -97,7 +97,7 @@ impl Viz {
                 analysis_vertices_path: rg::entity_path!["analysis_vertices"],
                 resolution: None,
                 data_bounds: None,
-                analysis: Analysis::empty(),
+                analysis: Analysis::EMPTY,
                 analysis_vertices: Vec::new(),
                 analysis_vertices_dirty: false,
                 mesh_edge_positions: Vec::new(),

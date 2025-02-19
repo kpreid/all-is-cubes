@@ -68,13 +68,13 @@ fn unflatten(
 }
 
 impl Analysis {
-    pub fn empty() -> Self {
+    pub const EMPTY: Self = {
         Analysis {
-            occupied_planes: FaceMap::splat([EMPTY_PLANE_BOX; MAX_PLANES]),
+            occupied_planes: FaceMap::splat_copy([EMPTY_PLANE_BOX; MAX_PLANES]),
             needs_texture: false,
             resolution: Resolution::R1,
         }
-    }
+    };
 
     /// For each face normal, which depths will need any triangles generated.
     /// Index 0 is depth 0 (the surface of the block volume), index 1 is one voxel
@@ -152,7 +152,7 @@ impl Analysis {
 ///
 /// This is a preliminary step before creating the actual vertices and texture of a `BlockMesh`.
 pub(crate) fn analyze(resolution: Resolution, voxels: Vol<&[Evoxel]>, viz: &mut Viz) -> Analysis {
-    let mut analysis = Analysis::empty();
+    let mut analysis = Analysis::EMPTY;
     analysis.resolution = resolution;
     viz.analysis_in_progress(&analysis);
 
