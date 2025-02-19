@@ -30,27 +30,13 @@ fn block_mesh_benches(c: &mut Criterion) {
     g.bench_function("checker-new", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(&mut universe, &[AIR, color_block!(Rgba::WHITE)]);
-        let ev = block.evaluate().unwrap();
-
-        b.iter_batched_ref(
-            || (),
-            |()| BlockMesh::<Mt>::new(&ev, &Allocator::new(), options),
-            BatchSize::SmallInput,
-        );
+        iter_new_block_mesh(b, options, &block);
     });
 
     g.bench_function("checker-reused", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(&mut universe, &[AIR, color_block!(Rgba::WHITE)]);
-        let ev = block.evaluate().unwrap();
-
-        let mut shared_mesh = BlockMesh::<Mt>::default();
-
-        b.iter_batched_ref(
-            || (),
-            |()| shared_mesh.compute(&ev, &Allocator::new(), options),
-            BatchSize::SmallInput,
-        );
+        iter_reused_block_mesh(b, options, &block);
     });
 
     g.bench_function("half", |b| {
@@ -65,13 +51,7 @@ fn block_mesh_benches(c: &mut Criterion) {
                 universe.insert_anonymous(half_space(&color_block!(Rgba::WHITE))),
             )
             .build();
-        let ev = block.evaluate().unwrap();
-
-        b.iter_batched_ref(
-            || (),
-            |()| BlockMesh::<Mt>::new(&ev, &Allocator::new(), options),
-            BatchSize::SmallInput,
-        );
+        iter_new_block_mesh(b, options, &block);
     });
 
     g.bench_function("opaque", |b| {
@@ -80,28 +60,35 @@ fn block_mesh_benches(c: &mut Criterion) {
             &mut universe,
             &[color_block!(Rgba::BLACK), color_block!(Rgba::WHITE)],
         );
-        let ev = block.evaluate().unwrap();
-
-        b.iter_batched_ref(
-            || (),
-            |()| BlockMesh::<Mt>::new(&ev, &Allocator::new(), options),
-            BatchSize::SmallInput,
-        );
+        iter_new_block_mesh(b, options, &block);
     });
 
     g.bench_function("msvb", |b| {
         let mut universe = Universe::new();
         let [block] = make_some_voxel_blocks(&mut universe);
-        let ev = block.evaluate().unwrap();
-
-        b.iter_batched_ref(
-            || (),
-            |()| BlockMesh::<Mt>::new(&ev, &Allocator::new(), options),
-            BatchSize::SmallInput,
-        );
+        iter_new_block_mesh(b, options, &block);
     });
 
     // TODO: Add meshing a block that has a complex but not worst-case shape.
+}
+
+fn iter_reused_block_mesh(b: &mut criterion::Bencher<'_>, options: &MeshOptions, block: &Block) {
+    let evaluated = block.evaluate().unwrap();
+    let mut shared_mesh = BlockMesh::<Mt>::default();
+    b.iter_batched_ref(
+        || (),
+        |()| shared_mesh.compute(&evaluated, &Allocator::new(), options),
+        BatchSize::SmallInput,
+    );
+}
+
+fn iter_new_block_mesh(b: &mut criterion::Bencher<'_>, options: &MeshOptions, block: &Block) {
+    let evaluated = block.evaluate().unwrap();
+    b.iter_batched_ref(
+        || (),
+        |()| BlockMesh::<Mt>::new(&evaluated, &Allocator::new(), options),
+        BatchSize::SmallInput,
+    );
 }
 
 fn space_mesh_benches(c: &mut Criterion) {
