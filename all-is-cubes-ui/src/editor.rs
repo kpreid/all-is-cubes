@@ -5,7 +5,7 @@ use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use all_is_cubes::arcstr::{self, literal, ArcStr};
+use all_is_cubes::arcstr::{self, ArcStr, literal};
 use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::size3;

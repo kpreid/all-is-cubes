@@ -4,7 +4,7 @@
 
 use all_is_cubes::inv;
 use all_is_cubes::op::Operation;
-use allocation_counter::{measure, AllocationInfo};
+use allocation_counter::{AllocationInfo, measure};
 
 use all_is_cubes::block::{self, BlockAttributes};
 use all_is_cubes::universe::Universe;

@@ -1,7 +1,7 @@
 //! Cloud generation.
 
-use all_is_cubes::block::{Block, BlockCollision, AIR};
-use all_is_cubes::math::{zo32, GridAab, GridCoordinate, GridPoint, Rgb};
+use all_is_cubes::block::{AIR, Block, BlockCollision};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, Rgb, zo32};
 use all_is_cubes::space::{SetCubeError, Space};
 
 use crate::alg::NoiseFnExt as _;

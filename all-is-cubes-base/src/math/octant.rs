@@ -1,6 +1,6 @@
 use core::{fmt, ops};
 
-use euclid::{vec3, Vector3D};
+use euclid::{Vector3D, vec3};
 
 use crate::math::{Cube, Face6, FreeVector, GridCoordinate, GridPoint};
 
@@ -469,8 +469,8 @@ impl<T> ops::IndexMut<Octant> for OctantMap<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use euclid::vec3;
     use Face6::*;
+    use euclid::vec3;
 
     #[test]
     fn reflect() {

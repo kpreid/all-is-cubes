@@ -41,7 +41,6 @@ impl UniverseSource {
 
         // TODO: figure out a cleaner way to wrangle this rx hookup
         let notif_rx = Mutex::new(TryRecvKeep::Rx(notif_rx));
-        #[allow(unknown_lints)] // TODO: Remove in Rust 1.85
         #[allow(clippy::literal_string_with_formatting_args)]
         let universe_progress_bar = logging::new_progress_bar(100)
             .with_style(
@@ -93,7 +92,7 @@ impl UniverseSource {
             }
             UniverseSource::Template(template, TemplateParameters { seed, size }) => {
                 let seed: u64 = seed.unwrap_or_else(|| {
-                    let seed = rand::thread_rng().gen();
+                    let seed = rand::thread_rng().r#gen();
                     log::info!("Randomly chosen universe seed: {seed}");
                     seed
                 });

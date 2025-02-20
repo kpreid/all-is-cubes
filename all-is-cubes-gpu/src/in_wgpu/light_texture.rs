@@ -15,14 +15,14 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::Space;
 use all_is_cubes::{
-    euclid::{vec3, Box3D, Point3D, Size3D, Vector3D},
+    euclid::{Box3D, Point3D, Size3D, Vector3D, vec3},
     math::VectorOps,
 };
 use all_is_cubes_render::camera::Camera;
 
 use crate::{
-    in_wgpu::glue::{extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab},
     Identified,
+    in_wgpu::glue::{extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab},
 };
 
 type Texel = [u8; LightTexture::COMPONENTS];

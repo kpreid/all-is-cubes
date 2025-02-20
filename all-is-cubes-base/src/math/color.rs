@@ -4,7 +4,7 @@ use core::fmt;
 use core::iter::Sum;
 use core::ops::{Add, AddAssign, Mul};
 
-use euclid::{vec3, Vector3D};
+use euclid::{Vector3D, vec3};
 use ordered_float::NotNan;
 
 /// Acts as polyfill for float methods

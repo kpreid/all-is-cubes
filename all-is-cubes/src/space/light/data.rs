@@ -13,7 +13,7 @@ use euclid::vec3;
 )]
 use num_traits::float::Float as _;
 
-use crate::math::{ps32, PositiveSign, Rgb};
+use crate::math::{PositiveSign, Rgb, ps32};
 
 #[cfg(doc)]
 use crate::space::{self, Space};

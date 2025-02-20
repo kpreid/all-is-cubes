@@ -6,8 +6,8 @@ use futures_core::future::BoxFuture;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
-use crate::file;
 use crate::Format;
+use crate::file;
 
 /// Load a [`Universe`] described by the given file (of guessed format).
 ///

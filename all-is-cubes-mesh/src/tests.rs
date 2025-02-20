@@ -5,28 +5,27 @@ use alloc::vec::Vec;
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{
-    self, Block,
+    self, AIR, Block,
     Resolution::{self, *},
-    AIR,
 };
 use all_is_cubes::color_block;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
-use all_is_cubes::euclid::{point3, Point3D, Vector3D};
+use all_is_cubes::euclid::{Point3D, Vector3D, point3};
 use all_is_cubes::math::{
-    zo32, Aab, Cube,
+    Aab, Cube,
     Face6::{self, *},
-    FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba,
+    FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
-use all_is_cubes_render::camera::TransparencyOption;
 use all_is_cubes_render::Flaws;
+use all_is_cubes_render::camera::TransparencyOption;
 
-use crate::testing::{mesh_blocks_and_space, Allocator, TexPoint, TextureMt};
+use crate::testing::{Allocator, TexPoint, TextureMt, mesh_blocks_and_space};
 use crate::texture::TexelUnit;
 use crate::{
-    block_meshes_for_space, BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering,
-    IndexSlice, MeshOptions, MeshTypes, SpaceMesh,
+    BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering, IndexSlice, MeshOptions,
+    MeshTypes, SpaceMesh, block_meshes_for_space,
 };
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.

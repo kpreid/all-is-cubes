@@ -4,7 +4,7 @@ use core::ops;
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
-use crate::block::{Atom, Primitive, AIR};
+use crate::block::{AIR, Atom, Primitive};
 
 use crate::block::{
     BlockAttributes, BlockCollision, EvaluatedBlock,

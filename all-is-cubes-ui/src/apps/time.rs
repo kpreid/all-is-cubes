@@ -1,4 +1,4 @@
-use all_is_cubes::math::{zo64, PositiveSign, ZeroOne};
+use all_is_cubes::math::{PositiveSign, ZeroOne, zo64};
 use all_is_cubes::time::{Duration, Instant, TickSchedule};
 #[cfg(doc)]
 use all_is_cubes::universe::Universe;

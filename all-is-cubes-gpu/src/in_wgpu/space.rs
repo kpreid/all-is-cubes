@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use core::mem;
 use core::sync::atomic;
 use core::time::Duration;
-use std::sync::{mpsc, Mutex};
+use std::sync::{Mutex, mpsc};
 
 use hashbrown::HashSet;
 use itertools::Itertools as _;
@@ -18,8 +18,8 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
-    rgba_const, Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, GridSize,
-    GridVector, Rgb, Rgba, Wireframe as _, ZeroOne,
+    Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, GridSize, GridVector,
+    Rgb, Rgba, Wireframe as _, ZeroOne, rgba_const,
 };
 use all_is_cubes::raycast::Ray;
 #[cfg(feature = "rerun")]
@@ -40,13 +40,13 @@ use crate::in_wgpu::light_texture::LightChunk;
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::skybox;
 use crate::in_wgpu::vertex::{WgpuInstanceData, WgpuLinesVertex};
+use crate::in_wgpu::{LightTexture, WgpuMt};
 use crate::in_wgpu::{
     block_texture::AtlasAllocator,
     camera::ShaderSpaceCamera,
-    glue::{to_wgpu_index_range, BeltWritingParts, ResizingBuffer},
+    glue::{BeltWritingParts, ResizingBuffer, to_wgpu_index_range},
     vertex::WgpuBlockVertex,
 };
-use crate::in_wgpu::{LightTexture, WgpuMt};
 use crate::{DebugLineVertex, Memo, Msw, SpaceDrawInfo, SpaceUpdateInfo};
 
 // temporarily public for a lighting kludge

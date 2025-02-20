@@ -15,16 +15,16 @@ use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 use all_is_cubes::{space, transaction};
+use all_is_cubes_render::Rendering;
 use all_is_cubes_render::camera::Viewport;
 use all_is_cubes_render::raytracer::ortho::render_orthographic;
-use all_is_cubes_render::Rendering;
 
 use all_is_cubes_ui::apps::{Key, Session};
 use all_is_cubes_ui::notification::NotificationContent;
 use all_is_cubes_ui::vui::{self, widgets};
 
-use test_renderers::test_cases::u;
 use test_renderers::RenderTestContext;
+use test_renderers::test_cases::u;
 
 #[tokio::main]
 async fn main() -> test_renderers::HarnessResult {

@@ -2,7 +2,7 @@ use alloc::vec;
 use core::mem;
 
 use crate::block::{
-    self, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1, AIR,
+    self, AIR, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, Resolution::R1,
 };
 use crate::math::{
     Cube, GridAab, GridCoordinate, GridPoint, GridRotation, GridSize, GridVector, PositiveSign,
@@ -689,13 +689,13 @@ mod tests {
     use super::*;
     use crate::block::{EvKey, EvaluatedBlock, Resolution::*};
     use crate::content::{make_slab, make_some_blocks};
-    use crate::math::{zo32, Rgba};
+    use crate::math::{Rgba, zo32};
     use crate::space::Space;
     use crate::time;
     use crate::universe::Universe;
-    use pretty_assertions::assert_eq;
     use BlockCollision::{Hard, None as CNone};
     use CompositeOperator::{Atop, In, Over};
+    use pretty_assertions::assert_eq;
 
     // --- Helpers ---
 

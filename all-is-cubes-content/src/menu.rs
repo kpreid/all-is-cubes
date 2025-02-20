@@ -16,7 +16,7 @@ use all_is_cubes::transaction::{self, Merge, Transaction as _};
 use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::logo::logo_text;
-use all_is_cubes_ui::vui::{self, install_widgets, widgets, Align, LayoutTree, Layoutable as _};
+use all_is_cubes_ui::vui::{self, Align, LayoutTree, Layoutable as _, install_widgets, widgets};
 
 use crate::UniverseTemplate;
 

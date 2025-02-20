@@ -10,7 +10,7 @@ use core::future::Future;
 use std::io::Write as _;
 
 use all_is_cubes::euclid::Size3D;
-use all_is_cubes_render::{camera, Flaws, Rendering};
+use all_is_cubes_render::{Flaws, Rendering, camera};
 
 /// Create a [`wgpu::Instance`] controlled by environment variables.
 /// Then, check if the instance has any usable adapters,
@@ -215,7 +215,7 @@ where
 pub fn map_really_async(
     device: wgpu::Device,
     buffer: &wgpu::Buffer,
-) -> impl Future<Output = Result<(), wgpu::BufferAsyncError>> {
+) -> impl Future<Output = Result<(), wgpu::BufferAsyncError>> + use<> {
     let (sender, receiver) = futures_channel::oneshot::channel();
     buffer.slice(..).map_async(wgpu::MapMode::Read, |result| {
         let _ = sender.send(result);

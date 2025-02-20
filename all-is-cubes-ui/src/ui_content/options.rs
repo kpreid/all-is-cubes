@@ -5,12 +5,12 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::arcstr::{self, literal};
-use all_is_cubes::math::{zo32, Face6};
+use all_is_cubes::math::{Face6, zo32};
 use all_is_cubes_render::camera::{self, AntialiasingOption, GraphicsOptions};
 
 use crate::apps::ControlMessage;
 use crate::ui_content::hud::HudInputs;
-use crate::vui::{self, widgets, LayoutTree, UiBlocks, Widget, WidgetTree};
+use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree, widgets};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum OptionsStyle {

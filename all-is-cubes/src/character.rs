@@ -18,7 +18,7 @@ use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
 use crate::listen;
-use crate::math::{notnan, Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector};
+use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, notnan};
 use crate::physics;
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
 #[cfg(feature = "save")]

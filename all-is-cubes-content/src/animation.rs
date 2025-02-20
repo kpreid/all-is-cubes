@@ -9,11 +9,11 @@ use core::time::Duration;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
-use all_is_cubes::block::{self, Block, BlockCollision, AIR};
+use all_is_cubes::block::{self, AIR, Block, BlockCollision};
 use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{
-    rgba_const, Cube, GridAab, GridPoint, GridRotation, GridVector, Rgba, Vol,
+    Cube, GridAab, GridPoint, GridRotation, GridVector, Rgba, Vol, rgba_const,
 };
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;

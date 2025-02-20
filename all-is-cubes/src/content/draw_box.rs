@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::ops;
 
-use euclid::{vec3, Vector3D};
+use euclid::{Vector3D, vec3};
 
 use crate::block::{self, Block, Resolution};
 use crate::math::{Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};

@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use all_is_cubes::block::{Evoxel, Resolution};
-use all_is_cubes::euclid::{point3, Point2D};
+use all_is_cubes::euclid::{Point2D, point3};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, GridCoordinate, GridPoint, OctantMap, OctantMask, OpacityCategory,
     Vol,
@@ -297,7 +297,7 @@ mod tests {
     use all_is_cubes::block::Block;
     use all_is_cubes::color_block;
     use all_is_cubes::euclid::{point2, size2};
-    use all_is_cubes::math::{rgba_const, GridAab, Rgb, Rgba, ZMaj};
+    use all_is_cubes::math::{GridAab, Rgb, Rgba, ZMaj, rgba_const};
     use all_is_cubes::universe::Universe;
     use alloc::sync::Arc;
     use alloc::vec::Vec;

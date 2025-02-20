@@ -8,8 +8,8 @@ use euclid::Vector3D;
 use manyfmt::Refmt;
 
 use crate::math::{
-    sort_two, Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, GridIter,
-    GridPoint, GridSize, GridSizeCoord, GridVector, Gridgid, Vol,
+    Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, GridIter,
+    GridPoint, GridSize, GridSizeCoord, GridVector, Gridgid, Vol, sort_two,
 };
 use crate::resolution::Resolution;
 use crate::util::ConciseDebug;

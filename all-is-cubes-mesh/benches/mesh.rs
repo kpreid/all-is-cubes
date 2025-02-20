@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 
-use criterion::{criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_main};
 
-use all_is_cubes::block::{Block, Resolution::R16, AIR};
+use all_is_cubes::block::{AIR, Block, Resolution::R16};
 use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_voxel_blocks;
 use all_is_cubes::math::{GridAab, Rgba};
@@ -11,7 +11,7 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes_render::camera::GraphicsOptions;
 
 use all_is_cubes_mesh::testing::{Allocator, TextureMt as Mt};
-use all_is_cubes_mesh::{block_meshes_for_space, BlockMesh, BlockMeshes, MeshOptions, SpaceMesh};
+use all_is_cubes_mesh::{BlockMesh, BlockMeshes, MeshOptions, SpaceMesh, block_meshes_for_space};
 
 criterion_main!(benches);
 fn benches() {
@@ -168,8 +168,8 @@ fn dynamic_benches(c: &mut Criterion) {
     use all_is_cubes::time;
     use all_is_cubes::universe::{Handle, Name};
     use all_is_cubes_mesh::dynamic;
-    use all_is_cubes_render::camera::{Camera, Viewport};
     use all_is_cubes_render::Flaws;
+    use all_is_cubes_render::camera::{Camera, Viewport};
 
     let mut g = c.benchmark_group("dynamic");
     let graphics_options = GraphicsOptions::default();

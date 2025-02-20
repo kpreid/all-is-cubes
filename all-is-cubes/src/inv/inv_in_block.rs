@@ -265,7 +265,7 @@ impl<'a> arbitrary::Arbitrary<'a> for IconRow {
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::{size_hint::and_all, Arbitrary};
+        use arbitrary::{Arbitrary, size_hint::and_all};
         and_all(&[
             <usize as Arbitrary>::size_hint(depth),
             <usize as Arbitrary>::size_hint(depth),

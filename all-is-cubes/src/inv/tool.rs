@@ -5,7 +5,7 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use core::{fmt, hash};
 
-use crate::block::{self, Block, Primitive, RotationPlacementRule, AIR};
+use crate::block::{self, AIR, Block, Primitive, RotationPlacementRule};
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
 use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
@@ -620,7 +620,7 @@ impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaq
     fn try_size_hint(
         depth: usize,
     ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
-        use arbitrary::{size_hint, Arbitrary};
+        use arbitrary::{Arbitrary, size_hint};
         size_hint::try_recursion_guard(depth, |depth| {
             Ok(size_hint::and(
                 <bool as Arbitrary>::size_hint(depth),
@@ -636,7 +636,7 @@ mod tests {
     use crate::character::cursor_raycast;
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::inv::Slot;
-    use crate::math::{rgba_const, FreeCoordinate};
+    use crate::math::{FreeCoordinate, rgba_const};
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
     use crate::transaction;

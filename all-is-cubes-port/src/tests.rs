@@ -7,12 +7,12 @@ async fn port_whence_load_then_save() {
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
-    use all_is_cubes::block::BlockDef;
     use all_is_cubes::block::AIR;
+    use all_is_cubes::block::BlockDef;
     use all_is_cubes::universe::Universe;
     use all_is_cubes::util::yield_progress_for_testing;
 
-    use crate::{export_to_path, load_universe_from_file, ExportSet, Format};
+    use crate::{ExportSet, Format, export_to_path, load_universe_from_file};
     use std::path::PathBuf;
 
     let tmp_dir = tempfile::tempdir().unwrap();

@@ -3,7 +3,7 @@ use num_traits::Euclid as _;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
-use crate::block::{Block, AIR};
+use crate::block::{AIR, Block};
 use crate::character::Spawn;
 use crate::color_block;
 use crate::content::{free_editing_starter_inventory, palette};

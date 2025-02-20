@@ -9,21 +9,21 @@ use std::sync::Arc;
 
 use exhaust::Exhaust as _;
 
-use all_is_cubes::block::{Block, Resolution::*, AIR};
+use all_is_cubes::block::{AIR, Block, Resolution::*};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::color_block;
-use all_is_cubes::euclid::{point3, size2, size3, vec2, vec3, Point2D, Size2D, Size3D, Vector3D};
+use all_is_cubes::euclid::{Point2D, Size2D, Size3D, Vector3D, point3, size2, size3, vec2, vec3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{
-    ps32, rgb_const, rgba_const, zo32, Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate,
-    GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol,
+    Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
+    GridVector, Rgb, Rgba, Vol, ps32, rgb_const, rgba_const, zo32,
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Handle, HandleError, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
-use all_is_cubes_content::{make_some_voxel_blocks, palette, UniverseTemplate};
+use all_is_cubes_content::{UniverseTemplate, make_some_voxel_blocks, palette};
 use all_is_cubes_render::camera::{
     AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, LightingOption,
     StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState, ViewTransform, Viewport,
@@ -31,8 +31,8 @@ use all_is_cubes_render::camera::{
 use all_is_cubes_render::{Flaws, RenderError};
 
 use crate::{
-    finish_universe_from_space, Overlays, RenderTestContext, TestCaseCollector, Threshold,
-    UniverseFuture, COMMON_VIEWPORT,
+    COMMON_VIEWPORT, Overlays, RenderTestContext, TestCaseCollector, Threshold, UniverseFuture,
+    finish_universe_from_space,
 };
 
 /// Function to be called by the custom test harness to find all tests.
@@ -581,11 +581,10 @@ async fn icons(mut context: RenderTestContext) {
     use all_is_cubes::inv::Icons;
     use all_is_cubes::linking::{BlockModule, BlockProvider};
     use all_is_cubes_ui::vui::{
-        self,
+        self, Align,
         blocks::UiBlocks,
         widgets,
         widgets::{ToolbarButtonState, WidgetBlocks, WidgetTheme},
-        Align,
     };
 
     let universe = &mut Universe::new();

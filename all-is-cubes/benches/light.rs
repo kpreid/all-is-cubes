@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 
 use all_is_cubes::content::testing::lighting_bench_space;
 use all_is_cubes::euclid::size3;

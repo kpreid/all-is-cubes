@@ -1045,9 +1045,9 @@ impl DepthOrdering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{mesh_blocks_and_space, NoTextureMt, TexPoint, TextureMt};
+    use crate::testing::{NoTextureMt, TexPoint, TextureMt, mesh_blocks_and_space};
     use crate::texture::NoTextures;
-    use crate::{block_meshes_for_space, BlockVertex};
+    use crate::{BlockVertex, block_meshes_for_space};
     use all_is_cubes::color_block;
     use all_is_cubes::math::Rgba;
     use all_is_cubes_render::camera::GraphicsOptions;

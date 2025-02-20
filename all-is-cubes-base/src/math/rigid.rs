@@ -176,8 +176,8 @@ fn transpose_vector_option<T, U>(v: Vector3D<Option<T>, U>) -> Option<Vector3D<T
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::seq::SliceRandom as _;
     use rand::SeedableRng as _;
+    use rand::seq::SliceRandom as _;
     use rand_xoshiro::Xoshiro256Plus;
 
     fn random_gridgid(mut rng: impl rand::Rng) -> Gridgid {

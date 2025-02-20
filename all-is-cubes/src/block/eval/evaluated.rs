@@ -19,7 +19,7 @@ use crate::math::{Face6, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
-use crate::block::{Handle, AIR};
+use crate::block::{AIR, Handle};
 
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
 /// and physics, and does not require dereferencing [`Handle`]s or unbounded computation.

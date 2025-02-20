@@ -17,9 +17,9 @@ use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_desktop::logging::LoggingArgs;
 use all_is_cubes_render::camera;
 
+use all_is_cubes_desktop::UniverseSource;
 #[cfg(feature = "record")]
 use all_is_cubes_desktop::record::{RecordAnimationOptions, RecordFormat, RecordOptions};
-use all_is_cubes_desktop::UniverseSource;
 
 #[derive(Clone, Debug, Parser)]
 #[command(

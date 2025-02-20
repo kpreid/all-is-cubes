@@ -111,7 +111,7 @@ impl vui::Widget for Voxels {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vui::{instantiate_widget, Align};
+    use crate::vui::{Align, instantiate_widget};
     use all_is_cubes::block::Resolution::*;
 
     use all_is_cubes::euclid::Vector3D;

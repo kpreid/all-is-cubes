@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::mem;
 
-use crate::block::{self, Block, AIR};
+use crate::block::{self, AIR, Block};
 use crate::inv::{self, Inventory, InventoryTransaction};
 use crate::math::{Cube, Face6, GridAab, GridRotation, Gridgid};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};

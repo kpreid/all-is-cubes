@@ -4,8 +4,8 @@ use core::error::Error;
 use core::fmt;
 
 use crate::universe::Universe;
-use crate::util::maybe_sync::MaybeLocalBoxFuture;
 use crate::util::YieldProgress;
+use crate::util::maybe_sync::MaybeLocalBoxFuture;
 
 /// Specifies a file or other data storage a [`Universe`] can be read from or written to.
 ///

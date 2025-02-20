@@ -6,7 +6,7 @@ use std::{fs, io};
 
 use tinytemplate::TinyTemplate;
 
-use crate::{test_data_dir_path, ComparisonRecord, RendererId, SuiteId, TestId, Version};
+use crate::{ComparisonRecord, RendererId, SuiteId, TestId, Version, test_data_dir_path};
 
 /// Record of what happened when a specific test case was run with a specific renderer.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]

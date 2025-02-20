@@ -224,13 +224,13 @@ impl listen::Store<SpaceChange> for SrtTodo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::camera::{eye_for_look_at, Camera, Viewport};
+    use crate::camera::{Camera, Viewport, eye_for_look_at};
     use crate::content::make_some_voxel_blocks;
     use crate::raytracer::{CharacterBuf, CharacterRtData};
     use crate::universe::Universe;
     use alloc::string::ToString;
     use euclid::{size2, vec3};
-    use manyfmt::{formats::Unquote, Refmt};
+    use manyfmt::{Refmt, formats::Unquote};
     use pretty_assertions::assert_eq;
 
     struct EquivalenceTester {

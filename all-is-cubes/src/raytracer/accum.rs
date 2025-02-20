@@ -4,7 +4,7 @@ use euclid::Vector3D;
 
 use crate::block::Resolution;
 use crate::camera::GraphicsOptions;
-use crate::math::{rgb_const, zo32, Intensity, Rgb, Rgba, ZeroOne};
+use crate::math::{Intensity, Rgb, Rgba, ZeroOne, rgb_const, zo32};
 use crate::space::SpaceBlockData;
 
 /// Borrowed data which may be used to customize the result of raytracing.

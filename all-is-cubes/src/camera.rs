@@ -2,7 +2,7 @@
 
 use all_is_cubes_base::math::ps64;
 use euclid::{
-    point3, vec3, Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D,
+    Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D, point3, vec3,
 };
 use itertools::Itertools as _;
 use num_traits::ConstOne as _;
@@ -524,11 +524,7 @@ impl Viewport {
     #[inline]
     pub fn nominal_aspect_ratio(&self) -> FreeCoordinate {
         let ratio = self.nominal_size.width / self.nominal_size.height;
-        if ratio.is_finite() {
-            ratio
-        } else {
-            1.0
-        }
+        if ratio.is_finite() { ratio } else { 1.0 }
     }
 
     /// Convert an *x* coordinate from the range `0..self.framebuffer_size.x` (upper exclusive)

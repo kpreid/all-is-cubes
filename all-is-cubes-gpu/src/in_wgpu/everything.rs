@@ -6,7 +6,7 @@ use core::mem;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::{pixelcolor::Gray8, Drawable as _};
+use all_is_cubes::drawing::embedded_graphics::{Drawable as _, pixelcolor::Gray8};
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::math::VectorOps as _;
 use all_is_cubes::time;
@@ -28,12 +28,12 @@ use crate::in_wgpu::shaders::Shaders;
 use crate::in_wgpu::vertex::WgpuLinesVertex;
 use crate::in_wgpu::{DrawableTexture, FramebufferTextures, SpaceRenderer};
 use crate::{
-    gather_debug_lines, wireframe_vertices, DrawInfo, FrameBudget, SpaceDrawInfo, SpaceUpdateInfo,
-    UpdateInfo,
+    DrawInfo, FrameBudget, SpaceDrawInfo, SpaceUpdateInfo, UpdateInfo, gather_debug_lines,
+    wireframe_vertices,
 };
 
 #[cfg(feature = "rerun")]
-use crate::{in_wgpu::rerun_image, RerunFilter};
+use crate::{RerunFilter, in_wgpu::rerun_image};
 
 // -------------------------------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use all_is_cubes_ui::apps::Settings;
 use directories_next::ProjectDirs;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use all_is_cubes_render::camera::GraphicsOptions;
 

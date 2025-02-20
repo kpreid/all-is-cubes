@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use all_is_cubes::block::{Block, AIR};
+use all_is_cubes::block::{AIR, Block};
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen;
 use all_is_cubes::space::SpaceTransaction;

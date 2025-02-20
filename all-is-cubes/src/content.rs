@@ -6,12 +6,12 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use crate::arcstr::{literal, ArcStr};
+use crate::arcstr::{ArcStr, literal};
 use crate::block::{self, Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::color_block;
 use crate::inv::{Slot, Tool};
 use crate::math::{
-    rgb_const, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb, Rgba,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb, Rgba, rgb_const,
 };
 use crate::space::{SetCubeError, Space};
 use crate::transaction::Transactional as _;

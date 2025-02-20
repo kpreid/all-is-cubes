@@ -226,9 +226,9 @@ impl<N: fmt::Display> fmt::Display for IntoResolutionError<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use Resolution::*;
     use alloc::vec::Vec;
     use exhaust::Exhaust as _;
-    use Resolution::*;
 
     const RS: [Resolution; 8] = [R1, R2, R4, R8, R16, R32, R64, R128];
 

@@ -1,6 +1,6 @@
 //! Analyzes the scene around a character to choose a camera “exposure” (brightness scale) value.
 
-use euclid::{vec3, Point3D};
+use euclid::{Point3D, vec3};
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]

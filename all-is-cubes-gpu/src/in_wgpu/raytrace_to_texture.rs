@@ -9,21 +9,21 @@ use alloc::vec::Vec;
 use std::sync::Mutex;
 
 use half::f16;
-use rand::prelude::SliceRandom as _;
 use rand::SeedableRng as _;
+use rand::prelude::SliceRandom as _;
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use web_time::{Duration, Instant};
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::drawing::embedded_graphics::pixelcolor::PixelColor;
-use all_is_cubes::drawing::embedded_graphics::{draw_target::DrawTarget, prelude::Point, Pixel};
-use all_is_cubes::euclid::{point2, vec2, Box2D};
+use all_is_cubes::drawing::embedded_graphics::{Pixel, draw_target::DrawTarget, prelude::Point};
+use all_is_cubes::euclid::{Box2D, point2, vec2};
 use all_is_cubes::listen;
 use all_is_cubes::math::{Rgb, Rgba, VectorOps as _};
-use all_is_cubes_render::camera::{area_usize, Camera, StandardCameras, Viewport};
-use all_is_cubes_render::raytracer::{ColorBuf, RtRenderer};
 use all_is_cubes_render::RenderError;
+use all_is_cubes_render::camera::{Camera, StandardCameras, Viewport, area_usize};
+use all_is_cubes_render::raytracer::{ColorBuf, RtRenderer};
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
 use crate::in_wgpu::pipelines::Pipelines;

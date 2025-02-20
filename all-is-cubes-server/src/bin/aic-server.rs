@@ -6,7 +6,7 @@
 
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 
-use all_is_cubes_server::{start_server, AicClientSource};
+use all_is_cubes_server::{AicClientSource, start_server};
 
 #[derive(Debug, clap::Parser)]
 struct Args {

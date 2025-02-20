@@ -21,18 +21,20 @@ fn UI_BLOCKS(ctx: Context<'_>) {
 
     let widget_blocks = BlockProvider::<WidgetBlocks>::using(ctx.universe)?;
     let widget_blocks = widget_blocks
-            .iter()
-            .filter(|&(key, _)| match key {
-                // Filter out large number of pointer blocks
-                WidgetBlocks::ToolbarPointer([
+        .iter()
+        .filter(|&(key, _)| match key {
+            // Filter out large number of pointer blocks
+            WidgetBlocks::ToolbarPointer(
+                [
                     ToolbarButtonState::Unmapped,
                     ToolbarButtonState::Mapped,
-                    ToolbarButtonState::Pressed
-                ]) => true,
-                WidgetBlocks::ToolbarPointer(_) => false,
-                _ => true,
-            })
-            .map(|(_, block)| block.clone());
+                    ToolbarButtonState::Pressed,
+                ],
+            ) => true,
+            WidgetBlocks::ToolbarPointer(_) => false,
+            _ => true,
+        })
+        .map(|(_, block)| block.clone());
 
     let ui_blocks = BlockProvider::<UiBlocks>::using(ctx.universe)?;
     let ui_blocks = ui_blocks.iter().map(|(_, block)| block.clone());

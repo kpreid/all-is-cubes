@@ -5,7 +5,7 @@ use core::{fmt, ops};
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::util::{Fmt, Refmt, ShowStatus, StatusText};
 use all_is_cubes_mesh::dynamic::CsmUpdateInfo;
-use all_is_cubes_render::{camera::Layers, Flaws};
+use all_is_cubes_render::{Flaws, camera::Layers};
 
 /// Performance info about drawing an entire scene.
 ///

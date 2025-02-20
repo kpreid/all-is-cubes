@@ -8,8 +8,8 @@
 use pretty_assertions::assert_eq;
 
 use crate::block::{
-    self, Block, BlockChange, BlockDef, BlockDefTransaction, EvalBlockError, Modifier,
-    Resolution::*, AIR,
+    self, AIR, Block, BlockChange, BlockDef, BlockDefTransaction, EvalBlockError, Modifier,
+    Resolution::*,
 };
 use crate::content::make_some_blocks;
 use crate::listen::{self, NullListener, Sink};

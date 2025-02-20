@@ -11,9 +11,9 @@ use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 use all_is_cubes_port::{ExportSet, Format};
+use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::StandardCameras;
 use all_is_cubes_render::raytracer::RtRenderer;
-use all_is_cubes_render::Flaws;
 use all_is_cubes_ui::apps::MainTaskContext;
 
 mod options;
@@ -264,7 +264,6 @@ impl Recorder {
     pub(crate) async fn record_task(mut self, ctx: &MainTaskContext) {
         let frame_range = self.options.frame_range();
 
-        #[allow(unknown_lints)] // TODO: Remove in Rust 1.85
         #[allow(clippy::literal_string_with_formatting_args)]
         let progress_style = indicatif::ProgressStyle::default_bar()
             .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6}")

@@ -11,14 +11,14 @@ use exhaust::Exhaust;
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
-use crate::block::{Block, Resolution::*, AIR, AIR_EVALUATED};
+use crate::block::{AIR, AIR_EVALUATED, Block, Resolution::*};
 use crate::color_block;
 use crate::content::load_image::{default_srgb, include_image, space_from_image};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{
-    rgb_const, rgba_const, Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector,
-    Gridgid, Rgba,
+    Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector, Gridgid, Rgba, rgb_const,
+    rgba_const,
 };
 use crate::space::Space;
 use crate::universe::UniverseTransaction;

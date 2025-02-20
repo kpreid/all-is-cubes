@@ -9,7 +9,7 @@ use all_is_cubes::universe::Universe;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::ErrorChain;
 use all_is_cubes_render::camera::Viewport;
-use all_is_cubes_ui::apps::ExitMainTask;
+use all_is_cubes_ui::apps::{ExitMainTask, MainTaskContext};
 
 use crate::Session;
 
@@ -145,25 +145,26 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
 
         // TODO: Also make a way to do this that isn't replacing the main task,
         // or that defines a way for the existing main task to coordinate.
-        self.session.set_main_task(move |mut ctx| async move {
-            // TODO: Offer confirmation before replacing the current universe.
-            // TODO: Then open a progress-bar UI page while we load.
+        self.session
+            .set_main_task(async move |mut ctx: MainTaskContext| {
+                // TODO: Offer confirmation before replacing the current universe.
+                // TODO: Then open a progress-bar UI page while we load.
 
-            match loader_task.await.unwrap() {
-                Ok(universe) => {
-                    ctx.set_universe(universe);
+                match loader_task.await.unwrap() {
+                    Ok(universe) => {
+                        ctx.set_universe(universe);
+                    }
+                    Err(e) => {
+                        ctx.show_modal_message(arcstr::format!(
+                            "Failed to load file '{path}':\n{e}",
+                            path = path.display(),
+                            e = ErrorChain(&e),
+                        ));
+                    }
                 }
-                Err(e) => {
-                    ctx.show_modal_message(arcstr::format!(
-                        "Failed to load file '{path}':\n{e}",
-                        path = path.display(),
-                        e = ErrorChain(&e),
-                    ));
-                }
-            }
 
-            ExitMainTask
-        })
+                ExitMainTask
+            })
     }
 
     /// Set the “fixed” window title — the portion of the title not determined by the universe,

@@ -6,7 +6,7 @@ use core::any::TypeId;
 use futures_util::FutureExt as _;
 use indoc::indoc;
 
-use crate::block::{Block, BlockDef, BlockDefTransaction, Resolution, TickAction, AIR};
+use crate::block::{AIR, Block, BlockDef, BlockDefTransaction, Resolution, TickAction};
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
@@ -15,8 +15,8 @@ use crate::op::Operation;
 use crate::space::Space;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
-    self, list_handles, Handle, HandleError, InsertError, InsertErrorKind, Name, Universe,
-    UniverseTransaction,
+    self, Handle, HandleError, InsertError, InsertErrorKind, Name, Universe, UniverseTransaction,
+    list_handles,
 };
 use crate::util::{assert_conditional_send_sync, yield_progress_for_testing};
 use crate::{behavior, color_block, time};

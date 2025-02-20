@@ -16,8 +16,8 @@ use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
-    universe_txn as ut, ErasedHandle, Handle, InsertError, Name, PartialUniverse, RootHandle,
-    Universe, UniverseIter,
+    ErasedHandle, Handle, InsertError, Name, PartialUniverse, RootHandle, Universe, UniverseIter,
+    universe_txn as ut,
 };
 use crate::util::Refmt as _;
 

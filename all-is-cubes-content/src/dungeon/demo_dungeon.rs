@@ -9,12 +9,12 @@ use exhaust::Exhaust;
 use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
 
-use all_is_cubes::block::{self, Block, Resolution::*, RotationPlacementRule, AIR};
+use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::space_from_image;
-use all_is_cubes::content::{palette, BoxPart, BoxStyle};
+use all_is_cubes::content::{BoxPart, BoxStyle, palette};
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::{vec3, Size3D, Vector3D};
+use all_is_cubes::euclid::{Size3D, Vector3D, vec3};
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
@@ -29,8 +29,8 @@ use all_is_cubes::{color_block, include_image};
 use all_is_cubes::{op, time};
 
 use crate::alg::four_walls;
-use crate::dungeon::{build_dungeon, generate_maze, DungeonGrid, MazeRoomKind, Theme};
-use crate::{tree, DemoBlocks, LandscapeBlocks, TemplateParameters};
+use crate::dungeon::{DungeonGrid, MazeRoomKind, Theme, build_dungeon, generate_maze};
+use crate::{DemoBlocks, LandscapeBlocks, TemplateParameters, tree};
 
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
 const TORCH_PATTERN: [GridCoordinate; 2] = [-4, 4];

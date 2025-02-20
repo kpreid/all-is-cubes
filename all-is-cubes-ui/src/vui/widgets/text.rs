@@ -6,16 +6,16 @@ use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::text::{self, Text as BlockText};
 use all_is_cubes::block::{self, Resolution::*};
 use all_is_cubes::drawing::embedded_graphics::{
+    Drawable,
     mono_font::MonoTextStyle,
     prelude::{Dimensions, Point},
     text::{Text as EgText, TextStyle},
-    Drawable,
 };
-use all_is_cubes::drawing::{rectangle_to_aab, VoxelBrush};
+use all_is_cubes::drawing::{VoxelBrush, rectangle_to_aab};
 use all_is_cubes::math::{GridAab, GridSize, Gridgid};
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 
-use crate::vui::{self, widgets, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController};
+use crate::vui::{self, LayoutGrant, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
 
 // -------------------------------------------------------------------------------------------------
 

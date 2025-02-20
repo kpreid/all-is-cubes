@@ -4,18 +4,18 @@
 pub use yield_progress::{Builder as YieldProgressBuilder, YieldProgress};
 
 #[doc(no_inline)]
-pub use manyfmt::{refmt, Fmt, Refmt};
+pub use manyfmt::{Fmt, Refmt, refmt};
 
 // Unfortunately, we can't use a glob re-export here or hidden items end up visible when they
 // shouldn't be, mysteriously. So, explicit everything instead, with their various visibilities
 // and cfgs. TODO: Does that only apply to macros?
 #[doc(hidden)]
 pub use all_is_cubes_base::util::ErrorChain;
+pub use all_is_cubes_base::util::{ConciseDebug, Executor, TimeStats};
 #[doc(hidden)]
 pub use all_is_cubes_base::util::{
-    assert_conditional_send_sync, assert_send_sync, MapExtend, TypeName,
+    MapExtend, TypeName, assert_conditional_send_sync, assert_send_sync,
 };
-pub use all_is_cubes_base::util::{ConciseDebug, Executor, TimeStats};
 
 #[doc(hidden)] // public to allow our other crates to match, only
 pub mod maybe_sync;

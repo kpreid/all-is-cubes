@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::io;
 
 use ratatui::backend::Backend;
-use ratatui::crossterm::style::{Color, Colors, SetColors};
 use ratatui::crossterm::QueueableCommand as _;
+use ratatui::crossterm::style::{Color, Colors, SetColors};
 use ratatui::layout::Position;
 
 use all_is_cubes::euclid::Vector2D;
@@ -49,7 +49,7 @@ pub(super) fn image_patch_to_character(
                     (false, false) => " ", // U+0020 SPACE
                 },
                 CharacterMode::Shapes => {
-                    let avg_lum = ((lum1 + lum2) / 2.0).clamp(0.0, 1.0);
+                    let avg_lum = lum1.midpoint(lum2).clamp(0.0, 1.0);
 
                     if (lum1 - lum2).abs() < 0.05 {
                         [" ", "░", "▒", "▓", "█"][(avg_lum * 4.999) as usize]
@@ -296,7 +296,7 @@ mod tests {
     use super::*;
     use crate::terminal::TerminalOptions;
     use all_is_cubes::euclid::size2;
-    use all_is_cubes_render::camera::{area_usize, ImageSize, Viewport};
+    use all_is_cubes_render::camera::{ImageSize, Viewport, area_usize};
     use all_is_cubes_render::raytracer::RaytraceInfo;
 
     fn test_image(

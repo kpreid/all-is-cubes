@@ -11,9 +11,9 @@ pub use ::nosy::{
 };
 
 #[cfg(feature = "std")]
-pub use ::nosy::sync::{constant, Cell, CellWithLocal, DynListener, DynSource, Notifier};
+pub use ::nosy::sync::{Cell, CellWithLocal, DynListener, DynSource, Notifier, constant};
 #[cfg(not(feature = "std"))]
-pub use ::nosy::unsync::{constant, Cell, CellWithLocal, DynListener, DynSource, Notifier};
+pub use ::nosy::unsync::{Cell, CellWithLocal, DynListener, DynSource, Notifier, constant};
 
 mod listeners;
 pub use listeners::FnListener;

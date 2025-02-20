@@ -16,7 +16,7 @@ use all_is_cubes_render::{Flaws, RenderError};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 
-use crate::{in_wgpu::block_texture::AtlasAllocator, FrameBudget, Msw, RenderInfo, SpaceDrawInfo};
+use crate::{FrameBudget, Msw, RenderInfo, SpaceDrawInfo, in_wgpu::block_texture::AtlasAllocator};
 
 #[cfg(feature = "rerun")]
 use crate::RerunFilter;
@@ -27,7 +27,7 @@ mod block_texture;
 mod bloom;
 mod camera;
 mod everything;
-use everything::{surface_view_format, EverythingRenderer};
+use everything::{EverythingRenderer, surface_view_format};
 mod frame_texture;
 use frame_texture::{DrawableTexture, FramebufferTextures};
 mod glue;

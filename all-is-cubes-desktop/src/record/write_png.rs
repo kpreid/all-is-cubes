@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io::BufWriter;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 
-use png::{chunk::ChunkType, Encoder};
+use png::{Encoder, chunk::ChunkType};
 
 use all_is_cubes::listen;
 use all_is_cubes_render::Rendering;

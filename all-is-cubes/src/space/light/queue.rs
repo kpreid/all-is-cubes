@@ -4,8 +4,8 @@ use alloc::collections::BTreeSet;
 use core::fmt;
 use euclid::Vector3D;
 
-use hashbrown::hash_map::Entry;
 use hashbrown::HashMap as HbHashMap;
+use hashbrown::hash_map::Entry;
 
 use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint};
 use crate::space::light::PackedLightScalar;

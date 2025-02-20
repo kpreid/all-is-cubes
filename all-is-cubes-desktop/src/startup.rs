@@ -88,7 +88,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         match *options {}
     }
 
-    dsession.session.set_main_task(|mut ctx| async move {
+    dsession.session.set_main_task(async move |mut ctx| {
         let universe_result: Result<Universe, anyhow::Error> = match universe_task_future.await {
             // nested Results because one is template failure and the other is tokio JoinHandle failure
             Ok(Ok(u)) => Ok(u),

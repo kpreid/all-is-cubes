@@ -28,7 +28,7 @@ use embedded_graphics::primitives::Rectangle;
 /// Re-export the version of the [`embedded_graphics`] crate we're using.
 pub use embedded_graphics;
 
-use crate::block::{text, Block, Evoxel};
+use crate::block::{Block, Evoxel, text};
 use crate::math::{
     Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb,
     Rgba, Vol,
@@ -509,8 +509,8 @@ impl<'a, 'b> arbitrary::Arbitrary<'a> for VoxelBrush<'b> {
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         use arbitrary::{
-            size_hint::{and, and_all},
             Arbitrary,
+            size_hint::{and, and_all},
         };
         and(
             and(GridAab::size_hint(depth), bool::size_hint(depth)),
@@ -536,8 +536,8 @@ mod tests {
     use crate::block::AIR;
     use crate::color_block;
     use crate::content::make_some_blocks;
-    use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
     use embedded_graphics::Drawable as _;
+    use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
 
     /// With identity transform, `rectangle_to_aab`'s output matches exactly as one might
     /// expect.

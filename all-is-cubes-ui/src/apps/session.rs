@@ -7,12 +7,11 @@ use core::marker::PhantomData;
 use core::mem;
 use core::pin::Pin;
 use core::sync::atomic::{AtomicBool, Ordering};
-use core::task::{Context, Poll};
+use core::task::{Context, Poll, Waker};
 use std::sync::RwLock;
 
 use flume::TryRecvError;
 use futures_core::future::BoxFuture;
-use futures_task::noop_waker_ref;
 use sync_wrapper::SyncWrapper;
 
 use all_is_cubes::arcstr::{self, ArcStr};
@@ -33,8 +32,8 @@ use all_is_cubes_render::camera::{
 };
 
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets, Settings};
-use crate::ui_content::notification::{self, Notification};
 use crate::ui_content::Vui;
+use crate::ui_content::notification::{self, Notification};
 
 const LOG_FIRST_FRAMES: bool = false;
 
@@ -242,10 +241,10 @@ impl<I: time::Instant> Session<I> {
     pub fn set_main_task<F>(&mut self, task_ctor: F)
     where
         F: async_fn_traits::AsyncFnOnce1<
-            MainTaskContext,
-            Output = ExitMainTask,
-            OutputFuture: Send + 'static,
-        >,
+                MainTaskContext,
+                Output = ExitMainTask,
+                OutputFuture: Send + 'static,
+            >,
     {
         let context = MainTaskContext {
             shuttle: self.task_context_inner.clone(),
@@ -422,7 +421,7 @@ impl<I: time::Instant> Session<I> {
 
             let future: Pin<&mut dyn Future<Output = ExitMainTask>> =
                 sync_wrapped_future.get_mut().as_mut();
-            match future.poll(&mut Context::from_waker(noop_waker_ref())) {
+            match future.poll(&mut Context::from_waker(Waker::noop())) {
                 Poll::Pending => {}
                 Poll::Ready(ExitMainTask) => {
                     self.main_task = None;
@@ -1390,7 +1389,7 @@ mod tests {
         let mut cameras = session.create_cameras(listen::constant(Viewport::ARBITRARY));
         session.set_main_task({
             let noticed_step = noticed_step.clone();
-            move |mut ctx| async move {
+            async move |mut ctx: MainTaskContext| {
                 eprintln!("main task: waiting for new universe");
                 let new_universe = recv.await.unwrap();
                 ctx.set_universe(new_universe);

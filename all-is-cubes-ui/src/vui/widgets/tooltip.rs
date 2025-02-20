@@ -2,8 +2,8 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use std::sync::Mutex;
 
-use all_is_cubes::arcstr::{literal, ArcStr};
-use all_is_cubes::block::{self, text, Block};
+use all_is_cubes::arcstr::{ArcStr, literal};
+use all_is_cubes::block::{self, Block, text};
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::size3;
@@ -13,7 +13,7 @@ use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::universe::Handle;
 
 use crate::ui_content::hud::HudBlocks;
-use crate::vui::{self, widgets, LayoutRequest, Layoutable, Widget, WidgetController};
+use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
 
 #[derive(Debug)]
 pub(crate) struct TooltipState {

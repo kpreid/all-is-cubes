@@ -16,7 +16,7 @@
 
 #![allow(clippy::too_long_first_doc_paragraph, reason = "false positive on SVG")]
 
-use crate::math::{rgb_const, Rgb};
+use crate::math::{Rgb, rgb_const};
 
 /// Define a color constant and preview it in the documentation.
 macro_rules! palette_entry {

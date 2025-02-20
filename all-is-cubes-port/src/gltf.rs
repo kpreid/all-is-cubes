@@ -14,18 +14,18 @@ use std::time::Duration;
 use std::{fmt, fs, io};
 
 pub use gltf_json as json;
-use gltf_json::validation::Checked::Valid;
 use gltf_json::Index;
+use gltf_json::validation::Checked::Valid;
 
 use all_is_cubes::universe::PartialUniverse;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_mesh::{block_meshes_for_space, BlockMesh, MeshOptions, MeshTypes, SpaceMesh};
-use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform};
+use all_is_cubes_mesh::{BlockMesh, MeshOptions, MeshTypes, SpaceMesh, block_meshes_for_space};
 use all_is_cubes_render::Flaws;
+use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform};
 
 mod buffer;
-use buffer::create_buffer_and_accessor;
 pub use buffer::GltfDataDestination;
+use buffer::create_buffer_and_accessor;
 mod animation;
 use animation::FrameState;
 mod mesh;

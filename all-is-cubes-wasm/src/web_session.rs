@@ -5,18 +5,18 @@ use std::time::Duration;
 
 use js_sys::{ArrayBuffer, Error, Uint8Array};
 use send_wrapper::SendWrapper;
-use wasm_bindgen::prelude::{Closure, JsValue};
 use wasm_bindgen::JsCast;
-use wasm_bindgen_futures::{spawn_local, JsFuture};
+use wasm_bindgen::prelude::{Closure, JsValue};
+use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{
-    console, AddEventListenerOptions, DataTransferItem, Document, DragEvent, Element, Event,
-    FocusEvent, HtmlElement, HtmlProgressElement, KeyboardEvent, MouseEvent, Text,
+    AddEventListenerOptions, DataTransferItem, Document, DragEvent, Element, Event, FocusEvent,
+    HtmlElement, HtmlProgressElement, KeyboardEvent, MouseEvent, Text, console,
 };
 
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen;
 use all_is_cubes::universe::{Universe, UniverseStepInfo};
-use all_is_cubes_gpu::{in_wgpu, FrameBudget};
+use all_is_cubes_gpu::{FrameBudget, in_wgpu};
 use all_is_cubes_port::file::NonDiskFile;
 use all_is_cubes_render::camera::{StandardCameras, Viewport};
 use all_is_cubes_ui::apps::{CursorIcon, Key, Settings};

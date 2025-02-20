@@ -1,4 +1,4 @@
-use std::collections::{btree_map, BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashSet, btree_map};
 use std::future::Future;
 use std::io::Write as _;
 use std::path::PathBuf;
@@ -20,8 +20,8 @@ use all_is_cubes_render::Flaws;
 use all_is_cubes_render::{HeadlessRenderer, Rendering};
 
 use crate::{
-    results_json_path, write_report_file, ComparisonOutcome, ComparisonRecord, ImageId, Overlays,
-    RendererFactory, RendererId, Scene, SuiteId, TestCaseOutput, TestId, Threshold,
+    ComparisonOutcome, ComparisonRecord, ImageId, Overlays, RendererFactory, RendererId, Scene,
+    SuiteId, TestCaseOutput, TestId, Threshold, results_json_path, write_report_file,
 };
 
 type BoxedTestFn = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()> + Send + Sync>;

@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use criterion::measurement::WallTime;
-use criterion::{criterion_group, criterion_main, Bencher, Criterion};
+use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 
 use all_is_cubes::character::Character;
 use all_is_cubes::content::testing::lighting_bench_space;

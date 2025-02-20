@@ -19,7 +19,7 @@ use crate::math::{
 };
 use crate::raycast::Ray;
 use crate::space::light::{
-    chart::LightChart, LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority,
+    LightUpdateQueue, LightUpdateRayInfo, LightUpdateRequest, Priority, chart::LightChart,
 };
 use crate::space::palette::Palette;
 use crate::space::{

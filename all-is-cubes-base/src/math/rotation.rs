@@ -377,11 +377,7 @@ impl GridRotation {
         // TODO: there ought to be a much cleaner way to express this
         // ... and it should be a const fn, too
         let p = self.to_basis()[face.axis()];
-        if face.is_negative() {
-            p.opposite()
-        } else {
-            p
-        }
+        if face.is_negative() { p.opposite() } else { p }
     }
 
     /// Rotate the vector by this rotation.
@@ -590,9 +586,9 @@ mod tests {
     use super::*;
     use crate::math::GridPoint;
     use crate::util::MultiFailure;
+    use Face6::*;
     use num_traits::One;
     use std::collections::HashSet;
-    use Face6::*;
 
     #[test]
     fn identity() {

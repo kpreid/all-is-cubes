@@ -15,22 +15,21 @@ use alloc::vec::Vec;
 
 use wgpu::util::DeviceExt as _;
 
-use all_is_cubes::euclid::{point3, Rotation3D};
+use all_is_cubes::euclid::{Rotation3D, point3};
 use all_is_cubes::listen;
-use all_is_cubes::math::{ps64, Face6, FreeVector, GridSize, GridVector, Rgba};
+use all_is_cubes::math::{Face6, FreeVector, GridSize, GridVector, Rgba, ps64};
 use all_is_cubes::time;
 use all_is_cubes_mesh::{BlockVertex, Coloring};
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 
 use crate::in_wgpu::shaders::Shaders;
 use crate::in_wgpu::{
-    self,
+    self, FramebufferTextures,
     camera::ShaderSpaceCamera,
     frame_texture::{FbtConfig, FbtFeatures},
     init::get_texels_from_gpu,
     space::SpaceCameraBuffer,
     vertex::{WgpuBlockVertex, WgpuInstanceData},
-    FramebufferTextures,
 };
 
 // TODO: T is bad abstraction since it silently has to be f16

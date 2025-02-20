@@ -8,7 +8,7 @@ use pretty_assertions::assert_eq;
 use crate::arcstr::literal;
 use crate::block::{self, Block, Resolution::*};
 use crate::euclid::{point3, vec3};
-use crate::math::{rgba_const, Face6, Rgba};
+use crate::math::{Face6, Rgba, rgba_const};
 use crate::{inv, op, time};
 
 #[test]

@@ -8,14 +8,14 @@ use core::num::NonZero;
 
 use exhaust::Exhaust;
 
-use all_is_cubes::block::{self, Block, Resolution, RotationPlacementRule, Zoom, AIR};
+use all_is_cubes::block::{self, AIR, Block, Resolution, RotationPlacementRule, Zoom};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{free_editing_starter_inventory, palette};
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
-    rgb_const, Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint,
-    GridRotation, GridSizeCoord, GridVector, Gridgid, Rgb, Rgba, Vol,
+    Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
+    GridSizeCoord, GridVector, Gridgid, Rgb, Rgba, Vol, rgb_const,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -23,8 +23,8 @@ use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{color_block, time};
 
-use crate::alg::{array_of_noise, four_walls, scale_color};
 use crate::Fire;
+use crate::alg::{array_of_noise, four_walls, scale_color};
 
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
 const IWALL: GridCoordinate = 1;

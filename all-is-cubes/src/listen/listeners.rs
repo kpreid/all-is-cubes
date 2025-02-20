@@ -1,8 +1,8 @@
 use alloc::sync::{Arc, Weak};
 use core::fmt;
 
-use manyfmt::formats::Unquote;
 use manyfmt::Refmt as _;
+use manyfmt::formats::Unquote;
 
 use crate::listen::Listener;
 use crate::util::maybe_sync::SendSyncIfStd;

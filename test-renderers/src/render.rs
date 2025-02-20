@@ -7,8 +7,8 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::size2;
 use all_is_cubes::listen;
 use all_is_cubes::universe::Universe;
-use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 use all_is_cubes_render::HeadlessRenderer;
+use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
 
 use crate::RendererId;
 

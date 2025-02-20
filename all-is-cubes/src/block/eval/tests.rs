@@ -7,14 +7,14 @@ use pretty_assertions::assert_eq;
 use rstest::rstest;
 
 use crate::block::{
-    self, modifier, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision,
+    self, AIR, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision,
     BlockDef, Cost, EvKey, EvaluatedBlock, Evoxel, Evoxels, Modifier, Primitive,
     Resolution::{self, *},
-    VoxelOpacityMask, AIR,
+    VoxelOpacityMask, modifier,
 };
 use crate::math::{
-    zo32, Cube, Face6, FaceMap, GridAab, GridPoint, GridVector, Intensity, OpacityCategory, Rgb,
-    Rgba, Vol,
+    Cube, Face6, FaceMap, GridAab, GridPoint, GridVector, Intensity, OpacityCategory, Rgb, Rgba,
+    Vol, zo32,
 };
 use crate::space::Space;
 use crate::universe::Universe;
@@ -578,10 +578,12 @@ fn indirect_equivalence() {
 fn indirect_has_derived_value_cache_internally() {
     let mut universe = Universe::new();
     let block = Block::from(universe.insert_anonymous(BlockDef::new(AIR)));
-    assert!(block
-        .evaluate_impl(&block::EvalFilter::default())
-        .unwrap()
-        .has_derived());
+    assert!(
+        block
+            .evaluate_impl(&block::EvalFilter::default())
+            .unwrap()
+            .has_derived()
+    );
 }
 
 /// Fuzz-discovered test case for panic during evaluation,

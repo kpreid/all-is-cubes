@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 #[allow(unused_imports)]
 use num_traits::float::FloatCore as _;
 
-use all_is_cubes::block::{self, Block, Composite, CompositeOperator, AIR};
+use all_is_cubes::block::{self, AIR, Block, Composite, CompositeOperator};
 use all_is_cubes::color_block;
 use all_is_cubes::listen;
 use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, Rgb, ZeroOne};

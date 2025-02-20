@@ -371,7 +371,7 @@ impl<T: Copy> MVector4<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use euclid::{point3, vec3, Transform3D};
+    use euclid::{Transform3D, point3, vec3};
     use rand::{Rng, SeedableRng as _};
     use rand_xoshiro::Xoshiro256Plus;
 

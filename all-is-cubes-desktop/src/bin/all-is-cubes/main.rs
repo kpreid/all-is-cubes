@@ -19,17 +19,17 @@ use all_is_cubes_ui::apps::Settings;
 use all_is_cubes_desktop::record;
 #[cfg(feature = "terminal")]
 use all_is_cubes_desktop::terminal::{
-    create_terminal_session, terminal_main_loop, terminal_print_once, TerminalOptions,
+    TerminalOptions, create_terminal_session, terminal_main_loop, terminal_print_once,
 };
 use all_is_cubes_desktop::winit::{
     self as aic_winit, create_winit_wgpu_desktop_session, winit_main_loop_and_init,
 };
 use all_is_cubes_desktop::{
-    inner_main, load_config, logging, DesktopSession, InnerMainParams, Session, UniverseTask,
+    DesktopSession, InnerMainParams, Session, UniverseTask, inner_main, load_config, logging,
 };
 
 mod command_options;
-use command_options::{parse_universe_source, AicDesktopArgs, DisplaySizeArg, GraphicsType};
+use command_options::{AicDesktopArgs, DisplaySizeArg, GraphicsType, parse_universe_source};
 
 static TITLE: &str = "All is Cubes";
 fn title_and_version() -> String {

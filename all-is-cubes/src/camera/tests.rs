@@ -1,12 +1,12 @@
-use euclid::{point2, point3, vec2, vec3, Point3D, Rotation3D, Size2D};
+use euclid::{Point3D, Rotation3D, Size2D, point2, point3, vec2, vec3};
 use pretty_assertions::assert_eq;
 use rand::SeedableRng;
 
 use crate::camera::{
-    look_at_y_up, Camera, ExposureOption, FrustumPoints, GraphicsOptions, LightingOption,
-    ViewTransform, Viewport,
+    Camera, ExposureOption, FrustumPoints, GraphicsOptions, LightingOption, ViewTransform,
+    Viewport, look_at_y_up,
 };
-use crate::math::{ps32, ps64, rgba_const, Aab};
+use crate::math::{Aab, ps32, ps64, rgba_const};
 
 #[test]
 fn camera_bad_viewport_doesnt_panic() {
@@ -61,10 +61,12 @@ fn projection_depth() {
     });
 
     dbg!(expected_ndc_depths, actual_ndc_depths);
-    assert!(actual_ndc_depths
-        .into_iter()
-        .zip(expected_ndc_depths)
-        .all(|(a, e)| (a - e).abs() < 1e-8));
+    assert!(
+        actual_ndc_depths
+            .into_iter()
+            .zip(expected_ndc_depths)
+            .all(|(a, e)| (a - e).abs() < 1e-8)
+    );
 }
 
 #[test]

@@ -12,7 +12,7 @@ use all_is_cubes::util::YieldProgress;
 use all_is_cubes_render::camera::GraphicsOptions;
 
 use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
-use crate::ui_content::options::{graphics_options_widgets, pause_toggle_button, OptionsStyle};
+use crate::ui_content::options::{OptionsStyle, graphics_options_widgets, pause_toggle_button};
 use crate::ui_content::pages::open_page_button;
 use crate::ui_content::{CueNotifier, VuiMessage, VuiPageState};
 use crate::vui::widgets::{self, TooltipState, WidgetBlocks};

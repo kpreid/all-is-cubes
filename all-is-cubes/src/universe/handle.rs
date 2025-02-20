@@ -5,8 +5,8 @@ use core::ops::{Deref, DerefMut};
 
 use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::universe::{
-    owning_guard, AnyHandle, InsertError, InsertErrorKind, Name, Universe, UniverseId,
-    UniverseMember, VisitHandles,
+    AnyHandle, InsertError, InsertErrorKind, Name, Universe, UniverseId, UniverseMember,
+    VisitHandles, owning_guard,
 };
 use crate::util::maybe_sync::{Mutex, MutexGuard, RwLock};
 

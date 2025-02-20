@@ -4,8 +4,8 @@ use clap::Parser as _;
 use tokio::sync::OnceCell;
 
 use all_is_cubes_gpu::in_wgpu::{headless, init};
-use all_is_cubes_render::camera::StandardCameras;
 use all_is_cubes_render::HeadlessRenderer;
+use all_is_cubes_render::camera::StandardCameras;
 use test_renderers::{RendererFactory, RendererId};
 
 #[tokio::main]
@@ -29,7 +29,7 @@ async fn main() -> test_renderers::HarnessResult {
         RendererId::Wgpu,
         test_renderers::SuiteId::Renderers,
         test_renderers::test_cases::all_tests,
-        move |label| async move { get_factory(label).await.unwrap() },
+        async move |label| get_factory(label).await.unwrap(),
         parallelism,
     )
     .await

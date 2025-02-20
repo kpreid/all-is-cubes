@@ -80,9 +80,9 @@ mod behavior {
 mod block {
     use super::*;
     use crate::block::{
-        text, AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision,
-        Composite, Modifier, Move, PlacementAction, Primitive, Quote, RotationPlacementRule,
-        TickAction, Zoom,
+        AnimationChange, AnimationHint, Atom, Block, BlockAttributes, BlockCollision, Composite,
+        Modifier, Move, PlacementAction, Primitive, Quote, RotationPlacementRule, TickAction, Zoom,
+        text,
     };
     use crate::math::{Rgb, Rgba};
     use crate::tag;

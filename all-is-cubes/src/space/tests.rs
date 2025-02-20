@@ -10,7 +10,7 @@ use core::num::NonZeroU16;
 use euclid::Vector3D;
 use indoc::indoc;
 
-use crate::block::{self, Block, BlockDef, BlockDefTransaction, Resolution::*, TickAction, AIR};
+use crate::block::{self, AIR, Block, BlockDef, BlockDefTransaction, Resolution::*, TickAction};
 use crate::color_block;
 use crate::content::make_some_blocks;
 use crate::fluff::{self, Fluff};
@@ -648,7 +648,12 @@ fn block_tick_action_conflict() {
     use pretty_assertions::assert_eq;
 
     // Create an active block.
-    let [mut modifies_px_neighbor, output1, mut modifies_nx_neighbor, output2] = make_some_blocks();
+    let [
+        mut modifies_px_neighbor,
+        output1,
+        mut modifies_nx_neighbor,
+        output2,
+    ] = make_some_blocks();
     fn connect(from: &mut Block, to: &Block, face: Face6) {
         from.freezing_get_attributes_mut().tick_action = Some(TickAction {
             // TODO: replace this with a better-behaved neighbor-modifying operation,

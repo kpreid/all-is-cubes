@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 
 use crate::behavior::BehaviorSet;
-use crate::block::{Block, AIR};
+use crate::block::{AIR, Block};
 use crate::character::Spawn;
 use crate::math::{FreePoint, Rgb, Vol};
 use crate::space::{

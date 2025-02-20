@@ -12,8 +12,8 @@ use all_is_cubes::space::Space;
 use all_is_cubes::universe::Handle;
 
 use crate::camera::{
-    area_usize, Camera, FogOption, GraphicsOptions, Layers, Ndc, NdcPoint2, StandardCameras,
-    Viewport,
+    Camera, FogOption, GraphicsOptions, Layers, Ndc, NdcPoint2, StandardCameras, Viewport,
+    area_usize,
 };
 use crate::raytracer::{
     Accumulate, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
@@ -553,13 +553,13 @@ mod trace_image {
 mod eg {
     use super::*;
     use crate::info_text_drawable;
+    use embedded_graphics::Drawable;
+    use embedded_graphics::Pixel;
     use embedded_graphics::draw_target::DrawTarget;
     use embedded_graphics::draw_target::DrawTargetExt;
     use embedded_graphics::pixelcolor::BinaryColor;
     use embedded_graphics::prelude::{OriginDimensions, Point, Size};
     use embedded_graphics::primitives::Rectangle;
-    use embedded_graphics::Drawable;
-    use embedded_graphics::Pixel;
 
     pub fn draw_info_text<T: Clone>(
         output: &mut [T],

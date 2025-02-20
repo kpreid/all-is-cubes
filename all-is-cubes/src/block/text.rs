@@ -12,14 +12,14 @@ use embedded_graphics::mono_font::mapping::GlyphMapping;
 
 use arcstr::ArcStr;
 use embedded_graphics as eg;
-use embedded_graphics::{prelude::Dimensions as _, Drawable as _};
+use embedded_graphics::{Drawable as _, prelude::Dimensions as _};
 use euclid::vec3;
 
 use crate::block::{self, Block, BlockAttributes, Evoxel, MinEval, Resolution};
 use crate::content::palette;
-use crate::drawing::{rectangle_to_aab, DrawingPlane};
+use crate::drawing::{DrawingPlane, rectangle_to_aab};
 use crate::math::{
-    rgba_const, FaceMap, GridAab, GridCoordinate, GridVector, Gridgid, Rgb, Rgba, Vol,
+    FaceMap, GridAab, GridCoordinate, GridVector, Gridgid, Rgb, Rgba, Vol, rgba_const,
 };
 use crate::space::{self, SpaceTransaction};
 use crate::universe;

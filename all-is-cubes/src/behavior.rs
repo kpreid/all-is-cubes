@@ -11,7 +11,7 @@ use core::ops;
 #[cfg(doc)]
 use core::{future::Future, task::Waker};
 
-use downcast_rs::{impl_downcast, Downcast};
+use downcast_rs::{Downcast, impl_downcast};
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};

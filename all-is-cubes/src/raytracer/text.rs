@@ -5,11 +5,11 @@
 use alloc::string::String;
 use core::fmt;
 
-use arcstr::{literal_substr, ArcStr, Substr};
+use arcstr::{ArcStr, Substr, literal_substr};
 use euclid::size2;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::camera::{eye_for_look_at, Camera, GraphicsOptions, Viewport};
+use crate::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
 use crate::math::FreeVector;
 use crate::raytracer::{Accumulate, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
