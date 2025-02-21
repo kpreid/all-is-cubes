@@ -25,35 +25,35 @@
 //!   Time advances at a uniform rate throughout a `Universe`.
 //! * A [`Space`] is a 3D array of [`Block`]s forming the physical space/scene which
 //!   player characters can move through and interact with.
-//!     * `Space`s currently have fixed boundaries (no infinite procedural generation),
-//!       can have dimensions in the range of an [`i32`], and are kept in memory
-//!       uncompressed at 6 bytes per cube. They can contain at most 65536 distinct
-//!       blocks (subject to change).
-//!     * The light falling on surfaces within a `Space` is computed using a global
-//!       illumination algorithm (optionally).
-//!     * In addition to their [`Block`] contents, `Space`s have global physical
-//!       properties such as gravity and illumination. They also can have [`Behavior`]s
-//!       attached for miscellaneous “scripting” purposes, though this feature is
-//!       incomplete.
-//!     * There can be arbitrarily many spaces per [`Universe`]. Eventually there will
-//!       be ways to teleport between spaces; for now, this mainly assists [`Block`]s.
+//!   * `Space`s currently have fixed boundaries (no infinite procedural generation),
+//!     can have dimensions in the range of an [`i32`], and are kept in memory
+//!     uncompressed at 6 bytes per cube. They can contain at most 65536 distinct
+//!     blocks (subject to change).
+//!   * The light falling on surfaces within a `Space` is computed using a global
+//!     illumination algorithm (optionally).
+//!   * In addition to their [`Block`] contents, `Space`s have global physical
+//!     properties such as gravity and illumination. They also can have [`Behavior`]s
+//!     attached for miscellaneous “scripting” purposes, though this feature is
+//!     incomplete.
+//!   * There can be arbitrarily many spaces per [`Universe`]. Eventually there will
+//!     be ways to teleport between spaces; for now, this mainly assists [`Block`]s.
 //! * A [`Block`] is a cubical object which can be placed in a [`Space`] or carried in
 //!   a [`Character`]'s inventory.
-//!     * Blocks' shape and appearance (their [`Primitive`]) is either a cube of a single
-//!        color, or recursively defined by a [`Space`] of smaller blocks (at a reduced
-//!        size between 1/2 to 1/255 of a full cube).
-//!        Each of these voxels can be transparent.
-//!         * The player will be able to enter these [`Space`]s and interactively edit
-//!           blocks. This is not currently implemented but that is a lack in the user
-//!           interface rather than core data structures.
-//!         * In the future, there may be ways for blocks to be fully procedurally defined
-//!           rather than working through [`Space`]s, such as for the purposes of
-//!           animation or deriving variations from a single template or formula.
-//!     * Blocks can have [`Modifier`]s applied to them which change the basic shape and
-//!       behavior in a particular instance, such as being rotated into different
-//!       orientations.
-//!     * Blocks will have various forms of active behavior and responses to their
-//!       environment but that has not been designed yet.
+//!   * Blocks' shape and appearance (their [`Primitive`]) is either a cube of a single
+//!     color, or recursively defined by a [`Space`] of smaller blocks (at a reduced
+//!     size between 1/2 to 1/255 of a full cube).
+//!     Each of these voxels can be transparent.
+//!     * The player will be able to enter these [`Space`]s and interactively edit
+//!       blocks. This is not currently implemented but that is a lack in the user
+//!       interface rather than core data structures.
+//!     * In the future, there may be ways for blocks to be fully procedurally defined
+//!       rather than working through [`Space`]s, such as for the purposes of
+//!       animation or deriving variations from a single template or formula.
+//!   * Blocks can have [`Modifier`]s applied to them which change the basic shape and
+//!     behavior in a particular instance, such as being rotated into different
+//!     orientations.
+//!   * Blocks will have various forms of active behavior and responses to their
+//!     environment but that has not been designed yet.
 //! * A [`Character`] can move around a [`Space`], acting as the player's viewpoint, and
 //!   carry [`Tool`]s (items) with which to affect the space.
 //!     * There can be multiple characters, but not yet any multiplayer, NPC AI, or even
