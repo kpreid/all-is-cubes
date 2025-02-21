@@ -1,3 +1,8 @@
+#![allow(
+    exported_private_dependencies,
+    reason = "false positive on dpi via winit"
+)]
+
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::monitor::MonitorHandle;
 
