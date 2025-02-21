@@ -170,8 +170,15 @@ use std::collections::hash_map as std_map;
 #[cfg(feature = "std")]
 hashmap_merge!(std_map);
 
-use hashbrown::hash_map as hb_map;
-hashmap_merge!(hb_map);
+#[allow(
+    exported_private_dependencies,
+    reason = "false positive on transitive dependencies"
+)]
+mod hb_impl {
+    use super::*;
+    use hashbrown::hash_map as hb_map;
+    hashmap_merge!(hb_map);
+}
 
 // -------------------------------------------------------------------------------------------------
 

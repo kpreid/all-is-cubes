@@ -1,5 +1,5 @@
 #![feature(never_type)]
-
+#![allow(exported_private_dependencies, reason = "false positive on wgpu_types")]
 //! Algorithms for rendering [All is Cubes] content using a GPU, via
 //! the [`wgpu`] graphics library.
 //!

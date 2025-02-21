@@ -33,7 +33,7 @@ embed = []
 [dependencies]
 # TODO: server doesn't actually have any game-server functionality so this is unnecessary
 # all-is-cubes = { workspace = true, features = ["auto-threads"] }
-anyhow = { workspace = true }
+anyhow = { workspace = true, public = true }
 axum = { version = "0.8.1", features = ["tower-log"] }
 clap = { workspace = true }
 include_dir = "0.7.2"
