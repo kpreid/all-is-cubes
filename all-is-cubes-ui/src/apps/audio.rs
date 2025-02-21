@@ -139,6 +139,7 @@ pub struct AudioEventChannelReceiver {
     guaranteed_receiver: flume::Receiver<AudioEvent>,
 }
 
+#[allow(exported_private_dependencies, reason = "doc(hidden) type for now")]
 impl AudioEventChannelReceiver {
     /// Block until one event is available, then return it.
     ///
