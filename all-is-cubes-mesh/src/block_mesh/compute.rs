@@ -1,13 +1,14 @@
 //! The algorithm for generating block meshes, and nothing else.
 
+use all_is_cubes::euclid::{Point2D, point2};
 use alloc::vec::Vec;
 
 use itertools::Itertools as _;
 
 use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
-use all_is_cubes::euclid::point2;
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, OpacityCategory, Rgb, Rgba, Vol,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSizeCoord, OpacityCategory,
+    Rgb, Rgba, Vol, ZeroOne,
 };
 use all_is_cubes_render::Flaws;
 
@@ -43,15 +44,42 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 
     let resolution = block.resolution();
 
-    if resolution != Resolution::R1 && options.ignore_voxels {
+    if resolution != Resolution::R1 && (options.ignore_voxels) {
         // Substitute the block color for the actual voxels.
-        // TODO: This discards emission, but in principle we can and should keep it.
-        let color = options.transparency.limit_alpha(block.color());
-        // TODO: Use a partial box instead
-        push_full_box(
+        // Note: This discards emission, which we are considering acceptable for now.
+        let face_colors = block.face_colors().map(|face, full_face_color| {
+            // Increase the color's alpha to account for that we are drawing restricted bounds
+            // instead of full bounds.
+            // TODO: It would be more direct for `EvaluatedBlock` to provide us this value since
+            // it is trivial to compute there, but is it worth storing that value always?
+            let voxels_surface_area = block
+                .voxels()
+                .bounds()
+                .abut(face, 1)
+                .unwrap()
+                .volume()
+                .unwrap() as f32;
+            let full_surface_area = GridSizeCoord::from(resolution).pow(2) as f32;
+            let partial_face_color =
+                full_face_color
+                    .to_rgb()
+                    .with_alpha(ZeroOne::<f32>::new_clamped(
+                        full_face_color.alpha().into_inner()
+                            * (full_surface_area / voxels_surface_area),
+                    ));
+
+            options.transparency.limit_alpha(partial_face_color)
+        });
+        push_box(
             output,
-            color.opacity_category(),
-            QuadColoring::Solid(color),
+            resolution,
+            block.voxels().bounds(),
+            face_colors
+                .into_values_iter()
+                .map(Rgba::opacity_category)
+                .all_equal_value()
+                .unwrap_or(OpacityCategory::Partial),
+            face_colors.map(|_, color| QuadColoring::Solid(color)),
             &mut viz,
         );
         return;
@@ -117,8 +145,66 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
     }
 }
 
-/// Append triangles to `output` which form a box filling the entire block cube,
+/// Append triangles to `output` which form a single box,
 /// and set the `fully_opaque` flags true when appropriate.
+fn push_box<M: MeshTypes>(
+    output: &mut BlockMesh<M>,
+    resolution: Resolution,
+    aab: GridAab,
+    opacity_category: OpacityCategory,
+    coloring: FaceMap<QuadColoring<'_, <M::Tile as texture::Tile>::Plane>>,
+    viz: &mut Viz,
+) {
+    if opacity_category == OpacityCategory::Invisible {
+        return;
+    }
+    let fully_opaque = opacity_category == OpacityCategory::Opaque;
+    for face in Face6::ALL {
+        let volume_to_planar = face
+            .face_transform(GridCoordinate::from(resolution))
+            .inverse();
+        let aab_in_face_coordinates = aab.transform(volume_to_planar).unwrap();
+
+        let lower_bounds = aab_in_face_coordinates.lower_bounds().xy();
+        let upper_bounds = aab_in_face_coordinates.upper_bounds().xy();
+        let depth = aab_in_face_coordinates.lower_bounds().z;
+
+        // Check whether this mesh face meets the unit cube face.
+        let face_mesh = if depth == 0 {
+            &mut output.face_vertices[face]
+        } else {
+            &mut output.interior_vertices
+        };
+        face_mesh.fully_opaque |= fully_opaque
+            & (depth == 0)
+            & (lower_bounds == point2(0, 0))
+            & (upper_bounds == Point2D::splat(resolution.into()));
+        face_mesh.vertices.reserve_exact(4);
+
+        push_quad(
+            &mut face_mesh.vertices,
+            if fully_opaque {
+                face_mesh.indices_opaque.reserve_exact(6);
+                &mut face_mesh.indices_opaque
+            } else {
+                face_mesh.indices_transparent.reserve_exact(6);
+                &mut face_mesh.indices_transparent
+            },
+            &QuadTransform::new(face, resolution),
+            FreeCoordinate::from(depth),
+            lower_bounds.to_f64().cast_unit(),
+            upper_bounds.to_f64().cast_unit(),
+            coloring[face],
+            viz,
+            &mut face_mesh.bounding_box,
+        );
+    }
+}
+
+/// Append triangles to `output` which form a single box filling the entire block cube,
+/// and set the `fully_opaque` flags true when appropriate.
+///
+/// This is a more efficient, specialized version of [`push_box()`].
 fn push_full_box<M: MeshTypes>(
     output: &mut BlockMesh<M>,
     opacity_category: OpacityCategory,
