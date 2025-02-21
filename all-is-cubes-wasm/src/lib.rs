@@ -47,6 +47,7 @@ impl ops::Add<Duration> for AdaptedInstant {
 }
 impl ops::Sub<Duration> for AdaptedInstant {
     type Output = Self;
+    #[allow(clippy::unchecked_duration_subtraction)]
     fn sub(self, rhs: Duration) -> Self::Output {
         Self(self.0 - rhs)
     }
