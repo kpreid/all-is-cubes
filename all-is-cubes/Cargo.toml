@@ -81,6 +81,7 @@ save = [
     "dep:base64", # encoded compressed data
     "dep:flate2", # compression
     "dep:serde",
+    "dep:serde_core",
     "all-is-cubes-base/serde", # math types
     "bitflags/serde", # serde for util::ShowStatus
     "bytemuck/extern_crate_std", # impl Error for CheckedCastError
@@ -119,12 +120,12 @@ _serde_math_and_graphics_options = [
 _special_testing = ["all-is-cubes-base/_special_testing", "dep:visibility"]
 
 [dependencies]
-all-is-cubes-base = { workspace = true }
-arbitrary = { workspace = true, optional = true }
-arcstr = { version = "1.2.0", default-features = false, features = ["serde", "substr"] }
+all-is-cubes-base = { workspace = true, public = true }
+arbitrary = { workspace = true, optional = true, public = true }
+arcstr = { version = "1.2.0", public = true, default-features = false, features = ["serde", "substr"] }
 arrayvec = { workspace = true }
 base64 = { workspace = true, optional = true, features = ["std"] } # used in serialization
-bevy_ecs = { workspace = true }
+bevy_ecs = { workspace = true, public = true } # TODO(ecs): stop this being public if feasible
 bevy_platform = { workspace = true }
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
@@ -132,38 +133,40 @@ displaydoc = { workspace = true }
 # mint feature to guarantee that our callers can use mint types
 # libm feature to guarantee compilability and compatibility with no_std
 euclid = { workspace = true, default-features = false, features = ["libm", "mint"] }
-embedded-graphics = { workspace = true }
-exhaust = { workspace = true, default-features = false }
+embedded-graphics = { workspace = true, public = true }
+exhaust = { workspace = true, public = true, default-features = false }
 flate2 = { version = "1.0.35", optional = true }
 futures-core = { workspace = true }
-hashbrown = { workspace = true }
+hashbrown = { workspace = true, public = true }
 itertools = { workspace = true }
 libm = { workspace = true }
-log = { workspace = true }
+log = { workspace = true, public = true }
 macro_rules_attribute = { workspace = true }
-manyfmt = { workspace = true }
+manyfmt = { workspace = true, public = true }
 mutants = { workspace = true }
-nosy = { workspace = true, features = ["async", "spin-sync"] }
-num-traits = { workspace = true }
+nosy = { workspace = true, public = true, features = ["async", "spin-sync"] }
+num-traits = { workspace = true, public = true }
 once_cell = { workspace = true, features = ["alloc", "race"] }
-ordered-float = { workspace = true }
+ordered-float = { workspace = true, public = true }
 paste = { workspace = true }
 png-decoder = { workspace = true }
-rand = { workspace = true }
+rand = { workspace = true, public = true }
 rand_distr = { workspace = true }
 rand_xoshiro = { workspace = true }
-rayon = { workspace = true, optional = true }
+rayon = { workspace = true, optional = true, public = true }
 # re_sdk is a data-logging and visualization tool; we are currently using it _only_ for
 # development of All is Cubes itself.
-re_log_types = { workspace = true, optional = true }
-re_sdk = { workspace = true, optional = true }
-re_sdk_types = { workspace = true, optional = true }
+re_log_types = { workspace = true, optional = true, public = true }
+re_sdk = { workspace = true, optional = true, public = true }
+re_sdk_types = { workspace = true, optional = true, public = true }
 rustc-hash = { workspace = true }
 # rc feature needed because we are [de]serializing `Arc`s
 # alloc feature needed for #[serde(flatten)] — https://github.com/serde-rs/serde/issues/1935
 serde = { workspace = true, optional = true, features = ["alloc", "derive", "rc"] }
+# dummy dependency for exported_private_dependencies false positive
+serde_core = { workspace = true, optional = true, public = true }
 visibility = { workspace = true, optional = true }
-yield-progress = { workspace = true }
+yield-progress = { workspace = true, public = true }
 
 [dev-dependencies]
 allocation-counter = { workspace = true }
