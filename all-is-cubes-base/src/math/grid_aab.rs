@@ -288,12 +288,9 @@ impl GridAab {
     pub fn size(&self) -> GridSize {
         self.upper_bounds
             // Two’s complement math trick: If the subtraction overflows and wraps, the following
-            // conversion to u32 will give us the right answer anyway.
+            // conversion to unsigned will give us the right answer anyway.
             .zip(self.lower_bounds, GridCoordinate::wrapping_sub)
-            // Declaring the parameter type ensures that if we ever decide to change the numeric
-            // type of `GridCoordinate`, this will fail to compile.
-            // Not using `to_u32()` because that has an unnecessary range check and panic branch.
-            .map(|s: i32| s as u32)
+            .map(GridCoordinate::cast_unsigned)
             .into()
     }
 
