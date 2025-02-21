@@ -6,6 +6,10 @@
 #![cfg_attr(target_family = "wasm", feature(new_range))]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
+#![allow(
+    exported_private_dependencies,
+    reason = "not used as a library from Rust code"
+)]
 
 // Note: Not all tests depend on having a browser, but it’s simpler to have all tests configured
 // this way rather than running tests twice.

@@ -50,9 +50,10 @@ _special_testing = ["dep:visibility"]
 
 [dependencies]
 all-is-cubes = { workspace = true, features = ["std"] }
-all-is-cubes-mesh = { workspace = true, features = ["dynamic"] }
-all-is-cubes-render = { workspace = true, features = ["raytracer"] }
-bytemuck = { workspace = true, features = ["derive"] }
+all-is-cubes-mesh = { workspace = true, public = true, features = ["dynamic"] }
+all-is-cubes-render = { workspace = true, public = true, features = ["raytracer"] }
+# Public when used in shader tests
+bytemuck = { workspace = true, public = true, features = ["derive"] }
 derive_more = { workspace = true }
 descriptive-unwrap = { workspace = true }
 # Used to implement start_polling(). Also a `wgpu` dependency already.
@@ -83,7 +84,7 @@ visibility = { workspace = true, optional = true }
 web-time = { workspace = true }
 # std feature is needed for `wgpu::util::StagingBelt`
 # wgsl feature is needed because our shaders are written in WGSL
-wgpu = { workspace = true, features = ["std", "wgsl"] }
+wgpu = { workspace = true, public = true, features = ["std", "wgsl"] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 # Used in the `poll` module to implement timeout
@@ -95,7 +96,6 @@ send_wrapper = { workspace = true, features = ["futures"] }
 wasm-bindgen-futures = { workspace = true }
 # For initializing tests on web. (This is not a dev-dependency because some of said tests are not in this package.)
 web-sys = { version = "0.3.104", features = ["OffscreenCanvas"] }
-wgpu = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Using smol for async test-running.
