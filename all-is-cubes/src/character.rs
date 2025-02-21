@@ -77,6 +77,7 @@ pub struct Character {
     velocity_input: FreeVector,
 
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu
+    #[allow(exported_private_dependencies, reason = "false positive")]
     pub colliding_cubes: HbHashSet<Contact>,
 
     /// Last body step, for debugging.

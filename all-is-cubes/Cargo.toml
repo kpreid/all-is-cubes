@@ -107,12 +107,12 @@ auto-threads = [
 _special_testing = ["all-is-cubes-base/_special_testing", "dep:visibility"]
 
 [dependencies]
-all-is-cubes-base = { workspace = true, features = ["std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
-arbitrary = { workspace = true, optional = true }
-arcstr = { version = "1.2.0", default-features = false, features = ["serde", "substr"] }
+all-is-cubes-base = { workspace = true, public = true, features = ["std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
+arbitrary = { workspace = true, optional = true, public = true }
+arcstr = { version = "1.2.0", public = true, default-features = false, features = ["serde", "substr"] }
 arrayvec = { workspace = true }
 base64 = { workspace = true, optional = true, features = ["std"] } # used in serialization
-bevy_ecs = { workspace = true }
+bevy_ecs = { workspace = true, public = true } # TODO(ecs): stop this being public if feasible
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }
@@ -120,39 +120,39 @@ displaydoc = { workspace = true }
 # mint feature to guarantee that our callers can use mint types
 # libm feature to guarantee compilability and compatibility with no_std
 euclid = { workspace = true, default-features = false, features = ["libm", "mint"] }
-embedded-graphics = { workspace = true }
-exhaust = { workspace = true, default-features = false }
+embedded-graphics = { workspace = true, public = true }
+exhaust = { workspace = true, public = true, default-features = false }
 flate2 = { version = "1.0.26", optional = true }
 futures-core = { workspace = true }
-hashbrown = { workspace = true }
+hashbrown = { workspace = true, public = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 libm = { workspace = true }
-log = { workspace = true }
+log = { workspace = true, public = true }
 macro_rules_attribute = { workspace = true }
-manyfmt = { workspace = true }
+manyfmt = { workspace = true, public = true }
 mutants = { workspace = true }
-nosy = { workspace = true, features = ["async", "sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
-num-traits = { workspace = true }
+nosy = { workspace = true, public = true, features = ["async", "sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
+num-traits = { workspace = true, public = true }
 once_cell = { workspace = true, features = ["alloc", "race", "std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
-ordered-float = { workspace = true }
+ordered-float = { workspace = true, public = true }
 paste = { workspace = true }
 png-decoder = { workspace = true }
-rand = { workspace = true, features = ["small_rng"] }
+rand = { workspace = true, public = true, features = ["small_rng"] }
 rand_distr = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
 # re_sdk is a data-logging and visualization tool; we are currently using it _only_ for
 # development of All is Cubes itself.
-re_log_types = { workspace = true, optional = true }
-re_sdk = { workspace = true, optional = true }
-re_types = { workspace = true, optional = true }
+re_log_types = { workspace = true, optional = true, public = true }
+re_sdk = { workspace = true, optional = true, public = true }
+re_types = { workspace = true, optional = true, public = true }
 # rc feature needed because we are [de]serializing `Arc`s
 # alloc feature needed for #[serde(flatten)] — https://github.com/serde-rs/serde/issues/1935
-serde = { workspace = true, optional = true, features = ["alloc", "derive", "rc"] }
+serde = { workspace = true, optional = true, public = true, features = ["alloc", "derive", "rc"] }
 unicode-segmentation = { workspace = true }
 visibility = { workspace = true, optional = true }
-yield-progress = { workspace = true, features = ["sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
+yield-progress = { workspace = true, public = true, features = ["sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
 
 [dev-dependencies]
 allocation-counter = { workspace = true }
