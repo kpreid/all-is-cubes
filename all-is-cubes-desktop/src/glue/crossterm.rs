@@ -1,3 +1,8 @@
+#![allow(
+    exported_private_dependencies,
+    reason = "false positive on crossterm via ratatui"
+)]
+
 use all_is_cubes_ui::apps::Key;
 
 use ratatui::crossterm::event::{Event, KeyCode, KeyModifiers, MouseButton};

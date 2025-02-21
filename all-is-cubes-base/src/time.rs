@@ -1,3 +1,7 @@
+#![allow(
+    exported_private_dependencies,
+    reason = "false positive on indirect Instant"
+)]
 use core::cmp::Ordering;
 use core::fmt;
 use core::ops;
