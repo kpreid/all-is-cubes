@@ -15,8 +15,8 @@ keywords = ["all-is-cubes"]
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
-# Disable doctest running to reduce total noise in `cargo test` output.
-# Doctests are so slow, and not well applicable here, so we don't currently have any.
+# Disable doctest running (we have none) to reduce total noise in `cargo test` output.
+# This lib is not currently expected to have any especially relevant public API to document.
 doctest = false
 
 [[bin]]

@@ -19,6 +19,8 @@ features = []
 
 [lib]
 bench = false
+# Disable doctest running (we have none) to reduce total noise in `cargo test` output.
+doctest = false
 
 [[bin]]
 name = "all-is-cubes"

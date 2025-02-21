@@ -56,7 +56,7 @@ impl Move {
     // TODO: This is going to need to change again in order to support
     // moving one block in and another out at the same time.
     //
-    // TODO: This would be a good candidate for an example, once doctests are not so slow.
+    // TODO: This would be a good candidate for an example
     #[must_use]
     pub fn into_paired(self) -> [Self; 2] {
         let complement = self.complement();

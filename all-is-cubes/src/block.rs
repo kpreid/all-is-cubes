@@ -1124,7 +1124,6 @@ impl BlockChange {
 /// Panics if the `Space` cannot be accessed, and returns
 /// [`SetCubeError::TooManyBlocks`] if the space volume is too large.
 //---
-// TODO: add doc test for this
 // TODO: This is only used once ... is it really a good public API?
 pub fn space_to_blocks(
     resolution: Resolution,

@@ -17,8 +17,7 @@ features = ["_full-documentation", "arbitrary", "dynamic"]
 [lib]
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
-# Disable doctest running to reduce total noise in `cargo test` output.
-# Doctests are so slow, and not well applicable here, so we don't currently have any.
+# Disable doctest running (we have none) to reduce total noise in `cargo test` output.
 doctest = false
 
 [[bench]]
