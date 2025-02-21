@@ -3,6 +3,10 @@
     clippy::exhaustive_structs,
     reason = "internal use only"
 )]
+#![allow(
+    exported_private_dependencies,
+    reason = "false positive on indirect use of re_types"
+)]
 
 use alloc::vec;
 use alloc::vec::Vec;
