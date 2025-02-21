@@ -55,6 +55,10 @@ impl FrameClock {
     ///
     /// This cannot be meaningfully used in combination with
     /// [`FrameClock::request_frame()`] or [`FrameClock::advance_by()`].
+    #[allow(
+        exported_private_dependencies,
+        reason = "false positive on indirect Instant"
+    )]
     pub fn advance_to(&mut self, instant: Instant) {
         if let Some(last_absolute_time) = self.last_absolute_time {
             let delta = instant.saturating_duration_since(last_absolute_time);
@@ -93,6 +97,10 @@ impl FrameClock {
     ///
     /// [`FrameClock::advance_to()`] must have previously been called to give an absolute
     /// time reference.
+    #[allow(
+        exported_private_dependencies,
+        reason = "false positive on indirect Instant"
+    )]
     pub fn next_step_or_draw_time(&self) -> Option<Instant> {
         Some(self.last_absolute_time? + self.step_length())
     }
