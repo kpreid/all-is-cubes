@@ -100,6 +100,7 @@ pub(crate) struct ParentSpace(pub Handle<Space>);
 #[doc(hidden)]
 #[non_exhaustive]
 pub struct PhysicsOutputs {
+    #[allow(exported_private_dependencies, reason = "hidden for debugging")]
     pub colliding_cubes: HbHashSet<Contact>,
 
     /// Last body step, for debugging.
