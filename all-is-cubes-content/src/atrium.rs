@@ -345,10 +345,7 @@ fn map_text_block(
         // TODO: These are supposed to be planters
         b'P' => blocks[AtriumBlocks::Brazier].clone(),
         b'f' => lookup_multiblock_2d(blocks, AtriumBlocks::Pole, [cube.z - 1, 0]),
-        _ => panic!(
-            "Unrecognized block character {:?}",
-            core::str::from_utf8(&[ascii])
-        ),
+        _ => panic!("Unrecognized block character {:?}", char::from(ascii)),
     }
 }
 
