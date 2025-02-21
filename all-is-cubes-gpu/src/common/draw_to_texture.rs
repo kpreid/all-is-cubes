@@ -125,15 +125,15 @@ fn expand_rectangle(rectangle: &mut Rectangle, point: Point) {
     if relative.x < 0 {
         // Expand to the left.
         rectangle.top_left.x += relative.x;
-        rectangle.size.width += (-relative.x) as u32;
+        rectangle.size.width += (-relative.x).cast_unsigned();
     } else {
         // Maybe expand to the right.
-        rectangle.size.width = rectangle.size.width.max(relative.x as u32 + 1);
+        rectangle.size.width = rectangle.size.width.max(relative.x.cast_unsigned() + 1);
     }
     if relative.y < 0 {
         rectangle.top_left.y += relative.y;
-        rectangle.size.height += (-relative.y) as u32;
+        rectangle.size.height += (-relative.y).cast_unsigned();
     } else {
-        rectangle.size.height = rectangle.size.height.max(relative.y as u32 + 1);
+        rectangle.size.height = rectangle.size.height.max(relative.y.cast_unsigned() + 1);
     }
 }
