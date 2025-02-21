@@ -621,6 +621,10 @@ impl GridAab {
     /// assert_eq!(empty.random_cube(rng), None);
     /// ```
     #[allow(clippy::missing_inline_in_public_items)]
+    #[allow(
+        exported_private_dependencies,
+        reason = "RngCore is public in rand, which is itself a public dep"
+    )]
     pub fn random_cube(&self, rng: &mut impl rand::RngCore) -> Option<Cube> {
         if self.is_empty() {
             None
