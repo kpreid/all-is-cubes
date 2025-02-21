@@ -103,8 +103,8 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
                         texture,
                         mip_level: 0,
                         origin: wgpu::Origin3d {
-                            x: dirty_rect.top_left.x as u32,
-                            y: dirty_rect.top_left.y as u32,
+                            x: dirty_rect.top_left.x.cast_unsigned(),
+                            y: dirty_rect.top_left.y.cast_unsigned(),
                             z: 0,
                         },
                         aspect: wgpu::TextureAspect::All,

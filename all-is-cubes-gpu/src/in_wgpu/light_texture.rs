@@ -62,9 +62,9 @@ fn visible_light_volume(space_bounds: GridAab, camera: &Camera) -> GridAab {
 const LIGHT_CHUNK_SIZE: GridSize = GridSize::new(16, 1, 1);
 #[allow(clippy::cast_possible_wrap)]
 const LIGHT_CHUNK_SIZE_I32: Size3D<i32, Cube> = Size3D::new(
-    LIGHT_CHUNK_SIZE.width as i32,
-    LIGHT_CHUNK_SIZE.height as i32,
-    LIGHT_CHUNK_SIZE.depth as i32,
+    LIGHT_CHUNK_SIZE.width.cast_signed(),
+    LIGHT_CHUNK_SIZE.height.cast_signed(),
+    LIGHT_CHUNK_SIZE.depth.cast_signed(),
 );
 const LIGHT_CHUNK_VOLUME: usize =
     (LIGHT_CHUNK_SIZE.width * LIGHT_CHUNK_SIZE.height * LIGHT_CHUNK_SIZE.depth) as usize;
@@ -401,7 +401,7 @@ impl LightTexture {
                     .min
                     .zip(texture_size.to_vector().to_point().cast(), |coord, size| {
                         // after rem_euclid it is guaranteed to be nonnegative
-                        coord.rem_euclid(size) as u32
+                        coord.rem_euclid(size).cast_unsigned()
                     })
                     .to_point(),
                 region.size().cast(),

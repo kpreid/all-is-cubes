@@ -545,7 +545,11 @@ mod theme {
         let multi_resolution_g = u32::from(MULTI_RESOLUTION);
         Space::builder(GridAab::from_lower_size(
             [0, 0, 0],
-            [multi_resolution_g, multi_resolution_g, max_z as u32],
+            [
+                multi_resolution_g,
+                multi_resolution_g,
+                max_z.cast_unsigned(),
+            ],
         ))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build()
@@ -606,7 +610,7 @@ impl ButtonBase for ButtonVisualState {
         let rr = |bounding_box: GridAab, inset: i32| {
             RoundedRectangle::with_equal_corners(
                 aab_xy_to_rectangle(bounding_box).offset(-(outer_inset + inset)),
-                Size::new_equal((theme::RESOLUTION_G / 2 - outer_inset - inset) as u32),
+                Size::new_equal((theme::RESOLUTION_G / 2 - outer_inset - inset).cast_unsigned()),
             )
         };
 
@@ -673,7 +677,7 @@ impl ButtonBase for ToggleButtonVisualState {
         let rr = |bounding_box: GridAab, inset: i32| {
             RoundedRectangle::with_equal_corners(
                 aab_xy_to_rectangle(bounding_box).offset(-(outer_inset + inset)),
-                Size::new(5 - inset as u32, 5 - inset as u32),
+                Size::new(5 - inset.cast_unsigned(), 5 - inset.cast_unsigned()),
             )
         };
 

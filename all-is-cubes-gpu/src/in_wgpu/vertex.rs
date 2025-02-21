@@ -1,5 +1,5 @@
 use all_is_cubes::euclid::{Point3D, Vector3D};
-use all_is_cubes::math::{Cube, GridVector};
+use all_is_cubes::math::{Cube, GridCoordinate, GridVector};
 use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
 
 use crate::DebugLineVertex;
@@ -157,7 +157,7 @@ impl GfxVertex for WgpuBlockVertex {
 
     #[inline]
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
-        let cube = cube.lower_bounds().map(|c| c as u32);
+        let cube = cube.lower_bounds().map(GridCoordinate::cast_unsigned);
         cube.x | (cube.y << 8) | (cube.z << 16)
     }
 

@@ -66,8 +66,8 @@ pub(crate) async fn atrium(
         arches_footprint.expand(FaceMap::symmetric([balcony_radius, 0, balcony_radius]));
     let outer_walls_footprint = balconies_footprint.expand(FaceMap::symmetric([UWALL, 0, UWALL]));
 
-    let balcony_floor_pos = GridVector::new(0, (ceiling_height + UWALL) as i32, 0);
-    let top_floor_pos = GridVector::new(0, (ceiling_height + UWALL) as i32 * 2, 0);
+    let balcony_floor_pos = GridVector::new(0, (ceiling_height + UWALL).cast_signed(), 0);
+    let top_floor_pos = GridVector::new(0, (ceiling_height + UWALL).cast_signed() * 2, 0);
 
     let space_bounds = outer_walls_footprint
         .expand(FaceMap::default().with(Face6::PY, sun_height + ceiling_height * floor_count));
@@ -361,9 +361,9 @@ fn arch_row(
     parallel: Face6,
     pattern: Vol<&[u8]>,
 ) -> Result<(), InGenError> {
-    let offset = parallel.normal_vector() * section_length as GridCoordinate;
+    let offset = parallel.normal_vector() * section_length.cast_signed();
     let rotation = GridRotation::from_to(Face6::NX, parallel, Face6::PY).unwrap();
-    for i in 0..(section_count as GridCoordinate) {
+    for i in 0..section_count.cast_signed() {
         let column_base = first_column_base + offset * (i + 1);
 
         let banner_color = if parallel.axis() == Axis::Z {
