@@ -791,6 +791,10 @@ impl PartialEq<dyn ErasedHandle> for AnyHandle {
         self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
     }
 }
+#[allow(
+    exported_private_dependencies,
+    reason = "transitive dependency false positive"
+)]
 impl hashbrown::Equivalent<AnyHandle> for dyn ErasedHandle {
     fn equivalent(&self, other: &AnyHandle) -> bool {
         self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
