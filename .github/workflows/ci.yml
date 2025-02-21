@@ -531,11 +531,10 @@ jobs:
     - name: Install cargo-fuzz
       run: cargo install cargo-fuzz
 
-    - name: Cache fuzzer corpus
-      uses: actions/cache@v4
+    - name: Load fuzzer corpus
+      id: fuzz-corpus-restore
+      uses: actions/cache/restore@v4
       with:
-        # Failed runs are useful to cache since they expand the corpus
-        save-always: true
         key: fuzz-corpus
         path: |
           fuzz/corpus
@@ -552,3 +551,13 @@ jobs:
       with:
         name: fuzz-artifacts
         path: fuzz/artifacts
+
+    # Failed runs are useful to cache since they expand the corpus, so we use separate save and
+    # restore steps per <https://github.com/actions/cache/tree/main/save#always-save-cache>
+    - name: Save fuzzer corpus
+      if: ${{ always() }}
+      uses: actions/cache/save@v4
+      with:
+        key: fuzz-corpus
+        path: |
+          fuzz/corpus
