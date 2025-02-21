@@ -2,6 +2,10 @@
 //! broken out to minimize rebuilds when the test cases are edited.
 
 #![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
+#![allow(
+    exported_private_dependencies,
+    reason = "library for internal use only"
+)]
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
