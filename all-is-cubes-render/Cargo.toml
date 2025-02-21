@@ -44,13 +44,13 @@ raytracer = [
 ]
 
 [dependencies]
-all-is-cubes = { workspace = true }
+all-is-cubes = { workspace = true, public = true }
 bitflags = { workspace = true }
 displaydoc = { workspace = true }
 embedded-graphics = { workspace = true, optional = true }
 futures-core = { workspace = true }
 hashbrown = { workspace = true, optional = true }
-imgref = { workspace = true }
+imgref = { workspace = true, public = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 manyfmt = { workspace = true }
