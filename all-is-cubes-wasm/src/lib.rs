@@ -6,6 +6,10 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![allow(
+    exported_private_dependencies,
+    reason = "not used as a library from Rust code"
+)]
+#![allow(
     wasm_c_abi,
     reason = "tested and confirmed not affected by ABI transition"
 )]
