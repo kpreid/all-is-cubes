@@ -2,7 +2,6 @@ use alloc::boxed::Box;
 use alloc::string::ToString as _;
 use alloc::sync::{Arc, Weak};
 use core::fmt;
-use core::future::Future;
 use core::marker::PhantomData;
 use core::mem;
 use core::pin::Pin;

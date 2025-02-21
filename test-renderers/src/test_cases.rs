@@ -3,7 +3,6 @@
 #![expect(clippy::unused_async)]
 #![expect(clippy::cast_possible_wrap)]
 
-use std::future::Future;
 use std::str::FromStr;
 use std::sync::Arc;
 

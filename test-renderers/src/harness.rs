@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, HashSet, btree_map};
-use std::future::Future;
 use std::io::Write as _;
 use std::path::PathBuf;
 use std::process::ExitCode;

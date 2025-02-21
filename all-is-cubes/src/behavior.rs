@@ -9,7 +9,7 @@ use core::mem;
 use core::ops;
 
 #[cfg(doc)]
-use core::{future::Future, task::Waker};
+use core::task::Waker;
 
 use downcast_rs::{Downcast, impl_downcast};
 

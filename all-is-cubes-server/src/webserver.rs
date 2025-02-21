@@ -1,7 +1,6 @@
 //! Top-level code for server that serves the All is Cubes web client as well as being a game
 //! server in the multiplayer sense (eventually).
 
-use std::future::Future;
 use std::net::SocketAddr;
 
 /// Run the All is Cubes web server on an arbitrary local port.
