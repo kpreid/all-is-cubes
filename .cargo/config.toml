@@ -1,2 +1,5 @@
 [alias]
 xtask = "run --quiet --package xtask --"
+
+[unstable]
+public-dependency = true

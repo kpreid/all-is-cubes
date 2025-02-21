@@ -22,6 +22,7 @@
 // Increase recursion limit for deeply nested wgpu types
 #![recursion_limit = "256"]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
+#![allow(exported_private_dependencies, reason = "false positive on wgpu_types")]
 #![cfg_attr(
     feature = "_special_testing",
     allow(missing_docs, clippy::missing_panics_doc)
