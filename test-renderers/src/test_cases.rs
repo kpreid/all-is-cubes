@@ -692,8 +692,7 @@ async fn icons(mut context: RenderTestContext) {
             FreeCoordinate::from(bounds.size().height) * 1.5,
         ))
         .build();
-    for (index, block) in all_blocks.into_iter().enumerate() {
-        let index = index as GridCoordinate;
+    for (index, block) in (0i32..).zip(all_blocks) {
         space
             .set(
                 [
@@ -1330,10 +1329,10 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
         .fill_uniform(bounds.abut(Face6::PZ, -1).unwrap(), &AIR)
         .unwrap();
 
-    for (i, &luminance) in luminance_ramp.iter().enumerate() {
-        let x = i as GridCoordinate * x_spacing;
-        for (j, &color) in colors.iter().enumerate() {
-            let y = j as GridCoordinate * y_spacing;
+    for (i, luminance) in (0i32..).zip(luminance_ramp) {
+        let x = i * x_spacing;
+        for (j, color) in (0i32..).zip(colors) {
+            let y = j * y_spacing;
             let light_source_block = Block::builder()
                 .color(Rgba::WHITE)
                 .light_emission(color * luminance)

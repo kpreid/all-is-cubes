@@ -47,9 +47,9 @@ fn TREES(ctx: Context<'_>) {
     }
 
     // exhibit of leaves growth stages for debugging
-    for (i, g) in tree::TreeGrowth::exhaust().enumerate() {
+    for (i, g) in (0i32..).zip(tree::TreeGrowth::exhaust()) {
         space.set(
-            [i as GridCoordinate * 2, 0, bounds.lower_bounds().z],
+            [i * 2, 0, bounds.lower_bounds().z],
             &landscape_blocks[LandscapeBlocks::Leaves(g)],
         )?;
     }

@@ -57,8 +57,7 @@ fn UI_BLOCKS(ctx: Context<'_>) {
             FreeCoordinate::from(bounds.size().height) * 1.5,
         ))
         .build();
-    for (index, block) in all_blocks.into_iter().enumerate() {
-        let index = index as GridCoordinate;
+    for (index, block) in (0i32..).zip(all_blocks) {
         space
             .set(
                 [

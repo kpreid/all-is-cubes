@@ -36,9 +36,9 @@ fn COMPOSITE(ctx: Context<'_>) {
     ));
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
-    for (di, destination) in destinations.into_iter().enumerate() {
-        for (si, source) in sources.into_iter().enumerate() {
-            for (oi, operator) in operators.into_iter().enumerate() {
+    for (di, destination) in (0i32..).zip(destinations) {
+        for (si, source) in (0i32..).zip(sources) {
+            for (oi, operator) in (0i32..).zip(operators) {
                 let composite = destination.clone().with_modifier(Composite::new(
                     source.clone().rotate(GridRotation::CLOCKWISE),
                     operator,
@@ -64,11 +64,7 @@ fn COMPOSITE(ctx: Context<'_>) {
 
                 stack(
                     &mut space,
-                    GridPoint::new(
-                        di as GridCoordinate * 2,
-                        oi as GridCoordinate * 3,
-                        si as GridCoordinate * 2,
-                    ),
+                    GridPoint::new(di * 2, oi * 3, si * 2),
                     [if oi == 0 { pedestal } else { &AIR }, &composite, &label],
                 )?;
             }

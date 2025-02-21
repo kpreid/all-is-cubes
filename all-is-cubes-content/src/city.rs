@@ -673,8 +673,7 @@ fn place_roads_and_tunnels(
             .cast()
             .within(space.bounds());
         let curb_y = GridVector::new(0, 1, 0);
-        for (i, step) in raycaster.enumerate() {
-            let i = i as GridCoordinate;
+        for (i, step) in (0i32..).zip(raycaster) {
             // Road surface
             for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
                 space.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
