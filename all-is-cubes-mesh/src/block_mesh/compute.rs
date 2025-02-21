@@ -43,16 +43,21 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 
     let resolution = block.resolution();
 
-    // If `options.ignore_voxels` is set, substitute the block color for the
-    // actual voxels.
-    let tmp_block_color_voxel: Evoxels;
-    let voxels: &Evoxels = if options.ignore_voxels {
-        tmp_block_color_voxel = Evoxels::from_one(Evoxel::from_color(block.color()));
-        &tmp_block_color_voxel
-    } else {
-        block.voxels()
-    };
+    if resolution != Resolution::R1 && options.ignore_voxels {
+        // Substitute the block color for the actual voxels.
+        // TODO: This discards emission, but in principle we can and should keep it.
+        let color = options.transparency.limit_alpha(block.color());
+        // TODO: Use a partial box instead
+        push_full_box(
+            output,
+            color.opacity_category(),
+            QuadColoring::Solid(color),
+            &mut viz,
+        );
+        return;
+    }
 
+    let voxels = block.voxels();
     // Short-circuit case: if we have a single voxel a.k.a. resolution 1, then we generate a
     // mesh without going through all the conversion steps.
     if let Some(mut voxel) = voxels.single_voxel() {
@@ -63,6 +68,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 
         // If we want to use a texture, try to allocate it.
         output.texture_used = if prefer_textures {
+            // TODO: this doesn't use the result of `limit_alpha()` but should.
             texture::copy_voxels_to_new_texture(texture_allocator, voxels)
         } else {
             None
