@@ -1,3 +1,8 @@
+#![allow(
+    exported_private_dependencies,
+    reason = "false positive on indirect use of re_types"
+)]
+
 use alloc::vec::Vec;
 use core::fmt;
 
