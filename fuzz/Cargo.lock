@@ -46,6 +46,7 @@ dependencies = [
  "rand_xoshiro",
  "rustc-hash 2.1.1",
  "serde",
+ "serde_core",
  "visibility",
  "yield-progress",
 ]
@@ -70,6 +71,7 @@ dependencies = [
  "ordered-float",
  "rand 0.10.0",
  "serde",
+ "serde_core",
 ]
 
 [[package]]
