@@ -8,6 +8,8 @@
 
 // wgpu is not no_std but is working towards it, so we shall too, for a better wasm target someday.
 #![no_std]
+// Increase recursion limit for deeply nested wgpu types
+#![recursion_limit = "256"]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 // * TODO: warn(missing_docs), eventually.
 #![forbid(unsafe_code)]
