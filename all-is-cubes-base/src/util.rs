@@ -212,6 +212,7 @@ impl TimeStats {
     /// Returns the duration that was recorded.
     #[doc(hidden)] // for now, not making writing conveniences public
     #[inline]
+    #[allow(exported_private_dependencies, reason = "false positive on indirect Instant")]
     pub fn record_consecutive_interval(
         &mut self,
         last_marked_instant: &mut crate::time::Instant,
