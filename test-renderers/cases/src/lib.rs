@@ -3,6 +3,10 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![expect(clippy::unused_async)]
 #![expect(clippy::cast_possible_wrap)]
+#![allow(
+    exported_private_dependencies,
+    reason = "library for internal use only"
+)]
 #![warn(
     unused_crate_dependencies,
     reason = "should be no false positives for this crate"

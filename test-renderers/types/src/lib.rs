@@ -1,6 +1,11 @@
 //! Types which are used by both `test-renderers-runner` and `test-renderers-cases`,
 //! broken out to minimize rebuilds when the test cases are edited.
 
+#![allow(
+    exported_private_dependencies,
+    reason = "library for internal use only"
+)]
+
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
