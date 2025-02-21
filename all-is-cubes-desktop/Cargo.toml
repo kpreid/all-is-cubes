@@ -65,31 +65,31 @@ rerun = [
 # TODO: Define a feature with which to turn off windowing & GPU support.
 
 [dependencies]
-all-is-cubes = { workspace = true, features = ["auto-threads", "save"] }
+all-is-cubes = { workspace = true, public = true, features = ["auto-threads", "save"] }
 # TODO: make template support an optional feature, and this dependency with it
-all-is-cubes-content = { workspace = true }
-all-is-cubes-gpu = { workspace = true, features = ["auto-threads", "wgpu"] }
+all-is-cubes-content = { workspace = true, public = true }
+all-is-cubes-gpu = { workspace = true, public = true, features = ["auto-threads"] }
 all-is-cubes-mesh = { workspace = true, optional = true, features = ["dynamic"] }
 # TODO: make all file access an optional feature
-all-is-cubes-port = { workspace = true, features = ["auto-threads", "import", "native"] }
+all-is-cubes-port = { workspace = true, public = true, features = ["auto-threads", "import", "native"] }
 # TODO: make raytracer optional
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }
-all-is-cubes-ui = { workspace = true, features = ["session"] }
+all-is-cubes-ui = { workspace = true, public = true, features = ["session"] }
 async_fn_traits = { workspace = true }
 async-channel = { workspace = true }
 async-executor = { workspace = true }
 async-io = { workspace = true }
-anyhow = { workspace = true }
+anyhow = { workspace = true, public = true }
 clap = { workspace = true }
 directories-next = "2.0.0"
 # "serde" feature for TODO: explain
 # "mint" feature for interop with kira
-euclid = { workspace = true, optional = true, features = ["serde", "mint"] }
-futures-channel = { workspace = true }
+euclid = { workspace = true, optional = true, public = true, features = ["serde", "mint"] }
+futures-channel = { workspace = true, public = true }
 futures-core = { workspace = true }
 gilrs = { workspace = true }
 hashbrown = { workspace = true }
-indicatif = { version = "0.18.0", default-features = false }
+indicatif = { version = "0.18.0", public = true, default-features = false }
 itertools = { workspace = true }
 kira = { version = "0.11.0", optional = true, default-features = false, features = ["cpal"] }
 log = { workspace = true }
@@ -105,12 +105,12 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 simplelog = { workspace = true }
 strum = { workspace = true, features = ["derive", "std"] }
-ratatui = { version = "0.30.0", optional = true, default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.30.0", optional = true, public = true, default-features = false, features = ["crossterm"] }
 unicode-width = { workspace = true, optional = true }
 # Must enable all wgpu backends we want the desktop binary to support.
 wgpu = { workspace = true, features = ["dx12", "metal", "vulkan"] }
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
-winit = { version = "0.30.0", default-features = false, features = ["x11", "rwh_06"] }
+winit = { version = "0.30.0", public = true, default-features = false, features = ["x11", "rwh_06"] }
 # Enable the log_hiccups feature
 yield-progress = { workspace = true, features = ["log_hiccups"] }
 

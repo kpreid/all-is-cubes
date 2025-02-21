@@ -88,6 +88,7 @@ dependencies = [
  "rstest",
  "rustc-hash 2.1.1",
  "serde",
+ "serde_core",
  "serde_json",
  "smol-macros",
  "visibility",
@@ -120,6 +121,7 @@ dependencies = [
  "re_sdk_types",
  "rstest",
  "serde",
+ "serde_core",
 ]
 
 [[package]]

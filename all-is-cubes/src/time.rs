@@ -1,5 +1,10 @@
 //! Data types for simulated and real time.
 
+#![allow(
+    exported_private_dependencies,
+    reason = "false positive on indirect Instant"
+)]
+
 use core::fmt;
 use core::num::NonZeroU16;
 

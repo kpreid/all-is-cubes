@@ -152,6 +152,10 @@ pub(super) fn body_physics_step_system(
 #[doc(hidden)] // public for all-is-cubes-gpu debug visualizations
 #[non_exhaustive]
 pub struct PhysicsOutputs {
+    #[allow(
+        exported_private_dependencies,
+        reason = "transitive dependency false positive"
+    )]
     pub colliding_cubes: HbHashSet<Contact>,
 
     /// Last body step, for debugging.

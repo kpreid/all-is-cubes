@@ -32,6 +32,10 @@ use crate::util::{ConciseDebug, Fmt, Refmt as _, StatusText};
 // -------------------------------------------------------------------------------------------------
 
 /// Set of [`Contact`]s produced by a collision.
+#[allow(
+    exported_private_dependencies,
+    reason = "transitive dependency false positive"
+)]
 pub type ContactSet = hashbrown::HashSet<Contact>;
 
 // -------------------------------------------------------------------------------------------------

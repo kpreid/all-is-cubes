@@ -36,7 +36,7 @@ lukewarm-reload = ["dep:tempfile", "all-is-cubes/save", "dep:all-is-cubes-port"]
 _special_testing = ["dep:visibility"]
 
 [dependencies]
-all-is-cubes = { workspace = true }
+all-is-cubes = { workspace = true, public = true }
 all-is-cubes-ui = { workspace = true }
 all-is-cubes-port = { workspace = true, optional = true, features = ["import", "native"] }
 arbitrary = { workspace = true, optional = true }

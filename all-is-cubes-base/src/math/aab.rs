@@ -282,6 +282,10 @@ impl Aab {
     /// Returns a random point within this box, using inclusive ranges
     /// (`lower_bounds[axis] ≤ random_point()[axis] ≤ upper_bounds[axis]`).
     #[allow(clippy::missing_inline_in_public_items)]
+    #[allow(
+        exported_private_dependencies,
+        reason = "Rng is public in rand, which is itself a public dep"
+    )]
     pub fn random_point(self, rng: &mut impl rand::Rng) -> FreePoint {
         FreePoint::new(
             rng.random_range(self.lower_bounds.x..=self.upper_bounds.x),

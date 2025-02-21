@@ -283,6 +283,14 @@ cfg_select! {
     }
     _ => {
         #[doc(hidden)]
+        #[allow(
+            clippy::useless_attribute,
+            reason = "https://github.com/rust-lang/rust-clippy/pull/16470"
+        )]
+        #[allow(
+            exported_private_dependencies,
+            reason = "hidden, used by macro"
+        )]
         pub use ::once_cell::race::OnceBox as OnceBoxForIncludeImage;
         #[doc(hidden)]
         pub use ::alloc::boxed::Box as BoxForIncludeImage;
