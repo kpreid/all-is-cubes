@@ -381,9 +381,9 @@ impl<C> Vol<C, ZMaj> {
             .to_point();
 
         // Bounds check, expressed as a single unsigned comparison.
-        if (deoffsetted.x as u32 >= sizes.width)
-            | (deoffsetted.y as u32 >= sizes.height)
-            | (deoffsetted.z as u32 >= sizes.depth)
+        if (deoffsetted.x.cast_unsigned() >= sizes.width)
+            | (deoffsetted.y.cast_unsigned() >= sizes.height)
+            | (deoffsetted.z.cast_unsigned() >= sizes.depth)
         {
             return None;
         }
@@ -857,8 +857,7 @@ fn find_zmaj_subdivision(vol: Vol<()>) -> Option<(Vol<()>, Vol<()>, usize)> {
         let axis_range = bounds.axis_range(axis);
         let size: u32 = bounds.size()[axis];
         if size >= 2 {
-            #[expect(clippy::cast_possible_wrap, reason = "known to fit")]
-            let split_coordinate = axis_range.start + (size / 2) as i32;
+            let split_coordinate = axis_range.start + (size / 2).cast_signed();
 
             let mut lower_half_ub = bounds.upper_bounds();
             lower_half_ub[axis] = split_coordinate;
