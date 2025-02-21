@@ -49,8 +49,8 @@ _special_testing = ["dep:visibility"]
 
 
 [dependencies]
-all-is-cubes = { workspace = true }
-all-is-cubes-render = { workspace = true }
+all-is-cubes = { workspace = true, public = true }
+all-is-cubes-render = { workspace = true, public = true }
 arbitrary = { workspace = true, optional = true }
 bitvec = { workspace = true }
 bytemuck = { workspace = true }

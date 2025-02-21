@@ -29,29 +29,32 @@ arbitrary = [
 rerun = ["dep:re_sdk_types"]
 serde = [
     "dep:serde",
+    "dep:serde_core",
     "ordered-float/serde",
 ]
 _special_testing = []
 
 [dependencies]
-arbitrary = { workspace = true, optional = true }
+arbitrary = { workspace = true, optional = true, public = true }
 bevy_platform = { workspace = true, features = ["alloc"] }
 bytemuck = { workspace = true, features = ["derive"] }
 displaydoc = { workspace = true }
-embedded-graphics-core = { workspace = true }
+embedded-graphics-core = { workspace = true, public = true }
 # libm feature to guarantee compilability and compatibility with no_std
-euclid = { workspace = true, features = ["libm"] }
+euclid = { workspace = true, public = true, features = ["libm"] }
 exhaust = { workspace = true, default-features = false }
 futures-core = { workspace = true }
 libm = { workspace = true }
-log = { workspace = true }
-manyfmt = { workspace = true }
+log = { workspace = true, public = true }
+manyfmt = { workspace = true, public = true }
 mutants = { workspace = true }
-num-traits = { workspace = true }
-ordered-float = { workspace = true }
-rand = { workspace = true }
-re_sdk_types = { workspace = true, optional = true }
-serde = { workspace = true, optional = true, features = ["derive"] }
+num-traits = { workspace = true, public = true }
+ordered-float = { workspace = true, public = true }
+rand = { workspace = true, public = true }
+re_sdk_types = { workspace = true, optional = true, public = true }
+serde = { workspace = true, optional = true, public = true, features = ["derive"] }
+# dummy dependency for exported_private_dependencies false positive
+serde_core = { workspace = true, optional = true, public = true }
 
 [dev-dependencies]
 indoc = { workspace = true }

@@ -36,9 +36,9 @@ session = [
 ]
 
 [dependencies]
-all-is-cubes = { workspace = true, default-features = false }
-all-is-cubes-render = { workspace = true, default-features = false }
-async_fn_traits = { workspace = true, optional = true }
+all-is-cubes = { workspace = true, public = true, default-features = false }
+all-is-cubes-render = { workspace = true, public = true, default-features = false }
+async_fn_traits = { workspace = true, optional = true, public = true }
 bevy_platform = { workspace = true }
 bitflags = { workspace = true }
 displaydoc = { workspace = true }
