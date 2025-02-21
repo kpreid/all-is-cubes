@@ -15,6 +15,10 @@ use crate::space::Space;
 // -------------------------------------------------------------------------------------------------
 
 /// Set of [`Contact`]s produced by a collision.
+#[allow(
+    exported_private_dependencies,
+    reason = "transitive dependency false positive"
+)]
 pub type ContactSet = hashbrown::HashSet<Contact>;
 
 // -------------------------------------------------------------------------------------------------

@@ -65,12 +65,12 @@ auto-threads = [
 [dependencies]
 # Non-optional generally required dependencies
 # need all-is-cubes/std because we have boxed Send futures and errors
-all-is-cubes = { workspace = true, features = ["std"] }
+all-is-cubes = { workspace = true, public = true, features = ["std"] }
 futures-channel = { workspace = true }
 futures-core = { workspace = true }
 itertools = { workspace = true }
 # TODO: replace logging with explicit reporting data flow
-log = { workspace = true }
+log = { workspace = true, public = true }
 # Used for internal execution of not-publicly-async code
 pollster = { workspace = true }
 rayon = { workspace = true, optional = true }
@@ -80,7 +80,7 @@ yield-progress = { workspace = true }
 yoke = { workspace = true }
 
 # Dependencies related to formats
-all-is-cubes-mesh = { workspace = true, optional = true }
+all-is-cubes-mesh = { workspace = true, optional = true, public = true }
 all-is-cubes-render = { workspace = true, optional = true }
 # By disabling default features, we disable a dependency on `ahash` ← `getrandom` and use the
 # `std` `HasHMap` instead, which is useful for web-wasm compatibility.
@@ -94,7 +94,7 @@ serde_json = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true, features = ["alloc"] }
 bytemuck = { workspace = true, optional = true, features = ["derive"] }
 # gltf-json often has semver-incompatible changes, so pin it
-gltf-json = { version = ">=1.4.1, <1.5.0", optional = true, default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
+gltf-json = { version = ">=1.4.1, <1.5.0", optional = true, public = true, default-features = false, features = ["names", "KHR_materials_volume", "KHR_materials_transmission"] }
 # Used to write glTF textures
 image = { workspace = true, optional = true, features = ["png"] }
 # Used to pack glTF textures

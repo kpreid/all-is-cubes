@@ -60,16 +60,16 @@ gltf = [
 [dependencies]
 all-is-cubes = { workspace = true, features = ["save"] }
 all-is-cubes-content = { workspace = true }
-all-is-cubes-gpu = { workspace = true, features = ["wgpu"] }
+all-is-cubes-gpu = { workspace = true }
 # used only for gltf export+render tests
 all-is-cubes-port = { workspace = true, optional = true, features = ["export", "gltf"] }
-all-is-cubes-render = { workspace = true, features = ["raytracer", "serde", "std"] }
+all-is-cubes-render = { workspace = true, public = true, features = ["raytracer", "serde", "std"] }
 all-is-cubes-ui = { workspace = true, features = ["session"] }
 anyhow = { workspace = true }
-async_fn_traits = { workspace = true }
+async_fn_traits = { workspace = true, public = true }
 bytemuck = { workspace = true, optional = true }
 # Using clap for parsing test command-line arguments
-clap = { workspace = true }
+clap = { workspace = true, public = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
 #futures-channel = { workspace = true, optional = true }
