@@ -97,20 +97,15 @@ impl MeshOptions {
     /// Determines what geometry should be produced when a mesh contains transparent voxels,
     /// after filtering by [`TransparencyOption::limit_alpha()`].
     pub(crate) fn transparency_format(&self) -> TransparencyFormat {
-        // TODO(volumetric): Bounding box mode does not yet work correctly, so it is disabled.
-        if true {
-            TransparencyFormat::Surfaces
-        } else {
-            match self.transparency {
-                TransparencyOption::Surface => TransparencyFormat::Surfaces,
-                TransparencyOption::Volumetric => TransparencyFormat::BoundingBox,
-                TransparencyOption::Threshold(_) => TransparencyFormat::Surfaces,
-                ref o => {
-                    if cfg!(debug_assertions) {
-                        unreachable!("missing support for transparency option {o:?}");
-                    } else {
-                        TransparencyFormat::Surfaces
-                    }
+        match self.transparency {
+            TransparencyOption::Surface => TransparencyFormat::Surfaces,
+            TransparencyOption::Volumetric => TransparencyFormat::BoundingBox,
+            TransparencyOption::Threshold(_) => TransparencyFormat::Surfaces,
+            ref o => {
+                if cfg!(debug_assertions) {
+                    unreachable!("missing support for transparency option {o:?}");
+                } else {
+                    TransparencyFormat::Surfaces
                 }
             }
         }

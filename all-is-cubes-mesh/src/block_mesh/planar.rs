@@ -218,10 +218,6 @@ pub(super) enum QuadColoring<'a, T> {
     /// TODO(volumetric): It is a technically incorrect kludge that this holds a [`texture::Plane`];
     /// we are accessing texels that are outside of it. We need a new type of texture handle that is
     /// a 3D slice of a [`texture::Tile`].
-    #[expect(
-        unused,
-        reason = "TODO(volumetric): the code to use this isn’t ready yet"
-    )]
     Volume {
         plane: &'a T,
         /// Depth

@@ -152,15 +152,25 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             block.voxel_opacity_mask(),
             &mut viz,
         );
+
+        if let Some(bbox) = analysis.transparent_bounding_box {
+            if let Some(tile) = &output.texture_used {
+                let tile = tile.clone(); // TODO: needed to avoid borrowing conflict, but we should fix that by making push_box borrow less
+                push_box(
+                    output,
+                    resolution,
+                    bbox,
+                    OpacityCategory::Partial,
+                    &BoxColoring::VolumeTexture(tile),
+                    &mut viz,
+                );
+            }
+        }
     }
 }
 
 enum BoxColoring<M: MeshTypes> {
-    #[allow(
-        dead_code,
-        reason = "TODO(volumetric): this will not be used until volumetric texturing"
-    )]
-    Texture(M::Tile),
+    VolumeTexture(M::Tile),
     Solid(FaceMap<Rgba>),
 }
 
@@ -216,9 +226,12 @@ fn push_box<M: MeshTypes>(
             upper_bounds.to_f64().cast_unit(),
             match &coloring {
                 // TODO: for our actual purposes, this should be a volume and not face slices
-                BoxColoring::Texture(tile) => {
+                BoxColoring::VolumeTexture(tile) => {
                     plane = tile.slice(aab.abut(face, -1).unwrap());
-                    QuadColoring::Texture(&plane)
+                    QuadColoring::Volume {
+                        plane: &plane,
+                        far_depth: FreeCoordinate::from(aab_in_face_coordinates.upper_bounds().z),
+                    }
                 }
                 BoxColoring::Solid(face_colors) => QuadColoring::Solid(face_colors[face]),
             },

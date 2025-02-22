@@ -369,8 +369,13 @@ async fn voxel_shape_test(
     };
     let cameras = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
 
+    // TODO: tighten up these bounds once we are no longer using approximate raymarching
     context
-        .render_comparison_test(1, cameras, Overlays::NONE)
+        .render_comparison_test(
+            Threshold::new([(2, 1000), (5, 200), (15, 80)]),
+            cameras,
+            Overlays::NONE,
+        )
         .await;
 }
 

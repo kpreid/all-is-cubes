@@ -10,11 +10,11 @@ use all_is_cubes::block::{
 };
 use all_is_cubes::color_block;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
-use all_is_cubes::euclid::{Point3D, Vector3D, point3};
+use all_is_cubes::euclid::{Point3D, Size3D, Vector3D, point3};
 use all_is_cubes::math::{
     Aab, Cube,
     Face6::{self, *},
-    FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba, zo32,
+    Face7, FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::Universe;
@@ -800,6 +800,61 @@ fn texture_clamp_coordinate_ordering() {
                 had_any_textured,
                 "test invalid: {face:?} has no textured vertices"
             )
+        }
+    }
+}
+
+/// Test the texture coordinates for volumetric texturing.
+#[test]
+fn texture_coordinates_for_volumetric() {
+    // A simple case: a block with all partially transparent voxels
+    let mut universe = Universe::new();
+    let block = Block::builder()
+        .voxels_fn(R4, |cube| {
+            if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == point3(0, 0, 0) {
+                color_block!(1.0, 0.0, 0.0, 0.9)
+            } else if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == point3(1, 1, 1) {
+                color_block!(0.0, 0.0, 1.0, 0.9)
+            } else {
+                color_block!(1.0, 1.0, 1.0, 0.12)
+            }
+        })
+        .unwrap()
+        .build_into(&mut universe);
+
+    let mesh = test_block_mesh(block);
+    dbg!(&mesh);
+
+    assert!(mesh.texture_used.is_some());
+
+    for (face, face_mesh) in mesh.all_face_meshes() {
+        eprintln!("Checking {face:?}...");
+        if face == Face7::Within {
+            assert_eq!(face_mesh.vertices.len(), 0);
+        } else {
+            assert_eq!(face_mesh.vertices.len(), 4);
+        }
+        for (i, vertex) in face_mesh.vertices.iter().enumerate() {
+            let Coloring::Texture {
+                pos,
+                clamp_min,
+                clamp_max,
+                resolution,
+            } = vertex.coloring
+            else {
+                panic!("not using texture {face:?} {i:?}");
+            };
+            // texture coordinates should be equal to the block's shape
+            assert_eq!(
+                pos,
+                vertex.position.to_f32().cast_unit() * f32::from(resolution),
+                "vertex position {face:?} {i:?}"
+            );
+            assert_eq!(
+                (clamp_min, clamp_max),
+                (point3(0., 0., 0.), point3(4., 4., 4.)),
+                "clamp {face:?} {i:?}"
+            );
         }
     }
 }

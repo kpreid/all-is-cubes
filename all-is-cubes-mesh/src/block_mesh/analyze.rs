@@ -197,9 +197,7 @@ fn analyze_one_window(
             window.to_mask(|voxel| voxel.opacity_category() == OpacityCategory::Partial)
         }
         TransparencyFormat::BoundingBox => {
-            if window[Octant::Ppp].opacity_category() == OpacityCategory::Partial
-                && transparency == TransparencyFormat::BoundingBox
-            {
+            if window[Octant::Ppp].opacity_category() == OpacityCategory::Partial {
                 let cube = Cube::from(center);
                 match &mut analysis.transparent_bounding_box {
                     Some(v) => {
