@@ -79,7 +79,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                 .map(Rgba::opacity_category)
                 .all_equal_value()
                 .unwrap_or(OpacityCategory::Partial),
-            face_colors.map(|_, color| QuadColoring::Solid(color)),
+            &BoxColoring::Solid(face_colors),
             &mut viz,
         );
         return;
@@ -140,9 +140,18 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             options,
             block.color(),
             block.voxel_opacity_mask(),
-            viz,
+            &mut viz,
         );
     }
+}
+
+enum BoxColoring<M: MeshTypes> {
+    #[allow(
+        dead_code,
+        reason = "TODO(volumetric): this will not be used until volumetric texturing"
+    )]
+    Texture(M::Tile),
+    Solid(FaceMap<Rgba>),
 }
 
 /// Append triangles to `output` which form a single box,
@@ -152,7 +161,7 @@ fn push_box<M: MeshTypes>(
     resolution: Resolution,
     aab: GridAab,
     opacity_category: OpacityCategory,
-    coloring: FaceMap<QuadColoring<'_, <M::Tile as texture::Tile>::Plane>>,
+    coloring: &BoxColoring<M>,
     viz: &mut Viz,
 ) {
     if opacity_category == OpacityCategory::Invisible {
@@ -181,6 +190,7 @@ fn push_box<M: MeshTypes>(
             & (upper_bounds == Point2D::splat(resolution.into()));
         face_mesh.vertices.reserve_exact(4);
 
+        let plane: <M::Tile as texture::Tile>::Plane;
         push_quad(
             &mut face_mesh.vertices,
             if fully_opaque {
@@ -194,7 +204,14 @@ fn push_box<M: MeshTypes>(
             FreeCoordinate::from(depth),
             lower_bounds.to_f64().cast_unit(),
             upper_bounds.to_f64().cast_unit(),
-            coloring[face],
+            match &coloring {
+                // TODO: for our actual purposes, this should be a volume and not face slices
+                BoxColoring::Texture(tile) => {
+                    plane = tile.slice(aab.abut(face, -1).unwrap());
+                    QuadColoring::Texture(&plane)
+                }
+                BoxColoring::Solid(face_colors) => QuadColoring::Solid(face_colors[face]),
+            },
             viz,
             &mut face_mesh.bounding_box,
         );
@@ -251,7 +268,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     options: &MeshOptions,
     placeholder_color: Rgba,
     voxel_opacity_mask: &block::VoxelOpacityMask,
-    mut viz: Viz,
+    viz: &mut Viz,
 ) {
     let flaws = &mut output.flaws;
     let mut used_any_vertex_colors = false;
@@ -482,7 +499,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     low_corner.map(FreeCoordinate::from),
                     high_corner.map(FreeCoordinate::from),
                     coloring,
-                    &mut viz,
+                    viz,
                     bounding_box,
                 );
             });

@@ -190,8 +190,16 @@ pub(super) struct GmRect {
 /// Compared to [`Coloring`], it describes texturing for an entire quad rather than a vertex.
 #[derive(Debug)]
 pub(super) enum QuadColoring<'a, T> {
+    /// A single color (“vertex color”).
     Solid(Rgba),
+
+    /// A textured surface.
     Texture(&'a T),
+    //
+    // TODO:
+    // /// A textured volume of which this is the surface.
+    // /// Used only with [`crate::TransparencyFormat::BoundingBox`].
+    // Volume(&'a T),
 }
 impl<T> Copy for QuadColoring<'_, T> {}
 impl<T> Clone for QuadColoring<'_, T> {
@@ -259,7 +267,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                 })
             }));
         }
-        QuadColoring::Texture(tile) => {
+        QuadColoring::Texture(plane) => {
             // Transform planar texture coordinates into the 3D coordinate system.
             let mut clamp_min = transform.transform_texture_point(TilePoint::new(
                 low_corner.x as TextureCoordinate + half_texel,
@@ -278,8 +286,8 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
             }
 
             // Convert to global texture coordinates in the texture tile's format.
-            let clamp_min = tile.grid_to_texcoord(clamp_min);
-            let clamp_max = tile.grid_to_texcoord(clamp_max);
+            let clamp_min = plane.grid_to_texcoord(clamp_min);
+            let clamp_max = plane.grid_to_texcoord(clamp_max);
 
             vertices.extend(position_iter.map(|voxel_grid_point| {
                 let position = transform.transform_position(voxel_grid_point);
@@ -293,7 +301,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                     position,
                     face,
                     coloring: Coloring::Texture {
-                        pos: tile.grid_to_texcoord(transform.transform_texture_point(
+                        pos: plane.grid_to_texcoord(transform.transform_texture_point(
                             voxel_grid_point.map(|s| s as TextureCoordinate).cast_unit(),
                         )),
                         clamp_min,
