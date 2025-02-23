@@ -573,7 +573,7 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
     // that data.
     let static_lighting = lighting(in);
 
-    let step_length = 1.0/32.0;
+    let step_length = min(0.5 / in.resolution, 1.0 / 32.0);
     let march_step = normalize(in.camera_ray_direction) * (step_length);
 
     // Accumulated light along the ray's path.
@@ -581,8 +581,8 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
     // How much *future* light accumulation should be reduced due to absorption.
     // When this decays to zero, we have hit opacity and can stop.
     var accum_transmittance = 1.0;
-    // Point we march.
-    var march_position_in_cube = in.position_in_cube + march_step;
+    // Point we march. Start it just slightly under the surface.
+    var march_position_in_cube = in.position_in_cube + march_step / 256.0;
     var step_count: u32 = 0;
 
     while accum_transmittance > 1e-4 
