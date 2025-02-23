@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::ops::Range;
 
 use all_is_cubes::block::Resolution;
-use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D};
+use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D, vec3};
 use all_is_cubes::math::{
     Aab, Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba, rgba_const,
 };
@@ -272,12 +272,12 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
             let mut clamp_min = transform.transform_texture_point(TilePoint::new(
                 low_corner.x as TextureCoordinate + half_texel,
                 low_corner.y as TextureCoordinate + half_texel,
-                depth as TextureCoordinate,
+                depth as TextureCoordinate + half_texel,
             ));
             let mut clamp_max = transform.transform_texture_point(TilePoint::new(
                 high_corner.x as TextureCoordinate - half_texel,
                 high_corner.y as TextureCoordinate - half_texel,
-                depth as TextureCoordinate,
+                depth as TextureCoordinate + half_texel,
             ));
 
             // Ensure the transformed clamp range is not inverted.
@@ -301,9 +301,13 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                     position,
                     face,
                     coloring: Coloring::Texture {
-                        pos: plane.grid_to_texcoord(transform.transform_texture_point(
-                            voxel_grid_point.map(|s| s as TextureCoordinate).cast_unit(),
-                        )),
+                        pos: plane.grid_to_texcoord(
+                            transform.transform_texture_point(
+                                (voxel_grid_point + vec3(0., 0., 0.5))
+                                    .map(|s| s as TextureCoordinate)
+                                    .cast_unit(),
+                            ),
+                        ),
                         clamp_min,
                         clamp_max,
                         resolution: transform.resolution,
@@ -357,13 +361,8 @@ impl QuadTransform {
 
     /// Transform a point from quad U-V-depth coordinates with a scale of
     /// 1 unit = 1 texel/voxel, to 0-to-1 coordinates within the 3D `texture::Tile` space.
-    ///
-    /// The depth value is offset by +0.5 texel (into the depth of the voxel being
-    /// drawn), to move it from edge coordinates to mid-texel coordinates.
     #[inline]
-    fn transform_texture_point(&self, mut point: TilePoint) -> TilePoint {
-        // todo: incorporate z offset into the matrix
-        point.z += 0.5;
+    fn transform_texture_point(&self, point: TilePoint) -> TilePoint {
         self.texture_transform.transform_point3d(point).unwrap()
     }
 }
