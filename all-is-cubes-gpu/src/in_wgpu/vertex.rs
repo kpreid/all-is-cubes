@@ -257,7 +257,10 @@ pub struct FixTexCoord(u16);
 
 impl FixTexCoord {
     pub(crate) fn from_float(float_tc: f32) -> Self {
-        debug_assert!(float_tc >= 0.0);
+        debug_assert!(
+            float_tc >= 0.0,
+            "texture coordinate {float_tc:?} should not be negative"
+        );
         Self((float_tc * 2.).round() as u16)
     }
 
