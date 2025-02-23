@@ -64,11 +64,11 @@ pub enum Coloring<T> {
     Texture {
         /// Texture coordinates for this vertex.
         pos: T,
-        /// Lower bounds for clamping the entire surface's texture coordinates.
-        /// May be used to avoid texture bleed.
+        /// Lower bounds for clamping the interpolated texture coordinates on this surface.
+        /// All vertices in a triangle are guaranteed to have the same clamp values.
+        /// Together with `clamp_max`, may be used to avoid texture bleed in texture atlases.
         clamp_min: T,
-        /// Upper bounds for clamping the entire surface's texture coordinates.
-        /// May be used to avoid texture bleed.
+        /// Upper bounds for clamping the interpolated texture coordinates on this surface.
         clamp_max: T,
         /// Resolution of the voxels the texture was created from.
         resolution: Resolution,

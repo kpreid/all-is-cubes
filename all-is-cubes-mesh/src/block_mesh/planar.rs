@@ -195,11 +195,22 @@ pub(super) enum QuadColoring<'a, T> {
 
     /// A textured surface.
     Texture(&'a T),
-    //
-    // TODO:
-    // /// A textured volume of which this is the surface.
-    // /// Used only with [`crate::TransparencyFormat::BoundingBox`].
-    // Volume(&'a T),
+
+    /// A textured volume of which this is the surface.
+    /// Used only with [`crate::TransparencyFormat::BoundingBox`].
+    ///
+    /// TODO(volumetric): It is a technically incorrect kludge that this holds a [`texture::Plane`];
+    /// we are accessing texels that are outside of it. We need a new type of texture handle that is
+    /// a 3D slice of a [`texture::Tile`].
+    #[expect(
+        unused,
+        reason = "TODO(volumetric): the code to use this isn’t ready yet"
+    )]
+    Volume {
+        plane: &'a T,
+        /// Depth
+        far_depth: FreeCoordinate,
+    },
 }
 impl<T> Copy for QuadColoring<'_, T> {}
 impl<T> Clone for QuadColoring<'_, T> {
@@ -244,6 +255,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
         || match coloring {
             QuadColoring::Solid(color) => color,
             QuadColoring::Texture(_) => rgba_const!(0.5, 0.5, 0.5, 1.0),
+            QuadColoring::Volume { .. } => rgba_const!(0.5, 0.9, 0.5, 1.0),
         },
         transform.face,
     );
@@ -268,26 +280,20 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
             }));
         }
         QuadColoring::Texture(plane) => {
-            // Transform planar texture coordinates into the 3D coordinate system.
-            let mut clamp_min = transform.transform_texture_point(TilePoint::new(
-                low_corner.x as TextureCoordinate + half_texel,
-                low_corner.y as TextureCoordinate + half_texel,
-                depth as TextureCoordinate + half_texel,
-            ));
-            let mut clamp_max = transform.transform_texture_point(TilePoint::new(
-                high_corner.x as TextureCoordinate - half_texel,
-                high_corner.y as TextureCoordinate - half_texel,
-                depth as TextureCoordinate + half_texel,
-            ));
-
-            // Ensure the transformed clamp range is not inverted.
-            for axis in Axis::ALL {
-                all_is_cubes::math::sort_two(&mut clamp_min[axis], &mut clamp_max[axis]);
-            }
-
-            // Convert to global texture coordinates in the texture tile's format.
-            let clamp_min = plane.grid_to_texcoord(clamp_min);
-            let clamp_max = plane.grid_to_texcoord(clamp_max);
+            let (clamp_min, clamp_max) = transform_clamp_box(
+                plane,
+                transform,
+                TilePoint::new(
+                    low_corner.x as TextureCoordinate + half_texel,
+                    low_corner.y as TextureCoordinate + half_texel,
+                    depth as TextureCoordinate + half_texel,
+                ),
+                TilePoint::new(
+                    high_corner.x as TextureCoordinate - half_texel,
+                    high_corner.y as TextureCoordinate - half_texel,
+                    depth as TextureCoordinate + half_texel,
+                ),
+            );
 
             vertices.extend(position_iter.map(|voxel_grid_point| {
                 let position = transform.transform_position(voxel_grid_point);
@@ -315,9 +321,72 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                 })
             }));
         }
+        QuadColoring::Volume { plane, far_depth } => {
+            let (clamp_min, clamp_max) = transform_clamp_box(
+                plane,
+                transform,
+                // No half-texel offsets because the raymarcher uses the clamp box as the
+                // actual volume boundaries, and is precise about applying them.
+                TilePoint::new(
+                    low_corner.x as TextureCoordinate,
+                    low_corner.y as TextureCoordinate,
+                    depth as TextureCoordinate,
+                ),
+                TilePoint::new(
+                    high_corner.x as TextureCoordinate,
+                    high_corner.y as TextureCoordinate,
+                    far_depth as TextureCoordinate,
+                ),
+            );
+
+            // TODO: deduplicate this code
+            vertices.extend(position_iter.map(|voxel_grid_point| {
+                let position = transform.transform_position(voxel_grid_point);
+
+                *bounding_box = Some(match *bounding_box {
+                    None => Aab::from_lower_upper(position, position),
+                    Some(aab) => aab.union_point(position),
+                });
+
+                V::from(BlockVertex {
+                    position,
+                    face,
+                    coloring: Coloring::Texture {
+                        pos: plane.grid_to_texcoord(transform.transform_texture_point(
+                            voxel_grid_point.map(|s| s as TextureCoordinate).cast_unit(),
+                        )),
+                        clamp_min,
+                        clamp_max,
+                        resolution: transform.resolution,
+                    },
+                })
+            }));
+        }
     }
 
     indices.extend(QUAD_INDICES.iter().map(|&i| index_origin + i));
+}
+
+fn transform_clamp_box<Tex: texture::Plane>(
+    plane: &Tex,
+    transform: &QuadTransform,
+    min: TilePoint,
+    max: TilePoint,
+) -> (Tex::Point, Tex::Point) {
+    // Transform planar texture coordinates into the 3D coordinate system.
+    let mut clamp_min = transform.transform_texture_point(min);
+    let mut clamp_max = transform.transform_texture_point(max);
+
+    // Ensure the transformed clamp range is not inverted.
+    for axis in Axis::ALL {
+        all_is_cubes::math::sort_two(&mut clamp_min[axis], &mut clamp_max[axis]);
+    }
+
+    // Convert to global texture coordinates in the texture tile's format.
+    (
+        plane.grid_to_texcoord(clamp_min),
+        plane.grid_to_texcoord(clamp_max),
+    )
 }
 
 /// Ingredients for [`push_quad`] that are uniform for a resolution and face,
