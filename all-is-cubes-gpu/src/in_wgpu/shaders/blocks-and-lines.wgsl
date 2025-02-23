@@ -415,46 +415,57 @@ struct Material {
     reflectance: vec4<f32>,
     emission: vec3<f32>,
 }
+
 // Get the material details from vertex color or texture lookup.
 fn get_material(in: BlockFragmentInput) -> Material {
     if in.color_or_texture[3] < -0.5 {
         // Texture coordinates.
-        let atlas_id = i32(round(-in.color_or_texture[3] - 1.0));
-        let texcoord: vec3<i32> =
-            vec3<i32>(clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max));
-        
-        // If activated, this code will produce an “x-ray” view of all textured surfaces
-        // by cutting out all but the clamped border. Other similar changes could be used to
-        // visualize the clamping itself without adding any transparency.
-        //
-        // if (all(texcoord == in.color_or_texture.xyz)) {
-        //     discard;
-        // }
-        
-        // Read texture; using textureLoad because our coordinates are in units of texels
-        // and we don't want any filtering or wrapping, so using a sampler gives no benefit.
+        let atlas_id = get_atlas_id(in);
         // Note that coordinate rounding towards zero is effectively floor() since the
         // input is nonnegative.
-        if atlas_id == 1 {
-            return Material(
-                textureLoad(block_g1_reflectance, texcoord, 0),
-                textureLoad(block_g1_emission, texcoord, 0).rgb,
-            );
-        } else if atlas_id == 0 {
-            return Material(
-                textureLoad(block_g0_reflectance, texcoord, 0),
-                vec3<f32>(0.0),
-            );
-        } else {
-            // Error — incorrect atlas ID.
-            return Material(
-                vec4<f32>(1.0, (-in.color_or_texture[3] - 1.0), 0.0, 1.0),
-                vec3<f32>(0.0),
-            );
-        }
+        let texcoord: vec3<i32> =
+            vec3<i32>(clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max));
+        return get_material_from_texture(texcoord, atlas_id);
     } else {
         // Solid color.
         return Material(in.color_or_texture, vec3<f32>(0.0));
+    }
+}
+
+// Get the texture atlas ID that `get_material_from_texture` uses.
+// Must only be called if `in` is already known to be using textures.
+fn get_atlas_id(in: BlockFragmentInput) -> i32 {
+    return i32(round(-in.color_or_texture[3] - 1.0));
+}
+
+// Read material details from textures.
+fn get_material_from_texture(texcoord: vec3<i32>, atlas_id: i32) -> Material {    
+    // If activated, this code will produce an “x-ray” view of all textured surfaces
+    // by cutting out all but the clamped border. Other similar changes could be used to
+    // visualize the clamping itself without adding any transparency.
+    //
+    // if (all(texcoord == in.color_or_texture.xyz)) {
+    //     discard;
+    // }
+
+    // Read texture; using textureLoad because our coordinates are in units of texels
+    // and we don't want any filtering or wrapping, so using a sampler gives no benefit.
+    if atlas_id == 1 {
+        return Material(
+            textureLoad(block_g1_reflectance, texcoord, 0),
+            textureLoad(block_g1_emission, texcoord, 0).rgb,
+        );
+    } else if atlas_id == 0 {
+        return Material(
+            textureLoad(block_g0_reflectance, texcoord, 0),
+            vec3<f32>(0.0),
+        );
+    } else {
+        // Error — incorrect atlas ID.
+        return Material(
+            vec4<f32>(1.0, f32(atlas_id), 0.0, 1.0),
+            vec3<f32>(0.0),
+        );
     }
 }
 
