@@ -68,6 +68,7 @@ struct GreedyMesher {
     image_t_range: Range<GridCoordinate>,
     /// Contains a color if all voxels examined so far have that reflectance and no emission.
     single_reflectance: Option<Rgba>,
+    /// Whether the rectangle we are currently building has voxels that have alpha ≠ 1.
     rect_has_alpha: bool,
 }
 impl GreedyMesher {
@@ -151,6 +152,7 @@ impl GreedyMesher {
     /// Checks if a voxel is suitable for adding to the current rectangle, and either
     /// returns false if not, and updates `single_color`.
     #[inline]
+    #[allow(clippy::nonminimal_bool)]
     fn add_candidate(&mut self, s: GridCoordinate, t: GridCoordinate) -> bool {
         // TODO: I think this can never fail and should be an assertion…
         if !self.image_s_range.contains(&s) || !self.image_t_range.contains(&t) {
@@ -160,11 +162,25 @@ impl GreedyMesher {
         if !voxel.visible() {
             return false;
         }
+        if !voxel.reflectance.fully_opaque() != self.rect_has_alpha {
+            // Ensure that a rectangle is either fully opaque, or has no fully opaque voxels.
+            // This way, we do not end up putting any opaque surfaces into the transparent
+            // rendering pass (which would be inefficient), *and* we don't make any
+            // T-junctions at edges where the opacity changes. That is, consider this cross-section
+            // of two voxels and their surfaces:
+            //
+            // ----A----+----B----
+            //          |
+            //    α=1   C  0<α<1
+            //          |
+            //
+            // If we did not stop in this case, then we would end up generating a rectangle
+            // for A and B, and a rectangle for C, so the edge of C touches the middle of B.
+            // Instead, we generate separate rectangle for A, B, and C.
+            return false;
+        }
         if voxel.to_reflectance_only() != self.single_reflectance {
             self.single_reflectance = None; // Not uniform
-        }
-        if !voxel.reflectance.fully_opaque() {
-            self.rect_has_alpha = true;
         }
         true
     }
