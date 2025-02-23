@@ -83,7 +83,8 @@ fn make_example_blocks(universe: &mut Universe) -> Vec<Block> {
         demo_blocks[DemoBlocks::LamppostBase].clone(),
         demo_blocks[DemoBlocks::Arrow].clone(),
         demo_blocks[DemoBlocks::Pedestal].clone(),
-        make_transparent_block(universe),
+        make_transparent_boxes(universe),
+        make_transparent_window(universe),
     ];
 
     // Generate a set of blocks which exercise different types of corner.
@@ -106,8 +107,9 @@ fn make_example_blocks(universe: &mut Universe) -> Vec<Block> {
     blocks
 }
 
-/// A block containing transparent and emissive surfaces, that also meet opaque ones.
-fn make_transparent_block(universe: &mut Universe) -> Block {
+/// A block containing transparent and emissive surfaces, that also meet opaque ones
+/// perpendicularly.
+fn make_transparent_boxes(universe: &mut Universe) -> Block {
     let opaque_voxel = color_block!(content::palette::LOGO_FILL);
     let transparent_voxel = color_block!(0.7, 0.7, 0.2, 0.25);
     let emissive_voxel = Block::builder()
@@ -128,6 +130,32 @@ fn make_transparent_block(universe: &mut Universe) -> Block {
                 &transparent_voxel
             } else if emissive_box.contains_cube(cube) {
                 &emissive_voxel
+            } else {
+                &block::AIR
+            }
+        })
+        .unwrap()
+        .build_into(universe)
+}
+
+/// A block containing transparent surfaces that abut opaque ones.
+fn make_transparent_window(universe: &mut Universe) -> Block {
+    let opaque_voxel = color_block!(content::palette::LOGO_FILL);
+    let transparent_voxel = color_block!(0.7, 0.7, 0.2, 0.25);
+
+    let resolution = Resolution::R16;
+    let solid_box = GridAab::for_block(resolution)
+        .shrink(FaceMap::symmetric([0, 0, 2]))
+        .unwrap();
+    let transparent_box = GridAab::for_block(resolution)
+        .shrink(FaceMap::symmetric([2, 4, 2]))
+        .unwrap();
+    Block::builder()
+        .voxels_fn(resolution, |cube| {
+            if transparent_box.contains_cube(cube) {
+                &transparent_voxel
+            } else if solid_box.contains_cube(cube) {
+                &opaque_voxel
             } else {
                 &block::AIR
             }
