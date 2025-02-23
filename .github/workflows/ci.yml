@@ -155,7 +155,7 @@ jobs:
     - name: Install tools
       # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
       # about caching the builds of them.
-      # cargo-mutants is not used in this step but it will be cached for later use.
+      # cargo-mutants and cargo-about are not used in this step but it will be cached for later use.
       run: |
         cargo install --locked wasm-pack@0.13.0 cargo-about@0.6.1
         # Not locked so that we can have a newer `syn` than is in the lockfile
@@ -223,6 +223,9 @@ jobs:
         workspaces: |
           ./
           all-is-cubes-wasm/
+
+    # cargo-about should be restored from the cache, but the cache might fail.
+    - run: cargo install --locked cargo-about@0.6.1
 
     - run: cargo build --package xtask
     
