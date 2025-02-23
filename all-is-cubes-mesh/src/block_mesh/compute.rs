@@ -86,6 +86,11 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
     }
 
     let voxels = block.voxels();
+    if voxels.bounds().is_empty() {
+        // There cannot be anything to draw. Don't inflict this edge case on the rest of our math.
+        return;
+    }
+
     // Short-circuit case: if we have a single voxel a.k.a. resolution 1, then we generate a
     // mesh without going through all the conversion steps.
     if let Some(mut voxel) = voxels.single_voxel() {
