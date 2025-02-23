@@ -32,6 +32,12 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 ) {
     output.clear();
 
+    let voxels = block.voxels();
+    if voxels.bounds().is_empty() {
+        // There cannot be anything to draw. Don't inflict this edge case on the rest of our math.
+        return;
+    }
+
     // If this is true, avoid using vertex coloring even on solid rectangles.
     // We do this because:
     // * the block may be animated such that it is useful to reuse the mesh and change the
@@ -82,12 +88,6 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             &BoxColoring::Solid(face_colors),
             &mut viz,
         );
-        return;
-    }
-
-    let voxels = block.voxels();
-    if voxels.bounds().is_empty() {
-        // There cannot be anything to draw. Don't inflict this edge case on the rest of our math.
         return;
     }
 
