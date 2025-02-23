@@ -545,20 +545,19 @@ fn shade_uniform_volumetric(in: BlockFragmentInput) -> vec4<f32> {
 
 // Perform ray-marching along the path through this transparent block.
 //
-// TODO: This algorithm is flawed in several ways, and is therefore not yet used.
+// TODO(volumetric): This algorithm is flawed in several ways, and is therefore not yet used.
 //
-// * Performing the full lighting algorithm per step is too expensive; we should obtain a local
-//   light environment at the vertex shader stage and pass it along instead.
+// * Performing the full lighting algorithm per step is too expensive, so we don’t try; instead,
+//   we should obtain a local light environment at the vertex shader stage and pass it along, but
+//   currently we just use only one light sample.
 // * We should use the Amanatides & Woo algorithm to precisely step through the voxels instead of
 //   using a fixed step size.
 // * Instead of patching the input's texture coordinates, the mesh generator should produce an
 //   appropriate mesh to start with.
 // * The brightness of the output is wrong without an arbitrary nonsensical scale factor.
-// * `get_material()` does more work than necessary given that we know we are doing a texture
-//   lookup.
 fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
     // Undo the 0.5 middle-voxel offset that the texture coordinates do.
-    // TODO: Instead of doing this here, it should be done by the mesh generator,
+    // TODO(volumetric): Instead of doing this here, it should be done by the mesh generator,
     // having a special mode for generating meshes for volumetric tracing.
     var in = in_original;
     in.color_or_texture = vec4f(in.color_or_texture.xyz + in.normal * 0.5, in.color_or_texture.w);
@@ -566,6 +565,13 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
      // Unclamp the texture to enable 3D traversal -- TODO: mesh generator should give good data to start.
     in.clamp_min = vec3f(0.0);
     in.clamp_max = vec3f(102400.0);
+
+    let atlas_id = get_atlas_id(in);
+    // TODO(volumetric): light should be obtained from the actual raymarch position, but that is
+    // slow and  we don't actually have light interpolated on the *depth* axis yet. Fix this by
+    // computing the local lighting environment in the vertex shader, then interpolating across
+    // that data.
+    let static_lighting = lighting(in);
 
     let step_length = 1.0/32.0;
     let march_step = normalize(in.camera_ray_direction) * (step_length);
@@ -588,14 +594,8 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
         }
 
         let relative_to_original_position = (march_position_in_cube - in.position_in_cube.xyz);
-        var offset_input: BlockFragmentInput = in;
-        offset_input.color_or_texture = vec4(
-            in.color_or_texture.xyz + relative_to_original_position * in.resolution,
-            in.color_or_texture.w
-        );
-        offset_input.world_position += relative_to_original_position;
-        offset_input.position_in_cube += relative_to_original_position;
-        var material = get_material(offset_input);
+        let march_texcoord = in.color_or_texture.xyz + relative_to_original_position * in.resolution;
+        var material = get_material_from_texture(vec3i(march_texcoord), atlas_id);
 
         if material.reflectance.a == 0.0 {
             // Transparent voxels mean we exited the meshed volume;
@@ -604,7 +604,7 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
         }
 
         // Apply effect of material to accumulation.
-        // TODO: Deduplicate this code with shade_uniform_volumetric().
+        // TODO(volumetric): Deduplicate this code with shade_uniform_volumetric().
         let mat_unit_transmittance = 1.0 - material.reflectance.a;
         let mat_depth_transmittance = pow(mat_unit_transmittance, step_length);
 
@@ -617,7 +617,7 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
 
         accum_light += accum_transmittance * (
             material.reflectance.rgb 
-                * lighting(offset_input)
+                * static_lighting
                 * material.reflectance.a 
             + material.emission
         );
@@ -627,7 +627,7 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
     }
 
     let alpha = 1.0 - accum_transmittance;
-    // TODO: Something is wrong; this scaling makes no sense but gives right-looking answers
+    // TODO(volumetric): Something is wrong; this scaling makes no sense but gives right-looking answers
     return vec4f(accum_light / 16.0, alpha);
 }
 
