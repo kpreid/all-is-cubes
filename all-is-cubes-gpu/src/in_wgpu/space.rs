@@ -34,8 +34,7 @@ use all_is_cubes_render::camera::Camera;
 use all_is_cubes_render::{Flaws, RenderError};
 
 use crate::in_wgpu::block_texture::BlockTextureViews;
-use crate::in_wgpu::frame_texture::FramebufferTextures;
-use crate::in_wgpu::glue::{to_wgpu_color, to_wgpu_index_format};
+use crate::in_wgpu::glue::to_wgpu_index_format;
 use crate::in_wgpu::light_texture::LightChunk;
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::skybox;
@@ -61,9 +60,6 @@ const NO_WORLD_SKY: Sky = Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb());
 #[derive(Debug)]
 pub(crate) struct SpaceRenderer<I: time::Instant> {
     space_label: String,
-    /// A debugging label for the space's render pass.
-    /// (Derived from constructor's `space_label`)
-    render_pass_label: String,
     instance_buffer_label: String,
 
     /// Tracks information we need to update from the `Space`.
@@ -136,7 +132,6 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         SpaceRenderer {
             todo,
-            render_pass_label: format!("{space_label} render_pass"),
             instance_buffer_label: format!("{space_label} instances"),
             skybox: skybox::Skybox::new(device, &space_label),
             block_texture,
@@ -155,6 +150,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
             #[cfg(feature = "rerun")]
             rerun_destination: Default::default(),
         }
+    }
+
+    pub(crate) fn space(&mut self) -> Option<&Handle<Space>> {
+        self.csm.as_ref().map(|csm| csm.space())
     }
 
     /// Replace the space being rendered, while preserving some of the resources used to render it.
@@ -187,7 +186,6 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // Destructuring to explicitly skip or handle each field.
         let SpaceRenderer {
             space_label: _,
-            render_pass_label: _,
             instance_buffer_label: _,
             todo,
             skybox: _, // will be updated due to todo.sky = true
@@ -260,7 +258,6 @@ impl<I: time::Instant> SpaceRenderer<I> {
     fn clear_space(&mut self) {
         let SpaceRenderer {
             space_label: _,
-            render_pass_label: _,
             instance_buffer_label: _,
             todo,
             skybox: _,
@@ -446,53 +443,16 @@ impl<I: time::Instant> SpaceRenderer<I> {
     /// Draw the space as of the last [`Self::update`].
     ///
     /// Does not access the [`Space`] contents at all.
-    // TODO: needs error return or not?
-    #[expect(clippy::too_many_arguments)]
-    pub fn draw(
-        &self,
-        fb: &FramebufferTextures,
+    pub fn draw<'pass>(
+        &'pass self,
         queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
-        pipelines: &Pipelines,
+        render_pass: &mut wgpu::RenderPass<'pass>,
+        pipelines: &'pass Pipelines,
         camera: &Camera,
         draw_sky: bool, // TODO: consider specifying this at update time to decide whether to calc
-        store_depth: wgpu::StoreOp,
-        is_ui: bool,
     ) -> SpaceDrawInfo {
         let start_time = I::now();
         let mut flaws = Flaws::empty();
-
-        let clear_op = if draw_sky {
-            if camera.options().debug_pixel_cost {
-                wgpu::LoadOp::Clear(wgpu::Color::BLACK)
-            } else if self.csm.is_none() {
-                // There will be no skybox, so use the NO_WORLD color.
-                // TODO: Refactor so that we can draw the skybox anyway, and have
-                // a fancy error-display one.
-                wgpu::LoadOp::Clear(to_wgpu_color(palette::NO_WORLD_TO_SHOW))
-            } else {
-                // The skybox will cover everything, so don't actually need to clear, but more
-                // importantly, we don't want to depend on the previous contents, and clearing
-                // to black is the best way to do that.
-                // This color should never be actually visible.
-                wgpu::LoadOp::Clear(wgpu::Color::BLACK)
-            }
-        } else {
-            wgpu::LoadOp::Load
-        };
-
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some(&self.render_pass_label),
-            color_attachments: &[Some(fb.color_attachment_for_scene(clear_op))],
-            depth_stencil_attachment: Some(fb.depth_attachment_for_scene(
-                wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: store_depth,
-                },
-                is_ui,
-            )),
-            ..Default::default()
-        });
 
         // Check if we actually have a space to render.
         let Some(csm) = &self.csm else {
@@ -592,7 +552,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                     if let Some(buffers) = &chunk.render_data {
                         draw_chunk_instance(
                             chunk.mesh().opaque_range(),
-                            &mut render_pass,
+                            render_pass,
                             buffers,
                             &mut instance_data,
                             chunk.position(),
@@ -600,7 +560,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                         );
                         draw_chunk_instance(
                             chunk.mesh().transparent_range(DepthOrdering::Any),
-                            &mut render_pass,
+                            render_pass,
                             buffers,
                             &mut instance_data,
                             chunk.position(),
@@ -637,7 +597,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 if let Some(buffers) = &chunk.render_data {
                     draw_chunk_instance(
                         chunk.mesh().opaque_range(),
-                        &mut render_pass,
+                        render_pass,
                         buffers,
                         &mut instance_data,
                         chunk.position(),
@@ -668,7 +628,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 // TODO: this is an error that should be reported
                 continue;
             };
-            set_buffers(&mut render_pass, buffers);
+            set_buffers(render_pass, buffers);
 
             let first_instance_index = u32::try_from(instance_data.len()).unwrap();
             let cubes_len = cubes.len();
@@ -722,7 +682,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                                 chunk.position(),
                                 view_chunk,
                             )),
-                            &mut render_pass,
+                            render_pass,
                             buffers,
                             &mut instance_data,
                             chunk.position(),
@@ -736,10 +696,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             }
         }
 
-        let start_drop_pass_time = I::now();
-
-        // measure its time now
-        drop(render_pass);
+        let start_instance_copy_time = I::now();
 
         // Copy instance_data to self.instance_buffer now that we've accumulated everything that
         // goes in it. Note that this copy is submitted immediately to the queue, which means it
@@ -779,9 +736,9 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 .saturating_duration_since(start_opaque_chunk_draw_time),
             draw_opaque_blocks_time: start_draw_transparent_time
                 .saturating_duration_since(start_opaque_instance_draw_time),
-            draw_transparent_time: start_drop_pass_time
+            draw_transparent_time: start_instance_copy_time
                 .saturating_duration_since(start_draw_transparent_time),
-            finalize_time: end_time.saturating_duration_since(start_drop_pass_time),
+            finalize_time: end_time.saturating_duration_since(start_instance_copy_time),
             squares_drawn,
             chunk_meshes_drawn,
             chunks_with_instances_drawn,

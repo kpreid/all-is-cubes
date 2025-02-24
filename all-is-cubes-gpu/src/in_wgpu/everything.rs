@@ -2,7 +2,6 @@ use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
-use core::mem;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::content::palette;
@@ -20,7 +19,7 @@ use all_is_cubes::rerun_glue as rg;
 
 use crate::in_wgpu::block_texture::AtlasAllocator;
 use crate::in_wgpu::frame_texture::{self, FbtFeatures};
-use crate::in_wgpu::glue::{BeltWritingParts, ResizingBuffer};
+use crate::in_wgpu::glue::{BeltWritingParts, ResizingBuffer, to_wgpu_color};
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::postprocess;
 use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
@@ -479,10 +478,34 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 label: Some("EverythingRenderer::draw_frame_linear()"),
             });
 
-        // True until one of the passes has cleared linear_scene_texture.
-        // If it remains true at the end, we'll tell the postprocessing pass to
-        // not read the texture.
-        let mut output_needs_clearing = true;
+        let clear_op = if self.cameras.cameras().world.options().debug_pixel_cost {
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK)
+        } else if self.space_renderers.world.space().is_none() {
+            // There will be no skybox, so use the NO_WORLD color.
+            // TODO: Refactor so that we can draw the skybox anyway, and have
+            // a fancy error-display one.
+            wgpu::LoadOp::Clear(to_wgpu_color(palette::NO_WORLD_TO_SHOW))
+        } else {
+            // The skybox will cover everything, so don't actually need to clear, but more
+            // importantly, we don't want to depend on the previous contents, and clearing
+            // to black is the best way to do that.
+            // This color should never be actually visible.
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK)
+        };
+
+        let mut world_render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("EverythingRenderer world_render_pass"),
+            color_attachments: &[Some(self.fb.color_attachment_for_scene(clear_op))],
+            depth_stencil_attachment: Some(self.fb.depth_attachment_for_scene(
+                wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    // All 3D scene content
+                    store: wgpu::StoreOp::Discard,
+                },
+                false,
+            )),
+            ..Default::default()
+        });
 
         let (world_draw_info, is_raytracing): (SpaceDrawInfo, bool) =
             if let (true, Some(rt_bind_group)) = (
@@ -492,19 +515,9 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 // Copy the raytracing target texture (incrementally updated) to the linear scene
                 // texture. This is the simplest way to get it fed into both bloom and postprocessing
                 // passes.
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("rt to scene copy"),
-                    color_attachments: &[Some(
-                        self.fb
-                            .color_attachment_for_scene(wgpu::LoadOp::Clear(wgpu::Color::BLUE)),
-                    )],
-                    ..Default::default()
-                });
-                render_pass.set_bind_group(0, rt_bind_group, &[]);
-                render_pass.set_pipeline(&self.pipelines.frame_copy_pipeline);
-                render_pass.draw(0..3, 0..1);
-                drop(render_pass);
-                output_needs_clearing = false;
+                world_render_pass.set_bind_group(0, rt_bind_group, &[]);
+                world_render_pass.set_pipeline(&self.pipelines.frame_copy_pipeline);
+                world_render_pass.draw(0..3, 0..1);
 
                 (SpaceDrawInfo::default(), true)
             } else {
@@ -513,66 +526,65 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 let camera = &self.cameras.cameras().world;
                 let sr = &self.space_renderers.world;
                 let info = sr.draw(
-                    &self.fb,
                     queue,
-                    &mut encoder,
+                    &mut world_render_pass,
                     &self.pipelines,
                     camera,
-                    mem::take(&mut output_needs_clearing),
-                    // We need to store the depth buffer if and only if we are going to do
-                    // the lines pass or read the scene afterward
-                    match self.lines_vertex_count > 0 || self.fb.copy_out_enabled() {
-                        true => wgpu::StoreOp::Store,
-                        false => wgpu::StoreOp::Discard,
-                    },
-                    false,
+                    /* draw_sky: */ true,
                 );
 
                 (info, false)
             };
         let world_to_lines_time = I::now();
 
-        // Lines pass (if there are any lines)
-        if let (sr, 1..) = (&self.space_renderers.world, self.lines_vertex_count) {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("debug lines"),
-                color_attachments: &[Some(self.fb.color_attachment_for_scene(wgpu::LoadOp::Load))],
-                depth_stencil_attachment: Some(self.fb.depth_attachment_for_scene(
-                    wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: wgpu::StoreOp::Discard,
-                    },
-                    false,
-                )),
-                ..Default::default()
-            });
-            render_pass.set_pipeline(&self.pipelines.lines_render_pipeline);
-            render_pass.set_bind_group(0, sr.camera_bind_group(), &[]);
-            render_pass.set_vertex_buffer(
+        // Draw debug lines
+        if self.lines_vertex_count > 0 {
+            world_render_pass.set_pipeline(&self.pipelines.lines_render_pipeline);
+            world_render_pass.set_bind_group(
+                0,
+                self.space_renderers.world.camera_bind_group(),
+                &[],
+            );
+            world_render_pass.set_vertex_buffer(
                 0,
                 self.lines_buffer
                     .get()
                     .expect("missing lines buffer!")
                     .slice(..),
             );
-            render_pass.draw(0..self.lines_vertex_count, 0..1);
+            world_render_pass.draw(0..self.lines_vertex_count, 0..1);
         }
+
+        // New render pass so we clear the depth buffer for the UI.
+        drop(world_render_pass);
+        let mut ui_render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("EverythingRenderer ui_render_pass"),
+            color_attachments: &[Some(self.fb.color_attachment_for_scene(wgpu::LoadOp::Load))],
+            depth_stencil_attachment: Some(self.fb.depth_attachment_for_scene(
+                wgpu::Operations {
+                    // UI is not clipped by world geometry, so clear the depth buffer.
+                    load: wgpu::LoadOp::Clear(1.0),
+                    // After rendering the UI, we are done with the depth buffer.
+                    store: wgpu::StoreOp::Discard,
+                },
+                false,
+            )),
+            ..Default::default()
+        });
 
         let lines_to_ui_time = I::now();
         let ui_draw_info = if !is_raytracing {
             self.space_renderers.ui.draw(
-                &self.fb,
                 queue,
-                &mut encoder,
+                &mut ui_render_pass,
                 &self.pipelines,
                 &self.cameras.cameras().ui,
-                mem::take(&mut output_needs_clearing),
-                wgpu::StoreOp::Discard, // nothing uses the ui depth buffer
-                true,
+                /* draw_sky: */ false,
             )
         } else {
             SpaceDrawInfo::default()
         };
+        drop(ui_render_pass);
         let ui_to_postprocess_time = I::now();
 
         // Write the postprocess camera data.
@@ -583,7 +595,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 0,
                 bytemuck::bytes_of(&postprocess::PostprocessUniforms::new(
                     self.cameras.graphics_options(),
-                    !output_needs_clearing,
+                    true, // TODO: texture_is_valid is now always true; remove the feature.
                     self.fb.config().maximum_intensity,
                 )),
             );

@@ -335,10 +335,6 @@ impl FramebufferTextures {
         }
     }
 
-    pub(crate) fn copy_out_enabled(&self) -> bool {
-        self.config.enable_copy_out
-    }
-
     #[allow(
         unused,
         reason = "Used only in special cases such as cfg(test) and cfg(feature = \"rerun\")"
