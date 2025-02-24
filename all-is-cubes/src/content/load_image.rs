@@ -201,7 +201,7 @@ cfg_if::cfg_if! {
         /// Load an image from a relative path. Memoized if the `std` feature is enabled.
         #[doc(hidden)]
         #[macro_export]
-        macro_rules! include_image {
+        macro_rules! _content_load_image_include_image {
             ( $path:literal ) => {{
                 static IMAGE: $crate::content::load_image::LazyForIncludeImage<
                     $crate::content::load_image::DecodedPng,
@@ -215,14 +215,14 @@ cfg_if::cfg_if! {
         /// Load an image from a relative path. Memoized if the `std` feature is enabled.
         #[doc(hidden)]
         #[macro_export]
-        macro_rules! include_image {
+        macro_rules! _content_load_image_include_image {
             ( $path:literal ) => {
                 &$crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
             };
         }
     }
 }
-pub(crate) use include_image;
+pub use _content_load_image_include_image as include_image;
 
 #[cfg(test)]
 mod tests {

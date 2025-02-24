@@ -166,7 +166,7 @@ pub async fn install_demo_blocks(
                 let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3458679152340);
 
                 let palette_image = PngAdapter::adapt(
-                    all_is_cubes::include_image!("blocks/road-palette.png"),
+                    crate::load_image::include_image!("blocks/road-palette.png"),
                     &default_srgb,
                 );
                 let range = 0..palette_image.size().width;

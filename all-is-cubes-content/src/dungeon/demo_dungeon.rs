@@ -11,11 +11,10 @@ use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
 use all_is_cubes::character::Spawn;
-use all_is_cubes::content::load_image::space_from_image;
+use all_is_cubes::content::load_image::{include_image, space_from_image};
 use all_is_cubes::content::{BoxPart, BoxStyle, palette};
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Size3D, Vector3D, vec3};
-use all_is_cubes::include_image;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{

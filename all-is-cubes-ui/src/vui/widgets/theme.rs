@@ -5,10 +5,9 @@ use core::fmt;
 use exhaust::Exhaust;
 
 use all_is_cubes::block::{self, AIR, Block, Resolution::*};
-use all_is_cubes::content::load_image::{default_srgb, space_from_image};
+use all_is_cubes::content::load_image::{default_srgb, include_image, space_from_image};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::include_image;
 use all_is_cubes::inv::TOOL_SELECTIONS;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::GridRotation;
