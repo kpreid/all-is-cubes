@@ -567,7 +567,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                     // After rendering the UI, we are done with the depth buffer.
                     store: wgpu::StoreOp::Discard,
                 },
-                false,
+                true,
             )),
             ..Default::default()
         });
