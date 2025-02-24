@@ -554,7 +554,6 @@ fn shade_uniform_volumetric(in: BlockFragmentInput) -> vec4<f32> {
 //   using a fixed step size.
 // * Instead of patching the input's texture coordinates, the mesh generator should produce an
 //   appropriate mesh to start with.
-// * The brightness of the output is wrong without an arbitrary nonsensical scale factor.
 fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
     // Undo the 0.5 middle-voxel offset that the texture coordinates do.
     // TODO(volumetric): Instead of doing this here, it should be done by the mesh generator,
@@ -607,6 +606,7 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
         // TODO(volumetric): Deduplicate this code with shade_uniform_volumetric().
         let mat_unit_transmittance = 1.0 - material.reflectance.a;
         let mat_depth_transmittance = pow(mat_unit_transmittance, step_length);
+        let mat_depth_alpha = 1.0 - mat_depth_transmittance;
 
         // Compute how the emission should be scaled to account for internal absorption and thickness.
         if mat_unit_transmittance == 1.0 {
@@ -617,8 +617,8 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
 
         accum_light += accum_transmittance * (
             material.reflectance.rgb 
-                * static_lighting
-                * material.reflectance.a 
+                * static_lighting 
+                * mat_depth_alpha  // material colors are non-premultiplied
             + material.emission
         );
         accum_transmittance *= mat_depth_transmittance;
@@ -627,8 +627,7 @@ fn raymarch_volumetric(in_original: BlockFragmentInput) -> vec4<f32> {
     }
 
     let alpha = 1.0 - accum_transmittance;
-    // TODO(volumetric): Something is wrong; this scaling makes no sense but gives right-looking answers
-    return vec4f(accum_light / 16.0, alpha);
+    return vec4f(accum_light, alpha);
 }
 
 // --- Entry points for block fragment shading -----------------------------------------------------
