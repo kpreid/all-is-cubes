@@ -68,21 +68,21 @@ compile_error!("all-is-cubes does not support platforms with less than 32-bit `u
 ///
 /// ```compile_fail
 /// # extern crate all_is_cubes_base as all_is_cubes;
-/// # use all_is_cubes::{notnan, math::NotNan};
+/// # use all_is_cubes::math::{NotNan, notnan};
 /// // Not a literal; will not compile
 /// const X: NotNan<f32> = notnan!(f32::NAN);
 /// ```
 ///
 /// ```compile_fail
 /// # extern crate all_is_cubes_base as all_is_cubes;
-/// # use all_is_cubes::{notnan, math::NotNan};
+/// # use all_is_cubes::math::{NotNan, notnan};
 /// // Not a literal; will not compile
 /// const X: NotNan<f32> = notnan!(0.0 / 0.0);
 /// ```
 ///
 /// ```compile_fail
 /// # extern crate all_is_cubes_base as all_is_cubes;
-/// # use all_is_cubes::{notnan, math::NotNan};
+/// # use all_is_cubes::math::{NotNan, notnan};
 /// const N0N: f32 = f32::NAN;
 /// // Not a literal; will not compile
 /// const X: NotNan<f32> = notnan!(N0N);
@@ -90,12 +90,12 @@ compile_error!("all-is-cubes does not support platforms with less than 32-bit `u
 ///
 /// ```compile_fail
 /// # extern crate all_is_cubes_base as all_is_cubes;
-/// # use all_is_cubes::{notnan, math::NotNan};
+/// # use all_is_cubes::math::{NotNan, notnan};
 /// // Not a float; will not compile
 /// const X: NotNan<char> = notnan!('a');
 /// ```
-#[doc(hidden)]
-#[macro_export] // used by all-is-cubes-content
+#[doc(hidden)] // reexported publicly within the math module by `all_is_cubes`
+#[macro_export]
 macro_rules! notnan {
     ($value:literal) => {
         match $value {
