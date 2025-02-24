@@ -9,9 +9,11 @@ struct RerunCopyCamera {
 
 // This group is named rerun_copy_layout in the code.
 @group(0) @binding(0) var color_texture: texture_2d<f32>;
-@group(0) @binding(1) var depth_texture: texture_depth_multisampled_2d;
-@group(0) @binding(2) var linear_sampler: sampler;
-@group(0) @binding(3) var<uniform> camera: RerunCopyCamera;
+@group(0) @binding(1) var linear_sampler: sampler;
+@group(0) @binding(2) var<uniform> camera: RerunCopyCamera;
+// Only one of these is actually bound and used
+@group(0) @binding(10) var depth_texture_multisampled: texture_depth_multisampled_2d;
+@group(0) @binding(11) var depth_texture_single_sample: texture_depth_2d;
 
 // --- Vertex shader -----------------------------------------------------------
 
@@ -41,16 +43,8 @@ struct FragmentOutput {
     @location(1) depth: f32,
 }
 
-fn depth(texcoord: vec2<f32>) -> f32 {
-    // Compute integer (whole texel) coordinates for the depth texture,
-    // because we are not using a sampler.
-    let integer_texcoord: vec2<u32> = vec2<u32>(texcoord * vec2<f32>(textureDimensions(depth_texture)));
-
-    // arbitrary choice of sample index 0.
-    // TODO: Take the median of samples instead.
-    let raw_value = textureLoad(depth_texture, integer_texcoord, 0);
-
-    if raw_value == 1.0 {
+fn linearize_depth_value(depth_texel: f32) -> f32 {
+    if depth_texel == 1.0 {
         // didn't hit anything; set the distance to zero so the point doesn't appear anywhere in space
         return 0.0;
     } else {
@@ -65,16 +59,30 @@ fn depth(texcoord: vec2<f32>) -> f32 {
         // @jasperrlz:matrix.org in the WebGPU Matrix chat room.
         let ipz = camera.inverse_projection[2];
         let ipw = camera.inverse_projection[3];
-        return -(raw_value * ipz.z + ipw.z) / (raw_value * ipz.w + ipw.w);
+        return -(depth_texel * ipz.z + ipw.z) / (depth_texel * ipz.w + ipw.w);
     }
 }
 
-@fragment
-fn rerun_frame_copy_fragment(in: VertexOutput) -> FragmentOutput {
-    let texcoord: vec2<f32> = in.tc.xy;
+fn get_color(in: VertexOutput) -> vec4<f32> {
+    return textureSampleLevel(color_texture, linear_sampler, in.tc.xy, 0.0);
+}
 
+@fragment
+fn rerun_frame_copy_multisampled_fragment(in: VertexOutput) -> FragmentOutput {
+    let integer_texcoord: vec2<u32> = vec2u(in.tc.xy * vec2f(textureDimensions(depth_texture_multisampled)));
     return FragmentOutput(
-        textureSampleLevel(color_texture, linear_sampler, texcoord, 0.0),
-        depth(texcoord),
+        get_color(in),
+        // arbitrary choice of sample index 0.
+        // TODO: Take the median of samples instead.
+        linearize_depth_value(textureLoad(depth_texture_multisampled, integer_texcoord, 0)),
+    );
+}
+
+@fragment
+fn rerun_frame_copy_single_sample_fragment(in: VertexOutput) -> FragmentOutput {
+    let integer_texcoord: vec2<u32> = vec2u(in.tc.xy * vec2f(textureDimensions(depth_texture_single_sample)));
+    return FragmentOutput(
+        get_color(in),
+        linearize_depth_value(textureLoad(depth_texture_single_sample, integer_texcoord, 0)),
     );
 }

@@ -185,6 +185,8 @@ impl Pipelines {
         let vertex_buffers = &[WgpuBlockVertex::LAYOUT, WgpuInstanceData::LAYOUT];
 
         let multisample = fb.linear_scene_multisample_state();
+        #[cfg(feature = "rerun")]
+        let scene_textures_are_multisampled = multisample.count > 1;
 
         let vertex_state_for_blocks = wgpu::VertexState {
             module: shaders.blocks_and_lines.get(),
@@ -496,6 +498,7 @@ impl Pipelines {
         let rerun_copy_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Pipelines::rerun_copy_layout"),
             entries: &[
+                // Scene color texture
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -506,31 +509,39 @@ impl Pipelines {
                     },
                     count: None,
                 },
+                // linear_sampler for the scene texture
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        // We have to do our own "resolving" multisampled depth, because
-                        // it's not built in, because it's an arbitrary wrong choice.
-                        multisampled: true,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Depth,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
+                // Uniform RerunCopyCamera
                 wgpu::BindGroupLayoutEntry {
-                    binding: 3,
+                    binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
                         min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Scene depth texture
+                // We have to use two different bindings depending on whether it is multisampled.
+                wgpu::BindGroupLayoutEntry {
+                    binding: if scene_textures_are_multisampled {
+                        10
+                    } else {
+                        11
+                    },
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        // We have to do our own "resolving" multisampled depth, because
+                        // it's not built in, because it's an arbitrary wrong choice.
+                        multisampled: scene_textures_are_multisampled,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Depth,
                     },
                     count: None,
                 },
@@ -555,7 +566,11 @@ impl Pipelines {
             },
             fragment: Some(wgpu::FragmentState {
                 module: shaders.rerun_copy.get(),
-                entry_point: Some("rerun_frame_copy_fragment"),
+                entry_point: Some(if scene_textures_are_multisampled {
+                    "rerun_frame_copy_multisampled_fragment"
+                } else {
+                    "rerun_frame_copy_single_sample_fragment"
+                }),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 targets: &[
                     Some(wgpu::ColorTargetState {

@@ -132,15 +132,19 @@ impl RerunImageExport {
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
-                            resource: wgpu::BindingResource::TextureView(fb.scene_depth_for_test()),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
                             resource: wgpu::BindingResource::Sampler(&pipelines.linear_sampler),
                         },
                         wgpu::BindGroupEntry {
-                            binding: 3,
+                            binding: 2,
                             resource: camera_buffer.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: if fb.linear_scene_multisample_state().count > 1 {
+                                10
+                            } else {
+                                11
+                            },
+                            resource: wgpu::BindingResource::TextureView(fb.scene_depth_for_test()),
                         },
                     ],
                 });
