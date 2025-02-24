@@ -143,10 +143,10 @@ where
     /// in front-to-back order. (Use `.rev()` to iterate in back-to-front order.)
     ///
     /// Uses `camera`'s position, rotation, and options to decide which chunks to return.
-    pub fn iter_in_view<'a>(
-        &'a self,
-        camera: &'a Camera,
-    ) -> impl DoubleEndedIterator<Item = InViewChunkRef<'a, M, CHUNK_SIZE>> + 'a {
+    pub fn iter_in_view(
+        &self,
+        camera: &Camera,
+    ) -> impl DoubleEndedIterator<Item = InViewChunkRef<'_, M, CHUNK_SIZE>> {
         self.chunk_chart
             .chunks(self.view_chunk(), camera.view_direction_mask())
             .filter_map(|pos| {
