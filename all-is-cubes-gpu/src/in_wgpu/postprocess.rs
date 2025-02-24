@@ -244,18 +244,14 @@ pub(crate) struct PostprocessUniforms {
 
     maximum_intensity: f32,
 
-    /// 0 or 1 boolean indicating whether or not the `linear_scene_texture` was actually
-    /// written this frame. If zero, the postprocessing shader should display a “no data”
-    /// indication instead of reading the scene texture.
-    texture_is_valid: i32,
-
     bloom_intensity: f32,
+
+    _padding: i32,
 }
 
 impl PostprocessUniforms {
     pub(crate) fn new(
         options: &GraphicsOptions,
-        texture_is_valid: bool,
         surface_maximum_intensity: PositiveSign<f32>,
     ) -> Self {
         Self {
@@ -284,9 +280,9 @@ impl PostprocessUniforms {
                     .min(f32::MAX)
             },
 
-            texture_is_valid: i32::from(texture_is_valid),
-
             bloom_intensity: options.bloom_intensity.into_inner(),
+
+            _padding: 0,
         }
     }
 }

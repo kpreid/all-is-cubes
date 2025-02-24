@@ -595,7 +595,6 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 0,
                 bytemuck::bytes_of(&postprocess::PostprocessUniforms::new(
                     self.cameras.graphics_options(),
-                    true, // TODO: texture_is_valid is now always true; remove the feature.
                     self.fb.config().maximum_intensity,
                 )),
             );
