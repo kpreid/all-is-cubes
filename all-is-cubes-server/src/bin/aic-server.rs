@@ -4,6 +4,8 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 
+use std::net::SocketAddr;
+
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 
 use all_is_cubes_server::{AicClientSource, start_server};
@@ -13,11 +15,12 @@ struct Args {
     #[arg(long, short = 'v')]
     verbose: bool,
 
-    /// TCP port to bind.
+    /// TCP hostand port to bind.
     ///
-    /// If not specified, an arbitrary port will be chosen.
-    #[arg(long)]
-    port: Option<u16>,
+    /// If unspecified, will use `127.0.0.1:0`
+    /// If port is 0, an arbitrary free port will be chosen.
+    #[arg(long, default_value_t = std::net::SocketAddr::from(([127, 0, 0, 1], 0)))]
+    addr: SocketAddr,
 
     #[arg(
         long,
@@ -40,7 +43,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let Args {
-        port,
+        addr,
         verbose,
         client_source,
     } = <Args as clap::Parser>::parse();
@@ -63,8 +66,6 @@ async fn main() -> Result<(), anyhow::Error> {
             .build(),
         std::io::stderr(),
     )?;
-
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port.unwrap_or(0)));
 
     let (url, finished) = start_server(addr, &client_source).await?;
     println!("{url}"); // note: printed *to stdout* for the use of tests

@@ -309,7 +309,7 @@ fn main() -> Result<(), ActionError> {
                 .cargo()
                 .arg("watch")
                 .arg("-s")
-                .arg("cargo xtask run-game-server -- --client-source workspace --port 8080")
+                .arg("cargo xtask run-game-server -- --client-source=workspace --addr=127.0.0.1:8080")
                 .run()?;
         }
         XtaskCommand::RunGameServer { server_args } => {
