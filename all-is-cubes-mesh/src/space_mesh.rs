@@ -1048,7 +1048,7 @@ mod tests {
     use crate::testing::{NoTextureMt, TexPoint, TextureMt, mesh_blocks_and_space};
     use crate::texture::NoTextures;
     use crate::{BlockVertex, block_meshes_for_space};
-    use all_is_cubes::color_block;
+    use all_is_cubes::block;
     use all_is_cubes::math::Rgba;
     use all_is_cubes_render::camera::GraphicsOptions;
 
@@ -1068,7 +1068,7 @@ mod tests {
     #[test]
     fn nonempty_properties() {
         let space = Space::builder(GridAab::ORIGIN_CUBE)
-            .filled_with(color_block!(Rgba::WHITE))
+            .filled_with(block::from_color!(Rgba::WHITE))
             .build();
         let (_, _, mesh) = mesh_blocks_and_space(&space);
 
@@ -1097,7 +1097,7 @@ mod tests {
         space
             .fill_uniform(
                 GridAab::from_lower_upper([0, 0, 0], [4, 2, 4]),
-                &color_block!(Rgba::WHITE),
+                &block::from_color!(Rgba::WHITE),
             )
             .unwrap();
 

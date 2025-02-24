@@ -4,16 +4,16 @@ use core::fmt;
 
 use exhaust::Exhaust;
 
-use all_is_cubes::block::{AIR, Block, Resolution::*};
+use all_is_cubes::block::{self, AIR, Block, Resolution::*};
 use all_is_cubes::content::load_image::{default_srgb, space_from_image};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::include_image;
 use all_is_cubes::inv::TOOL_SELECTIONS;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::GridRotation;
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{color_block, include_image};
 
 use crate::vui::widgets;
 use crate::vui::widgets::{BoxStyle, ButtonBase as _, ButtonVisualState, ToggleButtonVisualState};
@@ -273,11 +273,15 @@ impl ToolbarButtonState {
             // same color as the icon image has for a background
             // (but TODO: this choice of constant doesn't make sense)
             Self::Unmapped => {
-                VoxelBrush::with_thickness(color_block!(palette::HUD_TOOLBAR_BACK), 0..1)
+                VoxelBrush::with_thickness(block::from_color!(palette::HUD_TOOLBAR_BACK), 0..1)
             }
-            Self::Mapped => VoxelBrush::with_thickness(color_block!(palette::BUTTON_BACK), 0..3),
+            Self::Mapped => {
+                VoxelBrush::with_thickness(block::from_color!(palette::BUTTON_BACK), 0..3)
+            }
             // TODO: figure out a palette color for this
-            Self::Pressed => VoxelBrush::with_thickness(color_block!(0.1, 0.1, 0.1, 1.0), 0..2),
+            Self::Pressed => {
+                VoxelBrush::with_thickness(block::from_color!(0.1, 0.1, 0.1, 1.0), 0..2)
+            }
         }
     }
 }

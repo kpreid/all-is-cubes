@@ -8,7 +8,6 @@ use all_is_cubes::block::{
     self, AIR, Block,
     Resolution::{self, *},
 };
-use all_is_cubes::color_block;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::euclid::{Point3D, Size3D, Vector3D, point3};
 use all_is_cubes::math::{
@@ -85,7 +84,10 @@ fn test_block_mesh_threshold(block: Block) -> BlockMesh<TextureMt> {
 }
 
 fn non_uniform_fill(cube: Cube) -> &'static Block {
-    const BLOCKS: &[Block] = &[color_block!(1., 1., 1., 1.), color_block!(0., 0., 0., 1.)];
+    const BLOCKS: &[Block] = &[
+        block::from_color!(1., 1., 1., 1.),
+        block::from_color!(0., 0., 0., 1.),
+    ];
     &BLOCKS[(cube.x + cube.y + cube.z).rem_euclid(2) as usize]
 }
 
@@ -149,7 +151,7 @@ fn no_panic_on_missing_blocks() {
 fn trivial_voxels_equals_atom() {
     // Construct recursive block.
     let mut u = Universe::new();
-    let atom_block = color_block!(0.0, 1.0, 0.0, 1.0);
+    let atom_block = block::from_color!(0.0, 1.0, 0.0, 1.0);
     let trivial_recursive_block = Block::builder()
         .voxels_fn(R1, |_| &atom_block)
         .unwrap()
@@ -205,7 +207,7 @@ fn animated_atom_uses_texture() {
 fn animated_voxels_uses_texture() {
     let mut u = Universe::new();
     let block = Block::builder()
-        .voxels_fn(R2, |_| const { &color_block!(Rgba::WHITE) })
+        .voxels_fn(R2, |_| const { &block::from_color!(Rgba::WHITE) })
         .unwrap()
         .animation_hint(block::AnimationHint::redefinition(
             block::AnimationChange::ColorSameCategory,
@@ -453,7 +455,7 @@ fn shrunken_box_uniform_color() {
     // Construct a box whose faces don't touch the outer extent of the volume.
     let resolution = R8;
     let mut u = Universe::new();
-    let filler_block = color_block!(0.0, 1.0, 0.5, 1.0);
+    let filler_block = block::from_color!(0.0, 1.0, 0.5, 1.0);
     let less_than_full_block = Block::builder()
         .voxels_fn(resolution, |cube| {
             if GridAab::from_lower_size([2, 2, 2], [4, 4, 4]).contains_cube(cube) {
@@ -523,15 +525,15 @@ fn opacities<M: MeshTypes>(mesh: &BlockMesh<M>) -> FaceMap<bool> {
 #[test]
 fn atom_transparency() {
     assert_eq!(
-        opacities(&test_block_mesh(color_block!(Rgba::WHITE))),
+        opacities(&test_block_mesh(block::from_color!(Rgba::WHITE))),
         FaceMap::splat(true)
     );
     assert_eq!(
-        opacities(&test_block_mesh(color_block!(Rgba::TRANSPARENT))),
+        opacities(&test_block_mesh(block::from_color!(Rgba::TRANSPARENT))),
         FaceMap::splat(false)
     );
     assert_eq!(
-        opacities(&test_block_mesh(color_block!(1.0, 1.0, 1.0, 0.5))),
+        opacities(&test_block_mesh(block::from_color!(1.0, 1.0, 1.0, 0.5))),
         FaceMap::splat(false)
     );
 }
@@ -540,12 +542,12 @@ fn atom_transparency() {
 fn atom_transparency_thresholded() {
     // Threshold means that partial transparency should produce exactly the same mesh as 0 or 1
     assert_eq!(
-        test_block_mesh_threshold(color_block!(1.0, 1.0, 1.0, 0.25)),
-        test_block_mesh_threshold(color_block!(1.0, 1.0, 1.0, 0.0)),
+        test_block_mesh_threshold(block::from_color!(1.0, 1.0, 1.0, 0.25)),
+        test_block_mesh_threshold(block::from_color!(1.0, 1.0, 1.0, 0.0)),
     );
     assert_eq!(
-        test_block_mesh_threshold(color_block!(1.0, 1.0, 1.0, 0.75)),
-        test_block_mesh_threshold(color_block!(1.0, 1.0, 1.0, 1.0)),
+        test_block_mesh_threshold(block::from_color!(1.0, 1.0, 1.0, 0.75)),
+        test_block_mesh_threshold(block::from_color!(1.0, 1.0, 1.0, 1.0)),
     );
 
     // TODO: also test voxels -- including self-occlusion (thresholded voxel in front of truly opaque voxel)
@@ -561,7 +563,7 @@ fn fully_opaque_voxels() {
             // Make a cube-corner shape
             // TODO: Also test partial alpha
             if cube.x < 1 || cube.y < 1 || cube.z < 1 {
-                color_block!(Rgba::BLACK)
+                block::from_color!(Rgba::BLACK)
             } else {
                 AIR
             }
@@ -592,7 +594,7 @@ fn fully_opaque_partial_block() {
             u.insert_anonymous(
                 Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 8, 8]))
                     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-                    .filled_with(color_block!(Rgba::WHITE))
+                    .filled_with(block::from_color!(Rgba::WHITE))
                     .build(),
             )
         })
@@ -638,10 +640,10 @@ fn transparency_split() {
     let mut space = Space::empty_positive(3, 1, 1);
     // One opaque block and one transparent block
     space
-        .set([0, 0, 0], color_block!(1.0, 0.0, 0.0, 1.0))
+        .set([0, 0, 0], block::from_color!(1.0, 0.0, 0.0, 1.0))
         .unwrap();
     space
-        .set([2, 0, 0], color_block!(0.0, 0.0, 1.0, 0.5))
+        .set([2, 0, 0], block::from_color!(0.0, 0.0, 1.0, 0.5))
         .unwrap();
 
     let (_, _, space_rendered) = mesh_blocks_and_space(&space);
@@ -812,11 +814,11 @@ fn texture_coordinates_for_volumetric() {
     let block = Block::builder()
         .voxels_fn(R4, |cube| {
             if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == point3(0, 0, 0) {
-                color_block!(1.0, 0.0, 0.0, 0.9)
+                block::from_color!(1.0, 0.0, 0.0, 0.9)
             } else if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == point3(1, 1, 1) {
-                color_block!(0.0, 0.0, 1.0, 0.9)
+                block::from_color!(0.0, 0.0, 1.0, 0.9)
             } else {
-                color_block!(1.0, 1.0, 1.0, 0.12)
+                block::from_color!(1.0, 1.0, 1.0, 0.12)
             }
         })
         .unwrap()

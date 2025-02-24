@@ -470,11 +470,11 @@ mod tests {
         );
         let rotation_rule = block::RotationPlacementRule::Attach { by: Face6::NZ };
         let placement_action = Some(block::PlacementAction {
-            operation: Operation::Become(color_block!(1.0, 0.0, 1.0)),
+            operation: Operation::Become(block::from_color!(1.0, 0.0, 1.0)),
             in_front: false,
         });
         let tick_action = Some(TickAction::from(Operation::Become(AIR)));
-        let activation_action = Some(Operation::Become(color_block!(1.0, 1.0, 1.0)));
+        let activation_action = Some(Operation::Become(block::from_color!(1.0, 1.0, 1.0)));
         assert_eq!(
             Block::builder()
                 .color(color)
@@ -539,7 +539,7 @@ mod tests {
 
         let resolution = R4;
         let expected_bounds = GridAab::for_block(resolution);
-        let atom = color_block!(palette::DIRT);
+        let atom = block::from_color!(palette::DIRT);
         let block = Block::builder()
             .display_name("hello world")
             .voxels_fn(resolution, |_cube| &atom)
@@ -583,7 +583,7 @@ mod tests {
 
         let resolution = R4;
         let expected_bounds = GridAab::from_lower_upper([0, 0, 0], [2, 4, 4]);
-        let atom = color_block!(palette::DIRT);
+        let atom = block::from_color!(palette::DIRT);
         let block = Block::builder()
             .display_name("hello world")
             .voxels_fn(resolution, |cube| {

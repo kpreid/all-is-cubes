@@ -533,8 +533,7 @@ fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCub
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::AIR;
-    use crate::color_block;
+    use crate::block::{self, AIR};
     use crate::content::make_some_blocks;
     use embedded_graphics::Drawable as _;
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
@@ -610,7 +609,7 @@ mod tests {
 
         // Brush to nominally draw with.
         // TODO: also test bigger or offset brushes
-        let brush = VoxelBrush::single(color_block!(Rgba::WHITE));
+        let brush = VoxelBrush::single(block::from_color!(Rgba::WHITE));
         let style = PrimitiveStyle::with_fill(&brush);
         let brush_box = brush.bounds().unwrap();
 

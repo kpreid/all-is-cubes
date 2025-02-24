@@ -764,8 +764,7 @@ pub(crate) use private::ErasedHandleInternalToken;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::BlockDef;
-    use crate::color_block;
+    use crate::block::{self, BlockDef};
     use crate::math::Rgba;
     use crate::space::Space;
     use crate::universe::UniverseTransaction;
@@ -776,7 +775,7 @@ mod tests {
     fn handle_debug_in_universe() {
         let mut u = Universe::new();
         let handle = u
-            .insert("foo".into(), BlockDef::new(color_block!(Rgba::WHITE)))
+            .insert("foo".into(), BlockDef::new(block::from_color!(Rgba::WHITE)))
             .unwrap();
         assert_eq!(format!("{handle:?}"), "Handle('foo')");
         assert_eq!(format!("{handle:#?}"), "Handle('foo')");
@@ -789,7 +788,8 @@ mod tests {
 
     #[test]
     fn handle_debug_pending() {
-        let handle = Handle::new_pending("foo".into(), BlockDef::new(color_block!(Rgba::WHITE)));
+        let handle =
+            Handle::new_pending("foo".into(), BlockDef::new(block::from_color!(Rgba::WHITE)));
         assert_eq!(
             format!("{handle:?}"),
             "Handle('foo' in no universe = BlockDef { \

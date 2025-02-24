@@ -4,7 +4,6 @@ use pretty_assertions::assert_eq;
 
 use super::{LightUpdatesInfo, PackedLight, Priority, data::LightStatus};
 use crate::block::{self, AIR, Block};
-use crate::color_block;
 use crate::listen::{Listen as _, Listener, Sink};
 use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgba, rgb_const};
 use crate::space::{GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
@@ -20,7 +19,7 @@ fn initial_value_in_empty_space() {
 #[test]
 fn initial_value_in_filled_space() {
     let space = Space::builder(GridAab::ORIGIN_CUBE)
-        .filled_with(color_block!(Rgba::WHITE))
+        .filled_with(block::from_color!(Rgba::WHITE))
         .build();
     assert_eq!(PackedLight::OPAQUE, space.get_lighting([0, 0, 0]));
 }
@@ -37,7 +36,7 @@ fn initial_value_initialized_after_creation() {
 
     // Put a block in it so this is not a trivial case, and activate lighting.
     space
-        .set([1, 1, 1], color_block!(1.0, 0.0, 0.0, 1.0))
+        .set([1, 1, 1], block::from_color!(1.0, 0.0, 0.0, 1.0))
         .unwrap();
     space.set_physics(SpacePhysics {
         light: LightPhysics::Rays {
@@ -92,7 +91,7 @@ fn step() {
         .build();
     let sky_light = PackedLight::from(color);
 
-    space.set([0, 0, 0], color_block!(Rgb::ONE)).unwrap();
+    space.set([0, 0, 0], block::from_color!(Rgb::ONE)).unwrap();
     // Not changed yet... except for the now-opaque block
     assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::NO_RAYS);
@@ -118,7 +117,7 @@ fn step() {
 fn evaluate_light() {
     let mut space = Space::empty_positive(3, 1, 1);
     assert_eq!(0, space.evaluate_light::<time::NoTime>(0, |_| {}));
-    space.set([1, 0, 0], color_block!(Rgb::ONE)).unwrap();
+    space.set([1, 0, 0], block::from_color!(Rgb::ONE)).unwrap();
     assert_eq!(2, space.evaluate_light::<time::NoTime>(0, |_| {}));
     assert_eq!(0, space.evaluate_light::<time::NoTime>(0, |_| {}));
     // This is just a smoke test, "is it plausible that it's working".
@@ -140,7 +139,7 @@ fn set_cube_opaque_notification() {
     // Self-test that the initial condition is not trivially the answer we're looking for
     assert_ne!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
 
-    space.set([0, 0, 0], color_block!(Rgb::ONE)).unwrap();
+    space.set([0, 0, 0], block::from_color!(Rgb::ONE)).unwrap();
 
     assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(
@@ -220,7 +219,7 @@ fn animation_treated_as_visible() {
         ]
     }
     let no_block = eval_mid_block(AIR);
-    let visible_block = eval_mid_block(color_block!(1.0, 1.0, 1.0, 0.5));
+    let visible_block = eval_mid_block(block::from_color!(1.0, 1.0, 1.0, 0.5));
     let invisible_but_animated = eval_mid_block(
         Block::builder()
             .color(Rgba::TRANSPARENT)
@@ -241,7 +240,7 @@ fn animation_treated_as_visible() {
 
 #[test]
 fn reflectance_is_clamped() {
-    let over_unity_block = color_block!(16.0, 1.0, 0.0, 1.0);
+    let over_unity_block = block::from_color!(16.0, 1.0, 0.0, 1.0);
     let sky_color = rgb_const!(0.5, 0.5, 0.5);
     let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 3, 3]))
         .sky_color(sky_color)

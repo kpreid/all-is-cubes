@@ -18,10 +18,10 @@ use all_is_cubes::math::{
     GridSizeCoord, GridVector, Gridgid, Rgb, Rgba, Vol, rgb_const,
 };
 use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{color_block, time};
 
 use crate::Fire;
 use crate::alg::{array_of_noise, four_walls, scale_color};
@@ -497,11 +497,11 @@ async fn install_atrium_blocks(
 ) -> Result<BlockProvider<AtriumBlocks>, InGenError> {
     let resolution = Resolution::R16;
     let resolution_g = GridCoordinate::from(resolution);
-    let stone_base = color_block!(0.53, 0.48, 0.40, 1.0);
-    let heavy_grout_base = color_block!(0.1, 0.1, 0.1, 1.0);
-    let grout_base = color_block!(0.32, 0.30, 0.28, 1.0);
-    let ceiling_paint = color_block!(0.975, 0.975, 0.975, 1.0);
-    let pole_color = color_block!(0.27, 0.20, 0.18, 1.0);
+    let stone_base = block::from_color!(0.53, 0.48, 0.40, 1.0);
+    let heavy_grout_base = block::from_color!(0.1, 0.1, 0.1, 1.0);
+    let grout_base = block::from_color!(0.32, 0.30, 0.28, 1.0);
+    let ceiling_paint = block::from_color!(0.975, 0.975, 0.975, 1.0);
+    let pole_color = block::from_color!(0.27, 0.20, 0.18, 1.0);
 
     // TODO: This whole section is about having noise pick from a fixed set of pregenerated shades.
     // We should abstract it out if we like this style
@@ -689,7 +689,7 @@ async fn install_atrium_blocks(
                 })?
                 .build_txn(txn),
             AtriumBlocks::BannerBottomAccent => {
-                let accent_color = color_block!(0.95, 0.89, 0.05, 1.0);
+                let accent_color = block::from_color!(0.95, 0.89, 0.05, 1.0);
                 Block::builder()
                     .display_name("Banner Accent")
                     .voxels_fn(resolution, |p| {

@@ -17,7 +17,7 @@ use all_is_cubes_render::camera::GraphicsOptions;
 use content::DemoBlocks;
 
 /// Private — do not use.
-use all_is_cubes::{color_block, rerun_glue as rg};
+use all_is_cubes::rerun_glue as rg;
 
 fn main() {
     let destination = rg::Destination {
@@ -94,7 +94,7 @@ fn make_example_blocks(universe: &mut Universe) -> Vec<Block> {
             Block::builder()
                 .voxels_fn(Resolution::R2, |cube| {
                     if i & (1 << (indexing.index(cube).unwrap() as u8)) != 0 {
-                        color_block!(0.5, 0.5, 0.5)
+                        block::from_color!(0.5, 0.5, 0.5)
                     } else {
                         block::AIR
                     }
@@ -110,8 +110,8 @@ fn make_example_blocks(universe: &mut Universe) -> Vec<Block> {
 /// A block containing transparent and emissive surfaces, that also meet opaque ones
 /// perpendicularly.
 fn make_transparent_boxes(universe: &mut Universe) -> Block {
-    let opaque_voxel = color_block!(content::palette::LOGO_FILL);
-    let transparent_voxel = color_block!(0.7, 0.7, 0.2, 0.25);
+    let opaque_voxel = block::from_color!(content::palette::LOGO_FILL);
+    let transparent_voxel = block::from_color!(0.7, 0.7, 0.2, 0.25);
     let emissive_voxel = Block::builder()
         .color(Rgba::TRANSPARENT)
         .light_emission(Rgb::new(0.0, 1.0, 1.0))
@@ -140,8 +140,8 @@ fn make_transparent_boxes(universe: &mut Universe) -> Block {
 
 /// A block containing transparent surfaces that abut opaque ones.
 fn make_transparent_window(universe: &mut Universe) -> Block {
-    let opaque_voxel = color_block!(content::palette::LOGO_FILL);
-    let transparent_voxel = color_block!(0.7, 0.7, 0.2, 0.25);
+    let opaque_voxel = block::from_color!(content::palette::LOGO_FILL);
+    let transparent_voxel = block::from_color!(0.7, 0.7, 0.2, 0.25);
 
     let resolution = Resolution::R16;
     let solid_box = GridAab::for_block(resolution)

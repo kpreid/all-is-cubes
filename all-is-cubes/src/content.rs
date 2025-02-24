@@ -8,7 +8,6 @@ use alloc::vec::Vec;
 
 use crate::arcstr::{ArcStr, literal};
 use crate::block::{self, Block, Resolution, Resolution::R16, RotationPlacementRule};
-use crate::color_block;
 use crate::inv::{Slot, Tool};
 use crate::math::{
     Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb, Rgba, rgb_const,
@@ -176,7 +175,7 @@ pub fn make_slab_txn(
     let numerator = numerator.min(Resolution::MAX.into());
 
     let voxel_palette = [
-        color_block!(palette::PLANK),
+        block::from_color!(palette::PLANK),
         Block::from(palette::PLANK * 1.06),
     ];
     let bounds = GridAab::from_lower_size(

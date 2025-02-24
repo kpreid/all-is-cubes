@@ -3,9 +3,8 @@ use num_traits::Euclid as _;
 use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
-use crate::block::{AIR, Block};
+use crate::block::{self, AIR, Block};
 use crate::character::Spawn;
-use crate::color_block;
 use crate::content::{free_editing_starter_inventory, palette};
 use crate::linking::InGenError;
 use crate::math::{Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba};
@@ -47,7 +46,7 @@ pub async fn lighting_bench_space(
                     .bounds()
                     .shrink(FaceMap::default().with(Face6::PY, layout.yup()))
                     .unwrap(),
-                &color_block!(0.5, 0.5, 0.5),
+                &block::from_color!(0.5, 0.5, 0.5),
             )
             .unwrap();
         space

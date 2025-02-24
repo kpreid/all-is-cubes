@@ -15,6 +15,7 @@ use all_is_cubes::content::load_image::space_from_image;
 use all_is_cubes::content::{BoxPart, BoxStyle, palette};
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Size3D, Vector3D, vec3};
+use all_is_cubes::include_image;
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
@@ -25,7 +26,6 @@ use all_is_cubes::space::{LightPhysics, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{color_block, include_image};
 use all_is_cubes::{op, time};
 
 use crate::alg::four_walls;
@@ -331,8 +331,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         };
 
         // TODO: put in struct, or eliminate
-        let start_wall = color_block!(1.0, 0.0, 0.0);
-        let goal_wall = color_block!(0.0, 0.8, 0.0);
+        let start_wall = block::from_color!(1.0, 0.0, 0.0);
+        let goal_wall = block::from_color!(0.0, 0.8, 0.0);
 
         let interior = self.actual_room_box(room_position, room_data);
         let unmodified_room_box = self.dungeon_grid.room_box_at(room_position);
@@ -843,7 +843,7 @@ pub async fn install_dungeon_blocks(
         .color(Rgba::new(0.7, 0.7, 0.0, 1.0))
         .light_emission(Rgb::new(8.0, 7.0, 0.7) * 0.5)
         .build();
-    let spike_metal = color_block!(palette::STEEL);
+    let spike_metal = block::from_color!(palette::STEEL);
 
     BlockProvider::<DungeonBlocks>::new(progress, |key| {
         Ok(match key {
@@ -1002,7 +1002,7 @@ pub async fn install_dungeon_blocks(
                 .display_name("Doorway Side Mask")
                 .voxels_fn(R8, |cube| {
                     if cube.x + cube.z / 2 < 8 {
-                        color_block!(1.0, 1.0, 1.0, 1.0)
+                        block::from_color!(1.0, 1.0, 1.0, 1.0)
                     } else {
                         AIR
                     }

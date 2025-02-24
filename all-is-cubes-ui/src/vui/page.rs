@@ -2,9 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec;
 
 use all_is_cubes::arcstr::ArcStr;
-use all_is_cubes::block::{AIR, text};
-use all_is_cubes::block::{Block, Resolution};
-use all_is_cubes::color_block;
+use all_is_cubes::block::{self, AIR, Block, Resolution, text};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::{Size2D, size2};
 use all_is_cubes::math::{
@@ -155,7 +153,9 @@ impl Page {
                         GridSizeCoord::from(UiSize::DEPTH_BEHIND_VIEW_PLANE) + 2,
                     ),
                 })),
-                vui::leaf_widget(widgets::Frame::with_block(color_block!(0., 0., 0., 0.7))),
+                vui::leaf_widget(widgets::Frame::with_block(block::from_color!(
+                    0., 0., 0., 0.7
+                ))),
                 Arc::new(LayoutTree::Shrink(
                     theme
                         .dialog_background()

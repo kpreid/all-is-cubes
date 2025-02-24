@@ -51,7 +51,7 @@ fn generate_destruction_mask(
     fraction: f64,
     next_mask: Option<Block>,
 ) -> Result<Block, InGenError> {
-    let solid = color_block!(Rgba::WHITE);
+    let solid = block::from_color!(Rgba::WHITE);
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
     let points: [_; 32] = core::array::from_fn(|_| {
         let free_point = Cube::ORIGIN.aab().random_point(&mut rng);

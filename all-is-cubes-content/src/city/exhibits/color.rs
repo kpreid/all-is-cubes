@@ -115,7 +115,7 @@ fn COLOR_LIGHTS(_: Context<'_>) {
     ];
 
     // Room wall block with test card
-    let wall_color_block = color_block!(0.5, 0.5, 0.5, 1.0);
+    let wall_color_block = block::from_color!(0.5, 0.5, 0.5, 1.0);
     let wall_resolution = R16;
     let wall_block = {
         let colors_as_blocks: Vec<Block> =
@@ -266,7 +266,7 @@ fn COLORED_BOUNCE(_: Context<'_>) {
         .light_emission(Rgb::ONE * brightness)
         .build();
 
-    let wall_block = color_block!(0.25, 0.25, 0.25); // fairly absorbing
+    let wall_block = block::from_color!(0.25, 0.25, 0.25); // fairly absorbing
 
     // --- Space ---
 

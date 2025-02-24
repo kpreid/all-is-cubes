@@ -823,7 +823,7 @@ mod tests {
         // by pointer identity that the composition didn't needlessly build a new
         // voxel allocation.
         let base_block = Block::builder()
-            .voxels_fn(R4, |_| color_block!(1.0, 0.0, 0.0, 1.0))
+            .voxels_fn(R4, |_| block::from_color!(1.0, 0.0, 0.0, 1.0))
             .unwrap()
             .build_into(universe);
         let base_block = Block::from(universe.insert_anonymous(block::BlockDef::new(base_block)));

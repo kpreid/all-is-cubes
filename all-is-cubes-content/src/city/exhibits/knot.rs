@@ -19,9 +19,9 @@ fn KNOT(ctx: Context<'_>) {
     let mut drawing_space = Space::builder(footprint.multiply(resolution.into()))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build();
-    let paint1 = color_block!(0.7, 0.7, 0.7, 1.0);
-    let paint2 = color_block!(0.1, 0.1, 0.9, 1.0);
-    let paint3 = color_block!(0.9, 0.7, 0.1, 1.0);
+    let paint1 = block::from_color!(0.7, 0.7, 0.7, 1.0);
+    let paint2 = block::from_color!(0.1, 0.1, 0.9, 1.0);
+    let paint3 = block::from_color!(0.9, 0.7, 0.1, 1.0);
     drawing_space.fill(drawing_space.bounds(), |p| {
         // Measure from midpoint of odd dimension space
         let p = p - Vector3D::new(1, 1, 1) * (GridCoordinate::from(resolution) / 2);

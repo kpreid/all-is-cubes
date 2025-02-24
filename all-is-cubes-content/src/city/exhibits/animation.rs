@@ -25,11 +25,11 @@ fn ANIMATION(ctx: Context<'_>) {
             AIR,
             AIR,
             AIR,
-            color_block!(0.0, 0.3, 0.0),
-            color_block!(0.0, 0.7, 0.0),
-            color_block!(0.0, 1.0, 0.0),
-            color_block!(0.0, 0.7, 0.7),
-            color_block!(0.0, 0.3, 1.0),
+            block::from_color!(0.0, 0.3, 0.0),
+            block::from_color!(0.0, 0.7, 0.0),
+            block::from_color!(0.0, 1.0, 0.0),
+            block::from_color!(0.0, 0.7, 0.7),
+            block::from_color!(0.0, 0.3, 1.0),
         ];
         let repeats_per_fill = 6;
         SpaceTransaction::add_behavior(
@@ -63,7 +63,7 @@ fn ANIMATION(ctx: Context<'_>) {
             .voxels_handle(fire_resolution, {
                 let fire_bounds = GridAab::for_block(fire_resolution);
                 let mut space = Space::for_block(fire_resolution).build();
-                space.set([0, 0, 0], color_block!(Rgb::ONE))?; // placeholder for not fully transparent so first pass lighting is better
+                space.set([0, 0, 0], block::from_color!(Rgb::ONE))?; // placeholder for not fully transparent so first pass lighting is better
                 SpaceTransaction::add_behavior(fire_bounds, Fire::new(fire_bounds))
                     .execute(&mut space, &mut transaction::no_outputs)
                     .unwrap();

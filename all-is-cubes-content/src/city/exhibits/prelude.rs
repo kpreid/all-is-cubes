@@ -25,6 +25,7 @@ pub(super) use all_is_cubes::drawing::embedded_graphics::{
 pub(super) use all_is_cubes::euclid::{
     Point3D, Rotation2D, Size3D, Vector2D, Vector3D, point3, size3, vec3,
 };
+pub(super) use all_is_cubes::include_image;
 pub(super) use all_is_cubes::linking::{BlockProvider, InGenError};
 pub(super) use all_is_cubes::listen;
 pub(super) use all_is_cubes::math::{
@@ -35,7 +36,6 @@ pub(super) use all_is_cubes::op::Operation;
 pub(super) use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};
 pub(super) use all_is_cubes::time;
 pub(super) use all_is_cubes::transaction::{self, Transaction as _};
-pub(super) use all_is_cubes::{color_block, include_image};
 
 pub(super) use crate::alg::{self, four_walls, stack};
 pub(super) use crate::city::exhibit::{Context, Exhibit, ExhibitTransaction, Placement, exhibit};

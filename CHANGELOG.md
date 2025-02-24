@@ -35,6 +35,7 @@
 
     - Renamed `block::Move::to_paired()` to `into_paired()`.
     - Renamed `block::Text::to_builder()` to `into_builder()`.
+    - Renamed `all_is_cubes::color_block!()` to `all_is_cubes::block::from_color!()`.
 
 - `all-is-cubes-ui` library:
     - `apps::Session::settings()` replaces `graphics_options_mut()`.

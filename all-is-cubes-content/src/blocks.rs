@@ -12,7 +12,6 @@ use all_is_cubes::block::{
     self, AIR, AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution::*,
     RotationPlacementRule, TickAction,
 };
-use all_is_cubes::color_block;
 use all_is_cubes::drawing::embedded_graphics::{
     prelude::Point,
     primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
@@ -114,7 +113,7 @@ pub async fn install_demo_blocks(
         }
     };
 
-    let lamp_globe = color_block!(1.0, 1.0, 1.0, 0.75);
+    let lamp_globe = block::from_color!(1.0, 1.0, 1.0, 0.75);
     let lamp_emitter_off_on: [Block; 2] = core::array::from_fn(|on| {
         Block::builder()
             .color(Rgba::WHITE)
@@ -126,19 +125,19 @@ pub async fn install_demo_blocks(
         .build();
     let lamppost_edge = Block::from(palette::ALMOST_BLACK * 1.12);
 
-    let pedestal_voxel = color_block!(palette::STONE);
+    let pedestal_voxel = block::from_color!(palette::STONE);
 
     use DemoBlocks::*;
     let provider_for_patch = BlockProvider::<DemoBlocks>::new(p, |key| {
         Ok(match key {
             GlassBlock => {
                 let glass_densities = [
-                    //color_block!(1.0, 0.0, 0.0, 1.0),
-                    color_block!(0.95, 1.0, 0.95, 0.9),
-                    color_block!(0.95, 0.95, 1.0, 0.65),
-                    color_block!(0.95, 1.0, 0.95, 0.3),
-                    color_block!(0.95, 0.95, 1.0, 0.07),
-                    color_block!(0.95, 1.0, 0.95, 0.05),
+                    //block::from_color!(1.0, 0.0, 0.0, 1.0),
+                    block::from_color!(0.95, 1.0, 0.95, 0.9),
+                    block::from_color!(0.95, 0.95, 1.0, 0.65),
+                    block::from_color!(0.95, 1.0, 0.95, 0.3),
+                    block::from_color!(0.95, 0.95, 1.0, 0.07),
+                    block::from_color!(0.95, 1.0, 0.95, 0.05),
                 ];
 
                 Block::builder()
@@ -285,7 +284,7 @@ pub async fn install_demo_blocks(
                 let mut space = Space::for_block(resolution).build();
 
                 // Support legs, identifying the down / -Y direction.
-                let leg = color_block!(palette::STEEL);
+                let leg = block::from_color!(palette::STEEL);
                 space.fill_uniform(
                     GridAab::from_lower_size(
                         [resolution_g / 2 - 1, 0, resolution_g / 2 - 1],
@@ -338,8 +337,8 @@ pub async fn install_demo_blocks(
 
             ExhibitBackground => {
                 let colors = [
-                    color_block!(0.825, 0.825, 0.825, 1.0),
-                    color_block!(0.75, 0.75, 0.75, 1.0),
+                    block::from_color!(0.825, 0.825, 0.825, 1.0),
+                    block::from_color!(0.75, 0.75, 0.75, 1.0),
                 ];
                 Block::builder()
                     .display_name("Exhibit Background")
@@ -367,8 +366,8 @@ pub async fn install_demo_blocks(
                 .build_txn(txn),
 
             Signboard => {
-                let sign_board = color_block!(palette::PLANK);
-                let sign_post = color_block!(palette::STEEL);
+                let sign_board = block::from_color!(palette::PLANK);
+                let sign_post = block::from_color!(palette::STEEL);
 
                 // This shape has to coordinate with the name-drawing code in city::demo_city.
                 // Haven't thought of a good way to abstract/combine it yet.

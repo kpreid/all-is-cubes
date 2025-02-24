@@ -2,8 +2,7 @@
 
 use criterion::{BatchSize, Criterion, criterion_main};
 
-use all_is_cubes::block::{AIR, Block, Resolution::R16};
-use all_is_cubes::color_block;
+use all_is_cubes::block::{self, AIR, Block, Resolution::R16};
 use all_is_cubes::content::make_some_voxel_blocks;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::space::Space;
@@ -38,12 +37,12 @@ fn block_mesh_benches(c: &mut Criterion) {
 
     g.bench_function("checker-new", |b| {
         let mut universe = Universe::new();
-        let block = checkerboard_block(&mut universe, &[AIR, color_block!(Rgba::WHITE)]);
+        let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
         iter_new_block_mesh(b, options, &block);
     });
     g.bench_function("checker-reused", |b| {
         let mut universe = Universe::new();
-        let block = checkerboard_block(&mut universe, &[AIR, color_block!(Rgba::WHITE)]);
+        let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
         iter_reused_block_mesh(b, options, &block);
     });
 
@@ -56,7 +55,7 @@ fn block_mesh_benches(c: &mut Criterion) {
         let block = Block::builder()
             .voxels_handle(
                 R16,
-                universe.insert_anonymous(half_space(&color_block!(Rgba::WHITE))),
+                universe.insert_anonymous(half_space(&block::from_color!(Rgba::WHITE))),
             )
             .build();
         iter_new_block_mesh(b, options, &block);
@@ -66,7 +65,10 @@ fn block_mesh_benches(c: &mut Criterion) {
         let mut universe = Universe::new();
         let block = checkerboard_block(
             &mut universe,
-            &[color_block!(Rgba::BLACK), color_block!(Rgba::WHITE)],
+            &[
+                block::from_color!(Rgba::BLACK),
+                block::from_color!(Rgba::WHITE),
+            ],
         );
         iter_new_block_mesh(b, options, &block);
     });
@@ -134,7 +136,7 @@ fn space_mesh_benches(c: &mut Criterion) {
         );
     });
 
-    let half_ing = SpaceMeshIngredients::new(options, half_space(&color_block!(Rgba::WHITE)));
+    let half_ing = SpaceMeshIngredients::new(options, half_space(&block::from_color!(Rgba::WHITE)));
     g.bench_function("half-new", |b| {
         b.iter_batched_ref(|| (), |()| half_ing.do_new(), BatchSize::SmallInput);
     });
@@ -177,7 +179,7 @@ fn dynamic_benches(c: &mut Criterion) {
 
     g.bench_function("initial-update", |b| {
         let space_handle =
-            Handle::new_pending(Name::Pending, half_space(&color_block!(Rgba::WHITE)));
+            Handle::new_pending(Name::Pending, half_space(&block::from_color!(Rgba::WHITE)));
         b.iter_batched_ref(
             || {
                 let csm: dynamic::ChunkedSpaceMesh<Mt, 16> =
@@ -203,9 +205,9 @@ fn checkerboard_space_bench_setup(options: MeshOptions, transparent: bool) -> Sp
         checkerboard_space(&[
             AIR,
             if transparent {
-                color_block!(0.5, 0.5, 0.5, 0.5)
+                block::from_color!(0.5, 0.5, 0.5, 0.5)
             } else {
-                color_block!(Rgba::WHITE)
+                block::from_color!(Rgba::WHITE)
             },
         ]),
     )

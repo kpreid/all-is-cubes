@@ -20,7 +20,7 @@ fn INVENTORY(ctx: Context<'_>) {
         .voxels_fn(R16, |cube| {
             // tray shape
             if cube.y == 0 || cube.y == 1 && alg::square_radius(R16, cube)[0] == 8 {
-                const { &color_block!(palette::STEEL) }
+                const { &block::from_color!(palette::STEEL) }
             } else {
                 &AIR
             }
@@ -47,11 +47,11 @@ fn INVENTORY(ctx: Context<'_>) {
     let pipe_with_item_1 = elbow_pipe_block
         .evaluate()
         .unwrap()
-        .with_inventory([inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_RED)).into()]);
+        .with_inventory([inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into()]);
     let pipe_with_item_2 = elbow_pipe_block
         .evaluate()
         .unwrap()
-        .with_inventory([inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_BLUE)).into()]);
+        .with_inventory([inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_BLUE)).into()]);
     let empty_pipe = straight_pipe_block.evaluate().unwrap().with_inventory([]);
     let empty_elbow_pipe = elbow_pipe_block.evaluate().unwrap().with_inventory([]);
 
@@ -62,9 +62,9 @@ fn INVENTORY(ctx: Context<'_>) {
             pedestal,
             &tray.evaluate().unwrap().with_inventory([
                 inv::Tool::Block(demo_blocks[DemoBlocks::ExhibitBackground].clone()).into(),
-                inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
-                inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_GREEN)).into(),
-                inv::Tool::Block(color_block!(Rgb::UNIFORM_LUMINANCE_BLUE)).into(),
+                inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
+                inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_GREEN)).into(),
+                inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_BLUE)).into(),
                 inv::Tool::Block(demo_blocks[DemoBlocks::Lamp(true)].clone()).into(),
             ]),
         ],
@@ -102,15 +102,15 @@ fn INVENTORY(ctx: Context<'_>) {
 fn make_pipe_blocks(txn: &mut ExhibitTransaction) -> (Block, Block) {
     // TODO: Move this to `DemoBlocks`?
 
-    let pipe_corner_material = color_block!(0.6, 0.2, 0.2);
-    let pipe_side_pattern_material = color_block!(0.3, 0.1, 0.1);
-    let pipe_side_glass = color_block!(0.4, 0.4, 0.4, 0.2);
+    let pipe_corner_material = block::from_color!(0.6, 0.2, 0.2);
+    let pipe_side_pattern_material = block::from_color!(0.3, 0.1, 0.1);
+    let pipe_side_glass = block::from_color!(0.4, 0.4, 0.4, 0.2);
     let pipe_box_style = BoxStyle::from_fn(|part| {
         if part.is_corner() || part.is_edge() {
             Some(pipe_corner_material.clone())
         } else if part.is_face() && !part.is_on_face(Face6::NZ) && !part.is_on_face(Face6::PZ) {
             // replaced in actual use
-            Some(color_block!(0.1, 0.1, 0.1))
+            Some(block::from_color!(0.1, 0.1, 0.1))
         } else {
             None
         }

@@ -4,8 +4,7 @@
 use all_is_cubes_render::Flaws;
 use alloc::vec::Vec;
 
-use all_is_cubes::block::{AIR, Block, Resolution};
-use all_is_cubes::color_block;
+use all_is_cubes::block::{self, AIR, Block, Resolution};
 use all_is_cubes::math::{Aab, Cube, Rgba};
 use all_is_cubes::universe::Universe;
 use all_is_cubes_render::camera::GraphicsOptions;
@@ -32,7 +31,7 @@ fn default_is_empty() {
 
 #[test]
 fn nonempty() {
-    let ev = color_block!(Rgba::WHITE).evaluate().unwrap();
+    let ev = block::from_color!(Rgba::WHITE).evaluate().unwrap();
     let mesh: TestMesh = BlockMesh::new(
         &ev,
         &NoTextures,
@@ -57,7 +56,7 @@ fn voxel_opacity_mask_not_set_with_voxel_colors() {
             if cube == Cube::ORIGIN {
                 AIR
             } else {
-                color_block!(Rgba::WHITE)
+                block::from_color!(Rgba::WHITE)
             }
         })
         .unwrap()

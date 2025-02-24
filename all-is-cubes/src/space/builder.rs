@@ -331,7 +331,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
 
 #[cfg(test)]
 mod tests {
-    use crate::color_block;
+    use crate::block;
     use crate::content::make_some_blocks;
     use crate::math::{Cube, Rgba};
 
@@ -351,7 +351,7 @@ mod tests {
     #[test]
     fn filled_with() {
         let bounds = GridAab::from_lower_size([1, 2, 3], [1, 1, 1]);
-        let block = color_block!(Rgba::WHITE);
+        let block = block::from_color!(Rgba::WHITE);
         let space = Space::builder(bounds).filled_with(block.clone()).build();
         space.consistency_check();
         assert_eq!(space[bounds.lower_bounds()], block);

@@ -9,8 +9,8 @@ use super::prelude::*;
 fn TEXT(_: Context<'_>) {
     use all_is_cubes::block::text;
 
-    let foreground_block = color_block!(palette::HUD_TEXT_FILL);
-    let outline_block = color_block!(palette::HUD_TEXT_STROKE);
+    let foreground_block = block::from_color!(palette::HUD_TEXT_FILL);
+    let outline_block = block::from_color!(palette::HUD_TEXT_STROKE);
 
     struct Texhibit {
         text: text::Text,
@@ -44,7 +44,10 @@ fn TEXT(_: Context<'_>) {
             offset: vec3(0, 1, 0),
         },
         {
-            let op = Composite::new(color_block!(palette::MENU_BACK), CompositeOperator::Out);
+            let op = Composite::new(
+                block::from_color!(palette::MENU_BACK),
+                CompositeOperator::Out,
+            );
             Texhibit {
                 text: text::Text::builder()
                     .string(literal!("engraved"))

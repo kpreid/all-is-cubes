@@ -16,57 +16,7 @@ use crate::math::{GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, 
 use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::{Handle, HandleVisitor, VisitHandles};
 
-/// Construct a [`Block`] with the given reflectance color.
-///
-/// This is equivalent to calling `Block::from()`, except that:
-///
-/// * the arguments must be constant expressions,
-/// * no allocations are performed, and
-/// * the value may be used in `const` evaluation.
-///
-/// The color may be specified as an expression which returns [`Rgb`] or [`Rgba`], or as three
-/// or four [`f32`] literal color components.
-///
-/// ```
-/// use all_is_cubes::{block::Block, color_block, math::{Rgb, rgb_const}};
-///
-/// assert_eq!(
-///     color_block!(rgb_const!(1.0, 0.5, 0.0)),
-///     Block::from(Rgb::new(1.0, 0.5, 0.0)),
-/// );
-///
-/// assert_eq!(
-///     color_block!(rgb_const!(1.0, 0.5, 0.0)),
-///     color_block!(1.0, 0.5, 0.0),
-/// );
-///
-/// assert_eq!(
-///     color_block!(1.0, 0.5, 0.0),
-///     color_block!(1.0, 0.5, 0.0, 1.0),
-/// );
-/// ```
-// ---
-// Must declare this macro before child modules, so they can use it.
-#[macro_export]
-#[expect(
-    clippy::module_name_repetitions,
-    reason = "macro export is actually at crate root"
-)]
-macro_rules! color_block {
-    ($color:expr) => {
-        $crate::block::Block::from_static_primitive(const {
-            &$crate::block::Primitive::from_color($color.with_alpha_one_if_has_no_alpha())
-        })
-    };
-
-    ($r:literal, $g:literal, $b:literal $(,)?) => {
-        $crate::color_block!($crate::math::rgb_const!($r, $g, $b))
-    };
-
-    ($r:literal, $g:literal, $b:literal, $a:literal $(,)?) => {
-        $crate::color_block!($crate::math::rgba_const!($r, $g, $b, $a))
-    };
-}
+// -------------------------------------------------------------------------------------------------
 
 mod attributes;
 pub use attributes::*;
@@ -112,7 +62,8 @@ pub mod text;
 #[cfg(test)]
 mod tests;
 
-// --- Block type declarations ---
+// -------------------------------------------------------------------------------------------------
+// Block type declarations
 // File organization: This is a series of closely related type definitions together before
 // any of their `impl`s, so the types can be understood in context.
 
@@ -304,7 +255,8 @@ pub struct Atom {
     pub collision: BlockCollision,
 }
 
-// --- End of type declarations, beginning of impls ---
+// -------------------------------------------------------------------------------------------------
+// Impls and supporting items
 
 impl fmt::Debug for Block {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -343,7 +295,7 @@ impl Block {
     ///
     /// This performs no allocation.
     /// It is also available as a [`From`] implementation.
-    #[doc(hidden)] // used by `color_block!()`, but I'm not sure whether to make it really public
+    #[doc(hidden)] // used by `block::from_color!()`, but I'm not sure whether to make it really public
     pub const fn from_static_primitive(r: &'static Primitive) -> Self {
         Block(BlockPtr::Static(r))
     }
@@ -467,8 +419,7 @@ impl Block {
     /// rule set for combining modifiers.)
     ///
     /// ```
-    /// use all_is_cubes::block::{AIR, Block, Modifier};
-    /// use all_is_cubes::color_block;
+    /// use all_is_cubes::block;
     /// use all_is_cubes::content::make_some_voxel_blocks;
     /// use all_is_cubes::math::{GridRotation, Rgba};
     /// use all_is_cubes::universe::Universe;
@@ -480,16 +431,16 @@ impl Block {
     ///
     /// // Basic rotation
     /// let rotated = block.clone().rotate(clockwise);
-    /// assert_eq!(rotated.modifiers(), &[Modifier::Rotate(clockwise)]);
+    /// assert_eq!(rotated.modifiers(), &[block::Modifier::Rotate(clockwise)]);
     ///
     /// // Multiple rotations are combined
     /// let double = rotated.clone().rotate(clockwise);
-    /// assert_eq!(double.modifiers(), &[Modifier::Rotate(clockwise * clockwise)]);
+    /// assert_eq!(double.modifiers(), &[block::Modifier::Rotate(clockwise * clockwise)]);
     ///
     /// // Atoms and AIR are never rotated
-    /// let atom = color_block!(Rgba::WHITE);
+    /// let atom = block::from_color!(Rgba::WHITE);
     /// assert_eq!(atom.clone().rotate(clockwise), atom);
-    /// assert_eq!(AIR.rotate(clockwise), AIR);
+    /// assert_eq!(block::AIR.rotate(clockwise), block::AIR);
     /// ```
     #[must_use]
     pub fn rotate(mut self, rotation: GridRotation) -> Self {
@@ -841,7 +792,8 @@ impl From<Rgb> for Block {
     /// Constructs a [`Block`] with the given reflectance color, and default attributes.
     ///
     /// This operation allocates a new [`Primitive`] value on the heap.
-    /// If the color is a constant, you may use [`color_block!`] instead to avoid allocation.
+    /// If the color is a constant, you may use [`block::from_color!`](from_color!)
+    /// instead to avoid allocation.
     fn from(color: Rgb) -> Self {
         Block::from(color.with_alpha_one())
     }
@@ -850,11 +802,69 @@ impl From<Rgba> for Block {
     /// Construct a [`Block`] with the given reflectance color, and default attributes.
     ///
     /// This operation allocates a new [`Primitive`] value on the heap.
-    /// If the color is a constant, you may use [`color_block!`] instead to avoid allocation.
+    /// If the color is a constant, you may use [`block::from_color!`](from_color!)
+    /// instead to avoid allocation.
     fn from(color: Rgba) -> Self {
         Block::from_primitive(Primitive::Atom(Atom::from(color)))
     }
 }
+
+// Scoping shenanigan: Macros can only be public from a library using `#[macro_export]`,
+// but `#[macro_export]` puts the macro at the crate root. To work around this, we use
+// `#[macro_export]` to export an undocumented name, then re-export it publicly with a normal `use`.
+#[doc(hidden)]
+#[macro_export]
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "macro export is actually at crate root"
+)]
+macro_rules! _block_from_color {
+    ($color:expr) => {
+        $crate::block::Block::from_static_primitive(const {
+            &$crate::block::Primitive::from_color($color.with_alpha_one_if_has_no_alpha())
+        })
+    };
+
+    ($r:literal, $g:literal, $b:literal $(,)?) => {
+        $crate::block::from_color!($crate::math::rgb_const!($r, $g, $b))
+    };
+
+    ($r:literal, $g:literal, $b:literal, $a:literal $(,)?) => {
+        $crate::block::from_color!($crate::math::rgba_const!($r, $g, $b, $a))
+    };
+}
+/// Construct a [`Block`] with the given reflectance color.
+///
+/// This is equivalent to calling `Block::from(some_color)`, except that:
+///
+/// * the arguments must be constant expressions,
+/// * no allocations are performed, and
+/// * the value may be used in `const` evaluation.
+///
+/// The color may be specified as an expression which returns [`Rgb`] or [`Rgba`], or as three
+/// or four [`f32`] literal color components.
+///
+/// ```
+/// use all_is_cubes::block::{self, Block};
+/// use all_is_cubes::math::{Rgb, rgb_const};
+///
+/// assert_eq!(
+///     block::from_color!(rgb_const!(1.0, 0.5, 0.0)),
+///     Block::from(Rgb::new(1.0, 0.5, 0.0)),
+/// );
+///
+/// assert_eq!(
+///     block::from_color!(rgb_const!(1.0, 0.5, 0.0)),
+///     block::from_color!(1.0, 0.5, 0.0),
+/// );
+///
+/// assert_eq!(
+///     block::from_color!(1.0, 0.5, 0.0),
+///     block::from_color!(1.0, 0.5, 0.0, 1.0),
+/// );
+/// ```
+#[doc(inline)] // display as item, not as reexport
+pub use _block_from_color as from_color;
 
 #[cfg(feature = "arbitrary")]
 mod arbitrary_block {

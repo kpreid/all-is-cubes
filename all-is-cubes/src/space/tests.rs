@@ -11,7 +11,6 @@ use euclid::Vector3D;
 use indoc::indoc;
 
 use crate::block::{self, AIR, Block, BlockDef, BlockDefTransaction, Resolution::*, TickAction};
-use crate::color_block;
 use crate::content::make_some_blocks;
 use crate::fluff::{self, Fluff};
 use crate::listen::{Listen as _, Sink};
@@ -345,7 +344,7 @@ fn fill_out_of_bounds() {
 /// Test filling an entire space with one block using [`Space::fill`].
 #[test]
 fn fill_entire_space() {
-    let block = color_block!(0., 0., 0., 0.5); // transparent so light gets involved
+    let block = block::from_color!(0., 0., 0., 0.5); // transparent so light gets involved
     let bounds = GridAab::from_lower_size([0, 3, 0], [25 * 16, 16, 2]);
     let mut space = Space::empty(bounds);
 
@@ -402,7 +401,8 @@ fn replace_last_block_regression() {
 fn listens_to_block_changes() {
     // Set up indirect block
     let mut universe = Universe::new();
-    let block_def_handle = universe.insert_anonymous(BlockDef::new(color_block!(Rgba::WHITE)));
+    let block_def_handle =
+        universe.insert_anonymous(BlockDef::new(block::from_color!(Rgba::WHITE)));
     let indirect = Block::from(block_def_handle.clone());
 
     // Set up space and listener
@@ -414,7 +414,7 @@ fn listens_to_block_changes() {
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the block def .
-    let new_block = color_block!(Rgba::BLACK);
+    let new_block = block::from_color!(Rgba::BLACK);
     block_def_handle
         .execute(&BlockDefTransaction::overwrite(new_block))
         .unwrap();
@@ -438,7 +438,10 @@ fn indirect_becomes_evaluation_error() {
     // (because right now, a Handle going away is silent...)
     let mut universe = Universe::new();
     let block_def_ref = universe
-        .insert(block_name.clone(), BlockDef::new(color_block!(Rgba::WHITE)))
+        .insert(
+            block_name.clone(),
+            BlockDef::new(block::from_color!(Rgba::WHITE)),
+        )
         .unwrap();
     let block = Block::from(block_def_ref.clone());
 
@@ -509,7 +512,7 @@ fn space_debug() {
 fn set_physics_light_none() {
     let mut space = Space::empty_positive(1, 1, 1);
     space
-        .set([0, 0, 0], color_block!(1.0, 1.0, 1.0, 0.5))
+        .set([0, 0, 0], block::from_color!(1.0, 1.0, 1.0, 0.5))
         .unwrap();
     assert_eq!(space.light.light_update_queue.len(), 1);
     // Check that a no-op update doesn't clear
@@ -531,10 +534,10 @@ fn set_physics_light_none() {
 fn set_physics_light_rays() {
     let mut space = Space::empty_positive(2, 1, 1);
     space
-        .set([0, 0, 0], color_block!(1.0, 1.0, 1.0, 0.5))
+        .set([0, 0, 0], block::from_color!(1.0, 1.0, 1.0, 0.5))
         .unwrap();
     space
-        .set([1, 0, 0], color_block!(1.0, 1.0, 1.0, 1.0))
+        .set([1, 0, 0], block::from_color!(1.0, 1.0, 1.0, 1.0))
         .unwrap();
     space.set_physics(SpacePhysics {
         light: LightPhysics::None,

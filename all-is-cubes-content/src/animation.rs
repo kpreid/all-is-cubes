@@ -10,7 +10,6 @@ use rand::{Rng as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
 use all_is_cubes::block::{self, AIR, Block, BlockCollision};
-use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{
     Cube, GridAab, GridPoint, GridRotation, GridVector, Rgba, Vol, rgba_const,
@@ -233,13 +232,13 @@ impl Clock {
     fn paint(&self) -> SpaceTransaction {
         // TODO: While these don't actually need to allocate anything, we ought to make them
         // constants to keep the per-frame cost minial.
-        let rim = color_block!(0.7, 0.7, 0.4, 1.0);
-        let marks = color_block!(palette::ALMOST_BLACK);
-        let trail = color_block!(0.5, 0.5, 0.5, 1.0);
+        let rim = block::from_color!(0.7, 0.7, 0.4, 1.0);
+        let marks = block::from_color!(palette::ALMOST_BLACK);
+        let trail = block::from_color!(0.5, 0.5, 0.5, 1.0);
         let background = if self.ticks.rem_euclid(120) >= 60 {
-            color_block!(0.6, 0.6, 0.6, 1.0)
+            block::from_color!(0.6, 0.6, 0.6, 1.0)
         } else {
-            color_block!(1.0, 1.0, 1.0, 1.0)
+            block::from_color!(1.0, 1.0, 1.0, 1.0)
         };
 
         let time_angle = self.ticks.rem_euclid(60) as f64 / 60.0;

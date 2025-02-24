@@ -6,20 +6,21 @@ use core::any::TypeId;
 use futures_util::FutureExt as _;
 use indoc::indoc;
 
-use crate::block::{AIR, Block, BlockDef, BlockDefTransaction, Resolution, TickAction};
+use crate::behavior;
+use crate::block::{self, AIR, Block, BlockDef, BlockDefTransaction, Resolution, TickAction};
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
 use crate::math::Rgba;
 use crate::op::Operation;
 use crate::space::Space;
+use crate::time;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
     self, Handle, HandleError, InsertError, InsertErrorKind, Name, Universe, UniverseTransaction,
     list_handles,
 };
 use crate::util::{assert_conditional_send_sync, yield_progress_for_testing};
-use crate::{behavior, color_block, time};
 
 #[test]
 fn thread_safety() {
@@ -490,7 +491,8 @@ fn visit_handles_character() {
 fn visit_handles_space() {
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(1, 1, 1);
-    let block_def_handle = universe.insert_anonymous(BlockDef::new(color_block!(Rgba::WHITE)));
+    let block_def_handle =
+        universe.insert_anonymous(BlockDef::new(block::from_color!(Rgba::WHITE)));
     space
         .set([0, 0, 0], Block::from(block_def_handle.clone()))
         .unwrap();

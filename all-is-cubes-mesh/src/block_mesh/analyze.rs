@@ -330,8 +330,7 @@ fn windows<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::block::Block;
-    use all_is_cubes::color_block;
+    use all_is_cubes::block::{self, Block};
     use all_is_cubes::euclid::{point2, size2};
     use all_is_cubes::math::{GridAab, Rgb, Rgba, ZMaj, rgba_const};
     use all_is_cubes::universe::Universe;
@@ -485,7 +484,7 @@ mod tests {
         let mut u = Universe::new();
 
         let block = Block::builder()
-            .voxels_fn(Resolution::R4, |_| color_block!(0.0, 0.0, 0.0, 0.5))
+            .voxels_fn(Resolution::R4, |_| block::from_color!(0.0, 0.0, 0.0, 0.5))
             .unwrap()
             .build_into(&mut u);
         let ev = block.evaluate().unwrap();

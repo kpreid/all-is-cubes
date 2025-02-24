@@ -579,7 +579,7 @@ impl Default for TextBuilder {
         Self {
             string: ArcStr::new(),
             font: Font::System16,
-            foreground: color_block!(palette::ALMOST_BLACK),
+            foreground: block::from_color!(palette::ALMOST_BLACK),
             outline: None,
             resolution: Resolution::R16,
             layout_bounds: None,

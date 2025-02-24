@@ -540,7 +540,7 @@ pub struct InventoryChange {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::color_block;
+    use crate::block;
     use crate::content::make_some_blocks;
     use crate::math::Rgba;
     use crate::transaction::TransactionTester;
@@ -650,9 +650,9 @@ mod tests {
 
     #[test]
     fn txn_systematic() {
-        let old_item = Tool::InfiniteBlocks(color_block!(1.0, 0.0, 0.0));
-        let new_item_1 = Tool::InfiniteBlocks(color_block!(0.0, 1.0, 0.0));
-        let new_item_2 = Tool::InfiniteBlocks(color_block!(0.0, 0.0, 1.0));
+        let old_item = Tool::InfiniteBlocks(block::from_color!(1.0, 0.0, 0.0));
+        let new_item_1 = Tool::InfiniteBlocks(block::from_color!(0.0, 1.0, 0.0));
+        let new_item_2 = Tool::InfiniteBlocks(block::from_color!(0.0, 0.0, 1.0));
 
         // TODO: Add tests of stack modification, emptying, merging
 

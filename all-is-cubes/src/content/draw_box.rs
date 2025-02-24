@@ -569,14 +569,13 @@ impl BoxPart {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::color_block;
 
     /// Test that funny box sizes (e.g. zero in some axis) don't cause panics.
     #[test]
     fn box_smoke_test() {
         let style = BoxStyle::from_composited_corner_and_edge(
-            color_block!(1., 0., 0., 1.),
-            color_block!(0., 0., 1., 1.),
+            block::from_color!(1., 0., 0., 1.),
+            block::from_color!(0., 0., 1., 1.),
         );
         for aab in [
             GridAab::ORIGIN_CUBE,

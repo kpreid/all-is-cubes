@@ -162,7 +162,7 @@ impl Rgb {
     }
 
     /// Adds an alpha component of `1.0` (fully opaque) to produce an [Rgba] color.
-    /// This is for compile-time duck-typed use by the [`color_block!`] macro.
+    /// This is for compile-time duck-typed use by the [`block::from_color!`] macro.
     #[doc(hidden)]
     #[inline]
     #[must_use]
@@ -288,7 +288,7 @@ impl Rgba {
     }
 
     /// Returns the color unchanged.
-    /// This is for compile-time duck-typed use by the [`color_block!`] macro.
+    /// This is for compile-time duck-typed use by the [`block::from_color!`] macro.
     #[doc(hidden)]
     #[inline]
     #[must_use]

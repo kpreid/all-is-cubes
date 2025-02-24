@@ -5,7 +5,6 @@ use std::sync::Mutex;
 
 use all_is_cubes::block::{self, AIR, Block, BlockDef, BlockDefTransaction};
 use all_is_cubes::chunking::ChunkPos;
-use all_is_cubes::color_block;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::euclid::{Point3D, Scale, point3};
 use all_is_cubes::listen::Store as _;
@@ -237,7 +236,7 @@ fn sort_view_every_frame_only_if_transparent() {
         .execute(&SpaceTransaction::set_cube(
             [0, 0, 0],
             None,
-            Some(color_block!(1.0, 1.0, 1.0, 0.5)),
+            Some(block::from_color!(1.0, 1.0, 1.0, 0.5)),
         ))
         .unwrap();
     let mut did_call = false;
@@ -266,7 +265,7 @@ fn graphics_options_change() {
 
     let mut space = Space::empty_positive(1, 1, 1);
     space
-        .set([0, 0, 0], color_block!(1., 1., 1., 0.25))
+        .set([0, 0, 0], block::from_color!(1., 1., 1., 0.25))
         .unwrap();
 
     let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(space, 200.0);

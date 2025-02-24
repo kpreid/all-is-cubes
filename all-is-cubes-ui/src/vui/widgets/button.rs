@@ -14,7 +14,6 @@ use all_is_cubes::block::{
     self, Block, Builder,
     Resolution::{self, *},
 };
-use all_is_cubes::color_block;
 use all_is_cubes::content::load_image::{DecodedPng, PngAdapter, default_srgb};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{
@@ -594,8 +593,8 @@ impl ButtonBase for ButtonVisualState {
 
     fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError> {
         let label_z = self.button_label_z();
-        let back_block = color_block!(palette::BUTTON_BACK); // TODO: different color theme for action than toggle?
-        let frame_brush = VoxelBrush::single(color_block!(palette::BUTTON_FRAME));
+        let back_block = block::from_color!(palette::BUTTON_BACK); // TODO: different color theme for action than toggle?
+        let frame_brush = VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME));
         let back_brush = VoxelBrush::with_thickness(back_block, 0..label_z);
         let cap_rim_brush = VoxelBrush::new([(
             [0, 0, label_z - 1],
@@ -659,7 +658,7 @@ impl ButtonBase for ToggleButtonVisualState {
             }
             .build()
         };
-        let frame_brush = VoxelBrush::single(color_block!(palette::BUTTON_FRAME));
+        let frame_brush = VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME));
         let back_brush = VoxelBrush::with_thickness(
             illuminate(Block::builder().color(palette::BUTTON_ACTIVATED_BACK)),
             0..label_z,

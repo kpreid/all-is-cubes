@@ -66,9 +66,9 @@ fn TRANSPARENCY_GLASS_AND_WATER(_: Context<'_>) {
     let window_block = {
         let window_pane_resolution = R32;
         let depth = 3;
-        let window_frame_block = color_block!(palette::ALMOST_BLACK);
-        let window_glass_surface_block = color_block!(0.5, 0.72, 0.5, 0.6);
-        let window_glass_inner_block = color_block!(0.7, 0.72, 0.7, 0.05);
+        let window_frame_block = block::from_color!(palette::ALMOST_BLACK);
+        let window_glass_surface_block = block::from_color!(0.5, 0.72, 0.5, 0.6);
+        let window_glass_inner_block = block::from_color!(0.7, 0.72, 0.7, 0.05);
         let upper = GridCoordinate::from(window_pane_resolution) - 1;
 
         Block::builder()
@@ -137,11 +137,11 @@ fn TRANSPARENCY_VOX(ctx: Context<'_>) {
     let block = Block::builder()
         .voxels_fn(resolution, |cube| {
             if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == point3(0, 0, 0) {
-                color_block!(1.0, 0.0, 0.0, 0.9)
+                block::from_color!(1.0, 0.0, 0.0, 0.9)
             } else if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == point3(1, 1, 1) {
-                color_block!(0.0, 0.0, 1.0, 0.9)
+                block::from_color!(0.0, 0.0, 1.0, 0.9)
             } else {
-                color_block!(1.0, 1.0, 1.0, 0.12)
+                block::from_color!(1.0, 1.0, 1.0, 0.12)
             }
         })?
         .build_txn(&mut txn);

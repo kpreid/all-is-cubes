@@ -184,7 +184,7 @@ fn emissive_only_atom() {
 
 #[test]
 fn invisible_atom() {
-    let block = color_block!(Rgba::TRANSPARENT);
+    let block = block::from_color!(Rgba::TRANSPARENT);
     let e = block.evaluate().unwrap();
     assert_eq!(e.color(), Rgba::TRANSPARENT);
     assert_eq!(e.face_colors(), FaceMap::splat(Rgba::TRANSPARENT));
@@ -422,7 +422,7 @@ fn voxels_partial_not_filling() {
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(2, 4, 4);
     space
-        .fill_uniform(space.bounds(), &color_block!(Rgba::WHITE))
+        .fill_uniform(space.bounds(), &block::from_color!(Rgba::WHITE))
         .unwrap();
     let space_handle = universe.insert_anonymous(space);
     let block = Block::builder()

@@ -2,9 +2,8 @@ use alloc::sync::Arc;
 
 use euclid::{Vector3D, point3};
 
-use crate::block::AIR;
+use crate::block::{self, AIR};
 use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn, cursor_raycast};
-use crate::color_block;
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listen as _, Sink};
 use crate::math::{Face6, GridAab, Rgb};
@@ -43,7 +42,7 @@ fn spawn_inferred_position() {
 
 #[test]
 fn spawn_inventory() {
-    let inventory_data = vec![Slot::from(Tool::InfiniteBlocks(color_block!(
+    let inventory_data = vec![Slot::from(Tool::InfiniteBlocks(block::from_color!(
         0.1, 0.2, 0.3
     )))];
     let character = test_spawn(|space| {
@@ -112,9 +111,9 @@ fn transaction_systematic() {
     let space = Space::empty_positive(1, 1, 1);
     let space_handle = universe.insert_anonymous(space);
 
-    let old_item = Slot::from(Tool::InfiniteBlocks(color_block!(1.0, 0.0, 0.0)));
-    let new_item_1 = Slot::from(Tool::InfiniteBlocks(color_block!(0.0, 1.0, 0.0)));
-    let new_item_2 = Slot::from(Tool::InfiniteBlocks(color_block!(0.0, 0.0, 1.0)));
+    let old_item = Slot::from(Tool::InfiniteBlocks(block::from_color!(1.0, 0.0, 0.0)));
+    let new_item_1 = Slot::from(Tool::InfiniteBlocks(block::from_color!(0.0, 1.0, 0.0)));
+    let new_item_2 = Slot::from(Tool::InfiniteBlocks(block::from_color!(0.0, 0.0, 1.0)));
 
     let new_space_1 = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
     let new_space_2 = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
@@ -203,7 +202,7 @@ fn no_superjumping() {
     let mut universe = Universe::new();
     let space = universe.insert_anonymous(
         Space::builder(GridAab::ORIGIN_CUBE)
-            .filled_with(color_block!(Rgb::ONE))
+            .filled_with(block::from_color!(Rgb::ONE))
             .build(),
     );
     let mut character = Character::spawn_default(space);
@@ -242,7 +241,7 @@ fn click_wrong_space_or_correct_space() {
         // something for the raycast to hit
         universe.insert_anonymous(
             Space::builder(GridAab::ORIGIN_CUBE)
-                .filled_with(color_block!(Rgb::ONE))
+                .filled_with(block::from_color!(Rgb::ONE))
                 .build(),
         )
     };

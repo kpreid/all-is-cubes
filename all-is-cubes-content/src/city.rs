@@ -10,7 +10,6 @@ use rand::{Rng, SeedableRng as _};
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::block::{self, AIR, Resolution::*, text::Font};
 use all_is_cubes::character::Spawn;
-use all_is_cubes::color_block;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::drawing::embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder};
@@ -801,7 +800,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
             vui::leaf_widget(widgets::LargeText {
                 text: exhibit.name.into(),
                 font: Font::System16,
-                brush: VoxelBrush::single(color_block!(palette::ALMOST_BLACK)),
+                brush: VoxelBrush::single(block::from_color!(palette::ALMOST_BLACK)),
                 text_style: TextStyleBuilder::new()
                     .alignment(Alignment::Center)
                     .baseline(Baseline::Middle)
@@ -816,7 +815,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
                 }
                 .into(),
                 font: Font::SmallerBodyText,
-                brush: VoxelBrush::single(color_block!(palette::ALMOST_BLACK)),
+                brush: VoxelBrush::single(block::from_color!(palette::ALMOST_BLACK)),
                 text_style: TextStyleBuilder::new()
                     .alignment(Alignment::Center)
                     .baseline(Baseline::Middle)

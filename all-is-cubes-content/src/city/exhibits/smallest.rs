@@ -20,7 +20,7 @@ fn SMALLEST(ctx: Context<'_>) {
     let rg = GridCoordinate::from(resolution);
 
     let block_space = Space::builder(GridAab::from_lower_size([rg / 2, 0, rg / 2], [1, 1, 1]))
-        .filled_with(color_block!(palette::ALMOST_BLACK))
+        .filled_with(block::from_color!(palette::ALMOST_BLACK))
         .build();
 
     let mut exhibit_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 1])).build();

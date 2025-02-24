@@ -619,14 +619,13 @@ impl core::hash::Hash for EvKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::eval::Derived;
     use crate::math::{Cube, Vol};
     use crate::universe::Universe;
     use indoc::indoc;
 
     #[test]
     fn evaluated_block_debug_simple() {
-        let ev = color_block!(Rgba::WHITE).evaluate().unwrap();
+        let ev = block::from_color!(Rgba::WHITE).evaluate().unwrap();
 
         // not testing the one-line version because it'll be not too surprising
         assert_eq!(

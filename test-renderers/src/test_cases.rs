@@ -8,9 +8,8 @@ use std::sync::Arc;
 
 use exhaust::Exhaust as _;
 
-use all_is_cubes::block::{AIR, Block, Resolution::*};
+use all_is_cubes::block::{self, AIR, Block, Resolution::*};
 use all_is_cubes::character::{Character, Spawn};
-use all_is_cubes::color_block;
 use all_is_cubes::euclid::{Point2D, Size2D, Size3D, Vector3D, point3, size2, size3, vec2, vec3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{
@@ -386,7 +385,7 @@ async fn error_character_gone(context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut space = one_cube_space();
     space
-        .set([0, 0, 0], color_block!(0.0, 1.0, 0.0, 1.0))
+        .set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
         .unwrap();
     finish_universe_from_space(&mut universe, space);
     let mut renderer = context.renderer(&universe);
@@ -423,7 +422,7 @@ async fn error_character_unavailable(context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut space = one_cube_space();
     space
-        .set([0, 0, 0], color_block!(0.0, 1.0, 0.0, 1.0))
+        .set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
         .unwrap();
     finish_universe_from_space(&mut universe, space);
     let mut renderer = context.renderer(&universe);
@@ -510,10 +509,10 @@ async fn follow_options_change(mut context: RenderTestContext) {
         .spawn(looking_at_one_cube_spawn(bounds))
         .build();
     space
-        .set([0, 0, 0], color_block!(0.0, 1.0, 0.0, 1.0))
+        .set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
         .unwrap();
     space
-        .set([1, 0, 0], color_block!(0.0, 0.0, 1.0, 0.5))
+        .set([1, 0, 0], block::from_color!(0.0, 0.0, 1.0, 0.5))
         .unwrap();
     finish_universe_from_space(&mut universe, space);
 
@@ -977,7 +976,7 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
     // this should be a 50% mix of [1, 0, 0] and [0.5, 0.5, 0.5], i.e.
     // [0.75, 0.25, 0.25], whose closest sRGB8 approximation is [225, 137, 137] = #E18989.
     space
-        .set([0, 0, 0], color_block!(1.0, 0.0, 0.0, 0.5))
+        .set([0, 0, 0], block::from_color!(1.0, 0.0, 0.0, 0.5))
         .unwrap();
 
     finish_universe_from_space(&mut universe, space);
@@ -1080,7 +1079,7 @@ fn one_cube_space() -> Space {
         .sky_color(rgb_const!(0.5, 0.5, 0.5))
         .spawn(looking_at_one_cube_spawn(bounds))
         // Fill the cube with a default block -- tests can replace this.
-        .filled_with(color_block!(0.0, 1.0, 0.0, 1.0))
+        .filled_with(block::from_color!(0.0, 1.0, 0.0, 1.0))
         .build()
 }
 
@@ -1098,7 +1097,7 @@ fn ui_space(universe: &mut Universe) -> Handle<Space> {
     let ui_space = Space::builder(GridAab::from_lower_size([-3, -3, -4], [1, 1, 1]))
         .light_physics(LightPhysics::None)
         .sky_color(rgb_const!(1.0, 1.0, 0.5)) // blatantly wrong color that should not be seen
-        .filled_with(color_block!(0.0, 1.0, 0.0, 1.0))
+        .filled_with(block::from_color!(0.0, 1.0, 0.0, 1.0))
         .build();
     universe.insert("ui_space".into(), ui_space).unwrap()
 }
@@ -1108,9 +1107,9 @@ fn ui_space(universe: &mut Universe) -> Handle<Space> {
 async fn antialias_test_universe() -> Arc<Universe> {
     let mut universe = Universe::new();
 
-    let neutral = color_block!(1., 1., 1., 1.);
-    let large_block = color_block!(1., 0., 0., 1.);
-    let voxel_part = color_block!(0.5, 0., 1., 1.);
+    let neutral = block::from_color!(1., 1., 1., 1.);
+    let large_block = block::from_color!(1., 0., 0., 1.);
+    let voxel_part = block::from_color!(0.5, 0., 1., 1.);
     let voxel_block_1 = Block::builder()
         .voxels_fn(R2, |p| {
             if (p.x + p.y + p.z).rem_euclid(2) == 0 {
@@ -1183,7 +1182,7 @@ async fn fog_test_universe() -> Arc<Universe> {
     space
         .fill_uniform(
             bounds.abut(Face6::NY, -1).unwrap(),
-            &color_block!(0.0, 1.0, 0.5, 1.0),
+            &block::from_color!(0.0, 1.0, 0.5, 1.0),
         )
         .unwrap();
 
@@ -1191,11 +1190,11 @@ async fn fog_test_universe() -> Arc<Universe> {
     space
         .fill_uniform(
             bounds.abut(Face6::PX, -1).unwrap(),
-            &color_block!(1.0, 0.5, 0.5, 1.0),
+            &block::from_color!(1.0, 0.5, 0.5, 1.0),
         )
         .unwrap();
 
-    let pillar_block = color_block!(palette::ALMOST_BLACK);
+    let pillar_block = block::from_color!(palette::ALMOST_BLACK);
     let pillar_lamp_block = Block::builder()
         .color(rgba_const!(1.0, 0.05, 0.05, 1.0))
         .light_emission(rgb_const!(40.0, 0.05, 0.05))
@@ -1233,11 +1232,11 @@ async fn light_test_universe() -> Arc<Universe> {
     space
         .fill_uniform(
             bounds.abut(Face6::NZ, -1).unwrap(),
-            &color_block!(0.5, 0.5, 0.5, 1.0),
+            &block::from_color!(0.5, 0.5, 0.5, 1.0),
         )
         .unwrap();
 
-    let pillar_block = color_block!(palette::ALMOST_BLACK);
+    let pillar_block = block::from_color!(palette::ALMOST_BLACK);
     let light_source_block = Block::builder()
         .color(rgba_const!(1.0, 0.05, 0.05, 1.0))
         .light_emission(rgb_const!(10.0, 5.0, 0.0))
@@ -1315,7 +1314,7 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
     let mut space = Space::builder(bounds)
         // Solid layer we will put holes in, to prevent different compartments from spilling
         // light into each other.
-        .filled_with(color_block!(palette::ALMOST_BLACK))
+        .filled_with(block::from_color!(palette::ALMOST_BLACK))
         // .sky_color(rgb_const!(0., 0.5, 0.5))
         .sky_color(Rgb::ZERO)
         .spawn_position(bounds.center() + vec3(0., 0., 65.))
@@ -1325,7 +1324,7 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
     space
         .fill_uniform(
             bounds.abut(Face6::NZ, -1).unwrap(),
-            &color_block!(0.5, 0.5, 0.5, 1.0),
+            &block::from_color!(0.5, 0.5, 0.5, 1.0),
         )
         .unwrap();
 
