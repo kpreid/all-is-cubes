@@ -36,8 +36,7 @@ fn TRANSPARENCY_WHOLE_BLOCK(_: Context<'_>) {
 #[exhibit(
     name: "Complex Voxel Transparency",
     subtitle:
-        "Transparency in complex blocks is not correctly implemented.\n\
-        We also need something for refraction.",
+        "",
     placement: Placement::Surface,
 )]
 fn TRANSPARENCY_GLASS_AND_WATER(_: Context<'_>) {
