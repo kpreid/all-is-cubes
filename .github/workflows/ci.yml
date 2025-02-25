@@ -410,7 +410,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: EmbarkStudios/cargo-deny-action@v2.0.4
+    - uses: EmbarkStudios/cargo-deny-action@v2.0.6
       with:
         # disables default --all-features
         arguments:
