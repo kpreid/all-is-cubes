@@ -1,6 +1,6 @@
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{Cube, GridVector};
-use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
+use all_is_cubes_mesh::{BlockVertex, Coloring, Vertex};
 
 use crate::DebugLineVertex;
 
@@ -145,7 +145,7 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
     }
 }
 
-impl GfxVertex for WgpuBlockVertex {
+impl Vertex for WgpuBlockVertex {
     const WANTS_DEPTH_SORTING: bool = true;
     /// TODO: no reason this should be f32 other than scaling to fractional integers.
     /// The depth sorting system should be made more flexible here.
@@ -289,7 +289,7 @@ mod tests {
         assert_eq!(size_of::<WgpuLinesVertex>(), 28);
     }
 
-    /// Test implementation of [`GfxVertex::position()`],
+    /// Tests the implementation of [`Vertex::position()`],
     /// because if it's wrong the only thing that breaks is depth-sorting,
     /// and because it is a useful test of the outgoing coordinate processing logic too.
     #[test]
@@ -300,10 +300,7 @@ mod tests {
             coloring: Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
         });
         vertex.instantiate_vertex(WgpuBlockVertex::instantiate_block(Cube::new(100, 50, 7)));
-        assert_eq!(
-            GfxVertex::position(&vertex),
-            Point3D::new(100.25, 50.0, 8.0)
-        );
+        assert_eq!(Vertex::position(&vertex), Point3D::new(100.25, 50.0, 8.0));
     }
 
     #[test]

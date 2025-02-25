@@ -9,14 +9,22 @@ use all_is_cubes::util::{ConciseDebug, Fmt, Refmt as _};
 
 use crate::MeshTypes;
 
+#[cfg(doc)]
+use {
+    crate::{BlockMesh, SpaceMesh},
+    all_is_cubes::{block::Block, space::Space},
+};
+
 /// Basic vertex data type for a [`BlockMesh`].
-/// Implement <code>[`From`]&lt;[`BlockVertex`]&gt;</code> (and usually [`GfxVertex`])
+/// Implement <code>[`From`]&lt;[`BlockVertex`]&gt;</code> (and usually [`Vertex`])
 /// to provide a specialized version fit for the target graphics API.
 ///
 /// `T` is the type of texture-coordinate points being used. That is, one `T` value
 /// should identify one point in the block's 3D texture, such as `T = Point3<f32>`).
 ///
 /// [`BlockMesh`]: super::BlockMesh
+//---
+// TODO: Find a better name for this type. `BasicVertex`? `GenericVertex`?
 #[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct BlockVertex<T> {
@@ -105,22 +113,20 @@ where
     }
 }
 
-/// A custom representation of [`BlockVertex`] suitable for a specific graphics system.
+/// Vertex types for use in [`BlockMesh`] and [`SpaceMesh`].
 ///
-/// The life cycle of a [`GfxVertex`]:
+/// Implement this trait to provide a vertex data type suitable for a specific rendering system
+/// or data format. The type must be constructible by <code>[`From`]&lt;[`BlockVertex`]&gt;</code>.
 ///
-/// * First, it is constructed by [`BlockMesh::new()`]
-///   for a particular [`Block`] value, and stored in a [`BlockMesh`].
-/// * Then, wherever that block appears in a [`Space`], the block vertices are copied
-///   to become the [`SpaceMesh`]’s vertices, and [`GfxVertex::instantiate_vertex`] is
-///   called on each copy to position it at the particular block's location.
+/// The life cycle of [`Vertex`]es:
 ///
-/// [`Block`]: all_is_cubes::block::Block
-/// [`BlockMesh`]: crate::BlockMesh
-/// [`BlockMesh::new()`]: crate::BlockMesh::new()
-/// [`Space`]: all_is_cubes::space::Space
-/// [`SpaceMesh`]: crate::SpaceMesh
-pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static {
+/// 1. They are constructed by [`BlockMesh::new()`] to depict a particular [`Block`] value,
+///    and stored in a [`BlockMesh`].
+/// 2. Wherever that block appears in a [`Space`], the block vertices are copied
+///    to become the [`SpaceMesh`]’s vertices, and [`Vertex::instantiate_vertex()`] is
+///    called on each copy to position it at the particular block's location.
+/// 3. You obtain the vertices from the [`SpaceMesh`] to draw or export them.
+pub trait Vertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static {
     /// Whether [`SpaceMesh`]es should provide pre-sorted vertex index slices to allow
     /// back-to-front drawing order based on viewing ranges.
     ///
@@ -159,8 +165,8 @@ pub trait GfxVertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static 
     fn position(&self) -> Point3D<Self::Coordinate, Cube>;
 }
 
-/// Trivial implementation of [`GfxVertex`] for testing purposes. Discards lighting.
-impl<T: Copy + 'static> GfxVertex for BlockVertex<T> {
+/// Trivial implementation of [`Vertex`] for testing purposes. Discards lighting.
+impl<T: Copy + 'static> Vertex for BlockVertex<T> {
     const WANTS_DEPTH_SORTING: bool = true;
     type Coordinate = FreeCoordinate;
     type TexPoint = T;
@@ -182,4 +188,4 @@ impl<T: Copy + 'static> GfxVertex for BlockVertex<T> {
 }
 
 /// A vertex type's position using its coordinate type.
-pub(crate) type VPos<M> = Point3D<<<M as MeshTypes>::Vertex as GfxVertex>::Coordinate, Cube>;
+pub(crate) type VPos<M> = Point3D<<<M as MeshTypes>::Vertex as Vertex>::Coordinate, Cube>;

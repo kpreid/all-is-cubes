@@ -123,7 +123,7 @@ pub trait Plane: Clone {
 
     /// Transform a point in the coordinate system of, and within, the `bounds` given to
     /// create this plane (that is, 1 unit = 1 texel) into texture coordinates suitable for
-    /// the target [`GfxVertex`](super::GfxVertex) type.
+    /// the target [`Vertex`](super::Vertex) type.
     ///
     /// The returned texture coordinates are guaranteed to be valid only as long as
     /// the parent [`Tile`] (or a clone of it) has not been dropped.

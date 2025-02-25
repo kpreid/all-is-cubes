@@ -16,7 +16,7 @@ use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 use crate::dynamic::ChunkedSpaceMesh;
 use crate::dynamic::{self, DynamicMeshTypes, job};
 use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh};
-use crate::{GfxVertex, MeshMeta, texture};
+use crate::{MeshMeta, Vertex, texture};
 
 #[derive(Debug)]
 pub(crate) struct VersionedBlockMeshes<M: DynamicMeshTypes> {
@@ -58,7 +58,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMeshes<M> {
 
 impl<M: DynamicMeshTypes> VersionedBlockMeshes<M>
 where
-    M::Vertex: GfxVertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
+    M::Vertex: Vertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
     M::Tile: texture::Tile + PartialEq,
 {
     /// Update block meshes based on the given [`Space`].

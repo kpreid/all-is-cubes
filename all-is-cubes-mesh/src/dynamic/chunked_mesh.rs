@@ -20,7 +20,7 @@ use all_is_cubes_render::{Flaws, camera::Camera};
 use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::chunk::ChunkTodoState;
 use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
-use crate::{GfxVertex, MeshOptions, texture};
+use crate::{MeshOptions, Vertex, texture};
 
 #[cfg(test)]
 mod tests;
@@ -92,7 +92,7 @@ impl<M, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<M, CHUNK_SIZE>
 where
     M: DynamicMeshTypes,
     // These bounds are redundant with `DynamicMeshTypes` but the compiler needs to see them
-    M::Vertex: GfxVertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
+    M::Vertex: Vertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
     M::Alloc: Send + Sync,
     M::Tile: texture::Tile + PartialEq + Send + Sync,
 {
@@ -493,8 +493,7 @@ where
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
         let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
-            if chunk.depth_sort_for_view(view_point.cast::<<M::Vertex as GfxVertex>::Coordinate>())
-            {
+            if chunk.depth_sort_for_view(view_point.cast::<<M::Vertex as Vertex>::Coordinate>()) {
                 render_data_updater(chunk.borrow_for_update(true));
                 Some(M::Instant::now())
             } else {

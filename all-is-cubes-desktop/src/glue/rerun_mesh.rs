@@ -53,7 +53,7 @@ impl From<mesh::BlockVertex<NoTexture>> for Vertex {
     }
 }
 
-impl mesh::GfxVertex for Vertex {
+impl mesh::Vertex for Vertex {
     const WANTS_DEPTH_SORTING: bool = false;
 
     type Coordinate = f32;

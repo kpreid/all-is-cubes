@@ -2,12 +2,12 @@
 
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::Cube;
-use all_is_cubes_mesh::{BlockVertex, Coloring, GfxVertex};
+use all_is_cubes_mesh::{BlockVertex, Coloring, Vertex};
 
 use super::glue::Lef32;
 use super::texture::GltfAtlasPoint;
 
-/// [`GfxVertex`] type for glTF exports.
+/// [`Vertex`] type for glTF exports.
 ///
 /// These vertices may be copied directly to glTF buffers; all fields are stored
 /// little-endian as per the specification.
@@ -74,7 +74,7 @@ impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
     }
 }
 
-impl GfxVertex for GltfVertex {
+impl Vertex for GltfVertex {
     const WANTS_DEPTH_SORTING: bool = false;
     type Coordinate = f32;
     type BlockInst = Vector3D<f32, Cube>;

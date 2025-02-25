@@ -14,7 +14,7 @@ use all_is_cubes_render::Flaws;
 #[cfg(doc)]
 use crate::SpaceMesh;
 use crate::texture::{self, Tile as _};
-use crate::{GfxVertex, IndexVec, MeshOptions, MeshTypes};
+use crate::{IndexVec, MeshOptions, MeshTypes, Vertex};
 
 mod analyze;
 mod compute;
@@ -380,7 +380,7 @@ impl<V> BlockFaceMesh<V> {
     }
 }
 
-impl<V: GfxVertex> BlockFaceMesh<V> {
+impl<V: Vertex> BlockFaceMesh<V> {
     #[cfg(debug_assertions)]
     fn consistency_check(&self) {
         // TODO: check vertex/index consistency like SpaceMesh does
@@ -421,7 +421,7 @@ pub fn block_meshes_for_space<M: MeshTypes>(
 ) -> BlockMeshes<M>
 where
     // These bounds are redundant with `MeshTypes` but the compiler needs to see them
-    M::Vertex: GfxVertex<TexPoint = <M::Tile as texture::Tile>::Point>,
+    M::Vertex: Vertex<TexPoint = <M::Tile as texture::Tile>::Point>,
 {
     space
         .block_data()

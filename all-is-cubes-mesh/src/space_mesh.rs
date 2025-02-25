@@ -15,7 +15,7 @@ use all_is_cubes_render::Flaws;
 
 #[cfg(doc)]
 use crate::texture;
-use crate::{BlockMesh, GfxVertex, IndexSlice, IndexVec, MeshOptions};
+use crate::{BlockMesh, IndexSlice, IndexVec, MeshOptions, Vertex};
 use crate::{MeshTypes, VPos};
 
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
@@ -359,14 +359,13 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 midpoint: Point3D<S, Cube>,
             }
             let quads = bytemuck::cast_slice::<I, [I; 6]>(&transparent_indices);
-            let mut sortable_quads: Vec<QuadWithMid<<M::Vertex as GfxVertex>::Coordinate, I>> =
-                quads
-                    .iter()
-                    .map(|&indices| QuadWithMid {
-                        indices,
-                        midpoint: Self::midpoint(&self.vertices, indices),
-                    })
-                    .collect();
+            let mut sortable_quads: Vec<QuadWithMid<<M::Vertex as Vertex>::Coordinate, I>> = quads
+                .iter()
+                .map(|&indices| QuadWithMid {
+                    indices,
+                    midpoint: Self::midpoint(&self.vertices, indices),
+                })
+                .collect();
 
             // Copy unsorted indices into the main array, for later dynamic sorting.
             self.meta.transparent_ranges[DepthOrdering::Within.to_index()] =
@@ -387,7 +386,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 // Note: Benchmarks show that `sort_by_key` is fastest
                 // (not `sort_unstable_by_key`).
                 sortable_quads.sort_by_key(
-                    |quad| -> [OrderedFloat<<M::Vertex as GfxVertex>::Coordinate>; 3] {
+                    |quad| -> [OrderedFloat<<M::Vertex as Vertex>::Coordinate>; 3] {
                         basis
                             .map(|f| OrderedFloat(-f.dot(quad.midpoint.to_vector())))
                             .into()
@@ -465,8 +464,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     where
         I: num_traits::NumCast,
     {
-        let one_half =
-            num_traits::cast::<f32, <M::Vertex as GfxVertex>::Coordinate>(0.5f32).unwrap();
+        let one_half = num_traits::cast::<f32, <M::Vertex as Vertex>::Coordinate>(0.5f32).unwrap();
         // We only need to look at one of the two triangles,
         // because they have the same bounding rectangle.
         let [v0, v1, v2, ..]: [VPos<M>; 6] =

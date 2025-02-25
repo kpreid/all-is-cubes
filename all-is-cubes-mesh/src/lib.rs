@@ -20,7 +20,7 @@
 //! [`dynamic::ChunkedSpaceMesh`].
 //!
 //! To support a new API/format, you will need to create suitable implementations of the
-//! [`GfxVertex`] and [`texture::Allocator`] traits, then implement [`MeshTypes`] to bundle them
+//! [`Vertex`] and [`texture::Allocator`] traits, then implement [`MeshTypes`] to bundle them
 //! together.
 
 #![no_std]
@@ -38,8 +38,8 @@ use core::fmt;
 
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
-mod block_vertex;
-pub use block_vertex::*;
+mod vertex;
+pub use vertex::*;
 mod block_mesh;
 pub use block_mesh::*;
 #[cfg(feature = "dynamic")]
@@ -121,7 +121,7 @@ impl MeshOptions {
 /// around separately.
 pub trait MeshTypes: 'static {
     /// Mesh vertex type.
-    type Vertex: GfxVertex<TexPoint = <Self::Alloc as texture::Allocator>::Point>
+    type Vertex: Vertex<TexPoint = <Self::Alloc as texture::Allocator>::Point>
         + fmt::Debug
         + PartialEq
         + Send
