@@ -488,7 +488,14 @@ impl Pipelines {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 ..<_>::default()
             },
-            depth_stencil: None,
+            // don't use depth, but it is configured anyway so that we can share the render pass
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: FramebufferTextures::DEPTH_FORMAT,
+                depth_write_enabled: false,
+                depth_compare: wgpu::CompareFunction::Always,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample,
             multiview: None,
             cache,
