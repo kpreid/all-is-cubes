@@ -52,7 +52,8 @@ Code style
 
 *   Avoid adding large amounts of data to version control.
     For example, image files for image-comparison testing should be kept as small as practical
-    (by keeping the image dimensions low, and by using compression like `pngcrush -brute`)
+    (by keeping the image dimensions low, and by using compression tools like
+    `oxipng -o max` or `pngcrush -brute`)
     and should not require frequent updates.
 
 Code formatting
