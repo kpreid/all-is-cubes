@@ -82,6 +82,7 @@ where
 
     let pipelines = in_wgpu::pipelines::Pipelines::new(
         &device,
+        &queue,
         &shaders,
         &fbt,
         listen::constant(Arc::new(GraphicsOptions::default())),
@@ -177,7 +178,7 @@ where
 
     let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
-        contents: bytemuck::bytes_of(&[WgpuInstanceData::new(GridVector::zero())]),
+        contents: bytemuck::bytes_of(&[WgpuInstanceData::new(GridVector::zero(), &"")]),
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
     });
 

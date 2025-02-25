@@ -66,6 +66,7 @@ impl Builder {
         let everything = in_wgpu::EverythingRenderer::new(
             self.executor.clone(),
             self.device.clone(),
+            &self.queue,
             cameras,
             wgpu::TextureFormat::Rgba8UnormSrgb,
             &self.adapter,

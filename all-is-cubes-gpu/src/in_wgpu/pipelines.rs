@@ -1,6 +1,8 @@
 use alloc::sync::Arc;
 use core::mem;
+use wgpu::util::DeviceExt;
 
+use all_is_cubes::content::load_image::include_image;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
@@ -77,6 +79,9 @@ pub(crate) struct Pipelines {
 
     /// A sampler configured for rendering the `SpaceRenderer`'s skybox texture.
     pub(crate) skybox_sampler: wgpu::Sampler,
+
+    /// Bind group created once and used by the blocks-and-lines shader.
+    pub(crate) blocks_static_bind_group: wgpu::BindGroup,
 }
 
 impl Pipelines {
@@ -87,6 +92,7 @@ impl Pipelines {
     /// * `graphics_options` is used to determine transparency behavior.
     pub fn new(
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         shaders: &Shaders,
         fb: &FramebufferTextures,
         graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
@@ -165,10 +171,29 @@ impl Pipelines {
                 label: Some("Pipelines::camera_bind_group_layout"),
             });
 
+        let blocks_static_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                }],
+            });
+
         let block_render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Pipelines::block_render_pipeline_layout"),
-                bind_group_layouts: &[&camera_bind_group_layout, &space_texture_bind_group_layout],
+                bind_group_layouts: &[
+                    &camera_bind_group_layout,
+                    &space_texture_bind_group_layout,
+                    &blocks_static_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -622,6 +647,40 @@ impl Pipelines {
             ..Default::default()
         });
 
+        let debug_font = {
+            let image = include_image!("../common/micro-font.png");
+            device.create_texture_with_data(
+                queue,
+                &wgpu::TextureDescriptor {
+                    label: None,
+                    size: wgpu::Extent3d {
+                        width: image.size().width,
+                        height: image.size().height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING,
+                    view_formats: &[],
+                },
+                wgpu::util::TextureDataOrder::MipMajor,
+                image.bytes(),
+            )
+        };
+
+        let blocks_static_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &blocks_static_bind_group_layout,
+            label: Some("blocks_static_bind_group"),
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(
+                    &debug_font.create_view(&wgpu::TextureViewDescriptor::default()),
+                ),
+            }],
+        });
+
         let dirty = listen::Flag::new(false);
         shaders.listen(dirty.listener());
         graphics_options.listen(dirty.listener());
@@ -647,12 +706,14 @@ impl Pipelines {
             rerun_copy_pipeline,
             linear_sampler,
             skybox_sampler,
+            blocks_static_bind_group,
         }
     }
 
     pub(crate) fn rebuild_if_changed(
         &mut self,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         shaders: &Shaders,
         fb: &FramebufferTextures,
     ) {
@@ -661,6 +722,7 @@ impl Pipelines {
             // non-dependent parts.
             *self = Self::new(
                 device,
+                queue,
                 shaders,
                 fb,
                 mem::replace(

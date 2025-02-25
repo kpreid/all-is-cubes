@@ -27,6 +27,7 @@ struct WgpuBlockVertex {
 // Mirrors `struct WgpuInstanceData` on the Rust side.
 struct WgpuInstanceData {
     @location(6) translation: vec3<f32>,
+    @location(7) debug_text: vec4<u32>,
 };
 
 // Mirrors `struct WgpuLinesVertex` on the Rust side.
@@ -45,6 +46,9 @@ struct WgpuLinesVertex {
 @group(1) @binding(3) var block_g1_emission: texture_3d<f32>;
 @group(1) @binding(4) var skybox_texture: texture_cube<f32>;
 @group(1) @binding(5) var skybox_sampler: sampler;
+
+// This group is named blocks_static_bind_group in the code.
+@group(2) @binding(0) var debug_font_texture: texture_2d<f32>;
 
 // --- Fog computation --------------------------------------------------------
 
@@ -132,6 +136,9 @@ struct BlockFragmentInput {
 
     @interpolate(flat, either)
     @location(11) resolution: f32,
+
+    @interpolate(flat, either)
+    @location(12) debug_text: vec4<u32>,
 };
 
 @vertex
@@ -208,6 +215,7 @@ fn block_vertex_main(
         // allow linear interpolation between vertices to get the right answer.
         world_position - camera.view_position, // camera_ray_direction
         resolution,
+        instance_input.debug_text,
     );
 }
 
@@ -613,6 +621,21 @@ fn raymarch_volumetric(in: BlockFragmentInput) -> vec4<f32> {
     return vec4f(accum_light, alpha);
 }
 
+// Perform final processing steps common to all entry points.
+//
+// `light` is the light from the scene hitting the camera.
+// `alpha` is alpha for the output image.
+// (`light` and `alpha` considered together should be interpreted as premultiplied.)
+fn finalize(light: vec3f, alpha: f32, in: BlockFragmentInput) -> vec4f {
+    let debug_text_fragment: vec4f = render_debug_text(in);
+
+    // Note: this is not a blend, but a branchless test. debug_text_fragment.a is always 0 or 1.
+    return mix(vec4<f32>(
+        apply_fog_and_exposure(light, in.fog_mix, in.camera_ray_direction),
+        alpha,
+    ), debug_text_fragment, debug_text_fragment.a);
+}
+
 // --- Entry points for block fragment shading -----------------------------------------------------
 
 // Entry point for opaque geometry.
@@ -622,10 +645,9 @@ fn raymarch_volumetric(in: BlockFragmentInput) -> vec4<f32> {
 fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     let material = get_material(in);
     let light_from_lit_surface: vec3f = material.reflectance.rgb * lighting(in) + material.emission;
-    return vec4<f32>(
-        apply_fog_and_exposure(light_from_lit_surface, in.fog_mix, in.camera_ray_direction),
-        1.0, // material alpha is ignored
-    );
+    
+    // material alpha is ignored -- it should always be 1.0 anyway
+    return finalize(light_from_lit_surface, 1.0, in);
 }
 
 // Entry point for transparency under TransparencyOption::Surface.
@@ -636,9 +658,7 @@ fn block_fragment_transparent_surface(in: BlockFragmentInput) -> @location(0) ve
     let material = get_material(in);
     let light_from_lit_surface: vec3f =
         material.reflectance.rgb * lighting(in) * material.reflectance.a + material.emission;
-    let exposed =
-        apply_fog_and_exposure(light_from_lit_surface, in.fog_mix, in.camera_ray_direction);
-    return vec4f(exposed.rgb, material.reflectance.a);
+    return finalize(light_from_lit_surface, material.reflectance.a, in);
 }
 
 // Entry point for transparency under TransparencyOption::Volumetric.
@@ -653,16 +673,14 @@ fn block_fragment_transparent_volumetric(in: BlockFragmentInput) -> @location(0)
     } else {
         light_from_lit_surface_and_alpha = raymarch_volumetric(in);
     }
-    let exposed = apply_fog_and_exposure(
-        light_from_lit_surface_and_alpha.rgb, in.fog_mix, in.camera_ray_direction);
-    return vec4f(exposed, light_from_lit_surface_and_alpha.a);
+    return finalize(light_from_lit_surface_and_alpha.rgb, light_from_lit_surface_and_alpha.a, in);
 }
 
 @fragment
 fn block_fragment_visualize_overdraw(in: BlockFragmentInput) -> @location(0) vec4<f32> {
     // Note that we are not doing the mathematically-simple thing of emitting 1.0 and rescaling
     // later, because that would not work if we only have Rgba8UnormSrgb render target support.
-    return vec4f(vec3f(1.0/32.0), 1.0);
+    return finalize(vec3f(1.0/32.0), 1.0, in);
 }
 
 // --- Lines shader ------------------------------------------------------------
@@ -736,4 +754,68 @@ fn skybox_vertex(
 @fragment
 fn skybox_fragment(in: SkyboxFragmentInput) -> @location(0) vec4<f32> {
     return vec4<f32>(apply_fog_and_exposure(vec3(0.0), 1.0, in.camera_ray_direction), 1.0);
+}
+
+// --- Debug text rendering -----------------------------------------------------------
+
+const dt_font_cell_size: vec2i = vec2i(3, 5);
+const dt_font_atlas_stride: vec2i = dt_font_cell_size + 1;
+const dt_character_spacing: i32 = 4;
+const dt_max_text_length: i32 = 16; // vec4u = 128 bits = 16 bytes
+
+fn get_debug_text_character(in: BlockFragmentInput, index: i32) -> i32 {
+    let vec_element: i32 = clamp(index / 4, 0, 4);
+    let vec_bitshift: u32 = u32((index % 4) * 8);
+    return i32((in.debug_text[vec_element] >> vec_bitshift) & 0xFF);
+}
+
+fn pick_text_uv(in: BlockFragmentInput) -> vec2f {
+    var text_uv_source: vec2f;
+    if in.color_or_texture[3] < -0.5 {
+        // We have texture coordinates.
+        let scale = (128.0 / in.resolution);
+        let local_coord = in.color_or_texture.xyz - floor(in.clamp_min);
+        // Recover 2D from 3D and flip Y
+        text_uv_source = vec2f(
+            dot(in.tangent, local_coord),
+            -dot(in.bitangent, local_coord),
+        ) * scale + vec2f(0.0, f32(dt_font_cell_size.y));
+    } else {
+        // We don’t have texture coordinates, so use screen coordinates.
+        text_uv_source = in.clip_position.xy / 4.0 % 128.0;
+    }
+    return text_uv_source;
+}
+
+fn render_debug_text(in: BlockFragmentInput) -> vec4f {
+    if all(in.debug_text == vec4u(0)) {
+        // String is empty (all NULs)
+        return vec4f(0.0);
+    }
+
+    let text_uv = pick_text_uv(in);
+    let text_uv_int = vec2i(floor(text_uv));
+    if (text_uv_int.y < 0) | (text_uv_int.y >= dt_font_cell_size.y) | (text_uv_int.x >= (dt_max_text_length * dt_character_spacing)) {
+        // bounds check of the text
+        return vec4f(0.0);
+    }
+
+    let string_index = i32(floor(text_uv.x) / f32(dt_character_spacing)); // avoid integer division
+    let character_code: i32 = get_debug_text_character(in, string_index);
+    let font_atlas_cell = vec2i(character_code % 16, character_code / 16);
+    let position_in_font_atlas = text_uv_int % dt_font_atlas_stride + vec2i(1, 1);
+    let font_atlas_uv = font_atlas_cell * dt_font_atlas_stride + position_in_font_atlas;
+
+    let texel = textureLoad(debug_font_texture, font_atlas_uv, 0);
+    if character_code == 0 {
+        // Nulls denote end-of-string, which should be transparent
+        return vec4f(0.0);
+    }
+    if (texel.r == texel.g) & (texel.g != 0.0) {
+        // Foreground
+        return texel;
+    } else {
+        // Background
+        return vec4f(0.0, 0.0, 0.0, 1.0);
+    }
 }

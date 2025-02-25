@@ -485,6 +485,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         self.write_camera_only(queue, camera);
 
         render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
+        render_pass.set_bind_group(2, &pipelines.blocks_static_bind_group, &[]);
         if let Some(space_bind_group) = self.space_bind_group.get() {
             render_pass.set_bind_group(1, space_bind_group, &[]);
         } else {
@@ -505,13 +506,18 @@ impl<I: time::Instant> SpaceRenderer<I> {
             render_pass: &mut wgpu::RenderPass<'pass>,
             buffers: &'pass ChunkBuffers,
             instance_data: &mut Vec<WgpuInstanceData>,
-            p: ChunkPos<CHUNK_SIZE>,
+            chunk_pos: ChunkPos<CHUNK_SIZE>,
             squares_drawn: &mut usize,
+            in_world_debug_label: &'static str,
         ) {
             if !range.is_empty() {
                 set_buffers(render_pass, buffers);
                 let id = u32::try_from(instance_data.len()).unwrap();
-                instance_data.push(WgpuInstanceData::new(p.bounds().lower_bounds().to_vector()));
+
+                instance_data.push(WgpuInstanceData::new(
+                    chunk_pos.bounds().lower_bounds().to_vector(),
+                    &format_args!("Ch{in_world_debug_label}"),
+                ));
                 render_pass.draw_indexed(to_wgpu_index_range(range.clone()), 0, id..(id + 1));
                 *squares_drawn += range.len() / 6;
             }
@@ -553,6 +559,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                             &mut instance_data,
                             chunk.position(),
                             &mut 0,
+                            "",
                         );
                         draw_chunk_instance(
                             chunk.mesh().transparent_range(DepthOrdering::Any),
@@ -561,6 +568,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                             &mut instance_data,
                             chunk.position(),
                             &mut 0,
+                            "",
                         );
                     }
                 }
@@ -598,6 +606,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                         &mut instance_data,
                         chunk.position(),
                         &mut squares_drawn,
+                        "O",
                     );
                 } else {
                     // TODO: If the chunk is missing, draw a blocking shape, possibly?
@@ -629,7 +638,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
             let first_instance_index = u32::try_from(instance_data.len()).unwrap();
             let cubes_len = cubes.len();
             for cube in cubes {
-                instance_data.push(WgpuInstanceData::new(cube.lower_bounds().to_vector()));
+                instance_data.push(WgpuInstanceData::new(
+                    cube.lower_bounds().to_vector(),
+                    &format_args!("IO{block_index}"),
+                ));
             }
             // Record draw command for all instances using this mesh
             render_pass.draw_indexed(
@@ -683,6 +695,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                             &mut instance_data,
                             chunk.position(),
                             &mut squares_drawn,
+                            "T",
                         );
                     }
                     flaws |= chunk.mesh().flaws();

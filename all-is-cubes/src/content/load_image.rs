@@ -4,6 +4,7 @@
 
 use alloc::vec::Vec;
 
+use euclid::size2;
 use hashbrown::HashMap;
 
 use embedded_graphics::Drawable;
@@ -16,6 +17,8 @@ use crate::block::{AIR, Block};
 use crate::drawing::{VoxelBrush, rectangle_to_aab};
 use crate::math::{GridAab, GridCoordinate, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Data type produced by [`include_image`].
 #[doc(hidden)]
@@ -38,6 +41,20 @@ pub struct PngAdapter<'a> {
     color_map: HashMap<Srgba, VoxelBrush<'a>>,
     max_brush: GridAab,
 }
+
+// -------------------------------------------------------------------------------------------------
+
+impl DecodedPng {
+    pub fn size(&self) -> crate::camera::ImageSize {
+        size2(self.header.width, self.header.height)
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 impl<'a> PngAdapter<'a> {
     #[inline(never)]
@@ -193,6 +210,8 @@ pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
         #[doc(hidden)]
@@ -223,6 +242,8 @@ cfg_if::cfg_if! {
     }
 }
 pub use _content_load_image_include_image as include_image;
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

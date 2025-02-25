@@ -127,6 +127,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         let everything = EverythingRenderer::<I>::new(
             executor,
             device.clone(),
+            &queue,
             cameras,
             choose_surface_format(&surface.get_capabilities(&adapter)),
             &adapter,

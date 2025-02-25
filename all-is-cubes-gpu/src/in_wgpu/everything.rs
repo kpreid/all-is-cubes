@@ -127,7 +127,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             label: Some(label),
             required_features: wgpu::Features::empty(),
             required_limits: wgpu::Limits {
-                max_inter_stage_shader_components: 33, // number used by blocks-and-lines shader
+                max_inter_stage_shader_components: 37, // number used by blocks-and-lines shader
                 ..wgpu::Limits::downlevel_webgl2_defaults().using_resolution(available_limits)
             },
             memory_hints: wgpu::MemoryHints::default(), // TODO: consider setting
@@ -137,6 +137,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
     pub fn new(
         executor: Arc<dyn Executor>,
         device: wgpu::Device,
+        queue: &wgpu::Queue,
         cameras: StandardCameras,
         surface_format: wgpu::TextureFormat,
         adapter: &wgpu::Adapter,
@@ -169,7 +170,13 @@ impl<I: time::Instant> EverythingRenderer<I> {
             ),
         );
 
-        let pipelines = Pipelines::new(&device, &shaders, &fb, cameras.graphics_options_source());
+        let pipelines = Pipelines::new(
+            &device,
+            queue,
+            &shaders,
+            &fb,
+            cameras.graphics_options_source(),
+        );
         let block_texture = AtlasAllocator::new("EverythingRenderer", &device.limits());
 
         let mut new_self = EverythingRenderer {
@@ -303,7 +310,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         // Recompile pipelines if needed.
         self.update_postprocess_pipeline();
         self.pipelines
-            .rebuild_if_changed(&self.device, &self.shaders, &self.fb);
+            .rebuild_if_changed(&self.device, queue, &self.shaders, &self.fb);
 
         // Identify spaces to be rendered
         let ws = self.cameras.world_space().get();

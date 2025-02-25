@@ -1,8 +1,13 @@
+use core::fmt::{self, Write as _};
+
 use all_is_cubes::euclid::{Point3D, Vector3D};
-use all_is_cubes::math::{Cube, GridVector};
+use all_is_cubes::math::{Cube, GridVector, Rgba};
 use all_is_cubes_mesh::{BlockVertex, Coloring, Vertex};
 
 use crate::DebugLineVertex;
+
+/// If true, label meshes, in the rendering, with which instance they came from.
+const DEBUG_INSTANCES: bool = false;
 
 /// Texture coordinates in the 3D atlas textures.
 ///
@@ -193,6 +198,9 @@ pub(crate) struct WgpuInstanceData {
     /// TODO: Eventually we want to be able to use camera-relative coordinates, to make
     /// the best use of f32 precision in the shader.
     pub translation: [f32; 3],
+
+    /// Text to draw onto the meshes, up to 16 ISO-8859-1 characters, packed into four `u32`s,
+    pub debug_text: [u32; 4],
 }
 
 impl WgpuInstanceData {
@@ -203,13 +211,22 @@ impl WgpuInstanceData {
             &wgpu::vertex_attr_array![
                 // location numbers must start after WgpuBlockVertex ends
                 6 => Float32x3,
+                7 => Uint32x4,
             ]
         },
     };
 
-    pub fn new(translation: GridVector) -> Self {
+    /// `debug_text` should format to ASCII (or ISO-8859-1) text of no more than 16 characters
+    /// which describes what kind of instance this is (e.g. chunk or block).
+    /// It may be ignored if debug is not enabled.
+    pub fn new(translation: GridVector, debug_text: &dyn fmt::Display) -> Self {
         Self {
             translation: translation.map(|int| int as f32).into(),
+            debug_text: if DEBUG_INSTANCES {
+                format_into_debug_text_vector(debug_text)
+            } else {
+                [0; 4]
+            },
         }
     }
 }
@@ -234,10 +251,7 @@ impl WgpuLinesVertex {
 }
 
 impl DebugLineVertex for WgpuLinesVertex {
-    fn from_position_color(
-        position: all_is_cubes::math::FreePoint,
-        color: all_is_cubes::math::Rgba,
-    ) -> Self {
+    fn from_position_color(position: all_is_cubes::math::FreePoint, color: Rgba) -> Self {
         Self {
             position: position.map(|c| c as f32).into(),
             color: color.into(),
@@ -273,6 +287,43 @@ impl From<FixTexCoord> for f32 {
     fn from(tc: FixTexCoord) -> Self {
         f32::from(tc.0) / 2.
     }
+}
+
+/// Packs text into the WGSL-compatible `debug_text: vec4<u32>` format.
+/// If the input is too long, silently truncates it.
+fn format_into_debug_text_vector(message: &dyn fmt::Display) -> [u32; 4] {
+    fn little_endian_byte_refs(int: &mut u32) -> [&mut u8; 4] {
+        let [b0, b1, b2, b3] = bytemuck::bytes_of_mut(int) else {
+            unreachable!()
+        };
+        if cfg!(target_endian = "big") {
+            [b3, b2, b1, b0]
+        } else {
+            [b0, b1, b2, b3]
+        }
+    }
+
+    struct Writer<I>(I);
+    impl<'a, I: Iterator<Item = &'a mut u8>> fmt::Write for Writer<I> {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            for ch in s.chars() {
+                match self.0.next() {
+                    Some(byte) => *byte = ch.try_into().unwrap_or(b'\xFF'),
+                    // Stop formatting if we hit the length limit.
+                    None => return Err(fmt::Error),
+                }
+            }
+            Ok(())
+        }
+    }
+
+    let mut buf: [u32; 4] = [0; 4];
+    // Ignore errors, which occur upon truncation.
+    let _ = write!(
+        Writer(buf.iter_mut().flat_map(little_endian_byte_refs)),
+        "{message}"
+    );
+    buf
 }
 
 #[cfg(test)]
