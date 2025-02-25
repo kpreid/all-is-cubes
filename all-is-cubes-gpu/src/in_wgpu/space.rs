@@ -482,11 +482,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 .map_or(0, |buffer| usize::try_from(buffer.size()).unwrap_or(0)),
         );
 
-        queue.write_buffer(
-            &self.camera_buffer.buffer,
-            0,
-            bytemuck::bytes_of(&ShaderSpaceCamera::new(camera)),
-        );
+        self.write_camera_only(queue, camera);
 
         render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
         if let Some(space_bind_group) = self.space_bind_group.get() {
@@ -749,6 +745,16 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
     pub fn particle_lines(&self) -> impl Iterator<Item = WgpuLinesVertex> + '_ {
         self.particle_sets.iter().flat_map(|p| p.lines())
+    }
+
+    /// Updates the camera buffer in the same way [`Self::draw()`] does,
+    /// so that [`Self::camera_bind_group()`] will be fresh even if `draw()` wasn’t called.
+    pub fn write_camera_only(&self, queue: &wgpu::Queue, camera: &Camera) {
+        queue.write_buffer(
+            &self.camera_buffer.buffer,
+            0,
+            bytemuck::bytes_of(&ShaderSpaceCamera::new(camera)),
+        );
     }
 
     /// Returns the camera, to allow additional drawing in the same coordinate system.

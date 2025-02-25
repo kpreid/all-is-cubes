@@ -354,6 +354,11 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let space_infos: Layers<SpaceUpdateInfo> = if should_raytrace(&self.cameras) {
             self.rt.update(cursor_result).unwrap(); // TODO: don't unwrap
 
+            // Update the camera bind group because it will be used by the lines pass.
+            self.space_renderers
+                .world
+                .write_camera_only(queue, &self.cameras.cameras().world);
+
             // TODO: convey update info
             Layers::default()
         } else {
