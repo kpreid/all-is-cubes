@@ -28,10 +28,17 @@ use {
 #[expect(clippy::exhaustive_structs)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct BlockVertex<T> {
-    /// Vertex position.
+    /// Position in 3D space.
+    ///
+    /// Vertices produced for a [`BlockMesh`] always have positions in the range 0 to 1, inclusive.
+    /// Positions outside this range only occur when block meshes are composed into a [`SpaceMesh`].
     pub position: FreePoint,
-    /// Vertex normal, always axis-aligned.
+
+    /// Cube face, or vertex normal, of the surface this vertex is part of.
+    ///
+    /// If you need a normal vector, call [`Face6::normal_vector()`].
     pub face: Face6,
+
     /// Surface color or texture coordinate.
     pub coloring: Coloring<T>,
 }
