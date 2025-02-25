@@ -525,9 +525,17 @@ impl FbtConfig {
                 size,
                 maximum_intensity,
                 linear_scene_texture_format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                sample_count: sample_count_if_ok,
+                sample_count: if features.rgba8_can_multisample {
+                    sample_count_if_ok
+                } else {
+                    1
+                },
                 enable_copy_out,
-                flaws: Flaws::empty(),
+                flaws: if !features.rgba8_can_multisample && sample_count_if_ok != 1 {
+                    Flaws::NO_ANTIALIASING
+                } else {
+                    Flaws::empty()
+                },
             }
         }
     }
@@ -552,6 +560,7 @@ impl FbtFeatures {
         let multisample_flags = wgpu::TextureFormatFeatureFlags::MULTISAMPLE_X4
             | wgpu::TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE;
 
+        let adapter_info = adapter.get_info();
         let float_tff = adapter.get_texture_format_features(float_format);
         let float_can_render = float_tff
             .allowed_usages
@@ -568,15 +577,26 @@ impl FbtFeatures {
             }
         }
 
+        let allow_multisampling = {
+            // Workaround: multisampling does not succeed with this software renderer.
+            adapter_info.name != "llvmpipe (LLVM 12.0.0, 256 bits)"
+            // Bug workaround <https://github.com/kpreid/all-is-cubes/issues/471>:
+            // on WebGL we cannot read, in a shader, from a multisampled texture.
+            // Since we need to read to implement any screen-space processing,
+            // pretend multisampling is unavailable even though we could do otherwise.
+            && !(adapter_info.backend == wgpu::Backend::Gl && cfg!(target_family = "wasm"))
+        };
+
         Self {
             float_can_render,
-            float_can_multisample: float_can_render && float_tff.flags.contains(multisample_flags),
-            // Kludge: multisampling does not succeed with this software renderer.
-            rgba8_can_multisample: adapter
-                .get_texture_format_features(wgpu::TextureFormat::Rgba8UnormSrgb)
-                .flags
-                .contains(multisample_flags)
-                && adapter.get_info().name != "llvmpipe (LLVM 12.0.0, 256 bits)",
+            float_can_multisample: allow_multisampling
+                && float_can_render
+                && float_tff.flags.contains(multisample_flags),
+            rgba8_can_multisample: allow_multisampling
+                && adapter
+                    .get_texture_format_features(wgpu::TextureFormat::Rgba8UnormSrgb)
+                    .flags
+                    .contains(multisample_flags),
         }
     }
 }
