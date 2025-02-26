@@ -35,6 +35,7 @@ skip = [
 ]
 
 skip-tree = [
+    { name = "rand", version = "0.8" } # via `noise`
 ]
 
 [sources]
