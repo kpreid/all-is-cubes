@@ -5,7 +5,7 @@ use std::time::Instant;
 use itertools::Itertools as _;
 
 use all_is_cubes::euclid::{Point3D, Vector3D};
-use all_is_cubes::math::{Cube, GridCoordinate};
+use all_is_cubes::math::{Cube, Face6, GridCoordinate};
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes::time::DeadlineStd;
@@ -40,6 +40,7 @@ const CHUNK_SIZE: GridCoordinate = 32;
 struct Vertex {
     position: rg::components::Position3D,
     color: rg::components::Color,
+    face: Face6,
 }
 
 impl From<mesh::BlockVertex<NoTexture>> for Vertex {
@@ -49,6 +50,7 @@ impl From<mesh::BlockVertex<NoTexture>> for Vertex {
             color: match v.coloring {
                 mesh::Coloring::Solid(color) => color.to_srgb8().into(),
             },
+            face: v.face,
         }
     }
 }
@@ -163,6 +165,12 @@ impl RerunMesher {
 fn convert_to_rerun_mesh(input: &mesh::SpaceMesh<Mt>, output: &mut rg::archetypes::Mesh3D) {
     *output = rg::archetypes::Mesh3D::new(input.vertices().iter().map(|v| v.position))
         .with_vertex_colors(input.vertices().iter().map(|v| v.color))
+        .with_vertex_normals(
+            input
+                .vertices()
+                .iter()
+                .map(|v| rg::convert_vec(v.face.normal_vector::<f32, ()>())),
+        )
         .with_triangle_indices(input.indices().iter_u32().tuples().map(|(i1, i2, i3)| {
             rg::components::TriangleIndices(rg::datatypes::UVec3D::new(i1, i2, i3))
         }));
