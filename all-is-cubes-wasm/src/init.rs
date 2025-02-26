@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use js_sys::Error;
-use rand::{Rng as _, thread_rng};
 use send_wrapper::SendWrapper;
 use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 
@@ -163,7 +162,7 @@ async fn start_game_with_dom(
             universe_progress,
             all_is_cubes_content::TemplateParameters {
                 seed: Some(seed.unwrap_or_else(|| {
-                    let seed: u64 = thread_rng().r#gen();
+                    let seed: u64 = crate::web_glue::pseudorandom_u64();
                     log::info!("Randomly chosen universe seed: {seed}");
                     seed
                 })),

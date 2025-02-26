@@ -40,12 +40,8 @@ form_urlencoded = "1.0.1"
 futures-channel = { version = "0.3.31", default-features = false, features = ["alloc"] }
 # We only use BoxFuture, which requires alloc
 futures-core = { version = "0.3.31", default-features = false, features = ["alloc"] }
-# Feature enabling for indirect dependency all-is-cubes → rand → getrandom,
-# as well as our direct dependency
-getrandom = { version = "0.2.7", features = ["js"] }
 js-sys = "0.3.77"
 log = { version = "0.4.22", default-features = false }
-rand = { version = "0.8.3", default-features = false, features = ["std", "std_rng"] }
 send_wrapper = { version = "0.6.0", default-features = false }
 # Used for settings serialization
 serde_json = { version = "1.0.79", default-features = false, features = ["std"] }

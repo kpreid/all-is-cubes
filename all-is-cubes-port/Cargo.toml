@@ -69,7 +69,10 @@ thiserror = { workspace = true }
 # Dependencies related to formats
 all-is-cubes-mesh = { workspace = true, optional = true }
 all-is-cubes-render = { workspace = true, optional = true }
-dot_vox = { version = "5.1.1", optional = true }
+# By disabling default features, we disable a dependency on `ahash` ← `getrandom` and use the
+# `std` `HasHMap` instead, which is useful for web-wasm compatibility.
+# TODO: But in the long run we will want `no_std` compatibility.
+dot_vox = { version = "5.1.1", default-features = false, optional = true }
 stl_io = { version = "0.8.1", optional = true }
 # json is used for native and glTF
 serde_json = { workspace = true, optional = true }

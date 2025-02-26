@@ -1808,7 +1808,6 @@ version = "5.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd05cab02d6074145c6f92ddf1b57357e4bc1424f87c790c044de62bdc94c13a"
 dependencies = [
- "ahash",
  "lazy_static",
  "log",
  "nom",

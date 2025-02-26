@@ -10,6 +10,18 @@ use wasm_bindgen::prelude::Closure;
 use web_sys::{AddEventListenerOptions, Document, Element, Event, EventTarget, Text};
 use web_time::{Duration, Instant};
 
+// -------------------------------------------------------------------------------------------------
+
+/// Generate a uniform random [`u64`] (without incurring a `getrandom` dependency).
+pub fn pseudorandom_u64() -> u64 {
+    // Math::random() will get us 56 random bits per call, but we want 64, so call it twice.
+    let [high, low]: [u64; 2] =
+        core::array::from_fn(|_| (js_sys::Math::random() * f64::from(u32::MAX)) as u64);
+    (high << 32) ^ low
+}
+
+// -------------------------------------------------------------------------------------------------
+
 pub fn get_mandatory_element<E: JsCast>(document: &Document, id: &'static str) -> Result<E, Error> {
     document
         .get_element_by_id(id)
@@ -56,6 +68,8 @@ pub fn add_event_listener<E, F>(
     closure.forget(); // TODO: Instead return the closure or some other kind of handle
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Executor;
 
@@ -68,6 +82,8 @@ impl all_is_cubes::util::Executor for Executor {
         Box::pin(yield_to_event_loop())
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Yield to the browser's event loop (if significant time has passed since the last call).
 pub(crate) async fn yield_to_event_loop() {
