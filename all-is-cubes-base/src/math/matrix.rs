@@ -376,12 +376,12 @@ mod tests {
     use rand_xoshiro::Xoshiro256Plus;
 
     fn random_grid_matrix(mut rng: impl Rng) -> GridMatrix {
-        let mut r = || rng.gen_range(-100..=100);
+        let mut r = || rng.random_range(-100..=100);
         GridMatrix::new(r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r())
     }
 
     fn random_possibly_invertible_matrix(mut rng: impl Rng) -> GridMatrix {
-        let mut r = |n: GridCoordinate| rng.gen_range(-n..=n);
+        let mut r = |n: GridCoordinate| rng.random_range(-n..=n);
         GridMatrix::new(
             r(1),
             r(1),

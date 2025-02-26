@@ -695,9 +695,9 @@ mod tests {
     fn chunk_chart_resize_rand() {
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for _ in 0..50 {
-            let target_size = rng.gen_range(0.0..200.0);
-            let small_size = rng.gen_range(0.0..target_size);
-            let big_size = rng.gen_range(target_size..200.0);
+            let target_size = rng.random_range(0.0..200.0);
+            let small_size = rng.random_range(0.0..target_size);
+            let big_size = rng.random_range(target_size..200.0);
             print!("{small_size:?} -> {target_size:?} <- {big_size:?} | ");
 
             let exact = ChunkChart::<16>::new(target_size);

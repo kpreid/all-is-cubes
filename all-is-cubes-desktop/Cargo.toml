@@ -87,7 +87,7 @@ itertools = { workspace = true }
 kira = { version = "0.10.2", optional = true, default-features = false, features = ["cpal"] }
 log = { workspace = true }
 png = { workspace = true, optional = true }
-rand = { workspace = true, features = ["std", "std_rng"] }
+rand = { workspace = true, features = ["thread_rng"] }
 # re_sdk is a data-logging and visualization tool; we are currently using it _only_ for
 # development of All is Cubes itself.
 re_sdk = { workspace = true, optional = true }

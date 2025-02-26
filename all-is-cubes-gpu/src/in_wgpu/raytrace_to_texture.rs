@@ -9,8 +9,7 @@ use alloc::vec::Vec;
 use std::sync::Mutex;
 
 use half::f16;
-use rand::SeedableRng as _;
-use rand::prelude::SliceRandom as _;
+use rand::{SeedableRng as _, seq::SliceRandom as _};
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use web_time::{Duration, Instant};

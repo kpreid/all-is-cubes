@@ -177,14 +177,14 @@ fn transpose_vector_option<T, U>(v: Vector3D<Option<T>, U>) -> Option<Vector3D<T
 mod tests {
     use super::*;
     use rand::SeedableRng as _;
-    use rand::seq::SliceRandom as _;
+    use rand::seq::IndexedRandom as _;
     use rand_xoshiro::Xoshiro256Plus;
 
     fn random_gridgid(mut rng: impl rand::Rng) -> Gridgid {
         Gridgid {
             rotation: *GridRotation::ALL.choose(&mut rng).unwrap(),
             translation: {
-                let mut r = || rng.gen_range(-100..=100);
+                let mut r = || rng.random_range(-100..=100);
                 GridVector::new(r(), r(), r())
             },
         }

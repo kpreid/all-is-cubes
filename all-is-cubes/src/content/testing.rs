@@ -70,12 +70,12 @@ pub async fn lighting_bench_space(
             );
             let section_bounds = layout.section_bounds(sx, sz);
             let color = Block::from(Rgba::new(
-                rng.gen_range(0.0..=1.0),
-                rng.gen_range(0.0..=1.0),
-                rng.gen_range(0.0..=1.0),
-                if rng.gen_bool(0.125) { 0.5 } else { 1.0 },
+                rng.random_range(0.0..=1.0),
+                rng.random_range(0.0..=1.0),
+                rng.random_range(0.0..=1.0),
+                if rng.random_bool(0.125) { 0.5 } else { 1.0 },
             ));
-            match rng.gen_range(0..3) {
+            match rng.random_range(0..3) {
                 0 => {
                     space.fill_uniform(section_bounds, &color).unwrap();
                 }
@@ -107,7 +107,7 @@ pub async fn lighting_bench_space(
                 2 => {
                     space
                         .fill(section_bounds, |_| {
-                            if rng.gen_bool(0.25) {
+                            if rng.random_bool(0.25) {
                                 Some(&color)
                             } else {
                                 Some(&AIR)

@@ -165,7 +165,7 @@ pub async fn install_landscape_blocks(
     let stone_points: Box<[_; 240]> = Box::new(array::from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
-            scale_color(colors[Stone].clone(), rng.gen_range(0.9..1.1), 0.02),
+            scale_color(colors[Stone].clone(), rng.random_range(0.9..1.1), 0.02),
         )
     }));
     let stone_pattern = voronoi_pattern(resolution, true, &*stone_points);
@@ -174,7 +174,7 @@ pub async fn install_landscape_blocks(
     let dirt_points: Box<[_; 1024]> = Box::new(array::from_fn(|_| {
         (
             Cube::ORIGIN.aab().random_point(rng),
-            scale_color(colors[Dirt].clone(), rng.gen_range(0.9..1.1), 0.02),
+            scale_color(colors[Dirt].clone(), rng.random_range(0.9..1.1), 0.02),
         )
     }));
     let dirt_pattern = voronoi_pattern(resolution, true, &*dirt_points);
@@ -296,7 +296,7 @@ pub async fn install_landscape_blocks(
                         f64::from(signed_distance_from_edge) / f64::from(growth.radius());
 
                     if unit_scale_distance <= 1.0
-                        && !rng.gen_bool(
+                        && !rng.random_bool(
                             ((unit_scale_distance * 4.0).powi(2) / 2.0 + 0.5).clamp(0., 1.),
                         )
                     {

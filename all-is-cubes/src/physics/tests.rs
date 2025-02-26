@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 
 use euclid::{Vector3D, point3, vec3};
 use ordered_float::NotNan;
-use rand::prelude::SliceRandom as _;
+use rand::prelude::IndexedRandom as _;
 use rand::{Rng as _, SeedableRng as _};
 
 use crate::block::{
@@ -266,7 +266,7 @@ fn no_passing_through_blocks() {
         let random_velocity = Vector3D::<f32 /* dummy */, _>::zero().map(|_| {
             // Generate vector components which are not too close to zero
             // to finish the test promptly
-            rng.gen_range(0.04..=1.) * [-1., 1.].choose(&mut rng).unwrap()
+            rng.random_range(0.04..=1.) * [-1., 1.].choose(&mut rng).unwrap()
         });
         if random_velocity.length() < 0.05 {
             // Too slow

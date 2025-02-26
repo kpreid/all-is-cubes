@@ -3,7 +3,7 @@ use core::fmt;
 use itertools::Itertools as _;
 use petgraph::visit::EdgeRef as _;
 use rand::Rng as _;
-use rand::seq::SliceRandom as _;
+use rand::seq::IndexedRandom as _;
 
 use all_is_cubes::block::{self, AIR, Block};
 use all_is_cubes::linking::BlockProvider;
@@ -128,7 +128,7 @@ pub(crate) fn make_tree(
         .unwrap_or(GridAab::ORIGIN_EMPTY);
 
     let max_leaves_height_for_size = (i32::try_from(bounds.size().height).unwrap_or(1) / 3) + 1;
-    let leaves_height = rng.gen_range(1..=max_leaves_height_for_size);
+    let leaves_height = rng.random_range(1..=max_leaves_height_for_size);
 
     // Generate foliage (before the branches that lead to it)
     for cube in bounds
@@ -140,7 +140,7 @@ pub(crate) fn make_tree(
             // leaves don't hide behind other leaves
             continue;
         }
-        if !rng.gen_bool(0.99) {
+        if !rng.random_bool(0.99) {
             // chance of entirely missing cube
             continue;
         }
@@ -151,7 +151,7 @@ pub(crate) fn make_tree(
                 max_growth * (1.0 - (distance_from_top / (leaves_height as f32 - 0.99)));
 
             *l = Some(TreeGrowth::from_radius(
-                rng.gen_range(min_growth..=8.5).floor() as i32,
+                rng.random_range(min_growth..=8.5).floor() as i32,
             ));
         }
     }
@@ -182,7 +182,7 @@ pub(crate) fn make_tree(
             if !is_currently_on_existing_branch && would_enter_branch {
                 // Highly penalize making a cyclic structure (branches splitting then rejoining).
                 MAX_STEP_COST
-            } else if edge_ref.growth.is_some() && rng.gen_bool(1.0 - relative_y) {
+            } else if edge_ref.growth.is_some() && rng.random_bool(1.0 - relative_y) {
                 // Reusing existing branches is cheaper.
                 // TODO: RNG in the cost function is probably a bad idea ...
                 BASE_DISTANCE_COST / 2

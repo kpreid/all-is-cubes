@@ -1015,7 +1015,7 @@ mod tests {
                     .to_vector(),
             );
             let step = aab_raycast(moving_aab, ray, false)
-                .nth(rng.gen_range(1..10))
+                .nth(rng.random_range(1..10))
                 .unwrap();
             let axis = step.face().axis().expect("should have an axis");
             let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?

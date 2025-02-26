@@ -6,6 +6,7 @@ use core::ops::Range;
 
 use euclid::Vector3D;
 use manyfmt::Refmt;
+use rand::Rng as _;
 
 use crate::math::{
     Aab, Axis, Cube, Face6, FaceMap, FreeCoordinate, FreePoint, GridCoordinate, GridIter,
@@ -623,15 +624,15 @@ impl GridAab {
     /// assert_eq!(empty.random_cube(rng), None);
     /// ```
     #[allow(clippy::missing_inline_in_public_items)]
-    pub fn random_cube(&self, rng: &mut impl rand::Rng) -> Option<Cube> {
+    pub fn random_cube(&self, rng: &mut impl rand::RngCore) -> Option<Cube> {
         if self.is_empty() {
             None
         } else {
             let _upper_bounds = self.upper_bounds();
             Some(Cube::new(
-                rng.gen_range(self.x_range()),
-                rng.gen_range(self.y_range()),
-                rng.gen_range(self.z_range()),
+                rng.random_range(self.x_range()),
+                rng.random_range(self.y_range()),
+                rng.random_range(self.z_range()),
             ))
         }
     }

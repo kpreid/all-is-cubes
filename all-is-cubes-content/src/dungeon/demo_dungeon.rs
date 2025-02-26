@@ -6,7 +6,7 @@ use core::f64::consts::TAU;
 use core::mem;
 
 use exhaust::Exhaust;
-use rand::prelude::SliceRandom;
+use rand::prelude::IndexedRandom as _;
 use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
@@ -712,15 +712,15 @@ fn generate_dungeon_map(
             MazeRoomKind::Path | MazeRoomKind::OffPath => true,
         };
 
-        let corridor_only = is_not_end && rng.gen_bool(0.5);
+        let corridor_only = is_not_end && rng.random_bool(0.5);
 
         let mut extended_bounds = GridAab::ORIGIN_CUBE;
         // Optional high ceiling
-        if !corridor_only && rng.gen_bool(0.25) {
+        if !corridor_only && rng.random_bool(0.25) {
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::PY, 1));
         }
         // Floor pit
-        let floor = if !corridor_only && is_not_end && rng.gen_bool(0.25) {
+        let floor = if !corridor_only && is_not_end && rng.random_bool(0.25) {
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
             *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
                 .choose(&mut rng)
@@ -766,9 +766,9 @@ fn generate_dungeon_map(
                     false
                 } else if face == Face6::PY {
                     // ceilings are more common overall and we want more internally-lit ones
-                    rng.gen_bool(0.25)
+                    rng.random_bool(0.25)
                 } else {
-                    rng.gen_bool(0.75)
+                    rng.random_bool(0.75)
                 };
 
                 if have_window {
@@ -785,11 +785,11 @@ fn generate_dungeon_map(
             wall_features,
             floor,
             corridor_only,
-            lit: wall_features[Face6::PY] == WallFeature::Blank && rng.gen_bool(0.75),
+            lit: wall_features[Face6::PY] == WallFeature::Blank && rng.random_bool(0.75),
             grants_item: (matches!(floor, FloorKind::Solid)
                 && !corridor_only
                 && is_not_end
-                && rng.gen_bool(0.5))
+                && rng.random_bool(0.5))
             .then(|| Block::clone(grantable_items.choose(&mut rng).unwrap())),
         })
     })

@@ -175,7 +175,7 @@ pub async fn install_demo_blocks(
                     .display_name("Road")
                     .voxels_fn(output_resolution, |cube| {
                         let y = (i32::from(output_resolution) - 1 - cube.y) / 2;
-                        let x = rng.gen_range(range.clone());
+                        let x = rng.random_range(range.clone());
                         palette_image.get_brush(x, y).origin_block().unwrap_or(&AIR)
                     })?
                     .build_txn(txn)
@@ -484,7 +484,7 @@ pub async fn install_demo_blocks(
                         block::AnimationChange::ColorSameCategory
                     }))
                     .voxels_fn(if timer <= 0 { R1 } else { R8 }, |_| {
-                        if rng.gen_bool(decay.powf(3.)) {
+                        if rng.random_bool(decay.powf(3.)) {
                             &atom
                         } else {
                             &AIR

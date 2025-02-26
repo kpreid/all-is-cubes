@@ -4,7 +4,7 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use itertools::Itertools;
-use rand::seq::SliceRandom as _;
+use rand::seq::IndexedRandom as _;
 use rand::{Rng, SeedableRng as _};
 
 use all_is_cubes::arcstr::literal;
@@ -276,7 +276,7 @@ impl State {
         for progress in progress.split_evenly(60) {
             // won't get this many trees, because some will be blocked
             let tree_origin = possible_tree_origins.random_cube(&mut rng).unwrap();
-            let height = rng.gen_range(1..8);
+            let height = rng.random_range(1..8);
             let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
                 nx: height / 3,
                 ny: 0,
