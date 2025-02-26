@@ -1,5 +1,5 @@
 # Configuration file for <https://crates.io/crates/cargo-deny>.
-# Use this as `cargo deny --config tools/deny.toml`.
+# When updating this, also review all-is-cubes-wasm/deny.toml.
 
 [graph]
 # This list of features excludes the "rerun" and "gltf" features

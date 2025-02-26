@@ -1,0 +1,45 @@
+# Configuration file for <https://crates.io/crates/cargo-deny>.
+
+[graph]
+features = []
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    # "MPL-2.0", # does not occur currently
+    "BSD-3-Clause",
+    "BSL-1.0",
+    # "ISC", # does not occur currently
+    "Unicode-3.0",
+    "Zlib",
+    "CC0-1.0",
+]
+private = { ignore = true }
+
+[advisories]
+yanked = "deny"
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow" # TODO: should be deny, but triggers a bug I can't repro independently
+allow-wildcard-paths = true
+# We might want to be stricter about default-features...
+# workspace-default-features = "warn"
+# external-default-features = "warn"
+
+skip = [
+    { name = "syn", version = "1" },
+    { name = "miniz_oxide" },
+    { name = "bitflags", version = "1" } # via `png`; will be updated next release
+]
+
+skip-tree = [
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = [
+    "https://github.com/kpreid/nosy"
+]
