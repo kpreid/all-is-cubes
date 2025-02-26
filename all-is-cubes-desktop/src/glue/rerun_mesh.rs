@@ -117,14 +117,15 @@ impl RerunMesher {
                     mesh: rg::archetypes::Mesh3D::new([[0., 0., 0.]; 0]),
                 };
 
-                if let Some(translation) = singleton_translation {
-                    dm.destination.log(
-                        &rg::entity_path![],
-                        &rg::archetypes::Transform3D::from_translation(rg::convert_vec(
-                            translation,
-                        )),
-                    );
-                }
+                let transform = if let Some(translation) = singleton_translation {
+                    rg::archetypes::InstancePoses3D::new()
+                        .with_translations([rg::convert_vec(translation)])
+                } else {
+                    // Log a transform which will hide the mesh until we reveal it later.
+                    rg::archetypes::InstancePoses3D::new().with_scales([0.0])
+                };
+
+                dm.destination.log(&rg::entity_path![], &transform);
 
                 dm
             });
@@ -154,7 +155,9 @@ impl RerunMesher {
                     });
                     dm.destination.log(
                         &rg::entity_path![],
-                        &rg::archetypes::InstancePoses3D::new().with_translations(translations),
+                        &rg::archetypes::InstancePoses3D::new()
+                            .with_scales([1.0]) // override earlier dummy scale
+                            .with_translations(translations),
                     )
                 }
             }
