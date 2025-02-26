@@ -7,7 +7,7 @@ use crate::math::{self, Axis, Rgb, rgba_const};
 pub use re_log_types::{EntityPath, entity_path};
 pub use re_sdk::{RecordingStream, RecordingStreamBuilder, RecordingStreamResult};
 pub use re_types::datatypes;
-pub use re_types::external::arrow2::types::f16;
+// pub use re_types::external::arrow::types::f16;
 pub use re_types::{archetypes, components, view_coordinates};
 
 /// Information that an entity or parent of entities can store in order to know where to
@@ -71,17 +71,17 @@ impl Destination {
         self.catch(|| self.stream.log_static(self.path.join(path_suffix), data))
     }
 
-    pub fn log_component_batches<'a>(
-        &self,
-        path_suffix: &EntityPath,
-        r#static: bool,
-        data: impl IntoIterator<Item = &'a dyn re_sdk::ComponentBatch>,
-    ) {
-        self.catch(|| {
-            self.stream
-                .log_component_batches(self.path.join(path_suffix), r#static, data)
-        })
-    }
+    // pub fn log_component_batches<'a>(
+    //     &self,
+    //     path_suffix: &EntityPath,
+    //     r#static: bool,
+    //     data: impl IntoIterator<Item = &'a dyn re_sdk::ComponentBatch>,
+    // ) {
+    //     self.catch(|| {
+    //         self.stream
+    //             .log_component_batches(self.path.join(path_suffix), r#static, data)
+    //     })
+    // }
 
     pub fn clear_recursive(&self, path_suffix: &EntityPath) {
         // TODO: this is no longer necessary
@@ -261,12 +261,9 @@ pub fn convert_camera_to_pinhole(
         half.width,             half.height,              1.,
     ]);
     (
-        archetypes::Pinhole {
-            image_from_camera: components::PinholeProjection(pinhole_matrix),
-            resolution: Some(components::Resolution(datatypes::Vec2D(size.into()))),
-            camera_xyz: Some(OUR_VIEW_COORDINATES),
-            image_plane_distance: Some((2.0f32).into()),
-        },
+        archetypes::Pinhole::new(components::PinholeProjection(pinhole_matrix))
+            .with_camera_xyz(OUR_VIEW_COORDINATES)
+            .with_image_plane_distance(2.0f32),
         convert_transform(camera.view_transform())
             .with_relation(components::TransformRelation::ParentFromChild)
             .with_axis_length(1.0f32),

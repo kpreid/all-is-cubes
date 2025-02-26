@@ -153,20 +153,16 @@ impl log::Log for AicLogger {
 
             self.rerun_destination.log(
                 &rg::entity_path![],
-                &rg::archetypes::TextLog {
-                    text: record.args().to_string().into(),
-                    level: Some(TextLogLevel(
-                        match record.level() {
-                            log::Level::Error => TextLogLevel::ERROR,
-                            log::Level::Warn => TextLogLevel::WARN,
-                            log::Level::Info => TextLogLevel::INFO,
-                            log::Level::Debug => TextLogLevel::DEBUG,
-                            log::Level::Trace => TextLogLevel::TRACE,
-                        }
-                        .into(),
-                    )),
-                    color: None,
-                },
+                &rg::archetypes::TextLog::new(record.args().to_string()).with_level(TextLogLevel(
+                    match record.level() {
+                        log::Level::Error => TextLogLevel::ERROR,
+                        log::Level::Warn => TextLogLevel::WARN,
+                        log::Level::Info => TextLogLevel::INFO,
+                        log::Level::Debug => TextLogLevel::DEBUG,
+                        log::Level::Trace => TextLogLevel::TRACE,
+                    }
+                    .into(),
+                )),
             );
         }
     }

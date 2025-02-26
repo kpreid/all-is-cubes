@@ -270,40 +270,28 @@ fn perform_image_copy(
     // currently doesn't.
     let (pinhole, transform) = rg::convert_camera_to_pinhole(camera);
 
-    let depth_range = Some(rg::components::ValueRange::new(
+    let depth_range = rg::datatypes::Range1D([
         camera.near_plane_distance().into_inner(),
         camera.view_distance().into_inner(),
-    ));
+    ]);
 
     Box::pin(async move {
         let color_data: Vec<u8> = color_future.await;
         let depth_data: Vec<f32> = depth_future.await;
 
         (
-            rg::archetypes::Image {
-                buffer: color_data.into(),
-                format: rg::datatypes::ImageFormat::rgba8([size.width, size.height]).into(),
-                draw_order: None,
-                opacity: None,
-            },
-            rg::archetypes::DepthImage {
-                buffer: depth_data
+            rg::archetypes::Image::from_rgba32(color_data, [size.width, size.height]),
+            rg::archetypes::DepthImage::from_data_type_and_bytes(
+                depth_data
                     .into_iter()
                     .map(f32::to_ne_bytes)
                     .collect::<Vec<[u8; 4]>>()
-                    .into_flattened()
-                    .into(),
-                format: rg::datatypes::ImageFormat::depth(
-                    [size.width, size.height],
-                    rg::datatypes::ChannelDatatype::F32,
-                )
-                .into(),
-                meter: Some(1f32.into()),
-                depth_range,
-                draw_order: None,
-                colormap: None,
-                point_fill_ratio: None,
-            },
+                    .into_flattened(),
+                [size.width, size.height],
+                rg::datatypes::ChannelDatatype::F32,
+            )
+            .with_meter(1f32)
+            .with_depth_range(depth_range),
             pinhole,
             transform,
         )

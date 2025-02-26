@@ -612,7 +612,7 @@ impl AllocatorBacking {
             &rg::entity_path![],
             &rg::archetypes::Transform3D::from_scale(0.0),
         );
-        destination.log(&rg::entity_path![], &rg::archetypes::ViewCoordinates::RUF);
+        destination.log(&rg::entity_path![], &rg::archetypes::ViewCoordinates::RUF());
         self.rerun_destination = destination;
     }
 }

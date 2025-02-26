@@ -145,16 +145,15 @@ impl RerunMesher {
         for (i, cubes) in instances {
             if let Some(mesh) = self.csm.block_instance_mesh(i) {
                 if let Some(dm) = &mesh.render_data {
-                    let translations: &dyn re_sdk::ComponentBatch = &cubes
-                        .into_iter()
-                        .map(|cube| {
-                            rg::components::PoseTranslation3D(rg::convert_vec(
-                                cube.lower_bounds().to_vector(),
-                            ))
-                        })
-                        .collect::<Vec<_>>();
-                    dm.destination
-                        .log_component_batches(&rg::entity_path![], false, [translations])
+                    let translations = cubes.into_iter().map(|cube| {
+                        rg::components::PoseTranslation3D(rg::convert_vec(
+                            cube.lower_bounds().to_vector(),
+                        ))
+                    });
+                    dm.destination.log(
+                        &rg::entity_path![],
+                        &rg::archetypes::InstancePoses3D::new().with_translations(translations),
+                    )
                 }
             }
         }
@@ -162,18 +161,9 @@ impl RerunMesher {
 }
 
 fn convert_to_rerun_mesh(input: &mesh::SpaceMesh<Mt>, output: &mut rg::archetypes::Mesh3D) {
-    output.vertex_positions.clear();
-    output
-        .vertex_positions
-        .extend(input.vertices().iter().map(|v| v.position));
-
-    let colors = output.vertex_colors.get_or_insert_default();
-    colors.clear();
-    colors.extend(input.vertices().iter().map(|v| v.color));
-
-    let indices = output.triangle_indices.get_or_insert_default();
-    indices.clear();
-    indices.extend(input.indices().iter_u32().tuples().map(|(i1, i2, i3)| {
-        rg::components::TriangleIndices(rg::datatypes::UVec3D::new(i1, i2, i3))
-    }));
+    *output = rg::archetypes::Mesh3D::new(input.vertices().iter().map(|v| v.position))
+        .with_vertex_colors(input.vertices().iter().map(|v| v.color))
+        .with_triangle_indices(input.indices().iter_u32().tuples().map(|(i1, i2, i3)| {
+            rg::components::TriangleIndices(rg::datatypes::UVec3D::new(i1, i2, i3))
+        }));
 }
