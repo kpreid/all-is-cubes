@@ -1,25 +1,7 @@
-//! Items not specific to a particular GPU API.
-
 use core::ops;
 use core::time::Duration;
 
 use all_is_cubes_render::camera::Layers;
-
-mod debug_lines;
-pub(crate) use debug_lines::*;
-mod draw_to_texture;
-pub(crate) use draw_to_texture::*;
-mod id;
-pub(crate) use id::*;
-mod info;
-pub use info::*;
-mod msw;
-pub(crate) use msw::Msw;
-
-#[doc(hidden)] // Exported only for use by fuzz_octree
-pub mod octree_alloc;
-
-pub(crate) mod reloadable;
 
 /// A plan for the maximum amount of time to use for each step of each frame of rendering.
 ///
@@ -95,67 +77,5 @@ impl ops::Sub<Duration> for AdaptedInstant {
     type Output = Self;
     fn sub(self, rhs: Duration) -> Self::Output {
         Self(ops::Sub::sub(self.0, rhs))
-    }
-}
-
-#[cfg(feature = "rerun")]
-#[doc(hidden)] // not stable, just exists to support config from desktop cmdline
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-#[allow(clippy::exhaustive_structs)] // hidden, not stable
-pub struct RerunFilter {
-    /// Log performance info
-    pub performance: bool,
-    /// Log the rendered image.
-    pub image: bool,
-    /// Log the contents of the texture atlases.
-    pub textures: bool,
-}
-
-/// Single-entry cache.
-#[derive(Clone, Debug)]
-pub(crate) struct Memo<K, V> {
-    data: Option<(K, V)>,
-}
-
-impl<K: Eq, V> Memo<K, V> {
-    pub fn new() -> Self {
-        Self { data: None }
-    }
-
-    pub fn get_or_insert(&mut self, key: K, value_fn: impl FnOnce() -> V) -> &mut V
-    where
-        K: Copy,
-    {
-        match &mut self.data {
-            Some((k, v)) => {
-                if *k == key {
-                    v
-                } else {
-                    *v = value_fn();
-                    *k = key;
-                    v
-                }
-            }
-            d @ None => {
-                let (_k, v) = d.insert((key, value_fn()));
-                v
-            }
-        }
-    }
-
-    pub(crate) fn get(&self) -> Option<&V> {
-        self.data.as_ref().map(|(_k, v)| v)
-    }
-
-    /// Drop the stored value, if any.
-    #[cfg_attr(not(feature = "rerun"), expect(unused))] // currently not otherwise used
-    pub fn clear(&mut self) {
-        self.data = None;
-    }
-}
-
-impl<K, V> Default for Memo<K, V> {
-    fn default() -> Self {
-        Self { data: None }
     }
 }
