@@ -116,10 +116,7 @@ impl GltfDataDestination {
             // TODO: Only do this if we exceed the in-memory limit?
             let unique_file_suffix: String = {
                 let mut suffix_uses = self.0.suffix_uses.lock().map_err(|_| {
-                    io::Error::new(
-                        io::ErrorKind::Other,
-                        "previous panic while using GltfDataDestination",
-                    )
+                    io::Error::other("previous panic while using GltfDataDestination")
                 })?;
                 make_unique_name(proposed_file_name, &mut suffix_uses)
             };
@@ -259,10 +256,9 @@ impl io::Write for SwitchingWriter {
                 let n = buffer.write(bytes)?;
                 if buffer.len() > limit {
                     let path = path.as_ref().ok_or_else(|| {
-                        io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("no destination was provided for glTF buffers > {limit} bytes"),
-                        )
+                        io::Error::other(format!(
+                            "no destination was provided for glTF buffers > {limit} bytes"
+                        ))
                     })?;
                     // TODO: refuse to overwrite existing files unless we are also overwriting a corresponding .gltf
                     let file = File::create(path)?;
