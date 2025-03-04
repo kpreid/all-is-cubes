@@ -474,7 +474,7 @@ mod trace_image {
 
         // x.max(1) is zero-sized-viewport protection; the chunk size will be wrong, but there
         // will be zero chunks anyway.
-        let total_info = output
+        output
             .par_chunks_mut(viewport_size.width.max(1))
             .enumerate()
             .map(move |(ych, raster_row)| {
@@ -495,9 +495,7 @@ mod trace_image {
                     })
             })
             .flatten()
-            .sum();
-
-        total_info
+            .sum() // sum of info
     }
 
     /// Compute a full image, writing it into `output`.
