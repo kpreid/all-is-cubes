@@ -386,7 +386,7 @@ where
         Some(match self.surface_iter.next()? {
             TraceStep::EnterSurface(this_surface) => {
                 let exit_t_distance = this_surface.t_distance;
-                match core::mem::replace(&mut self.last_surface, Some(this_surface)) {
+                match self.last_surface.replace(this_surface) {
                     Some(last_surface) => DepthStep::Span(Span {
                         surface: last_surface,
                         exit_t_distance,
