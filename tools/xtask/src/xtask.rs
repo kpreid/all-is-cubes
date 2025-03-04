@@ -1004,7 +1004,11 @@ static PROJECT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     );
     // Sanity check
     assert!(path.is_absolute());
-    assert!(path.ends_with("tools/xtask"), "{path:?}");
+    assert!(
+        path.ends_with("tools/xtask"),
+        "CARGO_MANIFEST_DIR unexpectedly did not end with “tools/xtask”, but was {}",
+        path.display()
+    );
     // Since we are the xtask binary, we'll be given the path to the xtask package.
     // Pop `tools/xtask` to become the path to the main project directory.
     path.pop();

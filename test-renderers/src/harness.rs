@@ -327,7 +327,7 @@ where
             eprint!("{label:?}...");
             _ = io::stderr().flush();
             let universe: Arc<Universe> = uf.future.clone().await;
-            eprintln!("writing to {file_path:?}...");
+            eprintln!("writing to “{}”...", file_path.display());
 
             let mut file = fs::File::create(file_path).expect("creating dump file failed");
             serde_json::to_writer(&file, &universe).expect("serializing dump universe failed");
