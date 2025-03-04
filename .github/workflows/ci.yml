@@ -107,11 +107,12 @@ jobs:
       # The rust-toolchain.toml file specifies the targets and components we need,
       # but we may want to override the toolchain.
       if: ${{ matrix.toolchain != 'stable' }}
-      run: |
-          sed -i.origstable "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
-          rustup show  # triggers installation of selected toolchain
+      run: sed -i.origstable "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
 
-    - name: Install nightly for -Z direct-minimal-versions
+    - name: Install Rust toolchain
+      run: rustup show active-toolchain || rustup toolchain install
+
+    - name: Install nightly toolchain for -Z direct-minimal-versions
       if: ${{ matrix.depversions == 'minimal' }}
       run: rustup toolchain install nightly --profile=minimal 
 
@@ -287,10 +288,11 @@ jobs:
       # The rust-toolchain.toml file specifies the targets and components we need,
       # but we may want to override the toolchain.
       if: ${{ matrix.toolchain != 'stable' }}
-      run: |
-          sed -i.origstable "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
-          rustup show  # triggers installation of selected toolchain
-
+      run: sed -i.origstable "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
+    
+    - name: Install Rust toolchain
+      run: rustup show active-toolchain || rustup toolchain install
+    
     - name: Install native libraries
       if: ${{ runner.os == 'Linux' }}
       run: |
