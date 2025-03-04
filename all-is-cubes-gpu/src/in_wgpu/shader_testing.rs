@@ -219,6 +219,7 @@ where
         });
         render_pass.set_bind_group(0, &camera_buffer.bind_group, &[]);
         render_pass.set_bind_group(1, &space_bind_group, &[]);
+        render_pass.set_bind_group(2, &pipelines.blocks_static_bind_group, &[]);
 
         render_pass.set_pipeline(&test_pipeline);
 
