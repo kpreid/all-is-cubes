@@ -224,8 +224,8 @@ jobs:
           ./
           all-is-cubes-wasm/
 
-    # cargo-about should be restored from the cache, but the cache might fail.
-    - run: cargo install --locked cargo-about@0.6.1
+    # cargo-about should be restored from the cache, but the cache might miss.
+    - run: cargo install --locked wasm-pack@0.13.0 cargo-about@0.6.1
 
     - run: cargo build --package xtask
     
