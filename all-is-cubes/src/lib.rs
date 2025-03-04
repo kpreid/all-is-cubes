@@ -1,5 +1,6 @@
 #![feature(assert_matches)]
 #![feature(doc_notable_trait)]
+#![feature(generic_arg_infer)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(large_assignments)]
 #![move_size_limit = "2000"]
@@ -7,6 +8,7 @@
 #![feature(negative_impls)]
 #![feature(never_type)]
 #![feature(try_blocks)]
+#![feature(type_alias_impl_trait)]
 
 //! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks
 //! are themselves made of “smaller” blocks (voxels) that define their appearance and
