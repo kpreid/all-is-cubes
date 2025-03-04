@@ -70,12 +70,7 @@ jobs:
       # The rust-toolchain.toml file specifies the targets and components we need,
       # but we may want to override the toolchain.
       if: ${{ matrix.toolchain != 'stable' }}
-      # Note: for some reason, without including multiple commands, this fails on Windows
-      # with a parse error:
-      #   /usr/bin/sed: -e expression #1, char 1: unknown command: `.'
-      run: | 
-        sed -i.origstable "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
-        echo
+      run: perl -pi -e "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
 
     - name: Install Rust toolchain
       run: rustup show active-toolchain || rustup toolchain install

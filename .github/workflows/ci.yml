@@ -107,7 +107,7 @@ jobs:
       # The rust-toolchain.toml file specifies the targets and components we need,
       # but we may want to override the toolchain.
       if: ${{ matrix.toolchain != 'stable' }}
-      run: sed -i.origstable "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
+      run: perl -pi -e "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
 
     - name: Install Rust toolchain
       run: rustup show active-toolchain || rustup toolchain install
@@ -288,7 +288,7 @@ jobs:
       # The rust-toolchain.toml file specifies the targets and components we need,
       # but we may want to override the toolchain.
       if: ${{ matrix.toolchain != 'stable' }}
-      run: sed -i.origstable "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
+      run: perl -pi -e "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
     
     - name: Install Rust toolchain
       run: rustup show active-toolchain || rustup toolchain install
