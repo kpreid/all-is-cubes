@@ -444,7 +444,7 @@ impl LightTexture {
         for chunk_batch in &itertools::Itertools::chunks(chunks, Self::COPY_BUFFER_CHUNKS) {
             #[allow(clippy::large_stack_arrays)]
             let mut data: [[Texel; LIGHT_CHUNK_VOLUME]; Self::COPY_BUFFER_CHUNKS] =
-                [[[0; Self::COMPONENTS]; LIGHT_CHUNK_VOLUME]; Self::COPY_BUFFER_CHUNKS];
+                [[[0; _]; _]; _];
             let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("space light scatter-copy"),
             });

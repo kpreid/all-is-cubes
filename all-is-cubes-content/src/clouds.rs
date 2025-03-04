@@ -36,8 +36,7 @@ pub fn clouds(
             })
             .build()
     }
-    const LEVELS: usize = 4;
-    let blocks: [Block; LEVELS] = [
+    let blocks: [Block; _] = [
         cloud_block(0.25),
         cloud_block(0.50),
         cloud_block(0.75),
@@ -60,7 +59,7 @@ pub fn clouds(
                 if alpha <= 0. {
                     continue;
                 }
-                let block = &blocks[(alpha / (LEVELS as f32 + 0.99)) as usize];
+                let block = &blocks[(alpha / (blocks.len() as f32 + 0.99)) as usize];
                 m.set(cube, block)?;
             }
         }

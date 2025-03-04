@@ -42,7 +42,7 @@ pub(crate) struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
-            luminance_samples: [1.0; 100],
+            luminance_samples: [1.0; _],
             luminance_sample_index: 0,
             exposure_log: 0.0,
         }
