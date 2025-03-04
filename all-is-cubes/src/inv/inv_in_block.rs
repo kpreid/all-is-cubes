@@ -226,7 +226,10 @@ impl IconRow {
             // Taking the minimum of opposing corners accounts for which direction the
             // block extends.
             origin: transform.checked_transform_point(self.origin)?.min(
-                transform.checked_transform_point(self.origin + GridVector::splat(icon_size))?,
+                transform.checked_transform_point(checked_add_point_vector(
+                    self.origin,
+                    GridVector::splat(icon_size),
+                )?)?,
             ),
             stride: transform.rotation.checked_transform_vector(self.stride)?,
         })
@@ -273,6 +276,14 @@ impl<'a> arbitrary::Arbitrary<'a> for IconRow {
             <[GridCoordinate; 3] as Arbitrary>::size_hint(depth),
         ])
     }
+}
+
+fn checked_add_point_vector(p: GridPoint, v: GridVector) -> Option<GridPoint> {
+    Some(GridPoint::new(
+        p.x.checked_add(v.x)?,
+        p.y.checked_add(v.y)?,
+        p.z.checked_add(v.z)?,
+    ))
 }
 
 #[cfg(test)]
@@ -394,14 +405,27 @@ mod tests {
 
     #[test]
     fn rotate_row_overflow() {
+        // For coverage, two cases:
+        // 1. case without icon size involved
         assert_eq!(
             IconRow {
                 first_slot: 0,
                 count: 10,
-                origin: GridPoint::new(1397969747, -2147483648, 255827,),
-                stride: GridVector::new(134767872, 2820644, 7285711,),
+                origin: GridPoint::new(1397969747, -2147483648, 255827),
+                stride: GridVector::new(134767872, 2820644, 7285711),
             }
-            .rotate(Gridgid::from_rotation_about_origin(GridRotation::Rxyz,), 1),
+            .rotate(Gridgid::from_rotation_about_origin(GridRotation::Rxyz), 1),
+            None,
+        );
+        // 1. case where icon size causes the overflow
+        assert_eq!(
+            IconRow {
+                first_slot: 0,
+                count: 10,
+                origin: GridPoint::new(1397969747, i32::MAX - 1, 255827),
+                stride: GridVector::new(134767872, 2820644, 7285711),
+            }
+            .rotate(Gridgid::from_rotation_about_origin(GridRotation::Rxyz), 4),
             None,
         );
     }
