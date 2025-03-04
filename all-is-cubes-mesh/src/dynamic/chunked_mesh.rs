@@ -173,6 +173,9 @@ where
 
     /// Retrieves the mesh for a block which should be rendered according to
     /// [`ChunkMesh::block_instances()`].
+    ///
+    /// If this returns [`None`], then the block is not a candidate for instanced rendering
+    /// and the index should never appear in `block_instances()`.
     pub fn block_instance_mesh(&self, block_index: BlockIndex) -> Option<&InstanceMesh<M>> {
         self.block_meshes
             .meshes

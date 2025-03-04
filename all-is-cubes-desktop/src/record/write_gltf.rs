@@ -32,8 +32,8 @@ impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for RecordGltfMt {
 
     type Instant = std::time::Instant;
 
-    // TODO(instancing): Implement instance rendering and set this appropriately.
-    const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = usize::MAX;
+    // TODO(instancing): Tune this value (or make it configurable).
+    const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = 300;
 }
 
 #[derive(Debug)]
@@ -100,19 +100,31 @@ impl MeshRecorder {
             let _ = self.scene_sender.send(msg);
         }
 
+        let mut instances: Vec<(MeshIndexCell, GridVector)> = Vec::new();
+        for c in self.csm.iter_chunks() {
+            let csm = &self.csm;
+            instances.extend(
+                c.block_instances()
+                    .flat_map(move |(block_index, positions)| {
+                        positions.filter_map(move |position| {
+                            Some((
+                                csm.block_instance_mesh(block_index)?.render_data.clone(),
+                                position.lower_bounds().to_vector(),
+                            ))
+                        })
+                    }),
+            );
+            instances.push((
+                c.render_data.clone(),
+                c.position().bounds().lower_bounds().to_vector(),
+            ))
+        }
+
         self.scene_sender
             .send(MeshRecordMsg::FinishFrame(
                 this_frame_number,
                 self.cameras.cameras().world.clone(),
-                self.csm
-                    .iter_chunks()
-                    .map(|c| {
-                        (
-                            c.render_data.clone(),
-                            c.position().bounds().lower_bounds().to_vector(),
-                        )
-                    })
-                    .collect(),
+                instances,
             ))
             .expect("channel closed; recorder render thread died?")
     }
