@@ -1,3 +1,4 @@
+#![feature(generic_arg_infer)]
 #![feature(large_assignments)]
 #![move_size_limit = "5000"]
 
