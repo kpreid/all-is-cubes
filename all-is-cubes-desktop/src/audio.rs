@@ -90,7 +90,8 @@ fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: Aud
         sample_rate: 44100,
         frames: (0..440)
             .map(|i| {
-                #[allow(clippy::manual_midpoint)]
+                #[allow(unknown_lints, reason = "not yet released on stable")]
+                #[allow(clippy::manual_midpoint, reason = "not a midpoint")]
                 let envelope = ((i as f32 / 440. * PI).sin() + 1.0) / 2.0;
                 let wave = (i as f32 / 44.1 * 0.25).sin() * envelope;
                 kira::Frame {
