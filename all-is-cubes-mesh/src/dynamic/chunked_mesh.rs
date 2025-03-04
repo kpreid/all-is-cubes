@@ -286,7 +286,7 @@ where
         let view_chunk_is_different = self.view_chunk != view_chunk;
         self.view_chunk = view_chunk;
 
-        let todo: &mut CsmTodo<CHUNK_SIZE> = &mut self.todo.lock();
+        let todo: &mut CsmTodo<_> = &mut self.todo.lock();
 
         let space = &*if let Ok(space) = self.space.read(read_ticket) {
             space
@@ -459,7 +459,7 @@ where
             });
 
         // Update some chunk geometry and depth sorting.
-        let chunk_updater = |mut state: ChunkUpdateState<M, CHUNK_SIZE>| {
+        let chunk_updater = |mut state: ChunkUpdateState<M, _>| {
             // TODO: The current split between this function and ChunkMesh::recompute() is
             // awkward and leads to misleading TimeStats results. It is motivated by keeping
             // ChunkUpdateState private to the parallel update process, but it's not clear
