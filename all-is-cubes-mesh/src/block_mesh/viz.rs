@@ -28,6 +28,7 @@ use {
 /// compiles to nothing if the "rerun" feature is not enabled.
 #[doc(hidden)]
 #[expect(missing_debug_implementations)]
+#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
 pub enum Viz {
     Disabled,

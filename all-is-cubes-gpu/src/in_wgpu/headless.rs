@@ -114,6 +114,7 @@ struct RendererImpl {
 }
 
 /// Messages from [`Renderer`] to [`RendererImpl`].
+#[allow(clippy::large_enum_variant)]
 pub(super) enum RenderMsg {
     Update(Option<Cursor>, oneshot::Sender<Result<(), RenderError>>),
     Render(String, oneshot::Sender<Result<Rendering, RenderError>>),

@@ -43,6 +43,7 @@ pub(crate) struct Recorder {
 
 // TODO: should this be a trait? It's also an awful lot like HeadlessRenderer, except without the image output...
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 enum RecorderInner {
     Shutdown,
     Raytrace(RtRecorder),

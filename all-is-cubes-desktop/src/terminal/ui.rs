@@ -38,6 +38,7 @@ pub struct TerminalWindow {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(super) enum OutMsg {
     BeginFullscreen,
     WriteUiAndFrame(UiFrame),
