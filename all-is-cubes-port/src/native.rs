@@ -24,7 +24,7 @@ pub(crate) fn import_native_json(
         detail: if error.is_eof() || error.is_io() {
             ImportErrorKind::Read {
                 path: None,
-                error: io::Error::new(io::ErrorKind::Other, error),
+                error: io::Error::other(error),
             }
         } else {
             ImportErrorKind::Parse(Box::new(error))
@@ -43,7 +43,7 @@ pub(crate) async fn export_native_json(
     let ExportSet { contents } = source;
     serde_json::to_writer(destination, &contents).map_err(|error| {
         // TODO: report non-IO errors distinctly
-        ExportError::Write(io::Error::new(io::ErrorKind::Other, error))
+        ExportError::Write(io::Error::other(error))
     })?;
     progress.finish().await;
     Ok(())
