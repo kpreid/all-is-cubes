@@ -34,7 +34,7 @@ use all_is_cubes_render::camera::Camera;
 use all_is_cubes_render::{Flaws, RenderError};
 
 use crate::in_wgpu::block_texture::BlockTextureViews;
-use crate::in_wgpu::glue::{buffer_size_of, to_wgpu_index_format};
+use crate::in_wgpu::glue::{MapVec, buffer_size_of, to_wgpu_index_format};
 use crate::in_wgpu::light_texture::LightChunk;
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::skybox;
@@ -474,16 +474,19 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         let view_chunk = csm.view_chunk();
 
-        // Accumulates instance data for meshes, which we will then write to self.instance_buffer
-        // *before* submitting the rendering command buffer.
-        // TODO: Make this a direct wgpu::BufferView instead of copying.
-        let mut instance_data: Vec<WgpuInstanceData> = Vec::with_capacity(
-            self.instance_buffer
-                .get()
-                .map_or(0, |buffer| usize::try_from(buffer.size()).unwrap_or(0)),
-        );
-
         self.write_camera_only(bwp.reborrow(), camera);
+
+        // If we have a instance buffer (which will have been previously allocated with sufficient
+        // size), prepare to write to it via the staging belt.
+        let mut instance_buffer_view: Option<wgpu::BufferViewMut<'_>> = self
+            .instance_buffer
+            .get()
+            .and_then(|b| Some((b, wgpu::BufferSize::new(b.size())?)))
+            .map(|(b, size)| bwp.write_buffer(b, 0, size));
+        let mut instance_buffer_writer: MapVec<'_, WgpuInstanceData> = match instance_buffer_view {
+            Some(ref mut view) => MapVec::new(view),
+            None => MapVec::default(),
+        };
 
         render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
         render_pass.set_bind_group(2, &pipelines.blocks_static_bind_group, &[]);
@@ -502,23 +505,33 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         // Helper for the common logic of opaque + transparent drawing of a single instance
         // that's a chunk mesh (i.e. instance range is length 1).
+        #[allow(clippy::too_many_arguments)]
         fn draw_chunk_instance<'pass>(
             range: std::ops::Range<usize>,
             render_pass: &mut wgpu::RenderPass<'pass>,
             buffers: &'pass ChunkBuffers,
-            instance_data: &mut Vec<WgpuInstanceData>,
+            instance_buffer_writer: &mut MapVec<'_, WgpuInstanceData>,
             chunk_pos: ChunkPos<CHUNK_SIZE>,
             squares_drawn: &mut usize,
+            flaws: &mut Flaws,
             in_world_debug_label: &'static str,
         ) {
             if !range.is_empty() {
                 set_buffers(render_pass, buffers);
-                let id = u32::try_from(instance_data.len()).unwrap();
+                let id = u32::try_from(instance_buffer_writer.len()).unwrap();
 
-                instance_data.push(WgpuInstanceData::new(
+                let ok = instance_buffer_writer.push(&WgpuInstanceData::new(
                     chunk_pos.bounds().lower_bounds().to_vector(),
                     &format_args!("Ch{in_world_debug_label}"),
                 ));
+                if !ok {
+                    if !flaws.contains(Flaws::UNFINISHED) {
+                        *flaws |= Flaws::UNFINISHED;
+                        log::warn!("instance buffer too small for {} instances", id + 1);
+                    }
+                    return;
+                }
+
                 render_pass.draw_indexed(to_wgpu_index_range(range.clone()), 0, id..(id + 1));
                 *squares_drawn += range.len() / 6;
             }
@@ -557,18 +570,20 @@ impl<I: time::Instant> SpaceRenderer<I> {
                             chunk.mesh().opaque_range(),
                             render_pass,
                             buffers,
-                            &mut instance_data,
+                            &mut instance_buffer_writer,
                             chunk.position(),
                             &mut 0,
+                            &mut flaws,
                             "",
                         );
                         draw_chunk_instance(
                             chunk.mesh().transparent_range(DepthOrdering::Any),
                             render_pass,
                             buffers,
-                            &mut instance_data,
+                            &mut instance_buffer_writer,
                             chunk.position(),
                             &mut 0,
+                            &mut flaws,
                             "",
                         );
                     }
@@ -604,9 +619,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
                         chunk.mesh().opaque_range(),
                         render_pass,
                         buffers,
-                        &mut instance_data,
+                        &mut instance_buffer_writer,
                         chunk.position(),
                         &mut squares_drawn,
+                        &mut flaws,
                         "O",
                     );
                 } else {
@@ -636,22 +652,28 @@ impl<I: time::Instant> SpaceRenderer<I> {
             };
             set_buffers(render_pass, buffers);
 
-            let first_instance_index = u32::try_from(instance_data.len()).unwrap();
-            let cubes_len = cubes.len();
+            let first_instance_index = u32::try_from(instance_buffer_writer.len()).unwrap();
+            let mut count: u32 = 0;
             for cube in cubes {
-                instance_data.push(WgpuInstanceData::new(
+                let ok = instance_buffer_writer.push(&WgpuInstanceData::new(
                     cube.lower_bounds().to_vector(),
                     &format_args!("IO{block_index}"),
                 ));
+                if ok {
+                    count += 1;
+                } else {
+                    if !flaws.contains(Flaws::UNFINISHED) {
+                        flaws |= Flaws::UNFINISHED;
+                        log::warn!("instance buffer too small");
+                    }
+                    break;
+                }
             }
             // Record draw command for all instances using this mesh
-            render_pass.draw_indexed(
-                to_wgpu_index_range(meta.opaque_range()),
-                0,
-                first_instance_index..(first_instance_index + cubes_len as u32),
-            );
-            blocks_drawn += cubes_len;
-            squares_drawn += meta.opaque_range().len() / 6;
+            let instance_range = first_instance_index..(first_instance_index + count);
+            blocks_drawn += instance_range.len();
+            squares_drawn += (meta.opaque_range().len() / 6) * instance_range.len();
+            render_pass.draw_indexed(to_wgpu_index_range(meta.opaque_range()), 0, instance_range);
 
             // If we are doing overdraw visualization, run the depthless overdraw visualization.
             // We do this here so that we can take advantage of the state in this loop, even though
@@ -662,7 +684,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 render_pass.draw_indexed(
                     to_wgpu_index_range(meta.opaque_range()),
                     0,
-                    first_instance_index..(first_instance_index + cubes_len as u32),
+                    first_instance_index..(first_instance_index + count),
                 );
                 // Restore previous pipeline
                 render_pass.set_pipeline(pipeline_for_opaque);
@@ -693,9 +715,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
                             )),
                             render_pass,
                             buffers,
-                            &mut instance_data,
+                            &mut instance_buffer_writer,
                             chunk.position(),
                             &mut squares_drawn,
+                            &mut flaws,
                             "T",
                         );
                     }
@@ -703,37 +726,6 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 }
                 // TODO: transparent instances support
                 _ = instances_in_view;
-            }
-        }
-
-        let start_instance_copy_time = I::now();
-
-        // Copy instance_data to self.instance_buffer now that we've accumulated everything that
-        // goes in it. Note that this copy is submitted immediately to the queue, which means it
-        // will be executed *before* the command buffer containing render commands that read from
-        // instance_buffer.
-        {
-            let mut instance_data = instance_data.as_slice();
-            let buffer_capacity = self.instance_buffer.get().map_or(0, |b| b.size() as usize)
-                / size_of::<WgpuInstanceData>();
-            let len = instance_data.len();
-            if len > buffer_capacity {
-                // Doing anything about this is probably futile, because wgpu will emit a validation
-                // error from the drawing commands, but we can at least report what the problem is.
-                flaws |= Flaws::UNFINISHED;
-                log::warn!(
-                    "instance buffer too small ({buffer_capacity} instances) for drawing \
-                        {len} instances"
-                );
-                instance_data = &instance_data[..buffer_capacity];
-            }
-
-            // if this fails then we are proceeding as if the length is 0 anyway.
-            if let Some(buffer) = self.instance_buffer.get() {
-                let data: &[u8] = bytemuck::must_cast_slice::<WgpuInstanceData, u8>(instance_data);
-                if let Some(size) = wgpu::BufferSize::new(data.len() as u64) {
-                    bwp.write_buffer(buffer, 0, size).copy_from_slice(data);
-                }
             }
         }
 
@@ -745,9 +737,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 .saturating_duration_since(start_opaque_chunk_draw_time),
             draw_opaque_blocks_time: start_draw_transparent_time
                 .saturating_duration_since(start_opaque_instance_draw_time),
-            draw_transparent_time: start_instance_copy_time
-                .saturating_duration_since(start_draw_transparent_time),
-            finalize_time: end_time.saturating_duration_since(start_instance_copy_time),
+            draw_transparent_time: end_time.saturating_duration_since(start_draw_transparent_time),
+            finalize_time: Duration::ZERO, // would be after draw_transparent_time if there was anything
             squares_drawn,
             chunk_meshes_drawn,
             chunks_with_instances_drawn,

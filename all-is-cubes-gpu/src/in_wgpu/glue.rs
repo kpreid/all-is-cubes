@@ -1,5 +1,7 @@
 //! Miscellaneous conversion functions and trait impls for [`wgpu`].
 
+use core::marker::PhantomData;
+use core::mem;
 use core::ops::Range;
 
 use bytemuck::Pod;
@@ -216,6 +218,52 @@ impl ResizingBuffer {
             }
 
             self.buffer = Some(device.create_buffer(descriptor));
+        }
+    }
+}
+
+/// Wraps a byte slice to present a `Vec::push()`-like interface.
+#[derive(Debug)]
+pub(crate) struct MapVec<'buf, T> {
+    unwritten: &'buf mut [u8],
+    len: usize,
+    _phantom: PhantomData<fn(&T)>,
+}
+
+impl<'buf, T: bytemuck::NoUninit> MapVec<'buf, T> {
+    pub fn new(buffer: &'buf mut [u8]) -> Self {
+        Self {
+            unwritten: buffer,
+            len: 0,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Returns the number of elements pushed so far.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Push an element if possible, and return whether there was room to do so.
+    #[must_use]
+    pub fn push(&mut self, value: &T) -> bool {
+        if self.unwritten.len() < size_of::<T>() {
+            return false;
+        }
+        let (to_write, remaining) = mem::take(&mut self.unwritten).split_at_mut(size_of::<T>());
+        self.unwritten = remaining;
+        to_write.copy_from_slice(bytemuck::bytes_of(value));
+        self.len += 1;
+        true
+    }
+}
+
+impl<T> Default for MapVec<'_, T> {
+    fn default() -> Self {
+        Self {
+            unwritten: Default::default(),
+            len: Default::default(),
+            _phantom: Default::default(),
         }
     }
 }
