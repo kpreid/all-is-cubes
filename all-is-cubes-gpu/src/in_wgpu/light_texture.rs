@@ -486,14 +486,8 @@ impl LightTexture {
                 total_count += 1;
             }
 
-            // TODO(efficiency): use `StagingBelt` to write buffer instead.
-            // To do this optimally, `StagingBelt` will need to be modified to allow
-            // us accessing its buffers to issue a `copy_buffer_to_texture` instead of
-            // it issuing a `copy_buffer_to_buffer`.
-            //
-            // It should be worth it, though, as I am informed that `submit()`ing repeatedly
-            // is costly, and by avoiding `write_buffer()` we can just use a single command
-            // buffer.
+            // TODO(efficiency): use `StagingBelt` to write buffer instead, once
+            // https://github.com/gfx-rs/wgpu/pull/6900 makes it into a release.
             queue.write_buffer(
                 &self.copy_buffer,
                 0,

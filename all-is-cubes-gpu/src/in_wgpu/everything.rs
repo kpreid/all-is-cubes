@@ -360,13 +360,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
         let space_infos: Layers<SpaceUpdateInfo> = if should_raytrace(&self.cameras) {
             self.rt.update(cursor_result).unwrap(); // TODO: don't unwrap
-
-            // Update the camera bind group because it will be used by the lines pass.
-            self.space_renderers
-                .world
-                .write_camera_only(queue, &self.cameras.cameras().world);
-
-            // TODO: convey update info
+            // TODO: convey update info instead of zeroes
             Layers::default()
         } else {
             Layers {
@@ -524,6 +518,12 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 should_raytrace(&self.cameras),
                 self.rt.frame_copy_bind_group(),
             ) {
+                // Update camera buffer since space_renderers.world.draw() won't be doing that,
+                // but the lines pass wants to have it available.
+                self.space_renderers
+                    .world
+                    .write_camera_only(queue, &self.cameras.cameras().world);
+
                 // Copy the raytracing target texture (incrementally updated) to the linear scene
                 // texture. This is the simplest way to get it fed into both bloom and postprocessing
                 // passes.
@@ -534,14 +534,11 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 (SpaceDrawInfo::default(), true)
             } else {
                 // Not raytracing, so render the meshes
-
-                let camera = &self.cameras.cameras().world;
-                let sr = &self.space_renderers.world;
-                let info = sr.draw(
+                let info = self.space_renderers.world.draw(
                     queue,
                     &mut world_render_pass,
                     &self.pipelines,
-                    camera,
+                    &self.cameras.cameras().world,
                     /* draw_sky: */ true,
                 );
 
