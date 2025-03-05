@@ -124,7 +124,7 @@ pub(crate) struct BeltWritingParts<'a> {
     pub encoder: &'a mut wgpu::CommandEncoder,
 }
 
-impl BeltWritingParts<'_> {
+impl<'a> BeltWritingParts<'a> {
     /// Borrow `self` to produce another `BeltWritingParts` that can be consumed (moved)
     /// without losing this one.
     pub fn reborrow(&mut self) -> BeltWritingParts<'_> {
@@ -136,11 +136,11 @@ impl BeltWritingParts<'_> {
     }
 
     pub fn write_buffer(
-        &mut self,
+        self,
         target: &wgpu::Buffer,
         offset: wgpu::BufferAddress,
         size: wgpu::BufferSize,
-    ) -> wgpu::BufferViewMut<'_> {
+    ) -> wgpu::BufferViewMut<'a> {
         self.belt
             .write_buffer(self.encoder, target, offset, size, self.device)
     }
@@ -164,7 +164,7 @@ impl ResizingBuffer {
     /// if the existing buffer is used. TODO: Provide a means of lazy loading the label.
     pub(crate) fn write_with_resizing(
         &mut self,
-        mut bwp: BeltWritingParts<'_>,
+        bwp: BeltWritingParts<'_>,
         descriptor: &wgpu::util::BufferInitDescriptor<'_>,
     ) {
         let new_size: u64 = descriptor.contents.len().try_into().unwrap();
@@ -190,6 +190,15 @@ impl ResizingBuffer {
 
             self.buffer = Some(bwp.device.create_buffer_init(descriptor));
         }
+    }
+
+    pub(crate) fn map_without_resizing<'belt>(
+        &self,
+        bwp: BeltWritingParts<'belt>,
+    ) -> Option<wgpu::BufferViewMut<'belt>> {
+        self.get()
+            .and_then(|b| Some((b, wgpu::BufferSize::new(b.size())?)))
+            .map(move |(b, size)| bwp.write_buffer(b, 0, size))
     }
 
     /// Reallocate if needed, but don't write anything.

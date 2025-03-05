@@ -359,7 +359,8 @@ impl<I: time::Instant> SpaceRenderer<I> {
                                 .ok()
                                 .and_then(wgpu::BufferSize::new)
                             {
-                                bwp.write_buffer(index_buf, 0, len)
+                                bwp.reborrow()
+                                    .write_buffer(index_buf, 0, len)
                                     .copy_from_slice(index_buf_bytes);
                             }
                         }
@@ -478,11 +479,12 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         // If we have a instance buffer (which will have been previously allocated with sufficient
         // size), prepare to write to it via the staging belt.
-        let mut instance_buffer_view: Option<wgpu::BufferViewMut<'_>> = self
-            .instance_buffer
-            .get()
-            .and_then(|b| Some((b, wgpu::BufferSize::new(b.size())?)))
-            .map(|(b, size)| bwp.write_buffer(b, 0, size));
+        //
+        // Note: If we find more uses for the belt during drawing, we will need to not have this
+        // long-lived mapping, use multiple belts, or use a manually managed staging buffer for
+        // instances (which might be a good idea itself).
+        let mut instance_buffer_view: Option<wgpu::BufferViewMut<'_>> =
+            self.instance_buffer.map_without_resizing(bwp);
         let mut instance_buffer_writer: MapVec<'_, WgpuInstanceData> = match instance_buffer_view {
             Some(ref mut view) => MapVec::new(view),
             None => MapVec::default(),
@@ -753,7 +755,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
     /// Updates the camera buffer in the same way [`Self::draw()`] does,
     /// so that [`Self::camera_bind_group()`] will be fresh even if `draw()` wasn’t called.
-    pub fn write_camera_only(&self, mut bwp: BeltWritingParts<'_>, camera: &Camera) {
+    pub fn write_camera_only(&self, bwp: BeltWritingParts<'_>, camera: &Camera) {
         bwp.write_buffer(
             &self.camera_buffer.buffer,
             0,
