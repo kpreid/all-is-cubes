@@ -10,6 +10,23 @@ use all_is_cubes::math::{GridSize, Rgba};
 use all_is_cubes_mesh::IndexSlice;
 use num_traits::NumCast;
 
+/// Construct `wgpu::BufferSize` from the size of `T`.
+///
+/// Panics if `T`’s size is zero.
+pub const fn buffer_size_of<T>() -> wgpu::BufferSize {
+    let size: usize = size_of::<T>();
+
+    // Ideally this would be `try_into()` but that's not available in const yet.
+    // It will never overflow unless 128-bit pointers become a thing.
+    let size: u64 = size as u64;
+
+    match wgpu::BufferSize::new(size) {
+        Some(size) => size,
+        // can’t name the type here because formatting in const is not available
+        None => panic!("cannot do buffer operations on zero-sized type"),
+    }
+}
+
 pub fn to_wgpu_color(color: Rgba) -> wgpu::Color {
     // TODO: Check whether this is gamma-correct
     wgpu::Color {

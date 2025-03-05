@@ -19,7 +19,7 @@ use all_is_cubes::rerun_glue as rg;
 
 use crate::in_wgpu::block_texture::AtlasAllocator;
 use crate::in_wgpu::frame_texture::{self, FbtFeatures};
-use crate::in_wgpu::glue::{BeltWritingParts, ResizingBuffer, to_wgpu_color};
+use crate::in_wgpu::glue::{BeltWritingParts, ResizingBuffer, buffer_size_of, to_wgpu_color};
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::postprocess;
 use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
@@ -478,11 +478,23 @@ impl<I: time::Instant> EverythingRenderer<I> {
     pub(crate) fn draw_frame_linear(&mut self, queue: &wgpu::Queue) -> DrawInfo {
         let start_draw_time = I::now();
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("EverythingRenderer::draw_frame_linear()"),
-            });
+        // We need multiple encoders to avoid borrow conflicts between render pass and StagingBelt.
+        let mut pass_encoder =
+            self.device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("EverythingRenderer::draw_frame_linear().pass_encoder"),
+                });
+        let mut belt_encoder =
+            self.device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("EverythingRenderer::draw_frame_linear().belt_encoder"),
+                });
+
+        let mut bwp = BeltWritingParts {
+            device: &self.device,
+            belt: &mut self.staging_belt,
+            encoder: &mut belt_encoder,
+        };
 
         let clear_op = if self.cameras.cameras().world.options().debug_pixel_cost {
             wgpu::LoadOp::Clear(wgpu::Color::BLACK)
@@ -499,7 +511,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             wgpu::LoadOp::Clear(wgpu::Color::BLACK)
         };
 
-        let mut world_render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut world_render_pass = pass_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("EverythingRenderer world_render_pass"),
             color_attachments: &[Some(self.fb.color_attachment_for_scene(clear_op))],
             depth_stencil_attachment: Some(self.fb.depth_attachment_for_scene(
@@ -522,7 +534,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 // but the lines pass wants to have it available.
                 self.space_renderers
                     .world
-                    .write_camera_only(queue, &self.cameras.cameras().world);
+                    .write_camera_only(bwp.reborrow(), &self.cameras.cameras().world);
 
                 // Copy the raytracing target texture (incrementally updated) to the linear scene
                 // texture. This is the simplest way to get it fed into both bloom and postprocessing
@@ -535,7 +547,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             } else {
                 // Not raytracing, so render the meshes
                 let info = self.space_renderers.world.draw(
-                    queue,
+                    bwp.reborrow(),
                     &mut world_render_pass,
                     &self.pipelines,
                     &self.cameras.cameras().world,
@@ -566,7 +578,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
         // New render pass so we clear the depth buffer for the UI.
         drop(world_render_pass);
-        let mut ui_render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut ui_render_pass = pass_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("EverythingRenderer ui_render_pass"),
             color_attachments: &[Some(self.fb.color_attachment_for_scene(wgpu::LoadOp::Load))],
             depth_stencil_attachment: Some(self.fb.depth_attachment_for_scene(
@@ -584,7 +596,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let lines_to_ui_time = I::now();
         let ui_draw_info = if !is_raytracing {
             self.space_renderers.ui.draw(
-                queue,
+                bwp.reborrow(),
                 &mut ui_render_pass,
                 &self.pipelines,
                 &self.cameras.cameras().ui,
@@ -597,17 +609,15 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let ui_to_postprocess_time = I::now();
 
         // Write the postprocess camera data.
-        // Note: this can't use the StagingBelt because it was already finish()ed.
-        {
-            queue.write_buffer(
-                &self.postprocess.camera_buffer,
-                0,
-                bytemuck::bytes_of(&postprocess::PostprocessUniforms::new(
-                    self.cameras.graphics_options(),
-                    self.fb.config().maximum_intensity,
-                )),
-            );
-        }
+        bwp.write_buffer(
+            &self.postprocess.camera_buffer,
+            0,
+            const { buffer_size_of::<postprocess::PostprocessUniforms>() },
+        )
+        .copy_from_slice(bytemuck::bytes_of(&postprocess::PostprocessUniforms::new(
+            self.cameras.graphics_options(),
+            self.fb.config().maximum_intensity,
+        )));
 
         // If we're copying the scene image to Rerun, then start that copy now.
         #[cfg(feature = "rerun")]
@@ -622,7 +632,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
         if !self.cameras.graphics_options().bloom_intensity.is_zero() {
             if let Some(bloom) = &self.fb.bloom {
-                bloom.run(&mut encoder);
+                bloom.run(&mut pass_encoder);
             }
         }
 
@@ -630,7 +640,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
         // TODO(efficiency): allow this submit to happen externally and be combined with others
         // (postprocessing, in particular).
-        queue.submit(std::iter::once(encoder.finish()));
+        self.staging_belt.finish();
+        queue.submit([belt_encoder.finish(), pass_encoder.finish()]);
         self.staging_belt.recall();
 
         let end_time = I::now();

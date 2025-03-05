@@ -34,7 +34,7 @@ use all_is_cubes_render::camera::Camera;
 use all_is_cubes_render::{Flaws, RenderError};
 
 use crate::in_wgpu::block_texture::BlockTextureViews;
-use crate::in_wgpu::glue::to_wgpu_index_format;
+use crate::in_wgpu::glue::{buffer_size_of, to_wgpu_index_format};
 use crate::in_wgpu::light_texture::LightChunk;
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::in_wgpu::skybox;
@@ -443,11 +443,11 @@ impl<I: time::Instant> SpaceRenderer<I> {
     /// Draw the space as of the last [`Self::update`].
     ///
     /// Does not access the [`Space`] contents at all.
-    pub fn draw<'pass>(
-        &'pass self,
-        queue: &wgpu::Queue,
-        render_pass: &mut wgpu::RenderPass<'pass>,
-        pipelines: &'pass Pipelines,
+    pub fn draw<'rpass>(
+        &'rpass self,
+        mut bwp: BeltWritingParts<'_>,
+        render_pass: &mut wgpu::RenderPass<'rpass>,
+        pipelines: &'rpass Pipelines,
         camera: &Camera,
         draw_sky: bool, // TODO: consider specifying this at update time to decide whether to calc
     ) -> SpaceDrawInfo {
@@ -476,13 +476,14 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         // Accumulates instance data for meshes, which we will then write to self.instance_buffer
         // *before* submitting the rendering command buffer.
+        // TODO: Make this a direct wgpu::BufferView instead of copying.
         let mut instance_data: Vec<WgpuInstanceData> = Vec::with_capacity(
             self.instance_buffer
                 .get()
                 .map_or(0, |buffer| usize::try_from(buffer.size()).unwrap_or(0)),
         );
 
-        self.write_camera_only(queue, camera);
+        self.write_camera_only(bwp.reborrow(), camera);
 
         render_pass.set_bind_group(0, &self.camera_buffer.bind_group, &[]);
         render_pass.set_bind_group(2, &pipelines.blocks_static_bind_group, &[]);
@@ -729,11 +730,10 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
             // if this fails then we are proceeding as if the length is 0 anyway.
             if let Some(buffer) = self.instance_buffer.get() {
-                queue.write_buffer(
-                    buffer,
-                    0,
-                    bytemuck::must_cast_slice::<WgpuInstanceData, u8>(instance_data),
-                );
+                let data: &[u8] = bytemuck::must_cast_slice::<WgpuInstanceData, u8>(instance_data);
+                if let Some(size) = wgpu::BufferSize::new(data.len() as u64) {
+                    bwp.write_buffer(buffer, 0, size).copy_from_slice(data);
+                }
             }
         }
 
@@ -762,12 +762,13 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
     /// Updates the camera buffer in the same way [`Self::draw()`] does,
     /// so that [`Self::camera_bind_group()`] will be fresh even if `draw()` wasn’t called.
-    pub fn write_camera_only(&self, queue: &wgpu::Queue, camera: &Camera) {
-        queue.write_buffer(
+    pub fn write_camera_only(&self, mut bwp: BeltWritingParts<'_>, camera: &Camera) {
+        bwp.write_buffer(
             &self.camera_buffer.buffer,
             0,
-            bytemuck::bytes_of(&ShaderSpaceCamera::new(camera)),
-        );
+            const { buffer_size_of::<ShaderSpaceCamera>() },
+        )
+        .copy_from_slice(bytemuck::bytes_of(&ShaderSpaceCamera::new(camera)));
     }
 
     /// Returns the camera, to allow additional drawing in the same coordinate system.

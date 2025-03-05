@@ -2,7 +2,6 @@
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::num::NonZeroU64;
 
 use futures_core::future::BoxFuture;
 
@@ -11,6 +10,7 @@ use all_is_cubes_render::camera::{Camera, ImageSize, Viewport};
 
 use crate::Memo;
 use crate::in_wgpu::camera::ShaderSpaceCamera;
+use crate::in_wgpu::glue::buffer_size_of;
 use crate::in_wgpu::init;
 use crate::in_wgpu::pipelines::Pipelines;
 
@@ -165,7 +165,7 @@ impl RerunImageExport {
             .write_buffer_with(
                 camera_buffer,
                 0,
-                NonZeroU64::new(size_of::<RerunCopyCamera>() as u64).unwrap(),
+                const { buffer_size_of::<RerunCopyCamera>() },
             )
             .unwrap()
             .copy_from_slice(bytemuck::bytes_of(&RerunCopyCamera {
