@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use core::mem;
 use core::sync::atomic;
 use core::time::Duration;
-use std::sync::{Mutex, mpsc};
+use std::sync::{Mutex, PoisonError, mpsc};
 
 use hashbrown::HashSet;
 use itertools::Itertools as _;
@@ -79,6 +79,13 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
     /// Rewritten every frame, but reused to save reallocation.
     instance_buffer: ResizingBuffer,
 
+    /// Temporary storage for organizing block instances to be drawn.
+    ///
+    /// Rewritten every frame, but reused to save reallocation; stored in a mutex to
+    /// enable `&mut`-free usage (if the `Option` is empty we just allocate a new one).
+    /// When a collector is present, it is always `clear()`ed.
+    instance_collector: Mutex<Option<dynamic::InstanceCollector>>,
+
     /// Bind group containing our block texture and light texture,
     space_bind_group: Memo<[crate::Id<wgpu::TextureView>; 4], wgpu::BindGroup>,
 
@@ -139,6 +146,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             space_bind_group: Memo::new(),
             camera_buffer,
             instance_buffer: ResizingBuffer::default(),
+            instance_collector: Mutex::new(None),
             csm: None,
             interactive,
             space_label,
@@ -193,6 +201,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             light_texture,
             camera_buffer: _,
             instance_buffer: _,
+            instance_collector: _,
             space_bind_group: _, // will be updated later
             csm,
             interactive,
@@ -265,6 +274,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             light_texture: _,
             camera_buffer: _,
             instance_buffer: _,
+            instance_collector: _,
             space_bind_group: _,
             csm,
             interactive: _,
@@ -605,7 +615,12 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let mut chunks_with_instances_drawn = 0;
         let mut blocks_drawn = 0;
         let mut squares_drawn = 0;
-        let mut block_instances = dynamic::InstanceCollector::new(); // TODO: reuse across frames
+        let mut block_instances: dynamic::InstanceCollector = self
+            .instance_collector
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
+            .unwrap_or_default();
         render_pass.set_pipeline(pipeline_for_opaque);
         for dynamic::InViewChunkRef {
             chunk,
@@ -692,6 +707,12 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 render_pass.set_pipeline(pipeline_for_opaque);
             }
         }
+
+        block_instances.clear();
+        *self
+            .instance_collector
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(block_instances);
 
         // Transparent geometry after opaque geometry, in back-to-front order
         let start_draw_transparent_time = I::now();
