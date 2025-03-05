@@ -717,10 +717,12 @@ impl CsmUpdateInfo {
 #[derive(Debug, Default)]
 struct CsmTodo<const CHUNK_SIZE: GridCoordinate> {
     all_blocks_and_chunks: bool,
+
     // TODO: Benchmark using a BitVec instead.
     blocks: hashbrown::HashSet<BlockIndex>,
-    /// Membership in this table indicates that the chunk *exists;* todos for chunks
-    /// outside of the view area are not tracked.
+
+    /// Membership in this table indicates that the corresponding [`ChunkMesh`] *exists;*
+    /// todos for chunks outside of the view area are not tracked.
     chunks: hashbrown::HashMap<ChunkPos<CHUNK_SIZE>, ChunkTodo>,
 }
 
