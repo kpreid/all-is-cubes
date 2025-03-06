@@ -146,6 +146,14 @@ fn block_vertex_main(
     input: WgpuBlockVertex,
     instance_input: WgpuInstanceData,
 ) -> BlockFragmentInput {
+    // Note: This would be much simpler with the built-in function unpack4xU8(), but that fails on
+    // the WebGL2 backend: <https://github.com/gfx-rs/wgpu/issues/4525>. We can make this change if
+    // we drop WebGL2 support.
+    //
+    // let cube = unpack4xU8(input.cube_packed).xyz;
+    // let pnr_semi_unpacked = unpack4xU8(input.position_in_cube_and_normal_and_resolution_packed);
+    // ...
+
     // Unpack cube (three u8s represented as one u32).
     let cube = vec3<u32>(
         input.cube_packed & 0xFFu,
