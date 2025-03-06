@@ -736,6 +736,11 @@ impl LightBuffer {
             let light_cube = hit.adjacent();
             let stored_light = light_behind_cache.unwrap_or_else(|| current_light.get(light_cube));
 
+            // Note: I tried stopping here if (!stored_light.valid() && hit_alpha == 1.0) in order
+            // to ignore not-yet-initialized light values from the weighting, but not only does that
+            // create unsightly incorrect bright areas (at least starting from
+            // `fast_evaluate_light()`), it also converges slower.
+
             let light_from_struck_face =
                 ev_hit.light_emission() + hit_surface_color.reflect(stored_light.value());
 
