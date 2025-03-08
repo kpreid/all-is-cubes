@@ -1,0 +1,607 @@
+
+# cargo-vet audits file
+
+[[audits.allocation-counter]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.8.1"
+
+[[audits.arcstr]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "1.1.5"
+
+[[audits.async_fn_traits]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.1.1"
+
+[[audits.base64]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.21.2"
+
+[[audits.cassowary]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.3.0"
+
+[[audits.displaydoc]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.2.4"
+
+[[audits.displaydoc]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.2.5"
+
+[[audits.euclid]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.22.9"
+
+[[audits.gltf-derive]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.2.0 -> 1.4.1"
+
+[[audits.imgref]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "1.10.1"
+
+[[audits.mint]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.5.9"
+
+[[audits.mutants]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.0.3"
+
+[[audits.oxipng]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-run"
+version = "9.1.3"
+
+[[audits.png-decoder]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-run"
+version = "0.1.1"
+notes = """
+It allocates an amount of memory determined by the input image
+(using `Vec::with_capacity()`) without checks, so a malicious image
+could DoS via excessive memory use (zip bomb attack).
+"""
+
+[[audits.pretty_assertions]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "1.4.0"
+
+[[audits.ratatui]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.24.0"
+
+[[audits.ratatui]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.26.1"
+
+[[audits.rectangle-pack]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.4.2"
+
+[[audits.stl_io]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.7.0"
+
+[[audits.stl_io]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.7.0 -> 0.8.1"
+
+[[audits.sync_wrapper]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "1.0.1"
+
+[[audits.sync_wrapper]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "1.0.1 -> 1.0.2"
+
+[[audits.web-time]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.2.3"
+
+[[audits.web-time]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.2.3 -> 1.0.0"
+
+[[trusted.anstream]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2023-03-16"
+end = "2026-03-08"
+
+[[trusted.anstyle]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2022-05-18"
+end = "2026-03-08"
+
+[[trusted.anstyle-parse]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2023-03-08"
+end = "2026-03-08"
+
+[[trusted.anstyle-query]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2023-04-13"
+end = "2026-03-08"
+
+[[trusted.anstyle-wincon]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2023-03-08"
+end = "2026-03-08"
+
+[[trusted.clap]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2021-12-08"
+end = "2026-03-08"
+
+[[trusted.clap_builder]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2023-03-28"
+end = "2026-03-08"
+
+[[trusted.clap_derive]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2021-12-08"
+end = "2026-03-08"
+
+[[trusted.clap_lex]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2022-04-15"
+end = "2026-03-08"
+
+[[trusted.colorchoice]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2023-04-13"
+end = "2026-03-08"
+
+[[trusted.emath]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-12-16"
+end = "2026-03-11"
+
+[[trusted.exhaust]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2022-02-15"
+end = "2026-03-08"
+
+[[trusted.exhaust-macros]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2022-02-15"
+end = "2026-03-08"
+
+[[trusted.is_terminal_polyfill]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2024-05-02"
+end = "2026-03-08"
+
+[[trusted.manyfmt]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2023-10-07"
+end = "2026-03-08"
+
+[[trusted.nosy]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2024-12-19"
+end = "2026-03-08"
+
+[[trusted.range-alloc]]
+criteria = "safe-to-deploy"
+user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
+start = "2023-02-10"
+end = "2026-03-08"
+
+[[trusted.re_arrow2]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-01-22"
+end = "2026-03-11"
+
+[[trusted.re_arrow2]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-01-22"
+end = "2026-03-08"
+
+[[trusted.re_arrow_util]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2025-02-05"
+end = "2026-03-11"
+
+[[trusted.re_arrow_util]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2025-02-05"
+end = "2026-03-08"
+
+[[trusted.re_build_info]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-03-06"
+end = "2026-03-11"
+
+[[trusted.re_build_info]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-03-06"
+end = "2026-03-08"
+
+[[trusted.re_build_tools]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-07-05"
+end = "2026-03-11"
+
+[[trusted.re_build_tools]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-07-05"
+end = "2026-03-08"
+
+[[trusted.re_byte_size]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2025-02-05"
+end = "2026-03-11"
+
+[[trusted.re_byte_size]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2025-02-05"
+end = "2026-03-08"
+
+[[trusted.re_case]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-06-10"
+end = "2026-03-11"
+
+[[trusted.re_case]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-06-10"
+end = "2026-03-08"
+
+[[trusted.re_chunk]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-06-10"
+end = "2026-03-11"
+
+[[trusted.re_chunk]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-06-10"
+end = "2026-03-08"
+
+[[trusted.re_error]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_error]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_format]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_format]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_format_arrow]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-05-07"
+end = "2026-03-11"
+
+[[trusted.re_format_arrow]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-05-07"
+end = "2026-03-08"
+
+[[trusted.re_log]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_log]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_log_encoding]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-04-19"
+end = "2026-03-11"
+
+[[trusted.re_log_encoding]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-04-19"
+end = "2026-03-08"
+
+[[trusted.re_log_types]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_log_types]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_memory]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_memory]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_protos]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-11-11"
+end = "2026-03-11"
+
+[[trusted.re_protos]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-11-11"
+end = "2026-03-08"
+
+[[trusted.re_sdk]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_sdk]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_sdk_comms]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_sdk_comms]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_smart_channel]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_smart_channel]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_sorbet]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2025-02-05"
+end = "2026-03-11"
+
+[[trusted.re_sorbet]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2025-02-05"
+end = "2026-03-08"
+
+[[trusted.re_string_interner]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_string_interner]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_tracing]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-07-05"
+end = "2026-03-11"
+
+[[trusted.re_tracing]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-07-05"
+end = "2026-03-08"
+
+[[trusted.re_tuid]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-11"
+
+[[trusted.re_tuid]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-02-12"
+end = "2026-03-08"
+
+[[trusted.re_types]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-07-05"
+end = "2026-03-11"
+
+[[trusted.re_types]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-07-05"
+end = "2026-03-08"
+
+[[trusted.re_types_builder]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-07-05"
+end = "2026-03-11"
+
+[[trusted.re_types_builder]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-07-05"
+end = "2026-03-08"
+
+[[trusted.re_types_core]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-10-26"
+end = "2026-03-11"
+
+[[trusted.re_types_core]]
+criteria = "safe-to-run"
+user-id = 197939 # rerun.io (rerunio)
+start = "2023-10-26"
+end = "2026-03-08"
+
+[[trusted.rendiff]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2023-05-06"
+end = "2026-03-08"
+
+[[trusted.serde_spanned]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2023-01-20"
+end = "2026-03-08"
+
+[[trusted.snapbox]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2022-03-07"
+end = "2026-03-08"
+
+[[trusted.snapbox-macros]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2022-03-07"
+end = "2026-03-08"
+
+[[trusted.toml]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2022-12-14"
+end = "2026-03-08"
+
+[[trusted.toml_datetime]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2022-10-21"
+end = "2026-03-08"
+
+[[trusted.toml_edit]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2021-09-13"
+end = "2026-03-08"
+
+[[trusted.trycmd]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2021-11-05"
+end = "2026-03-08"
+
+[[trusted.wgpu]]
+criteria = "safe-to-deploy"
+user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
+start = "2022-07-01"
+end = "2026-03-08"
+
+[[trusted.wgpu-core]]
+criteria = "safe-to-deploy"
+user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
+start = "2022-07-01"
+end = "2026-03-12"
+
+[[trusted.wgpu-hal]]
+criteria = "safe-to-deploy"
+user-id = 53780 # Connor Fitzgerald (cwfitzgerald)
+start = "2022-07-01"
+end = "2026-03-12"
+
+[[trusted.winnow]]
+criteria = "safe-to-deploy"
+user-id = 6743 # Ed Page (epage)
+start = "2023-02-22"
+end = "2026-03-08"
+
+[[trusted.yield-progress]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2023-08-23"
+end = "2026-03-08"
