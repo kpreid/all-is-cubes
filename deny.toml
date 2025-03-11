@@ -23,6 +23,11 @@ private = { ignore = true }
 
 [advisories]
 yanked = "deny"
+unmaintained = "all"
+ignore = [
+    "RUSTSEC-2025-0014", # humantime is only used in tests
+    "RUSTSEC-2024-0436", # paste is “done”, not relevantly unmaintained
+]
 
 [bans]
 multiple-versions = "warn"
