@@ -23,6 +23,7 @@ use all_is_cubes_render::camera::{FogOption, GraphicsOptions, UiViewState, Viewp
 use crate::apps::{
     ControlMessage, FullscreenSetter, FullscreenState, QuitCancelled, QuitFn, QuitResult,
 };
+use crate::inv_watch::InventoryWatcher;
 use crate::settings;
 use crate::ui_content::hud::{HudBlocks, HudInputs};
 use crate::ui_content::{notification, pages};
@@ -166,12 +167,18 @@ impl Vui {
             GraphicsOptions::clone(&params.settings.get().to_graphics_options()),
         )));
 
+        let character_inventory_watcher = Arc::new(Mutex::new(InventoryWatcher::new(
+            params.character_source.clone(),
+            hud_blocks.icons.clone(),
+        )));
+
         let changed_custom_commands = listen::Flag::listening(false, &params.custom_commands);
         let changed_viewport = listen::Flag::listening(false, viewport_source);
         let ui_size = UiSize::new(viewport_source.get());
         let hud_inputs = HudInputs {
             base: params.clone(),
             hud_blocks,
+            character_inventory_watcher,
             cue_channel: cue_channel.clone(),
             vui_control_channel: control_send,
             page_state: state.as_source(),

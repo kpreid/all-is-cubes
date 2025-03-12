@@ -7,8 +7,8 @@ use std::sync::Mutex;
 
 use descriptive_unwrap::ResultExt as _;
 
+use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, Block, Resolution};
-use all_is_cubes::character::Character;
 use all_is_cubes::content::palette;
 use all_is_cubes::inv;
 use all_is_cubes::listen::{self, Listen as _};
@@ -19,8 +19,7 @@ use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::text;
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
-use all_is_cubes::universe::{ReadTicket, StrongHandle};
-use all_is_cubes::{arcstr, universe};
+use all_is_cubes::universe::{self, ReadTicket};
 
 use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::{CueMessage, CueNotifier, hud::HudBlocks};
@@ -47,7 +46,7 @@ impl Toolbar {
     const TOOLBAR_STEP: GridCoordinate = 2;
 
     pub fn new(
-        character_source: listen::DynSource<Option<StrongHandle<Character>>>,
+        watcher: Arc<Mutex<InventoryWatcher>>,
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         // TODO: remove Into when std::range syntax is stable
@@ -55,11 +54,8 @@ impl Toolbar {
         cue_channel: CueNotifier,
     ) -> Arc<Self> {
         Arc::new(Self {
-            watcher: Arc::new(Mutex::new(InventoryWatcher::new(
-                character_source,
-                hud_blocks.icons.clone(),
-            ))),
             hud_blocks,
+            watcher,
             cue_channel,
             slot_range: slot_range.into(),
             slot_info_text_template: block::Text::builder()
@@ -376,10 +372,11 @@ impl listen::Store<CueMessage> for ToolbarTodo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::character::Character;
     use all_is_cubes::euclid::Vector3D;
     use all_is_cubes::math::Face;
     use all_is_cubes::space::Space;
-    use all_is_cubes::universe::{Universe, UniverseTransaction};
+    use all_is_cubes::universe::{StrongHandle, Universe, UniverseTransaction};
     use all_is_cubes::util::yield_progress_for_testing;
     use all_is_cubes::{inv, space, time};
     use std::vec;
@@ -407,24 +404,23 @@ mod tests {
         );
         let cue_channel = Arc::new(listen::Notifier::new());
         let gravity = Vector3D::splat(vui::layout::Align::Low);
+        let watcher = Arc::new(Mutex::new(InventoryWatcher::new(
+            character_source.clone(),
+            hud_blocks.icons.clone(),
+        )));
 
         let widgets = Arc::new(vui::LayoutTree::Stack {
             direction: Face::PX,
             children: vec![
                 // This one is longer than the inventory
                 vui::leaf_widget(Toolbar::new(
-                    character_source.clone(),
+                    watcher.clone(),
                     hud_blocks.clone(),
                     0..2,
                     cue_channel.clone(),
                 )),
                 // This one is completely out of range
-                vui::leaf_widget(Toolbar::new(
-                    character_source,
-                    hud_blocks,
-                    10..12,
-                    cue_channel,
-                )),
+                vui::leaf_widget(Toolbar::new(watcher, hud_blocks, 10..12, cue_channel)),
             ],
         });
 

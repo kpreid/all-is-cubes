@@ -13,6 +13,7 @@ use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::apps::ControlMessage;
+use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::pages::open_page_button;
 use crate::ui_content::settings::{SettingsStyle, pause_toggle_button, settings_widgets};
 use crate::ui_content::{CueNotifier, UiTargets, VuiMessage, VuiPageState};
@@ -33,6 +34,7 @@ pub(crate) struct HudInputs {
     pub cue_channel: CueNotifier,
     pub vui_control_channel: flume::Sender<VuiMessage>,
     pub page_state: listen::DynSource<Arc<VuiPageState>>,
+    pub character_inventory_watcher: Arc<Mutex<InventoryWatcher>>,
 }
 
 impl fmt::Debug for HudInputs {
@@ -55,9 +57,8 @@ pub(super) fn new_hud_page(
     hud_inputs: &HudInputs,
     tooltip_state: Arc<Mutex<TooltipState>>,
 ) -> vui::Page {
-    let character_source = hud_inputs.character_source.clone();
     let toolbar = widgets::Toolbar::new(
-        character_source,
+        hud_inputs.character_inventory_watcher.clone(),
         Arc::clone(&hud_inputs.hud_blocks),
         0..TOOLBAR_POSITIONS,
         hud_inputs.cue_channel.clone(),
