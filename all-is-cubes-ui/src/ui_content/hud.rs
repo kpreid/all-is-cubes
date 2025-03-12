@@ -53,7 +53,7 @@ pub(super) fn new_hud_page(
     let toolbar = widgets::Toolbar::new(
         character_source,
         Arc::clone(&hud_inputs.hud_blocks),
-        TOOLBAR_POSITIONS,
+        0..TOOLBAR_POSITIONS,
         hud_inputs.cue_channel.clone(),
     );
     let tooltip = widgets::Tooltip::new(tooltip_state, hud_inputs.hud_blocks.clone());
