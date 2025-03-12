@@ -356,3 +356,72 @@ impl listen::Store<CueMessage> for ToolbarTodo {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use all_is_cubes::euclid::Vector3D;
+    use all_is_cubes::math::Face6;
+    use all_is_cubes::space::Space;
+    use all_is_cubes::universe::{Universe, UniverseTransaction};
+    use all_is_cubes::util::yield_progress_for_testing;
+    use all_is_cubes::{inv, space, time};
+
+    /// Test that [`Toolbar`] will not panic if given inventory slot ranges exceeding the size of
+    /// the inventory.
+    #[macro_rules_attribute::apply(smol_macros::test)]
+    async fn inventory_too_short() {
+        // Create test setup with a character with inventory with only 1 slot.
+        let mut universe = Universe::new();
+        let space_for_character = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
+        let mut spawn = space_for_character.read(universe.read_ticket()).unwrap().spawn().clone();
+        spawn.set_inventory(vec![inv::Slot::Empty]);
+        let character = StrongHandle::new(
+            universe.insert_anonymous(Character::spawn(&spawn, space_for_character)),
+        );
+        let character_source = listen::constant(Some(character));
+        let hud_blocks = Arc::new(
+            HudBlocks::new(
+                universe.read_ticket(),
+                &mut UniverseTransaction::default(),
+                yield_progress_for_testing(),
+            )
+            .await,
+        );
+        let cue_channel = Arc::new(listen::Notifier::new());
+        let gravity = Vector3D::splat(vui::layout::Align::Low);
+
+        let widgets = Arc::new(vui::LayoutTree::Stack {
+            direction: Face6::PX,
+            children: vec![
+                // This one is longer than the inventory
+                vui::leaf_widget(Toolbar::new(
+                    character_source.clone(),
+                    hud_blocks.clone(),
+                    0..2,
+                    cue_channel.clone(),
+                )),
+                // This one is completely out of range
+                vui::leaf_widget(Toolbar::new(
+                    character_source,
+                    hud_blocks,
+                    10..12,
+                    cue_channel,
+                )),
+            ],
+        });
+
+        let space = widgets
+            .to_space(universe.read_ticket(), space::Builder::default(), gravity)
+            .unwrap();
+        let space_handle = StrongHandle::new(universe.insert_anonymous(space));
+
+        // Step and observe that no panic ocurred
+        vui::synchronize_widgets(
+            universe.read_ticket(),
+            universe.read_ticket(),
+            &space_handle.read(universe.read_ticket()).unwrap(),
+        );
+        universe.step(false, time::Deadline::Whenever);
+    }
+}
