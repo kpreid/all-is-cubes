@@ -15,7 +15,7 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
-use all_is_cubes::universe::{Handle, Universe};
+use all_is_cubes::universe::Handle;
 
 use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::{CueMessage, CueNotifier, hud::HudBlocks};
@@ -48,15 +48,11 @@ impl Toolbar {
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         slot_count: u16,
-        universe: &mut Universe,
         cue_channel: CueNotifier,
     ) -> Arc<Self> {
         Arc::new(Self {
             hud_blocks,
-            watcher: Arc::new(Mutex::new(InventoryWatcher::new(
-                character_source,
-                universe,
-            ))),
+            watcher: Arc::new(Mutex::new(InventoryWatcher::new(character_source))),
             cue_channel,
             slot_count,
             slot_info_text_template: text::Text::builder()

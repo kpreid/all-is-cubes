@@ -7,7 +7,7 @@ use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
 use all_is_cubes::math::Face6;
-use all_is_cubes::universe::{Handle, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Handle, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_render::camera::GraphicsOptions;
 
@@ -48,15 +48,12 @@ pub(super) fn new_hud_page(
     // TODO: mess of tightly coupled parameters
     character_source: listen::DynSource<Option<Handle<Character>>>,
     hud_inputs: &HudInputs,
-    // TODO: stop mutating the universe in widget construction
-    universe: &mut Universe,
     tooltip_state: Arc<Mutex<TooltipState>>,
 ) -> vui::Page {
     let toolbar = widgets::Toolbar::new(
         character_source,
         Arc::clone(&hud_inputs.hud_blocks),
         TOOLBAR_POSITIONS,
-        universe,
         hud_inputs.cue_channel.clone(),
     );
     let tooltip = widgets::Tooltip::new(tooltip_state, hud_inputs.hud_blocks.clone());

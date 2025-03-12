@@ -9,7 +9,7 @@ use alloc::sync::Arc;
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::inv;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
-use all_is_cubes::universe::{Handle, HandleError, Universe};
+use all_is_cubes::universe::{Handle, HandleError};
 
 /// Some game entity that has an inventory we are watching, or none (treated as empty inventory).
 ///
@@ -50,10 +50,7 @@ impl InventoryWatcher {
     /// belonging to the [`Character`] in the given `inventory_source`.
     ///
     /// `ui_universe` will be used to create anonymous resources used to depict the inventory.
-    pub fn new(
-        inventory_source: listen::DynSource<Option<Handle<Character>>>,
-        _ui_universe: &mut Universe,
-    ) -> Self {
+    pub fn new(inventory_source: listen::DynSource<Option<Handle<Character>>>) -> Self {
         let dirty = listen::Flag::new(true);
 
         inventory_source.listen(dirty.listener());
@@ -215,6 +212,7 @@ mod tests {
     use all_is_cubes::character::CharacterTransaction;
     use all_is_cubes::inv;
     use all_is_cubes::space::Space;
+    use all_is_cubes::universe::Universe;
 
     struct Tester {
         universe: Universe,
@@ -230,7 +228,7 @@ mod tests {
             let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
             let character = universe.insert_anonymous(Character::spawn_default(space.clone()));
             let character_cell = listen::Cell::new(Some(character.clone()));
-            let watcher = InventoryWatcher::new(character_cell.as_source(), &mut universe);
+            let watcher = InventoryWatcher::new(character_cell.as_source());
 
             // Install listener
             let sink: listen::Sink<WatcherChange> = listen::Sink::new();

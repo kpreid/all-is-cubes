@@ -145,12 +145,8 @@ impl Vui {
             set_fullscreen,
             quit,
         };
-        let hud_page = super::hud::new_hud_page(
-            character_source.clone(),
-            &hud_inputs,
-            &mut universe,
-            tooltip_state.clone(),
-        );
+        let hud_page =
+            super::hud::new_hud_page(character_source.clone(), &hud_inputs, tooltip_state.clone());
 
         let paused_page = pages::new_paused_page(&mut universe, &hud_inputs).unwrap();
         let options_page = pages::new_options_widget_tree(&hud_inputs);
