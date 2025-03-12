@@ -259,6 +259,17 @@ impl Vui {
         self.compute_view_state();
     }
 
+    /// Same as [`Vui::set_state()`], unless that state is already the current state, in which
+    /// case the same as [`Vui::back()`]
+    pub(crate) fn toggle_state(&mut self, state: impl Into<Arc<VuiPageState>>) {
+        let state = state.into();
+        if self.state.get() == state {
+            self.back();
+        } else {
+            self.set_state(state);
+        }
+    }
+
     /// Update `self.current_space` from `self.state` and the source of the selected space.
     fn compute_view_state(&mut self) {
         let size = self.last_ui_size;
@@ -502,6 +513,9 @@ impl Vui {
                     );
                 }
             }
+            VuiPageState::Inventory => {
+                self.set_state(VuiPageState::Hud);
+            }
             VuiPageState::Paused => {
                 if self.hud_inputs.paused.get() {
                     // Unpause
@@ -583,6 +597,10 @@ pub(crate) enum VuiPageState {
     /// Normal gameplay, with UI elements around the perimeter.
     Hud,
 
+    /// Player character’s inventory.
+    /// (How to handle other inventories is not yet decided.)
+    Inventory,
+
     /// Report the paused (or lost-focus) state and offer a button to unpause
     /// and reactivate mouselook.
     Paused,
@@ -611,6 +629,7 @@ impl VuiPageState {
     pub fn freely_replaceable(&self) -> bool {
         match self {
             VuiPageState::Hud => true,
+            VuiPageState::Inventory => true,
             VuiPageState::Paused => true,
             VuiPageState::AboutText => true,
             VuiPageState::Progress => true,
@@ -632,6 +651,7 @@ impl VuiPageState {
 struct Pages {
     hud_page: PageInst,
     paused_page: PageInst,
+    inventory_page: PageInst,
     about_page: PageInst,
     progress_page: PageInst,
     options_page: PageInst,
@@ -649,6 +669,7 @@ impl Pages {
         let hud_page = super::hud::new_hud_page(universe.read_ticket(), hud_inputs, tooltip_state);
 
         let paused_page = pages::new_paused_page(universe, hud_inputs)?;
+        let inventory_page = pages::new_inventory_page(hud_inputs);
         let options_page = pages::new_settings_page_widget_tree(universe.read_ticket(), hud_inputs);
         let about_page = pages::new_about_page(universe, hud_inputs)?;
         let progress_page =
@@ -657,6 +678,7 @@ impl Pages {
         Ok(Self {
             hud_page: PageInst::new(hud_page),
             paused_page: PageInst::new(paused_page),
+            inventory_page: PageInst::new(inventory_page),
             options_page: PageInst::new(options_page),
             about_page: PageInst::new(about_page),
             dump_page: PageInst::new(vui::Page::empty()),
@@ -668,6 +690,7 @@ impl Pages {
         match state {
             VuiPageState::Hud => &mut self.hud_page,
             VuiPageState::Paused => &mut self.paused_page,
+            VuiPageState::Inventory => &mut self.inventory_page,
             VuiPageState::Settings => &mut self.options_page,
             VuiPageState::AboutText => &mut self.about_page,
             VuiPageState::Progress => &mut self.progress_page,

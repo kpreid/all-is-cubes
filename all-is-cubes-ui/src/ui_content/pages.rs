@@ -21,6 +21,31 @@ use crate::ui_content::{VuiMessage, VuiPageState, notification};
 use crate::vui::widgets::{ButtonLabel, ProgressBarState};
 use crate::vui::{self, InstallVuiError, LayoutTree, UiBlocks, Widget, WidgetTree, parts, widgets};
 
+#[allow(clippy::needless_pass_by_value)]
+pub(super) fn new_inventory_page(hud_inputs: &HudInputs) -> vui::Page {
+    let row_count = 4; // TODO: we must adapt to the inventory’s actual size
+    let column_count = 10;
+    let contents = Arc::new(LayoutTree::Stack {
+        direction: Face::NY,
+        children: (0u16..row_count)
+            .map(|row| {
+                vui::leaf_widget(widgets::Toolbar::new(
+                    hud_inputs.character_inventory_watcher.clone(),
+                    Arc::clone(&hud_inputs.hud_blocks),
+                    (row * column_count)..((row + 1) * column_count),
+                    hud_inputs.cue_channel.clone(),
+                ))
+            })
+            .collect(),
+    });
+    vui::Page::new_modal_dialog(
+        &hud_inputs.hud_blocks.widget_theme,
+        literal!("Inventory"),
+        Some(back_button(hud_inputs)),
+        contents,
+    )
+}
+
 // TODO: Disentangle general UI from the concept of "HUD" — i.e. the input accepted should be
 // not a `HudInputs` should become less specific, since this isn't actually part of the HUD.
 pub(super) fn new_paused_page(

@@ -114,6 +114,7 @@ impl InputProcessor {
             Key::Character('u') => true,
             Key::Character('y') => true,
             Key::Character('`' | '~') => true,
+            Key::Character('\t') => true,
             _ => false,
         }
     }
@@ -130,6 +131,7 @@ impl InputProcessor {
             Key::Character('u') => true,
             Key::Character('y') => true,
             Key::Character('`' | '~') => true,
+            Key::Character('\t') => true,
             // TODO: move slot selection commands here
             _ => false,
         }
@@ -366,6 +368,11 @@ impl InputProcessor {
                         ignore_command_channel_closure(ch.try_send(ControlMessage::Back));
                     }
                 }
+                Key::Character('\t') => {
+                    if let Some(ch) = control_channel {
+                        let _ = ch.try_send(ControlMessage::Inventory);
+                    }
+                }
                 Key::Character('i') => {
                     // TODO: Eventually, instead of hardcoding this particular complex key binding,
                     // this should look more like a single usage of a system for user-defined
@@ -442,7 +449,7 @@ impl InputProcessor {
                         )?;
                     }
                 }
-                _ => {}
+                _ => log::error!("unbound key in command buffer: {key:?}"),
             }
         }
 

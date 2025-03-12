@@ -483,9 +483,13 @@ impl Session {
             match self.control_channel.try_recv() {
                 Ok(msg) => match msg {
                     ControlMessage::Back => {
-                        // TODO: error reporting … ? hm.
                         if let Some(ui) = &mut self.shuttle_mut().ui {
                             ui.back();
+                        }
+                    }
+                    ControlMessage::Inventory => {
+                        if let Some(ui) = &mut self.shuttle_mut().ui {
+                            ui.toggle_state(crate::ui_content::VuiPageState::Inventory);
                         }
                     }
                     ControlMessage::ShowModal(message) => {
@@ -1021,6 +1025,14 @@ pub(crate) enum ControlMessage {
     /// * if in-game, pause and open menu
     Back,
 
+    /// Show or hide the inventory screen.
+    ///
+    /// TODO: This is, I think, a kludge which exists solely to wire up the `InputProcessor`
+    /// to the `Vui`, and instead we should have some way to define input bindings that talk to
+    /// VUI in its own terms rather than involving Session.
+    /// Same for a bunch of other variants here. Or not? Not sure yet.
+    Inventory,
+
     /// Save the game universe back to its [`WhenceUniverse`].
     Save,
 
@@ -1038,6 +1050,7 @@ impl fmt::Debug for ControlMessage {
         // Manual implementation required due to contained function.
         match self {
             Self::Back => write!(f, "Back"),
+            Self::Inventory => write!(f, "Inventory"),
             Self::Save => write!(f, "Save"),
             Self::ShowModal(_msg) => f.debug_struct("ShowModal").finish_non_exhaustive(),
             Self::EnterDebug => write!(f, "EnterDebug"),
