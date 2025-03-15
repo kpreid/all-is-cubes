@@ -1,4 +1,5 @@
 #![feature(assert_matches)]
+#![feature(doc_auto_cfg)]
 #![feature(large_assignments)]
 #![move_size_limit = "5000"]
 #![feature(never_type)]
