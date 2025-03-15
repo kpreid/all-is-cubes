@@ -1,3 +1,4 @@
+#![feature(doc_auto_cfg)]
 #![feature(generic_arg_infer)]
 #![feature(let_chains)]
 #![feature(never_type)]
