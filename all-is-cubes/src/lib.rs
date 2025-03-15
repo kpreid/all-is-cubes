@@ -1,4 +1,5 @@
 #![feature(assert_matches)]
+#![feature(doc_cfg)]
 #![feature(doc_notable_trait)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(large_assignments)]
