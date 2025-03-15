@@ -1,3 +1,4 @@
+#![feature(doc_auto_cfg)]
 #![feature(let_chains)]
 #![feature(never_type)]
 

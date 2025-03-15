@@ -1,3 +1,4 @@
+#![feature(doc_auto_cfg)]
 #![feature(large_assignments)]
 #![move_size_limit = "256"]
 #![feature(let_chains)]
