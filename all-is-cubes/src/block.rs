@@ -11,6 +11,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
+use crate::inv;
 use crate::listen::{self, Listen as _, Listener};
 use crate::math::{GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol};
 use crate::space::{SetCubeError, Space, SpaceChange};
@@ -531,6 +532,26 @@ impl Block {
         }
 
         output
+    }
+
+    /// If this block has an inventory, return it and its modifier index.
+    // TODO: not the greatest API design
+    pub fn find_inventory(&self) -> Option<(usize, &inv::Inventory)> {
+        match self
+            .modifiers()
+            .iter()
+            .enumerate()
+            .rev()
+            // TODO: we need a general theory of which modifiers we definitely should not
+            // traverse past, or maybe block evaluation should produce a derived field for
+            // "this is the modifier index of my inventory that I functionally posess"
+            .take_while(|(_, m)| !matches!(m, Modifier::Quote(_)))
+            .find(|(_, m)| matches!(m, Modifier::Inventory(_)))
+        {
+            Some((index, Modifier::Inventory(inventory))) => Some((index, inventory)),
+            Some((_index, wrong_modifier)) => unreachable!("wrong modifier {wrong_modifier:?}"),
+            None => None,
+        }
     }
 
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all

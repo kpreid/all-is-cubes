@@ -262,7 +262,7 @@ impl Operation {
                 let target_cube = transform.transform_cube(Cube::ORIGIN);
                 let old_block = &space[target_cube];
 
-                let Some((inventory_index, inventory)) = find_inventory(old_block) else {
+                let Some((inventory_index, inventory)) = old_block.find_inventory() else {
                     // If the inventory is absent, there are no slots to move.
                     return Ok(Default::default());
                 };
@@ -281,7 +281,7 @@ impl Operation {
                         let adjacent_cube = transform.transform_cube(Cube::ORIGIN + direction);
                         let adjacent_block = &space[adjacent_cube];
                         let Some((adjacent_inventory_index, adjacent_inventory)) =
-                            find_inventory(adjacent_block)
+                            adjacent_block.find_inventory()
                         else {
                             // TODO: if no inventory exists, should we just create it? Need a general policy. Probably the answer should be yes, but we refrain for now.
                             return Err(OperationError::BlockInventoryFull {
@@ -494,24 +494,6 @@ impl core::error::Error for OperationError {
             Self::OutOfBounds { .. } => None,
             Self::BlockInventoryFull { .. } => None,
         }
-    }
-}
-
-fn find_inventory(block: &Block) -> Option<(usize, &Inventory)> {
-    match block
-        .modifiers()
-        .iter()
-        .enumerate()
-        .rev()
-        // TODO: we need a general theory of which modifiers we definitely should not
-        // traverse past, or maybe block evaluation should produce a derived field for
-        // "this is the modifier index of my inventory that I functionally posess"
-        .take_while(|(_, m)| !matches!(m, block::Modifier::Quote(_)))
-        .find(|(_, m)| matches!(m, block::Modifier::Inventory(_)))
-    {
-        Some((index, block::Modifier::Inventory(inventory))) => Some((index, inventory)),
-        Some((_index, wrong_modifier)) => unreachable!("wrong modifier {wrong_modifier:?}"),
-        None => None,
     }
 }
 

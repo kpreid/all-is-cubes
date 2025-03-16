@@ -363,7 +363,7 @@ impl ToolInput {
         &self,
         cursor: &Cursor,
         old_block: Block,
-        new_block: Block,
+        mut new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
         // TODO: better error typing here
         let new_ev = new_block
@@ -393,9 +393,20 @@ impl ToolInput {
             } = action;
             self.apply_operation(operation, rotation, in_front)
         } else {
+            new_block = new_block.rotate(rotation);
+
+            // TODO: there should probably be one canonical implementation of "add the inventory
+            // modifier" between this and `EvaluatedBlock::with_inventory()`.
+            let inventory_size = new_ev.attributes().inventory.size;
+            if inventory_size > 0 {
+                new_block = new_block.with_modifier(block::Modifier::Inventory(
+                    inv::Inventory::new(inventory_size),
+                ));
+            }
+
             let affected_cube = cursor.cube() + cursor.face_selected().normal_vector();
 
-            let mut txn = self.set_cube(affected_cube, old_block, new_block.rotate(rotation))?;
+            let mut txn = self.set_cube(affected_cube, old_block, new_block)?;
 
             // Add fluff. TODO: This should probably be part of set_cube()?
             txn.merge_from(
@@ -633,6 +644,7 @@ impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaq
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::Resolution::*;
     use crate::character::cursor_raycast;
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::inv::Slot;
@@ -925,6 +937,40 @@ mod tests {
                     Cube::ORIGIN,
                     Some(AIR),
                     Some(tool_block.clone().rotate(GridRotation::CLOCKWISE)),
+                );
+                t.at(Cube::ORIGIN).add_fluff(Fluff::PlaceBlockGeneric);
+                t
+            }
+            .bind(tester.space_handle.clone())
+        );
+    }
+
+    #[test]
+    fn use_block_with_inventory_config() {
+        let [existing] = make_some_blocks();
+        let tester = ToolTester::new(|space| {
+            space.set([1, 0, 0], &existing).unwrap();
+        });
+
+        // Make a block with an inventory config
+        let tool_block = Block::builder()
+            .color(Rgba::WHITE)
+            .inventory_config(inv::InvInBlock::new(10, R4, R16, []))
+            .build();
+
+        let transaction = tester
+            .equip_and_use_tool(Tool::InfiniteBlocks(tool_block.clone()))
+            .unwrap();
+        assert_eq!(
+            transaction,
+            {
+                let mut t = SpaceTransaction::set_cube(
+                    Cube::ORIGIN,
+                    Some(AIR),
+                    Some(
+                        tool_block
+                            .with_modifier(block::Modifier::Inventory(inv::Inventory::new(10))),
+                    ),
                 );
                 t.at(Cube::ORIGIN).add_fluff(Fluff::PlaceBlockGeneric);
                 t

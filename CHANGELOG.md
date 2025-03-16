@@ -8,6 +8,7 @@
     - In the desktop version, changes to graphics options are now persisted across launches.
 
 - `all-is-cubes` library:
+    - `block::Block::find_inventory()`
     - `inv::Ix`
     - `inv::InvInBlock` and `inv::IconRow` now have public `new()` functions.
     - `math::FaceMap::sum()`
