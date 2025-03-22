@@ -1,11 +1,11 @@
 use all_is_cubes::block::Block;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
-use all_is_cubes::euclid::Point3D;
+use all_is_cubes::euclid::{Point3D, Size3D, Vector3D};
 use all_is_cubes::inv::Tool;
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridSize, rgba_const};
-use all_is_cubes::space::Space;
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridSize, Rgb, rgba_const};
+use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::Universe;
 
 use crate::DemoBlocks;
@@ -23,12 +23,29 @@ pub(crate) fn menger_sponge(
     // powers of 2. But, that might be worth restoring given other fractals that aren't
     // scaled by powers of 3.
 
-    let leaf_block = Block::builder()
-        .color(rgba_const!(0.5, 0.5, 0.5, 1.0))
+    let leaf_block_1 = Block::builder()
+        .color(rgba_const!(0.5, 0.5, 0.4, 1.0))
+        .build();
+    let leaf_block_2 = Block::builder()
+        .color(rgba_const!(0.4, 0.5, 0.5, 1.0))
         .build();
 
     let space_bounds = pow3aab(world_levels);
     let mut space = Space::builder(space_bounds)
+        .sky({
+            let above = Rgb::new(0.8, 0.8, 0.92);
+            let below = Rgb::new(0.4, 0.35, 0.35);
+            space::Sky::Octants([
+                below,
+                below,
+                above,
+                above * 3.0, // back upper left
+                below,
+                below,
+                above,
+                above,
+            ])
+        })
         .spawn({
             let mut spawn = Spawn::looking_at_space(space_bounds, [0., 0.5, 1.]);
             spawn.set_inventory(
@@ -42,7 +59,18 @@ pub(crate) fn menger_sponge(
         })
         .build();
     visit_menger_sponge_points(world_levels, GridPoint::origin(), &mut |cube| {
-        space.set(cube, &leaf_block)?;
+        let coloring = (cube.lower_bounds() / 3)
+            .to_vector()
+            .dot(Vector3D::splat(1))
+            .rem_euclid(2);
+        space.set(
+            cube,
+            if coloring == 0 {
+                &leaf_block_1
+            } else {
+                &leaf_block_2
+            },
+        )?;
         Ok::<_, InGenError>(())
     })?;
     space.fast_evaluate_light();
