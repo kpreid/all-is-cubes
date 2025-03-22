@@ -39,7 +39,7 @@ log = { workspace = true }
 macro_rules_attribute = { workspace = true }
 noise = { workspace = true } # TODO: not no_std compatible (fixable)
 paste = { workspace = true }
-petgraph = { workspace = true } # TODO: not no_std compatible (might become so someday)
+petgraph = { workspace = true }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 strum = { workspace = true, features = ["derive"] }

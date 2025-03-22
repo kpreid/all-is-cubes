@@ -251,10 +251,6 @@ criteria = "safe-to-deploy"
 version = "0.13.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.camino]]
-version = "1.1.9"
-criteria = "safe-to-deploy"
-
 [[exemptions.cargo-platform]]
 version = "0.1.9"
 criteria = "safe-to-deploy"
@@ -286,18 +282,6 @@ criteria = "safe-to-deploy"
 [[exemptions.chrono]]
 version = "0.4.39"
 criteria = "safe-to-deploy"
-
-[[exemptions.ciborium]]
-version = "0.2.2"
-criteria = "safe-to-run"
-
-[[exemptions.ciborium-io]]
-version = "0.2.2"
-criteria = "safe-to-run"
-
-[[exemptions.ciborium-ll]]
-version = "0.2.2"
-criteria = "safe-to-run"
 
 [[exemptions.clang-format]]
 version = "0.3.0"
@@ -528,7 +512,7 @@ version = "1.29.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.fixedbitset]]
-version = "0.4.2"
+version = "0.5.7"
 criteria = "safe-to-deploy"
 
 [[exemptions.flatbuffers]]
@@ -761,10 +745,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.itertools]]
 version = "0.13.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.itertools]]
-version = "0.14.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.jni-sys]]
@@ -1112,7 +1092,7 @@ version = "0.6.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.petgraph]]
-version = "0.6.5"
+version = "0.7.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.pin-project]]
@@ -1209,10 +1189,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.radium]]
 version = "0.7.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.rand]]
-version = "0.8.5"
 criteria = "safe-to-deploy"
 
 [[exemptions.rand]]
@@ -1317,10 +1293,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.scopeguard]]
 version = "1.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.semver]]
-version = "1.0.25"
 criteria = "safe-to-deploy"
 
 [[exemptions.send_wrapper]]
@@ -1428,15 +1400,7 @@ version = "0.4.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.thiserror]]
-version = "1.0.69"
-criteria = "safe-to-deploy"
-
-[[exemptions.thiserror]]
 version = "2.0.11"
-criteria = "safe-to-deploy"
-
-[[exemptions.thiserror-impl]]
-version = "1.0.69"
 criteria = "safe-to-deploy"
 
 [[exemptions.thiserror-impl]]
@@ -1525,10 +1489,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.typenum]]
 version = "1.18.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.unicase]]
-version = "2.8.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.unicode-ident]]
@@ -1645,10 +1605,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.windows]]
 version = "0.59.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.windows-core]]
-version = "0.52.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.windows-core]]
