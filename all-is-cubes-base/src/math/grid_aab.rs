@@ -4,7 +4,7 @@
 use core::fmt;
 use core::ops::Range;
 
-use euclid::Vector3D;
+use euclid::{Vector3D, size3};
 use manyfmt::Refmt;
 use rand::Rng as _;
 
@@ -231,13 +231,24 @@ impl GridAab {
     //---
     // TODO: add doctest example of failure
     #[inline]
-    pub fn volume(&self) -> Option<usize> {
-        let sizes = self.size();
-        let mut volume: usize = 1;
-        for i in Axis::ALL {
-            volume = volume.checked_mul(usize::try_from(sizes[i]).ok()?)?;
+    pub const fn volume(&self) -> Option<usize> {
+        // Convert size values to usize.
+        // These conversions cannot overflow and do not need to be checked,
+        // because we only build on platforms where usize is 32 bits.
+        // This is checked elsewhere but let's assert it locally too.
+        const {
+            assert!(size_of::<GridSizeCoord>() <= size_of::<usize>());
         }
-        Some(volume)
+        let sizes = self.size();
+        let width = sizes.width as usize;
+        let height = sizes.height as usize;
+        let depth = sizes.depth as usize;
+
+        // Checked multiplication of width * height * depth.
+        let Some(area) = width.checked_mul(height) else {
+            return None;
+        };
+        area.checked_mul(depth)
     }
 
     /// Computes the approximate volume of this box in cubes, i.e. the product of all sizes
@@ -285,16 +296,19 @@ impl GridAab {
     /// `self.upper_bounds() - self.lower_bounds()`, except that the result is
     /// unsigned (which is necessary so that it cannot overflow).
     #[inline]
-    pub fn size(&self) -> GridSize {
-        self.upper_bounds
-            // Two’s complement math trick: If the subtraction overflows and wraps, the following
-            // conversion to u32 will give us the right answer anyway.
-            .zip(self.lower_bounds, GridCoordinate::wrapping_sub)
+    pub const fn size(&self) -> GridSize {
+        size3(
+            // Two’s complement arithmetic trick: If the subtraction overflows and wraps, the
+            // following conversion to u32 will give us the right answer anyway.
+            //
             // Declaring the parameter type ensures that if we ever decide to change the numeric
             // type of `GridCoordinate`, this will fail to compile.
-            // Not using `to_u32()` because that has an unnecessary range check and panic branch.
-            .map(|s: i32| s as u32)
-            .into()
+            //
+            // TODO: Replace `as u32` with `.cast_unsigned()` after Rust 1.87.
+            i32::wrapping_sub(self.upper_bounds.x, self.lower_bounds.x) as u32,
+            i32::wrapping_sub(self.upper_bounds.y, self.lower_bounds.y) as u32,
+            i32::wrapping_sub(self.upper_bounds.z, self.lower_bounds.z) as u32,
+        )
     }
 
     /// The range of X coordinates for unit cubes within the box.
