@@ -23,7 +23,7 @@ use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{time, transaction};
 
-use crate::fractal::menger_sponge;
+use crate::fractal::menger_sponge_from_size;
 use crate::{LandscapeBlocks, wavy_landscape};
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
 use crate::{free_editing_starter_inventory, palette};
@@ -180,10 +180,15 @@ impl UniverseTemplate {
                 Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), params).await),
                 Islands => Some(islands(&mut universe, p.take().unwrap(), params).await),
                 Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
-                CornellBox => Some(cornell_box(
-                    params.size.unwrap_or(GridSize::new(57, 57, 57)),
-                )),
-                MengerSponge => Some(menger_sponge(&mut universe, p.take().unwrap(), 4).await),
+                CornellBox => Some(cornell_box(params.size.unwrap_or(GridSize::splat(57)))),
+                MengerSponge => Some(
+                    menger_sponge_from_size(
+                        &mut universe,
+                        p.take().unwrap(),
+                        params.size.unwrap_or(GridSize::splat(3u32.pow(4))),
+                    )
+                    .await,
+                ),
                 LightingBench => Some(
                     all_is_cubes::content::testing::lighting_bench_space(
                         &mut universe,

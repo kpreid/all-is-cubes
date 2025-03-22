@@ -16,6 +16,18 @@ use all_is_cubes::universe::Universe;
 
 use crate::DemoBlocks;
 
+pub(crate) fn menger_sponge_from_size(
+    universe: &mut Universe,
+    progress: YieldProgress,
+    requested_size: GridSize,
+) -> impl Future<Output = Result<Space, InGenError>> + Send {
+    let mut level = 1;
+    while requested_size.contains(pow3aab(level + 1).size()) {
+        level += 1;
+    }
+    menger_sponge(universe, progress, level)
+}
+
 pub(crate) async fn menger_sponge(
     universe: &mut Universe,
     progress: YieldProgress,
