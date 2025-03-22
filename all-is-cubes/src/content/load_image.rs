@@ -217,7 +217,7 @@ cfg_if::cfg_if! {
         #[doc(hidden)]
         pub use ::std::sync::LazyLock as LazyForIncludeImage;
 
-        /// Load an image from a relative path. Memoized if the `std` feature is enabled.
+        /// Load an image from a relative path.
         #[doc(hidden)]
         #[macro_export]
         macro_rules! _content_load_image_include_image {
@@ -227,17 +227,29 @@ cfg_if::cfg_if! {
                 > = $crate::content::load_image::LazyForIncludeImage::new(|| {
                     $crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
                 });
+
                 &*IMAGE
             }};
         }
     } else {
-        /// Load an image from a relative path. Memoized if the `std` feature is enabled.
+        #[doc(hidden)]
+        pub use ::once_cell::race::OnceBox as OnceBoxForIncludeImage;
+        #[doc(hidden)]
+        pub use ::alloc::boxed::Box as BoxForIncludeImage;
+
+        /// Load an image from a relative path.
         #[doc(hidden)]
         #[macro_export]
         macro_rules! _content_load_image_include_image {
-            ( $path:literal ) => {
-                &$crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
-            };
+            ( $path:literal ) => {{
+                static IMAGE: $crate::content::load_image::OnceBoxForIncludeImage<
+                    $crate::content::load_image::DecodedPng,
+                > = $crate::content::load_image::OnceBoxForIncludeImage::new();
+
+                IMAGE.get_or_init(|| $crate::content::load_image::BoxForIncludeImage::new(
+                    $crate::content::load_image::load_png_from_bytes($path, include_bytes!($path))
+                ))
+            }};
         }
     }
 }
