@@ -357,7 +357,6 @@ impl FromIterator<Octant> for OctantMask {
 /// If the values are [`bool`], use [`OctantMask`] instead for a more efficient representation.
 #[derive(Clone, Copy, Default, Hash, PartialEq, Eq, exhaust::Exhaust)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-
 pub struct OctantMap<T>([T; 8]);
 
 impl<T> OctantMap<T> {
