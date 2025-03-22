@@ -21,8 +21,6 @@ pub(crate) async fn menger_sponge(
     progress: YieldProgress,
     world_levels: u8,
 ) -> Result<Space, InGenError> {
-    let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
-
     let [mut building_progress, mut light_progress] = progress.split(0.9);
     building_progress.set_label("Constructing fractal");
     light_progress.set_label("Lighting");
@@ -41,34 +39,40 @@ pub(crate) async fn menger_sponge(
         .color(rgba_const!(0.4, 0.5, 0.5, 1.0))
         .build();
 
-    let space_bounds = pow3aab(world_levels);
-    let mut space = Space::builder(space_bounds)
-        .sky({
-            let above = Rgb::new(0.8, 0.8, 0.92);
-            let below = Rgb::new(0.4, 0.35, 0.35);
-            space::Sky::Octants([
-                below,
-                below,
-                above,
-                above * 3.0, // back upper left
-                below,
-                below,
-                above,
-                above,
-            ])
-        })
-        .spawn({
-            let mut spawn = Spawn::looking_at_space(space_bounds, [0., 0.5, 1.]);
-            spawn.set_inventory(
-                [
-                    free_editing_starter_inventory(true),
-                    vec![Tool::InfiniteBlocks(demo_blocks[DemoBlocks::Lamp(true)].clone()).into()],
-                ]
-                .concat(),
-            );
-            spawn
-        })
-        .build();
+    let mut space = {
+        let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+        let space_bounds = pow3aab(world_levels);
+        Space::builder(space_bounds)
+            .sky({
+                let above = Rgb::new(0.8, 0.8, 0.92);
+                let below = Rgb::new(0.4, 0.35, 0.35);
+                space::Sky::Octants([
+                    below,
+                    below,
+                    above,
+                    above * 3.0, // back upper left
+                    below,
+                    below,
+                    above,
+                    above,
+                ])
+            })
+            .spawn({
+                let mut spawn = Spawn::looking_at_space(space_bounds, [0., 0.5, 1.]);
+                spawn.set_inventory(
+                    [
+                        free_editing_starter_inventory(true),
+                        vec![
+                            Tool::InfiniteBlocks(demo_blocks[DemoBlocks::Lamp(true)].clone())
+                                .into(),
+                        ],
+                    ]
+                    .concat(),
+                );
+                spawn
+            })
+            .build()
+    };
 
     let total_cubes = 20f32.powf(world_levels.into());
     for (i, cube) in menger_sponge_points(world_levels, GridPoint::origin()).enumerate() {
