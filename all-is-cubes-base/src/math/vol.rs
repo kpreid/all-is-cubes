@@ -6,7 +6,7 @@ use core::ops::{Deref, DerefMut};
 #[cfg(doc)]
 use alloc::vec::Vec;
 
-use euclid::{Point3D, vec3};
+use euclid::{Point3D, Size3D, vec3};
 use manyfmt::Refmt as _;
 
 use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector};
@@ -61,6 +61,23 @@ impl<O> Vol<(), O> {
                 ordering,
                 contents: (),
             })
+        }
+    }
+
+    /// Constructs a [`Vol`] from 8-bit integers that cannot overflow.
+    ///
+    /// This constructor is limited so that it is `const` and infallible;
+    /// It is the [`Vol`] version of [`GridAab::tiny()`].
+    #[inline]
+    pub const fn tiny(
+        lower_bounds: Point3D<i8, Cube>,
+        size: Size3D<u8, Cube>,
+        ordering: O,
+    ) -> Self {
+        Self {
+            bounds: GridAab::tiny(lower_bounds, size),
+            ordering,
+            contents: (),
         }
     }
 
@@ -136,7 +153,35 @@ where
     }
 }
 
-/// Constructors from elements.
+impl<'a, O, V> Vol<&'a [V], O> {
+    /// Constructs a [`Vol`] containing the provided elements, of which there must be no more than
+    /// 255³.
+    ///
+    /// This constructor is limited so that it is `const` and infallible;
+    /// see also [`GridAab::tiny()`] and [`Vol::tiny()`].
+    ///
+    /// Panics if `data`’s length does not match the volume of `size`.
+    #[inline]
+    pub const fn from_tiny_elements(
+        lower_bounds: Point3D<i8, Cube>,
+        size: Size3D<u8, Cube>,
+        ordering: O,
+        contents: &'a [V],
+    ) -> Self {
+        let bounds = GridAab::tiny(lower_bounds, size);
+        assert!(
+            bounds.volume().unwrap() == contents.len(),
+            "element count does not match AAB volume"
+        );
+        Self {
+            bounds,
+            ordering,
+            contents,
+        }
+    }
+}
+
+/// Constructors from elements not already stored linearly.
 //---
 // TODO: This should be `O: Ordering` instead of `ZMaj` once we have alternative orderings
 #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
@@ -847,6 +892,7 @@ fn unreachable_wrong_size<T>(error: VolLengthError) -> T {
 mod tests {
     use super::*;
     use alloc::string::String;
+    use euclid::{point3, size3};
     use pretty_assertions::assert_eq;
 
     type VolBox<T> = Vol<Box<[T]>>;
@@ -913,6 +959,31 @@ mod tests {
                 }\
             "}
         )
+    }
+
+    #[test]
+    fn tiny_is_sufficiently_tiny() {
+        // Obtain the maximum without specifying what we think the type is.
+        let maximum_size = num_traits::Bounded::max_value();
+
+        let tiny_vol = Vol::tiny(point3(0, 0, 0), Size3D::splat(maximum_size), ZMaj);
+        assert_eq!(tiny_vol.volume(), usize::from(maximum_size).pow(3));
+
+        // Try the constructor with elements
+        let tiny_vol_data = Vol::from_tiny_elements(
+            point3(0, 0, 0),
+            size3(2, 2, 2),
+            ZMaj,
+            &[0, 1, 2, 3, 4, 5, 6, 7],
+        );
+        assert_eq!(tiny_vol_data.volume(), 8);
+        assert_eq!(tiny_vol_data[[1, 1, 0]], 6);
+    }
+
+    #[test]
+    #[should_panic = "element count does not match AAB volume"]
+    fn tiny_error() {
+        _ = Vol::from_tiny_elements(point3(0, 0, 0), size3(2, 2, 2), ZMaj, &[3, 3, 3]);
     }
 
     #[test]

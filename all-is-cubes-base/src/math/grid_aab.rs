@@ -213,6 +213,31 @@ impl GridAab {
         }
     }
 
+    /// Constructs a [`GridAab`] from 8-bit integers that cannot overflow.
+    ///
+    /// This constructor is limited so that it is `const` and infallible.
+    /// It always behaves identically to [`GridAab::from_lower_size()`].
+    ///
+    /// See also [`GridAab::for_block()`].
+    #[inline]
+    pub const fn tiny(
+        lower_bounds: euclid::Point3D<i8, Cube>,
+        size: euclid::Size3D<u8, Cube>,
+    ) -> Self {
+        GridAab {
+            lower_bounds: GridPoint::new(
+                lower_bounds.x as i32,
+                lower_bounds.y as i32,
+                lower_bounds.z as i32,
+            ),
+            upper_bounds: GridPoint::new(
+                lower_bounds.x as i32 + size.width as i32,
+                lower_bounds.y as i32 + size.height as i32,
+                lower_bounds.z as i32 + size.depth as i32,
+            ),
+        }
+    }
+
     /// Computes the volume of this box in cubes, i.e. the product of all sizes.
     ///
     /// Returns [`None`] if the volume does not fit in a `usize`.
@@ -1100,6 +1125,7 @@ mod tests {
     use crate::math::{GridRotation, ZMaj};
     use crate::resolution::Resolution::*;
     use alloc::string::ToString as _;
+    use euclid::{point3, size3};
     use indoc::indoc;
 
     #[test]
@@ -1129,6 +1155,14 @@ mod tests {
             GridAab::for_block(R128),
             GridAab::from_lower_size([0, 0, 0], [128, 128, 128])
         );
+    }
+
+    #[test]
+    fn tiny() {
+        assert_eq!(
+            GridAab::tiny(point3(-10, 0, 10), size3(0, 1, 255)),
+            GridAab::from_lower_size(point3(-10, 0, 10), size3(0, 1, 255))
+        )
     }
 
     #[test]
