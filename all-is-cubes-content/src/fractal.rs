@@ -86,7 +86,13 @@ async fn binary_fractal(
             .build()
     };
 
-    let total_cubes = 20f32.powf(world_levels.into());
+    let total_cubes = fractal
+        .pattern
+        .as_linear()
+        .iter()
+        .map(|&flag| f32::from(flag))
+        .sum::<f32>()
+        .powf(world_levels.into());
     for (i, cube) in fractal.cubes(world_levels, GridPoint::origin()).enumerate() {
         let coloring = cube
             .lower_bounds()
