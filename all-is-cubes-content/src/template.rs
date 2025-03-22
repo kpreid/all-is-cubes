@@ -183,7 +183,7 @@ impl UniverseTemplate {
                 CornellBox => Some(cornell_box(
                     params.size.unwrap_or(GridSize::new(57, 57, 57)),
                 )),
-                MengerSponge => Some(menger_sponge(&mut universe, 4)),
+                MengerSponge => Some(menger_sponge(&mut universe, p.take().unwrap(), 4).await),
                 LightingBench => Some(
                     all_is_cubes::content::testing::lighting_bench_space(
                         &mut universe,

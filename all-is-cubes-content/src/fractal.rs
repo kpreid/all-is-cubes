@@ -1,5 +1,8 @@
+use all_is_cubes::util::YieldProgress;
 use alloc::boxed::Box;
 use core::iter;
+
+use either::Either;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::character::Spawn;
@@ -10,15 +13,19 @@ use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, GridSize, Rgb, rgba_const};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::Universe;
-use either::Either;
 
 use crate::DemoBlocks;
 
-pub(crate) fn menger_sponge(
+pub(crate) async fn menger_sponge(
     universe: &mut Universe,
+    progress: YieldProgress,
     world_levels: u8,
 ) -> Result<Space, InGenError> {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
+
+    let [mut building_progress, mut light_progress] = progress.split(0.9);
+    building_progress.set_label("Constructing fractal");
+    light_progress.set_label("Lighting");
 
     // TODO: This fractal construction procedure could be generalized to other fractals.
     //
@@ -62,7 +69,9 @@ pub(crate) fn menger_sponge(
             spawn
         })
         .build();
-    for cube in menger_sponge_points(world_levels, GridPoint::origin()) {
+
+    let total_cubes = 20f32.powf(world_levels.into());
+    for (i, cube) in menger_sponge_points(world_levels, GridPoint::origin()).enumerate() {
         let coloring = (cube.lower_bounds() / 3)
             .to_vector()
             .dot(Vector3D::splat(1))
@@ -75,21 +84,31 @@ pub(crate) fn menger_sponge(
                 &leaf_block_2
             },
         )?;
+        if i.rem_euclid(20_000) == 0 {
+            building_progress.progress((i as f32) / total_cubes).await;
+        }
     }
+
+    light_progress.progress(0.0).await;
     space.fast_evaluate_light();
+    light_progress.finish().await;
+
     Ok(space)
 }
 
 /// Visit all cubes that are part of the Menger sponge of the given level.
 /// The side length of the bounding box is `3.pow(levels)`.
-fn menger_sponge_points(level: u8, lower_corner: GridPoint) -> impl Iterator<Item = Cube> {
+fn menger_sponge_points(
+    level: u8,
+    lower_corner: GridPoint,
+) -> impl Iterator<Item = Cube> + Send + 'static {
     // It'd be nice if we could do this without allocation, but not very important since
     // the rest of the process is quite expensive too.
     if level == 0 {
         Either::Left(iter::once(Cube::from(lower_corner)))
     } else {
         let size_of_next_level: GridCoordinate = 3_i32.pow((level - 1).into());
-        let iterator: Box<dyn Iterator<Item = Cube>> =
+        let iterator: Box<dyn Iterator<Item = Cube> + Send> =
             Box::new(pow3aab(1).interior_iter().flat_map(move |which_section| {
                 let Point3D { x, y, z, .. } = which_section
                     .lower_bounds()
