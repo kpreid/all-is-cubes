@@ -74,7 +74,7 @@ pollster = { workspace = true }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
-resource = "0.5.0"
+resource = "0.6.0"
 send_wrapper = { workspace = true, features = ["futures"] }
 wasm-bindgen-futures = { workspace = true }
 # For initializing tests on web. (This is not a dev-dependency because some of said tests are not in this package.)
