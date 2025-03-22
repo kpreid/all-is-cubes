@@ -31,6 +31,7 @@ arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary"]
 all-is-cubes = { workspace = true, features = ["std"] }
 all-is-cubes-ui = { workspace = true }
 arbitrary = { workspace = true, optional = true }
+either = { workspace = true }
 exhaust = { workspace = true }
 futures-core = { workspace = true }
 hashbrown = { workspace = true }

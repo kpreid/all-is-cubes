@@ -132,6 +132,7 @@ dependencies = [
  "all-is-cubes-ui",
  "arbitrary",
  "criterion",
+ "either",
  "exhaust",
  "futures-core",
  "hashbrown 0.15.2",
