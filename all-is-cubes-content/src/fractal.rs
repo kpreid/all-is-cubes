@@ -191,6 +191,28 @@ const MENGER_SPONGE: BinaryFractal = BinaryFractal {
 };
 
 #[allow(unused, reason = "TODO: use this")]
+const INVERTED_MENGER_SPONGE: BinaryFractal = BinaryFractal {
+    pattern: Vol::from_tiny_elements(
+        point3(0, 0, 0),
+        size3(3, 3, 3),
+        ZMaj,
+        &[
+            false, false, false, //
+            false, true, false, //
+            false, false, false, //
+            //
+            false, true, false, //
+            true, true, true, //
+            false, true, false, //
+            //
+            false, false, false, //
+            false, true, false, //
+            false, false, false, //
+        ],
+    ),
+};
+
+#[allow(unused, reason = "TODO: use this")]
 const SIERPINSKI_TETRAHEDRON: BinaryFractal = BinaryFractal {
     pattern: Vol::from_tiny_elements(
         point3(0, 0, 0),
