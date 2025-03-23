@@ -25,6 +25,7 @@ pub(super) use all_is_cubes::drawing::embedded_graphics::{
 pub(super) use all_is_cubes::euclid::{
     Point3D, Rotation2D, Size3D, Vector2D, Vector3D, point3, size3, vec3,
 };
+pub(super) use all_is_cubes::inv;
 pub(super) use all_is_cubes::linking::{BlockProvider, InGenError};
 pub(super) use all_is_cubes::listen;
 pub(super) use all_is_cubes::math::{

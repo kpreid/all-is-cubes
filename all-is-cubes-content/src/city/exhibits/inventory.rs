@@ -1,4 +1,5 @@
-use all_is_cubes::inv;
+use hashbrown::HashMap;
+use itertools::Itertools;
 
 use super::prelude::*;
 
@@ -13,7 +14,7 @@ fn INVENTORY(ctx: Context<'_>) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
-    let mut space = Space::empty(GridAab::from_lower_size([0, 0, 0], [4, 3, 1]));
+    let mut space = Space::empty(GridAab::from_lower_size([0, 0, -1], [4, 3, 2]));
 
     let tray = Block::builder()
         .display_name("Tray")
@@ -38,22 +39,20 @@ fn INVENTORY(ctx: Context<'_>) {
         .build_txn(&mut txn);
 
     let (straight_pipe_block, elbow_pipe_block) = make_pipe_blocks(&mut txn);
-    let clockwise_in_xy_plane = GridRotation::RyXZ;
 
-    // for purposes of "what is the primitive" we define the elbow pipe as NZ-to-NX
-    // but for demo building purposes it is easier if we say it is in the XY plane, NY-to-NX
-    let elbow_pipe_block = elbow_pipe_block.rotate(GridRotation::RXZy);
-
-    let pipe_with_item_1 = elbow_pipe_block
-        .evaluate()
-        .unwrap()
-        .with_inventory([inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into()]);
-    let pipe_with_item_2 = elbow_pipe_block
-        .evaluate()
-        .unwrap()
-        .with_inventory([inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_BLUE)).into()]);
-    let empty_pipe = straight_pipe_block.evaluate().unwrap().with_inventory([]);
-    let empty_elbow_pipe = elbow_pipe_block.evaluate().unwrap().with_inventory([]);
+    let pipe_table = prepare_pipes([
+        // TODO: Should prepare_pipes() automatically fix the lack of inventories?
+        PipeData {
+            block: straight_pipe_block.evaluate().unwrap().with_inventory([]),
+            from_face: Face6::NZ,
+            to_face: Face6::PZ,
+        },
+        PipeData {
+            block: elbow_pipe_block.evaluate().unwrap().with_inventory([]),
+            from_face: Face6::NZ,
+            to_face: Face6::NX,
+        },
+    ]);
 
     stack(
         &mut space,
@@ -74,29 +73,115 @@ fn INVENTORY(ctx: Context<'_>) {
         [1, 0, 0],
         [pedestal, &tray.evaluate().unwrap().with_inventory([])],
     )?;
-    stack(
-        &mut space,
-        [2, 0, 0],
-        [
-            &pipe_with_item_1.rotate(clockwise_in_xy_plane),
-            &empty_pipe.clone().rotate(GridRotation::RXZY),
-            &pipe_with_item_2
-                .clone()
-                .rotate(clockwise_in_xy_plane * clockwise_in_xy_plane),
-        ],
-    )?;
 
-    stack(
-        &mut space,
-        [3, 0, 0],
+    for (cube, block) in fit_pipes(
+        &pipe_table,
         [
-            &empty_elbow_pipe.clone(),
-            &empty_pipe.clone().rotate(GridRotation::RXZy),
-            &empty_elbow_pipe.rotate(clockwise_in_xy_plane.inverse()),
-        ],
-    )?;
+            [2, 0, 0],
+            [2, 1, 0],
+            [2, 2, 0],
+            [2, 2, -1],
+            [2, 1, -1],
+            [1, 1, -1],
+            [1, 0, -1],
+            [2, 0, -1],
+            [3, 0, -1],
+            [3, 1, -1],
+            [3, 2, -1],
+            [3, 2, 0],
+            [3, 1, 0],
+            [3, 0, 0],
+            // wrap around to join the start
+            [2, 0, 0],
+            [2, 1, 0],
+        ]
+        .map(Cube::from),
+    ) {
+        space.set(cube, block)?;
+    }
+
+    // Place some items in the loop of pipe
+    {
+        let pipe_with_item_1 =
+            straight_pipe_block
+                .evaluate()
+                .unwrap()
+                .with_inventory([
+                    inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
+                ]);
+        let pipe_with_item_2 =
+            straight_pipe_block
+                .evaluate()
+                .unwrap()
+                .with_inventory([inv::Tool::Block(block::from_color!(
+                    Rgb::UNIFORM_LUMINANCE_BLUE
+                ))
+                .into()]);
+        space.set([2, 1, 0], pipe_with_item_1.rotate(GridRotation::RXzY))?;
+        space.set([3, 1, 0], pipe_with_item_2.rotate(GridRotation::RXZy))?;
+    }
 
     Ok((space, txn))
+}
+
+struct PipeData {
+    block: Block,
+    from_face: Face6,
+    to_face: Face6,
+}
+
+// Assumed to be complete
+type PipeTable = HashMap<(Face6, Face6), Block>;
+
+/// Take a set of [`PipeData`] and expand it with rotations of those pipes.
+fn prepare_pipes(pipes: impl IntoIterator<Item = PipeData>) -> PipeTable {
+    let mut table: HashMap<(Face6, Face6), Block> = HashMap::new();
+    for pipe in pipes {
+        // TODO: Allow caller — or the individual pipes — to rank preferred and dispreferred
+        // rotations more finely than "prefer IDENTITY".
+        for rotation in GridRotation::ALL_BUT_REFLECTIONS {
+            let faces = (
+                rotation.transform(pipe.from_face),
+                rotation.transform(pipe.to_face),
+            );
+            if rotation == GridRotation::IDENTITY {
+                // Unconditionally insert.
+                table.insert(faces, pipe.block.clone().rotate(rotation));
+            } else {
+                // Insert only if we don't have one already.
+                table
+                    .entry(faces)
+                    .or_insert_with(|| pipe.block.clone().rotate(rotation));
+            }
+        }
+    }
+    table
+}
+
+/// Given a set of `pipes`, rotate and place them so that they follow the `path`.
+///
+/// The first and last elements of `path` are left unaltered and indicate the starting and
+/// ending faces the pipes should connect to.
+///
+/// `pipes` should contain a straight pipe and a right-angle pipe.
+/// If `pipes` contains multiple elements with the same angle, the one which does not require
+/// rotation will be preferred.
+///
+/// Panics if any element of `path` is not adjacent to the previous element.
+/// Panics if `pipes` does not contain a straight pipe and a right-angle pipe and one is needed.
+#[track_caller]
+fn fit_pipes(
+    pipes: &PipeTable,
+    path: impl IntoIterator<Item = Cube>,
+) -> impl Iterator<Item = (Cube, &Block)> {
+    path.into_iter()
+        .tuple_windows()
+        .map(|(cube_behind, cube_here, cube_ahead)| {
+            let face_behind = Face6::try_from(cube_behind - cube_here).expect("invalid path");
+            let face_ahead = Face6::try_from(cube_ahead - cube_here).expect("invalid path");
+
+            (cube_here, &pipes[&(face_behind, face_ahead)])
+        })
 }
 
 fn make_pipe_blocks(txn: &mut ExhibitTransaction) -> (Block, Block) {
