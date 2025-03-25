@@ -395,10 +395,6 @@ criteria = "safe-to-deploy"
 version = "0.9.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.crunchy]]
-version = "0.2.3"
-criteria = "safe-to-deploy"
-
 [[exemptions.cursor-icon]]
 version = "1.1.0"
 criteria = "safe-to-deploy"
@@ -735,10 +731,6 @@ criteria = "safe-to-deploy"
 version = "2.11.0"
 criteria = "safe-to-run"
 
-[[exemptions.is-terminal]]
-version = "0.4.15"
-criteria = "safe-to-deploy"
-
 [[exemptions.itertools]]
 version = "0.10.5"
 criteria = "safe-to-deploy"
@@ -821,10 +813,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.libudev-sys]]
 version = "0.1.4"
-criteria = "safe-to-deploy"
-
-[[exemptions.linux-raw-sys]]
-version = "0.4.15"
 criteria = "safe-to-deploy"
 
 [[exemptions.lock_api]]
@@ -1277,10 +1265,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.rustc_version]]
 version = "0.4.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.rustix]]
-version = "0.38.44"
 criteria = "safe-to-deploy"
 
 [[exemptions.ryu]]

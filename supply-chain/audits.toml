@@ -116,6 +116,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "1.0.1 -> 1.0.2"
 
+[[audits.tempfile]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "3.17.1 -> 3.19.1"
+
 [[audits.web-time]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
@@ -204,11 +209,23 @@ user-id = 98157 # Kevin Reid (kpreid)
 start = "2022-02-15"
 end = "2026-03-08"
 
+[[trusted.is-terminal]]
+criteria = "safe-to-deploy"
+user-id = 6825 # Dan Gohman (sunfishcode)
+start = "2022-01-22"
+end = "2026-03-25"
+
 [[trusted.is_terminal_polyfill]]
 criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2024-05-02"
 end = "2026-03-08"
+
+[[trusted.linux-raw-sys]]
+criteria = "safe-to-deploy"
+user-id = 6825 # Dan Gohman (sunfishcode)
+start = "2021-06-12"
+end = "2026-03-25"
 
 [[trusted.manyfmt]]
 criteria = "safe-to-deploy"
@@ -533,6 +550,12 @@ criteria = "safe-to-deploy"
 user-id = 98157 # Kevin Reid (kpreid)
 start = "2023-05-06"
 end = "2026-03-08"
+
+[[trusted.rustix]]
+criteria = "safe-to-deploy"
+user-id = 6825 # Dan Gohman (sunfishcode)
+start = "2021-10-29"
+end = "2026-03-25"
 
 [[trusted.serde_spanned]]
 criteria = "safe-to-deploy"
