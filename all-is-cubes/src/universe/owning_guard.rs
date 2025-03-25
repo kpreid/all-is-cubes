@@ -22,7 +22,6 @@
 //! <https://users.rust-lang.org/t/unsafe-code-review-semi-owning-weak-rwlock-t-guard/95706>
 
 use alloc::sync::Arc;
-use core::{mem, ptr};
 
 use super::handle::UEntry;
 use crate::util::maybe_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
@@ -135,56 +134,61 @@ impl<T> From<TryLockError<T>> for LockError {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Wrapper type that avoids implicitly asserting the contents are currently valid.
-/// Therefore it is safe to contain a dangling reference, as long as it is not used.
-///
-/// Context on this code:
-/// <https://users.rust-lang.org/t/unsafe-code-review-semi-owning-weak-rwlock-t-guard/95706/6>
-///
-/// TODO: Replace this with an official definitely-valid version when that is implemented.
-/// <https://github.com/rust-lang/rfcs/pull/3336>
-struct MaybeDangling<T> {
-    inner: mem::MaybeUninit<T>,
-}
+use maybe_dangling::MaybeDangling;
+mod maybe_dangling {
+    use core::{mem, ptr};
 
-impl<T> MaybeDangling<T> {
-    fn new(value: T) -> Self {
-        Self {
-            inner: mem::MaybeUninit::new(value),
+    /// Wrapper type that avoids implicitly asserting the contents are currently valid.
+    /// Therefore it is safe to contain a dangling reference, as long as it is not used.
+    ///
+    /// Context on this code:
+    /// <https://users.rust-lang.org/t/unsafe-code-review-semi-owning-weak-rwlock-t-guard/95706/6>
+    ///
+    /// TODO: Replace this with an official definitely-valid version when that is implemented.
+    /// <https://github.com/rust-lang/rfcs/pull/3336>
+    pub(crate) struct MaybeDangling<T> {
+        inner: mem::MaybeUninit<T>,
+    }
+
+    impl<T> MaybeDangling<T> {
+        pub fn new(value: T) -> Self {
+            Self {
+                inner: mem::MaybeUninit::new(value),
+            }
         }
     }
-}
 
-impl<T> core::ops::Deref for MaybeDangling<T> {
-    type Target = T;
+    impl<T> core::ops::Deref for MaybeDangling<T> {
+        type Target = T;
 
-    fn deref(&self) -> &Self::Target {
-        // SAFETY:
-        // The `MaybeUninit` is never actually uninitialized. It might be dangling, but
-        // in that case it is the caller's responsibility not to use `self`. We are only
-        // using `MaybeUninit` to tell the _compiler_ to assume less.
-        unsafe { self.inner.assume_init_ref() }
+        fn deref(&self) -> &Self::Target {
+            // SAFETY:
+            // The `MaybeUninit` is never actually uninitialized. It might be dangling, but
+            // in that case it is the caller's responsibility not to use `self`. We are only
+            // using `MaybeUninit` to tell the _compiler_ to assume less.
+            unsafe { self.inner.assume_init_ref() }
+        }
     }
-}
 
-impl<T> core::ops::DerefMut for MaybeDangling<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        // SAFETY:
-        // The `MaybeUninit` is never actually uninitialized. It might be dangling, but
-        // in that case it is the caller's responsibility not to use `self`. We are only
-        // using `MaybeUninit` to tell the _compiler_ to assume less.
-        unsafe { self.inner.assume_init_mut() }
+    impl<T> core::ops::DerefMut for MaybeDangling<T> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            // SAFETY:
+            // The `MaybeUninit` is never actually uninitialized. It might be dangling, but
+            // in that case it is the caller's responsibility not to use `self`. We are only
+            // using `MaybeUninit` to tell the _compiler_ to assume less.
+            unsafe { self.inner.assume_init_mut() }
+        }
     }
-}
 
-impl<T> Drop for MaybeDangling<T> {
-    fn drop(&mut self) {
-        let p = self.inner.as_mut_ptr();
-        // SAFETY:
-        // The `MaybeUninit` is never actually uninitialized, and it is the caller's
-        // responsibility to drop it before it is invalid just like any normal type.
-        unsafe {
-            ptr::drop_in_place(p);
+    impl<T> Drop for MaybeDangling<T> {
+        fn drop(&mut self) {
+            let p = self.inner.as_mut_ptr();
+            // SAFETY:
+            // The `MaybeUninit` is never actually uninitialized, and it is the caller's
+            // responsibility to drop it before it is invalid just like any normal type.
+            unsafe {
+                ptr::drop_in_place(p);
+            }
         }
     }
 }
