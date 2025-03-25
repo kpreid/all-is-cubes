@@ -10,6 +10,8 @@
 #![feature(never_type)]
 #![feature(try_blocks)]
 #![feature(type_alias_impl_trait)]
+#![feature(unsafe_fields)]
+#![allow(incomplete_features, reason = "unsafe_fields")]
 
 //! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks
 //! are themselves made of “smaller” blocks (voxels) that define their appearance and
