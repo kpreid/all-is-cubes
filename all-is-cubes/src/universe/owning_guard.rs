@@ -30,14 +30,19 @@ use crate::util::maybe_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryLock
 #[cfg(doc)]
 use super::Handle;
 
+// -------------------------------------------------------------------------------------------------
+
 type Lock<T> = RwLock<UEntry<T>>;
 type Strong<T> = Arc<Lock<T>>;
 
 // There are two near-identical implementations for read-only and exclusive access.
 // For readability, they are presented in parallel; both structs then both impls, etc.
+//
+// The “impl” in the name refers to that these are not public API; they are solely concerned with
+// maintaining their unsafe self-reference, and they dereference to `UEntry<T>` instead of `T`.
 
 /// Owning wrapper around [`RwLockReadGuard`] for [`Handle`].
-pub(super) struct UBorrowImpl<T: 'static> {
+pub(super) struct ReadGuardImpl<T: 'static> {
     // SAFETY: `guard` must be dropped before `strong`,
     // which is accomplished by declaring it first.
     /// Lock guard that points into `strong`.
@@ -50,7 +55,7 @@ pub(super) struct UBorrowImpl<T: 'static> {
 }
 
 /// Owning wrapper around [`RwLockWriteGuard`] for [`Handle`].
-pub(super) struct UBorrowMutImpl<T: 'static> {
+pub(super) struct WriteGuardImpl<T: 'static> {
     // SAFETY: `guard` must be dropped before `strong`,
     // which is accomplished by declaring it first.
     /// Lock guard that points into `strong`.
@@ -62,7 +67,7 @@ pub(super) struct UBorrowMutImpl<T: 'static> {
     strong: Strong<T>,
 }
 
-impl<T: 'static> UBorrowImpl<T> {
+impl<T: 'static> ReadGuardImpl<T> {
     pub(super) fn new(strong: Strong<T>) -> Result<Self, LockError> {
         let ptr: *const Lock<T> = Arc::as_ptr(&strong);
 
@@ -76,11 +81,11 @@ impl<T: 'static> UBorrowImpl<T> {
 
         let guard = MaybeDangling::new(reference.try_read()?);
 
-        Ok(UBorrowImpl { guard, strong })
+        Ok(ReadGuardImpl { guard, strong })
     }
 }
 
-impl<T: 'static> UBorrowMutImpl<T> {
+impl<T: 'static> WriteGuardImpl<T> {
     pub(super) fn new(strong: Strong<T>) -> Result<Self, LockError> {
         let ptr: *const Lock<T> = Arc::as_ptr(&strong);
 
@@ -94,25 +99,25 @@ impl<T: 'static> UBorrowMutImpl<T> {
 
         let guard = MaybeDangling::new(reference.try_write()?);
 
-        Ok(UBorrowMutImpl { guard, strong })
+        Ok(WriteGuardImpl { guard, strong })
     }
 }
 
-impl<T: 'static> core::ops::Deref for UBorrowImpl<T> {
+impl<T: 'static> core::ops::Deref for ReadGuardImpl<T> {
     type Target = UEntry<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.guard
     }
 }
-impl<T: 'static> core::ops::Deref for UBorrowMutImpl<T> {
+impl<T: 'static> core::ops::Deref for WriteGuardImpl<T> {
     type Target = UEntry<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.guard
     }
 }
-impl<T: 'static> core::ops::DerefMut for UBorrowMutImpl<T> {
+impl<T: 'static> core::ops::DerefMut for WriteGuardImpl<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.guard
     }
@@ -127,6 +132,8 @@ impl<T> From<TryLockError<T>> for LockError {
         Self
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Wrapper type that avoids implicitly asserting the contents are currently valid.
 /// Therefore it is safe to contain a dangling reference, as long as it is not used.

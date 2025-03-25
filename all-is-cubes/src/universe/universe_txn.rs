@@ -11,8 +11,8 @@ use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transacti
 #[cfg(doc)]
 use crate::universe::HandleError;
 use crate::universe::{
-    AnyHandle, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, UBorrowMut, Universe,
-    UniverseId, UniverseMember, UniverseTable,
+    AnyHandle, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, Universe, UniverseId,
+    UniverseMember, UniverseTable, WriteGuard,
 };
 
 // Reëxports for macro-generated types
@@ -83,7 +83,7 @@ pub(in crate::universe) struct TransactionInUniverseCheck<O>
 where
     O: Transactional + 'static,
 {
-    guard: UBorrowMut<O>,
+    guard: WriteGuard<O>,
     check: <O::Transaction as Transaction>::CommitCheck,
 }
 

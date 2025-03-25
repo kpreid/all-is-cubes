@@ -10,6 +10,8 @@ use crate::universe::{
 };
 use crate::util::maybe_sync::{Mutex, MutexGuard, RwLock};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
 /// parameterized with this somewhat less hairy.
 type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
@@ -153,15 +155,18 @@ impl<T: 'static> Handle<T> {
     /// Acquire temporary read access to the value, in the sense of
     /// [`std::sync::RwLock::try_read()`].
     ///
-    /// TODO: There is not currently any way to block on / wait for read access.
+    /// It is not possible to block on, or otherwise wait for, read access.
+    /// Callers are responsible for separately scheduling read and write access to avoid conflict.
+    ///
+    /// Returns an error if the value is currently being written to, or does not exist.
     #[inline(never)]
-    pub fn read(&self) -> Result<UBorrow<T>, HandleError> {
-        let inner = owning_guard::UBorrowImpl::new(self.upgrade()?)
+    pub fn read(&self) -> Result<ReadGuard<T>, HandleError> {
+        let inner = owning_guard::ReadGuardImpl::new(self.upgrade()?)
             .map_err(|_| HandleError::InUse(self.name()))?;
         if inner.data.is_none() {
             return Err(HandleError::NotReady(self.name()));
         }
-        Ok(UBorrow(inner))
+        Ok(ReadGuard(inner))
     }
 
     /// Apply the given function to the `&mut T` inside.
@@ -171,6 +176,8 @@ impl<T: 'static> Handle<T> {
     /// expressed as a [`Transaction`]. If you must use this, the requirement for
     /// correctness is that you must not replace the referent with a different value;
     /// only use the mutation operations provided by `T`.
+    ///
+    /// Returns an error if the value is currently being accessed, or does not exist.
     ///
     /// TODO: If possible, completely replace this operation with transactions.
     #[inline(never)]
@@ -205,13 +212,13 @@ impl<T: 'static> Handle<T> {
     /// This function is not exposed publicly, but only used in transactions to allow
     /// the check-then-commit pattern; use [`Handle::try_modify`] instead for other
     /// purposes.
-    pub(crate) fn try_borrow_mut(&self) -> Result<UBorrowMut<T>, HandleError> {
-        let inner = owning_guard::UBorrowMutImpl::new(self.upgrade()?)
+    pub(crate) fn try_borrow_mut(&self) -> Result<WriteGuard<T>, HandleError> {
+        let inner = owning_guard::WriteGuardImpl::new(self.upgrade()?)
             .map_err(|_| HandleError::InUse(self.name()))?;
         if inner.data.is_none() {
             return Err(HandleError::NotReady(self.name()));
         }
-        Ok(UBorrowMut(inner))
+        Ok(WriteGuard(inner))
     }
 
     /// Execute the given transaction on the referent.
@@ -536,68 +543,70 @@ pub enum HandleError {
 
 impl core::error::Error for HandleError {}
 
+// -------------------------------------------------------------------------------------------------
+
 /// Read access to the referent of a [`Handle`].
 ///
 /// You can create this by calling [`Handle::read()`], and must drop it before the next time
 /// the handle's referent is mutated.
-//---
-// TODO: Needs a new name now that `Handle` is no longer called `URef`.
-pub struct UBorrow<T: 'static>(owning_guard::UBorrowImpl<T>);
+pub struct ReadGuard<T: 'static>(owning_guard::ReadGuardImpl<T>);
 
-impl<T: fmt::Debug> fmt::Debug for UBorrow<T> {
+impl<T: fmt::Debug> fmt::Debug for ReadGuard<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "UBorrow({:?})", **self)
+        write!(fmt, "ReadGuard({:?})", **self)
     }
 }
-impl<T> Deref for UBorrow<T> {
+impl<T> Deref for ReadGuard<T> {
     type Target = T;
     fn deref(&self) -> &T {
         self.0
             .data
             .as_ref()
-            .expect("can't happen: UBorrow lost its data")
+            .expect("can't happen: universe::ReadGuard lost its data")
     }
 }
-impl<T> AsRef<T> for UBorrow<T> {
+impl<T> AsRef<T> for ReadGuard<T> {
     fn as_ref(&self) -> &T {
         self
     }
 }
-impl<T> core::borrow::Borrow<T> for UBorrow<T> {
+impl<T> core::borrow::Borrow<T> for ReadGuard<T> {
     fn borrow(&self) -> &T {
         self
     }
 }
 
-/// Parallel to [`UBorrow`], but for mutable access.
+/// Parallel to [`ReadGuard`], but for mutable access.
 //
 /// This type is not exposed publicly, but only used in transactions to allow
-/// the check-then-commit pattern; use [`Handle::try_modify`] instead for other
+/// the check-then-commit pattern; use [`Handle::try_modify()`] instead for other
 /// purposes.
-pub(crate) struct UBorrowMut<T: 'static>(owning_guard::UBorrowMutImpl<T>);
-impl<T: 'static> Deref for UBorrowMut<T> {
+pub(crate) struct WriteGuard<T: 'static>(owning_guard::WriteGuardImpl<T>);
+impl<T: 'static> Deref for WriteGuard<T> {
     type Target = T;
     fn deref(&self) -> &T {
         self.0
             .data
             .as_ref()
-            .expect("can't happen: UBorrowMut lost its data")
+            .expect("can't happen: universe::WriteGuard lost its data")
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for UBorrowMut<T> {
+impl<T: fmt::Debug> fmt::Debug for WriteGuard<T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "UBorrowMut({:?})", **self)
+        write!(fmt, "WriteGuard({:?})", **self)
     }
 }
-impl<T: 'static> DerefMut for UBorrowMut<T> {
+impl<T: 'static> DerefMut for WriteGuard<T> {
     fn deref_mut(&mut self) -> &mut T {
         self.0
             .data
             .as_mut()
-            .expect("can't happen: UBorrowMut lost its data")
+            .expect("can't happen: universe::WriteGuard lost its data")
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// The actual mutable data of a universe member, that can be accessed via [`Handle`].
 #[derive(Debug)]
@@ -674,6 +683,8 @@ impl<T> RootHandle<T> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Object-safe trait implemented for [`Handle`], to allow code to operate on `Handle<T>`
 /// regardless of `T`.
 pub trait ErasedHandle: core::any::Any + fmt::Debug {
@@ -749,6 +760,8 @@ impl alloc::borrow::ToOwned for dyn ErasedHandle {
         self.to_any_handle()
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(feature = "save")]
 mod private {

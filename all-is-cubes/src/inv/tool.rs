@@ -15,7 +15,7 @@ use crate::op::{self, Operation};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
 use crate::universe::{
-    Handle, HandleError, HandleVisitor, UBorrow, UniverseTransaction, VisitHandles,
+    Handle, HandleError, HandleVisitor, ReadGuard, UniverseTransaction, VisitHandles,
 };
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
@@ -456,7 +456,7 @@ impl ToolInput {
         // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
 
         let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail if this returns None?
-        let character_guard: Option<UBorrow<Character>> =
+        let character_guard: Option<ReadGuard<Character>> =
             self.character.as_ref().map(|c| c.read()).transpose()?;
 
         let cube = if in_front {
@@ -730,13 +730,13 @@ mod tests {
             Ok(())
         }
 
-        fn space(&self) -> UBorrow<Space> {
+        fn space(&self) -> ReadGuard<Space> {
             self.space_handle.read().unwrap()
         }
         fn space_handle(&self) -> &Handle<Space> {
             &self.space_handle
         }
-        fn character(&self) -> UBorrow<Character> {
+        fn character(&self) -> ReadGuard<Character> {
             self.character_handle.read().unwrap()
         }
     }

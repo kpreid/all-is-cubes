@@ -1105,7 +1105,7 @@ mod universe {
     use crate::space::Space;
     use crate::tag::TagDef;
     use crate::time;
-    use crate::universe::{self, Handle, Name, PartialUniverse, UBorrow, Universe};
+    use crate::universe::{self, Handle, Name, PartialUniverse, ReadGuard, Universe};
     use core::cell::RefCell;
     use schema::{HandleSer, MemberDe, NameSer};
 
@@ -1128,7 +1128,7 @@ mod universe {
 
             let blocks = blocks.iter().map(|member_handle: &Handle<BlockDef>| {
                 let name = member_handle.name();
-                let read_guard: UBorrow<BlockDef> = member_handle.read().map_err(|e| {
+                let read_guard: ReadGuard<BlockDef> = member_handle.read().map_err(|e| {
                     serde::ser::Error::custom(format!("Failed to read universe member {name}: {e}"))
                 })?;
                 let member_repr = schema::MemberSer::from(&*read_guard);
@@ -1289,7 +1289,7 @@ mod universe {
             S: Serializer,
         {
             let handle: &Handle<T> = &self.0;
-            let read_guard: UBorrow<T> = handle.read().map_err(|e| {
+            let read_guard: ReadGuard<T> = handle.read().map_err(|e| {
                 serde::ser::Error::custom(format!(
                     "Failed to read universe member {name}: {e}",
                     name = handle.name()

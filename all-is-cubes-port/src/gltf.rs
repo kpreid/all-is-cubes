@@ -386,7 +386,7 @@ pub(crate) async fn export_gltf(
         p.set_label(&name);
         p.progress(0.01).await;
         {
-            // constrained scope so we don't hold UBorrow over an await
+            // constrained scope so we don't hold the read guard over an await
             let block_def = block_def_handle.read()?;
             let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
                 &block_def
@@ -423,7 +423,7 @@ pub(crate) async fn export_gltf(
         p.set_label(&name);
         p.progress(0.01).await;
         {
-            // constrained scope so we don't hold UBorrow over an await
+            // constrained scope so we don't hold the read guard over an await
             let space = space_handle.read()?;
             let block_meshes = block_meshes_for_space::<GltfMt>(
                 &space,

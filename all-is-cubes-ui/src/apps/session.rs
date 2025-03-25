@@ -731,7 +731,7 @@ impl Shuttle {
 
         // Sync space_watch_state in case the character changed its universe.
         {
-            let character_read: Option<universe::UBorrow<Character>> = self
+            let character_read: Option<universe::ReadGuard<Character>> = self
                 .game_character
                 .get()
                 .as_ref()
