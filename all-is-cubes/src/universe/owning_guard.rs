@@ -44,14 +44,15 @@ type Strong<T> = Arc<Lock<T>>;
 /// Owning wrapper around [`RwLockReadGuard`] for [`Handle`].
 pub(super) struct ReadGuardImpl<T: 'static> {
     // SAFETY: `guard` must be dropped before `strong`,
-    // which is accomplished by declaring it first.
+    // which is accomplished by declaring it first and never moving anything out of this struct.
+    //
     /// Lock guard that points into `strong`.
-    guard: MaybeDangling<RwLockReadGuard<'static, T>>,
+    unsafe guard: MaybeDangling<RwLockReadGuard<'static, T>>,
 
     /// [`Arc`] that keeps the data pointer alive as long as `guard` is in use.
     /// This field is never read, only dropped to decrement the reference count appropriately.
     #[expect(dead_code, reason = "used for drop effect")]
-    strong: Strong<T>,
+    unsafe strong: Strong<T>,
 }
 
 impl<T: 'static> ReadGuardImpl<T> {
@@ -68,7 +69,8 @@ impl<T: 'static> ReadGuardImpl<T> {
 
         let guard = MaybeDangling::new(reference.try_read()?);
 
-        Ok(ReadGuardImpl { guard, strong })
+        // SAFETY: as per above
+        Ok(unsafe { ReadGuardImpl { guard, strong } })
     }
 }
 
@@ -76,7 +78,8 @@ impl<T: 'static> core::ops::Deref for ReadGuardImpl<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.guard
+        // SAFETY: the field is declared unsafe, but only move/drop are actually hazardous
+        unsafe { &self.guard }
     }
 }
 
