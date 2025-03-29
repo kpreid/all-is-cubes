@@ -808,17 +808,17 @@ impl<I: time::Instant> SessionBuilder<I> {
             shuttle: Some(Box::new(Shuttle {
                 ui: match viewport_for_ui {
                     Some(viewport) => Some(
-                        Vui::new(
-                            &input_processor,
-                            game_character.as_source(),
-                            paused.as_source(),
-                            settings.as_source(),
-                            control_send.clone(),
-                            viewport,
-                            fullscreen_state,
+                        Vui::new(crate::ui_content::UiTargets {
+                            mouselook_mode: input_processor.mouselook_mode(),
+                            character_source: game_character.as_source(),
+                            paused: paused.as_source(),
+                            graphics_options: settings.as_source(),
+                            app_control_channel: control_send.clone(),
+                            viewport_source: viewport,
+                            fullscreen_source: fullscreen_state,
                             set_fullscreen,
-                            quit_fn.clone(),
-                        )
+                            quit: quit_fn.clone(),
+                        })
                         .await,
                     ),
                     None => None,

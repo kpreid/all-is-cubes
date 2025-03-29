@@ -572,17 +572,17 @@ mod tests {
         // TODO: This test is both verbose and expensive.
         // We need simpler way to create a cheap Vui for a test, or some abstraction here.
         let (cctx, _) = flume::bounded(1);
-        let mut ui = crate::ui_content::Vui::new(
-            &InputProcessor::new(),
-            listen::constant(None),
-            paused.as_source(),
-            listen::constant(Default::default()),
-            cctx,
-            listen::constant(Viewport::ARBITRARY),
-            listen::constant(None),
-            None,
-            None,
-        )
+        let mut ui = crate::ui_content::Vui::new(crate::ui_content::UiTargets {
+            mouselook_mode: listen::constant(false),
+            character_source: listen::constant(None),
+            paused: paused.as_source(),
+            graphics_options: listen::constant(Default::default()),
+            app_control_channel: cctx,
+            viewport_source: listen::constant(Viewport::ARBITRARY),
+            fullscreen_source: listen::constant(None),
+            set_fullscreen: None,
+            quit: None,
+        })
         .await;
 
         // Create input processor and set it to have mouselook mode

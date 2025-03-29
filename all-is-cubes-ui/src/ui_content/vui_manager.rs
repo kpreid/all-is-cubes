@@ -1,7 +1,8 @@
 use alloc::string::{String, ToString as _};
 use alloc::sync::Arc;
-use flume::TryRecvError;
 use std::sync::Mutex;
+
+use flume::TryRecvError;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::character::{Character, Cursor};
@@ -14,13 +15,40 @@ use all_is_cubes::universe::{Handle, Universe, UniverseStepInfo, UniverseTransac
 use all_is_cubes_render::camera::{FogOption, GraphicsOptions, UiViewState, Viewport};
 
 use crate::apps::{
-    ControlMessage, FullscreenSetter, FullscreenState, InputProcessor, QuitCancelled, QuitFn,
-    QuitResult,
+    ControlMessage, FullscreenSetter, FullscreenState, QuitCancelled, QuitFn, QuitResult,
 };
 use crate::ui_content::hud::{HudBlocks, HudInputs};
 use crate::ui_content::{notification, pages};
 use crate::vui::widgets::TooltipState;
 use crate::vui::{self, PageInst, UiSize};
+
+// -------------------------------------------------------------------------------------------------
+
+/// All the things exposed by [`crate::apps::Session`] to [`Vui`],
+/// and that are required to create a [`Vui`].
+///
+/// TODO: Better name.
+pub(crate) struct UiTargets {
+    pub(crate) mouselook_mode: listen::DynSource<bool>,
+
+    /// Reports the `Character` whose inventory should be displayed.
+    pub(crate) character_source: listen::DynSource<Option<Handle<Character>>>,
+
+    pub(crate) paused: listen::DynSource<bool>,
+
+    pub(crate) graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
+
+    pub(crate) app_control_channel: flume::Sender<ControlMessage>,
+
+    pub(crate) viewport_source: listen::DynSource<Viewport>,
+
+    pub(crate) fullscreen_source: listen::DynSource<FullscreenState>,
+    pub(crate) set_fullscreen: FullscreenSetter,
+
+    pub(crate) quit: Option<QuitFn>,
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// `Vui` builds user interfaces out of voxels. It owns a `Universe` dedicated to the
 /// purpose and draws into spaces to form the HUD and menus.
@@ -82,26 +110,24 @@ pub(crate) struct Vui {
 }
 
 impl Vui {
-    /// `input_processor` is the `InputProcessor` whose state may be reflected on the HUD.
-    /// `character_source` reports the `Character` whose inventory should be displayed.
-    ///
     /// TODO: Reduce coupling, perhaps by passing in a separate struct with just the listenable
     /// elements.
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
     /// multitasking. It may safely be blocked on from a synchronous context.
-    #[expect(clippy::too_many_arguments)]
-    pub(crate) async fn new(
-        input_processor: &InputProcessor,
-        character_source: listen::DynSource<Option<Handle<Character>>>,
-        paused: listen::DynSource<bool>,
-        graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
-        app_control_channel: flume::Sender<ControlMessage>,
-        viewport_source: listen::DynSource<Viewport>,
-        fullscreen_source: listen::DynSource<FullscreenState>,
-        set_fullscreen: FullscreenSetter,
-        quit: Option<QuitFn>,
-    ) -> Self {
+    pub(crate) async fn new(params: UiTargets) -> Self {
+        let UiTargets {
+            mouselook_mode,
+            character_source,
+            paused,
+            graphics_options,
+            app_control_channel,
+            viewport_source,
+            fullscreen_source,
+            set_fullscreen,
+            quit,
+        } = params;
+
         let mut universe = Universe::new();
 
         let mut content_txn = UniverseTransaction::default();
@@ -129,7 +155,8 @@ impl Vui {
             (*graphics_options.get()).clone(),
         )));
 
-        // TODO: terrible mess of tightly coupled parameters
+        // TODO: HudInputs should own `UiTargets` or something so that we don’t have one
+        // line per thing.
         let changed_viewport = listen::Flag::listening(false, &viewport_source);
         let ui_size = UiSize::new(viewport_source.get());
         let hud_inputs = HudInputs {
@@ -140,7 +167,7 @@ impl Vui {
             graphics_options,
             paused,
             page_state: state.as_source(),
-            mouselook_mode: input_processor.mouselook_mode(),
+            mouselook_mode,
             fullscreen_mode: fullscreen_source,
             set_fullscreen,
             quit,
@@ -589,17 +616,17 @@ mod tests {
 
     async fn new_vui_for_test(paused: bool) -> (Vui, flume::Receiver<ControlMessage>) {
         let (cctx, ccrx) = flume::bounded(1);
-        let vui = Vui::new(
-            &InputProcessor::new(),
-            listen::constant(None),
-            listen::constant(paused),
-            listen::constant(Arc::new(GraphicsOptions::default())),
-            cctx,
-            listen::constant(Viewport::ARBITRARY),
-            listen::constant(None),
-            None,
-            None,
-        )
+        let vui = Vui::new(UiTargets {
+            mouselook_mode: listen::constant(false),
+            character_source: listen::constant(None),
+            paused: listen::constant(paused),
+            graphics_options: listen::constant(Arc::new(GraphicsOptions::default())),
+            app_control_channel: cctx,
+            viewport_source: listen::constant(Viewport::ARBITRARY),
+            fullscreen_source: listen::constant(None),
+            set_fullscreen: None,
+            quit: None,
+        })
         .await;
         (vui, ccrx)
     }
