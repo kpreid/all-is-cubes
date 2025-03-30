@@ -815,7 +815,7 @@ impl<I: time::Instant> SessionBuilder<I> {
                             graphics_options: settings.as_source(),
                             app_control_channel: control_send.clone(),
                             viewport_source: viewport,
-                            fullscreen_source: fullscreen_state,
+                            fullscreen_mode: fullscreen_state,
                             set_fullscreen,
                             quit: quit_fn.clone(),
                         })

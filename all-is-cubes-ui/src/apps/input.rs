@@ -579,7 +579,7 @@ mod tests {
             graphics_options: listen::constant(Default::default()),
             app_control_channel: cctx,
             viewport_source: listen::constant(Viewport::ARBITRARY),
-            fullscreen_source: listen::constant(None),
+            fullscreen_mode: listen::constant(None),
             set_fullscreen: None,
             quit: None,
         })

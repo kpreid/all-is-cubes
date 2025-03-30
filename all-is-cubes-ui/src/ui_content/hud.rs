@@ -2,19 +2,17 @@ use alloc::sync::Arc;
 use core::fmt;
 use std::sync::Mutex;
 
-use all_is_cubes::character::Character;
 use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
 use all_is_cubes::math::Face6;
-use all_is_cubes::universe::{Handle, UniverseTransaction};
+use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes_render::camera::GraphicsOptions;
 
-use crate::apps::{ControlMessage, FullscreenSetter, FullscreenState};
+use crate::apps::ControlMessage;
 use crate::ui_content::options::{OptionsStyle, graphics_options_widgets, pause_toggle_button};
 use crate::ui_content::pages::open_page_button;
-use crate::ui_content::{CueNotifier, VuiMessage, VuiPageState};
+use crate::ui_content::{CueNotifier, UiTargets, VuiMessage, VuiPageState};
 use crate::vui::widgets::{self, TooltipState, WidgetBlocks};
 use crate::vui::{self, LayoutTree, UiBlocks, Widget, WidgetTree};
 
@@ -25,17 +23,13 @@ pub(crate) const TOOLBAR_POSITIONS: u16 = 10;
 /// TODO: Disentangle general UI from the concept of "HUD" — this is used for lots of things
 /// that aren't HUD
 pub(crate) struct HudInputs {
+    // All the parts that are not the UI itself or created by it.
+    pub(crate) base: UiTargets,
+
     pub hud_blocks: Arc<HudBlocks>,
     pub cue_channel: CueNotifier,
     pub vui_control_channel: flume::Sender<VuiMessage>,
-    pub app_control_channel: flume::Sender<ControlMessage>,
-    pub graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
-    pub paused: listen::DynSource<bool>,
     pub page_state: listen::DynSource<Arc<VuiPageState>>,
-    pub mouselook_mode: listen::DynSource<bool>,
-    pub fullscreen_mode: listen::DynSource<FullscreenState>,
-    pub set_fullscreen: FullscreenSetter,
-    pub(crate) quit: Option<crate::apps::QuitFn>,
 }
 
 impl fmt::Debug for HudInputs {
@@ -44,12 +38,20 @@ impl fmt::Debug for HudInputs {
     }
 }
 
+// TODO: This is a convenience while we are still developing the UI.
+// Ideally the final form would not include this `Deref` and would organize things differently.
+impl core::ops::Deref for HudInputs {
+    type Target = UiTargets;
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
 pub(super) fn new_hud_page(
-    // TODO: mess of tightly coupled parameters
-    character_source: listen::DynSource<Option<Handle<Character>>>,
     hud_inputs: &HudInputs,
     tooltip_state: Arc<Mutex<TooltipState>>,
 ) -> vui::Page {
+    let character_source = hud_inputs.character_source.clone();
     let toolbar = widgets::Toolbar::new(
         character_source,
         Arc::clone(&hud_inputs.hud_blocks),

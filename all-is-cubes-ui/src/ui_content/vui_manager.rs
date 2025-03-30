@@ -27,7 +27,8 @@ use crate::vui::{self, PageInst, UiSize};
 /// All the things exposed by [`crate::apps::Session`] to [`Vui`],
 /// and that are required to create a [`Vui`].
 ///
-/// TODO: Better name.
+/// TODO: Better name, better data flow...?
+#[derive(Clone)]
 pub(crate) struct UiTargets {
     pub(crate) mouselook_mode: listen::DynSource<bool>,
 
@@ -42,7 +43,7 @@ pub(crate) struct UiTargets {
 
     pub(crate) viewport_source: listen::DynSource<Viewport>,
 
-    pub(crate) fullscreen_source: listen::DynSource<FullscreenState>,
+    pub(crate) fullscreen_mode: listen::DynSource<FullscreenState>,
     pub(crate) set_fullscreen: FullscreenSetter,
 
     pub(crate) quit: Option<QuitFn>,
@@ -80,7 +81,6 @@ pub(crate) struct Vui {
     ui_graphics_options: listen::Cell<Arc<GraphicsOptions>>,
 
     changed_viewport: listen::Flag,
-    viewport_source: listen::DynSource<Viewport>,
     /// Size computed from `viewport_source` and compared with `PageInst`.
     last_ui_size: UiSize,
     hud_inputs: HudInputs,
@@ -100,7 +100,6 @@ pub(crate) struct Vui {
     /// `Send + Sync`, unlike the `std` one.
     /// Our choice of `flume` in particular is just because our other crates use it.
     control_channel: flume::Receiver<VuiMessage>,
-    character_source: listen::DynSource<Option<Handle<Character>>>,
     changed_character: listen::Flag,
     tooltip_state: Arc<Mutex<TooltipState>>,
     /// Messages from session to UI that don't fit as [`listen::DynSource`] changes.
@@ -117,16 +116,8 @@ impl Vui {
     /// multitasking. It may safely be blocked on from a synchronous context.
     pub(crate) async fn new(params: UiTargets) -> Self {
         let UiTargets {
-            mouselook_mode,
-            character_source,
-            paused,
-            graphics_options,
-            app_control_channel,
-            viewport_source,
-            fullscreen_source,
-            set_fullscreen,
-            quit,
-        } = params;
+            viewport_source, ..
+        } = &params;
 
         let mut universe = Universe::new();
 
@@ -150,9 +141,9 @@ impl Vui {
         let cue_channel: CueNotifier = Arc::new(Notifier::new());
         let notif_hub = notification::Hub::new();
 
-        let changed_graphics_options = listen::Flag::listening(false, &graphics_options);
+        let changed_graphics_options = listen::Flag::listening(false, &params.graphics_options);
         let ui_graphics_options = listen::Cell::new(Arc::new(Self::graphics_options(
-            (*graphics_options.get()).clone(),
+            (*params.graphics_options.get()).clone(),
         )));
 
         // TODO: HudInputs should own `UiTargets` or something so that we don’t have one
@@ -160,20 +151,13 @@ impl Vui {
         let changed_viewport = listen::Flag::listening(false, &viewport_source);
         let ui_size = UiSize::new(viewport_source.get());
         let hud_inputs = HudInputs {
+            base: params.clone(),
             hud_blocks,
             cue_channel: cue_channel.clone(),
             vui_control_channel: control_send,
-            app_control_channel,
-            graphics_options,
-            paused,
             page_state: state.as_source(),
-            mouselook_mode,
-            fullscreen_mode: fullscreen_source,
-            set_fullscreen,
-            quit,
         };
-        let hud_page =
-            super::hud::new_hud_page(character_source.clone(), &hud_inputs, tooltip_state.clone());
+        let hud_page = super::hud::new_hud_page(&hud_inputs, tooltip_state.clone());
 
         let paused_page = pages::new_paused_page(&mut universe, &hud_inputs).unwrap();
         let options_page = pages::new_options_widget_tree(&hud_inputs);
@@ -192,7 +176,6 @@ impl Vui {
             ui_graphics_options,
 
             changed_viewport,
-            viewport_source,
             last_ui_size: ui_size,
             hud_inputs,
 
@@ -204,8 +187,7 @@ impl Vui {
             progress_page: PageInst::new(progress_page),
 
             control_channel: control_recv,
-            changed_character: listen::Flag::listening(false, &character_source),
-            character_source,
+            changed_character: listen::Flag::listening(false, &params.character_source),
             tooltip_state,
             cue_channel,
             notif_hub,
@@ -335,7 +317,7 @@ impl Vui {
 
         // TODO: This should possibly be the responsibility of the TooltipState itself?
         if self.changed_character.get_and_clear() {
-            if let Some(character_handle) = self.character_source.get() {
+            if let Some(character_handle) = self.hud_inputs.character_source.get() {
                 TooltipState::bind_to_character(&self.tooltip_state, character_handle.clone());
             }
         }
@@ -360,7 +342,7 @@ impl Vui {
         }
 
         if self.changed_viewport.get_and_clear() {
-            let new_viewport = self.viewport_source.get();
+            let new_viewport = self.hud_inputs.viewport_source.get();
             let new_size = UiSize::new(new_viewport);
             if new_size != self.last_ui_size {
                 anything_changed = true;
@@ -623,7 +605,7 @@ mod tests {
             graphics_options: listen::constant(Arc::new(GraphicsOptions::default())),
             app_control_channel: cctx,
             viewport_source: listen::constant(Viewport::ARBITRARY),
-            fullscreen_source: listen::constant(None),
+            fullscreen_mode: listen::constant(None),
             set_fullscreen: None,
             quit: None,
         })
