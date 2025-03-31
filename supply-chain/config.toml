@@ -103,10 +103,6 @@ criteria = "safe-to-deploy"
 version = "1.2.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.array-init-cursor]]
-version = "0.2.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.arrow]]
 version = "53.4.0"
 criteria = "safe-to-deploy"

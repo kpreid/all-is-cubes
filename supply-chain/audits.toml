@@ -11,6 +11,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "1.1.5"
 
+[[audits.array-init-cursor]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+version = "0.2.1"
+
 [[audits.async_fn_traits]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
