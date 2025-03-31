@@ -125,8 +125,10 @@ impl BoxStyle {
     /// and the single [`GridAab`] bounding all of thewm.
     ///
     /// This function is a convenience for setup and not mandatory.
-    #[doc(hidden)] // TODO: good public api? or ad-hoc?
-    pub fn nine_boxes(
+    //---
+    // TODO: This currently isn't used and it's unclear whether it is good API
+    #[expect(dead_code)]
+    fn nine_boxes(
         resolution: Resolution,
     ) -> impl Iterator<Item = GridAab> + Clone + Send + 'static {
         let resolution = GridCoordinate::from(resolution);

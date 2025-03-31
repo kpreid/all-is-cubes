@@ -10,17 +10,19 @@ use exhaust::Exhaust;
 
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::behavior::BehaviorSetTransaction;
+use all_is_cubes::block::AIR;
 use all_is_cubes::block::{
     self, Block, Builder,
     Resolution::{self, *},
 };
-use all_is_cubes::content::load_image::{DecodedPng, PngAdapter, default_srgb};
+use all_is_cubes::content::load_image::{
+    DecodedPng, PngAdapter, default_srgb, include_image, space_from_image,
+};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::embedded_graphics::{
     Drawable,
     image::Image as EgImage,
-    prelude::{Dimensions, PixelColor, Point, Size},
-    primitives::{Primitive, PrimitiveStyleBuilder, Rectangle, RoundedRectangle, StrokeAlignment},
+    prelude::{Dimensions, PixelColor, Point},
 };
 use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
 use all_is_cubes::euclid::vec3;
@@ -28,7 +30,7 @@ use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen;
 use all_is_cubes::math::{
-    Cube, Face6, GridAab, GridCoordinate, GridSize, GridVector, Gridgid, Rgba,
+    Cube, Face6, GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Gridgid, Rgba,
 };
 use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
 use all_is_cubes::transaction::Merge;
@@ -540,16 +542,6 @@ mod theme {
         color.map_rgb(|rgb| rgb * 1.1)
     }
 
-    pub fn create_space(max_z: GridCoordinate) -> Space {
-        let multi_resolution_g = u32::from(MULTI_RESOLUTION);
-        Space::builder(GridAab::from_lower_size(
-            [0, 0, 0],
-            [multi_resolution_g, multi_resolution_g, max_z as u32],
-        ))
-        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build()
-    }
-
     /// Build a [`Block`] for [`ButtonBase`].
     pub fn common_block(space: Handle<Space>, name: &str) -> Block {
         Block::builder()
@@ -592,50 +584,12 @@ impl ButtonBase for ButtonVisualState {
     }
 
     fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError> {
-        let label_z = self.button_label_z();
-        let back_block = block::from_color!(palette::BUTTON_BACK); // TODO: different color theme for action than toggle?
-        let frame_brush = VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME));
-        let back_brush = VoxelBrush::with_thickness(back_block, 0..label_z);
-        let cap_rim_brush = VoxelBrush::new([(
-            [0, 0, label_z - 1],
-            Block::from(theme::rim_lightening(palette::BUTTON_BACK)),
-        )]);
-
-        let outer_inset = 2; // TODO duplicate number
-        let rr = |bounding_box: GridAab, inset: i32| {
-            RoundedRectangle::with_equal_corners(
-                aab_xy_to_rectangle(bounding_box).offset(-(outer_inset + inset)),
-                Size::new_equal((theme::RESOLUTION_G / 2 - outer_inset - inset) as u32),
-            )
-        };
-
-        let mut space = theme::create_space(label_z);
-        let draw_target = &mut space.draw_target(Gridgid::IDENTITY);
-
-        for b in BoxStyle::nine_boxes(theme::RESOLUTION) {
-            rr(b, 0)
-                .into_styled(
-                    PrimitiveStyleBuilder::new()
-                        .fill_color(&back_brush)
-                        .stroke_color(&frame_brush)
-                        .stroke_width(2)
-                        .stroke_alignment(StrokeAlignment::Inside)
-                        .build(),
-                )
-                .draw(draw_target)?;
-            rr(b, 2)
-                .into_styled(
-                    PrimitiveStyleBuilder::new()
-                        .stroke_color(&cap_rim_brush)
-                        .stroke_width(1)
-                        .stroke_alignment(StrokeAlignment::Inside)
-                        .build(),
-                )
-                .draw(draw_target)?;
-        }
-
         Ok(theme::common_block(
-            txn.insert_anonymous(space),
+            txn.insert_anonymous(draw_button_multiblock_from_image(
+                self,
+                false,
+                include_image!("theme/button-shape-action.png"),
+            )?),
             "Action Button",
         ))
     }
@@ -648,67 +602,72 @@ impl ButtonBase for ToggleButtonVisualState {
     }
 
     fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError> {
-        let label_z = self.button_label_z();
-        let active = self.value;
-        let illuminate = move |builder: Builder<block::builder::Atom, ()>| {
-            if active {
-                builder.light_emission(palette::BUTTON_ACTIVATED_GLOW)
-            } else {
-                builder
-            }
-            .build()
-        };
-        let back_color = if active {
-            palette::BUTTON_ACTIVATED_BACK
-        } else {
-            palette::BUTTON_BACK
-        };
-        let frame_brush = VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME));
-        let back_brush =
-            VoxelBrush::with_thickness(illuminate(Block::builder().color(back_color)), 0..label_z);
-        let cap_rim_brush = VoxelBrush::new([(
-            [0, 0, label_z - 1],
-            illuminate(Block::builder().color(theme::rim_lightening(back_color))),
-        )]);
-
-        let outer_inset = 2;
-        let rr = |bounding_box: GridAab, inset: i32| {
-            RoundedRectangle::with_equal_corners(
-                aab_xy_to_rectangle(bounding_box).offset(-(outer_inset + inset)),
-                Size::new(5 - inset as u32, 5 - inset as u32),
-            )
-        };
-
-        let mut space = theme::create_space(label_z);
-        let draw_target = &mut space.draw_target(Gridgid::IDENTITY);
-
-        for b in BoxStyle::nine_boxes(theme::RESOLUTION) {
-            rr(b, 0)
-                .into_styled(
-                    PrimitiveStyleBuilder::new()
-                        .fill_color(&back_brush)
-                        .stroke_color(&frame_brush)
-                        .stroke_width(2)
-                        .stroke_alignment(StrokeAlignment::Inside)
-                        .build(),
-                )
-                .draw(draw_target)?;
-            rr(b, 2)
-                .into_styled(
-                    PrimitiveStyleBuilder::new()
-                        .stroke_color(&cap_rim_brush)
-                        .stroke_width(1)
-                        .stroke_alignment(StrokeAlignment::Inside)
-                        .build(),
-                )
-                .draw(draw_target)?;
-        }
-
         Ok(theme::common_block(
-            txn.insert_anonymous(space),
+            txn.insert_anonymous(draw_button_multiblock_from_image(
+                self,
+                self.value,
+                include_image!("theme/button-shape-toggle.png"),
+            )?),
             &format!("Toggle Button {self}"),
         ))
     }
+}
+
+/// Colors expected in the image passed to [`draw_button_multiblock_from_image`].
+/// These simple colors are chosen to be clearly distinct and will be replaced.
+mod image_palette {
+    pub(super) const OUTSIDE: [u8; 4] = [0, 0, 0, 0];
+    pub(super) const FRAME: [u8; 4] = [0, 0, 0, 255];
+    pub(super) const RIM: [u8; 4] = [255, 255, 255, 255];
+    pub(super) const BACK: [u8; 4] = [0, 255, 255, 255];
+}
+
+/// Convert an image into a 3D button block for implementing [`ButtonBase::button_block()`].
+///
+/// The image must contain only colors in [`image_palette`],
+/// be a multiblock arrangement for [`BoxStyle::from_nine_and_thin()`],
+/// and have block resolution [`theme::RESOLUTION`].
+fn draw_button_multiblock_from_image(
+    state: &impl ButtonBase,
+    active: bool,
+    image: &DecodedPng,
+) -> Result<Space, InGenError> {
+    let label_z = state.button_label_z();
+    let illuminate = move |builder: Builder<block::builder::Atom, ()>| {
+        if active {
+            builder.light_emission(palette::BUTTON_ACTIVATED_GLOW)
+        } else {
+            builder
+        }
+        .build()
+    };
+    // TODO: different color theme for action than toggle?
+    let back_color = if active {
+        palette::BUTTON_ACTIVATED_BACK
+    } else {
+        palette::BUTTON_BACK
+    };
+    let back_color_block = illuminate(Block::builder().color(back_color));
+    let rim_color_block = illuminate(Block::builder().color(theme::rim_lightening(back_color)));
+    let space = space_from_image(image, GridRotation::RXyZ, &|color| match color {
+        image_palette::OUTSIDE => VoxelBrush::single(AIR),
+        image_palette::FRAME => VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME)),
+        image_palette::RIM => VoxelBrush::new((0..label_z).map(|z| {
+            // Highlight just the corner with a lighter color;
+            // otherwise identical to BACK.
+            (
+                [0, 0, z],
+                if z == label_z - 1 {
+                    &rim_color_block
+                } else {
+                    &back_color_block
+                },
+            )
+        })),
+        image_palette::BACK => VoxelBrush::with_thickness(back_color_block.clone(), 0..label_z),
+        _ => panic!("bad color in button image: {color:?}"),
+    })?;
+    Ok(space)
 }
 
 // Move a block that's part of a button label so that its z=0 aligns with the button's face.
@@ -718,15 +677,4 @@ fn shift_label_block(state: &impl ButtonBase, block: Block) -> Block {
         (state.button_label_z() * 256 / theme::RESOLUTION_G) as u16,
         0,
     ))
-}
-
-fn aab_xy_to_rectangle(bounding_box: GridAab) -> Rectangle {
-    Rectangle::with_corners(
-        Point::new(bounding_box.lower_bounds().x, bounding_box.lower_bounds().y),
-        Point::new(
-            // - 1 because e-g rectangles are specified in terms of their outermost pixels
-            bounding_box.upper_bounds().x - 1,
-            bounding_box.upper_bounds().y - 1,
-        ),
-    )
 }
