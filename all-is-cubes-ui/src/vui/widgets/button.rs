@@ -658,14 +658,17 @@ impl ButtonBase for ToggleButtonVisualState {
             }
             .build()
         };
+        let back_color = if active {
+            palette::BUTTON_ACTIVATED_BACK
+        } else {
+            palette::BUTTON_BACK
+        };
         let frame_brush = VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME));
-        let back_brush = VoxelBrush::with_thickness(
-            illuminate(Block::builder().color(palette::BUTTON_ACTIVATED_BACK)),
-            0..label_z,
-        );
+        let back_brush =
+            VoxelBrush::with_thickness(illuminate(Block::builder().color(back_color)), 0..label_z);
         let cap_rim_brush = VoxelBrush::new([(
             [0, 0, label_z - 1],
-            illuminate(Block::builder().color(theme::rim_lightening(palette::BUTTON_BACK))),
+            illuminate(Block::builder().color(theme::rim_lightening(back_color))),
         )]);
 
         let outer_inset = 2;
