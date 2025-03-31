@@ -104,9 +104,9 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
 
     let text_block = Block::from(block::Primitive::Text {
         text: text::Text::builder()
-            .string(label.clone())
+            .string(label)
             .font(text::Font::Logo) // legacy compatibility choice
-            .foreground(label_voxel.clone())
+            .foreground(label_voxel)
             .positioning(text::Positioning {
                 x: text::PositioningX::Center,
                 line_y: text::PositioningY::BodyMiddle,

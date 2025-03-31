@@ -221,7 +221,7 @@ impl Text {
     /// for quickly creating blocks from text that fits in one block.
     pub fn single_block(self) -> Block {
         Block::from_primitive(block::Primitive::Text {
-            text: self.clone(),
+            text: self,
             offset: GridVector::zero(),
         })
     }

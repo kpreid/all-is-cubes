@@ -1068,7 +1068,7 @@ mod tests {
     fn use_block_stack_decrements() {
         let [existing, tool_block] = make_some_blocks();
         let stack_2 = Slot::stack(2, Tool::Block(tool_block.clone()));
-        let stack_1 = Slot::stack(1, Tool::Block(tool_block.clone()));
+        let stack_1 = Slot::stack(1, Tool::Block(tool_block));
 
         let mut tester = ToolTester::new(|space| {
             // This must be far enough along +X for the blocks we're placing to not run out of space.
@@ -1085,7 +1085,7 @@ mod tests {
         #[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool,
     ) {
         let [existing, tool_block, obstacle] = make_some_blocks();
-        let tool = tool_ctor(tool_block.clone());
+        let tool = tool_ctor(tool_block);
         let tester = ToolTester::new(|space| {
             space.set([1, 0, 0], &existing).unwrap();
         });
@@ -1109,7 +1109,7 @@ mod tests {
         #[values(Tool::Block, Tool::InfiniteBlocks)] tool_ctor: fn(Block) -> Tool,
     ) {
         let [tool_block] = make_some_blocks();
-        let tool = tool_ctor(tool_block.clone());
+        let tool = tool_ctor(tool_block);
         let tester = ToolTester::new(|_space| {});
         assert_eq!(
             tester.equip_and_use_tool(tool),
@@ -1157,10 +1157,10 @@ mod tests {
             transaction,
             SpaceTransaction::set_cube(
                 [0, 0, 0],
-                Some(existing.clone()),
-                Some(placed.clone().rotate(GridRotation::CLOCKWISE)),
+                Some(existing),
+                Some(placed.rotate(GridRotation::CLOCKWISE)),
             )
-            .bind(tester.space_handle.clone())
+            .bind(tester.space_handle)
         );
     }
 }

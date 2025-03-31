@@ -46,7 +46,7 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
         let [block] = make_some_blocks();
         let txn1 =
             SpaceTransaction::set_cube([0, 0, 0], None, Some(block::AIR)).bind(space.clone());
-        let txn2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space.clone());
+        let txn2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
 
         b.to_async(runtime).iter_with_large_drop(move || {
             txn1.execute(&mut universe, &mut drop).unwrap();

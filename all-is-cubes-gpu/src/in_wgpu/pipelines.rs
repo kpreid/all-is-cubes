@@ -325,7 +325,7 @@ impl Pipelines {
                     })],
                 }),
                 primitive: block_primitive_state,
-                depth_stencil: Some(depth_state_for_opaque.clone()),
+                depth_stencil: Some(depth_state_for_opaque),
                 multisample,
                 multiview: None,
                 cache,

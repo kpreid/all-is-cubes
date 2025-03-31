@@ -318,7 +318,7 @@ impl Vui {
         // TODO: This should possibly be the responsibility of the TooltipState itself?
         if self.changed_character.get_and_clear() {
             if let Some(character_handle) = self.hud_inputs.character_source.get() {
-                TooltipState::bind_to_character(&self.tooltip_state, character_handle.clone());
+                TooltipState::bind_to_character(&self.tooltip_state, character_handle);
             }
         }
 

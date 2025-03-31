@@ -1124,7 +1124,7 @@ mod tests {
         #[test]
         fn unspecialize_no() {
             let [b1, b2] = make_some_blocks();
-            let composed = b1.clone().with_modifier(Composite::new(b2.clone(), Over));
+            let composed = b1.with_modifier(Composite::new(b2, Over));
             assert_eq!(composed.unspecialize(), vec![composed]);
         }
 

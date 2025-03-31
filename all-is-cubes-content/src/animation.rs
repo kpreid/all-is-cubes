@@ -49,7 +49,7 @@ impl<F: Fn(Cube, u64) -> Block + Clone + 'static> AnimatedVoxels<F> {
     fn paint(&self, bounds: GridAab) -> SpaceTransaction {
         SpaceTransaction::filling(bounds, |cube| {
             let block = (self.function)(cube, self.frame);
-            CubeTransaction::replacing(None, Some(block.clone()))
+            CubeTransaction::replacing(None, Some(block))
         })
     }
 }

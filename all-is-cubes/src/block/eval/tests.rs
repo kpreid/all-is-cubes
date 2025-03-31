@@ -426,7 +426,7 @@ fn voxels_partial_not_filling() {
         .unwrap();
     let space_handle = universe.insert_anonymous(space);
     let block = Block::builder()
-        .voxels_handle(resolution, space_handle.clone())
+        .voxels_handle(resolution, space_handle)
         .build();
 
     let e = block.evaluate().unwrap();
@@ -455,7 +455,7 @@ fn recur_with_offset() {
     let block_at_offset = Block::from_primitive(Primitive::Recur {
         offset: offset.to_point(),
         resolution,
-        space: space_handle.clone(),
+        space: space_handle,
     });
 
     let e = block_at_offset.evaluate().unwrap();
@@ -538,7 +538,7 @@ fn indirect_equivalence() {
         .unwrap();
     let space_handle = universe.insert_anonymous(space);
     let block = Block::builder()
-        .voxels_handle(resolution, space_handle.clone())
+        .voxels_handle(resolution, space_handle)
         .build();
 
     let eval_bare = block.evaluate().unwrap();
@@ -551,7 +551,7 @@ fn indirect_equivalence() {
         EvaluatedBlock {
             cost: eval_def.cost,
             block: indirect_block.clone(),
-            ..eval_bare.clone()
+            ..eval_bare
         }
     );
     assert_eq!(

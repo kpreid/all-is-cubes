@@ -53,7 +53,7 @@ impl Script {
         character::CharacterTransaction::behaviors(behavior::BehaviorSetTransaction::insert(
             (),
             Arc::new(Performance {
-                script: self.clone(),
+                script: self,
                 time: Duration::ZERO,
             }),
         ))

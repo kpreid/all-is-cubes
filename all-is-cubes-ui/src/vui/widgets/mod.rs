@@ -113,7 +113,7 @@ mod tests {
             bounds: GridAab::from_lower_size(origin, [0, 1, 1]),
             gravity: Vector3D::new(Align::Low, Align::Center, Align::High),
         };
-        let (bounds, _space) = vui::instantiate_widget(grant, block.clone());
+        let (bounds, _space) = vui::instantiate_widget(grant, block);
         assert_eq!(bounds, None);
     }
 }

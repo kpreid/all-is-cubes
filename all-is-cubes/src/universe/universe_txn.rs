@@ -393,7 +393,7 @@ impl UniverseTransaction {
                     hashbrown::hash_map::Entry::Occupied(_) => {
                         // Equivalent to how transaction merge would fail
                         Err(InsertError {
-                            name: name.clone(),
+                            name,
                             kind: InsertErrorKind::AlreadyExists,
                         })
                     }

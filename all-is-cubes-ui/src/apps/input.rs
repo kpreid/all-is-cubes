@@ -618,7 +618,7 @@ mod tests {
         // TODO: Awful lot of setup boilerplate...
         let u = &mut Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let character = u.insert_anonymous(Character::spawn_default(space.clone()));
+        let character = u.insert_anonymous(Character::spawn_default(space));
         let mut input = InputProcessor::new();
 
         input.key_down(Key::Character('5'));

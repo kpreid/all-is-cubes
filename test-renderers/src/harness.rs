@@ -174,7 +174,7 @@ impl RenderTestContext {
         }
 
         // The comparison log will be consulted to determine if the test should be marked failed.
-        self.comparison_log.lock().unwrap().push(outcome.clone());
+        self.comparison_log.lock().unwrap().push(outcome);
     }
 }
 
@@ -345,7 +345,7 @@ where
         .map(|(test_name, test_case)| {
             let test_id = TestId {
                 suite: suite_id,
-                test: test_name.clone(),
+                test: test_name,
             };
             let comparison_log: Arc<Mutex<Vec<ComparisonRecord>>> = Default::default();
             let factory_future = factory_factory(test_id.to_string());

@@ -277,7 +277,7 @@ fn graphics_options_change() {
 
     // Change options so that the mesh should disappear
     options.transparency = TransparencyOption::Threshold(zo32(0.5));
-    tester.camera.set_options(options.clone());
+    tester.camera.set_options(options);
 
     vertices = None;
     tester.update(|u| vertices = Some(u.mesh.vertices().len()));

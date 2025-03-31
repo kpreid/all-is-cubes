@@ -437,7 +437,6 @@ mod tests {
             .with_modifier(R);
 
         let expected_after_tick = base
-            .clone()
             .with_modifier(Move {
                 direction: Face6::PX,
                 distance: 20,
@@ -469,7 +468,6 @@ mod tests {
             .with_modifier(composite.clone());
 
         let expected_after_tick = base
-            .clone()
             .with_modifier(Move {
                 direction: Face6::PX,
                 distance: 20,
@@ -499,8 +497,8 @@ mod tests {
             block::CompositeOperator::Over,
         ));
 
-        let expected_after_tick = extra.clone().with_modifier(Composite::new(
-            base.clone().with_modifier(Move {
+        let expected_after_tick = extra.with_modifier(Composite::new(
+            base.with_modifier(Move {
                 direction: Face6::PX,
                 distance: 20,
                 velocity: 10,

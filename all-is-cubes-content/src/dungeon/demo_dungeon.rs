@@ -291,7 +291,7 @@ impl DemoTheme {
                 // that slides the gate into the pocket, but that isn't
                 // supported by Composite yet
                 (Cube::new(0, -1, 0), move_gate.clone()),
-                (Cube::new(0, 1, 0), move_gate.clone()),
+                (Cube::new(0, 1, 0), move_gate),
             ]
             .into(),
         );
