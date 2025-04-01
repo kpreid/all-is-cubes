@@ -159,6 +159,37 @@ impl<P, Txn> Builder<P, Txn> {
         }
     }
 
+    /// As [`Self::voxels_handle()`], but for inserting the [`Space`] too.
+    ///
+    /// TODO: good public API?
+    pub(crate) fn voxels_space(
+        self,
+        resolution: Resolution,
+        space: Space,
+    ) -> Builder<Voxels, UniverseTransaction> {
+        let space_handle = Handle::new_pending(Name::Pending, space);
+
+        let Self {
+            attributes,
+            primitive_builder: _,
+            modifiers,
+            transaction: _,
+        } = self;
+        Builder {
+            attributes,
+            primitive_builder: Voxels {
+                space: space_handle.clone(),
+                resolution,
+                offset: GridPoint::origin(),
+            },
+            modifiers,
+            // TODO: This might not be the right thing in more general transaction usage.
+            // For now, it's OK that we discard the transaction because it can only ever be
+            // inserting a `Space` we are not going to use any more.
+            transaction: UniverseTransaction::insert(space_handle),
+        }
+    }
+
     /// Constructs a `Space` for building a [`Primitive::Recur`], and calls
     /// the given function to fill it with blocks, in the manner of [`Space::fill`].
     ///
