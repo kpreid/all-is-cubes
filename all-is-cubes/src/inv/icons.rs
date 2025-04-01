@@ -1,8 +1,5 @@
 use core::fmt;
 
-use embedded_graphics::geometry::Point;
-use embedded_graphics::prelude::{Drawable, Primitive};
-use embedded_graphics::primitives::{Circle, Line, PrimitiveStyleBuilder};
 use euclid::vec3;
 use exhaust::Exhaust;
 
@@ -15,11 +12,7 @@ use crate::block::{self, AIR, Block, Resolution::*};
 use crate::content::load_image::{block_from_image, default_srgb, include_image};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
-use crate::math::{
-    Face6, FreeCoordinate, GridCoordinate, GridRotation, GridVector, Gridgid, Rgba, rgb_const,
-    rgba_const,
-};
-use crate::space::Space;
+use crate::math::{FreeCoordinate, GridCoordinate, GridRotation, Rgba, rgb_const, rgba_const};
 use crate::universe::UniverseTransaction;
 
 #[cfg(doc)]
@@ -96,57 +89,13 @@ impl Icons {
                 .display_name("Activate")
                 .build_txn(txn),
 
-                Icons::Delete => {
-                    let x_radius = i32::from(resolution) * 3 / 16;
-                    let background_block_1: Block = Rgba::new(1.0, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
-                    let background_block_2: Block = Rgba::new(0.8, 0.05, 0.0, 1.0).into(); // TODO: Use palette colors
-                    let background_brush = VoxelBrush::new([
-                        ([0, 0, 1], &background_block_1),
-                        ([1, 0, 0], &background_block_2),
-                        ([-1, 0, 0], &background_block_2),
-                        ([0, 1, 0], &background_block_2),
-                        ([0, -1, 0], &background_block_2),
-                    ]);
-                    let line_brush = VoxelBrush::single(block::from_color!(Rgba::BLACK))
-                        .translate(GridVector::new(0, 0, 2));
-                    let line_style = PrimitiveStyleBuilder::new()
-                        .stroke_color(&line_brush)
-                        .stroke_width(1)
-                        .build();
-
-                    let mut space = Space::for_block(resolution).build();
-                    let display = &mut space.draw_target(Gridgid {
-                        translation: GridVector::new(1, 1, 1)
-                            * (GridCoordinate::from(resolution) / 2),
-                        rotation: GridRotation::from_basis([Face6::PX, Face6::NY, Face6::PZ]),
-                    });
-
-                    // Draw X on circle
-                    Circle::with_center(Point::new(0, 0), u32::from(resolution) - 4)
-                        .into_styled(
-                            PrimitiveStyleBuilder::new()
-                                .fill_color(&background_brush)
-                                .build(),
-                        )
-                        .draw(display)?;
-                    Line::new(
-                        Point::new(-x_radius, -x_radius),
-                        Point::new(x_radius, x_radius),
-                    )
-                    .into_styled(line_style)
-                    .draw(display)?;
-                    Line::new(
-                        Point::new(x_radius, -x_radius),
-                        Point::new(-x_radius, x_radius),
-                    )
-                    .into_styled(line_style)
-                    .draw(display)?;
-
-                    Block::builder()
-                        .display_name("Delete Block")
-                        .voxels_handle(resolution, txn.insert_anonymous(space))
-                        .build()
-                }
+                Icons::Delete => block_from_image(
+                    include_image!("icons/placeholder-hammer.png"),
+                    GridRotation::RXyZ,
+                    &default_srgb,
+                )?
+                .display_name("Delete Block")
+                .build_txn(txn),
 
                 Icons::CopyFromSpace => Block::builder()
                     .display_name("Copy Block from Cursor")
