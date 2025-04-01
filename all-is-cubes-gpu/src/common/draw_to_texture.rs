@@ -1,20 +1,26 @@
 //! Drawing to a CPU-side image buffer which is going to be transferred to the GPU.
 
+use all_is_cubes_render::camera::ImagePixel;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use all_is_cubes::drawing::embedded_graphics::{
-    Pixel,
-    draw_target::DrawTarget,
-    pixelcolor::{self, PixelColor},
-    prelude::{OriginDimensions, Point, RgbColor, Size},
-    primitives::Rectangle,
+use all_is_cubes::{
+    drawing::embedded_graphics::{
+        Pixel,
+        draw_target::DrawTarget,
+        pixelcolor::{self, PixelColor},
+        prelude::{OriginDimensions, Point, RgbColor, Size},
+        primitives::Rectangle,
+    },
+    euclid::Point2D,
 };
 
 /// Storage for an image which can be written to using [`DrawTarget`].
 ///
 /// This storage tracks a “dirty rectangle” so that copying can be limited to affected areas.
+//---
+// TODO: When we have eliminated `embedded_graphics` usage, get rid of the `In` type.
 pub(crate) struct EgFramebuffer<In, Out> {
     /// RGBA image buffer. Row-major, Y-up.
     data: Vec<Out>,
@@ -62,6 +68,21 @@ impl<In, Out: Copy + Default> EgFramebuffer<In, Out> {
 
     pub fn is_nonzero(&self) -> bool {
         !self.nonzero.is_zero_sized()
+    }
+
+    /// Directly write a single image pixel.
+    /// Does nothing if out of bounds.
+    pub fn set_pixel(&mut self, position: Point2D<u32, ImagePixel>, value: Out) {
+        if !(position.x < self.size.width && position.y < self.size.height) {
+            return;
+        }
+
+        #[expect(clippy::cast_possible_wrap, reason = "already bounds checked")]
+        let position_eg = Point::new(position.x as i32, position.y as i32);
+        expand_rectangle(&mut self.dirty, position_eg);
+        expand_rectangle(&mut self.nonzero, position_eg);
+
+        self.data[position.x as usize + position.y as usize * self.size.width as usize] = value;
     }
 }
 

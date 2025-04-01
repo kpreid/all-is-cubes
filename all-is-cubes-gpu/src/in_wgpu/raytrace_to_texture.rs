@@ -15,18 +15,19 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use web_time::{Duration, Instant};
 
 use all_is_cubes::character::Cursor;
-use all_is_cubes::drawing::embedded_graphics::pixelcolor::PixelColor;
-use all_is_cubes::drawing::embedded_graphics::{Pixel, draw_target::DrawTarget, prelude::Point};
 use all_is_cubes::euclid::{Box2D, point2, vec2};
 use all_is_cubes::listen;
 use all_is_cubes::math::{Rgb, Rgba, VectorOps as _};
 use all_is_cubes_render::RenderError;
-use all_is_cubes_render::camera::{Camera, StandardCameras, Viewport, area_usize};
+use all_is_cubes_render::camera::{Camera, ImagePixel, StandardCameras, Viewport, area_usize};
 use all_is_cubes_render::raytracer::{ColorBuf, RtRenderer};
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
 use crate::in_wgpu::pipelines::Pipelines;
-use crate::{Identified, Memo, ToTexel};
+use crate::{Identified, Memo};
+
+// TODO: this type definition makes more sense in `draw_to_texture.rs` once we are not partly using embedded_graphics
+type Point = all_is_cubes::euclid::Point2D<u32, ImagePixel>;
 
 #[derive(Debug)]
 pub(crate) struct RaytraceToTexture {
@@ -42,7 +43,7 @@ struct Inner {
     pixel_picker: PixelPicker,
     dirty_pixels: usize,
     rays_per_frame: usize,
-    render_target: DrawableTexture<Rgbf16, [f16; 4]>,
+    render_target: DrawableTexture<[f16; 4], [f16; 4]>,
 }
 
 impl RaytraceToTexture {
@@ -190,14 +191,20 @@ impl Inner {
                 ),
             });
             // Note: these are *not* postprocessed colors, because we let the GPU do that.
-            let color = Rgbf16::from(Rgba::from(color_buf).to_rgb());
-            Pixel(point, color)
+            let color = Rgba::from(color_buf);
+            let color: [f16; 4] = [
+                f16::from_f32(color.red().into_inner()),
+                f16::from_f32(color.green().into_inner()),
+                f16::from_f32(color.blue().into_inner()),
+                f16::from_f32(color.alpha().into_inner()),
+            ];
+            (point, color)
         };
 
         #[cfg(feature = "auto-threads")]
-        let traces: Vec<Pixel<Rgbf16>> = this_frame_pixels.into_par_iter().map(trace).collect();
+        let traces: Vec<(Point, [f16; 4])> = this_frame_pixels.into_par_iter().map(trace).collect();
         #[cfg(not(feature = "auto-threads"))]
-        let traces: Vec<Pixel<Rgbf16>> = this_frame_pixels.into_iter().map(trace).collect();
+        let traces: Vec<(Point, [f16; 4])> = this_frame_pixels.into_iter().map(trace).collect();
 
         let tracing_duration = Instant::now().duration_since(start_time);
 
@@ -212,7 +219,10 @@ impl Inner {
             }
         }
 
-        self.render_target.draw_target().draw_iter(traces).unwrap();
+        let target = self.render_target.draw_target();
+        for (point, color) in traces {
+            target.set_pixel(point, color);
+        }
     }
 }
 
@@ -269,7 +279,6 @@ impl PixelPicker {
 impl Iterator for PixelPicker {
     type Item = Point;
 
-    #[expect(clippy::cast_possible_wrap)]
     fn next(&mut self) -> Option<Self::Item> {
         // `as usize` is safe because we would have failed earlier if it doesn't fit in usize.
         let size = self.viewport.framebuffer_size.map(|s| s as usize);
@@ -279,8 +288,8 @@ impl Iterator for PixelPicker {
             None => linear_index,
         };
         Some(Point::new(
-            index.rem_euclid(size.width) as i32,
-            index.div_euclid(size.width).rem_euclid(size.height) as i32,
+            index.rem_euclid(size.width) as u32,
+            index.div_euclid(size.width).rem_euclid(size.height) as u32,
         ))
     }
 }
@@ -306,17 +315,6 @@ impl From<Rgb> for Rgbf16 {
             f16::from_f32(value.green().into_inner()),
             f16::from_f32(value.blue().into_inner()),
         ])
-    }
-}
-
-impl PixelColor for Rgbf16 {
-    type Raw = ();
-}
-
-impl ToTexel<[f16; 4]> for Rgbf16 {
-    fn to_texel(self) -> [f16; 4] {
-        let Self([r, g, b]) = self;
-        [r, g, b, f16::ONE]
     }
 }
 
