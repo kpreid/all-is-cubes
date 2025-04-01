@@ -11,7 +11,7 @@ use rand::{Rng, SeedableRng};
 
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
 use all_is_cubes::character::Spawn;
-use all_is_cubes::content::load_image::{include_image, space_from_image};
+use all_is_cubes::content::load_image::{block_from_image, include_image};
 use all_is_cubes::content::{BoxPart, BoxStyle, palette};
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::{Size3D, Vector3D, vec3};
@@ -903,16 +903,13 @@ pub async fn install_dungeon_blocks(
 
             FloorTile => {
                 let resolution = R32;
-                let space =
-                    space_from_image(include_image!("floor.png"), GridRotation::RXZY, &|pixel| {
-                        let block = Block::from(Rgba::from_srgb8(pixel));
-                        VoxelBrush::with_thickness(block, 0..resolution.into())
-                            .rotate(GridRotation::RXZY)
-                    })?;
-                Block::builder()
-                    .display_name("Floor Tile")
-                    .voxels_handle(resolution, txn.insert_anonymous(space))
-                    .build()
+                block_from_image(include_image!("floor.png"), GridRotation::RXZY, &|pixel| {
+                    let block = Block::from(Rgba::from_srgb8(pixel));
+                    VoxelBrush::with_thickness(block, 0..resolution.into())
+                        .rotate(GridRotation::RXZY)
+                })?
+                .display_name("Floor Tile")
+                .build_txn(txn)
             }
 
             Spikes => Block::builder()
@@ -930,20 +927,17 @@ pub async fn install_dungeon_blocks(
 
             Gate => {
                 let space =
-                    space_from_image(include_image!("fence.png"), GridRotation::RXyZ, &|pixel| {
+                    block_from_image(include_image!("fence.png"), GridRotation::RXyZ, &|pixel| {
                         // Note that this produces selectable collidable transparent blocks --
                         // that's preferred here.
                         let block = Block::builder().color(Rgba::from_srgb8(pixel)).build();
                         VoxelBrush::with_thickness(block, 7..9)
                     })?;
-                Block::builder()
-                    .display_name("Gate")
-                    .voxels_handle(R16, txn.insert_anonymous(space))
-                    .build()
+                space.display_name("Gate").build_txn(txn)
             }
 
             GatePocket => {
-                let space = space_from_image(
+                let space = block_from_image(
                     include_image!("fence-pocket.png"),
                     GridRotation::RXyZ,
                     &|pixel| {
@@ -951,14 +945,11 @@ pub async fn install_dungeon_blocks(
                         VoxelBrush::new([([0, 0, 6], block.clone()), ([0, 0, 9], block)])
                     },
                 )?;
-                Block::builder()
-                    .display_name("Gate Pocket")
-                    .voxels_handle(R16, txn.insert_anonymous(space))
-                    .build()
+                space.display_name("Gate Pocket").build_txn(txn)
             }
 
             GateLock => {
-                let space = space_from_image(
+                let space = block_from_image(
                     include_image!("gate-lock.png"),
                     GridRotation::RXyZ,
                     &|pixel| {
@@ -975,27 +966,19 @@ pub async fn install_dungeon_blocks(
                         )
                     },
                 )?;
-                Block::builder()
-                    .display_name("Keyhole")
-                    .voxels_handle(R16, txn.insert_anonymous(space))
-                    .build()
+                space.display_name("Keyhole").build_txn(txn)
             }
 
-            Key => {
-                let space =
-                    space_from_image(include_image!("key.png"), GridRotation::RXyZ, &|pixel| {
-                        let block = if pixel[3] == 0 {
-                            AIR
-                        } else {
-                            Block::builder().color(Rgba::from_srgb8(pixel)).build()
-                        };
-                        VoxelBrush::with_thickness(block, 7..9)
-                    })?;
-                Block::builder()
-                    .display_name("Key")
-                    .voxels_handle(R16, txn.insert_anonymous(space))
-                    .build()
-            }
+            Key => block_from_image(include_image!("key.png"), GridRotation::RXyZ, &|pixel| {
+                let block = if pixel[3] == 0 {
+                    AIR
+                } else {
+                    Block::builder().color(Rgba::from_srgb8(pixel)).build()
+                };
+                VoxelBrush::with_thickness(block, 7..9)
+            })?
+            .display_name("Key")
+            .build_txn(txn),
 
             DoorwaySideMask => Block::builder()
                 .display_name("Doorway Side Mask")

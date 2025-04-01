@@ -511,7 +511,7 @@ pub(crate) fn make_button_label_block(
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
             .build();
 
-            // TODO: replace this with space_from_image()
+            // TODO: replace this with block_from_image()
             {
                 let mut draw_target = draw_target_for_button_label(&mut space);
 

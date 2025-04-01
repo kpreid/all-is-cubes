@@ -5,7 +5,9 @@ use core::fmt;
 use exhaust::Exhaust;
 
 use all_is_cubes::block::{self, AIR, Block, Resolution::*};
-use all_is_cubes::content::load_image::{default_srgb, include_image, space_from_image};
+use all_is_cubes::content::load_image::{
+    block_from_image, default_srgb, include_image, space_from_image,
+};
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::TOOL_SELECTIONS;
@@ -134,17 +136,13 @@ impl WidgetBlocks {
     pub async fn new(txn: &mut UniverseTransaction, p: YieldProgress) -> BlockProvider<Self> {
         BlockProvider::new(p, |key| {
             Ok(match key {
-                WidgetBlocks::Crosshair => Block::builder()
-                    .display_name("Crosshair")
-                    .voxels_handle(
-                        R64, // TODO: get resolution from image file
-                        txn.insert_anonymous(space_from_image(
-                            include_image!("theme/crosshair.png"),
-                            GridRotation::RXyZ,
-                            &default_srgb,
-                        )?),
-                    )
-                    .build(),
+                WidgetBlocks::Crosshair => block_from_image(
+                    include_image!("theme/crosshair.png"),
+                    GridRotation::RXyZ,
+                    &default_srgb,
+                )?
+                .display_name("Crosshair")
+                .build_txn(txn),
 
                 WidgetBlocks::ToolbarSlotFrame => {
                     Block::builder()
@@ -167,38 +165,30 @@ impl WidgetBlocks {
                     ToolbarButtonState::Unmapped,
                     ToolbarButtonState::Unmapped,
                 ]) => AIR,
-                WidgetBlocks::ToolbarPointer(buttons) => Block::builder()
-                    .display_name("Selected")
-                    .voxels_handle(
-                        R32, // TODO: get resolution from image file
-                        txn.insert_anonymous(space_from_image(
-                            include_image!("theme/toolbar-sel-cursor.png"),
-                            GridRotation::RXyZ,
-                            &|color| match color {
-                                // Map placeholder colors to the color for each button's state.
-                                [255, 0, 0, 255] => buttons[0].brush(),
-                                [0, 255, 0, 255] => buttons[1].brush(),
-                                [0, 0, 255, 255] => buttons[2].brush(),
-                                _ => default_srgb(color),
-                            },
-                        )?),
-                    )
-                    .build(),
+                WidgetBlocks::ToolbarPointer(buttons) => block_from_image(
+                    include_image!("theme/toolbar-sel-cursor.png"),
+                    GridRotation::RXyZ,
+                    &|color| match color {
+                        // Map placeholder colors to the color for each button's state.
+                        [255, 0, 0, 255] => buttons[0].brush(),
+                        [0, 255, 0, 255] => buttons[1].brush(),
+                        [0, 0, 255, 255] => buttons[2].brush(),
+                        _ => default_srgb(color),
+                    },
+                )?
+                .display_name("Selected")
+                .build_txn(txn),
 
                 WidgetBlocks::DialogBackground => {
-                    Block::builder()
-                        .display_name("Dialog Background")
-                        .voxels_handle(
-                            R64, // 16 res × 4 tiles
-                            txn.insert_anonymous(space_from_image(
-                                include_image!("theme/dialog-background.png"),
-                                GridRotation::RXYZ,
-                                // place image on the front face (of the R16 individual blocks!)
-                                // so it meets the back of the widgets in the dialog.
-                                &|color| default_srgb(color).translate([0, 0, 15]),
-                            )?),
-                        )
-                        .build()
+                    block_from_image(
+                        include_image!("theme/dialog-background.png"),
+                        GridRotation::RXYZ,
+                        // place image on the front face (of the R16 individual blocks!)
+                        // so it meets the back of the widgets in the dialog.
+                        &|color| default_srgb(color).translate([0, 0, 15]),
+                    )?
+                    .display_name("Dialog Background")
+                    .build_txn(txn)
                 }
 
                 WidgetBlocks::ProgressBar { full } => {
@@ -208,17 +198,9 @@ impl WidgetBlocks {
                         include_image!("theme/progress-bar-empty.png")
                     };
 
-                    Block::builder()
+                    block_from_image(image, GridRotation::IDENTITY, &default_srgb)?
                         .display_name(format! {"Progress Bar {}", if full {"Full"} else {"Empty"}})
-                        .voxels_handle(
-                            R64, // 16 res × 4 tiles
-                            txn.insert_anonymous(space_from_image(
-                                image,
-                                GridRotation::IDENTITY,
-                                &default_srgb,
-                            )?),
-                        )
-                        .build()
+                        .build_txn(txn)
                 }
 
                 WidgetBlocks::ActionButton(state) => state.button_block(txn)?,

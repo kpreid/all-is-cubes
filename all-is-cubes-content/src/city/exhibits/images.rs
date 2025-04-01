@@ -1,10 +1,10 @@
-use all_is_cubes::content::load_image::{default_srgb, space_from_image};
+use all_is_cubes::content::load_image::{block_from_image, default_srgb};
 
 use super::prelude::*;
 
 #[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
-    name: "space_from_image()",
+    name: "block_from_image()",
     subtitle: "Using rotations XYZ, XyZ, XZY, xYZ",
     placement: Placement::Surface,
 )]
@@ -29,12 +29,9 @@ fn IMAGES(ctx: Context<'_>) {
         };
 
         let image = include_image!("terrain-image.png");
-        let image_space =
-            txn.insert_anonymous(space_from_image(image, rotation, &terrain_map_function).unwrap());
-        let block = Block::builder()
+        let block = block_from_image(image, rotation, &terrain_map_function)?
             .display_name(format!("{rotation:?}"))
-            .voxels_handle(R16, image_space)
-            .build();
+            .build_txn(&mut txn);
 
         stack(&mut outer_space, position, [pedestal, &block])?;
         Ok(())

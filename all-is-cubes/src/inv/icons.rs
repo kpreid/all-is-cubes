@@ -12,7 +12,7 @@ use exhaust::Exhaust;
 use num_traits::float::FloatCore as _;
 
 use crate::block::{self, AIR, Block, Resolution::*};
-use crate::content::load_image::{default_srgb, include_image, space_from_image};
+use crate::content::load_image::{block_from_image, default_srgb, include_image};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{
@@ -88,17 +88,13 @@ impl Icons {
                     .color(Rgba::TRANSPARENT)
                     .build(),
 
-                Icons::Activate => Block::builder()
-                    .display_name("Activate")
-                    .voxels_handle(
-                        R16, // TODO: get resolution from image file
-                        txn.insert_anonymous(space_from_image(
-                            include_image!("icons/hand.png"),
-                            GridRotation::RXyZ,
-                            &default_srgb,
-                        )?),
-                    )
-                    .build(),
+                Icons::Activate => block_from_image(
+                    include_image!("icons/hand.png"),
+                    GridRotation::RXyZ,
+                    &default_srgb,
+                )?
+                .display_name("Activate")
+                .build_txn(txn),
 
                 Icons::Delete => {
                     let x_radius = i32::from(resolution) * 3 / 16;
@@ -167,39 +163,33 @@ impl Icons {
                 Icons::PushPull => {
                     let dots = [block::from_color!(Rgba::BLACK), AIR];
                     let dots = move |y: GridCoordinate| dots[y.rem_euclid(2) as usize].clone();
-                    Block::builder()
-                        .display_name("Push/Pull")
-                        .voxels_handle(
-                            R32, // TODO: get resolution from image file,
-                            txn.insert_anonymous(space_from_image(
-                                include_image!("icons/push.png"),
-                                GridRotation::RXZY,
-                                &|color| {
-                                    // TODO: Figure out abstractions to not need so much fiddly custom code
-                                    let bcolor = Block::from(Rgba::from_srgb8(color));
-                                    match color {
-                                        [0, 0, 0, 255] => {
-                                            VoxelBrush::new(vec![([0, 15, 0], dots(0))])
-                                        }
-                                        [0x85, 0x85, 0x85, 255] => {
-                                            VoxelBrush::new(vec![([0, 0, 0], dots(0))])
-                                        }
-                                        [0, 127, 0, 255] => {
-                                            VoxelBrush::new((0..16).map(|y| ([0, y, 0], dots(y))))
-                                        }
-                                        [0, 255, 0, 255] => VoxelBrush::new(
-                                            (0..16).map(|y| ([0, y, 0], dots(y + 1))),
-                                        ),
-                                        [255, 0, 0, 255] => VoxelBrush::new(
-                                            (0..16).map(|y| ([0, y, 0], bcolor.clone())),
-                                        ),
-                                        _ => VoxelBrush::new([([0, 0, 0], bcolor)]),
-                                    }
-                                    .translate([8, 8, 0])
-                                },
-                            )?),
-                        )
-                        .build()
+                    block_from_image(
+                        include_image!("icons/push.png"),
+                        GridRotation::RXZY,
+                        &|color| {
+                            // TODO: Figure out abstractions to not need so much fiddly custom code
+                            let bcolor = Block::from(Rgba::from_srgb8(color));
+                            match color {
+                                [0, 0, 0, 255] => VoxelBrush::new(vec![([0, 15, 0], dots(0))]),
+                                [0x85, 0x85, 0x85, 255] => {
+                                    VoxelBrush::new(vec![([0, 0, 0], dots(0))])
+                                }
+                                [0, 127, 0, 255] => {
+                                    VoxelBrush::new((0..16).map(|y| ([0, y, 0], dots(y))))
+                                }
+                                [0, 255, 0, 255] => {
+                                    VoxelBrush::new((0..16).map(|y| ([0, y, 0], dots(y + 1))))
+                                }
+                                [255, 0, 0, 255] => {
+                                    VoxelBrush::new((0..16).map(|y| ([0, y, 0], bcolor.clone())))
+                                }
+                                _ => VoxelBrush::new([([0, 0, 0], bcolor)]),
+                            }
+                            .translate([0, 8, 0])
+                        },
+                    )?
+                    .display_name("Push/Pull")
+                    .build_txn(txn)
                 }
 
                 Icons::Jetpack { active } => {
