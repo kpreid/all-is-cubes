@@ -17,11 +17,6 @@ pub(super) use all_is_cubes::block::{
     RotationPlacementRule, Zoom, space_to_blocks, text,
 };
 pub(super) use all_is_cubes::drawing::VoxelBrush;
-pub(super) use all_is_cubes::drawing::embedded_graphics::{
-    geometry::Point,
-    prelude::Size,
-    primitives::{PrimitiveStyle, Rectangle, StyledDrawable},
-};
 pub(super) use all_is_cubes::euclid::{
     Point3D, Rotation2D, Size3D, Vector2D, Vector3D, point3, size3, vec3,
 };

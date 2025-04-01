@@ -117,6 +117,7 @@ fn COLOR_LIGHTS(_: Context<'_>) {
     // Room wall block with test card
     let wall_color_block = block::from_color!(0.5, 0.5, 0.5, 1.0);
     let wall_resolution = R16;
+    let wall_resolution_g = GridCoordinate::from(wall_resolution);
     let wall_block = {
         let colors_as_blocks: Vec<Block> =
             surface_colors.iter().copied().map(Block::from).collect();
@@ -129,17 +130,19 @@ fn COLOR_LIGHTS(_: Context<'_>) {
             GridRotation::CLOCKWISE * GridRotation::CLOCKWISE,
             GridRotation::COUNTERCLOCKWISE,
         ] {
-            let mut plane = wall_block_space.draw_target(
-                rotation.to_positive_octant_transform(GridCoordinate::from(wall_resolution) - 1)
-                    * Gridgid::from_translation([4, 4, 15]),
-            );
-            for (i, swatch_block) in colors_as_blocks.iter().enumerate() {
-                let i = i as GridCoordinate;
-                Rectangle::new(
-                    Point::new(i.rem_euclid(3) * 3, i.div_euclid(3) * 3),
-                    Size::new(2, 2),
-                )
-                .draw_styled(&PrimitiveStyle::with_fill(swatch_block), &mut plane)?;
+            let transform = rotation.to_positive_octant_transform(wall_resolution_g)
+                * Gridgid::from_translation([4, 4, wall_resolution_g - 1]);
+
+            for (i, swatch_block) in (0i32..).zip(colors_as_blocks.iter()) {
+                wall_block_space.fill_uniform(
+                    GridAab::from_lower_size(
+                        [i.rem_euclid(3) * 3, i.div_euclid(3) * 3, 0],
+                        [2, 2, 1],
+                    )
+                    .transform(transform)
+                    .unwrap(),
+                    swatch_block,
+                )?;
             }
         }
 
