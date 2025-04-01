@@ -3,6 +3,7 @@
 //! TODO: stuff in this module is kind of duplicative of [`crate::drawing`]...
 
 use alloc::vec::Vec;
+use core::fmt;
 
 use euclid::size2;
 use hashbrown::HashMap;
@@ -13,10 +14,12 @@ use embedded_graphics::prelude::{Dimensions as _, DrawTarget, Point, Size};
 use embedded_graphics::primitives::{PointsIter, Rectangle};
 use png_decoder::PngHeader;
 
-use crate::block::{AIR, Block};
+use crate::block::{self, AIR, Block, Resolution};
+use crate::camera::ImageSize;
 use crate::drawing::{VoxelBrush, rectangle_to_aab};
 use crate::math::{GridAab, GridCoordinate, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
+use crate::universe::UniverseTransaction;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -45,7 +48,7 @@ pub struct PngAdapter<'a> {
 // -------------------------------------------------------------------------------------------------
 
 impl DecodedPng {
-    pub fn size(&self) -> crate::camera::ImageSize {
+    pub fn size(&self) -> ImageSize {
         size2(self.header.width, self.header.height)
     }
 
@@ -185,6 +188,28 @@ pub fn space_from_image<'b>(
     Ok(space)
 }
 
+/// Convert a decoded PNG image into a [`BlockBuilder`] with voxels (which can then create a
+/// [`Block`]).
+#[doc(hidden)] // still experimental API
+pub fn block_from_image<'b>(
+    png: &DecodedPng,
+    rotation: GridRotation,
+    pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'b>,
+) -> Result<block::Builder<block::builder::Voxels, UniverseTransaction>, BlockFromImageError> {
+    let size = png.size();
+    let resolution =
+        Resolution::try_from(size.width).map_err(|_| BlockFromImageError::Size(size))?;
+    if size.width != size.height {
+        return Err(BlockFromImageError::Size(size));
+    }
+
+    // TODO: Implement the same bounds-shrinking feature as `Block::voxels_fn()` has.
+    Ok(Block::builder().voxels_space(
+        resolution,
+        space_from_image(png, rotation, pixel_function).map_err(BlockFromImageError::Space)?,
+    ))
+}
+
 /// Simple function for [`space_from_image()`] pixel conversion.
 ///
 /// Special case:
@@ -200,6 +225,44 @@ pub fn default_srgb(pixel: Srgba) -> VoxelBrush<'static> {
     })
 }
 
+#[doc(hidden)] // still experimental API
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum BlockFromImageError {
+    /// Error constructing the [`Space`].
+    /// May occur if there are too many distinct colors in the image,
+    /// or if block evaluation fails.
+    Space(SetCubeError),
+
+    /// Image width and height are unequal or cannot be converted to [`Resolution`].
+    Size(ImageSize),
+}
+
+impl fmt::Display for BlockFromImageError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BlockFromImageError::Space(_) => write!(f, "error constructing the Space"),
+            BlockFromImageError::Size(size) => {
+                write!(
+                    f,
+                    "image size {}×{} invalid for a block",
+                    size.width, size.height
+                )
+            }
+        }
+    }
+}
+impl core::error::Error for BlockFromImageError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            BlockFromImageError::Space(error) => Some(error),
+            BlockFromImageError::Size(_) => None,
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Helper for [`include_image`] macro.
 #[doc(hidden)]
 #[inline(never)]
@@ -209,8 +272,6 @@ pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
         Err(error) => panic!("Error loading image asset {name:?}: {error:?}",),
     }
 }
-
-// -------------------------------------------------------------------------------------------------
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
