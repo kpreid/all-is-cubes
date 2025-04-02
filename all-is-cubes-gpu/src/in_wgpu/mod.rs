@@ -169,6 +169,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
+        about_to_present: impl FnOnce(),
     ) -> Result<RenderInfo, RenderError> {
         let update_info = self
             .everything
@@ -253,6 +254,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         );
         info.flaws |= post_flaws;
         self.queue.submit([post_cmd]);
+        about_to_present();
         output.present();
         Ok(info)
     }

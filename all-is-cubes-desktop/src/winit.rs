@@ -562,9 +562,12 @@ impl RendererToWinit for SurfaceRenderer<Instant> {
         );
 
         let _info = self
-            .render_frame(session.cursor_result(), &frame_budget, |render_info| {
-                format!("{}", session.info_text(render_info))
-            })
+            .render_frame(
+                session.cursor_result(),
+                &frame_budget,
+                |render_info| format!("{}", session.info_text(render_info)),
+                || window.pre_present_notify(),
+            )
             .unwrap();
     }
 }

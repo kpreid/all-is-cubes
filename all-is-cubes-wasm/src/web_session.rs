@@ -423,6 +423,7 @@ impl WebSession {
                             inner.session.cursor_result(),
                             &FrameBudget::SIXTY_FPS, // TODO: try to estimate real refresh rate
                             |_| String::new(),
+                            || {},
                         )
                         .expect("error in render_frame")
                 }
