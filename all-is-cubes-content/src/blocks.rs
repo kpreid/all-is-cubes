@@ -12,15 +12,11 @@ use all_is_cubes::block::{
     self, AIR, AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution::*,
     RotationPlacementRule, TickAction,
 };
-use all_is_cubes::drawing::embedded_graphics::{
-    prelude::Point,
-    primitives::{Line, PrimitiveStyle, Rectangle, StyledDrawable},
-};
 use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
+use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
-    Gridgid, Rgb, Rgba, rgb_const, rgba_const,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSizeCoord, GridVector, Rgb, Rgba,
+    rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
@@ -385,34 +381,35 @@ pub async fn install_demo_blocks(
                 .build();
 
                 // Sign board
-                {
-                    let mut plane =
-                        space.draw_target(Gridgid::from_translation([0, 0, resolution_g - 1]));
-                    Rectangle::with_corners(
-                        Point::new(0, bottom_edge),
-                        Point::new(resolution_g - 1, top_edge),
-                    )
-                    .draw_styled(&PrimitiveStyle::with_fill(&sign_board), &mut plane)?;
-                }
+                space.fill_uniform(
+                    GridAab::from_lower_upper(
+                        [0, bottom_edge, resolution_g - 1],
+                        [resolution_g, top_edge, resolution_g],
+                    ),
+                    &sign_board,
+                )?;
 
                 // Support posts
-                let mut post = |x| -> Result<(), InGenError> {
-                    let mut plane = space.draw_target(Gridgid {
-                        rotation: GridRotation::RZYX,
-                        translation: GridVector::new(x, 0, 0),
-                    });
-                    let style = &PrimitiveStyle::with_stroke(&sign_post, 2);
-                    let z = resolution_g - 3;
-                    // Vertical post
-                    Line::new(Point::new(z, 0), Point::new(z, top_edge - 1))
-                        .draw_styled(style, &mut plane)?;
-                    // Diagonal brace
-                    Line::new(Point::new(z - 4, 0), Point::new(z, 4))
-                        .draw_styled(style, &mut plane)?;
-                    Ok(())
-                };
-                post(2)?;
-                post(resolution_g - 3)?;
+                // TODO: consider drawing this from an image or ascii-art instead,
+                // for more art control with less code.
+                for post_x in [2, resolution_g - 3] {
+                    let post_shape_depth = 6;
+                    space.fill(
+                        GridAab::from_lower_size(
+                            [post_x, 0, resolution_g - post_shape_depth - 1],
+                            [1, top_edge as u32 - 1, post_shape_depth as u32],
+                        ),
+                        |cube| {
+                            let vertical_post = cube.z >= resolution_g - 3;
+                            let diagonal_brace = (9..11).contains(&(cube.z - cube.y));
+                            if vertical_post || diagonal_brace {
+                                Some(&sign_post)
+                            } else {
+                                None
+                            }
+                        },
+                    )?;
+                }
 
                 Block::builder()
                     .display_name("Signboard")
