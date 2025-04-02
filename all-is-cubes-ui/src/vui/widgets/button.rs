@@ -16,23 +16,16 @@ use all_is_cubes::block::{
     Resolution::{self, *},
 };
 use all_is_cubes::content::load_image::{
-    DecodedPng, PngAdapter, default_srgb, include_image, space_from_image,
+    DecodedPng, default_srgb, include_image, space_from_image,
 };
 use all_is_cubes::content::palette;
-use all_is_cubes::drawing::embedded_graphics::{
-    Drawable,
-    image::Image as EgImage,
-    prelude::{Dimensions, PixelColor, Point},
-};
-use all_is_cubes::drawing::{DrawingPlane, VoxelBrush};
-use all_is_cubes::euclid::vec3;
+use all_is_cubes::drawing::VoxelBrush;
+use all_is_cubes::euclid::{Vector2D, vec3};
 use all_is_cubes::inv::EphemeralOpaque;
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::listen;
-use all_is_cubes::math::{
-    Cube, Face6, GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Gridgid, Rgba,
-};
-use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpacePhysics, SpaceTransaction};
+use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridRotation, GridSize, GridVector, Rgba};
+use all_is_cubes::space::{self, Space, SpaceBehaviorAttachment, SpaceTransaction};
 use all_is_cubes::transaction::Merge;
 use all_is_cubes::universe::{Handle, UniverseTransaction};
 
@@ -474,23 +467,6 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
     }
 }
 
-/// Returns a [`DrawTarget`] for drawing the button label, with a
-/// Y-down coordinate system whose origin is centered on the button (or more precisely,
-/// (0, 0) is the lower-right pixel closest to the center, since e-g uses a convention
-/// where coordinates identify pixels, not their edges).
-///
-/// TODO: explain expected size
-///
-/// [`DrawTarget`]: all_is_cubes::drawing::embedded_graphics::prelude::DrawTarget
-pub(crate) fn draw_target_for_button_label<C: PixelColor>(
-    space: &mut Space,
-) -> DrawingPlane<'_, Space, C> {
-    space.draw_target(
-        Gridgid::from_translation([theme::RESOLUTION_G / 2, theme::RESOLUTION_G / 2 - 1, 0])
-            * Gridgid::FLIP_Y,
-    )
-}
-
 pub(crate) enum ButtonIcon<'a> {
     Icon(&'a DecodedPng),
 }
@@ -504,26 +480,20 @@ pub(crate) fn make_button_label_block(
 ) -> Result<Block, InGenError> {
     Ok(match icon {
         ButtonIcon::Icon(icon) => {
-            let mut space = Space::builder(GridAab::from_lower_size(
-                [0, 0, 0],
-                [theme::RESOLUTION.into(), theme::RESOLUTION.into(), 1],
-            ))
-            .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-            .build();
+            let size = icon.size();
+            let centering = ((Vector2D::splat(theme::RESOLUTION_G) - size.to_vector().to_i32())
+                / 2)
+            .extend(0)
+            .cast_unit::<Cube>();
 
-            // TODO: replace this with block_from_image()
-            {
-                let mut draw_target = draw_target_for_button_label(&mut space);
+            let space = space_from_image(icon, GridRotation::RXyZ, &|color| {
+                default_srgb(color).translate(centering)
+            })?;
 
-                let id = &PngAdapter::adapt(icon, &default_srgb);
-                EgImage::new(&id, -id.bounding_box().center() - Point::new(1, 1))
-                    .draw(&mut draw_target)?;
-            }
-
-            let space = txn.insert_anonymous(space);
+            // TODO: Implement the same bounds-shrinking feature as `Block::voxels_fn()` has.
             Block::builder()
+                .voxels_handle(theme::RESOLUTION, txn.insert_anonymous(space))
                 .display_name(name.to_owned())
-                .voxels_handle(theme::RESOLUTION, space)
                 .build()
         }
     })
