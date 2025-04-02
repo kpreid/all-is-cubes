@@ -2,16 +2,15 @@
 //!
 //! TODO: stuff in this module is kind of duplicative of [`crate::drawing`]...
 
+use all_is_cubes_base::math::{Cube, GridPoint};
 use alloc::vec::Vec;
 use core::fmt;
 
-use euclid::size2;
+use euclid::{Size2D, size2};
 use hashbrown::HashMap;
 
-use embedded_graphics::Drawable;
-use embedded_graphics::image::ImageDrawable;
-use embedded_graphics::prelude::{Dimensions as _, DrawTarget, Point, Size};
-use embedded_graphics::primitives::{PointsIter, Rectangle};
+use embedded_graphics::prelude::{Point, Size};
+use embedded_graphics::primitives::Rectangle;
 use png_decoder::PngHeader;
 
 use crate::block::{self, AIR, Block, Resolution};
@@ -114,43 +113,6 @@ impl PngAdapter<'_> {
     }
 }
 
-/// Note: This implementation is on references so it can return [`VoxelBrush`]es
-/// borrowing from itself.
-impl<'b> ImageDrawable for &'b PngAdapter<'b> {
-    type Color = &'b VoxelBrush<'b>;
-
-    fn draw<D>(&self, target: &mut D) -> Result<(), <D as DrawTarget>::Error>
-    where
-        D: DrawTarget<Color = Self::Color>,
-    {
-        self.draw_sub_image(target, &self.bounding_box())
-    }
-
-    fn draw_sub_image<D>(
-        &self,
-        target: &mut D,
-        area: &Rectangle,
-    ) -> Result<(), <D as DrawTarget>::Error>
-    where
-        D: DrawTarget<Color = Self::Color>,
-    {
-        target.fill_contiguous(
-            area,
-            PointsIter::points(area).map(|Point { x, y }| self.get_brush(x, y)),
-        )
-    }
-}
-
-impl embedded_graphics::geometry::OriginDimensions for &'_ PngAdapter<'_> {
-    fn size(&self) -> Size {
-        // TODO: use max_brush to expand this
-        Size {
-            width: self.width.unsigned_abs(),
-            height: self.height.unsigned_abs(),
-        }
-    }
-}
-
 /// Convert a decoded PNG image into a [`Space`].
 ///
 /// The `block_function` will be memoized.
@@ -166,25 +128,46 @@ pub fn space_from_image<'b>(
     pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'b>,
 ) -> Result<Space, SetCubeError> {
     let header = &png.header;
+    let size: Size2D<i32, ()> = Size2D::new(header.width, header.height).to_i32();
 
     // TODO: let caller control the transform offsets (not necessarily positive-octant)
+    //
+    // TODO: Subtracting 1 here is wrong but cancels out wrongness in rectangle_to_aab()
+    // and the code below using transform_point() instead of transform_cube().
+    // Fix this once we've gotten rid of rectangle_to_aab().
     let transform = rotation.to_positive_octant_transform(
         GridCoordinate::try_from(header.width.max(header.height)).unwrap() - 1,
     );
 
     let ia = &PngAdapter::adapt(png, pixel_function);
-    let eg_image = embedded_graphics::image::Image::new(&ia, Point::zero());
 
     // Compute bounds including the brush sizes.
     // Note: This strategy will overestimate the size in case a brush has X/Y size but is
     // never used near the edge. To fix that, we could use a dynamically resized Space
     // instead of this pessimistic choice.
-    let bounds: GridAab = rectangle_to_aab(eg_image.bounding_box(), transform, ia.max_brush);
+    let bounds: GridAab = rectangle_to_aab(
+        Rectangle::new(
+            Point::zero(),
+            Size {
+                width: header.width,
+                height: header.height,
+            },
+        ),
+        transform,
+        ia.max_brush,
+    );
 
     let mut space = Space::builder(bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build();
-    eg_image.draw(&mut space.draw_target(transform))?;
+    for y in 0..(size.height) {
+        for x in 0..(size.width) {
+            ia.get_brush(x, y).paint(
+                &mut space,
+                Cube::from(transform.transform_point(GridPoint::new(x, y, 0))),
+            )?;
+        }
+    }
     Ok(space)
 }
 
