@@ -9,6 +9,8 @@ use all_is_cubes_render::Rendering;
 
 use crate::record::{RecordOptions, Status};
 
+type PngWriter<'a> = png::Writer<&'a mut BufWriter<File>>;
+
 /// Occupy a thread with writing a sequence of frames as (A)PNG data.
 #[expect(
     clippy::needless_pass_by_value,
@@ -45,7 +47,7 @@ pub(crate) fn threaded_write_frames(
 fn new_png_writer<'a>(
     file_writer: &'a mut BufWriter<File>,
     options: &RecordOptions,
-) -> Result<png::Writer<&'a mut BufWriter<File>>, std::io::Error> {
+) -> Result<PngWriter<'a>, std::io::Error> {
     // Scope of file_writer being borrowed
     let mut png_encoder = Encoder::new(
         file_writer,
@@ -65,9 +67,7 @@ fn new_png_writer<'a>(
     Ok(png_writer)
 }
 
-fn write_color_metadata<W: std::io::Write>(
-    png_writer: &mut png::Writer<W>,
-) -> Result<(), std::io::Error> {
+fn write_color_metadata(png_writer: &mut PngWriter<'_>) -> Result<(), std::io::Error> {
     // TODO: This data has not been checked for correctness, just copied from
     // http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html#C.sRGB
     // When png 0.17 is released we can stop rolling our own metadata:
