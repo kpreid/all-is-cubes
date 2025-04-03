@@ -392,7 +392,7 @@ async fn error_character_gone(context: RenderTestContext) {
 
     // Run a first render because this test is about what happens afterward
     renderer.update(None).await.unwrap();
-    let _image = renderer.draw("").await.unwrap();
+    let _ = renderer.draw("").await.unwrap();
 
     let character_handle: Handle<Character> = universe.get(&"character".into()).unwrap();
     UniverseTransaction::delete(character_handle)
@@ -410,7 +410,7 @@ async fn error_character_gone(context: RenderTestContext) {
     // Drawing should succeed with no data.
     // TODO: We temporarily also allow failure. Stop that.
     match renderer.draw("").await {
-        Ok(_image) => {}
+        Ok(_) => {}
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from draw(): {res:?}"),
@@ -1015,13 +1015,14 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let mut renderer = context.renderer(cameras);
 
     // Initially zero viewport
-    renderer.update(None).await.unwrap();
-    let image = renderer
-        .draw(overlays.info_text.as_ref().unwrap())
-        .await
-        .unwrap();
-    assert_eq!(image.size, size2(0, 0));
-
+    {
+        renderer.update(None).await.unwrap();
+        let zero_image = renderer
+            .draw(overlays.info_text.as_ref().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(zero_image.size, size2(0, 0));
+    }
     // Now confirm the renderer can produce an okay image afterward
     viewport_cell.set(COMMON_VIEWPORT);
     context
@@ -1029,13 +1030,15 @@ async fn viewport_zero(mut context: RenderTestContext) {
         .await;
 
     // Now try *resizing to* zero and back
-    viewport_cell.set(zero);
-    renderer.update(None).await.unwrap();
-    let image = renderer
-        .draw(overlays.info_text.as_ref().unwrap())
-        .await
-        .unwrap();
-    assert_eq!(image.size, size2(0, 0));
+    {
+        viewport_cell.set(zero);
+        renderer.update(None).await.unwrap();
+        let zero_image = renderer
+            .draw(overlays.info_text.as_ref().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(zero_image.size, size2(0, 0));
+    }
     viewport_cell.set(COMMON_VIEWPORT);
     context
         .render_comparison_test_with_renderer(TEXT_MAX_DIFF, &mut renderer, overlays)

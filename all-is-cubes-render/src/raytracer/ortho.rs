@@ -78,6 +78,9 @@ fn trace_one_pixel_with_cache(
 ) -> [u8; 4] {
     match camera.project_pixel_into_world(point2(x, y)) {
         Some(ray) => {
+            // Note that this cache key may be nonsense (using the resolution from the wrong cube),
+            // but in that case it will always not match the cube, so we’ll then create
+            // a new key with the correct resolution.
             let cache_key: CacheKey = (
                 ray.origin_cube(),
                 cache.resolution,
@@ -91,7 +94,7 @@ fn trace_one_pixel_with_cache(
 
                 let output = Rgba::from(pixel.color);
 
-                let cache_key = (
+                let new_cache_key = (
                     ray.origin_cube(),
                     pixel.max_resolution,
                     ray.zoom_in(ray.origin_cube(), pixel.max_resolution)
@@ -99,7 +102,7 @@ fn trace_one_pixel_with_cache(
                 );
                 *cache = Cache {
                     resolution: pixel.max_resolution,
-                    pixel: Some((cache_key, output)),
+                    pixel: Some((new_cache_key, output)),
                 };
                 output
             }

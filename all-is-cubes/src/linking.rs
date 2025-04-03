@@ -104,6 +104,10 @@ where
     {
         let count = E::exhaust().count();
         let mut map = HbHashMap::with_capacity(count);
+        #[expect(
+            clippy::shadow_unrelated,
+            reason = "https://github.com/rust-lang/rust-clippy/issues/11827"
+        )]
         for (key, progress) in E::exhaust().zip(progress.split_evenly(count)) {
             match definer(key.clone()) {
                 Ok(value) => {

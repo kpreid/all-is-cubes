@@ -62,12 +62,12 @@ fn ANIMATION(ctx: Context<'_>) {
             ))
             .voxels_handle(fire_resolution, {
                 let fire_bounds = GridAab::for_block(fire_resolution);
-                let mut space = Space::for_block(fire_resolution).build();
-                space.set([0, 0, 0], block::from_color!(Rgb::ONE))?; // placeholder for not fully transparent so first pass lighting is better
+                let mut fire_space = Space::for_block(fire_resolution).build();
+                fire_space.set([0, 0, 0], block::from_color!(Rgb::ONE))?; // placeholder for not fully transparent so first pass lighting is better
                 SpaceTransaction::add_behavior(fire_bounds, Fire::new(fire_bounds))
-                    .execute(&mut space, &mut transaction::no_outputs)
+                    .execute(&mut fire_space, &mut transaction::no_outputs)
                     .unwrap();
-                txn.insert_anonymous(space)
+                txn.insert_anonymous(fire_space)
             })
             .build()
     };

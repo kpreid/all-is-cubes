@@ -916,7 +916,7 @@ pub async fn install_dungeon_blocks(
                 .display_name("Spikes")
                 .voxels_fn(resolution, |Cube { x, y, z }| {
                     let resolution = f64::from(resolution);
-                    let bsin = |x| (f64::from(x) * TAU / resolution * 2.0).sin();
+                    let bsin = |coord| (f64::from(coord) * TAU / resolution * 2.0).sin();
                     if f64::from(y) / resolution < bsin(x) * bsin(z) {
                         &spike_metal
                     } else {

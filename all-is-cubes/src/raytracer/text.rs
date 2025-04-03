@@ -28,7 +28,7 @@ impl RtBlockData for CharacterRtData {
         // TODO: allow customizing the fallback character
         let name: &ArcStr = &s.evaluated().attributes().display_name;
         let char = match name.graphemes(true).next() {
-            Some(s) => name.substr_from(s),
+            Some(grapheme) => name.substr_from(grapheme),
             None => literal_substr!("#"),
         };
         Self(char)

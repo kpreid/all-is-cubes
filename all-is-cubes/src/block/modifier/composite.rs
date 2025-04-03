@@ -504,8 +504,8 @@ impl CompositeOperator {
     fn blend_operations<'op>(
         self,
         ctx: &CompEvalCtx<'_>,
-        mut source: Option<&'op Operation>,
-        mut destination: Option<&'op Operation>,
+        mut source_op: Option<&'op Operation>,
+        mut destination_op: Option<&'op Operation>,
     ) -> Option<Operation> {
         let Some(this_modifier_index) = ctx.this_modifier_index else {
             // This is not a `Modifier::Composite` and so we cannot compose operations
@@ -515,7 +515,7 @@ impl CompositeOperator {
 
         // Unreverse the operations so that they apply to their original parts of the block.
         if ctx.was_reversed {
-            mem::swap(&mut source, &mut destination);
+            mem::swap(&mut source_op, &mut destination_op);
         }
 
         // For now, `Become` is the only supported operation.
@@ -526,17 +526,17 @@ impl CompositeOperator {
                 _ => None,
             }
         }
-        let source = require_become(source);
-        let destination = require_become(destination);
+        let source_becoming = require_become(source_op);
+        let destination_becoming = require_become(destination_op);
 
-        if source.is_none() && destination.is_none() {
+        if source_becoming.is_none() && destination_becoming.is_none() {
             // No operation to produce
             return None;
         }
 
         // We now know that we need to make a `Become` operation which composes two blocks,
         // at least one of which will different.
-        let mut new_block = match destination {
+        let mut new_block = match destination_becoming {
             // If there is a new whole destination block to become, then start with that.
             Some(block) => block.clone(),
             // Else start with the block with modifiers *preceding* this Composite modifier.
@@ -551,9 +551,11 @@ impl CompositeOperator {
         new_block
             .modifiers_mut()
             .push(Modifier::Composite(Composite {
-                source: match source {
-                    Some(source) => source.clone(),
+                source: match source_becoming {
+                    Some(source_becoming) => source_becoming.clone(),
                     None => {
+                        // If the source block had no `Operation::Become` of its own, then treat
+                        // it as becoming itself.
                         let Modifier::Composite(Composite { source, .. }) =
                             &ctx.block.modifiers()[this_modifier_index]
                         else {

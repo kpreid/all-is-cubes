@@ -177,8 +177,8 @@ impl Space {
                         // TODO: Also register a low-priority "update everything" in case data is
                         // from an old version.
                         let mut queue = LightUpdateQueue::new();
-                        for (cube, light) in light.iter() {
-                            match light.status() {
+                        for (cube, cube_light) in light.iter() {
+                            match cube_light.status() {
                                 LightStatus::Uninitialized => queue.insert(LightUpdateRequest {
                                     priority: light::Priority::UNINIT,
                                     cube,
@@ -865,11 +865,15 @@ impl Space {
         }
 
         self.physics = physics;
-        let physics = self.physics.clone(); // TODO: put physics in UpdateCtx?
+        // We could avoid this clone by putting `&self.physics` in `UpdateCtx`, but it’s not worth
+        // it for the common cases.
+        // TODO: But maybe add it to the return value of `borrow_light_update_context`?
+        let new_physics = self.physics.clone();
+
         let (light, uc, mut change_buffer) = self.borrow_light_update_context();
         light.maybe_reinitialize_for_physics_change(
             uc,
-            &physics,
+            &new_physics,
             uc.palette.all_block_opacities_as_category(),
         );
 

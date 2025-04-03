@@ -291,15 +291,15 @@ pub async fn install_demo_blocks(
 
                 // Arrow body
                 let base_body_color = rgb_const!(0.5, 0.5, 0.5);
-                space.fill(space.bounds(), |p| {
+                space.fill(space.bounds(), |cube| {
                     // TODO: We really need better procgen tools
-                    let p2 = p.lower_bounds() * 2 + one_diagonal - center_point_doubled;
+                    let p2 = cube.lower_bounds() * 2 + one_diagonal - center_point_doubled;
                     let r = p2
                         .component_mul(Vector3D::new(1, 1, 0))
                         .map(|c| f64::from(c) / 2.0)
                         .length();
-                    let body_radius = if p.z < 6 {
-                        f64::from(p.z) / 1.5 + 1.0
+                    let body_radius = if cube.z < 6 {
+                        f64::from(cube.z) / 1.5 + 1.0
                     } else {
                         2.0
                     };
@@ -425,7 +425,6 @@ pub async fn install_demo_blocks(
                 .build(),
 
             Clock => {
-                let resolution = R16;
                 let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [16, 16, 1]))
                     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                     .build();
@@ -438,7 +437,8 @@ pub async fn install_demo_blocks(
                     .animation_hint(AnimationHint::redefinition(
                         block::AnimationChange::ColorSameCategory,
                     ))
-                    .voxels_handle(resolution, txn.insert_anonymous(space))
+                    // Clock behavior assumes R16
+                    .voxels_handle(R16, txn.insert_anonymous(space))
                     .build()
             }
 

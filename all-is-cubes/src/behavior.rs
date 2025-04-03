@@ -1178,60 +1178,64 @@ mod tests {
         let key = *set.members.keys().next().unwrap();
 
         // Try mismatched behavior
-        let transaction = BehaviorSetTransaction::<Space>::replace(
-            key,
-            Replace {
-                old: BehaviorSetEntry {
-                    attachment,
-                    behavior: Arc::new(NoopBehavior(2)), // not equal to actual behavior
-                    waker: None,
-                },
-                new: Some(BehaviorSetEntry {
-                    attachment,
-                    behavior: Arc::new(NoopBehavior(3)),
-                    waker: None,
-                }),
-            },
-        );
-        assert_eq!(
-            transaction.check(&set).unwrap_err(),
-            BehaviorTransactionMismatch {
+        {
+            let transaction = BehaviorSetTransaction::<Space>::replace(
                 key,
-                key_not_found: false,
-                wrong_attachment: false,
-                wrong_value: true,
-            }
-        );
+                Replace {
+                    old: BehaviorSetEntry {
+                        attachment,
+                        behavior: Arc::new(NoopBehavior(2)), // not equal to actual behavior
+                        waker: None,
+                    },
+                    new: Some(BehaviorSetEntry {
+                        attachment,
+                        behavior: Arc::new(NoopBehavior(3)),
+                        waker: None,
+                    }),
+                },
+            );
+            assert_eq!(
+                transaction.check(&set).unwrap_err(),
+                BehaviorTransactionMismatch {
+                    key,
+                    key_not_found: false,
+                    wrong_attachment: false,
+                    wrong_value: true,
+                }
+            );
+        }
 
         // Try mismatched attachment
-        let transaction = BehaviorSetTransaction::<Space>::replace(
-            key,
-            Replace {
-                old: BehaviorSetEntry {
-                    // not equal to attachment
-                    attachment: SpaceBehaviorAttachment::new(GridAab::from_lower_size(
-                        [100, 0, 0],
-                        [1, 1, 1],
-                    )),
-                    behavior: correct_old_behavior,
-                    waker: None,
-                },
-                new: Some(BehaviorSetEntry {
-                    attachment,
-                    behavior: Arc::new(NoopBehavior(4)),
-                    waker: None,
-                }),
-            },
-        );
-        assert_eq!(
-            transaction.check(&set).unwrap_err(),
-            BehaviorTransactionMismatch {
+        {
+            let transaction = BehaviorSetTransaction::<Space>::replace(
                 key,
-                key_not_found: false,
-                wrong_attachment: true,
-                wrong_value: false,
-            }
-        );
+                Replace {
+                    old: BehaviorSetEntry {
+                        // not equal to attachment
+                        attachment: SpaceBehaviorAttachment::new(GridAab::from_lower_size(
+                            [100, 0, 0],
+                            [1, 1, 1],
+                        )),
+                        behavior: correct_old_behavior,
+                        waker: None,
+                    },
+                    new: Some(BehaviorSetEntry {
+                        attachment,
+                        behavior: Arc::new(NoopBehavior(4)),
+                        waker: None,
+                    }),
+                },
+            );
+            assert_eq!(
+                transaction.check(&set).unwrap_err(),
+                BehaviorTransactionMismatch {
+                    key,
+                    key_not_found: false,
+                    wrong_attachment: true,
+                    wrong_value: false,
+                }
+            );
+        }
     }
 
     #[test]

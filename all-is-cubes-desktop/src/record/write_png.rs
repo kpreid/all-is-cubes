@@ -36,6 +36,7 @@ pub(crate) fn threaded_write_frames(
             }
         }
     }
+    #[expect(clippy::shadow_unrelated)]
     let file = buf_writer.into_inner()?;
     file.sync_all()?;
     Ok(())

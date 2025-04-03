@@ -686,40 +686,44 @@ fn block_tick_action_conflict() {
     space.set(left, &modifies_px_neighbor).unwrap();
     space.set(right, &modifies_nx_neighbor).unwrap();
 
-    let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineNt::Whenever);
-    assert_eq!(step_txn, UniverseTransaction::default());
+    {
+        let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineNt::Whenever);
+        assert_eq!(step_txn, UniverseTransaction::default());
 
-    assert_eq!(
-        [&space[left], &space[middle], &space[right]],
-        [&modifies_px_neighbor, &AIR, &modifies_nx_neighbor],
-        "expecting no change"
-    );
-    assert_eq!(
-        fluff_sink.drain(),
-        vec![
-            SpaceFluff {
-                position: left,
-                fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(middle.grid_aab())),
-            },
-            SpaceFluff {
-                position: right,
-                fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(middle.grid_aab())),
-            }
-        ]
-    );
+        assert_eq!(
+            [&space[left], &space[middle], &space[right]],
+            [&modifies_px_neighbor, &AIR, &modifies_nx_neighbor],
+            "expecting no change"
+        );
+        assert_eq!(
+            fluff_sink.drain(),
+            vec![
+                SpaceFluff {
+                    position: left,
+                    fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(middle.grid_aab())),
+                },
+                SpaceFluff {
+                    position: right,
+                    fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(middle.grid_aab())),
+                }
+            ]
+        );
+    }
 
     // Now if we delete one of the conflicting blocks, the tick action of the remaining one
     // should take effect.
     space.set(right, &AIR).unwrap();
 
-    let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineNt::Whenever);
-    assert_eq!(step_txn, UniverseTransaction::default());
-    assert_eq!(fluff_sink.drain(), vec![]);
-    assert_eq!(
-        [&space[left], &space[middle], &space[right]],
-        [&modifies_px_neighbor, &output1, &AIR],
-        "expecting change"
-    );
+    {
+        let (_info, step_txn) = space.step(None, clock.advance(false), time::DeadlineNt::Whenever);
+        assert_eq!(step_txn, UniverseTransaction::default());
+        assert_eq!(fluff_sink.drain(), vec![]);
+        assert_eq!(
+            [&space[left], &space[middle], &space[right]],
+            [&modifies_px_neighbor, &output1, &AIR],
+            "expecting change"
+        );
+    }
 }
 
 /// Test that a block tick action spontaneously repeats even if it doesn't replace the block

@@ -348,8 +348,8 @@ impl LightStorage {
             // since the rays are not perfectly reciprocal.
             if difference_priority > 1 {
                 let priority = Priority::from_difference(difference_priority);
-                for cube in dependencies {
-                    self.light_needs_update(cube, priority);
+                for dep_cube in dependencies {
+                    self.light_needs_update(dep_cube, priority);
                 }
             }
         }

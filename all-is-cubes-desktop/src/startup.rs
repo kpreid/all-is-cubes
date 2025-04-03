@@ -117,6 +117,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             let recording_cameras =
                 ctx.create_cameras(all_is_cubes::listen::constant(record_options.viewport()));
 
+            #[expect(clippy::shadow_unrelated)]
             let recorder = ctx.with_universe(|universe| {
                 record::configure_universe_for_recording(
                     universe.get_default_character().as_ref(),

@@ -268,6 +268,10 @@ impl Transaction for SpaceTransaction {
                 to_activate.push(cube);
             }
 
+            #[expect(
+                clippy::shadow_unrelated,
+                reason = "https://github.com/rust-lang/rust-clippy/issues/11827"
+            )]
             for fluff in fluff.iter().cloned() {
                 space.fluff_notifier.notify(&super::SpaceFluff {
                     position: cube,

@@ -372,7 +372,7 @@ where
         // Loop over all the cubes that our AAB is currently intersecting.
         for cube in potential_intersection_bounds
             .iter()
-            .flat_map(|aab| aab.interior_iter())
+            .flat_map(|ib| ib.interior_iter())
         {
             let cell = space.get_cell(cube);
             match Sp::collision(cell) {

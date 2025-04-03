@@ -250,16 +250,20 @@ fn click_wrong_space_or_correct_space() {
     let character = universe.insert_anonymous(Character::spawn_default(sp2.clone()));
 
     // Click in wrong space
-    let cursor = cursor_raycast(Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]), &sp1, 10.);
-    assert!(cursor.is_some());
-    let error = Character::click(character.clone(), cursor.as_ref(), 0).unwrap_err();
-    assert!(matches!(error, ToolError::Internal(_)));
+    {
+        let cursor = cursor_raycast(Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]), &sp1, 10.);
+        assert!(cursor.is_some());
+        let error = Character::click(character.clone(), cursor.as_ref(), 0).unwrap_err();
+        assert!(matches!(error, ToolError::Internal(_)));
+    }
 
     // Click in right space
-    let cursor = cursor_raycast(Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]), &sp2, 10.);
-    assert!(cursor.is_some());
-    let error = Character::click(character, cursor.as_ref(), 0).unwrap_err();
-    assert!(matches!(error, ToolError::NoTool));
+    {
+        let cursor = cursor_raycast(Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]), &sp2, 10.);
+        assert!(cursor.is_some());
+        let error = Character::click(character, cursor.as_ref(), 0).unwrap_err();
+        assert!(matches!(error, ToolError::NoTool));
+    }
 }
 
 #[test]

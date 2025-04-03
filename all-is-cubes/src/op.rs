@@ -262,11 +262,12 @@ impl Operation {
                 let target_cube = transform.transform_cube(Cube::ORIGIN);
                 let old_block = &space[target_cube];
 
-                let Some((inventory_index, inventory)) = old_block.find_inventory() else {
+                let Some((source_inventory_index, source_inventory)) = old_block.find_inventory()
+                else {
                     // If the inventory is absent, there are no slots to move.
                     return Ok(Default::default());
                 };
-                let Some(last_slot) = inventory.slots().last() else {
+                let Some(last_slot) = source_inventory.slots().last() else {
                     // If the inventory is zero-sized, there are no slots to move.
                     return Ok(Default::default());
                 };
@@ -331,15 +332,15 @@ impl Operation {
 
                 // TODO: Add an option to compact items rather than just "stopping the conveyor belt".
 
-                let mut new_inventory_contents: Vec<inv::Slot> = inventory.slots().to_vec();
+                let mut new_inventory_contents: Vec<inv::Slot> = source_inventory.slots().to_vec();
                 new_inventory_contents.rotate_right(1);
                 new_inventory_contents[0] = inv::Slot::Empty; // erase the item we
 
                 // If the inventory actually changed, put the change in the transaction
-                if &new_inventory_contents[..] != inventory.slots() {
+                if &new_inventory_contents[..] != source_inventory.slots() {
                     // TODO: In order to avoid merge conflicts with neighbors, we need to be able to stuff an actual InventoryTransaction into a CubeTransaction so that multiple insertions and moves can happen at once.
                     let mut new_block = old_block.clone();
-                    new_block.modifiers_mut()[inventory_index] =
+                    new_block.modifiers_mut()[source_inventory_index] =
                         block::Modifier::Inventory(Inventory::from_slots(new_inventory_contents));
                     *space_txn.at(target_cube) =
                         CubeTransaction::replacing(Some(old_block.clone()), Some(new_block));

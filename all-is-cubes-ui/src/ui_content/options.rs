@@ -213,19 +213,22 @@ fn graphics_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'stati
             children: [label]
                 .into_iter()
                 .chain(list.into_iter().map(|value| {
-                    let value2 = value.clone();
                     let button = widgets::ToggleButton::new(
                         hud_inputs.graphics_options.clone(),
-                        move |options| *getter(options) == value,
-                        arcstr::format!("{:?}", value2), // TODO: quick kludge; need real labels
+                        {
+                            let value_to_compare = value.clone();
+                            move |options| *getter(options) == value_to_compare
+                        },
+                        arcstr::format!("{:?}", value), // TODO: quick kludge; need real labels
                         &hud_inputs.hud_blocks.widget_theme,
                         {
                             let cc = hud_inputs.app_control_channel.clone();
                             move || {
-                                let value = value2.clone();
+                                let value_to_send = value.clone();
                                 let _ignore_errors = cc.send(ControlMessage::ModifySettings(
                                     Box::new(move |settings| {
-                                        settings.mutate_graphics_options(|go| setter(go, value))
+                                        settings
+                                            .mutate_graphics_options(|go| setter(go, value_to_send))
                                     }),
                                 ));
                             }

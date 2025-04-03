@@ -170,9 +170,9 @@ impl LightTexture {
         // we need the data.
         // We also have to add 1 chunk size to allow for separate chunks on opposite faces of
         // the bounds.
-        let chunked_size =
-            visually_needed_size.zip(LIGHT_CHUNK_SIZE.cast_unit(), |space_size, chunk_size| {
-                (space_size.saturating_add(chunk_size)).div_ceil(chunk_size) * chunk_size
+        let chunked_size = visually_needed_size
+            .zip(LIGHT_CHUNK_SIZE.cast_unit(), |space, chunk| {
+                (space.saturating_add(chunk)).div_ceil(chunk) * chunk
             });
 
         // Limit to wgpu limits, rounded down to chunk.

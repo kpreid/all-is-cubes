@@ -121,6 +121,7 @@ pub fn create_terminal_session(
     std::thread::Builder::new()
         .name("raytracer".to_string())
         .spawn({
+            #[expect(clippy::shadow_unrelated)]
             move || {
                 while let Ok(FrameInput { options, scene }) = render_thread_in.recv() {
                     // TODO: it isn't actually correct to use the world camera always,

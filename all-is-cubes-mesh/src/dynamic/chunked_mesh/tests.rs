@@ -326,34 +326,38 @@ fn did_not_finish_detection() {
     let mut tester: CsmTester<NO_INSTANCES> =
         CsmTester::new(Space::empty_positive(1000, 1, 1), LARGE_VIEW_DISTANCE);
 
-    eprintln!("--- timing out update");
-    let info = tester
-        .csm
-        .update(&tester.camera, time::DeadlineNt::Asap, |_| {});
+    {
+        eprintln!("--- timing out update");
+        let info = tester
+            .csm
+            .update(&tester.camera, time::DeadlineNt::Asap, |_| {});
 
-    // This is the state that should(n't) be affected.
-    // (If we stop having `complete_time` then it's okay to just delete that part of
-    // the assertion.)
-    assert_eq!(
-        (
-            info.flaws,
-            tester.csm.did_not_finish_chunks,
-            tester.csm.complete_time
-        ),
-        (Flaws::UNFINISHED, true, None)
-    );
+        // This is the state that should(n't) be affected.
+        // (If we stop having `complete_time` then it's okay to just delete that part of
+        // the assertion.)
+        assert_eq!(
+            (
+                info.flaws,
+                tester.csm.did_not_finish_chunks,
+                tester.csm.complete_time
+            ),
+            (Flaws::UNFINISHED, true, None)
+        );
+    }
 
-    eprintln!("--- normal update");
-    // Now while we're at it, try finishing things and check that state too.
-    let info = tester.update(|_| {});
-    assert_eq!(
-        (
-            info.flaws,
-            tester.csm.did_not_finish_chunks,
-            tester.csm.complete_time.is_some(),
-        ),
-        (Flaws::empty(), false, true)
-    );
+    {
+        eprintln!("--- normal update");
+        // Now while we're at it, try finishing things and check that state too.
+        let info = tester.update(|_| {});
+        assert_eq!(
+            (
+                info.flaws,
+                tester.csm.did_not_finish_chunks,
+                tester.csm.complete_time.is_some(),
+            ),
+            (Flaws::empty(), false, true)
+        );
+    }
 }
 
 /// Instances are grouped by block index, even if they are in different chunks.

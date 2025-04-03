@@ -212,9 +212,9 @@ impl<I: time::Instant> SpaceRenderer<I> {
         } = self;
 
         *todo = {
-            let todo = listen::StoreLock::new(SpaceRendererTodo::EVERYTHING);
-            space_borrowed.listen(todo.listener());
-            todo
+            let new_todo = listen::StoreLock::new(SpaceRendererTodo::EVERYTHING);
+            space_borrowed.listen(new_todo.listener());
+            new_todo
         };
 
         #[allow(unused_mut)]
@@ -355,6 +355,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 camera,
                 deadline, // TODO: decrease deadline by some guess at texture writing time
                 |u| {
+                    #[expect(clippy::shadow_unrelated)]
                     let bwp = &mut *bwp_mutex.lock().unwrap();
                     if u.indices_only {
                         if let Some(index_buf) =

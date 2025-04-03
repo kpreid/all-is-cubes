@@ -1238,10 +1238,8 @@ mod universe {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             match HandleSer::deserialize(deserializer)? {
                 HandleSer::HandleV1 { name } => {
-                    HANDLE_DESERIALIZATION_CONTEXT.with(|context| -> Result<Self, D::Error> {
-                        let mut context_refcell_guard = context.borrow_mut();
-
-                        match context_refcell_guard.as_mut() {
+                    HANDLE_DESERIALIZATION_CONTEXT.with(|context_cell| -> Result<Self, D::Error> {
+                        match Option::as_mut(&mut context_cell.borrow_mut()) {
                             Some(context) => context
                                 .universe
                                 .get_or_insert_deserializing(name)

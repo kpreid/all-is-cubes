@@ -440,8 +440,10 @@ mod tests {
         assert_eq!(world_source.get().as_ref(), None);
 
         // No redundant notification when world is absent
-        let changed = cameras.update();
-        assert_eq!((changed, world_flag.get_and_clear()), (false, false));
+        {
+            let changed = cameras.update();
+            assert_eq!((changed, world_flag.get_and_clear()), (false, false));
+        }
 
         // Create a universe with space and character
         let mut universe = Universe::new();
@@ -455,14 +457,18 @@ mod tests {
         character_cell.set(Some(character));
 
         // Now the world_source should be reporting the new space
-        assert!(!world_flag.get_and_clear());
-        let changed = cameras.update();
-        assert_eq!((changed, world_flag.get_and_clear()), (true, true));
-        assert_eq!(world_source.get().as_ref(), Some(&space_handle));
+        {
+            assert!(!world_flag.get_and_clear());
+            let changed = cameras.update();
+            assert_eq!((changed, world_flag.get_and_clear()), (true, true));
+            assert_eq!(world_source.get().as_ref(), Some(&space_handle));
+        }
 
         // No redundant notification when world is present
-        let changed = cameras.update();
-        assert_eq!((changed, world_flag.get_and_clear()), (false, false));
+        {
+            let changed = cameras.update();
+            assert_eq!((changed, world_flag.get_and_clear()), (false, false));
+        }
 
         // TODO: test further changes
     }

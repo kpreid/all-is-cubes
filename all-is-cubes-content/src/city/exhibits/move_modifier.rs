@@ -16,21 +16,26 @@ fn MOVED_BLOCKS(_: Context<'_>) {
             let i = x + z * 8;
             let distance = (i * 16).try_into().unwrap();
             let block = &blocks[i as usize];
-            let [move_out, move_in] = Move::new(Face6::PY, distance, 0).into_paired();
-            // TODO: Move should be able to spawn a "tail" on its own when animated?
-            space.set(
-                [x * 2, 0, (1 - z) * 2],
-                block.clone().with_modifier(move_out),
-            )?;
-            space.set(
-                [x * 2, 1, (1 - z) * 2],
-                block.clone().with_modifier(move_in),
-            )?;
+
+            // Vertical
+            {
+                let [move_out, move_in] = Move::new(Face6::PY, distance, 0).into_paired();
+                space.set(
+                    [x * 2, 0, (1 - z) * 2],
+                    block.clone().with_modifier(move_out),
+                )?;
+                space.set(
+                    [x * 2, 1, (1 - z) * 2],
+                    block.clone().with_modifier(move_in),
+                )?;
+            }
 
             // Horizontal
-            let [move_out, move_in] = Move::new(Face6::PZ, distance, 0).into_paired();
-            space.set([i, 0, -2], block.clone().with_modifier(move_out))?;
-            space.set([i, 0, -1], block.clone().with_modifier(move_in))?;
+            {
+                let [move_out, move_in] = Move::new(Face6::PZ, distance, 0).into_paired();
+                space.set([i, 0, -2], block.clone().with_modifier(move_out))?;
+                space.set([i, 0, -1], block.clone().with_modifier(move_in))?;
+            }
         }
     }
     Ok((space, txn))

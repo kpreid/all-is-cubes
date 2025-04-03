@@ -313,6 +313,7 @@ impl InEvalError {
             used,
             kind: match self {
                 InEvalError::BudgetExceeded => ErrorKind::BudgetExceeded,
+                #[expect(clippy::shadow_unrelated)]
                 InEvalError::PriorBudgetExceeded { budget, used } => {
                     ErrorKind::PriorBudgetExceeded { budget, used }
                 }

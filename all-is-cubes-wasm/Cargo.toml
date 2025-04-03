@@ -146,9 +146,6 @@ too_many_lines = "allow"
 unreadable_literal = "allow"
 wildcard_imports = "allow" # we use this sparingly
 
-# clippy::restriction lints that are set to allow (to note why we aren't using them)
-shadow_unrelated = "allow" # would use except for <https://github.com/rust-lang/rust-clippy/issues/10780>
-
 # clippy lints that are set to deny
 should_panic_without_expect = "deny"
 
@@ -176,6 +173,7 @@ needless_pass_by_value = "warn"
 option_as_ref_cloned = "warn"
 pub_without_shorthand = "warn"
 return_self_not_must_use = "warn"
+shadow_unrelated = "warn"
 suboptimal_flops = "warn"
 trivially_copy_pass_by_ref = "warn"
 undocumented_unsafe_blocks = "warn"

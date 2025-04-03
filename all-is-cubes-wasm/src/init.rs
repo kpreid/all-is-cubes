@@ -162,9 +162,9 @@ async fn start_game_with_dom(
             universe_progress,
             all_is_cubes_content::TemplateParameters {
                 seed: Some(seed.unwrap_or_else(|| {
-                    let seed: u64 = crate::web_glue::pseudorandom_u64();
-                    log::info!("Randomly chosen universe seed: {seed}");
-                    seed
+                    let rand_seed: u64 = crate::web_glue::pseudorandom_u64();
+                    log::info!("Randomly chosen universe seed: {rand_seed}");
+                    rand_seed
                 })),
                 size: None,
             },

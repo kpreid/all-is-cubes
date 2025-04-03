@@ -147,6 +147,7 @@ impl Move {
                 let modifiers = new_block.modifiers_mut();
 
                 // Update the distance for the next step.
+                #[expect(clippy::shadow_unrelated)]
                 if let Modifier::Move(Move {
                     distance, velocity, ..
                 }) = &mut modifiers[this_modifier_index]

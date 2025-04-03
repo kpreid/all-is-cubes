@@ -122,6 +122,7 @@ async fn export_to_dot_vox_data(
     let mut palette: Vec<dot_vox::Color> = Vec::new();
     let mut models: Vec<dot_vox::Model> = Vec::with_capacity(to_export.len());
 
+    #[expect(clippy::shadow_unrelated)]
     for (mut p, space_handle) in p.split_evenly(to_export.len()).zip(to_export) {
         p.set_label(format!("Exporting space {}", space_handle.name()));
         models.push(space_to_dot_vox_model(&space_handle, &mut palette)?);

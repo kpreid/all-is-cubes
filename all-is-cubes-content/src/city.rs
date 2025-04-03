@@ -39,7 +39,7 @@ use exhibits::DEMO_CITY_EXHIBITS;
 
 pub(crate) async fn demo_city<I: Instant>(
     universe: &mut Universe,
-    mut p: YieldProgress,
+    mut progress: YieldProgress,
     params: TemplateParameters,
 ) -> Result<Space, InGenError> {
     let start_city_time = I::now();
@@ -50,16 +50,16 @@ pub(crate) async fn demo_city<I: Instant>(
     // We do this once so that if multiple exhibits end up wanting them there are no conflicts.
     // TODO: We want a "module loading" system that allows expressing dependencies.
     let mut install_txn = UniverseTransaction::default();
-    let widget_theme_progress = p.start_and_cut(0.05, "WidgetTheme").await;
+    let widget_theme_progress = progress.start_and_cut(0.05, "WidgetTheme").await;
     let widget_theme = widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress)
         .await
         .unwrap();
-    let ui_blocks_progress = p.start_and_cut(0.05, "UiBlocks").await;
+    let ui_blocks_progress = progress.start_and_cut(0.05, "UiBlocks").await;
     vui::blocks::UiBlocks::new(&mut install_txn, ui_blocks_progress)
         .await
         .install(&mut install_txn)
         .unwrap();
-    let icons_blocks_progress = p.start_and_cut(0.05, "Icons").await;
+    let icons_blocks_progress = progress.start_and_cut(0.05, "Icons").await;
     all_is_cubes::inv::Icons::new(&mut install_txn, icons_blocks_progress)
         .await
         .install(&mut install_txn)
@@ -75,19 +75,19 @@ pub(crate) async fn demo_city<I: Instant>(
             .y_range(state.space.bounds().lower_bounds().y, 0),
         &state.landscape_blocks[Stone],
     )?;
-    p.progress(0.1).await;
+    progress.progress(0.1).await;
     state
         .space
         .fill_uniform(state.planner.y_range(0, 1), &state.landscape_blocks[Grass])?;
-    p.progress(0.2).await;
+    progress.progress(0.2).await;
 
     // Stray grass
     state.plant_grass()?;
-    p.progress(0.3).await;
+    progress.progress(0.3).await;
 
     // Roads and lamps
     place_roads_and_tunnels(&mut state.space, &state.demo_blocks)?;
-    p.progress(0.4).await;
+    progress.progress(0.4).await;
 
     let blank_city_time = I::now();
     log::trace!(
@@ -98,7 +98,7 @@ pub(crate) async fn demo_city<I: Instant>(
     );
 
     // Landscape filling one quadrant
-    let landscape_progress = p.start_and_cut(0.4, "Landscape").await;
+    let landscape_progress = progress.start_and_cut(0.4, "Landscape").await;
     landscape_progress.progress(0.0).await;
     state
         .space
@@ -135,7 +135,7 @@ pub(crate) async fn demo_city<I: Instant>(
             .saturating_duration_since(blank_city_time)
             .as_secs_f32()
     );
-    let [exhibits_progress, mut final_progress] = p.split(0.8);
+    let [exhibits_progress, mut final_progress] = progress.split(0.8);
 
     state.place_logo()?;
 

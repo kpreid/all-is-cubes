@@ -76,7 +76,7 @@ fn main() -> Result<(), anyhow::Error> {
             if graphics_type == GraphicsType::Record
                 && optropt
                     .as_ref()
-                    .is_some_and(|options| options.output_format.includes_light())
+                    .is_some_and(|ropt| ropt.output_format.includes_light())
             {
                 precompute_light = true;
             }
@@ -153,6 +153,7 @@ fn main() -> Result<(), anyhow::Error> {
     // Note that while its return type is nominally Result<()>, it does not necessarily
     // ever return “successfully”, so no code should follow it.
     match graphics_type {
+        #[expect(clippy::shadow_unrelated)]
         GraphicsType::Window | GraphicsType::WindowRt => {
             winit_main_loop_and_init(
                 Box::new(move |inner_params, elwt| {

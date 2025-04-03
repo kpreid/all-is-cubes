@@ -59,6 +59,10 @@ pub async fn lighting_bench_space(
         let i = layout.section_iter();
         progress.split_evenly(i.len()).zip(i)
     };
+    #[expect(
+        clippy::shadow_unrelated,
+        reason = "https://github.com/rust-lang/rust-clippy/issues/11827"
+    )]
     for (progress, (sx, sz)) in section_iter {
         {
             // This block ensures its variables are dropped before the await.

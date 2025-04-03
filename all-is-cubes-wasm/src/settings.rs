@@ -19,7 +19,7 @@ const GRAPHICS_OPTIONS_KEY: &str = "all-is-cubes.settings.graphics-options";
 fn load_settings_from_local_storage() -> Option<Settings> {
     let storage: web_sys::Storage = window()?.local_storage().ok()??;
 
-    let data: GraphicsOptions = match storage.get_item(GRAPHICS_OPTIONS_KEY).ok()? {
+    let initial_data: GraphicsOptions = match storage.get_item(GRAPHICS_OPTIONS_KEY).ok()? {
         Some(data_string) => match serde_json::from_str(&data_string) {
             Ok(value) => {
                 log::trace!("Loaded settings from {GRAPHICS_OPTIONS_KEY}");
@@ -41,7 +41,7 @@ fn load_settings_from_local_storage() -> Option<Settings> {
     let storage = SendWrapper::new(storage);
 
     Some(Settings::with_persistence(
-        Arc::new(data),
+        Arc::new(initial_data),
         Arc::new(
             move |data: &Arc<GraphicsOptions>| match serde_json::to_string(data) {
                 Ok(data_string) => match storage.set_item(GRAPHICS_OPTIONS_KEY, &data_string) {
