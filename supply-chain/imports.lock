@@ -463,8 +463,8 @@ user-login = "hsivonen"
 user-name = "Henri Sivonen"
 
 [[publisher.wgpu]]
-version = "24.0.1"
-when = "2025-01-23"
+version = "24.0.3"
+when = "2025-03-19"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
@@ -477,8 +477,8 @@ user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.wgpu-hal]]
-version = "24.0.2"
-when = "2025-02-27"
+version = "24.0.4"
+when = "2025-04-04"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
