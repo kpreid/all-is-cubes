@@ -296,12 +296,15 @@ pub(in crate::dynamic) struct CompletedMeshJob<M: DynamicMeshTypes> {
     pub(in crate::dynamic) compute_time: Duration,
 }
 
+/// Subsystem for tracking how many jobs currently exist
+/// (which is not the same thing as how many jobs are in the queue).
 mod state {
     use super::*;
     use std::collections::HashSet;
     use std::sync::{Condvar, Mutex};
 
-    /// Shared structure recording how many jobs are in a given state.
+    /// Shared mutable state recording how many jobs are in a given state,
+    /// and owned by an [`Arc<Counters>`][Counters].
     /// Fields correspond to variants of [`JobState`].
     #[derive(Debug)]
     struct InnerCounters {
@@ -322,6 +325,9 @@ mod state {
         }
     }
 
+    /// Access to counts of how many jobs are in a given state,
+    /// shared between the job queue and all of the jobs' [`Ticket`]s
+    /// as an `Arc<Counters>`.
     #[derive(Debug)]
     pub(super) struct Counters {
         counters: Mutex<InnerCounters>,
@@ -380,7 +386,7 @@ mod state {
         Completed,
     }
 
-    /// A handle on one count in [`JobStateCounters`], which makes sure to decrement
+    /// A handle on one count in [`Counters`], which makes sure to decrement
     /// on change or drop.
     pub(super) struct Ticket {
         /// TODO: When we have background chunk meshing too, this will need to become a more general
