@@ -80,7 +80,7 @@ where
         F: Fn(super::RenderDataUpdate<'_, M>),
     {
         // TODO: optimally we would check whether any jobs are complete here
-        if todo.is_empty() && self.jobs.count_jobs() == 0 {
+        if todo.is_empty() && self.jobs.count_block_jobs() == 0 {
             // Don't increment the version counter, or do any of the scans, if we don't need to.
             return VbmUpdateInfo {
                 total_time: Duration::ZERO,
@@ -184,7 +184,7 @@ where
         let mut completed_job_stats = TimeStats::default();
         let mut callback_stats = TimeStats::default();
         let process_completed_jobs = || {
-            for block_index in self.jobs.take_completed() {
+            for block_index in self.jobs.take_completed_blocks() {
                 let uindex = usize::from(block_index);
                 let current_mesh_entry = &mut self.meshes[uindex];
                 match current_mesh_entry.try_recv_update() {
@@ -242,7 +242,7 @@ where
 
         // Run the job queue for a while to ensure that updates are happening
         // (whether or not background tasks are also doing this).
-        let (running, waiting) = self.jobs.run_until(deadline, process_completed_jobs);
+        let (running, waiting) = self.jobs.run_until(deadline, true, process_completed_jobs);
         let queued = self.jobs.count_queued();
 
         // All job processing is now done; finalize and report info.
@@ -266,7 +266,7 @@ where
             running,
             waiting,
             queued,
-            unfinished: self.jobs.count_jobs(),
+            unfinished: self.jobs.count_block_jobs(),
         }
     }
 
@@ -384,7 +384,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
         mesh_options: MeshOptions,
         jobs: &job::QueueOwner<M>,
     ) {
-        let response_receiver = jobs.send(block_index, block, mesh_options);
+        let response_receiver = jobs.send_block_job(block_index, block, mesh_options);
 
         let old_job = self.pending_latest.replace(response_receiver);
 

@@ -7,6 +7,9 @@ use futures_channel::oneshot;
 use futures_util::FutureExt as _;
 
 use all_is_cubes::block::EvaluatedBlock;
+use all_is_cubes::chunking::ChunkPos;
+use all_is_cubes::euclid::Point3D;
+use all_is_cubes::math::GridCoordinate;
 use all_is_cubes::space::BlockIndex;
 use all_is_cubes::time::{self, Instant};
 use all_is_cubes::util::{ConciseDebug, Refmt as _};
@@ -15,6 +18,10 @@ use all_is_cubes::util::{ConciseDebug, Refmt as _};
 use crate::dynamic::ChunkedSpaceMesh;
 use crate::dynamic::DynamicMeshTypes;
 use crate::{BlockMesh, MeshOptions};
+
+// -------------------------------------------------------------------------------------------------
+
+type ErasedChunkPos = Point3D<i32, ()>;
 
 /// Access to a job queue which may be used to speed up mesh generation by driving it from
 /// background tasks.
@@ -79,33 +86,49 @@ impl<M: DynamicMeshTypes> MeshJobQueue<M> {
         }
     }
 
+    /// The actual job computation.
     fn run_job(&self, job: MeshJob<M>) {
+        let MeshJob {
+            kind,
+            mesh_options,
+            mut counter_ticket,
+            response,
+        } = job;
+
         // Check that the job is not stale before kicking off the computation.
-        if job.response.is_canceled() {
+        if response.is_canceled() {
             return;
         }
 
         let t0 = M::Instant::now();
-        let mesh = BlockMesh::new(&job.block, &self.texture_allocator, &job.mesh_options);
-        let compute_time = M::Instant::now().saturating_duration_since(t0);
+        match kind {
+            JobInputData::Block { block } => {
+                let mesh = BlockMesh::new(&block, &self.texture_allocator, &mesh_options);
+                let compute_time = M::Instant::now().saturating_duration_since(t0);
 
-        let mut counter_ticket = job.counter_ticket;
-        counter_ticket.set_state(state::State::Completed);
+                counter_ticket.set_state(state::State::Completed);
 
-        _ = job.response.send(CompletedJobShell {
-            output: CompletedMeshJob { mesh, compute_time },
-            counter_ticket,
-        });
+                _ = response.send(CompletedJobShell {
+                    output: CompletedMeshJob { mesh, compute_time },
+                    counter_ticket,
+                });
 
-        if compute_time > Duration::from_millis(4) {
-            log::trace!(
-                "Block mesh took {}: {:?}",
-                compute_time.refmt(&ConciseDebug),
-                job.block.attributes().display_name,
-            );
+                if compute_time > Duration::from_millis(4) {
+                    log::trace!(
+                        "Block mesh took {}: {:?}",
+                        compute_time.refmt(&ConciseDebug),
+                        block.attributes().display_name,
+                    );
+                }
+            }
+            JobInputData::Chunk {} => {
+                todo!("TODO: actually use job queue for chunk meshes")
+            }
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Job-sending end of the mesh job queue (channel).
 #[derive(Debug)]
@@ -116,12 +139,19 @@ pub(in crate::dynamic) struct QueueOwner<M: DynamicMeshTypes> {
     /// Job executors may take jobs from this handle, which is clonable and `Send` if `M` permits.
     job_queue_handle: MeshJobQueue<M>,
 
-    /// Counts how many jobs are in particular states.
+    /// Counts how many block mesh jobs are in particular states.
     ///
     /// In addition, the `strong_count` of this `Arc`, minus one, is the number of active, or
     /// completed but not yet consumed, jobs. This should be equal to the sum of the individual
     /// counters.
-    counters: Arc<state::Counters>,
+    block_job_counters: Arc<state::Counters>,
+
+    /// Counts how many chunk mesh jobs are in particular states.
+    ///
+    /// In addition, the `strong_count` of this `Arc`, minus one, is the number of active, or
+    /// completed but not yet consumed, jobs. This should be equal to the sum of the individual
+    /// counters.
+    chunk_job_counters: Arc<state::Counters>,
 }
 
 impl<M: DynamicMeshTypes> QueueOwner<M> {
@@ -133,7 +163,8 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
                 queue: job_queue_receiver,
                 texture_allocator,
             },
-            counters: Arc::new(state::Counters::new()),
+            block_job_counters: Arc::new(state::Counters::new()),
+            chunk_job_counters: Arc::new(state::Counters::new()),
         }
     }
 
@@ -141,9 +172,17 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
         &self.job_queue_handle
     }
 
-    /// Returns the number of jobs that have been enqueued, but their results not yet consumed.
-    pub(crate) fn count_jobs(&self) -> usize {
-        Arc::strong_count(&self.counters) - 1
+    /// Returns the number of block mesh jobs that have been enqueued,
+    /// but their results not yet consumed.
+    pub(crate) fn count_block_jobs(&self) -> usize {
+        Arc::strong_count(&self.block_job_counters) - 1
+    }
+
+    /// Returns the number of chunk mesh jobs that have been enqueued,
+    /// but their results not yet consumed.
+    #[expect(dead_code, reason = "TODO: actually use job queue for chunk meshes")]
+    pub(crate) fn count_chunk_jobs(&self) -> usize {
+        Arc::strong_count(&self.chunk_job_counters) - 1
     }
 
     /// Returns the number of jobs in the queue (not yet taken out).
@@ -159,7 +198,7 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
         &self.job_queue_handle.texture_allocator
     }
 
-    pub(in crate::dynamic) fn send(
+    pub(in crate::dynamic) fn send_block_job(
         &self,
         block_index: BlockIndex,
         block: EvaluatedBlock,
@@ -168,12 +207,35 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
         let (response_sender, receiver) = oneshot::channel();
         self.job_queue_sender
             .send(MeshJob {
-                block,
+                kind: JobInputData::Block { block },
                 mesh_options,
                 response: response_sender,
                 counter_ticket: state::Ticket::new(
-                    self.counters.clone(),
-                    block_index,
+                    self.block_job_counters.clone(),
+                    JobId::Block(block_index),
+                    state::State::Queued,
+                ),
+            })
+            .expect("job queue should never be defunct or full");
+        Receiver { receiver }
+    }
+
+    #[expect(dead_code, reason = "TODO: actually use job queue for chunk meshes")]
+    pub(in crate::dynamic) fn send_chunk_job<const CHUNK_SIZE: GridCoordinate>(
+        &self,
+        chunk_pos: ChunkPos<CHUNK_SIZE>,
+        // TODO: actual args
+        mesh_options: MeshOptions,
+    ) -> Receiver<CompletedMeshJob<M>> {
+        let (response_sender, receiver) = oneshot::channel();
+        self.job_queue_sender
+            .send(MeshJob {
+                kind: JobInputData::Chunk {},
+                mesh_options,
+                response: response_sender,
+                counter_ticket: state::Ticket::new(
+                    self.chunk_job_counters.clone(),
+                    JobId::Chunk(Point3D::from(chunk_pos.0).cast_unit()), // TODO: tidy conversion
                     state::State::Queued,
                 ),
             })
@@ -182,8 +244,8 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
     }
 
     /// Returns all block indices which have had a job complete since the last time this was called.
-    pub(crate) fn take_completed(&self) -> Vec<BlockIndex> {
-        self.counters.take_completed()
+    pub(crate) fn take_completed_blocks(&self) -> Vec<BlockIndex> {
+        self.block_job_counters.take_completed()
     }
 
     /// Run jobs in the queue, wait for jobs to complete, or both,
@@ -191,6 +253,10 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
     ///
     /// `when_completed` is called after some jobs may have completed (so their results may be
     /// processed). It should tolerate being called spuriously.
+    ///
+    /// `blocks` should be true to wait for block jobs or false to wait for chunk jobs.
+    /// TODO: Make that nicer (if we don't get rid of this entirely in favor of more asynchronous
+    /// execution anyway).
     //---
     // TODO: In the presence of background threads, “no jobs in queue” is not the same
     // as “nothing to wait for”. Optimally, we'd sleep until either some jobs have
@@ -198,10 +264,12 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
     pub(crate) fn run_until(
         &self,
         deadline: time::Deadline<M::Instant>,
+        #[cfg_attr(target_family = "wasm", expect(unused))] blocks: bool,
         mut when_completed: impl FnMut(),
     ) -> (Duration, Duration) {
         let start_running_time = M::Instant::now();
         let mut current_time = start_running_time;
+
         while deadline > current_time {
             let Some(job) = self.job_queue_handle.try_next() else {
                 break;
@@ -214,11 +282,16 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
         // Wait for further jobs finishing.
         #[cfg(not(target_family = "wasm"))] // we are not allowed to block and it would be futile
         loop {
+            let counters = if blocks {
+                &self.block_job_counters
+            } else {
+                &self.chunk_job_counters
+            };
             let remaining = deadline.remaining_since(current_time);
             if remaining == Some(Duration::ZERO) {
                 break;
             }
-            if !self.counters.has_any_not_completed()
+            if !counters.has_any_not_completed()
                 || self.job_queue_handle.queue.receiver_count() == 1
             {
                 // No jobs queued or running, or no background tasks to process them,
@@ -232,7 +305,7 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
                 break;
             }
 
-            self.counters.wait_for_finish_or_timeout(remaining);
+            counters.wait_for_finish_or_timeout(remaining);
             when_completed();
 
             current_time = M::Instant::now();
@@ -246,6 +319,8 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
         )
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Receiver of a single job's output.
 pub(in crate::dynamic) struct Receiver<T> {
@@ -274,20 +349,34 @@ struct CompletedJobShell<T> {
 
     /// Own this to signal that a completed job exists to be retrieved.
     /// It is dropped when the completed job is retrieved.
-    #[expect(dead_code)]
+    #[expect(dead_code, reason = "kept for its destructor")]
     counter_ticket: state::Ticket,
 }
 
-/// Inputs for a block mesh calculation stored in the [`MeshJobQueue`].
-///
-/// (In the future we might also cover chunk meshes here with an enum.)
+// -------------------------------------------------------------------------------------------------
+
+/// Inputs for a calculation stored in the [`MeshJobQueue`].
 struct MeshJob<M: DynamicMeshTypes> {
-    block: EvaluatedBlock,
+    kind: JobInputData,
     mesh_options: MeshOptions,
 
     counter_ticket: state::Ticket,
 
     response: oneshot::Sender<CompletedJobShell<CompletedMeshJob<M>>>,
+}
+enum JobInputData {
+    Block {
+        block: EvaluatedBlock,
+    },
+    Chunk {
+        // TODO: chunk jobs are not yet used
+    },
+}
+
+/// Identifies where the result of the job goes.
+enum JobId {
+    Block(BlockIndex),
+    Chunk(ErasedChunkPos),
 }
 
 #[derive(Debug)]
@@ -295,6 +384,8 @@ pub(in crate::dynamic) struct CompletedMeshJob<M: DynamicMeshTypes> {
     pub(in crate::dynamic) mesh: BlockMesh<M>,
     pub(in crate::dynamic) compute_time: Duration,
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Subsystem for tracking how many jobs currently exist
 /// (which is not the same thing as how many jobs are in the queue).
@@ -312,7 +403,8 @@ mod state {
         taken: usize,
         completed: usize,
 
-        completed_ids: HashSet<BlockIndex>,
+        completed_blocks: HashSet<BlockIndex>,
+        completed_chunks: HashSet<ErasedChunkPos>,
     }
 
     impl InnerCounters {
@@ -342,7 +434,8 @@ mod state {
                     queued: 0,
                     taken: 0,
                     completed: 0,
-                    completed_ids: HashSet::new(),
+                    completed_blocks: HashSet::new(),
+                    completed_chunks: HashSet::new(),
                 }),
                 endings: Condvar::new(),
             }
@@ -373,7 +466,7 @@ mod state {
             self.counters
                 .lock()
                 .unwrap()
-                .completed_ids
+                .completed_blocks
                 .drain()
                 .collect()
         }
@@ -389,14 +482,12 @@ mod state {
     /// A handle on one count in [`Counters`], which makes sure to decrement
     /// on change or drop.
     pub(super) struct Ticket {
-        /// TODO: When we have background chunk meshing too, this will need to become a more general
-        /// "`JobId`" enum type, if we don't split the queues.
-        block_index: BlockIndex,
+        job_id: JobId,
         current_state: State,
         shared: Arc<Counters>,
     }
     impl Ticket {
-        pub fn new(shared: Arc<Counters>, block_index: BlockIndex, current_state: State) -> Self {
+        pub fn new(shared: Arc<Counters>, job_id: JobId, current_state: State) -> Self {
             // avoid complexity by not supporting this case
             assert!(current_state != State::Completed);
 
@@ -406,7 +497,7 @@ mod state {
             }
 
             Self {
-                block_index,
+                job_id,
                 current_state,
                 shared,
             }
@@ -427,7 +518,11 @@ mod state {
             self.current_state = new_state;
 
             if new_state == State::Completed {
-                counters.completed_ids.insert(self.block_index);
+                match self.job_id {
+                    JobId::Block(block_index) => counters.completed_blocks.insert(block_index),
+                    JobId::Chunk(position) => counters.completed_chunks.insert(position),
+                };
+
                 self.shared.endings.notify_all();
             }
         }
