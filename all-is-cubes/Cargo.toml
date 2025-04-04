@@ -113,7 +113,7 @@ log = { workspace = true }
 macro_rules_attribute = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
-nosy = { workspace = true }
+nosy = { workspace = true, features = ["async"] }
 num-traits = { workspace = true }
 once_cell = { workspace = true, features = ["alloc", "race"] }
 ordered-float = { workspace = true }

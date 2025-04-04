@@ -5,7 +5,6 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
 use core::pin::Pin;
-use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::{Context, Poll, Waker};
 use std::sync::RwLock;
 
@@ -1223,11 +1222,11 @@ impl MainTaskContext {
             .session_event_notifier
             .upgrade()
             .expect("can't happen: session_event_notifier dead");
-        let (listener, future) = wake_on_message();
+        let (mut wake_flag, listener) = listen::WakeFlag::new(false);
         notifier.listen(listener.filter(|event| match event {
             Event::Stepped => Some(()),
         }));
-        future.await
+        let _alive = wake_flag.wait().await;
     }
 
     #[track_caller]
@@ -1257,64 +1256,6 @@ impl MainTaskContext {
     }
 }
 
-/// Produces a `Listener` and a `Future` that suspends until the `Listener` receives one message.
-///
-/// TODO: This could use tests. It's more or less a basic use of `AtomicWaker`, but still.
-/// TODO: Move this into the main `all_is_cubes::listen` module?
-fn wake_on_message() -> (impl listen::Listener<()>, impl Future<Output = ()>) {
-    use futures_util::task::AtomicWaker;
-
-    #[derive(Debug)]
-    struct Inner {
-        notified: AtomicBool,
-        waker: AtomicWaker,
-    }
-    #[derive(Debug)]
-    struct Adapter(Weak<Inner>);
-    impl listen::Listener<()> for Adapter {
-        fn receive(&self, messages: &[()]) -> bool {
-            let Some(inner) = self.0.upgrade() else {
-                return false;
-            };
-            let inner: &Inner = &inner;
-            if messages.is_empty() {
-                // We're alive iff we have not yet received any messages.
-                !inner.notified.load(Ordering::Relaxed)
-            } else {
-                inner.notified.store(true, Ordering::Relaxed);
-                inner.waker.wake();
-
-                // Always remove ourselves immediately.
-                false
-            }
-        }
-    }
-
-    let inner = Arc::new(Inner {
-        notified: AtomicBool::new(false),
-        waker: AtomicWaker::new(),
-    });
-
-    let listener = Adapter(Arc::downgrade(&inner));
-
-    let future = core::future::poll_fn(move |ctx| {
-        if inner.notified.load(Ordering::Relaxed) {
-            return Poll::Ready(());
-        }
-
-        inner.waker.register(ctx.waker());
-
-        // Check again to avoid lost signal in case of simultaneously arriving notification.
-        if inner.notified.load(Ordering::Relaxed) {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
-        }
-    });
-
-    (listener, future)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1323,8 +1264,8 @@ mod tests {
     use all_is_cubes::math::Cube;
     use all_is_cubes::universe::Name;
     use all_is_cubes::util::assert_send_sync;
+    use core::sync::atomic::{AtomicUsize, Ordering};
     use futures_channel::oneshot;
-    use std::sync::atomic::AtomicUsize;
 
     fn advance_time<T: time::Instant>(session: &mut Session<T>) {
         session

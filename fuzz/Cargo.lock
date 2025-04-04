@@ -604,6 +604,8 @@ source = "git+https://github.com/kpreid/nosy/?rev=24a4d626a9dc6e1d4fb55fc6fc1c3e
 dependencies = [
  "arrayvec",
  "cfg-if",
+ "futures-core",
+ "futures-util",
  "mutants",
 ]
 
