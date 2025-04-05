@@ -5,6 +5,13 @@
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
+// TODO: When Rust 1.87 is stable, change this to expect(wasm_c_abi),
+// then remove in the future when the lint is gone
+#![allow(unknown_lints, reason = "wasm_c_abi not yet stable")]
+#![allow(
+    wasm_c_abi,
+    reason = "tested and confirmed not affected by ABI transition"
+)]
 
 use core::ops;
 use core::time::Duration;
