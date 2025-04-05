@@ -348,7 +348,16 @@ impl InputProcessor {
                             options.lighting_display = match options.lighting_display {
                                 LightingOption::None => LightingOption::Flat,
                                 LightingOption::Flat => LightingOption::Smooth,
-                                LightingOption::Smooth => LightingOption::None,
+                                LightingOption::Smooth => {
+                                    // TODO: the question we actually want to ask is,
+                                    // what does the *current renderer* support?
+                                    if options.render_method == RenderMethod::Reference {
+                                        LightingOption::Bounce
+                                    } else {
+                                        LightingOption::None
+                                    }
+                                }
+                                LightingOption::Bounce => LightingOption::None,
                                 _ => LightingOption::None, // TODO: either stop doing cycle-commands or put it on the enum so it can be exhaustive
                             };
                         });

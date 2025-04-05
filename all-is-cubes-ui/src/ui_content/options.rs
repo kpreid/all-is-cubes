@@ -82,6 +82,7 @@ pub(crate) fn graphics_options_widgets(
                 camera::LightingOption::None,
                 camera::LightingOption::Flat,
                 camera::LightingOption::Smooth,
+                camera::LightingOption::Bounce,
             ],
         ),
         graphics_enum_button(

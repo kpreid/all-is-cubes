@@ -1,5 +1,7 @@
 //! [`Accumulate`] and output formats of the raytracer.
 
+use core::marker::PhantomData;
+
 use euclid::Vector3D;
 
 use crate::block::Resolution;
@@ -402,6 +404,64 @@ where
 }
 
 // -------------------------------------------------------------------------------------------------
+
+/// Adapts an [`Accumulator`] which takes `BlockData = ()` to take a different type and ignore it.
+///
+/// Ideally, this would not be necessary and there would be some kind of automatic adaptation
+/// for any compatible data, but doing that would require introducing more traits.
+/// The obvious choice of trait would be [`AsRef`], but there is no `impl AsRef<()> for ()`.
+/// Another possibility would be `trait Accumulate<D>` — making the associated type into a parameter
+/// so that impls look like `impl<D> Accumulate<D> for ColorBuf` — but that causes awkward things
+/// like having different `mean()` per data type. Might be worthwhile anyway.
+///
+/// This isn’t a generic “map the block data” adapter because the `Default` requirement means the
+/// mapping function can’t be provided. Perhaps we should replace that requirement with a factory.
+#[derive(Debug)]
+pub(crate) struct IgnoreBlockData<D, A> {
+    pub inner: A,
+    _phantom: PhantomData<fn(&D)>,
+}
+
+impl<D, A: Default> Default for IgnoreBlockData<D, A> {
+    fn default() -> Self {
+        Self {
+            inner: A::default(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<D: RtBlockData, A: Accumulate<BlockData = ()>> Accumulate for IgnoreBlockData<D, A> {
+    type BlockData = D;
+
+    fn opaque(&self) -> bool {
+        self.inner.opaque()
+    }
+
+    fn add(&mut self, hit: Hit<'_, Self::BlockData>) {
+        self.inner.add(hit.map_block_data(|_| &()))
+    }
+
+    fn mean<const N: usize>(items: [Self; N]) -> Self {
+        Self {
+            inner: A::mean(items.map(|item| item.inner)),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<D, A: Copy> Copy for IgnoreBlockData<D, A> {}
+impl<D, A: Clone> Clone for IgnoreBlockData<D, A> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;

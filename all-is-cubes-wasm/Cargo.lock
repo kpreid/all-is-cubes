@@ -47,6 +47,7 @@ dependencies = [
  "paste",
  "png-decoder",
  "rand 0.9.0",
+ "rand_distr",
  "rand_xoshiro",
  "serde",
  "unicode-segmentation",
@@ -1474,6 +1475,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a509b1a2ffbe92afab0e55c8fd99dea1c280e8171bd2d88682bb20bc41cbc2c"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "rand_distr"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a8615d50dcf34fa31f7ab52692afec947c4dd0ab803cc87cb3b0b4570ff7463"
+dependencies = [
+ "num-traits",
+ "rand 0.9.0",
 ]
 
 [[package]]

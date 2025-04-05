@@ -128,7 +128,8 @@ once_cell = { workspace = true, features = ["alloc", "race", "std"] } # TODO(no_
 ordered-float = { workspace = true }
 paste = { workspace = true }
 png-decoder = { workspace = true }
-rand = { workspace = true }
+rand = { workspace = true, features = ["small_rng"] }
+rand_distr = { workspace = true }
 rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
 # re_sdk is a data-logging and visualization tool; we are currently using it _only_ for

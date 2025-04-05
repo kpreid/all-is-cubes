@@ -297,8 +297,10 @@ pub enum RenderMethod {
     /// Use the reference implementation of All is Cubes content rendering.
     ///
     /// This means `all_is_cubes_render::raytracer`, a CPU-based raytracer.
-    /// It is too slow for high-resolution interactive use, though it does have a potential
-    /// advantage in rapidly changing content.
+    /// It is typically too slow for high-resolution interactive use, though it could
+    /// have an advantage in rapidly changing content.
+    ///
+    /// See also [`LightingOption::Bounce`].
     Reference,
     // TODO: Someday, GpuRaytracing.
 }
@@ -415,13 +417,22 @@ impl Default for ExposureOption {
 #[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum LightingOption {
-    /// No lighting: objects will be displayed with their original surface color.
+    /// No lighting: objects will be displayed with their intrinsically defined surface color,
+    /// as if illuminated by a white light with luminance 1.0 everywhere.
     None,
+
     /// Light is taken from the volume immediately above a cube face.
     /// Edges between cubes are visible.
     Flat,
-    /// Light varies across surfaces.
+
+    /// Light is interpolated across surfaces, between adjacent cubes.
     Smooth,
+
+    /// Compute per-pixel rather than per-block illumination.
+    ///
+    /// This option has the most physical accuracy, but may be very slow or unsupported.
+    /// If unsupported, the renderer should substitute [`Smooth`][Self::Smooth].
+    Bounce,
 }
 
 /// How to render transparent objects; part of a [`GraphicsOptions`].

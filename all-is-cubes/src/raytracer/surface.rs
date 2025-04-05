@@ -1,10 +1,14 @@
+use all_is_cubes_base::math::FreeVector;
 use euclid::Vector3D;
+use rand_distr::Distribution;
 
 use crate::block::Evoxel;
 use crate::camera::LightingOption;
 use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, Vol};
-use crate::raycast::{RayIsh as _, RaycasterIsh};
-use crate::raytracer::{ColorBuf, RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData};
+use crate::raycast::{Ray, RayIsh as _, RaycasterIsh};
+use crate::raytracer::{
+    BounceRng, ColorBuf, RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData,
+};
 
 /// Description of a surface the ray passes through (or from the volumetric perspective,
 /// a transition from one material to another).
@@ -54,7 +58,11 @@ impl<D: RtBlockData> Surface<'_, D> {
     /// Note that this is completely unaware of volume/thickness; that is handled by
     /// `TracingState::trace_through_span()` tweaking the data before this is called.
     #[inline]
-    pub(crate) fn to_light(&self, rt: &SpaceRaytracer<D>) -> Option<ColorBuf> {
+    pub(crate) fn to_light(
+        &self,
+        rt: &SpaceRaytracer<D>,
+        ray_bounce_rng: Option<&mut BounceRng>,
+    ) -> Option<ColorBuf> {
         let diffuse_color = rt
             .graphics_options
             .transparency
@@ -64,7 +72,9 @@ impl<D: RtBlockData> Surface<'_, D> {
             return None;
         }
 
-        let illumination = self.compute_illumination(rt);
+        // Obtain the illumination of this surface.
+        let illumination: Rgb =
+            self.compute_illumination(rt, ray_bounce_rng.filter(|_| diffuse_color.fully_opaque()));
         // Combine reflected and emitted light to produce the outgoing light.
         let outgoing_rgb = diffuse_color.reflect(illumination) + self.emission;
 
@@ -74,15 +84,67 @@ impl<D: RtBlockData> Surface<'_, D> {
         ))
     }
 
-    fn compute_illumination(&self, rt: &SpaceRaytracer<D>) -> Rgb {
-        match rt.graphics_options.lighting_display {
-            LightingOption::None => Rgb::ONE,
-            LightingOption::Flat => {
+    /// Compute the illumination on this surface from the space in `rt`.
+    ///
+    /// This will involve tracing further rays if the [`LightingOption`] in use allows and
+    /// `bounce` is not [`None`]. `bounce` provides the RNG for randomly directing rays.
+    fn compute_illumination(&self, rt: &SpaceRaytracer<D>, bounce: Option<&mut BounceRng>) -> Rgb {
+        match (&rt.graphics_options.lighting_display, bounce) {
+            (LightingOption::Bounce, Some(rng)) => {
+                let mut multi_ray_accum: Rgb = Rgb::ZERO;
+
+                // Trace multiple pseudorandomly-directed secondary rays.
+                let sample_count = 16u8;
+                for _ in 0..sample_count {
+                    // Choose a random reflection direction.
+                    // This formula produces a distribution that obeys Lambert’s cosine law.
+                    // TODO: Justify that claim. <https://fizzer.neocities.org/lambertnotangent>
+                    // seems to agree but I don’t think it’s where I learned this trick and it isn’t
+                    // as clear as I would like.
+                    let lambertian_bounce_direction = self.normal.normal_vector()
+                        + FreeVector::from(rand_distr::UnitSphere.sample(rng));
+
+                    // If we wanted mirror reflection we would do it like this instead,
+                    // but for now, voxels have no specularity parameters and are assumed to be
+                    // always Lambertian.
+                    //
+                    // let mut mirror_direction = ray_direction.normalize();
+                    // let Some(axis) = self.normal.axis() {
+                    //     mirror_direction[axis] *= -1.0;
+                    // } else { continue };
+
+                    let ray = Ray::new(
+                        // need some past-the-surface epsilon
+                        self.intersection_point + self.normal.normal_vector() * 0.0001,
+                        lambertian_bounce_direction,
+                    );
+
+                    // Compute the illumination from the reflected ray.
+                    // Note that we pass allow_ray_bounce=false so that there will be no further
+                    // bounces; the stored light data essentially completely suffices after one
+                    // bounce. (This would not be true if we had any mirror reflections.)
+                    // TODO: should propagate info
+                    let (light_accum_buf, _info) = rt
+                        .trace_ray_impl::<super::IgnoreBlockData<D, ColorBuf>, Ray>(
+                            ray, true, false,
+                        );
+                    multi_ray_accum += Rgba::from(light_accum_buf.inner).to_rgb();
+                }
+                multi_ray_accum * f32::from(sample_count).recip()
+            }
+
+            // The non-raytraced options:
+            (LightingOption::None, _) => Rgb::ONE,
+
+            // Note that if we've exceeded our bounce budget (which is always 1) we use Flat.
+            // We don't combine Bounce and Smooth because the improvement of Smooth is negligible.
+            (LightingOption::Flat | LightingOption::Bounce, _) => {
                 rt.get_packed_light(self.cube + self.normal.normal_vector())
                     .value()
                     * fixed_directional_lighting(self.normal)
             }
-            LightingOption::Smooth => {
+
+            (LightingOption::Smooth, _) => {
                 rt.get_interpolated_light(self.intersection_point, self.normal)
                     * fixed_directional_lighting(self.normal)
             }

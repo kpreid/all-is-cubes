@@ -6,6 +6,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use core::{fmt, mem};
+use rand::SeedableRng;
 
 use euclid::{Vector3D, vec3};
 use manyfmt::Fmt;
@@ -46,6 +47,8 @@ mod text;
 pub use text::*;
 pub use updating::*;
 mod updating;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Precomputed data for raytracing a single frame of a single [`Space`], and bearer of
 /// the methods for actually performing raytracing.
@@ -117,7 +120,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         ray: Ray,
         include_sky: bool,
     ) -> (P, RaytraceInfo) {
-        self.trace_ray_impl::<P, Ray>(ray, include_sky)
+        self.trace_ray_impl::<P, Ray>(ray, include_sky, true)
     }
 
     /// Computes a single image pixel from the given ray.
@@ -128,23 +131,39 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         ray: raycast::AaRay,
         include_sky: bool,
     ) -> (P, RaytraceInfo) {
-        self.trace_ray_impl::<P, raycast::AaRay>(ray, include_sky)
+        self.trace_ray_impl::<P, raycast::AaRay>(ray, include_sky, true)
     }
 
     fn trace_ray_impl<P: Accumulate<BlockData = D>, R: RayIsh>(
         &self,
         ray: R,
         include_sky: bool,
+        allow_ray_bounce: bool,
     ) -> (P, RaytraceInfo) {
         let options = RtOptionsRef {
             graphics_options: &self.graphics_options,
             custom_options: &self.custom_options,
         };
+        let ray_direction = ray.direction();
 
         let mut state: TracingState<P> = TracingState {
             t_to_absolute_distance: ray.direction().length(),
             cubes_traced: 0,
             accumulator: P::default(),
+            ray_bounce_rng: allow_ray_bounce.then(|| {
+                // Computing the random bounces from the ray direction makes the bounce pattern,
+                // and thus the produced image, deterministic. This is useful for the current
+                // experimentation, but will no longer be desirable in the event that we add
+                // temporal accumulation. At that point we would want to either reuse a single
+                // RNG for all rendering, or mix something like a frame number into this seed.
+                rand::rngs::SmallRng::seed_from_u64(
+                    ray_direction
+                        .x
+                        .to_bits()
+                        .wrapping_add(ray_direction.y.to_bits())
+                        .wrapping_add(ray_direction.z.to_bits()),
+                )
+            }),
         };
         let surface_iter: SurfaceIter<'_, D, R::Caster> = SurfaceIter::new(self, ray);
 
@@ -423,6 +442,8 @@ fn mix4(a: [f32; 4], b: [f32; 4], amount: f32) -> [f32; 4] {
     })
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Performance info from a [`SpaceRaytracer`] operation.
 ///
 /// The contents of this structure are subject to change; use [`Debug`] to view it.
@@ -457,6 +478,8 @@ impl Fmt<StatusText> for RaytraceInfo {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Get cube data out of [`Space`].
 #[inline]
 fn prepare_cubes(space: &Space) -> Vol<Box<[TracingCubeData]>> {
@@ -481,6 +504,8 @@ struct TracingCubeData {
     always_invisible: bool,
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[derive(Clone, Debug)]
 struct TracingBlock<D> {
     block_data: D,
@@ -500,9 +525,13 @@ impl<D: RtBlockData> TracingBlock<D> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+type BounceRng = rand::rngs::SmallRng;
+
 /// Holds an [`Accumulate`] and other per-ray state, and updates it
 /// according to the things it encounters.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct TracingState<P: Accumulate> {
     /// Conversion factor from raycaster `t` values to “true” [`Space`] distance values
     /// where 1 unit = 1 block thickness.
@@ -513,6 +542,10 @@ struct TracingState<P: Accumulate> {
     cubes_traced: usize,
 
     accumulator: P,
+
+    /// *If* we are going to compute ray bounces, this RNG is used to decide which direction they
+    /// bounce.
+    ray_bounce_rng: Option<BounceRng>,
 }
 impl<P: Accumulate> TracingState<P> {
     #[inline]
@@ -593,7 +626,7 @@ impl<P: Accumulate> TracingState<P> {
         surface: &Surface<'_, P::BlockData>,
         rt: &SpaceRaytracer<P::BlockData>,
     ) {
-        if let Some(light) = surface.to_light(rt) {
+        if let Some(light) = surface.to_light(rt, self.ray_bounce_rng.as_mut()) {
             self.accumulator.add(Hit {
                 surface: light,
                 t_distance: Some(surface.t_distance),
@@ -625,6 +658,8 @@ impl<P: Accumulate> TracingState<P> {
         self.trace_through_surface(&surface, rt);
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Given an `Atom`/`Evoxel` color, and the thickness of that material passed through,
 /// return the effective alpha that should replace the original, and the coefficient for
@@ -675,6 +710,8 @@ fn apply_transmittance(color: Rgba, thickness: f32) -> (Rgba, f32) {
     (modified_color, emission_coeff.max(0.0))
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Minimal raytracing helper used by block evaluation to compute aggregate properties
 /// of voxel blocks. Compared to the regular raytracer, it:
 ///
@@ -721,6 +758,8 @@ pub(crate) struct EvalTrace {
     pub emission: Vector3D<f32, Intensity>,
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(feature = "auto-threads")]
 mod rayon_helper {
     use core::iter::{Sum, empty, once};
@@ -752,6 +791,8 @@ mod rayon_helper {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Note: Further raytracer tests are found in
 ///
