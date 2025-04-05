@@ -449,7 +449,7 @@ mod graph {
     }
 
     #[derive(Clone, Debug)]
-    pub struct VisitMap(Vol<Box<[bool]>>);
+    pub(crate) struct VisitMap(Vol<Box<[bool]>>);
     impl VisitMap {
         fn new(bounds: GridAab) -> VisitMap {
             Self(Vol::from_fn(bounds, |_| false))

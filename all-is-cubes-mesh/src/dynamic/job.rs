@@ -364,6 +364,7 @@ struct MeshJob<M: DynamicMeshTypes> {
 
     response: oneshot::Sender<CompletedJobShell<CompletedMeshJob<M>>>,
 }
+#[allow(clippy::large_enum_variant)]
 enum JobInputData {
     Block {
         block: EvaluatedBlock,
