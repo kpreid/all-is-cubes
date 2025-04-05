@@ -148,7 +148,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         let mut state: TracingState<P> = TracingState {
             t_to_absolute_distance: ray.direction().length(),
-            cubes_traced: 0,
+            primary_cubes_traced: 0,
+            secondary_info: RaytraceInfo::default(),
             accumulator: P::default(),
             ray_bounce_rng: allow_ray_bounce.then(|| {
                 // Computing the random bounces from the ray direction makes the bounce pattern,
@@ -453,6 +454,13 @@ fn mix4(a: [f32; 4], b: [f32; 4], amount: f32) -> [f32; 4] {
 pub struct RaytraceInfo {
     cubes_traced: usize,
 }
+impl core::ops::Add for RaytraceInfo {
+    type Output = Self;
+    fn add(mut self, other: Self) -> Self {
+        self += other;
+        self
+    }
+}
 impl core::ops::AddAssign<RaytraceInfo> for RaytraceInfo {
     fn add_assign(&mut self, other: Self) {
         self.cubes_traced += other.cubes_traced;
@@ -537,9 +545,12 @@ struct TracingState<P: Accumulate> {
     /// where 1 unit = 1 block thickness.
     t_to_absolute_distance: f64,
 
-    /// Number of cubes traced through -- controlled by the caller, so not necessarily
-    /// equal to the number of calls to [`Self::trace_through_surface()`].
-    cubes_traced: usize,
+    /// Number of cubes traced through by primary rays -- controlled by the caller, so not
+    /// necessarily equal to the number of calls to [`Self::trace_through_surface()`].
+    primary_cubes_traced: usize,
+
+    /// Diagnostic info from secondary rays.
+    secondary_info: RaytraceInfo,
 
     accumulator: P,
 
@@ -553,8 +564,8 @@ impl<P: Accumulate> TracingState<P> {
         &mut self,
         options: RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>,
     ) -> bool {
-        self.cubes_traced += 1;
-        if self.cubes_traced > 1000 {
+        self.primary_cubes_traced += 1;
+        if self.primary_cubes_traced > 1000 {
             // Abort excessively long traces.
             self.accumulator = Default::default();
             // TODO: Should there be a dedicated method for this like hit_nothing()?
@@ -575,7 +586,7 @@ impl<P: Accumulate> TracingState<P> {
         sky_data: &P::BlockData,
         debug_steps: bool,
     ) -> (P, RaytraceInfo) {
-        if self.cubes_traced == 0 {
+        if self.primary_cubes_traced == 0 {
             // Didn't intersect the world at all.
             // Inform the accumulator of this in case it wants to do something different.
             self.accumulator.hit_nothing();
@@ -602,7 +613,7 @@ impl<P: Accumulate> TracingState<P> {
                 .unwrap_or(Rgba::BLACK);
 
             self.accumulator.add(Hit {
-                surface: (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32
+                surface: (rgb_const!(0.02, 0.002, 0.0) * self.primary_cubes_traced as f32
                     + rgb_const!(0.0, 0.0, 0.2) * original_color.luminance())
                 .with_alpha_one()
                 .into(),
@@ -614,8 +625,8 @@ impl<P: Accumulate> TracingState<P> {
         (
             self.accumulator,
             RaytraceInfo {
-                cubes_traced: self.cubes_traced,
-            },
+                cubes_traced: self.primary_cubes_traced,
+            } + self.secondary_info,
         )
     }
 
@@ -626,12 +637,13 @@ impl<P: Accumulate> TracingState<P> {
         surface: &Surface<'_, P::BlockData>,
         rt: &SpaceRaytracer<P::BlockData>,
     ) {
-        if let Some(light) = surface.to_light(rt, self.ray_bounce_rng.as_mut()) {
+        if let Some((light, info)) = surface.to_light(rt, self.ray_bounce_rng.as_mut()) {
             self.accumulator.add(Hit {
                 surface: light,
                 t_distance: Some(surface.t_distance),
                 block: surface.block_data,
             });
+            self.secondary_info += info;
         }
     }
 

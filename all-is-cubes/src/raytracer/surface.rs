@@ -7,7 +7,7 @@ use crate::camera::LightingOption;
 use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, Vol};
 use crate::raycast::{Ray, RayIsh as _, RaycasterIsh};
 use crate::raytracer::{
-    BounceRng, ColorBuf, RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData,
+    BounceRng, ColorBuf, RaytraceInfo, RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData,
 };
 
 /// Description of a surface the ray passes through (or from the volumetric perspective,
@@ -62,7 +62,7 @@ impl<D: RtBlockData> Surface<'_, D> {
         &self,
         rt: &SpaceRaytracer<D>,
         ray_bounce_rng: Option<&mut BounceRng>,
-    ) -> Option<ColorBuf> {
+    ) -> Option<(ColorBuf, RaytraceInfo)> {
         let diffuse_color = rt
             .graphics_options
             .transparency
@@ -73,14 +73,17 @@ impl<D: RtBlockData> Surface<'_, D> {
         }
 
         // Obtain the illumination of this surface.
-        let illumination: Rgb =
+        let (illumination, info) =
             self.compute_illumination(rt, ray_bounce_rng.filter(|_| diffuse_color.fully_opaque()));
         // Combine reflected and emitted light to produce the outgoing light.
         let outgoing_rgb = diffuse_color.reflect(illumination) + self.emission;
 
-        Some(ColorBuf::from_light_and_transmittance(
-            outgoing_rgb,
-            1.0 - diffuse_color.alpha().into_inner(),
+        Some((
+            ColorBuf::from_light_and_transmittance(
+                outgoing_rgb,
+                1.0 - diffuse_color.alpha().into_inner(),
+            ),
+            info,
         ))
     }
 
@@ -88,10 +91,16 @@ impl<D: RtBlockData> Surface<'_, D> {
     ///
     /// This will involve tracing further rays if the [`LightingOption`] in use allows and
     /// `bounce` is not [`None`]. `bounce` provides the RNG for randomly directing rays.
-    fn compute_illumination(&self, rt: &SpaceRaytracer<D>, bounce: Option<&mut BounceRng>) -> Rgb {
+    /// The returned count of rays will be non-zero in that case.
+    fn compute_illumination(
+        &self,
+        rt: &SpaceRaytracer<D>,
+        bounce: Option<&mut BounceRng>,
+    ) -> (Rgb, RaytraceInfo) {
         match (&rt.graphics_options.lighting_display, bounce) {
             (LightingOption::Bounce, Some(rng)) => {
                 let mut multi_ray_accum: Rgb = Rgb::ZERO;
+                let mut info_accum = RaytraceInfo::default();
 
                 // Trace multiple pseudorandomly-directed secondary rays.
                 let sample_count = 16u8;
@@ -123,30 +132,36 @@ impl<D: RtBlockData> Surface<'_, D> {
                     // Note that we pass allow_ray_bounce=false so that there will be no further
                     // bounces; the stored light data essentially completely suffices after one
                     // bounce. (This would not be true if we had any mirror reflections.)
-                    // TODO: should propagate info
-                    let (light_accum_buf, _info) = rt
+                    let (light_accum_buf, ray_info) = rt
                         .trace_ray_impl::<super::IgnoreBlockData<D, ColorBuf>, Ray>(
                             ray, true, false,
                         );
                     multi_ray_accum += Rgba::from(light_accum_buf.inner).to_rgb();
+                    info_accum += ray_info;
                 }
-                multi_ray_accum * f32::from(sample_count).recip()
+                (
+                    multi_ray_accum * f32::from(sample_count).recip(),
+                    info_accum,
+                )
             }
 
             // The non-raytraced options:
-            (LightingOption::None, _) => Rgb::ONE,
+            (LightingOption::None, _) => (Rgb::ONE, RaytraceInfo::default()),
 
             // Note that if we've exceeded our bounce budget (which is always 1) we use Flat.
             // We don't combine Bounce and Smooth because the improvement of Smooth is negligible.
             (LightingOption::Flat | LightingOption::Bounce, _) => {
-                rt.get_packed_light(self.cube + self.normal.normal_vector())
+                let light = rt
+                    .get_packed_light(self.cube + self.normal.normal_vector())
                     .value()
-                    * fixed_directional_lighting(self.normal)
+                    * fixed_directional_lighting(self.normal);
+                (light, RaytraceInfo::default())
             }
 
             (LightingOption::Smooth, _) => {
-                rt.get_interpolated_light(self.intersection_point, self.normal)
-                    * fixed_directional_lighting(self.normal)
+                let light = rt.get_interpolated_light(self.intersection_point, self.normal)
+                    * fixed_directional_lighting(self.normal);
+                (light, RaytraceInfo::default())
             }
         }
     }
