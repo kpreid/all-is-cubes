@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use std::sync::Mutex;
 
 use half::f16;
-use rand::{SeedableRng as _, seq::SliceRandom as _};
+use itertools::Itertools;
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use web_time::{Duration, Instant};
@@ -56,7 +56,7 @@ impl RaytraceToTexture {
                 Box::new(raytracer_size_policy),
                 listen::constant(Arc::new(())),
             ),
-            pixel_picker: PixelPicker::new(initial_viewport, false),
+            pixel_picker: PixelPicker::new(initial_viewport),
             dirty_pixels: initial_viewport.pixel_count().unwrap(),
             rays_per_frame: 50000,
             render_target: DrawableTexture::new(wgpu::TextureFormat::Rgba16Float),
@@ -157,7 +157,7 @@ impl Inner {
     }
 
     fn dirty(&mut self) {
-        self.dirty_pixels = self.render_viewport.pixel_count().unwrap_or(usize::MAX);
+        self.dirty_pixels = self.pixel_picker.cycle_length;
     }
 
     fn do_some_tracing(&mut self) {
@@ -243,35 +243,63 @@ fn background_tracing_task(weak_inner: Weak<Mutex<Inner>>) {
 
 #[derive(Clone, Debug)]
 struct PixelPicker {
-    iter: std::iter::Cycle<std::ops::Range<usize>>,
     viewport: Viewport,
-    /// If None, don't shuffle.
-    shuffled_pixels: Option<Box<[usize]>>,
+
+    /// Iterator that generates indices into `sorted_pixels` to tell us what to render next.
+    iter: itertools::Interleave<
+        core::iter::Cycle<core::ops::Range<usize>>,
+        core::iter::Cycle<core::ops::Range<usize>>,
+    >,
+
+    /// Ordering of pixels such that earlier pixels are higher priorities
+    /// (currently, this means closer to the center).
+    sorted_pixels: Box<[usize]>,
+
+    /// After at least this many pixels have been picked, the entire image has been covered.
+    cycle_length: usize,
 }
 
 impl PixelPicker {
-    fn new(viewport: Viewport, shuffle: bool) -> Self {
+    fn new(viewport: Viewport) -> Self {
         let pixel_count = viewport.pixel_count().unwrap();
-        let shuffled_pixels = shuffle.then(|| {
-            // Generate a pseudorandom order to evenly distributed update rays about the
-            // screen. Note that this is deterministic since we don't reuse the RNG.
-            let mut shuffled_pixels: Box<[usize]> = (0..pixel_count).collect();
-            shuffled_pixels.shuffle(&mut rand_xoshiro::Xoshiro256Plus::seed_from_u64(
-                0x9aa8bc4be2112757,
-            ));
-            shuffled_pixels
+        let width = viewport.framebuffer_size.width as usize;
+        // Subtracting 0.5 here means that when we use this later,
+        // it'll give us pixel-center coordinates
+        let image_center = viewport.framebuffer_size.to_vector().to_f64() / 2.0 - vec2(0.5, 0.5);
+
+        // Precompute an ordering of the pixels based on distance from center with some dithering.
+        let mut sorted_pixels: Box<[usize]> = (0..pixel_count).collect();
+        sorted_pixels.sort_by_key(|index| {
+            let image_point = vec2(index % width, index / width);
+            let from_center_point = image_point.to_f64() - image_center;
+            let blend = ((image_point.x ^ image_point.y).rem_euclid(4) * 2) as f64;
+            //let square_radius = from_center_point.length();
+            let square_radius = from_center_point.x.abs().max(from_center_point.y.abs());
+            (square_radius + blend) as i64
         });
 
+        // We prioritize tracing these pixels, tracing them more often than the rest.
+        // One could call this a form of fixed foveated rendering, to be fancy about it.
+        let central_pixel_count: usize = 60000.min(pixel_count / 4);
+
+        let inner_range = 0..central_pixel_count;
+        let outer_range = central_pixel_count..pixel_count;
+
+        // There are two cyclic iterators interleaved, so the overall cycle length is
+        // twice the longest individual cycle length.
+        let cycle_length = inner_range.len().max(outer_range.len()) * 2;
+
         PixelPicker {
-            iter: (0..pixel_count).cycle(),
+            iter: ((inner_range).cycle()).interleave(outer_range.cycle()),
             viewport,
-            shuffled_pixels,
+            sorted_pixels,
+            cycle_length,
         }
     }
 
     fn resize(&mut self, viewport: Viewport) {
         if self.viewport != viewport {
-            *self = Self::new(viewport, self.shuffled_pixels.is_some());
+            *self = Self::new(viewport);
         }
     }
 }
@@ -283,10 +311,7 @@ impl Iterator for PixelPicker {
         // `as usize` is safe because we would have failed earlier if it doesn't fit in usize.
         let size = self.viewport.framebuffer_size.map(|s| s as usize);
         let linear_index = self.iter.next().unwrap();
-        let index = match &self.shuffled_pixels {
-            Some(lookup) => lookup[linear_index],
-            None => linear_index,
-        };
+        let index = self.sorted_pixels[linear_index];
         Some(Point::new(
             index.rem_euclid(size.width) as u32,
             index.div_euclid(size.width).rem_euclid(size.height) as u32,
@@ -307,5 +332,5 @@ fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
 mod tests {
     //use super::*;
     // ...
-    // TODO: Test PixelPicker and Srgb8Adapter since they are independent of GraphicsContext
+    // TODO: Test PixelPicker since it is independent of the GPU
 }
