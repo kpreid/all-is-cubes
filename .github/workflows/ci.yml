@@ -89,6 +89,11 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
     continue-on-error: ${{ !matrix.primary }}
 
+    env:
+      # TODO: Remove this flag when the wasm-c-abi transition completes.
+      # See <https://blog.rust-lang.org/2025/04/04/c-abi-changes-for-wasm32-unknown-unknown.html>
+      RUSTFLAGS: ${{ matrix.toolchain == 'nightly' && '-Zwasm-c-abi=spec' || '' }}
+
     steps:
     # Free some disk space so our largest builds can complete reliably.
     - uses: jlumbroso/free-disk-space@v1.3.1
@@ -279,7 +284,9 @@ jobs:
     continue-on-error: false
 
     env:
-      RUSTFLAGS: '-Dwarnings'
+      # TODO: Remove this -Zwasm-c-abi flag when the wasm-c-abi transition completes.
+      # See <https://blog.rust-lang.org/2025/04/04/c-abi-changes-for-wasm32-unknown-unknown.html>
+      RUSTFLAGS: ${{ matrix.toolchain == 'nightly' && '-Dwarnings -Zwasm-c-abi=spec' || '-Dwarnings' }}
 
     steps:
     - uses: actions/checkout@v4

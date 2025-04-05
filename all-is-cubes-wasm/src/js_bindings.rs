@@ -1,5 +1,12 @@
 //! Bindings for our own JS code.
 
+// TODO: When Rust 1.87 is stable, change this to expect(wasm_c_abi).
+#![allow(unknown_lints, reason = "wasm_c_abi not yet stable")]
+#![allow(
+    wasm_c_abi,
+    reason = "tested and confirmed not affected by ABI transition"
+)]
+
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::HtmlCanvasElement;
 
