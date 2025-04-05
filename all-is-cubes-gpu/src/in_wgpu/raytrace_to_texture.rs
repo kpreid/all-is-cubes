@@ -17,7 +17,7 @@ use web_time::{Duration, Instant};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::{Box2D, point2, vec2};
 use all_is_cubes::listen;
-use all_is_cubes::math::{Rgb, Rgba, VectorOps as _};
+use all_is_cubes::math::{Rgba, VectorOps as _};
 use all_is_cubes_render::RenderError;
 use all_is_cubes_render::camera::{Camera, ImagePixel, StandardCameras, Viewport, area_usize};
 use all_is_cubes_render::raytracer::{ColorBuf, RtRenderer};
@@ -301,21 +301,6 @@ fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
         .map(|c| (c / 2.0).round() as u32)
         .cast_unit();
     viewport
-}
-
-/// embedded-graphics pixel type for f16 colors
-#[derive(Clone, Copy, Default, PartialEq, bytemuck::Zeroable, bytemuck::Pod)]
-#[repr(transparent)]
-pub(crate) struct Rgbf16(pub [f16; 3]);
-
-impl From<Rgb> for Rgbf16 {
-    fn from(value: Rgb) -> Self {
-        Self([
-            f16::from_f32(value.red().into_inner()),
-            f16::from_f32(value.green().into_inner()),
-            f16::from_f32(value.blue().into_inner()),
-        ])
-    }
 }
 
 #[cfg(test)]
