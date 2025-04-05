@@ -14,7 +14,7 @@ use all_is_cubes::euclid::{Point2D, Size2D, Size3D, Vector3D, point3, size2, siz
 use all_is_cubes::listen;
 use all_is_cubes::math::{
     Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Rgb, Rgba, Vol, ps32, rgb_const, rgba_const, zo32,
+    GridVector, Rgb, Rgba, Vol, ps32, ps64, rgb_const, rgba_const, zo32,
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::time;
@@ -82,6 +82,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     );
     c.insert("follow_character_change", None, follow_character_change);
     c.insert("follow_options_change", None, follow_options_change);
+    c.insert("furnace", None, furnace);
     c.insert("icons", None, icons);
     c.insert("layers_all", None, layers_all);
     c.insert("layers_hidden_ui", None, layers_hidden_ui);
@@ -544,6 +545,46 @@ async fn follow_options_change(mut context: RenderTestContext) {
     options_cell.set(Arc::new(options_2));
     context
         .render_comparison_test_with_renderer(1, &mut renderer, Overlays::NONE)
+        .await;
+}
+
+/// A “white furnace test shows that a renderer’s rendering of a 100% reflective surface is
+/// accurate, neither absorbing nor emitting additional light energy. When properly implemented,
+/// the white object should be invisible.
+///
+/// In our case, rendering has a tiny fudge factor intended to make corners more distinct even
+/// under uniform lighting conditions, so the output image is expected not to be perfectly constant.
+/// But it’s still a test case worth looking at. (And perhaps we should remove that fudge factor.)
+async fn furnace(mut context: RenderTestContext) {
+    let mut universe = Universe::new();
+    let bounds = GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]);
+    let mut space = Space::builder(bounds)
+        .sky(space::Sky::Uniform(Rgb::ONE * 0.75))
+        .spawn({
+            let mut spawn = Spawn::default_for_new_space(GridAab::ORIGIN_CUBE);
+            spawn.set_eye_position([-3., 4., 4.]);
+            spawn.set_look_direction(vec3(1., -1., -1.));
+            spawn
+        })
+        .build();
+    let white_block = block::from_color!(Rgba::WHITE);
+    // Make a pattern of blocks that has room for some reflections.
+    space.set([-1, -1, 1], &white_block).unwrap();
+    space.set([1, -1, 0], &white_block).unwrap();
+    space.set([-1, 1, -1], &white_block).unwrap();
+    space.evaluate_light::<std::time::Instant>(0, drop);
+    finish_universe_from_space(&mut universe, space);
+
+    // Unlike other test cases we are not using UNALTERED_COLORS, because the entire point of this
+    // test is that none of the alterations should cause the block to not be colored identically
+    // to the sky.
+    let mut options = GraphicsOptions::default();
+    options.fov_y = ps64(45.0);
+    options.bloom_intensity = zo32(0.0);
+    let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
+
+    context
+        .render_comparison_test(1, scene, Overlays::NONE)
         .await;
 }
 
