@@ -9,6 +9,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::error::Error;
 use core::fmt::Debug;
+use core::sync::atomic::{self, AtomicBool};
 
 use bevy_platform::sync::Mutex;
 
@@ -127,9 +128,28 @@ pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     ///
     /// If the widget encounters an unexpected problem, it may return an error instead of panicking
     /// so that the rest of the system can continue.
+    //---
+    // TODO: Make this no longer able to return a transaction, and have `draw()` take over the job.
     fn step(&mut self, context: &WidgetContext<'_, '_>) -> Result<StepSuccess, StepError> {
         let _ = context;
         Ok((WidgetTransaction::default(), Then::Drop))
+    }
+
+    /// Produces a [`WidgetTransaction`] that draws the current state of the widget.
+    /// If `from_scratch` is true, the widget should disregard any dirty state tracking it has
+    /// and draw everything.
+    ///
+    /// Currently, this is called after every [`Self::initialize()`] and every [`Self::step()`].
+    ///
+    /// The transaction must not affect any part of the [`Space`] outside of its grant,
+    /// or produce blocks that have such effects later.
+    /// It must not conflict with the transaction produced by `step()` or `initialize()`.
+    //---
+    // TODO: Make this able to work without `&mut self`
+    fn draw(&mut self, context: &WidgetContext<'_, '_>, from_scratch: bool) -> WidgetTransaction {
+        let _ = context;
+        let _ = from_scratch;
+        WidgetTransaction::default()
     }
 }
 
@@ -146,6 +166,13 @@ pub type StepSuccess = (WidgetTransaction, Then);
 pub type StepError = Box<dyn Error + Send + Sync>;
 
 impl WidgetController for Box<dyn WidgetController> {
+    fn initialize(
+        &mut self,
+        context: &WidgetContext<'_, '_>,
+    ) -> Result<WidgetTransaction, InstallVuiError> {
+        (**self).initialize(context)
+    }
+
     fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
         (**self).synchronize(world_read_ticket, ui_read_ticket)
     }
@@ -154,11 +181,8 @@ impl WidgetController for Box<dyn WidgetController> {
         (**self).step(context)
     }
 
-    fn initialize(
-        &mut self,
-        context: &WidgetContext<'_, '_>,
-    ) -> Result<WidgetTransaction, InstallVuiError> {
-        (**self).initialize(context)
+    fn draw(&mut self, context: &WidgetContext<'_, '_>, from_scratch: bool) -> WidgetTransaction {
+        (**self).draw(context, from_scratch)
     }
 }
 
@@ -172,6 +196,7 @@ pub(super) struct WidgetBehavior {
     /// Original widget -- not used directly but for error reporting
     widget: Positioned<Arc<dyn Widget>>,
     controller: Mutex<Box<dyn WidgetController>>,
+    draw_requested: AtomicBool,
 }
 
 impl WidgetBehavior {
@@ -182,11 +207,14 @@ impl WidgetBehavior {
         mut controller: Box<dyn WidgetController>,
         read_ticket: ReadTicket<'_>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
-        let init_txn = match controller.initialize(&WidgetContext {
+        let draw_requested = AtomicBool::new(false);
+        let context = &WidgetContext {
             read_ticket,
             behavior_context: None,
             grant: &positioned_widget.position,
-        }) {
+            draw_requested: &draw_requested,
+        };
+        let init_txn = match controller.initialize(context) {
             Ok(t) => t,
             Err(e) => {
                 return Err(InstallVuiError::WidgetInitialization {
@@ -195,15 +223,22 @@ impl WidgetBehavior {
                 });
             }
         };
+        let draw_txn = controller.draw(context, true);
+        let full_init_txn =
+            init_txn.merge(draw_txn).map_err(|error| InstallVuiError::Conflict {
+                error,
+                widget: positioned_widget.value.clone(),
+            })?;
         let add_txn = behavior::BehaviorSetTransaction::insert(
             // TODO: widgets should be rotatable and that should go here
             space::SpaceBehaviorAttachment::new(positioned_widget.position.bounds),
             Arc::new(WidgetBehavior {
                 widget: positioned_widget.clone(),
                 controller: Mutex::new(controller),
+                draw_requested,
             }),
         );
-        init_txn.merge(SpaceTransaction::behaviors(add_txn)).map_err(|error| {
+        full_init_txn.merge(SpaceTransaction::behaviors(add_txn)).map_err(|error| {
             InstallVuiError::Conflict {
                 error,
                 widget: positioned_widget.value,
@@ -217,6 +252,7 @@ impl VisitHandles for WidgetBehavior {
         let Self {
             widget: _,
             controller,
+            draw_requested: _,
         } = self;
         // Not visiting the widget because it is not used for actual behavior
         // (no handles it may contain will be used *by* this WidgetBehavior).
@@ -226,16 +262,27 @@ impl VisitHandles for WidgetBehavior {
 
 impl Behavior<Space> for WidgetBehavior {
     fn step(&self, context: &behavior::Context<'_, '_, Space>) -> (UniverseTransaction, Then) {
-        let (txn, then) = self
-            .controller
-            .lock()
-            .unwrap()
-            .step(&WidgetContext {
+        let (txn, then) = {
+            let controller = &mut *self.controller.lock().unwrap();
+            let widget_context = WidgetContext {
                 read_ticket: context.read_ticket,
                 behavior_context: Some(context),
                 grant: &self.widget.position,
-            })
-            .expect("TODO: behaviors should have an error reporting path");
+                draw_requested: &self.draw_requested,
+            };
+            let (step_txn, then) = controller
+                .step(&widget_context)
+                .expect("TODO: behaviors should have an error reporting path");
+            if self.draw_requested.fetch_and(false, atomic::Ordering::Acquire) {
+                let draw_txn = controller.draw(&widget_context, false);
+                (
+                    step_txn.merge(draw_txn).expect("step and draw txn should not conflict"),
+                    then,
+                )
+            } else {
+                (step_txn, then)
+            }
+        };
         // TODO: should be using the attachment bounds instead of the layout grant to validate bounds
         validate_widget_transaction(&self.widget.value, &txn, &self.widget.position)
             .expect("transaction validation failed");
@@ -254,6 +301,7 @@ pub struct WidgetContext<'ctx, 'read> {
     /// [`ReadTicket`] for the universe the widget is UI for, not the one it is in.
     read_ticket: ReadTicket<'ctx>,
     grant: &'ctx LayoutGrant,
+    draw_requested: &'ctx AtomicBool,
 }
 
 impl<'a> WidgetContext<'a, '_> {
@@ -278,6 +326,11 @@ impl<'a> WidgetContext<'a, '_> {
     #[allow(dead_code)] // TODO(read_ticket): this may or may not end up being needed
     pub(crate) fn read_ticket(&self) -> ReadTicket<'a> {
         self.read_ticket
+    }
+
+    /// Causes [`WidgetController::draw()`] to be called after the current operation.
+    pub fn request_draw(&self) {
+        self.draw_requested.store(true, atomic::Ordering::Release);
     }
 }
 
