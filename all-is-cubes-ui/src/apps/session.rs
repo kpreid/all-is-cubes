@@ -112,7 +112,7 @@ struct Shuttle {
 
     ui: Option<Vui>,
 
-    space_watch_state: SpaceWatchState,
+    space_watch_state: Layers<SpaceWatchState>,
 
     control_channel_sender: flume::Sender<ControlMessage>,
 
@@ -728,7 +728,7 @@ impl Shuttle {
             whence: Arc::clone(&self.game_universe.whence),
         });
 
-        // Sync space_watch_state in case the character changed its universe.
+        // Sync space_watch_state.world in case the character changed its universe.
         {
             let character_read: Option<universe::ReadGuard<Character>> = self
                 .game_character
@@ -737,8 +737,22 @@ impl Shuttle {
                 .map(|cref| cref.read().expect("TODO: decide how to handle error"));
             let space: Option<&Handle<Space>> = character_read.as_ref().map(|ch| &ch.space);
 
-            if space != self.space_watch_state.space.as_ref() {
-                self.space_watch_state = SpaceWatchState::new(space.cloned(), &self.fluff_notifier)
+            if space != self.space_watch_state.world.space.as_ref() {
+                self.space_watch_state.world =
+                    SpaceWatchState::new(space.cloned(), &self.fluff_notifier)
+                        .expect("TODO: decide how to handle error");
+            }
+        }
+
+        // Sync space_watch_state.ui.
+        {
+            // TODO: don't get() and clone every time, add a dirty flag
+            let space = self
+                .ui
+                .as_ref()
+                .and_then(|ui| ui.view().get().space.clone());
+            if space != self.space_watch_state.ui.space {
+                self.space_watch_state.ui = SpaceWatchState::new(space, &self.fluff_notifier)
                     .expect("TODO: decide how to handle error");
             }
         }
@@ -799,7 +813,10 @@ impl<I: time::Instant> SessionBuilder<I> {
         let paused = listen::Cell::new(false);
         let (control_send, control_recv) = flume::bounded(100);
 
-        let space_watch_state = SpaceWatchState::empty();
+        let space_watch_state = Layers {
+            world: SpaceWatchState::empty(),
+            ui: SpaceWatchState::empty(),
+        };
 
         Session {
             frame_clock: FrameClock::new(game_universe.clock().schedule()),
