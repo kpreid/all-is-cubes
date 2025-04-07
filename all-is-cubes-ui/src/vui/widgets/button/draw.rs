@@ -225,14 +225,14 @@ pub(crate) trait ButtonBase {
 /// The label drawn onto this button should fit within a 24/32 × 24/32 circle.
 impl ButtonBase for super::ButtonVisualState {
     fn button_label_z(&self) -> GridCoordinate {
-        theme::UNPRESSED_Z + if self.pressed { -2 } else { 0 }
+        theme::UNPRESSED_Z + if self.pressed { -4 } else { 0 }
     }
 
     fn button_block(&self, txn: &mut UniverseTransaction) -> Result<Block, InGenError> {
         Ok(theme::common_block(
             txn.insert_anonymous(draw_button_multiblock_from_image(
                 self,
-                false,
+                self.pressed,
                 include_image!("../theme/button-shape-action.png"),
             )?),
             "Action Button",
