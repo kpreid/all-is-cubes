@@ -1,5 +1,6 @@
 //! Button widget controllers.
 
+use all_is_cubes::fluff::Fluff;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::fmt;
@@ -116,6 +117,17 @@ struct ButtonActivity {
     state: ButtonVisualState,
 }
 
+impl ButtonActivity {
+    fn add_fluff(&self, context: &vui::WidgetContext<'_>, txn: &mut SpaceTransaction) {
+        if self.changed && self.state.pressed {
+            // TODO: dedicated button press fluff/sounds
+            if let Some(cube) = context.grant().shrink_to_cube() {
+                txn.at(cube).add_fluff(Fluff::Happened);
+            }
+        }
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 impl vui::WidgetController for ActionButtonController {
@@ -136,14 +148,19 @@ impl vui::WidgetController for ActionButtonController {
             .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
 
-    fn step(&mut self, _: &vui::WidgetContext<'_>) -> Result<vui::StepSuccess, vui::StepError> {
+    fn step(
+        &mut self,
+        context: &vui::WidgetContext<'_>,
+    ) -> Result<vui::StepSuccess, vui::StepError> {
         let activity = self.common.step();
+        let mut txn = if activity.changed {
+            self.draw_txn(activity.state)
+        } else {
+            SpaceTransaction::default()
+        };
+        activity.add_fluff(context, &mut txn);
         Ok((
-            if activity.changed {
-                self.draw_txn(activity.state)
-            } else {
-                SpaceTransaction::default()
-            },
+            txn,
             // TODO: use waking
             vui::Then::Step,
         ))
@@ -169,14 +186,19 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
             .map_err(|error| vui::InstallVuiError::Conflict { error })
     }
 
-    fn step(&mut self, _: &vui::WidgetContext<'_>) -> Result<vui::StepSuccess, vui::StepError> {
+    fn step(
+        &mut self,
+        context: &vui::WidgetContext<'_>,
+    ) -> Result<vui::StepSuccess, vui::StepError> {
         let activity = self.common.step();
+        let mut txn = if self.todo.get_and_clear() || activity.changed {
+            self.draw_txn(activity.state)
+        } else {
+            SpaceTransaction::default()
+        };
+        activity.add_fluff(context, &mut txn);
         Ok((
-            if self.todo.get_and_clear() || activity.changed {
-                self.draw_txn(activity.state)
-            } else {
-                SpaceTransaction::default()
-            },
+            txn,
             // TODO: use waking
             vui::Then::Step,
         ))
