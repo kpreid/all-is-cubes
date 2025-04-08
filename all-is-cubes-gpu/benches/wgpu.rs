@@ -25,7 +25,7 @@ fn main() {
 
     let mut criterion: Criterion<_> = Criterion::default().configure_from_args();
 
-    let instance = runtime.block_on(init::create_instance_for_test_or_exit());
+    let instance = runtime.block_on(init::create_instance_for_test_or_exit(false));
 
     render_benches(&runtime, &mut criterion, &instance);
     light_benches(&runtime, &mut criterion, &instance);

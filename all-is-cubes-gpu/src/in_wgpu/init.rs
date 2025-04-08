@@ -16,12 +16,16 @@ use all_is_cubes_render::{Flaws, Rendering, camera};
 /// and exit the process if it does not.
 /// Print status information to stderr.
 #[doc(hidden)]
-pub async fn create_instance_for_test_or_exit() -> wgpu::Instance {
+pub async fn create_instance_for_test_or_exit(allow_noop: bool) -> wgpu::Instance {
     let stderr = &mut std::io::stderr();
     let backends = wgpu::Backends::from_env().unwrap_or_else(wgpu::Backends::all);
 
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends,
+        backend_options: wgpu::BackendOptions {
+            noop: wgpu::NoopBackendOptions { enable: allow_noop },
+            ..Default::default()
+        },
         ..Default::default()
     });
 

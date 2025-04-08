@@ -69,6 +69,11 @@ pub trait RendererFactory: Send + Sync + Debug {
     }
 
     fn id(&self) -> RendererId;
+
+    /// Returns whether all images from this renderer are known to be incorrect due to inability
+    /// to obtain a GPU or other necessary resources. Those images should also report
+    /// `Flaws::OTHER` (TODO: assign a dedicated flag bit?).
+    fn known_incorrect(&self) -> bool;
 }
 
 /// [`RendererFactory`] implementor which produces [`all_is_cubes_render::raytracer::RtRenderer`]s.
@@ -87,6 +92,10 @@ impl RendererFactory for RtFactory {
 
     fn id(&self) -> RendererId {
         RendererId::Raytracer
+    }
+
+    fn known_incorrect(&self) -> bool {
+        false
     }
 }
 

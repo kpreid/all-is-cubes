@@ -483,6 +483,11 @@ async fn follow_character_change(context: RenderTestContext) {
     renderer.update(None).await.unwrap();
     let image1 = renderer.draw("").await.unwrap();
 
+    // Don't assert if they would fail because the renderer is stubbed
+    if context.renderer_known_incorrect() {
+        return;
+    }
+
     // It'd be surprising if this fails, but we should validate our premises.
     assert_eq!(
         image1.data[0],
