@@ -91,9 +91,9 @@ time = { workspace = true }
 tinytemplate = "1.2.1"
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync", "time"] }
-# In addition to depending on wgpu directly, we also need to select backends to be enabled in our binary.
-# (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
-wgpu = { workspace = true, features = ["dx12", "metal"] }
+# In addition to depending on wgpu directly, we also need to enable backends for the tests to
+# actually find an adapter. Enabling default features suffices (as of wgpu 24.0).
+wgpu = { workspace = true, default-features = true }
 
 [lints]
 workspace = true
