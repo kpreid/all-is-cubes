@@ -98,9 +98,8 @@ strum = { workspace = true, features = ["derive", "std"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync"] }
 ratatui = { version = "0.29.0", optional = true, default-features = false, features = ["crossterm"] }
 unicode-width = { workspace = true, optional = true }
-# We have no true direct dependency on wgpu, but do need to select backends.
-# (As of wgpu 0.19, Vulkan is implicitly enabled on Linux.)
-wgpu = { workspace = true, features = ["dx12", "metal"] }
+# Must enable all wgpu backends we want the desktop binary to support.
+wgpu = { workspace = true, features = ["dx12", "metal", "vulkan"] }
 # Note on feature selection: winit requires either "x11" or "wayland" to build at all on Linux, which is harmless elsewhere. I picked x11 because it should be the most compatible.
 winit = { version = "0.30.0", default-features = false, features = ["x11", "rwh_06"] }
 # Enable the log_hiccups feature

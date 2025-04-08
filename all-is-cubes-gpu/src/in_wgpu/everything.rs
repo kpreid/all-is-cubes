@@ -131,6 +131,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 ..wgpu::Limits::downlevel_webgl2_defaults().using_resolution(available_limits)
             },
             memory_hints: wgpu::MemoryHints::default(), // TODO: consider setting
+            trace: wgpu::Trace::Off,
         }
     }
 

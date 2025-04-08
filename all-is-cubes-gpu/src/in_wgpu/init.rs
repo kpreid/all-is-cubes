@@ -90,9 +90,9 @@ pub async fn try_create_adapter_for_test(
     // TODO: Replace this with
     //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None)
     // (which defaults to low-power) or even better, test on *all* available adapters?
-    let mut adapter: Option<wgpu::Adapter> =
+    let mut adapter: Result<wgpu::Adapter, wgpu::RequestAdapterError> =
         wgpu::util::initialize_adapter_from_env(instance, surface.as_ref());
-    if adapter.is_none() {
+    if let Err(wgpu::RequestAdapterError::EnvNotSet) = adapter {
         log(format_args!(
             "No adapter specified via WGPU_ADAPTER_NAME; picking automatically."
         ));
@@ -108,7 +108,7 @@ pub async fn try_create_adapter_for_test(
 
     if adapter
         .as_ref()
-        .is_some_and(|adapter| adapter.get_info().name == "Microsoft Basic Render Driver")
+        .is_ok_and(|adapter| adapter.get_info().name == "Microsoft Basic Render Driver")
     {
         // TODO: This is *probably* a wgpu bug or a Microsoft driver bug, which ideally would be
         // reported upstream, but the only practical Windows access I have right now is CI, so
@@ -116,19 +116,25 @@ pub async fn try_create_adapter_for_test(
         log(format_args!(
             "Skipping Microsoft Basic Render Driver which is known to fail."
         ));
-        adapter = None;
+        return None;
     }
 
-    if let Some(adapter) = &adapter {
-        log(format_args!(
-            "Using: {}",
-            shortened_adapter_info(&adapter.get_info())
-        ));
-    } else {
-        log(format_args!("Failed to obtain any wgpu adapter."))
+    match adapter {
+        Ok(adapter) => {
+            log(format_args!(
+                "Using: {}",
+                shortened_adapter_info(&adapter.get_info())
+            ));
+            Some(adapter)
+        }
+        Err(error) => {
+            log(format_args!(
+                "Failed to obtain any wgpu adapter. Error:\n{chain}",
+                chain = all_is_cubes::util::ErrorChain(&error)
+            ));
+            None
+        }
     }
-
-    adapter
 }
 
 #[allow(dead_code, reason = "conditionally used")]

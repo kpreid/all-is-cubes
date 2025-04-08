@@ -106,18 +106,9 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
         // Poll all the devices to poll.
         // eprintln!("poller: polling {}", to_poll.len());
         for device in to_poll.keys() {
-            // Kludge: As of wgpu 0.18, using Maintain::Poll doesn't actually have any
-            // effect (doesn't cause the map callbacks to run) on WebGL on Firefox.
-            // So, for now, use Maintain::Wait (which also doesn't actually do any waiting
-            // (wgpu bug), but *does* trigger the callbacks).
-            // TODO: See if we can remove this in the next wgpu version.
-            let maintain = if cfg!(target_family = "wasm") {
-                wgpu::Maintain::Wait
-            } else {
-                wgpu::Maintain::Poll
-            };
-
-            device.poll(maintain);
+            device
+                .poll(wgpu::PollType::Poll)
+                .expect("unreachable: poll() timed out despite not using timeout");
         }
 
         // While waiting for it to be time to poll again, check for incoming requests.

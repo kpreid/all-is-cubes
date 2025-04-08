@@ -85,7 +85,7 @@ async fn light_texture_write_read(
     let instance = crate::harness::instance().await;
     let adapter = init::create_adapter_for_test(instance).await;
     let (device, queue) = adapter
-        .request_device(&wgpu::DeviceDescriptor::default(), None)
+        .request_device(&wgpu::DeviceDescriptor::default())
         .await
         .expect("failed to request_device");
     let device = Arc::new(device);

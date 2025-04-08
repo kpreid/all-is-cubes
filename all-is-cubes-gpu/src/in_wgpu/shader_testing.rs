@@ -48,7 +48,6 @@ where
                 device_label,
                 adapter.limits(),
             ),
-            None,
         )
         .await
         .unwrap();

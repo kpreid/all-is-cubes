@@ -128,13 +128,10 @@ fn light_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance
         .block_on(async {
             let adapter = init::create_adapter_for_test(instance).await;
             adapter
-                .request_device(
-                    &all_is_cubes_gpu::in_wgpu::device_descriptor(
-                        "module_benches",
-                        adapter.limits(),
-                    ),
-                    None,
-                )
+                .request_device(&all_is_cubes_gpu::in_wgpu::device_descriptor(
+                    "module_benches",
+                    adapter.limits(),
+                ))
                 .await
         })
         .unwrap();
