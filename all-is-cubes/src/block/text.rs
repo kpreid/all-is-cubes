@@ -400,8 +400,10 @@ impl<'a> arbitrary::Arbitrary<'a> for Text {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // As a temporary measure, restrict GridAab coordinate range to avoid overflows.
         // Eventually we should fix the overflows, but let's do that after we build our own
-        // text rendering because that'll be easier.
-        // (Another possibility would be to actually restrict `layout_bounds` itself,)
+        // text rendering because that'll be easier. Once that’s done, replace this with a
+        // derived implementation.
+        //
+        // (Another possibility would be to actually restrict `layout_bounds` itself.)
         let layout_bounds = GridAab::checked_from_lower_upper(
             <[i16; 3]>::arbitrary(u)?.map(i32::from),
             <[u16; 3]>::arbitrary(u)?.map(i32::from),

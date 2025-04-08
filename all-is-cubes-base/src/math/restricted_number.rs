@@ -664,6 +664,13 @@ where
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         NotNan::<T>::size_hint(depth)
     }
+
+    #[inline(never)]
+    fn try_size_hint(
+        depth: usize,
+    ) -> arbitrary::Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+        NotNan::<T>::try_size_hint(depth)
+    }
 }
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
@@ -686,6 +693,13 @@ where
     #[inline(never)]
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         NotNan::<T>::size_hint(depth)
+    }
+
+    #[inline(never)]
+    fn try_size_hint(
+        depth: usize,
+    ) -> arbitrary::Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+        NotNan::<T>::try_size_hint(depth)
     }
 }
 
@@ -858,6 +872,21 @@ mod tests {
         ] {
             zo32(f).consistency_check();
         }
+    }
+
+    #[cfg(feature = "arbitrary")]
+    #[test]
+    fn arbitrary_size_hints() {
+        use arbitrary::Arbitrary as _;
+
+        assert_eq!(ZeroOne::<f32>::size_hint(0), (4, Some(4)));
+        assert_eq!(ZeroOne::<f32>::try_size_hint(0).unwrap(), (4, Some(4)));
+        assert_eq!(PositiveSign::<f32>::size_hint(0), (4, Some(4)));
+        assert_eq!(PositiveSign::<f32>::try_size_hint(0).unwrap(), (4, Some(4)));
+        assert_eq!(ZeroOne::<f64>::size_hint(0), (8, Some(8)));
+        assert_eq!(ZeroOne::<f64>::try_size_hint(0).unwrap(), (8, Some(8)));
+        assert_eq!(PositiveSign::<f64>::size_hint(0), (8, Some(8)));
+        assert_eq!(PositiveSign::<f64>::try_size_hint(0).unwrap(), (8, Some(8)));
     }
 
     // TODO: could use some edge-case tests for being closed under arithmetic ops,

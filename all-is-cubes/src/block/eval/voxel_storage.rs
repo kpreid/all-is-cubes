@@ -329,8 +329,8 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         use crate::math::GridCoordinate;
 
-        let max_data_size = GridAab::for_block(Resolution::MAX).volume().unwrap()
-            * Evoxel::size_hint(depth).1.unwrap();
+        let max_data_size =
+            GridAab::for_block(Resolution::MAX).volume().unwrap() * Evoxel::size_hint(0).1.unwrap();
 
         arbitrary::size_hint::and(
             Resolution::size_hint(depth),
@@ -418,5 +418,15 @@ mod tests {
         // This is unfortunately probabilistic and might be broken by a change in implementation,
         // but we do want to be assured that the hash is okayish.
         assert!(collisions < checks / 10);
+    }
+
+    #[cfg(feature = "arbitrary")]
+    #[test]
+    fn arbitrary_size_hints() {
+        use arbitrary::Arbitrary as _;
+
+        // Check that the size hints are bounded.
+        Evoxel::size_hint(0).1.unwrap();
+        Evoxels::size_hint(0).1.unwrap();
     }
 }

@@ -334,13 +334,18 @@ impl<'a> arbitrary::Arbitrary<'a> for EvaluatedBlock {
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        MinEval::size_hint(depth)
+        Self::try_size_hint(depth).unwrap_or_default()
     }
 
     fn try_size_hint(
         depth: usize,
     ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
-        MinEval::try_size_hint(depth)
+        arbitrary::size_hint::try_recursion_guard(depth, |depth| {
+            Ok(arbitrary::size_hint::and(
+                MinEval::try_size_hint(depth)?,
+                Cost::try_size_hint(depth)?,
+            ))
+        })
     }
 }
 

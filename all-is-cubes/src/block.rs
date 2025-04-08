@@ -168,6 +168,7 @@ pub enum Primitive {
 ///
 /// [intensive properties]: https://en.wikipedia.org/wiki/Intensive_and_extensive_properties
 #[derive(Clone, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[expect(clippy::exhaustive_structs)]
 pub struct Atom {
     /// The color exhibited by diffuse reflection from this block.
@@ -912,16 +913,12 @@ mod arbitrary_block {
         }
     }
 
-    // Manual impl because `GridPoint` doesn't impl Arbitrary.
+    // Manual impl because `Primitive::Text` isn't properly overflow-proof yet.
     impl<'a> Arbitrary<'a> for Primitive {
         fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
             Ok(match u.int_in_range(0..=4)? {
                 0 => Primitive::Air,
-                1 => Primitive::Atom(Atom {
-                    color: Rgba::arbitrary(u)?,
-                    emission: Rgb::arbitrary(u)?,
-                    collision: BlockCollision::arbitrary(u)?,
-                }),
+                1 => Primitive::Atom(Atom::arbitrary(u)?),
                 2 => Primitive::Indirect(Handle::arbitrary(u)?),
                 3 => Primitive::Recur {
                     offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
@@ -930,7 +927,8 @@ mod arbitrary_block {
                 },
                 4 => Primitive::Text {
                     text: text::Text::arbitrary(u)?,
-                    // TODO: fix unhandled overflows so this can be full i32 range
+                    // TODO: fix unhandled overflows so this can be full i32 range,
+                    // then replace this `Arbitrary` impl with a derived one
                     offset: GridVector::from(<[i16; 3]>::arbitrary(u)?.map(i32::from)),
                 },
                 _ => unreachable!(),

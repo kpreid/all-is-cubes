@@ -254,6 +254,8 @@ impl fmt::Debug for IconRow {
     }
 }
 
+// Manual implementation of `Arbitrary` because, currently, if we don't then the
+// size hint will be missing, because the `euclid` vector types don't give one.
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for IconRow {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {

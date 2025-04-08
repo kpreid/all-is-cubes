@@ -649,6 +649,8 @@ impl fmt::Debug for Rgba {
     }
 }
 
+// Note: These currently cannot be derived implementations, because
+// `euclid`'s `Arbitrary` implementations don't implement size hints.
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
 #[allow(clippy::missing_inline_in_public_items)]
@@ -657,8 +659,8 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgb {
         Ok(Rgb::new_ps(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
     }
 
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        <[f32; 3]>::size_hint(depth)
+    fn size_hint(_depth: usize) -> (usize, Option<usize>) {
+        <[PositiveSign<f32>; 3]>::size_hint(0) // non-recursive, so don't fail
     }
 }
 #[cfg(feature = "arbitrary")]
@@ -674,8 +676,8 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgba {
         ))
     }
 
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        <[f32; 4]>::size_hint(depth)
+    fn size_hint(_depth: usize) -> (usize, Option<usize>) {
+        <[PositiveSign<f32>; 4]>::size_hint(0) // non-recursive, so don't fail
     }
 }
 
@@ -984,5 +986,16 @@ mod tests {
             Rgb::UNIFORM_LUMINANCE_GREEN.with_alpha_one().to_srgb8(),
             optimize(1)
         );
+    }
+
+    #[cfg(feature = "arbitrary")]
+    #[test]
+    fn arbitrary_size_hints() {
+        use arbitrary::Arbitrary as _;
+
+        assert_eq!(Rgb::size_hint(0), (12, Some(12)));
+        assert_eq!(Rgb::try_size_hint(0).unwrap(), (12, Some(12)));
+        assert_eq!(Rgba::size_hint(0), (16, Some(16)));
+        assert_eq!(Rgba::try_size_hint(0).unwrap(), (16, Some(16)));
     }
 }

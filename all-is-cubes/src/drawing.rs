@@ -307,6 +307,7 @@ impl<'a> VoxelColor<'a> for Rgb888 {
 /// Note that only `&VoxelBrush` implements [`PixelColor`]; this is because `PixelColor`
 /// requires a value implementing [`Copy`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct VoxelBrush<'a>(Vec<(GridVector, Cow<'a, Block>)>);
 
 impl VoxelBrush<'static> {
@@ -488,34 +489,6 @@ impl crate::universe::VisitHandles for VoxelBrush<'_> {
         for (_, block) in self.0.iter() {
             block.visit_handles(visitor);
         }
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-#[mutants::skip]
-impl<'a, 'b> arbitrary::Arbitrary<'a> for VoxelBrush<'b> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(VoxelBrush(
-            u.arbitrary_iter()?
-                .map(|result| {
-                    // `GridVector` doesn't implement `Arbitrary`
-                    result.map(|(offset, block): ([i32; 3], Block)| {
-                        (offset.into(), Cow::Owned(block))
-                    })
-                })
-                .collect::<arbitrary::Result<Vec<(GridVector, Cow<'b, Block>)>>>()?,
-        ))
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::{
-            Arbitrary,
-            size_hint::{and, and_all},
-        };
-        and(
-            and(GridAab::size_hint(depth), bool::size_hint(depth)),
-            and_all(&[<f64 as Arbitrary>::size_hint(depth); 6]),
-        )
     }
 }
 

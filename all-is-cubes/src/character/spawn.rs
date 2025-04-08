@@ -19,6 +19,7 @@ use crate::universe::{HandleVisitor, VisitHandles};
 /// [`Character`]: super::Character
 /// [`Space`]: crate::space::Space
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Spawn {
     /// Volume which is permitted to be occupied.
     pub(super) bounds: GridAab,
@@ -161,34 +162,5 @@ impl<'de> serde::Deserialize<'de> for Spawn {
                 inventory: inventory.into_iter().map(|slot| slot.into()).collect(),
             }),
         }
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-#[mutants::skip]
-impl<'a> arbitrary::Arbitrary<'a> for Spawn {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self {
-            bounds: GridAab::arbitrary(u)?,
-            eye_position: if u.arbitrary()? {
-                // Point3D doesn't implement Arbitrary
-                Some(Point3D::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?))
-            } else {
-                None
-            },
-            look_direction: Vector3D::new(u.arbitrary()?, u.arbitrary()?, u.arbitrary()?), // Vector3D doesn't implement Arbitrary
-            inventory: vec![], // TODO: need impl Arbitrary for Tool
-        })
-    }
-
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        use arbitrary::{
-            Arbitrary,
-            size_hint::{and, and_all},
-        };
-        and(
-            and(GridAab::size_hint(depth), bool::size_hint(depth)),
-            and_all(&[<f64 as Arbitrary>::size_hint(depth); 6]),
-        )
     }
 }
