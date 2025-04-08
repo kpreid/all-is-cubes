@@ -858,6 +858,44 @@ mod op {
     }
 }
 
+mod sound {
+    use super::*;
+    use crate::sound;
+
+    impl Serialize for sound::SoundDef {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            schema::SoundDefSer::SynthesizedSoundV1 {
+                duration: self.duration,
+                frequency: self.frequency,
+                amplitude: self.amplitude,
+            }
+            .serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for sound::SoundDef {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            match schema::SoundDefSer::deserialize(deserializer)? {
+                schema::SoundDefSer::SynthesizedSoundV1 {
+                    duration,
+                    frequency,
+                    amplitude,
+                } => Ok(sound::SoundDef {
+                    duration,
+                    frequency,
+                    amplitude,
+                }),
+            }
+        }
+    }
+}
+
 mod space {
     use super::*;
     use crate::math::{Rgb, Vol};
@@ -1108,6 +1146,7 @@ mod universe {
     use crate::block::BlockDef;
     use crate::character::Character;
     use crate::save::schema::MemberEntrySer;
+    use crate::sound::SoundDef;
     use crate::space::Space;
     use crate::tag::TagDef;
     use crate::time;
@@ -1128,6 +1167,7 @@ mod universe {
             let Self {
                 blocks,
                 characters,
+                sounds,
                 spaces,
                 tags,
             } = self;
@@ -1147,6 +1187,14 @@ mod universe {
                 Ok(MemberEntrySer {
                     name: member_handle.name(),
                     value: schema::MemberSer::Character {
+                        value: schema::SerializeHandle(member_handle.clone()),
+                    },
+                })
+            });
+            let sounds = sounds.iter().map(|member_handle: &Handle<SoundDef>| {
+                Ok(MemberEntrySer {
+                    name: member_handle.name(),
+                    value: schema::MemberSer::Sound {
                         value: schema::SerializeHandle(member_handle.clone()),
                     },
                 })
@@ -1171,6 +1219,7 @@ mod universe {
             schema::UniverseSer::UniverseV1 {
                 members: blocks
                     .chain(characters)
+                    .chain(sounds)
                     .chain(spaces)
                     .chain(tags)
                     .collect::<Result<Vec<MemberEntrySer<schema::MemberSer>>, S::Error>>()?,
@@ -1203,15 +1252,12 @@ mod universe {
                             MemberDe::Block { value: block } => {
                                 universe.insert_deserialized(name, BlockDef::new(block))
                             }
-                            MemberDe::Character { value: character } => {
-                                universe.insert_deserialized(name, character)
+                            MemberDe::Character { value } => {
+                                universe.insert_deserialized(name, value)
                             }
-                            MemberDe::Space { value: space } => {
-                                universe.insert_deserialized(name, space)
-                            }
-                            MemberDe::Tag { value: tag_def } => {
-                                universe.insert_deserialized(name, tag_def)
-                            }
+                            MemberDe::Sound { value } => universe.insert_deserialized(name, value),
+                            MemberDe::Space { value } => universe.insert_deserialized(name, value),
+                            MemberDe::Tag { value } => universe.insert_deserialized(name, value),
                         }
                         .expect("insertion from deserialization failed");
                     }

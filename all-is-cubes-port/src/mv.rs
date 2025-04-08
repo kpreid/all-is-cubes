@@ -109,6 +109,7 @@ async fn export_to_dot_vox_data(
         contents:
             PartialUniverse {
                 blocks: block_defs,
+                sounds,
                 spaces: to_export,
                 characters: _,
                 tags,
@@ -117,6 +118,7 @@ async fn export_to_dot_vox_data(
 
     // TODO: I forget; is there a reason we just ignore instead of erroring on characters?
     crate::reject_unsupported_members(Format::DotVox, block_defs)?;
+    crate::reject_unsupported_members(Format::DotVox, sounds)?;
     crate::reject_unsupported_members(Format::DotVox, tags)?;
 
     let mut palette: Vec<dot_vox::Color> = Vec::new();

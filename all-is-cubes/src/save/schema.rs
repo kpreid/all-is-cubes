@@ -34,7 +34,7 @@ use crate::math::{
 use crate::save::compress::{GzSerde, Leu16};
 use crate::time::Schedule;
 use crate::universe::Handle;
-use crate::{behavior, block, character, inv, op, space, tag, universe};
+use crate::{behavior, block, character, inv, op, sound, space, tag, universe};
 
 /// Placeholder type for when we want to serialize the *contents* of a `Handle`,
 /// without cloning or referencing those contents immediately.
@@ -318,6 +318,7 @@ pub(crate) enum SpawnSer {
         inventory: Vec<Option<InvStackSer>>,
     },
 }
+
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `inv` module
 
@@ -442,6 +443,18 @@ pub(crate) enum BodySer {
         pitch: f64,
     },
 }
+//------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `sound` module
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum SoundDefSer {
+    SynthesizedSoundV1 {
+        duration: ZeroOne<f32>,
+        frequency: PositiveSign<f32>,
+        amplitude: ZeroOne<f32>,
+    },
+}
 
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `space` module
@@ -535,19 +548,21 @@ pub(crate) enum ScheduleSer {
 /// case vs. the deserialization case.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
-pub(crate) enum UniverseSchema<C, S, T> {
+pub(crate) enum UniverseSchema<C, So, Sp, T> {
     UniverseV1 {
         /// Note: We are currently targeting JSON output, which cannot use non-string keys.
         /// Therefore, this is not expressed as a map.
-        members: Vec<MemberEntrySer<MemberSchema<C, S, T>>>,
+        members: Vec<MemberEntrySer<MemberSchema<C, So, Sp, T>>>,
     },
 }
 pub(crate) type UniverseSer = UniverseSchema<
     SerializeHandle<character::Character>,
+    SerializeHandle<sound::SoundDef>,
     SerializeHandle<space::Space>,
     SerializeHandle<tag::TagDef>,
 >;
-pub(crate) type UniverseDe = UniverseSchema<character::Character, space::Space, tag::TagDef>;
+pub(crate) type UniverseDe =
+    UniverseSchema<character::Character, sound::SoundDef, space::Space, tag::TagDef>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct MemberEntrySer<T> {
@@ -558,18 +573,24 @@ pub(crate) struct MemberEntrySer<T> {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "member_type")]
-pub(crate) enum MemberSchema<C, S, T> {
+pub(crate) enum MemberSchema<C, So, Sp, T> {
+    // Cheap-to-clone members can have their values directly here;
+    // expensive or unclonable ones need to be serialized by handle.
+    // TODO: Should TagDef be really counted as expensive?
     Block { value: Block },
     Character { value: C },
-    Space { value: S },
+    Sound { value: So },
+    Space { value: Sp },
     Tag { value: T },
 }
 pub(crate) type MemberSer = MemberSchema<
     SerializeHandle<character::Character>,
+    SerializeHandle<sound::SoundDef>,
     SerializeHandle<space::Space>,
     SerializeHandle<tag::TagDef>,
 >;
-pub(crate) type MemberDe = MemberSchema<character::Character, space::Space, tag::TagDef>;
+pub(crate) type MemberDe =
+    MemberSchema<character::Character, sound::SoundDef, space::Space, tag::TagDef>;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]

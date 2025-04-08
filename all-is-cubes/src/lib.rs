@@ -177,6 +177,7 @@ pub mod raytracer;
 #[doc(hidden)]
 pub mod rerun_glue;
 pub mod save;
+pub mod sound;
 pub mod space;
 pub mod tag;
 pub mod time;

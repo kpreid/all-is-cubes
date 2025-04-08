@@ -22,17 +22,17 @@ pub(crate) async fn export_stl(
     source: crate::ExportSet,
     destination: std::path::PathBuf,
 ) -> Result<(), crate::ExportError> {
+    // TODO: this should be doing reject_unsupported_members but that is incompatible with member_export_path() -- fix somehow
     let crate::ExportSet {
         contents:
             PartialUniverse {
                 blocks: block_defs,
+                sounds: _,
                 spaces,
                 characters: _,
                 tags: _,
             },
     } = &source;
-
-    // TODO: give each exported item a distinct filename suffix
 
     for space in spaces {
         stl_io::write_stl(

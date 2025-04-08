@@ -364,6 +364,7 @@ pub(crate) async fn export_gltf(
         contents:
             PartialUniverse {
                 blocks: block_defs,
+                sounds,
                 spaces,
                 characters,
                 tags,
@@ -371,6 +372,7 @@ pub(crate) async fn export_gltf(
     } = source;
 
     crate::reject_unsupported_members(Format::Gltf, characters)?;
+    crate::reject_unsupported_members(Format::Gltf, sounds)?;
     crate::reject_unsupported_members(Format::Gltf, tags)?;
 
     let [block_def_progress, space_progress] = progress.split(0.5); // TODO: ratio

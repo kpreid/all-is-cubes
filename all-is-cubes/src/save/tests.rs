@@ -17,7 +17,7 @@ use crate::block::{
 use crate::character::{Character, Spawn};
 use crate::content::make_some_blocks;
 use crate::inv::{self, EphemeralOpaque, Inventory, Tool};
-use crate::math::{Cube, Face6, GridAab, GridRotation, Rgb, Rgba, notnan};
+use crate::math::{Cube, Face6, GridAab, GridRotation, Rgb, Rgba, notnan, ps32, zo32};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};
@@ -828,6 +828,7 @@ fn space_light_queue_remembered() {
 // Tests corresponding to the `universe` module
 
 /// A universe with one of each type, which we're going to use in a couple tests.
+/// This also helps exercise some of the serialization of those types.
 fn universe_with_one_of_each() -> Universe {
     let mut universe = Universe::new();
 
@@ -839,6 +840,17 @@ fn universe_with_one_of_each() -> Universe {
     block.modifiers_mut().push(Modifier::Tag(tag::Be(tag)));
     let block_handle = universe
         .insert("a_block".into(), BlockDef::new(block))
+        .unwrap();
+
+    universe
+        .insert(
+            "a_sound".into(),
+            crate::sound::SoundDef {
+                duration: zo32(0.5),
+                frequency: ps32(100.0),
+                amplitude: zo32(0.25),
+            },
+        )
         .unwrap();
 
     // Note: space has no light (which simplifies our work here)
@@ -925,6 +937,16 @@ fn universe_with_one_of_each_json() -> serde_json::Value {
                             }
                         ]
                     }
+                }
+            },
+            {
+                "name": {"Specific": "a_sound"},
+                "member_type": "Sound",
+                "value": {
+                    "type": "SynthesizedSoundV1",
+                    "amplitude": 0.25,
+                    "duration": 0.5,
+                    "frequency": 100.0,
                 }
             },
             {

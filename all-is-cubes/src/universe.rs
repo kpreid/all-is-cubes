@@ -621,12 +621,14 @@ impl Universe {
         let UniverseTables {
             blocks,
             characters,
+            sounds,
             spaces,
             tags,
         } = &mut self.tables;
 
         blocks.remove(name).is_some()
             || characters.remove(name).is_some()
+            || sounds.remove(name).is_some()
             || spaces.remove(name).is_some()
             || tags.remove(name).is_some()
     }
@@ -639,6 +641,7 @@ impl Universe {
         let UniverseTables {
             blocks,
             characters,
+            sounds,
             spaces,
             tags,
         } = &mut self.tables;
@@ -653,6 +656,7 @@ impl Universe {
         // go away at a time that is deterministic with respect to the simulation.
         gc_members(blocks);
         gc_members(characters);
+        gc_members(sounds);
         gc_members(spaces);
         gc_members(tags);
     }
@@ -669,12 +673,14 @@ impl Universe {
         let UniverseTables {
             blocks,
             characters,
+            sounds,
             spaces,
             tags,
         } = &self.tables;
 
         fix_handles_in_members(visitor, blocks)?;
         fix_handles_in_members(visitor, characters)?;
+        fix_handles_in_members(visitor, sounds)?;
         fix_handles_in_members(visitor, spaces)?;
         fix_handles_in_members(visitor, tags)?;
 
@@ -955,6 +961,7 @@ pub struct PartialUniverse {
     // exports to be statically exhaustive.
     pub blocks: Vec<Handle<block::BlockDef>>,
     pub characters: Vec<Handle<Character>>,
+    pub sounds: Vec<Handle<crate::sound::SoundDef>>,
     pub spaces: Vec<Handle<Space>>,
     pub tags: Vec<Handle<crate::tag::TagDef>>,
 }
@@ -964,6 +971,7 @@ impl PartialUniverse {
         Self {
             blocks: universe.iter_by_type().map(|(_, r)| r).collect(),
             characters: universe.iter_by_type().map(|(_, r)| r).collect(),
+            sounds: universe.iter_by_type().map(|(_, r)| r).collect(),
             spaces: universe.iter_by_type().map(|(_, r)| r).collect(),
             tags: universe.iter_by_type().map(|(_, r)| r).collect(),
         }
@@ -983,9 +991,10 @@ impl PartialUniverse {
         let Self {
             blocks,
             characters,
+            sounds,
             spaces,
             tags,
         } = self;
-        blocks.len() + characters.len() + spaces.len() + tags.len()
+        blocks.len() + characters.len() + sounds.len() + spaces.len() + tags.len()
     }
 }

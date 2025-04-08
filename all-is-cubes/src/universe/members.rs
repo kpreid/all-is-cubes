@@ -12,6 +12,7 @@ use core::fmt;
 
 use crate::block::BlockDef;
 use crate::character::Character;
+use crate::sound::SoundDef;
 use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
@@ -397,15 +398,18 @@ macro_rules! member_enums_and_impls {
 
 // This macro does not handle everything.
 // To add another type, it is also necessary to update:
-//    impl Debug for Universe
-//    Universe::get_any
 //    Universe::delete
 //    Universe::gc
-//    Universe::step
+//    Universe::fix_deserialized_handles
+//    Universe::step (if the members do anything on step)
+//    struct PartialUniverse
+//    impl Serialize for PartialUniverse
+//    save::schema::MemberSer
 //    transaction::universe_txn::*
 member_enums_and_impls!(
     (BlockDef, blocks),
     (Character, characters),
+    (SoundDef, sounds),
     (Space, spaces),
     (TagDef, tags),
 );
