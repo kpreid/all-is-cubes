@@ -10,6 +10,8 @@ use all_is_cubes_wasm::js_bindings::CanvasHelper;
 
 #[wasm_bindgen_test]
 fn canvas_helper_viewport() {
+    console_error_panic_hook::set_once();
+
     let document = web_sys::window()
         .expect("missing `window`")
         .document()
