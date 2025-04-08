@@ -25,7 +25,7 @@ use crate::in_wgpu::{self, init};
 #[derive(Clone, Debug)]
 pub struct Builder {
     executor: Arc<dyn Executor>,
-    adapter: wgpu::Adapter,
+    pub(crate) adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
 }
@@ -76,6 +76,7 @@ impl Builder {
         let color_texture = create_color_texture(&self.device, viewport);
 
         Renderer::wrap(RendererImpl {
+            adapter_info: self.adapter.get_info(),
             device: self.device.clone(),
             queue: self.queue.clone(),
             color_texture,
@@ -103,12 +104,17 @@ pub struct Renderer {
 /// Internals of [`Renderer`] to actually do the rendering.
 #[derive(Debug)]
 struct RendererImpl {
+    adapter_info: wgpu::AdapterInfo,
     device: wgpu::Device,
     queue: wgpu::Queue,
+
     color_texture: wgpu::Texture,
     everything: super::EverythingRenderer<AdaptedInstant>,
+
     viewport_source: listen::DynSource<Viewport>,
     viewport_dirty: listen::Flag,
+
+    /// Flaws from the last [`Self::update()`] call.
     flaws: Flaws,
 }
 
@@ -206,6 +212,14 @@ impl RendererImpl {
         // TODO: refactor so that this viewport read is done synchronously, outside the RendererImpl
         let viewport = self.viewport_source.get();
 
+        // If we are using the noop testing backend, then it is expected that the image will be
+        // missing.
+        let adapter_flaws = if self.adapter_info.backend == wgpu::Backend::Noop {
+            Flaws::OTHER
+        } else {
+            Flaws::empty()
+        };
+
         if viewport.is_empty() {
             // GPU doesn't accept zero size, so we have to short-circuit it at this layer or we will
             // get a placeholder at-least-1-pixel size that EverythingRenderer uses internally.
@@ -233,7 +247,7 @@ impl RendererImpl {
             &self.device,
             &self.queue,
             &self.color_texture,
-            self.flaws | draw_info.flaws() | post_flaws,
+            self.flaws | draw_info.flaws() | post_flaws | adapter_flaws,
         )
         .await;
         debug_assert_eq!(viewport.framebuffer_size, image.size);

@@ -100,7 +100,7 @@ scopeguard = { workspace = true }
 # Using tokio for async test-running.
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
 # Enable wgpu backends for tests, by enabling default features.
-wgpu = { workspace = true, default-features = true }
+wgpu = { workspace = true, default-features = true, features = ["noop"] }
 
 
 [lints]

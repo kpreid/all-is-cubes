@@ -176,6 +176,15 @@ impl RenderTestContext {
         // The comparison log will be consulted to determine if the test should be marked failed.
         self.comparison_log.lock().unwrap().push(outcome);
     }
+
+    /// Returns whether the renderer is known to be unable to produce correct results
+    /// (non-conformant or stub implementation).
+    ///
+    /// This is part of a system which handles letting the test suite complete even when no GPU
+    /// is available to run GPU rendering tests.
+    pub fn renderer_known_incorrect(&self) -> bool {
+        self.renderer_factory.known_incorrect()
+    }
 }
 
 /// Command-line arguments for binaries using the renderer test harness.
@@ -426,6 +435,7 @@ where
             }
             Format::Terse => {}
         }
+        // TODO: If any comparisons were skipped due to Flaws, don't print “ok”.
         let outcome_for_report = match (comparison_failure, outcome) {
             (None, Ok(case_time)) => {
                 match format {
