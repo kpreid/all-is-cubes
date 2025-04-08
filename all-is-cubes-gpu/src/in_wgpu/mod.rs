@@ -114,13 +114,11 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         adapter: wgpu::Adapter,
         executor: Arc<dyn Executor>,
     ) -> Result<Self, wgpu::RequestDeviceError> {
-        let request_device_future = adapter.request_device(
-            &EverythingRenderer::<I>::device_descriptor(
+        let request_device_future =
+            adapter.request_device(&EverythingRenderer::<I>::device_descriptor(
                 "SurfaceRenderer::device",
                 adapter.limits(),
-            ),
-            None,
-        );
+            ));
         let (device, queue) = request_device_future.await?;
 
         let viewport_source = cameras.viewport_source();

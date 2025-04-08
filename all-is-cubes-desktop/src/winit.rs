@@ -216,9 +216,9 @@ pub async fn create_winit_wgpu_desktop_session(
         .context("failed to obtain graphics surface from new session’s window")?;
 
     // Pick an adapter.
-    let mut adapter: Option<wgpu::Adapter> =
+    let mut adapter: Result<wgpu::Adapter, _> =
         wgpu::util::initialize_adapter_from_env(&instance, Some(&surface));
-    if adapter.is_none() {
+    if adapter.is_err() {
         let request_adapter_future = instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::from_env()
                 .unwrap_or(wgpu::PowerPreference::HighPerformance),
@@ -227,8 +227,7 @@ pub async fn create_winit_wgpu_desktop_session(
         });
         adapter = request_adapter_future.await;
     }
-    let adapter = adapter
-        .ok_or_else(|| anyhow::format_err!("could not request suitable graphics adapter"))?;
+    let adapter = adapter.context("requesting suitable graphics adapter failed")?;
     log::debug!("Adapter: {:?}", adapter.get_info());
 
     let renderer = SurfaceRenderer::new(

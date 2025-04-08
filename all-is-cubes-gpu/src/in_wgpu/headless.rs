@@ -42,7 +42,6 @@ impl Builder {
                     label,
                     adapter.limits(),
                 ),
-                None,
             )
             .await?;
         Ok(Self {

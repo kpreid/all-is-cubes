@@ -200,7 +200,7 @@ async fn init_wgpu(
         });
         let surface = wgpu_instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
-            .map_err(|e| format!("Requesting {backends:?} context failed: {e:?}"))?;
+            .map_err(|e| format!("requesting {backends:?} context failed: {e:?}"))?;
         let request_adapter_future = wgpu_instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
@@ -208,8 +208,6 @@ async fn init_wgpu(
         });
         (surface, request_adapter_future)
     };
-    let adapter = request_adapter_future
-        .await
-        .ok_or("Could not request suitable graphics adapter")?;
+    let adapter = request_adapter_future.await?;
     Ok((surface, adapter))
 }
