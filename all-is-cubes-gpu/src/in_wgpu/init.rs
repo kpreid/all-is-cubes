@@ -204,13 +204,13 @@ where
 
     let tc = TextureCopyParameters::from_texture(texture);
     let temp_buffer = tc.copy_texture_to_new_buffer(device, queue, texture);
-    let buffer_mapped_future = map_really_async(device.clone(), &temp_buffer);
+    let buffer_mapped_future = map_really_async(device.clone(), temp_buffer.slice(..));
 
     // Await the buffer being available and build the image.
     async move {
         buffer_mapped_future.await.expect("buffer reading failed");
 
-        let texel_vector = tc.copy_mapped_to_vec(components, &temp_buffer);
+        let texel_vector = tc.copy_mapped_to_vec(components, temp_buffer.slice(..));
 
         // Note: We must do this after the get_mapped_range() has been dropped, due to the
         // WebGPU backend otherwise crashing: <https://github.com/gfx-rs/wgpu/issues/6202>.
@@ -223,10 +223,10 @@ where
 #[doc(hidden)]
 pub fn map_really_async(
     device: wgpu::Device,
-    buffer: &wgpu::Buffer,
+    buffer: wgpu::BufferSlice<'_>,
 ) -> impl Future<Output = Result<(), wgpu::BufferAsyncError>> + use<> {
     let (sender, receiver) = futures_channel::oneshot::channel();
-    buffer.slice(..).map_async(wgpu::MapMode::Read, |result| {
+    buffer.map_async(wgpu::MapMode::Read, |result| {
         let _ = sender.send(result);
     });
     let poller = super::poll::start_polling(device);
@@ -321,7 +321,7 @@ impl TextureCopyParameters {
     /// Given a mapped buffer, make a [`Vec<C>`] of it.
     ///
     /// `size_of::<C>() * components` must be equal to the byte size of a texel.
-    pub fn copy_mapped_to_vec<C>(&self, components: usize, buffer: &wgpu::Buffer) -> Vec<C>
+    pub fn copy_mapped_to_vec<C>(&self, components: usize, buffer: wgpu::BufferSlice<'_>) -> Vec<C>
     where
         C: bytemuck::AnyBitPattern,
     {
@@ -336,7 +336,7 @@ impl TextureCopyParameters {
         // by copying it one row at a time.
         let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
         {
-            let mapped: &[u8] = &buffer.slice(..).get_mapped_range();
+            let mapped: &[u8] = &buffer.get_mapped_range();
             for row in 0..self.row_count() {
                 let byte_start_of_row = (self.padded_bytes_per_row()) as usize * row;
                 // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.
