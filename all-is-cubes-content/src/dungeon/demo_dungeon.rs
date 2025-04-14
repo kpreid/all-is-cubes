@@ -4,12 +4,13 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::f64::consts::TAU;
 use core::mem;
+use rand::seq::IteratorRandom;
 
 use exhaust::Exhaust;
 use rand::prelude::IndexedRandom as _;
 use rand::{Rng, SeedableRng};
 
-use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule};
+use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule, text};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::{block_from_image, include_image};
 use all_is_cubes::content::{BoxPart, BoxStyle, palette};
@@ -25,7 +26,7 @@ use all_is_cubes::space::{LightPhysics, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{op, time};
+use all_is_cubes::{arcstr, op, time};
 
 use crate::alg::four_walls;
 use crate::dungeon::{DungeonGrid, MazeRoomKind, Theme, build_dungeon, generate_maze};
@@ -37,6 +38,7 @@ const TORCH_PATTERN: [GridCoordinate; 2] = [-4, 4];
 #[derive(Clone, Debug)]
 struct DemoRoom {
     maze_kind: MazeRoomKind,
+    position_on_path: Option<usize>,
 
     /// In a *relative* room coordinate system (1 unit = 1 room box),
     /// how big is this room? Occupying multiple rooms' space if this
@@ -443,6 +445,32 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     }
                 }
 
+                // Debug dump data for the room, so we can compare the data to what was
+                // actually generated. This is spoilers for the maze, but it’s hard to read.
+                if !room_data.corridor_only {
+                    let description = arcstr::format!(
+                        "{room_position:?}\n{kind:?}\ndop={position_on_path:?}",
+                        kind = room_data.maze_kind,
+                        position_on_path = room_data.position_on_path
+                    );
+                    let info_text_block = text::Text::builder()
+                        .string(description)
+                        .font(text::Font::SmallerBodyText)
+                        .foreground(block::from_color!(crate::palette::STEEL))
+                        .resolution(R128)
+                        .positioning(text::Positioning {
+                            line_y: text::PositioningY::BodyTop,
+                            ..text::Positioning::LOW
+                        })
+                        .build()
+                        .single_block()
+                        .rotate(GridRotation::IDENTITY);
+                    space.set(
+                        Cube::from(interior.lower_bounds() + vec3(1, 3, 0)),
+                        info_text_block,
+                    )?;
+                }
+
                 // Item.
                 if let Some(item) = room_data.grants_item.clone() {
                     // note that this is the nominal floor, not the possibly extended downward floor
@@ -460,15 +488,12 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Set spawn.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
                 if matches!(room_data.maze_kind, MazeRoomKind::Start) {
-                    let key_tool = self.make_key_tool();
-
                     let mut spawn = Spawn::default_for_new_space(space.bounds());
                     spawn.set_bounds(interior);
                     spawn.set_inventory(vec![
                         Tool::Activate.into(),
                         Tool::RemoveBlock { keep: true }.into(),
                         Tool::Jetpack { active: false }.into(),
-                        key_tool.into(),
                     ]);
 
                     // Orient towards the first room's exit.
@@ -636,7 +661,12 @@ pub(crate) async fn demo_dungeon(
 
     // Construct dungeon map
     let maze_progress = progress.start_and_cut(0.1, "generating layout").await;
-    let dungeon_map = generate_dungeon_map(seed, requested_rooms, &grantable_items);
+    let dungeon_map = generate_dungeon_map(
+        seed,
+        requested_rooms,
+        &grantable_items,
+        &theme.make_key_tool(),
+    );
     maze_progress.finish().await;
 
     // Construct space with initial bulk-filled contents
@@ -698,16 +728,46 @@ fn generate_dungeon_map(
     seed: u64,
     requested_rooms: GridSize,
     grantable_items: &[Tool],
+    key_item: &Tool,
 ) -> all_is_cubes::math::Vol<alloc::boxed::Box<[Option<DemoRoom>]>> {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
-    let maze = generate_maze(seed, requested_rooms);
+    let (maze, path_length) = generate_maze(seed, requested_rooms);
+
+    // Pick a position along the path at which the player will gain a key for use to access
+    // future rooms. It should not be the start or end room.
+    let gain_key_at_path_position: usize = rng.random_range(1..path_length - 1);
+
+    // Pick a room in which the key can be found.
+    let key_room_position: Cube = maze
+        .iter()
+        .filter(|(_, room)| room.position_on_path == Some(gain_key_at_path_position))
+        .choose(&mut rng)
+        .map(|(pos, _)| pos)
+        .expect("no candidate room for key");
+    if false {
+        log::debug!(
+            "dungeon keys: gain_key_at_path_position = {gain_key_at_path_position}, \
+            key_room_position = {key_room_position:?}"
+        );
+    }
 
     // Expand bounds to allow for extra-tall rooms.
     let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
 
-    Vol::from_fn(expanded_bounds, |room_position| {
+    // sanity check variable
+    let mut key_was_placed = false;
+
+    let map = Vol::from_fn(expanded_bounds, |room_position| {
         let maze_room = maze.get(room_position)?;
+
+        let must_grant_item: Option<Tool> = (room_position == key_room_position).then(|| {
+            key_was_placed = true;
+            key_item.clone()
+        });
+        let may_require_key = maze_room
+            .position_on_path
+            .is_some_and(|p| p > gain_key_at_path_position);
 
         // Allow rooms that are not start or end to have more interesting properties.
         let is_not_end = match maze_room.kind {
@@ -716,7 +776,7 @@ fn generate_dungeon_map(
             MazeRoomKind::Path | MazeRoomKind::OffPath => true,
         };
 
-        let corridor_only = is_not_end && rng.random_bool(0.5);
+        let corridor_only = is_not_end && must_grant_item.is_none() && rng.random_bool(0.5);
 
         let mut extended_bounds = GridAab::ORIGIN_CUBE;
         // Optional high ceiling
@@ -724,14 +784,15 @@ fn generate_dungeon_map(
             extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::PY, 1));
         }
         // Floor pit
-        let floor = if !corridor_only && is_not_end && rng.random_bool(0.25) {
-            extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
-            *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
-                .choose(&mut rng)
-                .unwrap()
-        } else {
-            FloorKind::Solid
-        };
+        let floor =
+            if !corridor_only && is_not_end && must_grant_item.is_none() && rng.random_bool(0.25) {
+                extended_bounds = extended_bounds.expand(FaceMap::default().with(Face6::NY, 1));
+                *[FloorKind::Chasm, FloorKind::Bridge, FloorKind::Bridge]
+                    .choose(&mut rng)
+                    .unwrap()
+            } else {
+                FloorKind::Solid
+            };
 
         let wall_features = {
             FaceMap::from_fn(|face| -> WallFeature {
@@ -744,20 +805,24 @@ fn generate_dungeon_map(
                         || maze[neighbor].kind == MazeRoomKind::OffPath);
 
                     let door = *if must_be_passable {
-                        // If the rooms are on the path, generate no door or a door that
-                        // is or can be opened.
-                        //
-                        // TODO: Add keys found inside the dungeon, so there can be
-                        // puzzles of actually finding the key and then the door.
-                        &[
-                            Door::None,
-                            Door::None,
-                            Door::Open,
-                            Door::Locked,
-                            Door::Locked,
-                        ][..]
+                        if may_require_key {
+                            // If the rooms are on the path and the player has a key,
+                            // generate no door or a door that is can be opened.
+                            &[
+                                Door::None,
+                                Door::None,
+                                Door::Open,
+                                Door::Locked,
+                                Door::Locked,
+                            ][..]
+                        } else {
+                            // If the rooms are on the path the player does *not* have a key,
+                            // don't generate locked doors, only already-open ones.
+                            &[Door::None, Door::None, Door::Open][..]
+                        }
                     } else {
-                        // If the rooms are not on the path, make it possibly entirely closed off.
+                        // If the rooms are not on the path, make it possibly entirely closed off,
+                        // or possibly a red-herring locked door.
                         &[Door::None, Door::Open, Door::Locked, Door::Permanent][..]
                     }
                     .choose(&mut rng)
@@ -783,20 +848,30 @@ fn generate_dungeon_map(
             })
         };
 
+        let ok_to_grant_item = matches!(floor, FloorKind::Solid) && !corridor_only && is_not_end;
+        assert!(must_grant_item.is_none() || ok_to_grant_item);
+        let grants_item = must_grant_item.or_else(|| {
+            (ok_to_grant_item && rng.random_bool(0.5))
+                .then(|| grantable_items.choose(&mut rng).unwrap().clone())
+        });
+
         Some(DemoRoom {
             maze_kind: maze_room.kind,
+            position_on_path: maze_room.position_on_path,
             extended_bounds,
             wall_features,
             floor,
             corridor_only,
-            lit: wall_features[Face6::PY] == WallFeature::Blank && rng.random_bool(0.75),
-            grants_item: (matches!(floor, FloorKind::Solid)
-                && !corridor_only
-                && is_not_end
-                && rng.random_bool(0.5))
-            .then(|| grantable_items.choose(&mut rng).unwrap().clone()),
+            // Light some rooms that might be dark, particularly if they have items in them.
+            lit: wall_features[Face6::PY] == WallFeature::Blank
+                && (grants_item.is_some() || rng.random_bool(0.75)),
+            grants_item,
         })
-    })
+    });
+
+    assert!(key_was_placed);
+
+    map
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
