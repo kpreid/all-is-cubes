@@ -45,9 +45,11 @@ impl Inventory {
         }
     }
 
-    /// TODO: temporary interface, reevaluate design
+    /// Construct an [`Inventory`] with the given slots.
+    ///
+    /// Ordinary user actions cannot change the number of slots.
     #[track_caller]
-    pub(crate) fn from_slots(items: impl Into<Box<[Slot]>>) -> Self {
+    pub fn from_slots(items: impl Into<Box<[Slot]>>) -> Self {
         let slots = items.into();
         Ix::try_from(slots.len())
             .expect("input has more slots than an inventory is allowed to have");
