@@ -1,3 +1,5 @@
+//! Generates a random abstract maze, for refinement into a dungeon elsewhere.
+
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 
@@ -5,6 +7,8 @@ use rand::SeedableRng;
 use rand::seq::{IteratorRandom as _, SliceRandom as _};
 
 use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, GridSize, Vol};
+
+// -------------------------------------------------------------------------------------------------
 
 pub type Maze = Vol<Box<[MazeRoom]>>;
 
@@ -60,6 +64,7 @@ pub fn generate_maze(seed: u64, requested_rooms: GridSize) -> Maze {
     maze
 }
 
+/// Create rooms and passages from the room `starting_cube` to a randomly chosen ending room.
 fn generate_path(
     maze: &mut Maze,
     rng: &mut rand_xoshiro::Xoshiro256Plus,
@@ -94,6 +99,8 @@ fn generate_path(
     }
 }
 
+/// Given a maze which already has start and end rooms, create dead-end paths to all the other
+/// possible rooms.
 fn generate_dead_ends(maze: &mut Maze, rng: &mut rand_xoshiro::Xoshiro256Plus) {
     let mut needs_filling: VecDeque<Cube> = maze
         .iter()
