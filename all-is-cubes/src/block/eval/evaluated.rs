@@ -10,7 +10,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::block::eval::derived::Derived;
 use crate::block::{
-    self, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels, Modifier,
+    self, Block, BlockAttributes, BlockCollision, Cost, Evoxel, Evoxels,
     Resolution::{self, R1},
     VoxelOpacityMask,
 };
@@ -19,7 +19,7 @@ use crate::math::{Face6, Face7, FaceMap, GridAab, OpacityCategory, Rgb, Rgba};
 
 // Things mentioned in doc comments only
 #[cfg(doc)]
-use crate::block::{AIR, Handle};
+use crate::block::{AIR, Handle, Modifier};
 
 /// A snapshotted form of [`Block`] which contains all information needed for rendering
 /// and physics, and does not require dereferencing [`Handle`]s or unbounded computation.
@@ -289,7 +289,7 @@ impl EvaluatedBlock {
             .map(|z| z.into_left())
             .collect::<Box<[inv::Slot]>>(),
         );
-        self.block.with_modifier(Modifier::Inventory(inventory))
+        self.block.with_modifier(inventory)
     }
 
     // --- Other ---

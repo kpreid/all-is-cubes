@@ -399,9 +399,7 @@ impl ToolInput {
             // modifier" between this and `EvaluatedBlock::with_inventory()`.
             let inventory_size = new_ev.attributes().inventory.size;
             if inventory_size > 0 {
-                new_block = new_block.with_modifier(block::Modifier::Inventory(
-                    inv::Inventory::new(inventory_size),
-                ));
+                new_block = new_block.with_modifier(inv::Inventory::new(inventory_size));
             }
 
             let affected_cube = cursor.cube() + cursor.face_selected().normal_vector();
@@ -967,10 +965,7 @@ mod tests {
                 let mut t = SpaceTransaction::set_cube(
                     Cube::ORIGIN,
                     Some(AIR),
-                    Some(
-                        tool_block
-                            .with_modifier(block::Modifier::Inventory(inv::Inventory::new(10))),
-                    ),
+                    Some(tool_block.with_modifier(inv::Inventory::new(10))),
                 );
                 t.at(Cube::ORIGIN).add_fluff(Fluff::PlaceBlockGeneric);
                 t

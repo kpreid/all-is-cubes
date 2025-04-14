@@ -7,13 +7,23 @@ use alloc::vec::Vec;
 use euclid::Point3D;
 use manyfmt::Refmt;
 
-use crate::block::Resolution;
-use crate::inv::Ix;
+use crate::block::{Modifier, Resolution};
+use crate::inv::{Inventory, Ix};
 use crate::math::{GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid};
+use crate::util::ConciseDebug;
 
 #[cfg(doc)]
-use crate::block::{self, Block, Modifier};
-use crate::util::ConciseDebug;
+use crate::block::{self, Block};
+
+// -------------------------------------------------------------------------------------------------
+
+impl From<Inventory> for Modifier {
+    fn from(value: Inventory) -> Self {
+        Modifier::Inventory(value)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Defines how a [`Modifier::Inventory`] should be configured and displayed within a [`Block`].
 ///
@@ -54,6 +64,8 @@ pub struct IconRow {
     pub(crate) origin: GridPoint,
     pub(crate) stride: GridVector,
 }
+
+// -------------------------------------------------------------------------------------------------
 
 impl InvInBlock {
     /// Value appropriate for “normal” blocks which should not carry inventories.
@@ -287,6 +299,8 @@ fn checked_add_point_vector(p: GridPoint, v: GridVector) -> Option<GridPoint> {
         p.z.checked_add(v.z)?,
     ))
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
