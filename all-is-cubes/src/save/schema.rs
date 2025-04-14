@@ -416,6 +416,9 @@ pub(crate) enum OperationSer<'a> {
     MoveInventoryV1 {
         transfer_into_adjacent: Option<Face6>,
     },
+    TakeInventoryV1 {
+        destroy_if_empty: bool,
+    },
     NeighborsV1 {
         neighbors: Cow<'a, [([i32; 3], op::Operation)]>,
     },

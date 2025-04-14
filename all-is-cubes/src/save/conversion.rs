@@ -794,6 +794,9 @@ mod op {
                 } => schema::OperationSer::MoveInventoryV1 {
                     transfer_into_adjacent,
                 },
+                &op::Operation::TakeInventory { destroy_if_empty } => {
+                    schema::OperationSer::TakeInventoryV1 { destroy_if_empty }
+                }
                 op::Operation::Neighbors(neighbors) => schema::OperationSer::NeighborsV1 {
                     // TODO: arrange to be able to borrow here
                     neighbors: Cow::Owned(
@@ -842,6 +845,9 @@ mod op {
                 } => op::Operation::MoveInventory {
                     transfer_into_adjacent,
                 },
+                schema::OperationSer::TakeInventoryV1 { destroy_if_empty } => {
+                    op::Operation::TakeInventory { destroy_if_empty }
+                }
                 schema::OperationSer::NeighborsV1 { neighbors } => op::Operation::Neighbors(
                     cow_into_iter(neighbors)
                         .map(|(offset, op)| (offset.into(), op))

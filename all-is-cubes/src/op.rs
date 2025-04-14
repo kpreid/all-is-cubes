@@ -8,7 +8,7 @@ use crate::block::{self, AIR, Block};
 use crate::inv::{self, Inventory, InventoryTransaction};
 use crate::math::{Cube, Face6, GridAab, GridRotation, Gridgid};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
-use crate::transaction::Merge;
+use crate::transaction::{Merge, Transaction};
 use crate::universe::VisitHandles;
 
 type OpTxn = (SpaceTransaction, InventoryTransaction);
@@ -90,7 +90,8 @@ pub enum Operation {
     // TODO: If the block already has a non-animated move modifier, then advance it?
     StartMove(block::Move),
 
-    /// Move the contents of the target block’s inventory.
+    /// Move the contents of the target block’s inventory within itself,
+    /// and optionally to an adjacent block’s inventory.
     ///
     /// Currently, this always performs a shift forward 1 slot of the contents of every slot.
     /// If the last slot is full, then:
@@ -103,6 +104,15 @@ pub enum Operation {
         /// Attempt to transfer inventory items to the block that is adjacent to this face of
         /// the target block.
         transfer_into_adjacent: Option<Face6>,
+    },
+
+    /// Move the contents of the target block’s inventory to the tool user’s inventory.
+    //---
+    // TODO: Allow taking a single item or single stack instead of the entire inventory.
+    TakeInventory {
+        /// Whether to destroy the block entirely (replacing it with [`AIR`])
+        /// once its inventory is empty.
+        destroy_if_empty: bool,
     },
 
     /// Apply the given operations to the cubes offset from this one.
@@ -127,7 +137,6 @@ impl Operation {
     ///
     /// Note that lack of error does not guarantee that the returned transaction will
     /// succeed. TODO: Explain how the two kinds of errors should be reported.
-    #[expect(clippy::only_used_in_recursion)] // TODO: Inventory not used *yet*.
     pub(crate) fn apply(
         &self,
         space: &Space,
@@ -348,6 +357,42 @@ impl Operation {
 
                 Ok((space_txn, InventoryTransaction::default()))
             }
+            &Operation::TakeInventory { destroy_if_empty } => {
+                let Some(destination_inventory) = inventory else {
+                    return Err(OperationError::CharacterInventoryFull);
+                };
+                // TODO: this inventory-finding code is duplicated with MoveInventory
+                let target_cube = transform.transform_cube(Cube::ORIGIN);
+                let old_block = &space[target_cube];
+                let Some((source_inventory_index, source_inventory)) = old_block.find_inventory()
+                else {
+                    todo!("error for nothing to take")
+                };
+                let to_insert =
+                    InventoryTransaction::insert(source_inventory.slots().iter().cloned());
+
+                let new_block = if destroy_if_empty {
+                    AIR
+                } else {
+                    let mut new_block = old_block.clone();
+                    new_block.modifiers_mut()[source_inventory_index] =
+                        block::Modifier::Inventory(Inventory::new(source_inventory.size()));
+                    new_block
+                };
+
+                if to_insert.check(destination_inventory).is_err() {
+                    return Err(OperationError::CharacterInventoryFull);
+                }
+
+                Ok((
+                    SpaceTransaction::set_cube(
+                        target_cube,
+                        Some(old_block.clone()),
+                        Some(new_block),
+                    ),
+                    to_insert,
+                ))
+            }
             Operation::Neighbors(neighbors) => {
                 let mut txns = OpTxn::default();
                 for &(cube, ref op) in neighbors.iter() {
@@ -376,11 +421,14 @@ impl Operation {
                 conserved: _,
                 optional: _,
             } => old.rotationally_symmetric() && new.rotationally_symmetric(),
-            Operation::AddModifiers(_) => false, // TODO: We need to ask modifiers if they are symmetric (*not* Modifier::does_not_introduce_asymmetry)
+            Operation::AddModifiers(_) => false,
             Operation::StartMove(_) => false,
             Operation::MoveInventory {
                 transfer_into_adjacent,
             } => transfer_into_adjacent.is_none(),
+            Operation::TakeInventory {
+                destroy_if_empty: _,
+            } => true,
             Operation::Neighbors(_) => false,
         }
     }
@@ -422,6 +470,9 @@ impl Operation {
             } => Operation::MoveInventory {
                 transfer_into_adjacent: transfer_into_adjacent.map(|dir| rotation.transform(dir)),
             },
+            op @ Operation::TakeInventory {
+                destroy_if_empty: _,
+            } => op,
             Operation::Neighbors(mut neighbors) => {
                 // TODO: cheaper placeholder value, like an Operation::Nop
                 let mut placeholder = Operation::Become(AIR);
@@ -461,6 +512,9 @@ impl VisitHandles for Operation {
             Operation::MoveInventory {
                 transfer_into_adjacent: _,
             } => {}
+            Operation::TakeInventory {
+                destroy_if_empty: _,
+            } => {}
             Operation::Neighbors(neighbors) => {
                 for (_, op) in neighbors.iter() {
                     op.visit_handles(visitor);
@@ -485,6 +539,8 @@ pub(crate) enum OperationError {
 
     /// block’s inventory is full at {cube:?}
     BlockInventoryFull { cube: Cube },
+    /// character’s inventory is full
+    CharacterInventoryFull,
 }
 
 impl core::error::Error for OperationError {
@@ -494,6 +550,7 @@ impl core::error::Error for OperationError {
             Self::Unmatching => None,
             Self::OutOfBounds { .. } => None,
             Self::BlockInventoryFull { .. } => None,
+            Self::CharacterInventoryFull => None,
         }
     }
 }
@@ -676,6 +733,70 @@ mod tests {
                     txn
                 },
                 InventoryTransaction::default()
+            )
+        );
+    }
+
+    // TODO: reduce code duplication between the following two tests
+    #[test]
+    fn take_inventory_and_destroy_success() {
+        let [block_bare] = make_some_blocks();
+        let stack = inv::Slot::stack(3, inv::Tool::Activate);
+        let block_with_inventory = block_bare
+            .clone()
+            .with_modifier(Inventory::from_slots(vec![stack.clone()]));
+        let op = Operation::TakeInventory {
+            destroy_if_empty: true,
+        };
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+            .filled_with(block_with_inventory.clone())
+            .build();
+        let character_inventory = Inventory::new(2);
+
+        assert_eq!(
+            op.apply(&space, Some(&character_inventory), Gridgid::IDENTITY)
+                .unwrap(),
+            (
+                {
+                    let mut txn = SpaceTransaction::default();
+                    *txn.at(Cube::new(0, 0, 0)) =
+                        CubeTransaction::replacing(Some(block_with_inventory), Some(AIR));
+                    txn
+                },
+                InventoryTransaction::insert([stack])
+            )
+        );
+    }
+    #[test]
+    fn take_inventory_and_keep_success() {
+        let [block_bare] = make_some_blocks();
+        let stack = inv::Slot::stack(3, inv::Tool::Activate);
+        let block_with_inventory = block_bare
+            .clone()
+            .with_modifier(Inventory::from_slots(vec![stack.clone()]));
+        let op = Operation::TakeInventory {
+            destroy_if_empty: false,
+        };
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+            .filled_with(block_with_inventory.clone())
+            .build();
+        let character_inventory = Inventory::new(2);
+
+        assert_eq!(
+            op.apply(&space, Some(&character_inventory), Gridgid::IDENTITY)
+                .unwrap(),
+            (
+                {
+                    let mut txn = SpaceTransaction::default();
+                    *txn.at(Cube::new(0, 0, 0)) = CubeTransaction::replacing(
+                        Some(block_with_inventory),
+                        Some(
+                            block_bare.with_modifier(Inventory::from_slots(vec![inv::Slot::Empty])),
+                        ),
+                    );
+                    txn
+                },
+                InventoryTransaction::insert([stack])
             )
         );
     }

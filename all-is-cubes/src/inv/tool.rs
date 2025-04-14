@@ -541,9 +541,9 @@ impl From<op::OperationError> for ToolError {
         match value {
             // TODO: should not forget source()s
             op::OperationError::InternalConflict(c) => ToolError::Internal(c.to_string()),
-            op::OperationError::Unmatching | op::OperationError::BlockInventoryFull { .. } => {
-                ToolError::NotUsable
-            }
+            op::OperationError::Unmatching
+            | op::OperationError::BlockInventoryFull { .. }
+            | op::OperationError::CharacterInventoryFull => ToolError::NotUsable,
             op::OperationError::OutOfBounds { .. } => ToolError::Obstacle,
         }
     }
