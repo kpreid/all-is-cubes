@@ -14,8 +14,8 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::load_image::{block_from_image, include_image};
 use all_is_cubes::content::{BoxPart, BoxStyle, palette};
 use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::{Size3D, Vector3D, vec3};
-use all_is_cubes::inv::Tool;
+use all_is_cubes::euclid::{Size3D, Vector3D, point3, vec3};
+use all_is_cubes::inv::{self, Tool};
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
@@ -50,7 +50,7 @@ struct DemoRoom {
     corridor_only: bool,
     lit: bool,
 
-    grants_item: Option<Block>,
+    grants_item: Option<inv::Tool>,
 }
 
 impl DemoRoom {
@@ -444,14 +444,17 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 }
 
                 // Item.
-                if let Some(block) = &room_data.grants_item {
+                if let Some(item) = room_data.grants_item.clone() {
                     // note that this is the nominal floor, not the possibly extended downward floor
                     let floor_middle =
                         Cube::containing(floor_layer.abut(Face6::PY, 1).unwrap().center()).unwrap();
                     space.set(floor_middle, &self.item_pedestal)?;
-                    // TODO: This should be in pick-up-able form as opposed to placed,
-                    // once such a distinction is actually implemented
-                    space.set(floor_middle + GridVector::new(0, 1, 0), block)?;
+                    space.set(
+                        floor_middle + GridVector::new(0, 1, 0),
+                        self.blocks[DungeonBlocks::ItemHolder]
+                            .clone()
+                            .with_modifier(inv::Inventory::from_slots([item.into()])),
+                    )?;
                 }
 
                 // Set spawn.
@@ -618,7 +621,7 @@ pub(crate) async fn demo_dungeon(
         item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
         blocks: dungeon_blocks,
     };
-    // Random assortment of blocks to provide
+    // Random assortment of items to provide
     // TODO: make this things like keys for doors
     let grantable_items = [
         demo_blocks[DemoBlocks::Lamp(false)].clone(),
@@ -628,7 +631,8 @@ pub(crate) async fn demo_dungeon(
         landscape_blocks[LandscapeBlocks::Grass].clone(),
         landscape_blocks[LandscapeBlocks::Dirt].clone(),
         landscape_blocks[LandscapeBlocks::Stone].clone(),
-    ];
+    ]
+    .map(Tool::Block);
 
     // Construct dungeon map
     let maze_progress = progress.start_and_cut(0.1, "generating layout").await;
@@ -693,7 +697,7 @@ pub(crate) async fn demo_dungeon(
 fn generate_dungeon_map(
     seed: u64,
     requested_rooms: GridSize,
-    grantable_items: &[Block],
+    grantable_items: &[Tool],
 ) -> all_is_cubes::math::Vol<alloc::boxed::Box<[Option<DemoRoom>]>> {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
@@ -790,7 +794,7 @@ fn generate_dungeon_map(
                 && !corridor_only
                 && is_not_end
                 && rng.random_bool(0.5))
-            .then(|| Block::clone(grantable_items.choose(&mut rng).unwrap())),
+            .then(|| grantable_items.choose(&mut rng).unwrap().clone()),
         })
     })
 }
@@ -803,18 +807,25 @@ pub(crate) enum DungeonBlocks {
     CorridorLight,
     /// A light to put in rooms.
     Brazier,
+
     /// Normal flooring for the dungeon.
     FloorTile,
     /// Spikes for pit traps, facing upward.
     Spikes,
+
     /// Gate for blocking passage in the Z axis and to be possibly slid sideways.
     Gate,
     /// Receptacle for a moved `Gate`.
     GatePocket,
     /// Lock to be composited on a `Gate` block.
     GateLock,
+
     /// Icon of a tool which can unlock `GateLock`s.
     Key,
+
+    /// Block which has a 1-slot inventory, displaying an item the player can take.
+    ItemHolder,
+
     /// Shape into which to cut blocks [using `CompositeOperator::In`] on the sides of a doorway.
     ///
     /// The +X face of this block should be oriented towards the doorway's interior from the left,
@@ -979,6 +990,25 @@ pub async fn install_dungeon_blocks(
             })?
             .display_name("Key")
             .build_txn(txn),
+
+            ItemHolder => Block::builder()
+                .display_name("Item")
+                .color(Rgba::TRANSPARENT) // TODO: have a shape
+                .collision(block::BlockCollision::None)
+                // TODO: instead of or in addition to having a special action for this, it should
+                // also be expressible as something that happens when the entire block is taken,
+                // as part of Block::unspecialize().
+                .activation_action(op::Operation::TakeInventory {
+                    destroy_if_empty: true,
+                })
+                .inventory_config(inv::InvInBlock::new(
+                    1,
+                    R2,
+                    R32, // to allow a shrunk R16 tool icon
+                    // Bottom middle.
+                    vec![inv::IconRow::new(0..1, point3(8, 0, 8), vec3(0, 0, 0))],
+                ))
+                .build(),
 
             DoorwaySideMask => Block::builder()
                 .display_name("Doorway Side Mask")
