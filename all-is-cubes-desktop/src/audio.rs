@@ -1,13 +1,14 @@
-use std::f32::consts::PI;
 use std::fmt;
 use std::sync::{atomic, mpsc};
 
-use all_is_cubes::fluff::Fluff;
-use all_is_cubes::listen::Listener;
-
+use hashbrown::HashMap;
 use kira::AudioManager;
 use kira::PlaySoundError;
 use kira::sound::static_sound::StaticSoundData;
+
+use all_is_cubes::fluff::Fluff;
+use all_is_cubes::listen::Listener;
+use all_is_cubes::sound::SoundDef;
 
 use crate::Session;
 
@@ -53,77 +54,32 @@ pub(crate) fn init_sound(session: &Session) -> Result<AudioOut, anyhow::Error> {
 }
 
 /// Thread function for receiving commands and executing them on `&mut AudioManager`.
+/// This is not a real-time audio thread.
 #[expect(clippy::needless_pass_by_value)]
 fn audio_command_thread(receiver: mpsc::Receiver<AudioCommand>, mut manager: AudioManager) {
-    // TODO: better sound and more sounds
-    let beep = StaticSoundData {
-        sample_rate: 44100,
-        frames: (0..2205)
-            .map(|i| {
-                let wave = (i as f32 / 44.1 * 4.0).sin() * 0.1;
-                kira::Frame {
-                    left: wave,
-                    right: wave,
-                }
-            })
-            .collect(),
-
-        settings: kira::sound::static_sound::StaticSoundSettings::default(),
-        slice: None,
-    };
-    let happened = StaticSoundData {
-        sample_rate: 44100,
-        frames: (0..220)
-            .map(|i| {
-                let wave = (i as f32 / 44.1 * 2.0).sin() * 0.1;
-                kira::Frame {
-                    left: wave,
-                    right: wave,
-                }
-            })
-            .collect(),
-
-        settings: kira::sound::static_sound::StaticSoundSettings::default(),
-        slice: None,
-    };
-    let thump = StaticSoundData {
-        sample_rate: 44100,
-        frames: (0..440)
-            .map(|i| {
-                #[allow(unknown_lints, reason = "not yet released on stable")]
-                #[allow(clippy::manual_midpoint, reason = "not a midpoint")]
-                let envelope = ((i as f32 / 440. * PI).sin() + 1.0) / 2.0;
-                let wave = (i as f32 / 44.1 * 0.25).sin() * envelope;
-                kira::Frame {
-                    left: wave,
-                    right: wave,
-                }
-            })
-            .collect(),
-
-        settings: kira::sound::static_sound::StaticSoundSettings::default(),
-        slice: None,
-    };
+    let sample_rate = 44100;
+    let mut sound_cache: HashMap<SoundDef, StaticSoundData> = HashMap::new();
 
     while let Ok(message) = receiver.recv() {
         match message {
-            AudioCommand::Fluff(fluff) => match fluff {
-                Fluff::Beep => play_fluff(&mut manager, beep.clone()),
-                Fluff::Happened | Fluff::PlaceBlockGeneric => {
-                    play_fluff(&mut manager, happened.clone())
-                }
-                Fluff::BlockImpact { velocity, .. } => {
-                    let velocity: f32 = velocity.into_inner();
+            AudioCommand::Fluff(fluff) => {
+                if let Some((sound_def, amplitude)) = fluff.sound() {
+                    // TODO: Need a better solution than comparing sounds by value.
+                    // When we have the sounds stored in Universes instead of as constants,
+                    // we can compare the Handles by name.
+                    let mut sound: StaticSoundData = match sound_cache.get(sound_def) {
+                        Some(sound) => sound.clone(),
+                        None => {
+                            let new_sound = convert_sound_to_kira(sample_rate, sound_def);
+                            sound_cache.insert(sound_def.clone(), new_sound.clone());
+                            new_sound
+                        }
+                    };
 
-                    let amplitude = (velocity * 0.01).clamp(0.0, 1.0);
-
-                    let mut sound = thump.clone();
                     sound.settings.volume = kira::Decibels(amplitude.log10() * 20.0).into();
                     play_fluff(&mut manager, sound)
                 }
-                Fluff::BlockFault(_) => {}
-                f => log::debug!("No known sound for Fluff value: {f:?}"),
-            },
+            }
         }
     }
 }
@@ -179,5 +135,19 @@ impl Listener<Fluff> for FluffListener {
             }
         }
         true
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+fn convert_sound_to_kira(sample_rate: u32, sound: &SoundDef) -> StaticSoundData {
+    StaticSoundData {
+        sample_rate,
+        frames: sound
+            .synthesize(sample_rate as f32)
+            .map(|[left, right]| kira::Frame { left, right })
+            .collect(),
+        settings: Default::default(),
+        slice: Default::default(),
     }
 }

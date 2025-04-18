@@ -1,14 +1,17 @@
 //! Momentary decorative and informative effects produced by the game world, such as sound and
 //! particles.
 
-use crate::math::{GridAab, PositiveSign};
+use crate::math::{GridAab, PositiveSign, ps32, zo32};
 
 #[cfg(doc)]
 use crate::block::BlockAttributes;
 #[cfg(doc)]
 use crate::op::Operation;
+use crate::sound::SoundDef;
 #[cfg(doc)]
 use crate::space::{Space, SpaceFluff};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Momentary decorative and informative effects produced by the game world, such as sound and
 /// particles.
@@ -62,4 +65,50 @@ pub enum BlockFault {
     /// but another tick action conflicted with it in the given region.
     /// This may occur as a normal consequence of e.g. moving structures colliding with each other.
     TickConflict(GridAab),
+}
+
+// -------------------------------------------------------------------------------------------------
+
+impl Fluff {
+    /// Returns the sound that should be played and the amplitude multiplier with which it should be
+    /// played.
+    ///
+    /// Whether or not this sound should be spatialized depends on the context in which the
+    /// [`Fluff`] was delivered.
+    ///
+    /// TODO: The return value shouldn’t be `'static` but a `Handle`; this is a development
+    /// placeholder.
+    pub fn sound(&self) -> Option<(&'static SoundDef, f32)> {
+        // TODO: these constants should be universe contents instead
+        const BEEP: SoundDef = SoundDef {
+            duration: zo32(0.08),
+            frequency: ps32(636.6),
+            amplitude: zo32(0.1),
+        };
+        const HAPPENED: SoundDef = SoundDef {
+            duration: zo32(0.005),
+            frequency: ps32(318.3),
+            amplitude: zo32(0.2),
+        };
+        const THUMP: SoundDef = SoundDef {
+            duration: zo32(0.02),
+            frequency: ps32(79.6),
+            amplitude: zo32(1.0), // modulated by collision info
+        };
+
+        match self {
+            Fluff::Beep => Some((&BEEP, 1.0)),
+            Fluff::Happened | Fluff::PlaceBlockGeneric => Some((&HAPPENED, 1.0)),
+            Fluff::BlockFault(_) => None,
+            // TODO: Should produce THUMP but there is not yet a way to implement the volume variation
+            Fluff::BlockImpact { velocity } => {
+                let velocity: f32 = velocity.into_inner();
+                // TODO: Use the correct scaling here.
+                // The amplitude of the sound should be proportional to the initial displacement
+                // of the vibrating surfaces, but how does that initial displacement scale?
+                let amplitude = (velocity * 0.01).clamp(0.0, 1.0);
+                Some((&THUMP, amplitude))
+            }
+        }
+    }
 }
