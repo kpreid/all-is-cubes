@@ -566,6 +566,30 @@ user-id = 98157 # Kevin Reid (kpreid)
 start = "2023-10-07"
 end = "2026-03-08"
 
+[[trusted.naga-rust-back]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2025-03-26"
+end = "2027-07-28"
+
+[[trusted.naga-rust-embed]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2025-03-26"
+end = "2027-07-28"
+
+[[trusted.naga-rust-macros]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2025-03-26"
+end = "2027-07-28"
+
+[[trusted.naga-rust-rt]]
+criteria = "safe-to-deploy"
+user-id = 98157 # Kevin Reid (kpreid)
+start = "2025-03-26"
+end = "2027-07-28"
+
 [[trusted.nosy]]
 criteria = "safe-to-deploy"
 user-id = 98157 # Kevin Reid (kpreid)

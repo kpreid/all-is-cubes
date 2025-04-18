@@ -1,10 +1,17 @@
 // --- Interface declarations --------------------------------------------------
 
-// Mirrors `struct PostprocessUniforms` on the Rust side.
 struct PostprocessUniforms {
+    // Scale factors transforming from the viewport extent in 0.0..1.0 coordinates
+    // to `info_text_texture` sampling coordinates.
+    //
+    // These factors are not simple because `info_text_texture`’s size is in character cells,
+    // which are to be some exact multiple of framebuffer pixels.
     info_text_coordinate_scale: vec2f,
+    // Position of the top-left corner of the info text’s top-left character cell,
+    // in 0.0..1.0 coordinates.
     info_text_origin: vec2f,
     // --- 16-byte aligned point ---
+    // Size of a single character cell in `font_texture`.
     font_cell_size: vec2u,
     font_cell_margin: u32,
     tone_mapping_id: i32,
@@ -12,6 +19,7 @@ struct PostprocessUniforms {
     color_space_id: i32,
     maximum_intensity: f32,
     bloom_intensity: f32,
+    // Adjust this as needed to make a multiple of 16 bytes
     _padding: i32,
 }
 

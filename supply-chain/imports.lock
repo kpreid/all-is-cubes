@@ -183,6 +183,34 @@ user-id = 98157
 user-login = "kpreid"
 user-name = "Kevin Reid"
 
+[[publisher.naga-rust-back]]
+version = "0.3.0"
+when = "2026-07-28"
+user-id = 98157
+user-login = "kpreid"
+user-name = "Kevin Reid"
+
+[[publisher.naga-rust-embed]]
+version = "0.3.0"
+when = "2026-07-28"
+user-id = 98157
+user-login = "kpreid"
+user-name = "Kevin Reid"
+
+[[publisher.naga-rust-macros]]
+version = "0.3.0"
+when = "2026-07-28"
+user-id = 98157
+user-login = "kpreid"
+user-name = "Kevin Reid"
+
+[[publisher.naga-rust-rt]]
+version = "0.3.0"
+when = "2026-07-28"
+user-id = 98157
+user-login = "kpreid"
+user-name = "Kevin Reid"
+
 [[publisher.nosy]]
 version = "0.3.0"
 when = "2025-11-18"
@@ -309,8 +337,8 @@ user-login = "rerunio"
 user-name = "Rerun"
 
 [[publisher.re_span]]
-version = "0.33.0"
-when = "2026-05-29"
+version = "0.34.1"
+when = "2026-07-07"
 user-id = 197939
 user-login = "rerunio"
 user-name = "Rerun"

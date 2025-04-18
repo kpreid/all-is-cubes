@@ -13,6 +13,9 @@ use crate::common::Memo;
 use crate::glue::{buffer_size_of, size2d_to_extent};
 use crate::init;
 use crate::pipelines::Pipelines;
+use crate::shaders::rerun_copy::RerunCopyCamera;
+
+// -------------------------------------------------------------------------------------------------
 
 pub(crate) struct RerunImageExport {
     device: wgpu::Device,
@@ -166,8 +169,8 @@ impl RerunImageExport {
             .expect("TODO: when does this even fail?")
             .copy_from_slice(bytemuck::bytes_of(&RerunCopyCamera {
                 // a bit wasteful to construct entire `ShaderSpaceCamera`, but avoids inconsistency
-                inverse_projection_matrix: ShaderSpaceCamera::new(normal_camera)
-                    .inverse_projection_matrix,
+                inverse_projection: ShaderSpaceCamera::from_camera(normal_camera)
+                    .inverse_projection,
             }));
 
         {
@@ -293,13 +296,6 @@ fn perform_image_copy(
             transform,
         )
     })
-}
-
-/// Uniform buffer struct for the `rerun-copy.wgsl` shader.
-#[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct RerunCopyCamera {
-    inverse_projection_matrix: [[f32; 4]; 4],
 }
 
 /// Policy about how to downsample the scene to produce a sane amount of Rerun data.

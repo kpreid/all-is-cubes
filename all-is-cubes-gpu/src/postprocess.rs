@@ -306,41 +306,12 @@ pub(crate) fn create_postprocess_pipeline(
 // -------------------------------------------------------------------------------------------------
 
 /// Contents of the uniform buffer updated every frame and read by `postprocess.wgsl`.
-#[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct PostprocessUniforms {
-    /// Scale factors transforming from the viewport extent in 0.0..1.0 coordinates
-    /// to `info_text_texture` sampling coordinates.
-    ///
-    /// These factors are not simple because `info_text_texture`’s size is in character cells,
-    /// which are to be some exact multiple of framebuffer pixels.
-    info_text_coordinate_scale: [f32; 2],
-
-    /// Position of the top-left corner of the info text’s top-left character cell,
-    /// in 0.0..1.0 coordinates.
-    info_text_origin: [f32; 2],
-
-    // --- 16-byte aligned point ---
-    /// Size of a single character cell in `font_texture`.
-    font_cell_size: [u32; 2],
-
-    font_cell_margin: u32,
-
-    tone_mapping_id: i32,
-
-    // --- 16-byte aligned point ---
-    color_space_id: i32,
-
-    maximum_intensity: f32,
-
-    bloom_intensity: f32,
-
-    // Adjust this as needed to make a multiple of 16 bytes
-    _padding: [u32; 1],
-}
+pub(crate) use crate::shaders::postprocess::PostprocessUniforms;
 
 impl PostprocessUniforms {
-    pub(crate) fn new(
+    // We can’t call this function `new()` because it conflicts with the automatic shader-style
+    // new() function. TODO: consider making naga-rust-embed not hog that name.
+    pub(crate) fn from_options(
         options: &GraphicsOptions,
         viewport: Viewport,
         surface_maximum_intensity: PositiveSign<f32>,
@@ -349,13 +320,14 @@ impl PostprocessUniforms {
         info_text_font_metrics: &GpuFontMetrics,
     ) -> Self {
         Self {
-            info_text_coordinate_scale: info_text_coordinate_scale.into(),
+            info_text_coordinate_scale: info_text_coordinate_scale.to_array().into(),
             info_text_origin: vec2(5., 5.)
                 .component_div(viewport.nominal_size.to_vector())
                 .to_f32()
+                .to_array()
                 .into(),
 
-            font_cell_size: info_text_font_metrics.atlas_cell_size.into(),
+            font_cell_size: info_text_font_metrics.atlas_cell_size.to_array().into(),
             font_cell_margin: info_text_font_metrics.cell_margin,
 
             tone_mapping_id: if options.maximum_intensity.is_finite() {
