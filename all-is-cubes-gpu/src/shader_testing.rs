@@ -7,6 +7,9 @@
 //!
 //! The code in this module is located here so that we do not need to make many pieces
 //! of the infrastructure, like `FramebufferTextures`, `pub`, but only this module.
+//!
+//! TODO: Replace this with testing via `naga-rust-embed` which does not require actually
+//! talking to the GPU and has easier data flow.
 
 use alloc::string::{String, ToString as _};
 use alloc::sync::Arc;
@@ -203,7 +206,7 @@ where
     queue.write_buffer(
         &camera_buffer.buffer,
         0,
-        bytemuck::bytes_of(&ShaderSpaceCamera::new(&camera)),
+        bytemuck::bytes_of(&ShaderSpaceCamera::from_camera(&camera)),
     );
 
     let mut encoder =

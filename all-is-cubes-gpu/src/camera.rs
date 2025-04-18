@@ -1,40 +1,20 @@
+use naga_rust_embed::rt;
+
 use all_is_cubes::euclid::Transform3D;
 use all_is_cubes_render::camera::{AntialiasingOption, Camera, FogOption, LightingOption};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Information corresponding to [`Camera`] but in a form suitable for passing in a
 /// uniform buffer to the `blocks-and-lines.wgsl` shader. Also includes some miscellaneous
 /// data for rendering [`Space`], which hasn't yet demonstrated enough distinction
 /// to be worth putting in a separate buffer.
-#[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub(crate) struct ShaderSpaceCamera {
-    projection_matrix: [[f32; 4]; 4],
-    pub(super) inverse_projection_matrix: [[f32; 4]; 4],
-    view_matrix: [[f32; 4]; 4],
-
-    // --- 16-byte aligned point ---
-    /// Eye position in world coordinates. Used for computing distance
-    /// in volumetric rendering.
-    view_position: [f32; 3],
-
-    /// Scale factor for scene brightness.
-    exposure: f32,
-
-    // --- 16-byte aligned point ---
-    /// Light rendering style to use; a copy of [`GraphicsOptions::lighting_display`].
-    light_option: i32,
-
-    /// 0 or 1 indicating whether to apply antialiasing to block texture texel edges.
-    antialiasing_option: i32,
-
-    /// Fog equation blending: 0 is realistic fog and 1 is distant more abrupt fog.
-    fog_mode_blend: f32,
-    /// How far out should be fully fogged?
-    fog_distance: f32,
-}
+pub(crate) use crate::shaders::blocks_and_lines::ShaderSpaceCamera;
 
 impl ShaderSpaceCamera {
-    pub fn new(camera: &Camera) -> Self {
+    // We can’t call this function `new()` because it conflicts with the automatic shader-style
+    // new() function. TODO: consider making naga-rust-embed not hog that name.
+    pub fn from_camera(camera: &Camera) -> Self {
         let options = camera.options();
         let view_distance = camera.view_distance().into_inner() as f32;
 
@@ -54,14 +34,14 @@ impl ShaderSpaceCamera {
 
         // If the matrix isn't invertible, then what we're rendering must be degenerate (e.g.
         // zero FOV), so use a mostly harmless placeholder.
-        let inverse_projection_matrix =
+        let inverse_projection =
             convert_matrix(projection_matrix.inverse().unwrap_or(Transform3D::identity()));
 
         Self {
-            projection_matrix: convert_matrix(projection_matrix),
-            inverse_projection_matrix,
+            projection: convert_matrix(projection_matrix),
+            inverse_projection,
             view_matrix: convert_matrix(camera.view_matrix()),
-            view_position: camera.view_position().map(|s| s as f32).to_vector().into(),
+            view_position: camera.view_position().map(|s| s as f32).to_vector().to_array().into(),
 
             light_option: match options.lighting_display {
                 LightingOption::None => 0,
@@ -90,6 +70,6 @@ impl ShaderSpaceCamera {
     }
 }
 
-pub(crate) fn convert_matrix<Src, Dst>(matrix: Transform3D<f64, Src, Dst>) -> [[f32; 4]; 4] {
-    matrix.cast::<f32>().to_arrays()
+pub(crate) fn convert_matrix<Src, Dst>(matrix: Transform3D<f64, Src, Dst>) -> rt::Mat4x4<f32> {
+    rt::Mat4x4::from_column_arrays(matrix.cast::<f32>().to_arrays())
 }

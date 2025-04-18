@@ -467,6 +467,7 @@ impl RaytraceToTexture {
                         .to_f32()
                         .to_vector()
                         .component_div(render_viewport.framebuffer_size.to_f32().to_vector())
+                        .to_array()
                         .into(),
                     _padding: Default::default(),
                 }),
@@ -976,21 +977,7 @@ impl raytracer::Accumulate for Split {
 
 // -------------------------------------------------------------------------------------------------
 
-#[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct ReprojectionUniforms {
-    /// Matrix transforming points in the old camera's clip space to the new camera's clip space.
-    reprojection_matrix: [[f32; 4]; 4],
-    /// Inverse of the current projection matrix, used for transforming depths.
-    /// (In principle we should be passing the old projection matrix and new projection matrix,
-    /// but that's overkill.
-    inverse_projection: [[f32; 4]; 4],
-
-    /// Scale factors which scale texels in the input textures, the raytracing buffer textures,
-    /// into the viewport of the render target. Inverse of what `raytracer_size_policy()` did.
-    output_pixel_scale: [f32; 2],
-    _padding: [f32; 2],
-}
+use crate::shaders::rt_copy::ReprojectionUniforms;
 
 // -------------------------------------------------------------------------------------------------
 

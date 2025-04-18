@@ -168,3 +168,28 @@ impl ReloadableShader {
         }
     }
 }
+
+// Translate shader structs to Rust, so we can use them as uniform buffer layouts.
+//
+// This translation does not interact with the hot-reloading system: if the reloaded shader code
+// has a different struct layout, things will break.
+//
+// TODO: Under cfg(test), make this translation include the functions so we can test the functions.
+macro_rules! include_wgsl {
+    ($mod_name:ident, $path:literal) => {
+        pub(crate) mod $mod_name {
+            naga_rust_embed::include_wgsl_mr!(
+                include_functions = false,
+                public_items = true,
+                rule(derive(bytemuck::NoUninit)),
+                $path
+            );
+        }
+    };
+}
+include_wgsl!(blocks_and_lines, "src/shaders/blocks-and-lines.wgsl");
+include_wgsl!(postprocess, "src/shaders/postprocess.wgsl");
+include_wgsl!(rerun_copy, "src/shaders/rerun-copy.wgsl");
+// resampling.wgsl has no structs to share.
+include_wgsl!(rt_copy, "src/shaders/rt-copy.wgsl");
+// uniform-color.wgsl has no structs to share.

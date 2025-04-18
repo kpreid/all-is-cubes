@@ -3,9 +3,16 @@
 // --- Interface declarations --------------------------------------------------
 
 struct ReprojectionUniforms {
+    // Matrix transforming points in the old camera's clip space to the new camera's clip space.
     reprojection_matrix: mat4x4<f32>,
+    // Inverse of the current projection matrix, used for transforming depths.
+    // (In principle we should be passing the old projection matrix and new projection matrix,
+    // but that's overkill.
     inverse_projection: mat4x4<f32>,
+    // Scale factors which scale texels in the input textures, the raytracing buffer textures,
+    // into the viewport of the render target. Inverse of what `raytracer_size_policy()` did.
     output_pixel_scale: vec2<f32>,
+    // Adjust this as needed to make a multiple of 16 bytes
     _padding: vec2<f32>,
 }
 

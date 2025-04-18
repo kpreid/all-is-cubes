@@ -103,6 +103,7 @@ dependencies = [
  "hashbrown 0.17.0",
  "itertools",
  "log",
+ "naga-rust-embed",
  "num-traits",
  "pollster",
  "pretty_assertions",
@@ -980,6 +981,9 @@ name = "litrs"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
+dependencies = [
+ "proc-macro2",
+]
 
 [[package]]
 name = "lock_api"
@@ -1085,6 +1089,55 @@ dependencies = [
  "rustc-hash 1.1.0",
  "thiserror",
  "unicode-ident",
+]
+
+[[package]]
+name = "naga-rust-back"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17df434b5faaa6590902bf193ad0c79b3241cec3ad77d16746d6250de9d5513c"
+dependencies = [
+ "arrayvec",
+ "bitflags",
+ "half",
+ "mutants 0.0.4",
+ "naga",
+ "once_cell",
+ "proc-macro2",
+]
+
+[[package]]
+name = "naga-rust-embed"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3633cc74f40cd1d78a8b4f6f1b1984dd49775840259335cb33e38695947517b2"
+dependencies = [
+ "naga-rust-macros",
+ "naga-rust-rt",
+]
+
+[[package]]
+name = "naga-rust-macros"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46485380f5b1e387149bc6f0784c7dc123db71f770c62a49f73ae944fbb31060"
+dependencies = [
+ "litrs",
+ "naga",
+ "naga-rust-back",
+ "proc-macro2",
+]
+
+[[package]]
+name = "naga-rust-rt"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12204286ea6fb2018756c0a458a4ec74c7418cc1a0742d3ac46bcb7cfdc55c7d"
+dependencies = [
+ "bytemuck",
+ "mutants 0.0.4",
+ "num-traits",
+ "paste",
 ]
 
 [[package]]

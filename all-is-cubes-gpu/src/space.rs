@@ -808,7 +808,7 @@ impl SpaceRenderer {
             0,
             const { buffer_size_of::<ShaderSpaceCamera>() },
         )
-        .copy_from_slice(bytemuck::bytes_of(&ShaderSpaceCamera::new(camera)));
+        .copy_from_slice(bytemuck::bytes_of(&ShaderSpaceCamera::from_camera(camera)));
     }
 
     /// Returns the camera, to allow additional drawing in the same coordinate system.

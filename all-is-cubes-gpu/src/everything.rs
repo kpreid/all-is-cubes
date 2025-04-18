@@ -707,14 +707,16 @@ impl EverythingRenderer {
             0,
             const { buffer_size_of::<postprocess::PostprocessUniforms>() },
         )
-        .copy_from_slice(bytemuck::bytes_of(&postprocess::PostprocessUniforms::new(
-            self.cameras.graphics_options(),
-            self.cameras.viewport(),
-            self.fb.config().maximum_intensity,
-            self.fb.config().output_color_space,
-            self.info_text_coordinate_scale,
-            &self.pipelines.info_text_font_metrics,
-        )));
+        .copy_from_slice(bytemuck::bytes_of(
+            &postprocess::PostprocessUniforms::from_options(
+                self.cameras.graphics_options(),
+                self.cameras.viewport(),
+                self.fb.config().maximum_intensity,
+                self.fb.config().output_color_space,
+                self.info_text_coordinate_scale,
+                &self.pipelines.info_text_font_metrics,
+            ),
+        ));
 
         // If we're copying the scene image to Rerun, then start that copy now.
         #[cfg(feature = "rerun")]

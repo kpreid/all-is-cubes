@@ -69,6 +69,7 @@ half = { workspace = true, features = ["bytemuck"] }
 hashbrown = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+naga-rust-embed = { workspace = true }
 num-traits = { workspace = true }
 # Used to implement start_polling() on non-Wasm targets, and in the `rerun` support.
 pollster = { workspace = true }

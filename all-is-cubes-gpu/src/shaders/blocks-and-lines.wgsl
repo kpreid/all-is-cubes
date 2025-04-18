@@ -1,17 +1,25 @@
 // --- Interface declarations --------------------------------------------------
 
-// Mirrors `struct ShaderSpaceCamera` on the Rust side.
+// Information corresponding to `all_is_cubes::render::Camera`. Also includes some miscellaneous
+// data for rendering [`Space`], which hasn't yet demonstrated enough distinction
+// to be worth putting in a separate buffer.
 struct ShaderSpaceCamera {
     projection: mat4x4<f32>,
     inverse_projection: mat4x4<f32>,
     view_matrix: mat4x4<f32>,
     // --- 16-byte aligned point ---
+    // Eye position in world coordinates. Used for computing distance in volumetric rendering.
     view_position: vec3<f32>,
+    // Scale factor for scene brightness.
     exposure: f32,
     // --- 16-byte aligned point ---
+    // Light rendering style to use; a copy of [`GraphicsOptions::lighting_display`].
     light_option: i32,
+    /// 0 or 1 indicating whether to apply antialiasing to block texture texel edges.
     antialiasing_option: i32,
+    // Fog equation blending: 0 is realistic fog and 1 is distant more abrupt fog.
     fog_mode_blend: f32,
+    // How far out should be fully fogged?
     fog_distance: f32,
 }
 
