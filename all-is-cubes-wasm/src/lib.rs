@@ -17,6 +17,8 @@ use core::ops;
 use core::time::Duration;
 
 #[cfg(target_family = "wasm")]
+mod audio;
+#[cfg(target_family = "wasm")]
 mod init;
 #[cfg(target_family = "wasm")]
 #[doc(hidden)] // public for testing

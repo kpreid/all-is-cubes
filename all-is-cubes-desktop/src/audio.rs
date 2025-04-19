@@ -37,10 +37,13 @@ pub(crate) fn init_sound(session: &Session) -> Result<AudioOut, anyhow::Error> {
         kira::AudioManagerSettings::default(),
     )?;
 
+    // Transfers audio events to the audio processing thread.
+    // We never block on this channel, but drop things if full.
     let (sender, receiver) = mpsc::sync_channel(256);
 
     // The audio processing is done on a thread because `AudioManager` wants `&mut self`
     // to perform operations, so I either need a dedicated thread (actor) or a mutex.
+    // We also don’t want to find ourselves running synthesis inside the Listener.
     // Note that this is *not* a sample-by-sample realtime audio thread.
     std::thread::Builder::new()
         .name("all_is_cubes_audio".to_owned())
@@ -97,7 +100,7 @@ fn play_fluff(manager: &mut AudioManager, sound: StaticSoundData) {
     }
 }
 
-/// Adapter from [`Listener`] to the audio thread channel.
+/// Adapter from [`Listener`] to the audio command channel.
 struct FluffListener {
     sender: mpsc::SyncSender<AudioCommand>,
     alive: atomic::AtomicBool,
@@ -127,7 +130,10 @@ impl Listener<Fluff> for FluffListener {
         for fluff in fluffs {
             match self.sender.try_send(AudioCommand::Fluff(fluff.clone())) {
                 Ok(()) => {}
-                Err(mpsc::TrySendError::Full(_)) => {}
+                Err(mpsc::TrySendError::Full(_)) => {
+                    // If the channel is full, indicating the audio thread is falling behind,
+                    // drop the message.
+                }
                 Err(mpsc::TrySendError::Disconnected(_)) => {
                     self.alive.store(false, atomic::Ordering::Relaxed);
                     return false;

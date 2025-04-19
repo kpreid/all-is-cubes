@@ -213,6 +213,7 @@ dependencies = [
  "all-is-cubes-ui",
  "console_error_panic_hook",
  "console_log",
+ "flume",
  "form_urlencoded",
  "futures-channel",
  "futures-core",

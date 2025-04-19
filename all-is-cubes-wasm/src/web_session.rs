@@ -43,6 +43,8 @@ pub(crate) struct WebSession {
     static_dom: StaticDom,
     viewport_cell: listen::Cell<Viewport>,
     fullscreen_cell: listen::Cell<Option<bool>>,
+    #[expect(dead_code, reason = "used for its drop effect")]
+    audio_task_gate: Option<listen::Gate>,
     raf_callback: Closure<dyn FnMut(f64)>,
     step_callback: Closure<dyn FnMut()>,
 
@@ -73,6 +75,13 @@ impl WebSession {
                 static_dom,
                 viewport_cell,
                 fullscreen_cell,
+                audio_task_gate: match crate::audio::initialize_audio(&session) {
+                    Ok(gate) => Some(gate),
+                    Err(error) => {
+                        log::warn!("failed to initialize web audio: {error:?}");
+                        None
+                    }
+                },
                 raf_callback: {
                     let weak_self = weak_self.clone();
                     Closure::wrap(Box::new(move |dom_timestamp: f64| {
