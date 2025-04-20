@@ -800,9 +800,14 @@ fn generate_dungeon_map(
                 let neighbor_in_bounds = maze.bounds().contains_cube(neighbor);
 
                 if maze_room.has_passage(face) {
-                    // If the two rooms are both on the path, then the path passes between them.
+                    // If the two rooms are both on the path, then the path passes between them
+                    // and it must be passable.
+                    // Also, in the off-path section which has the key, we must let the player
+                    // reach the key -- we don’t track what the exact path to the key is, so instead
+                    // we just make all rooms at that path-position passable.
                     let must_be_passable = !(maze_room.kind == MazeRoomKind::OffPath
-                        || maze[neighbor].kind == MazeRoomKind::OffPath);
+                        || maze[neighbor].kind == MazeRoomKind::OffPath)
+                        || maze_room.position_on_path == Some(gain_key_at_path_position);
 
                     let door = *if must_be_passable {
                         if may_require_key {
