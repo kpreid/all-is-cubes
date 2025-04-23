@@ -32,6 +32,8 @@ use crate::alg::four_walls;
 use crate::dungeon::{DungeonGrid, MazeRoomKind, Theme, build_dungeon, generate_maze};
 use crate::{DemoBlocks, LandscapeBlocks, TemplateParameters, tree};
 
+// -------------------------------------------------------------------------------------------------
+
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
 const TORCH_PATTERN: [GridCoordinate; 2] = [-4, 4];
 
@@ -49,7 +51,10 @@ struct DemoRoom {
     wall_features: FaceMap<WallFeature>,
 
     floor: FloorKind,
+
+    /// If true, the room is no bigger than its attached corridors.
     corridor_only: bool,
+
     lit: bool,
 
     grants_item: Option<inv::Tool>,
@@ -90,7 +95,7 @@ enum FloorKind {
     Bridge,
 }
 
-/// Data to use to construct specific dungeon rooms.
+/// Data for the size and theming of dungeon rooms.
 struct DemoTheme {
     dungeon_grid: DungeonGrid,
 
@@ -117,6 +122,8 @@ struct DemoTheme {
     window_glass_block: Block,
     item_pedestal: Block,
 }
+
+// -------------------------------------------------------------------------------------------------
 
 impl DemoTheme {
     fn plain_room(
@@ -149,27 +156,25 @@ impl DemoTheme {
         &self,
         space: &mut Space,
         map: Vol<&[Option<DemoRoom>]>,
-        room_position: Cube,
+        mut room_1_position: Cube,
         face: Face6,
         door: Door,
     ) -> Result<(), InGenError> {
         let passage_axis = face.axis();
+        let mut room_2_position = room_1_position + face.normal_vector();
 
-        let mut room_1_box = self.actual_room_box(
-            room_position,
-            map[room_position]
-                .as_ref()
-                .expect("passage led to nonexistent room"),
-        );
-        let mut room_2_box = self.actual_room_box(
-            room_position + face.normal_vector(),
-            map[room_position + face.normal_vector()]
-                .as_ref()
-                .expect("passage led to nonexistent room"),
-        );
-        if room_1_box.lower_bounds()[passage_axis] > room_2_box.lower_bounds()[passage_axis] {
-            mem::swap(&mut room_1_box, &mut room_2_box);
+        if face.is_negative() {
+            mem::swap(&mut room_1_position, &mut room_2_position);
         }
+
+        let room_1_data = map[room_1_position]
+            .as_ref()
+            .expect("passage led to nonexistent room");
+        let room_2_data = map[room_2_position]
+            .as_ref()
+            .expect("passage led to nonexistent room");
+        let room_1_box = self.actual_room_box(room_1_position, room_1_data);
+        let room_2_box = self.actual_room_box(room_2_position, room_2_data);
 
         let wall_parallel = GridRotation::CLOCKWISE.transform(face);
         let parallel_axis = wall_parallel.axis();
@@ -182,7 +187,7 @@ impl DemoTheme {
         let doorway_box = {
             let corridor_box = self
                 .corridor_box
-                .translate(self.dungeon_grid.room_translation(room_position));
+                .translate(self.dungeon_grid.room_translation(room_1_position));
             // TODO: Add GridAab operations to make this easier
             let mut lower = corridor_box.lower_bounds();
             let mut upper = corridor_box.upper_bounds();
@@ -190,6 +195,23 @@ impl DemoTheme {
             upper[passage_axis] = room_2_box.lower_bounds()[passage_axis];
             GridAab::from_lower_upper(lower, upper)
         };
+
+        // Choose the box style used to carve/connect the doorway.
+        // In particular, if either room is corridor_only, make its ends be featureless by copying
+        // from the center.
+        // TODO: we should probably precalculate these
+        let unmodified_corridor_box_style = &self.corridor_box_styles[passage_axis];
+        let corridor_box_style = unmodified_corridor_box_style.clone().map(|part, block| {
+            if room_1_data.corridor_only && part.is_on_face(passage_axis.negative_face())
+                || room_2_data.corridor_only && part.is_on_face(passage_axis.positive_face())
+            {
+                unmodified_corridor_box_style[part.centered_on(passage_axis)]
+                    .clone()
+                    .unwrap_or(AIR)
+            } else {
+                block
+            }
+        });
 
         // Place the doorway/corridor’s walls and cut it into the room walls.
         let doorway_box_for_box_style = doorway_box.expand({
@@ -199,7 +221,7 @@ impl DemoTheme {
             v[passage_axis] = 0;
             FaceMap::symmetric(v)
         });
-        self.corridor_box_styles[passage_axis]
+        corridor_box_style
             .create_box(doorway_box_for_box_style)
             .execute(space, &mut transaction::no_outputs)
             .unwrap();
@@ -259,7 +281,6 @@ impl DemoTheme {
     fn actual_room_box(&self, room_position: Cube, room_data: &DemoRoom) -> GridAab {
         if room_data.corridor_only {
             self.corridor_box
-                .expand(FaceMap::symmetric([1, 0, 1]))
                 .translate(self.dungeon_grid.room_translation(room_position))
         } else {
             let eb = room_data.extended_map_bounds();
@@ -512,6 +533,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
         Ok(())
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// This function is called from `UniverseTemplate`.
 pub(crate) async fn demo_dungeon(
@@ -878,6 +901,8 @@ fn generate_dungeon_map(
 
     map
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
 #[strum(serialize_all = "kebab-case")]

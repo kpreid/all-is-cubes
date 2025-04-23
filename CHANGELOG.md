@@ -11,6 +11,7 @@
     - `block::Block::find_inventory()`
     - `inv::Ix`
     - `inv::InvInBlock` and `inv::IconRow` now have public `new()` functions.
+    - `math::BoxPart::centered_on()`
     - `math::FaceMap::sum()`
     - New universe member type `sound::SoundDef` allows defining synthesized sounds as game content.
     - `impl IntoIterator for math::FaceMap`

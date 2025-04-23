@@ -5,7 +5,7 @@ use core::ops;
 use euclid::{Vector3D, vec3};
 
 use crate::block::{self, Block, Resolution};
-use crate::math::{Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
+use crate::math::{Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
 use crate::space;
 
 // Bits in [`BoxPart`] and indexes of [`BoxStyle::parts`].
@@ -558,6 +558,17 @@ impl BoxPart {
         } else {
             UPPER
         };
+        self
+    }
+
+    /// Returns the part which is centered on the given axis and is the
+    /// same as this part on other axes.
+    ///
+    /// This may be used to find an edge or corner starting from a face,
+    /// or to find ends starting from [`UNIT`](Self::UNIT).
+    #[must_use]
+    pub fn centered_on(mut self, axis: Axis) -> Self {
+        self.0[axis] = 0;
         self
     }
 
