@@ -1,35 +1,31 @@
-#![expect(unused_qualifications)] // macro false positive
-
+use alloc::boxed::Box;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
-use core::f64::consts::TAU;
 use core::mem;
-use rand::seq::IteratorRandom;
 
-use exhaust::Exhaust;
 use rand::prelude::IndexedRandom as _;
+use rand::seq::IteratorRandom as _;
 use rand::{Rng, SeedableRng};
 
-use all_is_cubes::block::{self, AIR, Block, Resolution::*, RotationPlacementRule, text};
+use all_is_cubes::block::{self, AIR, Block, Resolution::*, text};
 use all_is_cubes::character::Spawn;
-use all_is_cubes::content::load_image::{block_from_image, include_image};
 use all_is_cubes::content::{BoxPart, BoxStyle, palette};
-use all_is_cubes::drawing::VoxelBrush;
-use all_is_cubes::euclid::{Size3D, Vector3D, point3, vec3};
+use all_is_cubes::euclid::{Size3D, Vector3D, vec3};
 use all_is_cubes::inv::{self, Tool};
-use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
+use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
-    GridVector, Rgb, Rgba, Vol,
+    GridVector, Vol,
 };
-use all_is_cubes::space::{LightPhysics, Space, SpaceTransaction};
+use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{arcstr, op, time};
 
 use crate::alg::four_walls;
-use crate::dungeon::{DungeonGrid, MazeRoomKind, Theme, build_dungeon, generate_maze};
+use crate::dungeon::{
+    DungeonBlocks, DungeonBlocks::*, DungeonGrid, MazeRoomKind, Theme, build_dungeon, generate_maze,
+};
 use crate::{DemoBlocks, LandscapeBlocks, TemplateParameters, tree};
 
 // -------------------------------------------------------------------------------------------------
@@ -57,7 +53,7 @@ struct DemoRoom {
 
     lit: bool,
 
-    grants_item: Option<inv::Tool>,
+    grants_item: Option<Tool>,
 }
 
 impl DemoRoom {
@@ -303,9 +299,7 @@ impl DemoTheme {
                     Cube::new(0, 0, 0),
                     op::Operation::Replace {
                         old: self.locked_gate_block.clone(),
-                        new: self.blocks[DungeonBlocks::Gate]
-                            .clone()
-                            .with_modifier(move_modifier),
+                        new: self.blocks[Gate].clone().with_modifier(move_modifier),
                         conserved: true,
                         optional: false,
                     },
@@ -330,7 +324,7 @@ impl DemoTheme {
         Tool::Custom {
             op: unlock,
 
-            icon: self.blocks[DungeonBlocks::Key].clone(),
+            icon: self.blocks[Key].clone(),
         }
     }
 }
@@ -477,7 +471,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     let info_text_block = text::Text::builder()
                         .string(description)
                         .font(text::Font::SmallerBodyText)
-                        .foreground(block::from_color!(crate::palette::STEEL))
+                        .foreground(block::from_color!(palette::STEEL))
                         .resolution(R128)
                         .positioning(text::Positioning {
                             line_y: text::PositioningY::BodyTop,
@@ -500,7 +494,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     space.set(floor_middle, &self.item_pedestal)?;
                     space.set(
                         floor_middle + GridVector::new(0, 1, 0),
-                        self.blocks[DungeonBlocks::ItemHolder]
+                        self.blocks[ItemHolder]
                             .clone()
                             .with_modifier(inv::Inventory::from_slots([item.into()])),
                     )?;
@@ -551,7 +545,7 @@ pub(crate) async fn demo_dungeon(
     {
         let mut install_txn = UniverseTransaction::default();
         let blocks_progress = progress.start_and_cut(0.2, "dungeon blocks").await;
-        install_dungeon_blocks(&mut install_txn, blocks_progress).await?;
+        super::install_dungeon_blocks(&mut install_txn, blocks_progress).await?;
         install_txn.execute(universe, &mut transaction::no_outputs)?;
     }
 
@@ -585,7 +579,7 @@ pub(crate) async fn demo_dungeon(
             if part == BoxPart::INTERIOR {
                 Some(AIR)
             } else if part.is_on_face(Face6::NY) {
-                Some(dungeon_blocks[DungeonBlocks::FloorTile].clone())
+                Some(dungeon_blocks[FloorTile].clone())
             } else {
                 // TODO: add wall-tile and ceiling-tile blocks
                 Some(landscape_blocks[LandscapeBlocks::Stone].clone())
@@ -597,7 +591,7 @@ pub(crate) async fn demo_dungeon(
                 if part == BoxPart::INTERIOR {
                     Some(AIR)
                 } else if part.is_on_face(Face6::NY) {
-                    Some(dungeon_blocks[DungeonBlocks::FloorTile].clone())
+                    Some(dungeon_blocks[FloorTile].clone())
                 } else {
                     // TODO: add wall-tile and ceiling-tile blocks
                     Some(landscape_blocks[LandscapeBlocks::Stone].clone())
@@ -606,16 +600,14 @@ pub(crate) async fn demo_dungeon(
 
             let corner_block = |facing_room: Face6, left: bool| {
                 block::Composite::new(
-                    dungeon_blocks[DungeonBlocks::DoorwaySideMask]
-                        .clone()
-                        .rotate(
-                            GridRotation::from_to(Face6::PZ, facing_room, Face6::PY).unwrap()
-                                * if left {
-                                    GridRotation::IDENTITY
-                                } else {
-                                    GridRotation::RxYZ
-                                },
-                        ),
+                    dungeon_blocks[DoorwaySideMask].clone().rotate(
+                        GridRotation::from_to(Face6::PZ, facing_room, Face6::PY).unwrap()
+                            * if left {
+                                GridRotation::IDENTITY
+                            } else {
+                                GridRotation::RxYZ
+                            },
+                    ),
                     block::CompositeOperator::In,
                 )
                 .reversed()
@@ -752,7 +744,7 @@ fn generate_dungeon_map(
     requested_rooms: GridSize,
     grantable_items: &[Tool],
     key_item: &Tool,
-) -> all_is_cubes::math::Vol<alloc::boxed::Box<[Option<DemoRoom>]>> {
+) -> Vol<Box<[Option<DemoRoom>]>> {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
     let (maze, path_length) = generate_maze(seed, requested_rooms);
@@ -903,233 +895,3 @@ fn generate_dungeon_map(
 }
 
 // -------------------------------------------------------------------------------------------------
-
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, Exhaust)]
-#[strum(serialize_all = "kebab-case")]
-#[non_exhaustive]
-pub(crate) enum DungeonBlocks {
-    /// A light to attach to corridor ceilings.
-    CorridorLight,
-    /// A light to put in rooms.
-    Brazier,
-
-    /// Normal flooring for the dungeon.
-    FloorTile,
-    /// Spikes for pit traps, facing upward.
-    Spikes,
-
-    /// Gate for blocking passage in the Z axis and to be possibly slid sideways.
-    Gate,
-    /// Receptacle for a moved `Gate`.
-    GatePocket,
-    /// Lock to be composited on a `Gate` block.
-    GateLock,
-
-    /// Icon of a tool which can unlock `GateLock`s.
-    Key,
-
-    /// Block which has a 1-slot inventory, displaying an item the player can take.
-    ItemHolder,
-
-    /// Shape into which to cut blocks [using `CompositeOperator::In`] on the sides of a doorway.
-    ///
-    /// The +X face of this block should be oriented towards the doorway's interior from the left,
-    /// while the +Z face should be oriented towards the room it connects to.
-    DoorwaySideMask,
-}
-impl BlockModule for DungeonBlocks {
-    fn namespace() -> &'static str {
-        "all-is-cubes/dungeon-blocks"
-    }
-}
-use DungeonBlocks::*;
-
-/// Add [`DungeonBlocks`] to the universe.
-pub async fn install_dungeon_blocks(
-    txn: &mut UniverseTransaction,
-    progress: YieldProgress,
-) -> Result<(), GenError> {
-    let resolution = R16;
-    let resolution_g = GridCoordinate::from(resolution);
-    let one_diagonal = GridVector::new(1, 1, 1);
-    let center_point_doubled = (one_diagonal * resolution_g).to_point();
-
-    let light_voxel = Block::builder()
-        .color(Rgba::new(0.7, 0.7, 0.0, 1.0))
-        .light_emission(Rgb::new(8.0, 7.0, 0.7) * 0.5)
-        .build();
-    let spike_metal = block::from_color!(palette::STEEL);
-
-    BlockProvider::<DungeonBlocks>::new(progress, |key| {
-        Ok(match key {
-            CorridorLight => Block::builder()
-                .display_name("Corridor Light")
-                .rotation_rule(RotationPlacementRule::Attach { by: Face6::PY })
-                .voxels_fn(resolution, |cube| {
-                    let centered = cube.lower_bounds() * 2 - center_point_doubled;
-                    if centered.y > centered.x.abs() && centered.y > centered.z.abs() {
-                        &light_voxel
-                    } else {
-                        &AIR
-                    }
-                })?
-                .build_txn(txn),
-
-            Brazier => Block::builder()
-                .display_name("Brazier")
-                .voxels_handle(resolution, {
-                    let mut space = Space::for_block(resolution).build();
-                    // Use a darker color to dampen the effect of interior light
-                    let body_block = Block::from(palette::STEEL * 0.2);
-                    space.fill(
-                        GridAab::from_lower_upper(
-                            [0, 0, 0],
-                            [resolution_g, resolution_g / 2, resolution_g],
-                        )
-                        .shrink(FaceMap::symmetric([2, 0, 2]))
-                        .unwrap(),
-                        |p| {
-                            let mid =
-                                (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
-                            if mid.x.max(mid.z) + (mid.y / 2) < resolution_g {
-                                Some(&body_block)
-                            } else {
-                                None
-                            }
-                        },
-                    )?;
-                    {
-                        let fire_inset = 4;
-                        let bounds = GridAab::from_lower_upper(
-                            // Vertical overlap will be overwritten, making a bowl shape
-                            [fire_inset, resolution_g / 2 - 2, fire_inset],
-                            [
-                                resolution_g - fire_inset,
-                                resolution_g,
-                                resolution_g - fire_inset,
-                            ],
-                        );
-                        SpaceTransaction::add_behavior(bounds, crate::Fire::new(bounds))
-                            .execute(&mut space, &mut transaction::no_outputs)
-                            .unwrap();
-                    }
-                    txn.insert_anonymous(space)
-                })
-                .build(),
-
-            FloorTile => {
-                let resolution = R32;
-                block_from_image(include_image!("floor.png"), GridRotation::RXZY, &|pixel| {
-                    let block = Block::from(Rgba::from_srgb8(pixel));
-                    VoxelBrush::with_thickness(block, 0..resolution.into())
-                        .rotate(GridRotation::RXZY)
-                })?
-                .display_name("Floor Tile")
-                .build_txn(txn)
-            }
-
-            Spikes => Block::builder()
-                .display_name("Spikes")
-                .voxels_fn(resolution, |Cube { x, y, z }| {
-                    let resolution = f64::from(resolution);
-                    let bsin = |coord| (f64::from(coord) * TAU / resolution * 2.0).sin();
-                    if f64::from(y) / resolution < bsin(x) * bsin(z) {
-                        &spike_metal
-                    } else {
-                        &AIR
-                    }
-                })?
-                .build_txn(txn),
-
-            Gate => {
-                let space =
-                    block_from_image(include_image!("fence.png"), GridRotation::RXyZ, &|pixel| {
-                        // Note that this produces selectable collidable transparent blocks --
-                        // that's preferred here.
-                        let block = Block::builder().color(Rgba::from_srgb8(pixel)).build();
-                        VoxelBrush::with_thickness(block, 7..9)
-                    })?;
-                space.display_name("Gate").build_txn(txn)
-            }
-
-            GatePocket => {
-                let space = block_from_image(
-                    include_image!("fence-pocket.png"),
-                    GridRotation::RXyZ,
-                    &|pixel| {
-                        let block = Block::builder().color(Rgba::from_srgb8(pixel)).build();
-                        VoxelBrush::new([([0, 0, 6], block.clone()), ([0, 0, 9], block)])
-                    },
-                )?;
-                space.display_name("Gate Pocket").build_txn(txn)
-            }
-
-            GateLock => {
-                let space = block_from_image(
-                    include_image!("gate-lock.png"),
-                    GridRotation::RXyZ,
-                    &|pixel| {
-                        let pixel = Rgba::from_srgb8(pixel);
-                        let block = if pixel.fully_transparent() {
-                            AIR
-                        } else {
-                            Block::builder().color(pixel).build()
-                        };
-                        VoxelBrush::new(
-                            (5..11)
-                                .map(|z| ([0, 0, z], block.clone()))
-                                .collect::<Vec<_>>(),
-                        )
-                    },
-                )?;
-                space.display_name("Keyhole").build_txn(txn)
-            }
-
-            Key => block_from_image(include_image!("key.png"), GridRotation::RXyZ, &|pixel| {
-                let block = if pixel[3] == 0 {
-                    AIR
-                } else {
-                    Block::builder().color(Rgba::from_srgb8(pixel)).build()
-                };
-                VoxelBrush::with_thickness(block, 7..9)
-            })?
-            .display_name("Key")
-            .build_txn(txn),
-
-            ItemHolder => Block::builder()
-                .display_name("Item")
-                .color(Rgba::TRANSPARENT) // TODO: have a shape
-                .collision(block::BlockCollision::None)
-                // TODO: instead of or in addition to having a special action for this, it should
-                // also be expressible as something that happens when the entire block is taken,
-                // as part of Block::unspecialize().
-                .activation_action(op::Operation::TakeInventory {
-                    destroy_if_empty: true,
-                })
-                .inventory_config(inv::InvInBlock::new(
-                    1,
-                    R2,
-                    R32, // to allow a shrunk R16 tool icon
-                    // Bottom middle.
-                    vec![inv::IconRow::new(0..1, point3(8, 0, 8), vec3(0, 0, 0))],
-                ))
-                .build(),
-
-            DoorwaySideMask => Block::builder()
-                .display_name("Doorway Side Mask")
-                .voxels_fn(R8, |cube| {
-                    if cube.x + cube.z / 2 < 8 {
-                        block::from_color!(1.0, 1.0, 1.0, 1.0)
-                    } else {
-                        AIR
-                    }
-                })
-                .unwrap()
-                .build_txn(txn),
-        })
-    })
-    .await?
-    .install(txn)?;
-
-    Ok(())
-}
