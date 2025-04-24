@@ -1,0 +1,46 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "commitMessagePrefix": "Deps: ",
+  "labels": [
+    "dependencies"
+  ],
+  "semanticCommits": "disabled",
+  "packageRules": [
+    {
+      "description": "Group Cargo-semver-compatible updates of the 0.* kind",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "matchCurrentVersion": "<1.0.0",
+      "groupName": "compatible"
+    },
+    {
+      "description": "Group Cargo-semver-compatible updates of the >=1.0 kind",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "matchCurrentVersion": ">=1.0.0",
+      "groupName": "compatible"
+    },
+    {
+      "description": "Skip glam because we only use it explicitly syncing with Rerun version. (We can't use their reexport because it wouldn't enable the mint feature.)",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchPackageNames": [
+        "glam"
+      ],
+      "enabled": false
+    }
+  ]
+}
