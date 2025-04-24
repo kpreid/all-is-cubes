@@ -56,6 +56,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "1.10.1"
 
+[[audits.log]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.4.26 -> 0.4.27"
+
 [[audits.mint]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"

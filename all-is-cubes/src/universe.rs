@@ -351,7 +351,7 @@ impl Universe {
         if let Err(e) = behavior_txn.execute(self, &mut transaction::no_outputs) {
             // TODO: Need to report these failures back to the source
             // ... and perhaps in the UniverseStepInfo
-            log::info!("Transaction failure: {}", e);
+            log::info!("Transaction failure: {e}");
         }
 
         // Compute how to divide time among spaces, based on the previous srep
@@ -403,7 +403,7 @@ impl Universe {
             if let Err(e) = t.execute(self, &mut transaction::no_outputs) {
                 // TODO: Need to report these failures back to the source
                 // ... and perhaps in the UniverseStepInfo
-                log::info!("Transaction failure: {}", e);
+                log::info!("Transaction failure: {e}");
             }
         }
 

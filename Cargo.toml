@@ -106,7 +106,7 @@ imgref = { version = "1.10.1", default-features = false }
 indoc = { version = "2.0.1", default-features = false }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 libm = { version = "0.2.8", default-features = false }
-log = { version = "0.4.22", default-features = false }
+log = { version = "0.4.27", default-features = false }
 macro_rules_attribute = { version = "0.2.0", default-features = false }
 manyfmt = { version = "0.1.0", default-features = false }
 mutants = { version = "0.0.3", default-features = false }
