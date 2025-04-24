@@ -341,7 +341,7 @@ mod tests {
     use either::Either;
 
     #[test]
-    #[ignore]
+    #[ignore = "debug tool, not a test"]
     fn print_many_transforms() {
         let gbox = GridAab::from_lower_size([0, 0, 0], [2, 2, 2]);
         let transform = mv_to_aic_coordinate_transform(dot_vox::Size { x: 2, y: 2, z: 2 });

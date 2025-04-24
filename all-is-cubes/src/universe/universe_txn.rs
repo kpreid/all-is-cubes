@@ -1178,7 +1178,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: figure out how to get this to work w/ insert transactions
+    #[ignore = "TODO: figure out how to get this to work w/ insert transactions"]
     fn systematic() {
         TransactionTester::new()
             // TODO: more transactions of all kinds

@@ -502,7 +502,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "unimplemented"]
     fn min_distance_squared_consistent_with_chart() {
         todo!("implement check that min_distance_squared_from matches ChunkChart");
     }
