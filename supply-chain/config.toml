@@ -1063,6 +1063,10 @@ criteria = "safe-to-deploy"
 version = "0.7.1"
 criteria = "safe-to-deploy"
 
+[[exemptions.petgraph]]
+version = "0.8.1"
+criteria = "safe-to-deploy"
+
 [[exemptions.pin-project]]
 version = "1.1.9"
 criteria = "safe-to-deploy"

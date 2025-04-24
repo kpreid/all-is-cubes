@@ -463,6 +463,13 @@ mod graph {
             )
         }
 
+        fn unvisit(&mut self, node: Cube) -> bool {
+            mem::replace(
+                self.0.get_mut(node).expect("node coordinates out of range"),
+                false,
+            )
+        }
+
         fn is_visited(&self, &node: &Cube) -> bool {
             self.0[node]
         }
