@@ -41,7 +41,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
         // Lighting trace at cursor
         if graphics_options.debug_light_rays_at_cursor {
             if let Some(cursor) = cursor_result {
-                if std::ptr::eq(&*cursor.space().read().unwrap(), space) {
+                if std::ptr::eq(&raw const *cursor.space().read().unwrap(), space) {
                     let result = space
                         .compute_lighting::<all_is_cubes::space::LightUpdateCubeInfo>(
                             cursor.preceding_cube(),
