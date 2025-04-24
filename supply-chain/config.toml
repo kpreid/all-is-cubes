@@ -91,10 +91,6 @@ criteria = "safe-to-deploy"
 version = "0.2.2"
 criteria = "safe-to-deploy"
 
-[[exemptions.android-tzdata]]
-version = "0.1.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.anyhow]]
 version = "1.0.96"
 criteria = "safe-to-deploy"
@@ -250,10 +246,6 @@ criteria = "safe-to-deploy"
 [[exemptions.cargo-platform]]
 version = "0.1.9"
 criteria = "safe-to-deploy"
-
-[[exemptions.cargo_metadata]]
-version = "0.8.2"
-criteria = "safe-to-run"
 
 [[exemptions.cargo_metadata]]
 version = "0.14.2"
@@ -443,10 +435,6 @@ criteria = "safe-to-deploy"
 version = "5.1.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.downcast-rs]]
-version = "1.2.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.dpi]]
 version = "0.1.1"
 criteria = "safe-to-deploy"
@@ -489,10 +477,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.ethnum]]
 version = "1.5.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.fastrand]]
-version = "2.3.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.filetime]]
