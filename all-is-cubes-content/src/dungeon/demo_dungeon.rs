@@ -739,6 +739,9 @@ pub(crate) async fn demo_dungeon(
 }
 
 /// Non-async map generation subsection of [`demo_dungeon()`].
+///
+/// This calls [`generate_maze()`], then elaborates on that process by adding gates, keys,
+/// and random details.
 fn generate_dungeon_map(
     seed: u64,
     requested_rooms: GridSize,
@@ -749,41 +752,16 @@ fn generate_dungeon_map(
 
     let (maze, path_length) = generate_maze(seed, requested_rooms);
 
-    // Pick a position along the path at which the player will gain a key for use to access
-    // future rooms. It should not be the start or end room.
-    let gain_key_at_path_position: usize = rng.random_range(1..path_length - 1);
-
-    // Pick a room in which the key can be found.
-    let key_room_position: Cube = maze
-        .iter()
-        .filter(|(_, room)| room.position_on_path == Some(gain_key_at_path_position))
-        .choose(&mut rng)
-        .map(|(pos, _)| pos)
-        .expect("no candidate room for key");
-    if false {
-        log::debug!(
-            "dungeon keys: gain_key_at_path_position = {gain_key_at_path_position}, \
-            key_room_position = {key_room_position:?}"
-        );
-    }
+    let [gain_key] = choose_key_locations(&mut rng, &maze, path_length);
 
     // Expand bounds to allow for extra-tall rooms.
     let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
 
-    // sanity check variable
-    let mut key_was_placed = false;
-
     let map = Vol::from_fn(expanded_bounds, |room_position| {
         let maze_room = maze.get(room_position)?;
 
-        let must_grant_item: Option<Tool> = (room_position == key_room_position).then(|| {
-            key_was_placed = true;
-            key_item.clone()
-        });
-        let may_require_key = maze_room
-            .position_on_path
-            .is_some_and(|p| p > gain_key_at_path_position);
-
+        let must_grant_item: Option<Tool> =
+            (room_position == gain_key.found_in_room).then(|| key_item.clone());
         // Allow rooms that are not start or end to have more interesting properties.
         let is_not_end = match maze_room.kind {
             MazeRoomKind::Unoccupied => return None,
@@ -817,15 +795,15 @@ fn generate_dungeon_map(
                 if maze_room.has_passage(face) {
                     // If the two rooms are both on the path, then the path passes between them
                     // and it must be passable.
-                    // Also, in the off-path section which has the key, we must let the player
-                    // reach the key -- we don’t track what the exact path to the key is, so instead
-                    // we just make all rooms at that path-position passable.
+                    // Also, in the off-path section which has an important item, we must let the
+                    // player reach it -- we don’t track what the exact path to items are, so
+                    // instead we just make all rooms at that path-position passable.
                     let must_be_passable = !(maze_room.kind == MazeRoomKind::OffPath
                         || maze[neighbor].kind == MazeRoomKind::OffPath)
-                        || maze_room.position_on_path == Some(gain_key_at_path_position);
+                        || maze_room.position_on_path == Some(gain_key.found_on_path_position);
 
                     let door = *if must_be_passable {
-                        if may_require_key {
+                        if gain_key.room_may_require_this(maze_room) {
                             // If the rooms are on the path and the player has a key,
                             // generate no door or a door that is can be opened.
                             &[
@@ -889,9 +867,48 @@ fn generate_dungeon_map(
         })
     });
 
-    assert!(key_was_placed);
-
     map
 }
 
-// -------------------------------------------------------------------------------------------------
+fn choose_key_locations<const N: usize>(
+    rng: &mut rand_xoshiro::Xoshiro256Plus,
+    maze: &Vol<Box<[super::maze::MazeRoom]>>,
+    path_length: usize,
+) -> [KeyLocation; N] {
+    // Pick positions along the path at which the player will gain items for use to access
+    // future rooms. They should not be the start or end room.
+    let Some(positions_on_path) =
+        rand::seq::index::sample_array(rng, path_length - 2).map(|array| array.map(|i| i + 1))
+    else {
+        // TODO: handle this by having fewer obstacles instead of erroring out
+        panic!("maze too small")
+    };
+
+    // Pick rooms.
+    positions_on_path.map(|position_on_path| {
+        let found_in_room: Cube = maze
+            .iter()
+            .filter(|(_, room)| room.position_on_path == Some(position_on_path))
+            .choose(rng)
+            .map(|(pos, _)| pos)
+            .expect("no candidate room for key");
+
+        KeyLocation {
+            found_in_room,
+            found_on_path_position: position_on_path,
+        }
+    })
+}
+
+#[derive(Debug)]
+struct KeyLocation {
+    found_in_room: Cube,
+    found_on_path_position: usize,
+}
+impl KeyLocation {
+    fn room_may_require_this(&self, maze_room: &super::maze::MazeRoom) -> bool {
+        maze_room
+            .position_on_path
+            .is_some_and(|p| p > self.found_on_path_position)
+    }
+}
