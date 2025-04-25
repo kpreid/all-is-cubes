@@ -125,7 +125,6 @@ impl RenderTestContext {
     ) {
         renderer
             .update(overlays.cursor)
-            .await
             .expect("renderer update() failed");
         let image = renderer
             .draw(overlays.info_text.unwrap_or(""))

@@ -128,14 +128,9 @@ impl Renderer {
 }
 
 impl HeadlessRenderer for Renderer {
-    fn update<'a>(
-        &'a mut self,
-        cursor: Option<&'a Cursor>,
-    ) -> BoxFuture<'a, Result<(), RenderError>> {
-        let future = async move { self.inner.update(cursor) };
-        #[cfg(target_family = "wasm")]
-        let future = send_wrapper::SendWrapper::new(future);
-        Box::pin(future)
+    fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
+        // Note: this delegation is the simplest ways to
+        self.inner.update(cursor)
     }
 
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>> {

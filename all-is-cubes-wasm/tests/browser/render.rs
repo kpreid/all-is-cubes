@@ -54,7 +54,7 @@ async fn renderer_test() {
             .await
             .unwrap()
             .build(cameras.clone());
-    renderer.update(None).await.unwrap();
+    renderer.update(None).unwrap();
     let image = renderer.draw("").await.unwrap();
 
     // TODO: hook up a full image comparison here

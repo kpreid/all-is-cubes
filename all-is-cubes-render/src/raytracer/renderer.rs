@@ -305,14 +305,9 @@ where
 /// This implementation is only available if the `std` feature is enabled.
 #[cfg(feature = "std")] // can't provide `Sync` futures otherwise
 impl HeadlessRenderer for RtRenderer<()> {
-    fn update<'a>(
-        &'a mut self,
-        cursor: Option<&'a Cursor>,
-    ) -> futures_core::future::BoxFuture<'a, Result<(), RenderError>> {
-        Box::pin(async move {
-            let _anything_changed = self.update(cursor)?;
-            Ok(())
-        })
+    fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
+        let _anything_changed = self.update(cursor)?;
+        Ok(())
     }
 
     fn draw<'a>(

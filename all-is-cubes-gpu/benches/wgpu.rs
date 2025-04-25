@@ -48,13 +48,10 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
             SpaceTransaction::set_cube([0, 0, 0], None, Some(block::AIR)).bind(space.clone());
         let txn2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
 
-        b.to_async(runtime).iter_with_large_drop(move || {
+        b.iter_with_large_drop(move || {
             txn1.execute(&mut universe, &mut drop).unwrap();
             txn2.execute(&mut universe, &mut drop).unwrap();
-            let renderer = renderer.clone();
-            async move {
-                renderer.lock().unwrap().update(None).await.unwrap();
-            }
+            renderer.lock().unwrap().update(None).unwrap();
         });
     });
 
@@ -112,7 +109,7 @@ async fn create_updated_renderer(
             &universe,
         ));
 
-    renderer.update(None).await.unwrap();
+    renderer.update(None).unwrap();
 
     // Arc<Mutex< needed to satisfy borrow checking of the benchmark closure
     (universe, space, Arc::new(Mutex::new(renderer)))

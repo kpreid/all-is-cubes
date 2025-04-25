@@ -392,7 +392,7 @@ async fn error_character_gone(context: RenderTestContext) {
     let mut renderer = context.renderer(&universe);
 
     // Run a first render because this test is about what happens afterward
-    renderer.update(None).await.unwrap();
+    renderer.update(None).unwrap();
     let _ = renderer.draw("").await.unwrap();
 
     let character_handle: Handle<Character> = universe.get(&"character".into()).unwrap();
@@ -402,7 +402,7 @@ async fn error_character_gone(context: RenderTestContext) {
     drop(universe); // shouldn't make a difference but hey
 
     // Updating may fail, or it may succeed because there were no change notifications.
-    match renderer.update(None).await {
+    match renderer.update(None) {
         Ok(()) => {}
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
@@ -431,7 +431,7 @@ async fn error_character_unavailable(context: RenderTestContext) {
     // The simplest way for the character to be unavailable is to drop the entire universe.
     drop(universe);
 
-    match renderer.update(None).await {
+    match renderer.update(None) {
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from update(): {res:?}"),
@@ -480,7 +480,7 @@ async fn follow_character_change(context: RenderTestContext) {
     let mut renderer = context.renderer(cameras);
 
     // Draw the first character
-    renderer.update(None).await.unwrap();
+    renderer.update(None).unwrap();
     let image1 = renderer.draw("").await.unwrap();
 
     // Don't assert if they would fail because the renderer is stubbed
@@ -497,7 +497,7 @@ async fn follow_character_change(context: RenderTestContext) {
 
     // Switch characters and draw the second -- the resulting sky color should be from it
     character_cell.set(Some(c2));
-    renderer.update(None).await.unwrap();
+    renderer.update(None).unwrap();
     let image2 = renderer.draw("").await.unwrap();
 
     assert_eq!(
@@ -1062,7 +1062,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
 
     // Initially zero viewport
     {
-        renderer.update(None).await.unwrap();
+        renderer.update(None).unwrap();
         let zero_image = renderer
             .draw(overlays.info_text.as_ref().unwrap())
             .await
@@ -1078,7 +1078,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     // Now try *resizing to* zero and back
     {
         viewport_cell.set(zero);
-        renderer.update(None).await.unwrap();
+        renderer.update(None).unwrap();
         let zero_image = renderer
             .draw(overlays.info_text.as_ref().unwrap())
             .await

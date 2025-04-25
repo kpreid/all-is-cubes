@@ -43,6 +43,9 @@
 - `all-is-cubes-mesh` library:
     - Renamed `GfxVertex` to `Vertex`.
 
+- `all-is-cubes-render` library:
+    - `HeadlessRenderer::update()` is no longer async.
+
 - `all-is-cubes-ui` library:
     - `apps::Session::settings()` replaces `graphics_options_mut()`.
 

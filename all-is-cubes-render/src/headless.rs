@@ -23,14 +23,7 @@ pub trait HeadlessRenderer {
     /// prohibitive failure occurred. The resulting state of the renderer in such cases
     /// is not specified, but a good implementation should attempt recovery on a future
     /// call.
-    ///
-    /// TODO: provide for returning performance info?
-    ///
-    /// TODO: we may want more dynamic information than the cursor
-    fn update<'a>(
-        &'a mut self,
-        cursor: Option<&'a Cursor>,
-    ) -> futures_core::future::BoxFuture<'a, Result<(), RenderError>>;
+    fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError>;
 
     /// Produce an image of the current state of the scene this renderer was created to
     /// track, as of the last call to [`Self::update()`], with the given overlaid text.
