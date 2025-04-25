@@ -31,7 +31,7 @@ use crate::{DemoBlocks, LandscapeBlocks, TemplateParameters, tree};
 // -------------------------------------------------------------------------------------------------
 
 const WINDOW_PATTERN: [GridCoordinate; 3] = [-2, 0, 2];
-const TORCH_PATTERN: [GridCoordinate; 2] = [-4, 4];
+const TORCH_PATTERN: [GridCoordinate; 2] = [-3, 3];
 
 #[derive(Clone, Debug)]
 struct DemoRoom {
@@ -550,7 +550,7 @@ pub(crate) async fn demo_dungeon(
     }
 
     let dungeon_grid = DungeonGrid {
-        room_box: GridAab::from_lower_size([0, 0, 0], [9, 5, 9]),
+        room_box: GridAab::from_lower_size([0, 0, 0], [7, 5, 7]),
         room_wall_thickness: FaceMap::splat(1),
         gap_between_walls: Size3D::new(1, 1, 1),
     };
@@ -585,7 +585,7 @@ pub(crate) async fn demo_dungeon(
                 Some(landscape_blocks[LandscapeBlocks::Stone].clone())
             }
         }),
-        corridor_box: GridAab::from_lower_size([3, 0, 3], [3, 3, 3]),
+        corridor_box: GridAab::from_lower_size([2, 0, 2], [3, 3, 3]),
         corridor_box_styles: {
             let basic_style = BoxStyle::from_fn(|part| {
                 if part == BoxPart::INTERIOR {
