@@ -1,12 +1,9 @@
 //! Implementation of [`HeadlessRenderer`] using [`wgpu`].
 
-use alloc::borrow::ToOwned as _;
 use alloc::boxed::Box;
-use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use futures_channel::oneshot;
 use futures_core::future::BoxFuture;
 
 use all_is_cubes::character::Cursor;
@@ -94,9 +91,10 @@ impl Builder {
 /// and may then be used once or repeatedly to produce images of what those cameras see.
 #[derive(Debug)]
 pub struct Renderer {
-    /// `wgpu` is currently entirely `!Send` on Wasm; use a channel and actor to handle that.
+    /// `wgpu` is currently entirely `!Send` on web-wasm, but also there are no additional threads,
+    /// that might use this renderer, so we can use `send_wrapper` to achieve `Send`.
     #[cfg(target_family = "wasm")]
-    inner: futures_channel::mpsc::Sender<RenderMsg>,
+    inner: send_wrapper::SendWrapper<RendererImpl>,
     #[cfg(not(target_family = "wasm"))]
     inner: RendererImpl,
 }
@@ -118,49 +116,13 @@ struct RendererImpl {
     flaws: Flaws,
 }
 
-/// Messages from [`Renderer`] to [`RendererImpl`].
-#[allow(clippy::large_enum_variant)]
-pub(super) enum RenderMsg {
-    Update(Option<Cursor>, oneshot::Sender<Result<(), RenderError>>),
-    Render(String, oneshot::Sender<Result<Rendering, RenderError>>),
-}
-
 impl Renderer {
     fn wrap(inner: RendererImpl) -> Renderer {
         Self {
             #[cfg(target_family = "wasm")]
-            inner: {
-                // On Wasm, wgpu objects are not Send. Therefore, spawn an actor which
-                // explicitly runs on the main thread to own all of them.
-
-                let (tx, mut rx) = futures_channel::mpsc::channel(1);
-                wasm_bindgen_futures::spawn_local(async move {
-                    use futures_util::stream::StreamExt as _;
-                    let mut inner = inner;
-                    while let Some(msg) = rx.next().await {
-                        inner.handle(msg).await;
-                    }
-                });
-
-                tx
-            },
+            inner: send_wrapper::SendWrapper::new(inner),
             #[cfg(not(target_family = "wasm"))]
             inner,
-        }
-    }
-
-    async fn send_maybe_wait(&mut self, msg: RenderMsg) {
-        #[cfg(target_family = "wasm")]
-        {
-            use futures_util::sink::SinkExt as _;
-            self.inner
-                .send(msg)
-                .await
-                .expect("Renderer actor unexpectedly disconnected");
-        }
-        #[cfg(not(target_family = "wasm"))]
-        {
-            self.inner.handle(msg).await;
         }
     }
 }
@@ -170,36 +132,21 @@ impl HeadlessRenderer for Renderer {
         &'a mut self,
         cursor: Option<&'a Cursor>,
     ) -> BoxFuture<'a, Result<(), RenderError>> {
-        let (tx, rx) = oneshot::channel();
-        Box::pin(async move {
-            self.send_maybe_wait(RenderMsg::Update(cursor.cloned(), tx))
-                .await;
-            rx.await.unwrap()
-        })
+        let future = async move { self.inner.update(cursor) };
+        #[cfg(target_family = "wasm")]
+        let future = send_wrapper::SendWrapper::new(future);
+        Box::pin(future)
     }
 
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>> {
-        let (tx, rx) = oneshot::channel();
-        Box::pin(async move {
-            self.send_maybe_wait(RenderMsg::Render(info_text.to_owned(), tx))
-                .await;
-            rx.await.unwrap()
-        })
+        let future = async move { self.inner.draw(info_text).await };
+        #[cfg(target_family = "wasm")]
+        let future = send_wrapper::SendWrapper::new(future);
+        Box::pin(future)
     }
 }
 
 impl RendererImpl {
-    async fn handle(&mut self, msg: RenderMsg) {
-        match msg {
-            RenderMsg::Update(cursor, reply) => {
-                _ = reply.send(self.update(cursor.as_ref()));
-            }
-            RenderMsg::Render(info_text, reply) => {
-                _ = reply.send(self.draw(&info_text).await);
-            }
-        }
-    }
-
     fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
         let info =
             self.everything
