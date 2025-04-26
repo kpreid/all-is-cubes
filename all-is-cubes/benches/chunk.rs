@@ -144,7 +144,7 @@ fn dump_frustum_culling() {
 
     let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes/benches/chunk")
         .default_enabled(true)
-        .connect_tcp()
+        .connect_grpc()
         .unwrap();
 
     let frustum = camera.view_frustum_geometry();

@@ -211,6 +211,12 @@ user-id = 6743 # Ed Page (epage)
 start = "2023-04-13"
 end = "2026-03-08"
 
+[[trusted.dunce]]
+criteria = "safe-to-deploy"
+user-id = 988 # Kornel (kornelski)
+start = "2019-03-14"
+end = "2026-04-26"
+
 [[trusted.emath]]
 criteria = "safe-to-deploy"
 user-id = 197939 # rerun.io (rerunio)
@@ -228,6 +234,12 @@ criteria = "safe-to-deploy"
 user-id = 98157 # Kevin Reid (kpreid)
 start = "2022-02-15"
 end = "2026-03-08"
+
+[[trusted.imgref]]
+criteria = "safe-to-deploy"
+user-id = 988 # Kornel (kornelski)
+start = "2019-08-20"
+end = "2026-04-26"
 
 [[trusted.is-terminal]]
 criteria = "safe-to-deploy"
@@ -385,6 +397,18 @@ user-id = 197939 # rerun.io (rerunio)
 start = "2024-05-07"
 end = "2026-03-08"
 
+[[trusted.re_grpc_client]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2024-11-11"
+end = "2026-04-26"
+
+[[trusted.re_grpc_server]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2025-02-05"
+end = "2026-04-26"
+
 [[trusted.re_log]]
 criteria = "safe-to-deploy"
 user-id = 197939 # rerun.io (rerunio)
@@ -564,6 +588,12 @@ criteria = "safe-to-run"
 user-id = 197939 # rerun.io (rerunio)
 start = "2023-10-26"
 end = "2026-03-08"
+
+[[trusted.re_uri]]
+criteria = "safe-to-deploy"
+user-id = 197939 # rerun.io (rerunio)
+start = "2025-04-07"
+end = "2026-04-26"
 
 [[trusted.rendiff]]
 criteria = "safe-to-deploy"
@@ -571,11 +601,29 @@ user-id = 98157 # Kevin Reid (kpreid)
 start = "2023-05-06"
 end = "2026-03-08"
 
+[[trusted.rgb]]
+criteria = "safe-to-deploy"
+user-id = 988 # Kornel (kornelski)
+start = "2019-02-26"
+end = "2026-04-26"
+
 [[trusted.rustix]]
 criteria = "safe-to-deploy"
 user-id = 6825 # Dan Gohman (sunfishcode)
 start = "2021-10-29"
 end = "2026-03-25"
+
+[[trusted.security-framework]]
+criteria = "safe-to-deploy"
+user-id = 988 # Kornel (kornelski)
+start = "2019-02-27"
+end = "2026-04-26"
+
+[[trusted.security-framework-sys]]
+criteria = "safe-to-deploy"
+user-id = 988 # Kornel (kornelski)
+start = "2019-02-27"
+end = "2026-04-26"
 
 [[trusted.serde_spanned]]
 criteria = "safe-to-deploy"
@@ -618,6 +666,12 @@ criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2021-11-05"
 end = "2026-03-08"
+
+[[trusted.urlencoding]]
+criteria = "safe-to-deploy"
+user-id = 988 # Kornel (kornelski)
+start = "2020-06-17"
+end = "2026-04-26"
 
 [[trusted.wgpu]]
 criteria = "safe-to-deploy"

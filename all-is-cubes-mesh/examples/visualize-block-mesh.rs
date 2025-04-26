@@ -23,7 +23,7 @@ fn main() {
     let destination = rg::Destination {
         stream: rg::RecordingStreamBuilder::new("all-is-cubes/visualize-block-mesh")
             .default_enabled(true)
-            .connect_tcp()
+            .connect_grpc()
             .unwrap(),
         path: rg::entity_path![],
     };

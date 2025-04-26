@@ -65,6 +65,7 @@ pub fn install(
                 .add_filter_ignore_str("wgpu") // noisy
                 .add_filter_ignore_str("naga") // noisy
                 .add_filter_ignore_str("winit") // noisy at Debug level since 0.30
+                .add_filter_ignore_str("h2") // used by Rerun and noisy at Debug level since 0.23
                 .build(),
             std::io::stderr(),
         );
@@ -80,7 +81,7 @@ pub fn install(
     let (rerun_destination_general, rerun_destination_logging) = if !kinds.is_empty() {
         let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
             .default_enabled(true)
-            .connect_tcp()
+            .connect_grpc()
             .unwrap();
         let destination = rg::Destination {
             stream,

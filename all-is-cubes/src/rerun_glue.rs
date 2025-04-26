@@ -270,6 +270,6 @@ pub fn convert_camera_to_pinhole(
     )
 }
 
-pub fn milliseconds(d: core::time::Duration) -> archetypes::Scalar {
-    archetypes::Scalar::new(d.as_secs_f64() * 1000.0)
+pub fn milliseconds(d: core::time::Duration) -> archetypes::Scalars {
+    archetypes::Scalars::new([d.as_secs_f64() * 1000.0])
 }

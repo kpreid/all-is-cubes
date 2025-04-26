@@ -522,7 +522,7 @@ where
             if self.rerun_destination.is_enabled() {
                 self.rerun_destination.log(
                     &"all_meshes_done".into(),
-                    &rg::archetypes::Scalar::new(-10.0),
+                    &rg::archetypes::Scalars::new([-10.0]),
                 );
             }
             self.complete_time = Some(end_all_time);
@@ -592,15 +592,15 @@ where
         // Set up time series styling
         self.rerun_destination.log_static(
             &"one_chunk_compute_ms".into(),
-            &rg::archetypes::SeriesPoint::new(),
+            &rg::archetypes::SeriesPoints::new(),
         );
         self.rerun_destination.log_static(
             &"one_chunk_update_ms".into(),
-            &rg::archetypes::SeriesPoint::new(),
+            &rg::archetypes::SeriesPoints::new(),
         );
         self.rerun_destination.log_static(
             &"all_meshes_done".into(),
-            &rg::archetypes::SeriesPoint::new().with_name("all meshes done"),
+            &rg::archetypes::SeriesPoints::new().with_names(["all meshes done"]),
         );
     }
 }
