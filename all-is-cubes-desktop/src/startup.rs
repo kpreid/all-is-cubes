@@ -75,7 +75,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
     }
 
     // we'd do this inside the main task, except that that'd be circular borrowing
-    logging.attach_to_renderer(&mut dsession.renderer);
+    logging.attach_to_renderer(&mut dsession.renderer)?;
 
     if let Some(options) = &recording {
         #[cfg(feature = "record")]
@@ -97,15 +97,12 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             }
             Err(e) => Err(e).context("failed to create universe from requested template or file"),
         };
-        let mut universe = match universe_result {
-            Ok(u) => u,
-            Err(e) => {
-                report_error_and_exit(&ctx, e);
-            }
-        };
+        let mut universe = universe_result.unwrap_or_else(|e| report_error_and_exit(&ctx, e));
         log::trace!("Startup universe ready; switching...");
 
-        logging.finish(&mut universe);
+        logging
+            .finish(&mut universe)
+            .unwrap_or_else(|e| report_error_and_exit(&ctx, e));
         ctx.set_universe(universe);
         _ = universe_ready_signal.send(Ok(()));
 
@@ -280,8 +277,9 @@ impl UniverseTask {
     }
 }
 
-#[expect(clippy::needless_pass_by_value)]
-fn report_error_and_exit(_ctx: &MainTaskContext, error: anyhow::Error) -> ! {
+fn report_error_and_exit(_ctx: &MainTaskContext, error: impl Into<anyhow::Error>) -> ! {
+    let error = error.into();
+
     // TODO: if we are a GUI-no-terminal session, log this instead of printing and create a dialog
     // instead of exiting.
     eprintln!("Error: {error:?}");

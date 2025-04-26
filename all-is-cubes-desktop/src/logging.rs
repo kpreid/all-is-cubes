@@ -1,6 +1,7 @@
 //! Logging. And terminal progress bars. And their cooperation.
 
 use std::collections::HashSet;
+use std::fmt;
 use std::sync::LazyLock;
 
 use anyhow::Context as _;
@@ -232,9 +233,13 @@ pub struct LateLogging {
     rerun_destination: rg::Destination,
 }
 
+#[allow(clippy::unnecessary_wraps)]
 impl LateLogging {
     /// Hook up to the renderer.
-    pub fn attach_to_renderer<Ren: crate::glue::Renderer>(&self, renderer: &mut Ren) {
+    pub(crate) fn attach_to_renderer<Ren: crate::glue::Renderer>(
+        &self,
+        renderer: &mut Ren,
+    ) -> Result<(), NoRerunSupportError> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "rerun")] {
                 // split out into a function so rustfmt isn't interfered with by the macro
@@ -244,15 +249,18 @@ impl LateLogging {
                 let _ = renderer;
 
                 if !self.kinds.is_empty() {
-                    // TODO: cleaner error handling from this point
-                    panic!("not compiled with rerun logging support");
+                    return Err(NoRerunSupportError);
                 }
             }
         }
+        Ok(())
     }
 
     /// Hook up to the universe.
-    pub(crate) fn finish(self: LateLogging, universe: &mut all_is_cubes::universe::Universe) {
+    pub(crate) fn finish(
+        self: LateLogging,
+        universe: &mut all_is_cubes::universe::Universe,
+    ) -> Result<(), NoRerunSupportError> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "rerun")] {
                 // split out into a function so rustfmt isn't interfered with by the macro
@@ -262,11 +270,11 @@ impl LateLogging {
                 let _ = universe;
 
                 if !self.kinds.is_empty() {
-                    // TODO: cleaner error handling from this point
-                    panic!("not compiled with rerun logging support");
+                    return Err(NoRerunSupportError);
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -336,3 +344,12 @@ fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::univer
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub(crate) struct NoRerunSupportError;
+impl fmt::Display for NoRerunSupportError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.pad("the --rerun option is not available because Rerun support was not compiled in")
+    }
+}
+impl std::error::Error for NoRerunSupportError {}

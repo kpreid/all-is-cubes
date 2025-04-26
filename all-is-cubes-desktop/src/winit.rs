@@ -297,15 +297,24 @@ impl<Ren: RendererToWinit> winit::application::ApplicationHandler for Handler<Re
                     return;
                 }
             };
-            crate::inner_main(
+
+            match crate::inner_main(
                 inner_params,
                 |ds| {
                     self.dsession = Some(ds);
                     Ok(())
                 },
                 dsession,
-            )
-            .unwrap();
+            ) {
+                Ok(()) => (),
+                Err(error) => {
+                    // TODO: if we are a GUI-no-terminal session, log this instead of printing
+                    // and create a dialog instead of exiting immediately.
+                    // See also crate::startup::report_error_and_exit which should do the same.
+                    eprintln!("Error: {error:?}");
+                    event_loop.exit();
+                }
+            }
         }
     }
 
