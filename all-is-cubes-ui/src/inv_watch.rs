@@ -50,12 +50,14 @@ impl InventoryWatcher {
     /// belonging to the [`Character`] in the given `inventory_source`.
     ///
     /// `ui_universe` will be used to create anonymous resources used to depict the inventory.
+    ///
+    /// The presented inventory will be empty until the first [`update()`][Self::update].
     pub fn new(inventory_source: listen::DynSource<Option<Handle<Character>>>) -> Self {
         let dirty = listen::Flag::new(true);
 
         inventory_source.listen(dirty.listener());
 
-        let mut new_self = Self {
+        Self {
             inventory_source,
             inventory_owner: None, // will be replaced
             inventory: inv::Inventory::new(0),
@@ -63,11 +65,7 @@ impl InventoryWatcher {
             owner_gate: listen::Gate::default(),
             notifier: Arc::new(listen::Notifier::new()),
             dirty,
-        };
-
-        new_self.update();
-
-        new_self
+        }
     }
 
     /// Update this watcher's state from the inventory source, if any change has occurred.
@@ -228,7 +226,8 @@ mod tests {
             let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
             let character = universe.insert_anonymous(Character::spawn_default(space.clone()));
             let character_cell = listen::Cell::new(Some(character.clone()));
-            let watcher = InventoryWatcher::new(character_cell.as_source());
+            let mut watcher = InventoryWatcher::new(character_cell.as_source());
+            watcher.update();
 
             // Install listener
             let sink: listen::Sink<WatcherChange> = listen::Sink::new();
