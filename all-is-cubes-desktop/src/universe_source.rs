@@ -85,7 +85,10 @@ impl UniverseSource {
                 let space = universe.insert("menu".into(), space)?;
                 universe.insert(
                     "character".into(),
-                    all_is_cubes::character::Character::spawn_default(space),
+                    all_is_cubes::character::Character::spawn_default(
+                        universe.read_ticket(),
+                        space,
+                    ),
                 )?;
 
                 universe
@@ -127,7 +130,7 @@ impl UniverseSource {
 
         if precompute_light {
             if let Some(c) = universe.get_default_character() {
-                c.read()
+                c.read(universe.read_ticket())
                     .unwrap()
                     .space
                     .try_modify(evaluate_light_with_progress)

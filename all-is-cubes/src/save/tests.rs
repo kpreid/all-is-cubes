@@ -796,6 +796,8 @@ fn space_with_sparse_indices() {
 
 #[test]
 fn space_light_queue_remembered() {
+    let universe = Universe::new();
+
     use space::LightStatus::{NoRays, Opaque, Uninitialized, Visible};
     let [block0] = make_some_blocks();
     let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1])).build();
@@ -817,7 +819,12 @@ fn space_light_queue_remembered() {
     );
 
     // Then, when stepped, they are updated
-    let (_, _) = space2.step(None, Tick::arbitrary(), time::DeadlineNt::Whenever);
+    let (_, _) = space2.step(
+        universe.read_ticket(),
+        None,
+        Tick::arbitrary(),
+        time::DeadlineNt::Whenever,
+    );
     assert_eq!(
         [0, 1, 2].map(|x| space2.get_lighting([x, 0, 0]).status()),
         [Opaque, Visible, NoRays]
@@ -859,7 +866,7 @@ fn universe_with_one_of_each() -> Universe {
     space.set([0, 0, 0], Block::from(block_handle)).unwrap();
     let space_handle = universe.insert("a_space".into(), space).unwrap();
 
-    let character = Character::spawn_default(space_handle);
+    let character = Character::spawn_default(universe.read_ticket(), space_handle);
     universe.insert("a_character".into(), character).unwrap();
 
     universe
@@ -1027,16 +1034,24 @@ fn universe_success() {
         .get::<Character>(&"a_character".into())
         .unwrap();
 
-    let a_block_def_ev = Block::from(a_block_def).evaluate().unwrap();
+    let a_block_def_ev = Block::from(a_block_def)
+        .evaluate(deserialized_universe.read_ticket())
+        .unwrap();
     assert_eq!(a_block_def_ev.attributes().display_name, "0");
 
     assert_eq!(
-        a_space.read().unwrap().get_evaluated([0, 0, 0]),
+        a_space
+            .read(deserialized_universe.read_ticket())
+            .unwrap()
+            .get_evaluated([0, 0, 0]),
         &a_block_def_ev
     );
 
     assert_eq!(
-        a_character.read().unwrap().space,
+        a_character
+            .read(deserialized_universe.read_ticket())
+            .unwrap()
+            .space,
         deserialized_universe
             .get::<Space>(&"a_space".into())
             .unwrap()

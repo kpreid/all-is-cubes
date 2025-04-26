@@ -618,19 +618,25 @@ mod tests {
         // TODO: Awful lot of setup boilerplate...
         let u = &mut Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let character = u.insert_anonymous(Character::spawn_default(space));
+        let character = u.insert_anonymous(Character::spawn_default(u.read_ticket(), space));
         let mut input = InputProcessor::new();
 
         input.key_down(Key::Character('5'));
         input.key_up(Key::Character('5'));
         apply_input_helper(&mut input, u, &character);
-        assert_eq!(character.read().unwrap().selected_slots()[1], 4);
+        assert_eq!(
+            character.read(u.read_ticket()).unwrap().selected_slots()[1],
+            4
+        );
 
         // Tenth slot
         input.key_down(Key::Character('0'));
         input.key_up(Key::Character('0'));
         apply_input_helper(&mut input, u, &character);
-        assert_eq!(character.read().unwrap().selected_slots()[1], 9);
+        assert_eq!(
+            character.read(u.read_ticket()).unwrap().selected_slots()[1],
+            9
+        );
     }
 
     // TODO: test jump and flying logic

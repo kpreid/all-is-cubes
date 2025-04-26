@@ -10,7 +10,7 @@ use all_is_cubes::behavior::{self, Behavior};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Merge as _};
-use all_is_cubes::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
+use all_is_cubes::universe::{HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles};
 use all_is_cubes::util::maybe_sync::{self, SendSyncIfStd};
 
 // reused for WidgetController
@@ -150,6 +150,7 @@ impl WidgetBehavior {
         mut controller: Box<dyn WidgetController>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
         let init_txn = match controller.initialize(&WidgetContext {
+            read_ticket: ReadTicket::new(), // TODO(read_ticket): need to plumb this in somehow
             behavior_context: None,
             grant: &widget.position,
         }) {
@@ -188,6 +189,7 @@ impl Behavior<Space> for WidgetBehavior {
             .lock()
             .unwrap()
             .step(&WidgetContext {
+                read_ticket: ReadTicket::new(), // TODO(read_ticket): need to plumb this in somehow
                 behavior_context: Some(context),
                 grant: &self.widget.position,
             })
@@ -207,10 +209,13 @@ impl Behavior<Space> for WidgetBehavior {
 #[derive(Debug)]
 pub struct WidgetContext<'a> {
     behavior_context: Option<&'a behavior::Context<'a, Space>>,
+    /// [`ReadTicket`] for the universe the widget is UI for, not the one it is in.
+    // TODO(read_ticket): this is a kludge and we need a better story for UI data sources
+    read_ticket: ReadTicket<'a>,
     grant: &'a LayoutGrant,
 }
 
-impl WidgetContext<'_> {
+impl<'a> WidgetContext<'a> {
     /// The time tick that is currently passing, causing this step.
     pub fn tick(&self) -> Tick {
         match self.behavior_context {
@@ -225,8 +230,13 @@ impl WidgetContext<'_> {
 
     /// Returns the [`LayoutGrant`] given to this widget; the same value as when
     /// [`Widget::controller()`] was called.
-    pub fn grant(&self) -> &LayoutGrant {
+    pub fn grant(&self) -> &'a LayoutGrant {
         self.grant
+    }
+
+    #[cfg_attr(not(feature = "session"), allow(dead_code))]
+    pub(crate) fn read_ticket(&self) -> ReadTicket<'a> {
+        self.read_ticket
     }
 }
 

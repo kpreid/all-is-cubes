@@ -17,7 +17,7 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
-use all_is_cubes::universe::Handle;
+use all_is_cubes::universe::{Handle, ReadTicket};
 
 use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::{CueMessage, CueNotifier, hud::HudBlocks};
@@ -297,7 +297,7 @@ impl WidgetController for ToolbarController {
         }
 
         let watcher = &mut *self.definition.watcher.lock().unwrap();
-        watcher.update();
+        watcher.update(ReadTicket::new()); // TODO(read_ticket): figure out what basis widgets have for fetching data
 
         // TODO: check watcher's notifs on whether we should update or not
         let should_update_inventory = true;

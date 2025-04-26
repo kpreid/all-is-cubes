@@ -218,7 +218,10 @@ impl UniverseTemplate {
 
             // TODO: "character" is a special default name used for finding the character the
             // player actually uses, and we should replace that or handle it more formally.
-            universe.insert("character".into(), Character::spawn_default(space_handle))?;
+            universe.insert(
+                "character".into(),
+                Character::spawn_default(universe.read_ticket(), space_handle),
+            )?;
         }
 
         universe.whence = Arc::new(TemplateAndParameters {
@@ -547,7 +550,11 @@ mod tests {
             let mut u = result.unwrap();
 
             if template != UniverseTemplate::Blank {
-                let _ = u.get_default_character().unwrap().read().unwrap();
+                let _ = u
+                    .get_default_character()
+                    .unwrap()
+                    .read(u.read_ticket())
+                    .unwrap();
             }
             u.step(false, time::DeadlineNt::Asap);
 
@@ -584,14 +591,18 @@ mod tests {
         // TODO: also check blocks that are found in `Composite` and directly in `Space`, etc.
         // Use case for `VisitHandles` being more general?
         for (block_def_name, block_def_handle) in universe.iter_by_type::<block::BlockDef>() {
-            let block_def = &*block_def_handle.read().unwrap();
+            let block_def = &*block_def_handle.read(universe.read_ticket()).unwrap();
             if let block::Primitive::Recur {
                 space: space_handle,
                 ..
             } = block_def.block().primitive()
             {
                 assert_eq!(
-                    space_handle.read().unwrap().physics().light,
+                    space_handle
+                        .read(universe.read_ticket())
+                        .unwrap()
+                        .physics()
+                        .light,
                     LightPhysics::None,
                     "block {block_def_name} has space {space_name} \
                         whose light physics are not disabled",

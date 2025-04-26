@@ -10,13 +10,18 @@ use crate::block::{
 use crate::content::palette;
 use crate::listen;
 use crate::math::{GridAab, Rgba, Vol};
+use crate::universe::{HandleError, ReadTicket};
+
 #[cfg(doc)]
-use crate::universe::Handle;
-use crate::universe::HandleError;
+use crate::{block::BlockDef, space::Space, universe::Handle};
 
 /// Parameters to [`Block::evaluate2()`] to choose which information to compute.
 #[derive(Clone, Debug)]
-pub(crate) struct EvalFilter {
+pub(crate) struct EvalFilter<'a> {
+    /// Read access to the [`BlockDef`]s and [`Space`]s that may be referenced to by the
+    /// block.
+    pub read_ticket: ReadTicket<'a>,
+
     /// If true, don't actually evaluate, but return a placeholder value and do listen.
     ///
     /// TODO: All of the use cases where this is useful should actually be replaced with
@@ -42,11 +47,12 @@ pub(crate) struct EvalFilter {
     pub budget: Cell<Budget>,
 }
 
-impl Default for EvalFilter {
-    /// Returns a default `EvalFilter` which requests a complete result and installs no
+impl<'a> EvalFilter<'a> {
+    /// Returns a basic `EvalFilter` which requests a complete result and installs no
     /// listener.
-    fn default() -> Self {
+    pub fn new(read_ticket: ReadTicket<'a>) -> Self {
         Self {
+            read_ticket,
             skip_eval: Default::default(),
             listener: Default::default(),
             budget: Default::default(),
@@ -386,7 +392,7 @@ pub(in crate::block) fn finish_evaluation(
     block: Block,
     original_budget: Budget,
     result: Result<block::MinEval, InEvalError>,
-    filter: &EvalFilter,
+    filter: &EvalFilter<'_>,
 ) -> Result<EvaluatedBlock, EvalBlockError> {
     let cost = Cost::from_difference(original_budget, filter.budget.get());
     match result {

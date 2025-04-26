@@ -46,8 +46,16 @@ fn COMPOSITE(ctx: Context<'_>) {
 
                 let label_str = arcstr::format!(
                     "{s}\n{operator:?}\n{d}",
-                    s = source.evaluate().unwrap().attributes().display_name,
-                    d = destination.evaluate().unwrap().attributes().display_name
+                    s = source
+                        .evaluate(ctx.universe.read_ticket())
+                        .unwrap()
+                        .attributes()
+                        .display_name,
+                    d = destination
+                        .evaluate(ctx.universe.read_ticket())
+                        .unwrap()
+                        .attributes()
+                        .display_name
                 );
                 let label = text::Text::builder()
                     .string(label_str)

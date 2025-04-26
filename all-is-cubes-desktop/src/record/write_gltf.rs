@@ -7,9 +7,11 @@ use std::sync::{Arc, Mutex, mpsc};
 
 use anyhow::Context;
 
+use all_is_cubes::listen;
 use all_is_cubes::math::{GridAab, GridVector};
 use all_is_cubes::space::Space;
-use all_is_cubes::{listen, time, universe};
+use all_is_cubes::time;
+use all_is_cubes::universe::{self, ReadTicket};
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::MeshTypes;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshId};
@@ -67,7 +69,11 @@ impl MeshRecorder {
         }
     }
 
-    pub fn capture_frame(&mut self, this_frame_number: super::FrameNumber) {
+    pub fn capture_frame(
+        &mut self,
+        read_ticket: ReadTicket<'_>,
+        this_frame_number: super::FrameNumber,
+    ) {
         // TODO: this glue logic belongs in our gltf module and crate,
         // not here
 
@@ -77,6 +83,7 @@ impl MeshRecorder {
         let meshes_to_record: Mutex<BTreeMap<MeshId, MeshRecordMsg>> = Mutex::new(BTreeMap::new());
 
         self.csm.update(
+            read_ticket,
             &self.cameras.cameras().world,
             time::DeadlineStd::Whenever,
             |u| {

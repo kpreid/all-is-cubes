@@ -13,7 +13,7 @@ use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{Icons, Ix, Tool, ToolError, ToolInput};
 use crate::linking::BlockProvider;
 use crate::transaction::{CommitError, Merge, Transaction};
-use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
+use crate::universe::{Handle, HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles};
 
 /// A collection of [`Tool`]s (items).
 ///
@@ -86,6 +86,7 @@ impl Inventory {
     /// `character` must be the character containing the inventory. TODO: Bad API
     pub fn use_tool(
         &self,
+        read_ticket: ReadTicket<'_>,
         cursor: Option<&Cursor>,
         character: Handle<Character>,
         slot_index: Ix,
@@ -95,6 +96,7 @@ impl Inventory {
             None | Some(Slot::Empty) => Err(ToolError::NoTool),
             Some(Slot::Stack(count, original_tool)) => {
                 let input = ToolInput {
+                    read_ticket,
                     cursor: cursor.cloned(),
                     character: Some(character.clone()),
                 };

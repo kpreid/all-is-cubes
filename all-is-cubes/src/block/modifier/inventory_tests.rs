@@ -9,6 +9,7 @@ use crate::arcstr::literal;
 use crate::block::{self, Block, Resolution::*};
 use crate::euclid::{point3, vec3};
 use crate::math::{Face6, Rgba, rgba_const};
+use crate::universe::ReadTicket;
 use crate::{inv, op, time};
 
 #[test]
@@ -54,7 +55,7 @@ fn inventory_preserves_attributes() {
         .build();
 
     assert_eq!(
-        std::dbg!(inventory_block.evaluate().unwrap()).attributes,
+        std::dbg!(inventory_block.evaluate(ReadTicket::stub()).unwrap()).attributes,
         block::BlockAttributes {
             display_name: literal!("Inventory"),
             inventory: iib,

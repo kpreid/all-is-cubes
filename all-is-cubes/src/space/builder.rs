@@ -9,6 +9,7 @@ use crate::math::{FreePoint, Rgb, Vol};
 use crate::space::{
     BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, Sky, Space, SpacePhysics,
 };
+use crate::universe::ReadTicket;
 
 /// Builder of [`Space`]s.
 ///
@@ -164,6 +165,7 @@ impl Builder<Vol<()>> {
     /// such as [`filled_with()`](Self::filled_with()).
     pub fn palette_and_contents<P>(
         self,
+        read_ticket: ReadTicket<'_>,
         palette: P,
         contents: Vol<Box<[BlockIndex]>>,
         light: Option<Vol<Box<[PackedLight]>>>,
@@ -171,17 +173,18 @@ impl Builder<Vol<()>> {
     where
         P: IntoIterator<IntoIter: ExactSizeIterator<Item = Block>>,
     {
-        self.palette_and_contents_impl(&mut palette.into_iter(), contents, light)
+        self.palette_and_contents_impl(read_ticket, &mut palette.into_iter(), contents, light)
     }
 
     fn palette_and_contents_impl(
         mut self,
+        read_ticket: ReadTicket<'_>,
         palette: &mut dyn ExactSizeIterator<Item = Block>,
         mut contents: Vol<Box<[BlockIndex]>>,
         light: Option<Vol<Box<[PackedLight]>>>,
     ) -> Result<Self, PaletteError> {
         // Validate palette.
-        let (mut palette, remapping) = Palette::from_blocks(palette)?;
+        let (mut palette, remapping) = Palette::from_blocks(read_ticket, palette)?;
 
         // Validate bounds.
         if contents.bounds() != self.bounds {
@@ -381,10 +384,11 @@ mod tests {
 
     #[test]
     fn palette_err_too_long() {
+        let read_ticket = ReadTicket::new();
         let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
-                .palette_and_contents(vec![AIR; 65537], Vol::from_element(2), None,)
+                .palette_and_contents(read_ticket, vec![AIR; 65537], Vol::from_element(2), None,)
                 .unwrap_err(),
             PaletteError::PaletteTooLarge { len: 65537 }
         );
@@ -392,10 +396,11 @@ mod tests {
 
     #[test]
     fn palette_err_too_short_for_contents() {
+        let read_ticket = ReadTicket::new();
         let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
-                .palette_and_contents([AIR], Vol::from_element(2), None,)
+                .palette_and_contents(read_ticket, [AIR], Vol::from_element(2), None,)
                 .unwrap_err(),
             PaletteError::Index {
                 index: 2,
@@ -407,9 +412,10 @@ mod tests {
 
     #[test]
     fn palette_err_contents_wrong_bounds() {
+        let read_ticket = ReadTicket::new();
         assert_eq!(
             Space::builder(GridAab::single_cube(Cube::new(1, 0, 0)))
-                .palette_and_contents([AIR], Vol::from_element(0), None)
+                .palette_and_contents(read_ticket, [AIR], Vol::from_element(0), None)
                 .unwrap_err(),
             PaletteError::WrongDataBounds {
                 expected: GridAab::single_cube(Cube::new(1, 0, 0)),
@@ -428,6 +434,7 @@ mod tests {
         let [block0, block1] = make_some_blocks();
         let space = Space::builder(bounds)
             .palette_and_contents(
+                ReadTicket::new(),
                 [block0.clone(), block1.clone(), block0.clone()],
                 Vol::from_elements(bounds, [0, 1, 2]).unwrap(),
                 None,
@@ -451,6 +458,7 @@ mod tests {
         let blocks = make_some_blocks::<3>();
         let space = Space::builder(bounds)
             .palette_and_contents(
+                ReadTicket::new(),
                 blocks.clone(),
                 Vol::from_elements(bounds, [0, 2]).unwrap(),
                 None,

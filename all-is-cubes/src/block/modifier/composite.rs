@@ -122,7 +122,7 @@ impl Composite {
         block: &Block,
         this_modifier_index: usize,
         mut dst_evaluated: MinEval,
-        filter: &block::EvalFilter,
+        filter: &block::EvalFilter<'_>,
     ) -> Result<MinEval, block::InEvalError> {
         let Composite {
             ref source,
@@ -220,7 +220,7 @@ fn evaluate_composition(
     src_evaluated: MinEval,
     dst_evaluated: MinEval,
     operator: CompositeOperator,
-    filter: &block::EvalFilter,
+    filter: &block::EvalFilter<'_>,
     ctx: &CompEvalCtx<'_>,
 ) -> Result<MinEval, block::InEvalError> {
     // Short-circuit cases where we can return a block unchanged.
@@ -598,7 +598,7 @@ impl CompositeOperator {
 pub(in crate::block) fn render_inventory(
     mut input: MinEval,
     inventory: &crate::inv::Inventory,
-    filter: &block::EvalFilter,
+    filter: &block::EvalFilter<'_>,
 ) -> Result<MinEval, block::InEvalError> {
     if filter.skip_eval {
         return Ok(input);
@@ -694,7 +694,7 @@ mod tests {
     use crate::math::{Rgba, zo32};
     use crate::space::Space;
     use crate::time;
-    use crate::universe::Universe;
+    use crate::universe::{ReadTicket, Universe};
     use BlockCollision::{Hard, None as CNone};
     use CompositeOperator::{Atop, In, Over};
     use pretty_assertions::assert_eq;
@@ -748,7 +748,7 @@ mod tests {
     fn eval_compose(src: &Block, operator: CompositeOperator, dst: &Block) -> EvaluatedBlock {
         dst.clone()
             .with_modifier(Composite::new(src.clone(), operator))
-            .evaluate()
+            .evaluate(ReadTicket::stub())
             .expect("failed to evaluate in eval_compose()")
     }
 
@@ -789,7 +789,10 @@ mod tests {
     fn bounding_volume_when_one_is_air() {
         let universe = &mut Universe::new();
         let slab = make_slab(universe, 1, R2);
-        let slab_bounds = slab.evaluate().unwrap().voxels_bounds();
+        let slab_bounds = slab
+            .evaluate(universe.read_ticket())
+            .unwrap()
+            .voxels_bounds();
 
         assert_eq!(
             eval_compose(&slab, Over, &AIR).voxels_bounds(),
@@ -829,17 +832,17 @@ mod tests {
             .unwrap()
             .build_into(universe);
         let base_block = Block::from(universe.insert_anonymous(block::BlockDef::new(base_block)));
-        let base_key = EvKey::new(&base_block.evaluate().unwrap());
+        let base_key = EvKey::new(&base_block.evaluate(universe.read_ticket()).unwrap());
         assert_eq!(
             base_key,
-            EvKey::new(&base_block.evaluate().unwrap()),
+            EvKey::new(&base_block.evaluate(universe.read_ticket()).unwrap()),
             "test assumption failed"
         );
 
         let air_src_block = base_block.clone().with_modifier(Composite::new(AIR, Over));
         assert_eq!(
             base_key,
-            EvKey::new(&air_src_block.evaluate().unwrap()),
+            EvKey::new(&air_src_block.evaluate(universe.read_ticket()).unwrap()),
             "src"
         );
 
@@ -850,7 +853,7 @@ mod tests {
         let air_dst_block = base_block.with_modifier(Composite::new(AIR, Over).reversed());
         assert_ne!(
             base_key,
-            EvKey::new(&air_dst_block.evaluate().unwrap()),
+            EvKey::new(&air_dst_block.evaluate(universe.read_ticket()).unwrap()),
             "dst"
         );
     }

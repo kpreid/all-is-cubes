@@ -131,7 +131,7 @@ impl Modifier {
         block: &Block,
         this_modifier_index: usize,
         mut value: MinEval,
-        filter: &block::EvalFilter,
+        filter: &block::EvalFilter<'_>,
     ) -> Result<MinEval, block::InEvalError> {
         block::Budget::decrement_components(&filter.budget)?;
 

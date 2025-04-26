@@ -132,7 +132,10 @@ async fn export_character_not_supported() {
     let mut universe = Universe::new();
     let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
     universe
-        .insert("x".into(), Character::spawn_default(space))
+        .insert(
+            "x".into(),
+            Character::spawn_default(universe.read_ticket(), space),
+        )
         .unwrap();
 
     let destination_dir = tempfile::tempdir().unwrap();

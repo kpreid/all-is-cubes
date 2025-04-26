@@ -4,7 +4,7 @@ use core::{fmt, mem, ops};
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
 use crate::listen::{self, Gate, IntoDynListener as _, Listener, Notifier};
 use crate::transaction::{self, Equal, Transaction};
-use crate::universe::{HandleVisitor, VisitHandles};
+use crate::universe::{HandleVisitor, ReadTicket, VisitHandles};
 
 #[cfg(doc)]
 use crate::block::{EvaluatedBlock, Primitive};
@@ -68,7 +68,8 @@ impl BlockDef {
     /// in the future).
     pub fn new(block: Block) -> Self {
         BlockDef {
-            state: BlockDefState::new(block),
+            // TODO: Pass ReadTicket explicitly
+            state: BlockDefState::new(block, ReadTicket::new()),
             notifier: Arc::new(Notifier::new()),
         }
     }
@@ -86,8 +87,11 @@ impl BlockDef {
     ///
     /// This returns the same success or error as `Block::from(handle_to_self).evaluate()` would,
     /// not the same as `.block().evaluate()` would.
-    pub fn evaluate(&self) -> Result<block::EvaluatedBlock, EvalBlockError> {
-        let filter = block::EvalFilter::default();
+    pub fn evaluate(
+        &self,
+        read_ticket: ReadTicket<'_>,
+    ) -> Result<block::EvaluatedBlock, EvalBlockError> {
+        let filter = block::EvalFilter::new(read_ticket);
         block::finish_evaluation(
             self.block().clone(),
             filter.budget.get(),
@@ -103,8 +107,12 @@ impl BlockDef {
     }
 
     /// Implementation of block evaluation used by a [`Primitive::Indirect`] pointing to this.
-    pub(super) fn evaluate_impl(&self, filter: &block::EvalFilter) -> Result<MinEval, InEvalError> {
+    pub(super) fn evaluate_impl(
+        &self,
+        filter: &block::EvalFilter<'_>,
+    ) -> Result<MinEval, InEvalError> {
         let &block::EvalFilter {
+            read_ticket: _,
             skip_eval,
             ref listener,
             budget: _, // already accounted in the caller
@@ -128,20 +136,21 @@ impl BlockDef {
         }
     }
 
-    pub(crate) fn step(&mut self) -> BlockDefStepInfo {
-        self.state.step(&self.notifier)
+    pub(crate) fn step(&mut self, read_ticket: ReadTicket<'_>) -> BlockDefStepInfo {
+        self.state.step(read_ticket, &self.notifier)
     }
 }
 
 impl BlockDefState {
     #[inline]
-    fn new(block: Block) -> Self {
+    fn new(block: Block, read_ticket: ReadTicket<'_>) -> Self {
         let cache_dirty = listen::Flag::new(false);
         let (block_listen_gate, block_listener) =
             Listener::<BlockChange>::gate(cache_dirty.listener());
 
         let cache = block
             .evaluate2(&block::EvalFilter {
+                read_ticket,
                 skip_eval: false,
                 listener: Some(block_listener.into_dyn_listener()),
                 budget: Default::default(),
@@ -158,14 +167,18 @@ impl BlockDefState {
         }
     }
 
-    fn step(&mut self, notifier: &Notifier<BlockChange>) -> BlockDefStepInfo {
+    fn step(
+        &mut self,
+        read_ticket: ReadTicket<'_>,
+        notifier: &Notifier<BlockChange>,
+    ) -> BlockDefStepInfo {
         let mut info = BlockDefStepInfo::default();
 
         if !self.listeners_ok {
             info.attempted = 1;
             // If there was an evaluation error, then we may also be missing listeners.
             // Start over.
-            *self = BlockDefState::new(self.block.clone());
+            *self = BlockDefState::new(self.block.clone(), ReadTicket::new());
             notifier.notify(&BlockChange::new());
             info.updated = 1;
         } else if self.cache_dirty.get_and_clear() {
@@ -176,6 +189,7 @@ impl BlockDefState {
             let new_cache = self
                 .block
                 .evaluate2(&block::EvalFilter {
+                    read_ticket,
                     skip_eval: false,
                     listener: None, // we already have a listener installed
                     budget: Default::default(),
@@ -336,7 +350,7 @@ impl Transaction for BlockDefTransaction {
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
         if let Equal(Some(new)) = &self.new {
-            target.state = BlockDefState::new(new.clone());
+            target.state = BlockDefState::new(new.clone(), ReadTicket::new());
             target.notifier.notify(&BlockChange::new());
         }
         Ok(())
@@ -488,12 +502,12 @@ mod tests {
             .color(Rgba::new(1.0, 0.0, 0.0, 1.0))
             .build();
 
-        let eval_bare = block.evaluate().unwrap();
+        let eval_bare = block.evaluate(universe.read_ticket()).unwrap();
         let block_def = BlockDef::new(block.clone());
-        let eval_def = block_def.evaluate().unwrap();
+        let eval_def = block_def.evaluate(universe.read_ticket()).unwrap();
         let block_def_handle = universe.insert_anonymous(block_def);
         let indirect_block = Block::from(block_def_handle);
-        let eval_indirect = indirect_block.evaluate().unwrap();
+        let eval_indirect = indirect_block.evaluate(universe.read_ticket()).unwrap();
 
         assert_eq!(
             block::EvaluatedBlock {

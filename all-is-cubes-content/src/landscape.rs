@@ -12,9 +12,8 @@ use all_is_cubes::block::{
 };
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, zo32};
-use all_is_cubes::space::Sky;
-use all_is_cubes::space::{SetCubeError, Space};
-use all_is_cubes::universe::UniverseTransaction;
+use all_is_cubes::space::{SetCubeError, Sky, Space};
+use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::alg::{NoiseFnExt, array_of_noise, scale_color, voronoi_pattern};
@@ -187,7 +186,7 @@ pub async fn install_landscape_blocks(
 
     let attributes_from = |block: &Block| -> Result<BlockAttributes, InGenError> {
         Ok(block
-            .evaluate()
+            .evaluate(ReadTicket::stub())
             .map_err(InGenError::other)?
             .attributes()
             .clone())

@@ -13,7 +13,7 @@ use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
 use all_is_cubes::time::{self, Duration, Instant as _};
-use all_is_cubes::universe::Handle;
+use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes::util::{ConciseDebug, Fmt, Refmt, StatusText, TimeStats};
 use all_is_cubes_render::{Flaws, camera::Camera};
 
@@ -103,7 +103,9 @@ where
     /// If `interactive` is true, will prioritize getting a rough view of the world over
     /// a fully detailed one, by using placeholder block meshes on the first pass.
     pub fn new(space: Handle<Space>, texture_allocator: M::Alloc, interactive: bool) -> Self {
-        let space_borrowed = space.read().unwrap();
+        // TODO(read_ticket): Note that we *only* need this ticket to install the listener.
+        // We should add a way to defer adding listeners till the next access, or add without locking.
+        let space_borrowed = space.read(ReadTicket::new()).unwrap();
         let todo = listen::StoreLock::new(CsmTodo::initially_dirty());
         space_borrowed.listen(todo.listener());
 
@@ -210,6 +212,7 @@ where
     /// Returns performance information and the chunk the camera is located in.
     pub fn update<F>(
         &mut self,
+        read_ticket: ReadTicket<'_>,
         camera: &Camera,
         deadline: time::Deadline<M::Instant>,
         render_data_updater: F,
@@ -227,11 +230,12 @@ where
         // }
 
         let was_startup_chunks_only = self.startup_chunks_only;
-        let (mut info1, timed_out) = self.update_once(camera, deadline, &render_data_updater);
+        let (mut info1, timed_out) =
+            self.update_once(read_ticket, camera, deadline, &render_data_updater);
 
         // If the first pass did not finish and was startup_chunks_only, try again.
         if was_startup_chunks_only && !timed_out && info1.flaws.contains(Flaws::UNFINISHED) {
-            let (info2, _) = self.update_once(camera, deadline, &render_data_updater);
+            let (info2, _) = self.update_once(read_ticket, camera, deadline, &render_data_updater);
             info1.add_second_pass(info2);
 
             info1
@@ -246,6 +250,7 @@ where
     /// finishing its work.
     fn update_once<F>(
         &mut self,
+        read_ticket: ReadTicket<'_>,
         camera: &Camera,
         deadline: time::Deadline<M::Instant>,
         render_data_updater: &F,
@@ -275,7 +280,7 @@ where
 
         let todo: &mut CsmTodo<CHUNK_SIZE> = &mut self.todo.lock();
 
-        let space = &*if let Ok(space) = self.space.read() {
+        let space = &*if let Ok(space) = self.space.read(read_ticket) {
             space
         } else {
             // TODO: report error

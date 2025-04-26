@@ -13,7 +13,7 @@ use core::task::Waker;
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
-use crate::universe::{HandleVisitor, UniverseTransaction, VisitHandles};
+use crate::universe::{HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles};
 use crate::util::maybe_sync::{Mutex, SendSyncIfStd};
 
 #[cfg(doc)]
@@ -52,6 +52,9 @@ pub trait Host: transaction::Transactional + 'static {
 pub struct Context<'a, H: Host> {
     /// The time tick that is currently passing, causing this step.
     pub tick: Tick,
+
+    /// [`ReadTicket`] for the universe this behavior is contained in.
+    pub read_ticket: ReadTicket<'a>,
 
     /// The current state of the behavior's host object.
     pub host: &'a H,
@@ -190,6 +193,7 @@ impl<H: Host> BehaviorSet<H> {
 
     pub(crate) fn step(
         &self,
+        read_ticket: ReadTicket<'_>,
         host: &H,
         host_transaction_binder: &dyn Fn(H::Transaction) -> UniverseTransaction,
         // This is not `dyn` because it doesn't need to be stored, and there's no advantage
@@ -217,6 +221,7 @@ impl<H: Host> BehaviorSet<H> {
 
             let context = &Context {
                 tick,
+                read_ticket,
                 host,
                 attachment: &entry.attachment,
                 waker: entry.waker.as_ref().unwrap(),
@@ -983,7 +988,7 @@ mod tests {
         let mut u = Universe::new();
         // TODO: Once we have a simpler type than Character to test with, do that
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let mut character = Character::spawn_default(space);
+        let mut character = Character::spawn_default(u.read_ticket(), space);
         character.add_behavior(SelfModifyingBehavior {
             foo: 1,
             then: Then::Step,
@@ -993,7 +998,7 @@ mod tests {
         u.step(false, time::DeadlineNt::Whenever);
         u.step(false, time::DeadlineNt::Whenever);
 
-        let character = character.read().unwrap();
+        let character = character.read(u.read_ticket()).unwrap();
         assert_eq!(
             character
                 .behaviors
@@ -1013,7 +1018,7 @@ mod tests {
         let mut u = Universe::new();
         // TODO: Once we have a simpler type than Character to test with, do that
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let mut character = Character::spawn_default(space);
+        let mut character = Character::spawn_default(u.read_ticket(), space);
         character.add_behavior(SelfModifyingBehavior {
             foo: 1,
             then: Then::Drop,
@@ -1022,7 +1027,7 @@ mod tests {
 
         assert_eq!(
             character
-                .read()
+                .read(u.read_ticket())
                 .unwrap()
                 .behaviors
                 .query::<SelfModifyingBehavior>()
@@ -1032,7 +1037,7 @@ mod tests {
         u.step(false, time::DeadlineNt::Whenever);
         assert_eq!(
             character
-                .read()
+                .read(u.read_ticket())
                 .unwrap()
                 .behaviors
                 .query::<SelfModifyingBehavior>()

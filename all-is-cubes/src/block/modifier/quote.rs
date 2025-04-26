@@ -22,7 +22,7 @@ impl Quote {
     pub(in crate::block) fn evaluate(
         &self,
         value: block::MinEval,
-        filter: &block::EvalFilter,
+        filter: &block::EvalFilter<'_>,
     ) -> Result<block::MinEval, block::InEvalError> {
         let &Quote { suppress_ambient } = self;
         let (mut attributes, mut voxels) = value.into_parts();
@@ -65,6 +65,7 @@ mod tests {
 
     #[test]
     fn quote_evaluation() {
+        let read_ticket = universe::ReadTicket::stub();
         let l = Rgb::new(1.0, 2.0, 3.0);
         let mut block = Block::builder()
             .color(Rgba::WHITE)
@@ -72,7 +73,7 @@ mod tests {
             .build();
         assert_eq!(
             block
-                .evaluate()
+                .evaluate(read_ticket)
                 .unwrap()
                 .voxels
                 .single_voxel()
@@ -85,7 +86,7 @@ mod tests {
         }));
         assert_eq!(
             block
-                .evaluate()
+                .evaluate(read_ticket)
                 .unwrap()
                 .voxels
                 .single_voxel()

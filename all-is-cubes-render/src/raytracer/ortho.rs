@@ -10,7 +10,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::raycast;
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::Handle;
+use all_is_cubes::universe::{Handle, ReadTicket};
 
 use crate::camera::{self, GraphicsOptions, ImagePixel};
 use crate::raytracer;
@@ -21,7 +21,7 @@ use crate::{Flaws, Rendering};
 //---
 // TODO: This renderer has no tests of its output other than the implicit testing where
 // it is used in UI tests.
-pub fn render_orthographic(space: &Handle<Space>) -> Rendering {
+pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -> Rendering {
     // TODO: Figure out how to make this less of a from-scratch reimplementation and share
     // more components with the regular raytracer.
     // To do this we will need to add ortho support to `Camera` or some other special case.
@@ -30,7 +30,9 @@ pub fn render_orthographic(space: &Handle<Space>) -> Rendering {
     // for "what's the highest resolution that was tested along this ray", we can do adaptive
     // sampling so we can trace whole blocks at once when they're simple, and also detect if
     // the image scale is too low to accurately capture the scene.
-    let space = &*space.read().expect("failed to read space to render");
+    let space = &*space
+        .read(read_ticket)
+        .expect("failed to read space to render");
     let camera = &MultiOrthoCamera::new(Resolution::R32, space.bounds());
     let rt = &raytracer::SpaceRaytracer::new(space, GraphicsOptions::UNALTERED_COLORS, ());
 

@@ -9,7 +9,7 @@ use alloc::sync::Arc;
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::inv;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
-use all_is_cubes::universe::{Handle, HandleError};
+use all_is_cubes::universe::{Handle, HandleError, ReadTicket};
 
 /// Some game entity that has an inventory we are watching, or none (treated as empty inventory).
 ///
@@ -70,7 +70,7 @@ impl InventoryWatcher {
 
     /// Update this watcher's state from the inventory source, if any change has occurred.
     /// This should be called before making use of updated inventory information.
-    pub fn update(&mut self) {
+    pub fn update(&mut self, read_ticket: ReadTicket<'_>) {
         if !self.dirty.get_and_clear() {
             return;
         }
@@ -101,7 +101,7 @@ impl InventoryWatcher {
         let character_guard;
         let (new_inventory, new_selections) = match &self.inventory_owner {
             Some(character_handle) => {
-                match character_handle.read() {
+                match character_handle.read(read_ticket) {
                     Ok(cg) => {
                         character_guard = cg;
                         if let Some(l) = listener_to_install {
@@ -224,10 +224,13 @@ mod tests {
         pub fn new() -> Self {
             let mut universe = Universe::new();
             let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
-            let character = universe.insert_anonymous(Character::spawn_default(space.clone()));
+            let character = universe.insert_anonymous(Character::spawn_default(
+                universe.read_ticket(),
+                space.clone(),
+            ));
             let character_cell = listen::Cell::new(Some(character.clone()));
             let mut watcher = InventoryWatcher::new(character_cell.as_source());
-            watcher.update();
+            watcher.update(universe.read_ticket());
 
             // Install listener
             let sink: listen::Sink<WatcherChange> = listen::Sink::new();
@@ -242,6 +245,9 @@ mod tests {
                 sink,
             }
         }
+        pub fn update(&mut self) {
+            self.watcher.update(self.universe.read_ticket());
+        }
     }
 
     #[test]
@@ -249,7 +255,7 @@ mod tests {
         let mut t = Tester::new();
         // Run redundant update -- should see no effect
         assert_eq!(t.sink.drain(), vec![]);
-        t.watcher.update();
+        t.update();
         assert_eq!(t.sink.drain(), vec![]);
 
         assert_eq!(t.watcher.character(), Some(&t.character));
@@ -261,7 +267,7 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(t.sink.drain(), vec![WatcherChange::NeedsUpdate]);
-        t.watcher.update();
+        t.update();
         assert_eq!(t.sink.drain(), vec![WatcherChange::Inventory]);
     }
 
@@ -270,9 +276,10 @@ mod tests {
         let mut t = Tester::new();
 
         // Construct new character with different inventory.
-        let new_character = t
-            .universe
-            .insert_anonymous(Character::spawn_default(t.space));
+        let new_character = t.universe.insert_anonymous(Character::spawn_default(
+            t.universe.read_ticket(),
+            t.space.clone(),
+        ));
         new_character
             .execute(&CharacterTransaction::inventory(
                 inv::InventoryTransaction::insert([inv::Tool::Activate]),
@@ -281,7 +288,7 @@ mod tests {
 
         t.character_cell.set(Some(new_character.clone()));
         assert_eq!(t.watcher.character(), Some(&t.character));
-        t.watcher.update();
+        t.update();
         assert_eq!(t.watcher.character(), Some(&new_character));
         assert_eq!(t.sink.drain(), vec![WatcherChange::Inventory]);
     }

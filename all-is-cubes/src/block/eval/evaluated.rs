@@ -355,8 +355,9 @@ impl<'a> arbitrary::Arbitrary<'a> for EvaluatedBlock {
 ///
 /// ```
 /// use all_is_cubes::block::{AIR, AIR_EVALUATED};
+/// use all_is_cubes::universe::ReadTicket;
 ///
-/// assert_eq!(Ok(AIR_EVALUATED), AIR.evaluate());
+/// assert_eq!(Ok(AIR_EVALUATED), AIR.evaluate(ReadTicket::stub()));
 /// ```
 pub const AIR_EVALUATED: EvaluatedBlock = EvaluatedBlock {
     block: block::AIR,
@@ -625,12 +626,14 @@ impl core::hash::Hash for EvKey {
 mod tests {
     use super::*;
     use crate::math::{Cube, Vol};
-    use crate::universe::Universe;
+    use crate::universe::{ReadTicket, Universe};
     use indoc::indoc;
 
     #[test]
     fn evaluated_block_debug_simple() {
-        let ev = block::from_color!(Rgba::WHITE).evaluate().unwrap();
+        let ev = block::from_color!(Rgba::WHITE)
+            .evaluate(ReadTicket::stub())
+            .unwrap();
 
         // not testing the one-line version because it'll be not too surprising
         assert_eq!(
@@ -687,7 +690,7 @@ mod tests {
             })
             .unwrap()
             .build_into(&mut universe)
-            .evaluate()
+            .evaluate(universe.read_ticket())
             .unwrap();
 
         assert_eq!(
@@ -775,7 +778,10 @@ mod tests {
             Rgba::new(0.0, 0.5, 1.0, 0.5),
         ] {
             assert_eq!(
-                Block::from(color).evaluate().unwrap().opacity_as_category(),
+                Block::from(color)
+                    .evaluate(ReadTicket::stub())
+                    .unwrap()
+                    .opacity_as_category(),
                 color.opacity_category(),
                 "Input color {color:?}"
             );

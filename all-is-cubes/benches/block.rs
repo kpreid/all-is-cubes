@@ -13,10 +13,11 @@ pub fn evaluate_bench(c: &mut Criterion) {
     // Evaluate some ordinary atom blocks with no modifiers.
     group.bench_function("msb", |b| {
         const N: usize = 10;
+        let universe = Universe::new();
         let blocks = make_some_blocks::<N>();
 
         b.iter_with_large_drop(|| -> [EvaluatedBlock; N] {
-            core::array::from_fn(|i| blocks[i].evaluate().unwrap())
+            core::array::from_fn(|i| blocks[i].evaluate(universe.read_ticket()).unwrap())
         })
     });
 
@@ -27,7 +28,7 @@ pub fn evaluate_bench(c: &mut Criterion) {
         let blocks = make_some_voxel_blocks::<N>(&mut universe);
 
         b.iter_with_large_drop(|| -> [EvaluatedBlock; N] {
-            core::array::from_fn(|i| blocks[i].evaluate().unwrap())
+            core::array::from_fn(|i| blocks[i].evaluate(universe.read_ticket()).unwrap())
         })
     });
 
@@ -40,7 +41,9 @@ pub fn evaluate_bench(c: &mut Criterion) {
             let m = block.modifiers_mut();
             m.extend(vec![Modifier::Rotate(GridRotation::CLOCKWISE); 100]);
         }
-        b.iter_with_large_drop(|| -> EvaluatedBlock { block.evaluate().unwrap() })
+        b.iter_with_large_drop(|| -> EvaluatedBlock {
+            block.evaluate(universe.read_ticket()).unwrap()
+        })
     });
 
     group.finish();

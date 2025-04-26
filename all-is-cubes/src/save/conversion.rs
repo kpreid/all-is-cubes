@@ -8,6 +8,8 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::universe::ReadTicket;
+
 use super::schema;
 
 mod behavior {
@@ -979,7 +981,7 @@ mod space {
 
                     let space = Space::builder(bounds)
                         .physics(physics.into())
-                        .palette_and_contents(blocks, contents, light)
+                        .palette_and_contents(ReadTicket::new(), blocks, contents, light)
                         .map_err(serde::de::Error::custom)?
                         .behaviors(behaviors.into_owned())
                         .spawn(spawn.into_owned())
@@ -1174,9 +1176,12 @@ mod universe {
 
             let blocks = blocks.iter().map(|member_handle: &Handle<BlockDef>| {
                 let name = member_handle.name();
-                let read_guard: ReadGuard<BlockDef> = member_handle.read().map_err(|e| {
-                    serde::ser::Error::custom(format!("Failed to read universe member {name}: {e}"))
-                })?;
+                let read_guard: ReadGuard<BlockDef> =
+                    member_handle.read(ReadTicket::new()).map_err(|e| {
+                        serde::ser::Error::custom(format!(
+                            "Failed to read universe member {name}: {e}"
+                        ))
+                    })?;
                 let member_repr = schema::MemberSer::from(&*read_guard);
                 Ok(MemberEntrySer {
                     name: member_handle.name(),
@@ -1339,7 +1344,7 @@ mod universe {
             S: Serializer,
         {
             let handle: &Handle<T> = &self.0;
-            let read_guard: ReadGuard<T> = handle.read().map_err(|e| {
+            let read_guard: ReadGuard<T> = handle.read(ReadTicket::new()).map_err(|e| {
                 serde::ser::Error::custom(format!(
                     "Failed to read universe member {name}: {e}",
                     name = handle.name()

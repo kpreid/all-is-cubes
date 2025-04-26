@@ -123,8 +123,11 @@ fn get_any() {
     let sp = u
         .insert("test_space".into(), Space::empty_positive(1, 1, 1))
         .unwrap();
-    u.insert("test_char".into(), Character::spawn_default(sp))
-        .unwrap();
+    u.insert(
+        "test_char".into(),
+        Character::spawn_default(u.read_ticket(), sp),
+    )
+    .unwrap();
 
     assert!(u.get_any(&"nonexistent".into()).is_none());
 
@@ -156,8 +159,8 @@ fn insert_anonymous_makes_distinct_names() {
         .unwrap();
     assert_ne!(handle_a, handle_b, "not equal");
     assert_ne!(
-        handle_a.read().unwrap().block(),
-        handle_b.read().unwrap().block(),
+        handle_a.read(u.read_ticket(),).unwrap().block(),
+        handle_b.read(u.read_ticket(),).unwrap().block(),
         "different values"
     );
 }
@@ -278,14 +281,14 @@ fn delete_success() {
     let handle_1 = u
         .insert(name.clone(), BlockDef::new(blocks[0].clone()))
         .unwrap();
-    let _ = handle_1.read().unwrap();
+    let _ = handle_1.read(u.read_ticket()).unwrap();
 
     UniverseTransaction::delete(handle_1.clone())
         .execute(&mut u, &mut drop)
         .unwrap();
     assert_eq!(
         handle_1
-            .read()
+            .read(u.read_ticket(),)
             .expect_err("should be no longer reachable by ref"),
         HandleError::Gone(name.clone()),
     );
@@ -297,10 +300,12 @@ fn delete_success() {
         .insert(name.clone(), BlockDef::new(blocks[1].clone()))
         .unwrap();
     assert_eq!(
-        handle_1.read().expect_err("should not be resurrected"),
+        handle_1
+            .read(u.read_ticket(),)
+            .expect_err("should not be resurrected"),
         HandleError::Gone(name),
     );
-    let _ = handle_2.read().unwrap();
+    let _ = handle_2.read(u.read_ticket()).unwrap();
 }
 
 /// Anonymous members are strictly garbage collected, and cannot be deleted.
@@ -471,7 +476,7 @@ fn visit_handles_character() {
         .insert("space".into(), Space::empty_positive(1, 1, 1))
         .unwrap();
 
-    let mut character = Character::spawn_default(space_handle.clone());
+    let mut character = Character::spawn_default(u.read_ticket(), space_handle.clone());
 
     // A block handle in inventory.
     let block_handle = u.insert("block".into(), BlockDef::new(AIR)).unwrap();

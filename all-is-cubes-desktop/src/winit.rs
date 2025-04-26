@@ -4,6 +4,7 @@ use std::mem;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use all_is_cubes::universe::ReadTicket;
 use anyhow::Context as _;
 use winit::event::{DeviceEvent, ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
@@ -410,7 +411,9 @@ fn handle_window_event<Ren: RendererToWinit>(
                 return;
             }
 
-            dsession.renderer.update_world_camera();
+            dsession
+                .renderer
+                .update_world_camera(dsession.session.universe().read_ticket());
             dsession.session.update_cursor(dsession.renderer.cameras());
             dsession
                 .window
@@ -542,7 +545,7 @@ fn handle_window_event<Ren: RendererToWinit>(
 #[expect(clippy::module_name_repetitions)]
 pub trait RendererToWinit: crate::glue::Renderer + 'static {
     #[doc(hidden)]
-    fn update_world_camera(&mut self);
+    fn update_world_camera(&mut self, read_ticket: ReadTicket<'_>);
     #[doc(hidden)]
     fn cameras(&self) -> &StandardCameras;
     #[doc(hidden)]
@@ -550,8 +553,8 @@ pub trait RendererToWinit: crate::glue::Renderer + 'static {
 }
 
 impl RendererToWinit for SurfaceRenderer<Instant> {
-    fn update_world_camera(&mut self) {
-        self.update_world_camera()
+    fn update_world_camera(&mut self, read_ticket: ReadTicket<'_>) {
+        self.update_world_camera(read_ticket)
     }
 
     fn cameras(&self) -> &StandardCameras {
@@ -571,6 +574,7 @@ impl RendererToWinit for SurfaceRenderer<Instant> {
 
         let _info = self
             .render_frame(
+                session.universe().read_ticket(),
                 session.cursor_result(),
                 &frame_budget,
                 |render_info| format!("{}", session.info_text(render_info)),

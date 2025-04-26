@@ -15,7 +15,7 @@ use crate::op::{self, Operation};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
 use crate::universe::{
-    Handle, HandleError, HandleVisitor, ReadGuard, UniverseTransaction, VisitHandles,
+    Handle, HandleError, HandleVisitor, ReadGuard, ReadTicket, UniverseTransaction, VisitHandles,
 };
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
@@ -95,7 +95,7 @@ impl Tool {
     /// TODO: Return type is inelegant
     pub fn use_tool(
         self,
-        input: &ToolInput,
+        input: &ToolInput<'_>,
     ) -> Result<(Option<Self>, UniverseTransaction), ToolError> {
         match self {
             Self::Activate => {
@@ -167,14 +167,19 @@ impl Tool {
             }
             Self::EditBlock => {
                 // TODO: this should probably be a utility on Block itself
-                fn find_space(block: &Block) -> Result<Option<Handle<Space>>, HandleError> {
+                fn find_space(
+                    read_ticket: ReadTicket<'_>,
+                    block: &Block,
+                ) -> Result<Option<Handle<Space>>, HandleError> {
                     match block.primitive() {
-                        Primitive::Indirect(handle) => find_space(handle.read()?.block()),
+                        Primitive::Indirect(handle) => {
+                            find_space(read_ticket, handle.read(read_ticket)?.block())
+                        }
                         Primitive::Atom(_) | Primitive::Air | Primitive::Text { .. } => Ok(None),
                         Primitive::Recur { space, .. } => Ok(Some(space.clone())),
                     }
                 }
-                match find_space(&input.cursor()?.hit().block) {
+                match find_space(input.read_ticket, &input.cursor()?.hit().block) {
                     // TODO: Actually implement the tool.
                     Ok(Some(_space_handle)) => {
                         Err(ToolError::Internal("EditBlock not implemented".to_string()))
@@ -227,7 +232,10 @@ impl Tool {
     ///
     /// This operation is used for special cases where an action is expressed by a tool
     /// but the tool is not a “game item”.
-    pub fn use_immutable_tool(&self, input: &ToolInput) -> Result<UniverseTransaction, ToolError> {
+    pub fn use_immutable_tool(
+        &self,
+        input: &ToolInput<'_>,
+    ) -> Result<UniverseTransaction, ToolError> {
         let (new_tool, transaction) = self.clone().use_tool(input)?;
 
         if new_tool.as_ref() != Some(self) {
@@ -323,17 +331,21 @@ impl VisitHandles for Tool {
 /// parameter list for `Tool::use_tool`.
 #[derive(Debug)]
 #[expect(clippy::exhaustive_structs, reason = "TODO: should be non_exhaustive")]
-pub struct ToolInput {
+pub struct ToolInput<'a> {
+    /// Access to the universe being operated on.
+    pub read_ticket: ReadTicket<'a>,
+
     /// Cursor identifying block(s) to act on. If [`None`] then the tool was used while
     /// pointing at nothing or by an agent without an ability to aim.
     pub cursor: Option<Cursor>,
+
     /// Character that is using the tool.
     ///
     /// TODO: We want to be able to express “inventory host”, not just specifically Character (but there aren't any other examples).
     pub character: Option<Handle<Character>>,
 }
 
-impl ToolInput {
+impl ToolInput<'_> {
     /// Generic handler for a tool that replaces one cube.
     ///
     /// TODO: This should probably be replaced with a `Transaction` whose failure
@@ -346,7 +358,9 @@ impl ToolInput {
         new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
         let space_handle = self.cursor()?.space();
-        let space = space_handle.read().map_err(ToolError::SpaceHandle)?;
+        let space = space_handle
+            .read(self.read_ticket)
+            .map_err(ToolError::SpaceHandle)?;
         if space[cube] != old_block {
             return Err(ToolError::Obstacle);
         }
@@ -367,7 +381,7 @@ impl ToolInput {
     ) -> Result<UniverseTransaction, ToolError> {
         // TODO: better error typing here
         let new_ev = new_block
-            .evaluate()
+            .evaluate(self.read_ticket)
             .map_err(|e| ToolError::Internal(e.to_string()))?;
 
         let rotation = match new_ev.attributes().rotation_rule {
@@ -454,8 +468,11 @@ impl ToolInput {
         // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
 
         let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail if this returns None?
-        let character_guard: Option<ReadGuard<Character>> =
-            self.character.as_ref().map(|c| c.read()).transpose()?;
+        let character_guard: Option<ReadGuard<Character>> = self
+            .character
+            .as_ref()
+            .map(|c| c.read(self.read_ticket))
+            .transpose()?;
 
         let cube = if in_front {
             cursor.preceding_cube()
@@ -464,7 +481,7 @@ impl ToolInput {
         };
 
         let (space_txn, inventory_txn) = op.apply(
-            &*cursor.space().read()?,
+            &*cursor.space().read(self.read_ticket)?,
             character_guard.as_ref().map(|c| c.inventory()),
             Gridgid::from_translation(cube.lower_bounds().to_vector())
                 * rotation.to_positive_octant_transform(1),
@@ -671,12 +688,13 @@ mod tests {
             let mut space = Space::empty_positive(6, 4, 4);
             f(&mut space);
             let space_handle = universe.insert("ToolTester/space".into(), space).unwrap();
+            let read_ticket = universe.read_ticket();
 
             Self {
                 character_handle: universe
                     .insert(
                         "ToolTester/character".into(),
-                        Character::spawn_default(space_handle.clone()),
+                        Character::spawn_default(read_ticket, space_handle.clone()),
                     )
                     .unwrap(),
                 space_handle,
@@ -684,10 +702,12 @@ mod tests {
             }
         }
 
-        fn input(&self) -> ToolInput {
+        fn input(&self) -> ToolInput<'_> {
             ToolInput {
                 // TODO: define ToolInput::new
+                read_ticket: self.universe.read_ticket(),
                 cursor: cursor_raycast(
+                    self.universe.read_ticket(),
                     Ray::new([0., 0.5, 0.5], [1., 0., 0.]),
                     &self.space_handle,
                     FreeCoordinate::INFINITY,
@@ -713,6 +733,7 @@ mod tests {
             // single transaction.
             let input = self.input();
             self.character().inventory().use_tool(
+                self.universe.read_ticket(),
                 input.cursor().ok(),
                 self.character_handle.clone(),
                 index,
@@ -729,13 +750,15 @@ mod tests {
         }
 
         fn space(&self) -> ReadGuard<Space> {
-            self.space_handle.read().unwrap()
+            self.space_handle.read(self.universe.read_ticket()).unwrap()
         }
         fn space_handle(&self) -> &Handle<Space> {
             &self.space_handle
         }
         fn character(&self) -> ReadGuard<Character> {
-            self.character_handle.read().unwrap()
+            self.character_handle
+                .read(self.universe.read_ticket())
+                .unwrap()
         }
     }
 

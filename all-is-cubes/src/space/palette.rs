@@ -10,6 +10,7 @@ use crate::listen::{self, IntoDynListener as _, Listener as _};
 use crate::math::{self, OpacityCategory};
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::time::Instant;
+use crate::universe::ReadTicket;
 use crate::util::TimeStats;
 use crate::util::maybe_sync::Mutex;
 
@@ -43,7 +44,7 @@ pub(super) struct Palette {
 
 impl Palette {
     /// Constructs a new `Palette` with one entry, or zero entries if `count` is zero.
-    pub(crate) fn new(block: Block, count: usize) -> Self {
+    pub(crate) fn new(read_ticket: ReadTicket<'_>, block: Block, count: usize) -> Self {
         let todo = Default::default();
 
         if count == 0 {
@@ -55,6 +56,7 @@ impl Palette {
         }
 
         let mut block_data = SpaceBlockData::new(
+            read_ticket,
             block.clone(),
             // initial-creation version of listener_for_block()
             BlockListener {
@@ -77,6 +79,7 @@ impl Palette {
     /// If the input contains any duplicate entries, then they will be combined, and the
     /// returned [`hashbrown::HashMap`] will contain the required data remapping.
     pub(crate) fn from_blocks(
+        read_ticket: ReadTicket<'_>,
         blocks: &mut dyn ExactSizeIterator<Item = Block>,
     ) -> Result<(Self, hashbrown::HashMap<BlockIndex, BlockIndex>), PaletteError> {
         let dummy_notifier = listen::Notifier::new();
@@ -96,7 +99,7 @@ impl Palette {
         let mut remapping = hashbrown::HashMap::new();
         for (original_index, block) in (0..).zip(blocks) {
             let new_index = new_self
-                .ensure_index(&block, dummy_buffer, false)
+                .ensure_index(read_ticket, &block, dummy_buffer, false)
                 .expect("palette iterator lied about its length");
             if new_index != original_index {
                 remapping.insert(original_index, new_index);
@@ -138,6 +141,7 @@ impl Palette {
     #[inline]
     pub(super) fn ensure_index(
         &mut self,
+        read_ticket: ReadTicket<'_>,
         block: &Block,
         change_buffer: &mut ChangeBuffer<'_>,
         use_zeroed_entries: bool,
@@ -152,6 +156,7 @@ impl Palette {
                 for new_index in 0..high_mark {
                     if self.entries[new_index].count == 0 {
                         self.entries[new_index] = SpaceBlockData::new(
+                            read_ticket,
                             block.clone(),
                             self.listener_for_block(new_index as BlockIndex),
                         );
@@ -167,7 +172,11 @@ impl Palette {
             }
             let new_index = high_mark as BlockIndex;
             // Evaluate the new block type.
-            let new_data = SpaceBlockData::new(block.clone(), self.listener_for_block(new_index));
+            let new_data = SpaceBlockData::new(
+                read_ticket,
+                block.clone(),
+                self.listener_for_block(new_index),
+            );
             // Grow the vector.
             self.entries.push(new_data);
             self.block_to_index.insert(block.clone(), new_index);
@@ -180,6 +189,7 @@ impl Palette {
     /// [`Block`] for that index with `new_block`
     pub(super) fn try_replace_unique(
         &mut self,
+        read_ticket: ReadTicket<'_>,
         old_block_index: BlockIndex,
         new_block: &Block,
         change_buffer: &mut ChangeBuffer<'_>,
@@ -190,6 +200,7 @@ impl Palette {
             // Swap out the block_data entry.
             let old_block = {
                 let mut data = SpaceBlockData::new(
+                    read_ticket,
                     new_block.clone(),
                     self.listener_for_block(old_block_index),
                 );
@@ -242,7 +253,11 @@ impl Palette {
     }
 
     /// Reevaluate changed blocks.
-    pub(crate) fn step<I: Instant>(&mut self, change_buffer: &mut ChangeBuffer<'_>) -> TimeStats {
+    pub(crate) fn step<I: Instant>(
+        &mut self,
+        read_ticket: ReadTicket<'_>,
+        change_buffer: &mut ChangeBuffer<'_>,
+    ) -> TimeStats {
         let mut last_start_time = I::now();
         let mut evaluations = TimeStats::default();
         {
@@ -257,7 +272,7 @@ impl Palette {
                 // continuing with a partly broken world. Right now, we just continue with the
                 // placeholder, which may have cascading effects despite the placeholder's
                 // design to be innocuous.
-                data.evaluated = data.block.evaluate().unwrap_or_else(|e| {
+                data.evaluated = data.block.evaluate(read_ticket).unwrap_or_else(|e| {
                     // Trigger retrying evaluation at next step.
                     try_eval_again.insert(block_index);
 
@@ -455,7 +470,7 @@ impl SpaceBlockData {
         }
     }
 
-    fn new<L>(block: Block, listener: L) -> Self
+    fn new<L>(read_ticket: ReadTicket<'_>, block: Block, listener: L) -> Self
     where
         L: listen::Listener<BlockChange>,
         listen::GateListener<L>: listen::IntoDynListener<
@@ -470,6 +485,7 @@ impl SpaceBlockData {
 
         let original_budget = block::Budget::default();
         let filter = block::EvalFilter {
+            read_ticket,
             skip_eval: false,
             listener: Some(block_listener.clone()),
             budget: Cell::new(original_budget),
@@ -642,6 +658,7 @@ mod tests {
         let bounds = GridAab::from_lower_size([0, 0, 0], [3, 1, 1]);
         let space = Space::builder(bounds)
             .palette_and_contents(
+                ReadTicket::new(),
                 blocks.clone(),
                 Vol::from_elements(bounds, [0, 1, 0]).unwrap(),
                 None,

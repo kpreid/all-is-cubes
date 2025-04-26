@@ -34,7 +34,7 @@ fuzz_target!(|input: (
 
     let mut universe = Universe::new();
     let space_handle = universe.insert_anonymous(space);
-    let mut character = Character::spawn_default(space_handle);
+    let mut character = Character::spawn_default(universe.read_ticket(), space_handle);
     character.body.set_position(position);
     character.body.add_velocity(velocity);
     for i in 0..5000 {
@@ -44,7 +44,8 @@ fuzz_target!(|input: (
         }
 
         // dbg!((i, character.body.position));
-        let (_txn, _char_info, body_info) = character.step(None, Tick::arbitrary());
+        let (_txn, _char_info, body_info) =
+            character.step(universe.read_ticket(), None, Tick::arbitrary());
         // dbg!(info);
 
         // Check for no push out, but not on the first step, which might have been due to initial

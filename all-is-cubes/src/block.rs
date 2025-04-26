@@ -15,7 +15,7 @@ use crate::inv;
 use crate::listen::{self, Listen as _, Listener};
 use crate::math::{GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol};
 use crate::space::{SetCubeError, Space, SpaceChange};
-use crate::universe::{Handle, HandleVisitor, VisitHandles};
+use crate::universe::{Handle, HandleVisitor, ReadTicket, VisitHandles};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -399,9 +399,12 @@ impl Block {
     /// to tidy up the attributes-is-a-modifer refactor. The proper API is more like with_modifier()
     /// for a single attribute, but we don't have single attribute override modifiers yet.
     #[doc(hidden)]
-    pub fn freezing_get_attributes_mut(&mut self) -> &mut BlockAttributes {
+    pub fn freezing_get_attributes_mut(
+        &mut self,
+        read_ticket: ReadTicket<'_>,
+    ) -> &mut BlockAttributes {
         if !matches!(self.modifiers().last(), Some(Modifier::Attributes(_))) {
-            let attr_modifier = self.evaluate().unwrap().attributes.into();
+            let attr_modifier = self.evaluate(read_ticket).unwrap().attributes.into();
             self.modifiers_mut().push(attr_modifier);
         }
         let Some(Modifier::Attributes(a)) = self.modifiers_mut().last_mut() else {
@@ -558,8 +561,9 @@ impl Block {
     /// Converts this `Block` into a “flattened” and snapshotted form which contains all
     /// information needed for rendering and physics, and does not require [`Handle`] access
     /// to other objects.
-    pub fn evaluate(&self) -> Result<EvaluatedBlock, EvalBlockError> {
+    pub fn evaluate(&self, read_ticket: ReadTicket<'_>) -> Result<EvaluatedBlock, EvalBlockError> {
         self.evaluate2(&EvalFilter {
+            read_ticket,
             skip_eval: false,
             listener: None,
             budget: Default::default(),
@@ -581,9 +585,11 @@ impl Block {
     /// incompletely or not at all. It should not be relied on.
     pub fn evaluate_and_listen(
         &self,
+        read_ticket: ReadTicket<'_>,
         listener: impl listen::IntoDynListener<BlockChange, listen::DynListener<BlockChange>>,
     ) -> Result<EvaluatedBlock, EvalBlockError> {
         self.evaluate2(&EvalFilter {
+            read_ticket,
             skip_eval: false,
             listener: Some(listener.into_dyn_listener()),
             budget: Default::default(),
@@ -594,7 +600,10 @@ impl Block {
     ///    
     /// TODO: Placeholder name. At some point we may expose `EvalFilter` directly and make
     /// this be just `evaluate()`.
-    pub(crate) fn evaluate2(&self, filter: &EvalFilter) -> Result<EvaluatedBlock, EvalBlockError> {
+    pub(crate) fn evaluate2(
+        &self,
+        filter: &EvalFilter<'_>,
+    ) -> Result<EvaluatedBlock, EvalBlockError> {
         finish_evaluation(
             self.clone(),
             filter.budget.get(),
@@ -605,19 +614,21 @@ impl Block {
 
     /// Equivalent to `Evoxel::from_block(block.evaluate2(filter))` except for the error type.
     /// For use when blocks contain other blocks as voxels.
-    fn evaluate_to_evoxel_internal(&self, filter: &EvalFilter) -> Result<Evoxel, InEvalError> {
+    fn evaluate_to_evoxel_internal(&self, filter: &EvalFilter<'_>) -> Result<Evoxel, InEvalError> {
         // TODO: Make this more efficient by not building the full `EvaluatedBlock`
         self.evaluate_impl(filter)
             .map(|minev| Evoxel::from_block(&minev.finish(self.clone(), Cost::ZERO /* ignored */)))
     }
 
     #[inline]
-    fn evaluate_impl(&self, filter: &EvalFilter) -> Result<MinEval, InEvalError> {
+    fn evaluate_impl(&self, filter: &EvalFilter<'_>) -> Result<MinEval, InEvalError> {
         // The block's primitive counts as 1 component.
         Budget::decrement_components(&filter.budget)?;
 
         let mut value: MinEval = match *self.primitive() {
-            Primitive::Indirect(ref def_handle) => def_handle.read()?.evaluate_impl(filter)?,
+            Primitive::Indirect(ref def_handle) => {
+                def_handle.read(filter.read_ticket)?.evaluate_impl(filter)?
+            }
 
             Primitive::Atom(Atom {
                 color,
@@ -640,7 +651,7 @@ impl Block {
                 resolution,
                 space: ref space_handle,
             } => {
-                let block_space = space_handle.read()?;
+                let block_space = space_handle.read(filter.read_ticket)?;
 
                 // The region of `space` that the parameters say to look at.
                 let full_resolution_bounds =
@@ -1161,7 +1172,7 @@ pub fn space_to_blocks(
 ) -> Result<Space, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();
     let source_bounds = space_handle
-        .read()
+        .read(ReadTicket::new())
         .expect("space_to_blocks() could not read() provided space")
         .bounds();
     let destination_bounds = source_bounds.divide(resolution_g);

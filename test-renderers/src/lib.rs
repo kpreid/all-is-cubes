@@ -99,7 +99,11 @@ pub fn finish_universe_from_space(
     let space_handle = universe.insert("space".into(), space).unwrap();
 
     // If the universe is dumped, include tools and jetpack
-    let mut spawn = space_handle.read().unwrap().spawn().clone();
+    let mut spawn = space_handle
+        .read(universe.read_ticket())
+        .unwrap()
+        .spawn()
+        .clone();
     spawn.set_inventory(free_editing_starter_inventory(true));
 
     let character_handle = universe

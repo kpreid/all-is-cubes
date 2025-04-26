@@ -18,7 +18,6 @@ use all_is_cubes_render::raytracer::RtRenderer;
 
 /// Non-mutated test data shared between benches
 struct TestData {
-    #[expect(dead_code, reason = "must not be dropped")]
     universe: Universe,
     character: Handle<Character>,
 }
@@ -34,7 +33,8 @@ impl TestData {
         .await
         .unwrap();
         let space = universe.insert_anonymous(space);
-        let character = universe.insert_anonymous(Character::spawn_default(space));
+        let character =
+            universe.insert_anonymous(Character::spawn_default(universe.read_ticket(), space));
         Self {
             universe,
             character,
@@ -46,6 +46,7 @@ impl TestData {
         options_fn(&mut options);
         let mut renderer = RtRenderer::new(
             StandardCameras::new(
+                self.universe.read_ticket(),
                 listen::constant(Arc::new(options)),
                 listen::constant(Viewport::with_scale(1.0, [64, 16])),
                 listen::constant(Some(self.character.clone())),
@@ -54,7 +55,7 @@ impl TestData {
             Box::new(core::convert::identity),
             listen::constant(Arc::new(())),
         );
-        renderer.update(None).unwrap();
+        renderer.update(self.universe.read_ticket(), None).unwrap();
         renderer
     }
 

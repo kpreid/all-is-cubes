@@ -1,12 +1,12 @@
 //! Stand-alone tests of [`BlockMesh`].
 //! See [`crate::tests`] for additional tests.
 
-use all_is_cubes_render::Flaws;
 use alloc::vec::Vec;
 
 use all_is_cubes::block::{self, AIR, Block, Resolution};
 use all_is_cubes::math::{Aab, Cube, Rgba};
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{ReadTicket, Universe};
+use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::GraphicsOptions;
 
 use crate::tests::test_block_mesh;
@@ -31,7 +31,9 @@ fn default_is_empty() {
 
 #[test]
 fn nonempty() {
-    let ev = block::from_color!(Rgba::WHITE).evaluate().unwrap();
+    let ev = block::from_color!(Rgba::WHITE)
+        .evaluate(ReadTicket::stub())
+        .unwrap();
     let mesh: TestMesh = BlockMesh::new(
         &ev,
         &NoTextures,

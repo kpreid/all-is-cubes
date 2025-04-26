@@ -333,10 +333,13 @@ fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::univer
                     destination.child(&rg::entity_path!("world-mesh")),
                     c.space.clone(),
                 );
-                rm.update(&Camera::new(
-                    GraphicsOptions::default(),
-                    Viewport::with_scale(1.0, [1, 1]),
-                ));
+                rm.update(
+                    universe.read_ticket(),
+                    &Camera::new(
+                        GraphicsOptions::default(),
+                        Viewport::with_scale(1.0, [1, 1]),
+                    ),
+                );
                 core::mem::forget(rm);
             })
             .unwrap();

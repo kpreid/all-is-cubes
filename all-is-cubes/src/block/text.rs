@@ -231,7 +231,7 @@ impl Text {
     pub(in crate::block) fn evaluate(
         &self,
         block_offset: GridVector,
-        filter: &super::EvalFilter,
+        filter: &super::EvalFilter<'_>,
     ) -> Result<MinEval, block::InEvalError> {
         if filter.skip_eval {
             // TODO: Once we have a `Handle<FontDef>` or something, this will need to
@@ -882,6 +882,7 @@ mod tests {
     use crate::block::Primitive;
     use crate::raytracer::print_space;
     use crate::space::Space;
+    use crate::universe::Universe;
     use alloc::string::String;
     use alloc::vec::Vec;
     use arcstr::literal;
@@ -914,7 +915,12 @@ mod tests {
             .collect()
     }
 
-    fn single_block_test_case(text: Text) -> Block {
+    fn single_block_test_case(text: Text) -> (Universe, Block) {
+        // This universe is not really used now except to provide a `ReadTicket`,
+        // but I currently expect to add future restrictions on `Block` and `Space` usage
+        // that will make it necessary.
+        let universe = Universe::new();
+
         //assert_eq!(text.bounding_blocks(), GridAab::ORIGIN_CUBE);
 
         let block = Block::from_primitive(Primitive::Text {
@@ -930,7 +936,7 @@ mod tests {
             print_space(&space, [0., 0., 1.]);
         }
 
-        block
+        (universe, block)
     }
 
     #[test]
@@ -945,9 +951,9 @@ mod tests {
                 z: PositioningZ::Back,
             })
             .build();
-        let block = single_block_test_case(text.clone());
+        let (universe, block) = single_block_test_case(text.clone());
 
-        let ev = block.evaluate().unwrap();
+        let ev = block.evaluate(universe.read_ticket()).unwrap();
         assert_eq!(
             ev.attributes,
             BlockAttributes {
@@ -983,7 +989,7 @@ mod tests {
 
     #[test]
     fn multiple_line() {
-        let block = single_block_test_case(
+        let (universe, block) = single_block_test_case(
             Text::builder()
                 .resolution(Resolution::R32)
                 .string(literal!("abcd\nabcd"))
@@ -997,7 +1003,13 @@ mod tests {
         );
 
         assert_eq!(
-            plane_to_text(block.evaluate().unwrap().voxels.as_vol_ref()),
+            plane_to_text(
+                block
+                    .evaluate(universe.read_ticket())
+                    .unwrap()
+                    .voxels
+                    .as_vol_ref()
+            ),
             vec![
                 "................................",
                 "........##...................##.",
@@ -1102,7 +1114,7 @@ mod tests {
 
     #[test]
     fn no_intersection_with_block() {
-        let block = single_block_test_case({
+        let (universe, block) = single_block_test_case({
             Text::builder()
                 .string(literal!("ab"))
                 .font(Font::System16)
@@ -1113,7 +1125,7 @@ mod tests {
                 .build()
         });
 
-        let ev = block.evaluate().unwrap();
+        let ev = block.evaluate(universe.read_ticket()).unwrap();
         assert_eq!(
             ev.attributes,
             BlockAttributes {

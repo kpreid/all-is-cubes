@@ -310,6 +310,14 @@ impl Universe {
         self.id
     }
 
+    /// Returns a [`ReadTicket`] that may be used for reading the members of this universe.
+    #[allow(clippy::unused_self)]
+    pub fn read_ticket(&self) -> ReadTicket<'_> {
+        // Currently unassociated with this universe, but might start being,
+        // either by carrying the universe ID, or being an actual borrow of the storage.
+        ReadTicket::new()
+    }
+
     /// Advance time for all members.
     ///
     /// * `deadline` is when to stop computing flexible things such as light transport.
@@ -342,6 +350,7 @@ impl Universe {
 
         // Run behaviors attached to the universe itself.
         let (behavior_txn, behavior_info) = self.behaviors.step(
+            self.read_ticket(),
             self,
             &core::convert::identity,
             &UniverseTransaction::behaviors,
@@ -366,6 +375,7 @@ impl Universe {
             let (space_info, transaction) = space_root
                 .try_modify(|space| {
                     space.step(
+                        self.read_ticket(),
                         // TODO: avoid needing downgrade() unless the ref is actually used?
                         Some(&space_root.downgrade()),
                         tick,
@@ -390,7 +400,7 @@ impl Universe {
             let (transaction, character_info, _body_info) = character_root
                 .try_modify(|ch| {
                     // TODO: avoid needing downgrade() unless the ref is actually used?
-                    ch.step(Some(&character_root.downgrade()), tick)
+                    ch.step(self.read_ticket(), Some(&character_root.downgrade()), tick)
                 })
                 .expect("character borrowed during universe.step()");
             transactions.push(transaction);
@@ -425,8 +435,9 @@ impl Universe {
             self.tables
                 .blocks
                 .par_iter()
-                .map(
-                    |(_, block_def_root)| match block_def_root.try_modify(block::BlockDef::step) {
+                .map(|(_, block_def_root)| {
+                    match block_def_root.try_modify(|block_def| block_def.step(self.read_ticket()))
+                    {
                         Ok(info) => info,
                         // An in-use error might be due to our own parallel borrows!
                         // Therefore, treat it as if it were an evaluation in-use instead.
@@ -435,8 +446,8 @@ impl Universe {
                             "BlockDef ref broken during universe.step():\n{}",
                             crate::util::ErrorChain(&e)
                         ),
-                    },
-                )
+                    }
+                })
                 .reduce(BlockDefStepInfo::default, |a, b| a + b)
         };
         #[cfg(not(feature = "auto-threads"))]
@@ -446,7 +457,7 @@ impl Universe {
         // defer them to the next step; solve iteratively once we can do that cheaply with waking
         for block_def_root in self.tables.blocks.values() {
             info += block_def_root
-                .try_modify(block::BlockDef::step)
+                .try_modify(|block_def| block_def.step(self.read_ticket()))
                 .expect("BlockDef borrow error during universe.step()");
         }
 
@@ -552,7 +563,7 @@ impl Universe {
     ///
     /// let mut found_blocks = universe.iter_by_type()
     ///     .map(|(name, value): (Name, Handle<BlockDef>)| {
-    ///         (name, value.read().unwrap().block().clone())
+    ///         (name, value.read(universe.read_ticket()).unwrap().block().clone())
     ///     })
     ///     .collect::<Vec<_>>();
     /// found_blocks.sort_by_key(|(name, _)| name.to_string());
@@ -695,10 +706,13 @@ impl Universe {
                 //
                 // TODO: Gather information from other members to learn which member
                 // contained the bad handle.
-                let member_value = root.downgrade().read().map_err(|e| match e {
-                    HandleError::NotReady(name) => DeserializeHandlesError { to: name },
-                    _ => unreachable!(),
-                })?;
+                let member_value =
+                    root.downgrade()
+                        .read(ReadTicket::new())
+                        .map_err(|e| match e {
+                            HandleError::NotReady(name) => DeserializeHandlesError { to: name },
+                            _ => unreachable!(),
+                        })?;
                 member_value.visit_handles(visitor);
             }
             Ok(())
@@ -996,5 +1010,16 @@ impl PartialUniverse {
             tags,
         } = self;
         blocks.len() + characters.len() + sounds.len() + spaces.len() + tags.len()
+    }
+
+    /// TODO(read_ticket): Placeholder for actually being able to offer a `ReadTicket` from the
+    /// universe.
+    /// The signature will have to change as well as the implementation -- the exporters in
+    /// all-is-cubes-port currently destructure PartialUniverse, which is incompatible with
+    /// borrowing from self here.
+    #[doc(hidden)]
+    #[allow(clippy::unused_self)]
+    pub fn read_ticket<'a>(&self) -> ReadTicket<'a> {
+        ReadTicket::new()
     }
 }

@@ -9,6 +9,7 @@ use wgpu::TextureViewDescriptor;
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen;
 use all_is_cubes::time;
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
 use all_is_cubes_render::camera::{Layers, StandardCameras};
 use all_is_cubes_render::{Flaws, RenderError};
@@ -151,8 +152,8 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     /// TODO: This is a kludge which ought to be replaced with some architecture that
     /// doesn't require a very specific "do this before this"...
     #[doc(hidden)]
-    pub fn update_world_camera(&mut self) {
-        self.everything.cameras.update();
+    pub fn update_world_camera(&mut self, read_ticket: ReadTicket<'_>) {
+        self.everything.cameras.update(read_ticket);
     }
 
     /// Returns the [`StandardCameras`] which control what is rendered by this renderer.
@@ -164,14 +165,15 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     /// the given cursor and overlay text.
     pub fn render_frame(
         &mut self,
+        read_ticket: ReadTicket<'_>,
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
         about_to_present: impl FnOnce(),
     ) -> Result<RenderInfo, RenderError> {
-        let update_info = self
-            .everything
-            .update(&self.queue, cursor_result, frame_budget)?;
+        let update_info =
+            self.everything
+                .update(read_ticket, &self.queue, cursor_result, frame_budget)?;
 
         if self.viewport_dirty.get_and_clear() {
             // Test because wgpu insists on nonzero values -- we'd rather be inconsistent

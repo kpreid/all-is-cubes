@@ -82,7 +82,7 @@ fn inventory_transaction() {
     let mut universe = Universe::new();
     let space = Space::empty_positive(1, 1, 1);
     let space_handle = universe.insert_anonymous(space);
-    let character = Character::spawn_default(space_handle.clone());
+    let character = Character::spawn_default(universe.read_ticket(), space_handle.clone());
     let sink = Sink::new();
     character.listen(sink.listener());
     let character_handle = universe.insert_anonymous(character);
@@ -186,9 +186,10 @@ fn transaction_systematic() {
                 )
             },
         )
-        .target(|| Character::spawn_default(space_handle.clone()))
+        .target(|| Character::spawn_default(universe.read_ticket(), space_handle.clone()))
         .target(|| {
-            let mut character = Character::spawn_default(space_handle.clone());
+            let mut character =
+                Character::spawn_default(universe.read_ticket(), space_handle.clone());
             CharacterTransaction::inventory(InventoryTransaction::insert([old_item.clone()]))
                 .execute(&mut character, &mut transaction::no_outputs)
                 .unwrap();
@@ -205,7 +206,7 @@ fn no_superjumping() {
             .filled_with(block::from_color!(Rgb::ONE))
             .build(),
     );
-    let mut character = Character::spawn_default(space);
+    let mut character = Character::spawn_default(universe.read_ticket(), space);
     character.body.set_position(point3(
         0.,
         character
@@ -215,7 +216,7 @@ fn no_superjumping() {
             + 1.1,
         0.,
     ));
-    let _ = character.step(None, Tick::from_seconds(1.0)); // initial settling
+    let _ = character.step(universe.read_ticket(), None, Tick::from_seconds(1.0)); // initial settling
 
     assert!(
         character.is_on_ground(),
@@ -247,21 +248,41 @@ fn click_wrong_space_or_correct_space() {
     };
     let sp1 = make_space();
     let sp2 = make_space();
-    let character = universe.insert_anonymous(Character::spawn_default(sp2.clone()));
+    let character = universe.insert_anonymous(Character::spawn_default(
+        universe.read_ticket(),
+        sp2.clone(),
+    ));
 
     // Click in wrong space
     {
-        let cursor = cursor_raycast(Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]), &sp1, 10.);
+        let cursor = cursor_raycast(
+            universe.read_ticket(),
+            Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]),
+            &sp1,
+            10.,
+        );
         assert!(cursor.is_some());
-        let error = Character::click(character.clone(), cursor.as_ref(), 0).unwrap_err();
+        let error = Character::click(
+            universe.read_ticket(),
+            character.clone(),
+            cursor.as_ref(),
+            0,
+        )
+        .unwrap_err();
         assert!(matches!(error, ToolError::Internal(_)));
     }
 
     // Click in right space
     {
-        let cursor = cursor_raycast(Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]), &sp2, 10.);
+        let cursor = cursor_raycast(
+            universe.read_ticket(),
+            Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]),
+            &sp2,
+            10.,
+        );
         assert!(cursor.is_some());
-        let error = Character::click(character, cursor.as_ref(), 0).unwrap_err();
+        let error =
+            Character::click(universe.read_ticket(), character, cursor.as_ref(), 0).unwrap_err();
         assert!(matches!(error, ToolError::NoTool));
     }
 }
@@ -270,7 +291,7 @@ fn click_wrong_space_or_correct_space() {
 fn selected_slot_notification() {
     let mut universe = Universe::new();
     let space_handle = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
-    let mut character = Character::spawn_default(space_handle);
+    let mut character = Character::spawn_default(universe.read_ticket(), space_handle);
     let sink = Sink::new();
     character.listen(sink.listener());
 

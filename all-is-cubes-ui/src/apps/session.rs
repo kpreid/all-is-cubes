@@ -21,7 +21,7 @@ use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{self, Handle, Universe, UniverseId, UniverseStepInfo};
+use all_is_cubes::universe::{self, Handle, ReadTicket, Universe, UniverseId, UniverseStepInfo};
 use all_is_cubes::util::{
     ConciseDebug, Fmt, Refmt as _, ShowStatus, StatusText, YieldProgressBuilder,
 };
@@ -291,6 +291,7 @@ impl<I: time::Instant> Session<I> {
     /// including following changes to the current character or universe.
     pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
         StandardCameras::new(
+            self.shuttle().game_universe.read_ticket(),
             self.graphics_options(),
             viewport_source,
             self.character(),
@@ -506,10 +507,13 @@ impl<I: time::Instant> Session<I> {
     /// We'd like to not have too much dependencies on the rendering, but also
     /// not obligate each platform/renderer layer to have too much boilerplate.
     pub fn update_cursor(&mut self, cameras: &StandardCameras) {
-        self.shuttle_mut().cursor_result = self
+        let cursor_result = self
             .input_processor
             .cursor_ndc_position()
-            .and_then(|ndc_pos| cameras.project_cursor(ndc_pos));
+            .and_then(|ndc_pos| {
+                cameras.project_cursor(self.shuttle().game_universe.read_ticket(), ndc_pos)
+            });
+        self.shuttle_mut().cursor_result = cursor_result;
     }
 
     /// Returns the [`Cursor`] computed by the last call to [`Session::update_cursor()`].
@@ -692,6 +696,7 @@ impl Shuttle {
             // Character::click will validate against being a click in the wrong space.
             if let Some(character_handle) = self.game_character.get() {
                 let transaction = Character::click(
+                    self.game_universe.read_ticket(),
                     character_handle.clone(),
                     self.cursor_result.as_ref(),
                     button,
@@ -730,17 +735,20 @@ impl Shuttle {
 
         // Sync space_watch_state.world in case the character changed its universe.
         {
-            let character_read: Option<universe::ReadGuard<Character>> = self
-                .game_character
-                .get()
-                .as_ref()
-                .map(|cref| cref.read().expect("TODO: decide how to handle error"));
+            let character_read: Option<universe::ReadGuard<Character>> =
+                self.game_character.get().as_ref().map(|cref| {
+                    cref.read(self.game_universe.read_ticket())
+                        .expect("TODO: decide how to handle error")
+                });
             let space: Option<&Handle<Space>> = character_read.as_ref().map(|ch| &ch.space);
 
             if space != self.space_watch_state.world.space.as_ref() {
-                self.space_watch_state.world =
-                    SpaceWatchState::new(space.cloned(), &self.fluff_notifier)
-                        .expect("TODO: decide how to handle error");
+                self.space_watch_state.world = SpaceWatchState::new(
+                    self.game_universe.read_ticket(),
+                    space.cloned(),
+                    &self.fluff_notifier,
+                )
+                .expect("TODO: decide how to handle error");
             }
         }
 
@@ -752,8 +760,12 @@ impl Shuttle {
                 .as_ref()
                 .and_then(|ui| ui.view().get().space.clone());
             if space != self.space_watch_state.ui.space {
-                self.space_watch_state.ui = SpaceWatchState::new(space, &self.fluff_notifier)
-                    .expect("TODO: decide how to handle error");
+                self.space_watch_state.ui = SpaceWatchState::new(
+                    self.game_universe.read_ticket(),
+                    space,
+                    &self.fluff_notifier,
+                )
+                .expect("TODO: decide how to handle error");
             }
         }
     }
@@ -972,11 +984,12 @@ struct SpaceWatchState {
 
 impl SpaceWatchState {
     fn new(
+        read_ticket: ReadTicket<'_>,
         space: Option<Handle<Space>>,
         fluff_notifier: &Arc<listen::Notifier<Fluff>>,
     ) -> Result<Self, universe::HandleError> {
         if let Some(space) = space {
-            let space_read = space.read()?;
+            let space_read = space.read(read_ticket)?;
             let (fluff_gate, fluff_forwarder) =
                 listen::Notifier::forwarder(Arc::downgrade(fluff_notifier))
                     .filter(|sf: &space::SpaceFluff| {
@@ -1034,14 +1047,19 @@ impl<I: time::Instant, T: Fmt<StatusText>> fmt::Display for InfoText<'_, I, T> {
         let fopt = self.fopt;
         let mut empty = true;
         if fopt.show.contains(ShowStatus::CHARACTER) {
-            if let Some(character_handle) = self
-                .session
-                .shuttle
-                .as_ref()
-                .and_then(|shuttle| shuttle.game_character.get().as_ref())
-            {
-                empty = false;
-                write!(f, "{}", character_handle.read().unwrap().refmt(&fopt)).unwrap();
+            if let Some(shuttle) = self.session.shuttle.as_ref() {
+                if let Some(character_handle) = shuttle.game_character.get().as_ref() {
+                    empty = false;
+                    write!(
+                        f,
+                        "{}",
+                        character_handle
+                            .read(shuttle.game_universe.read_ticket())
+                            .unwrap()
+                            .refmt(&fopt)
+                    )
+                    .unwrap();
+                }
             }
         }
         if fopt.show.contains(ShowStatus::STEP) {
@@ -1144,6 +1162,7 @@ impl MainTaskContext {
     pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
         self.with_ref(|shuttle| {
             StandardCameras::new(
+                shuttle.game_universe.read_ticket(),
                 shuttle.settings.as_source(),
                 viewport_source,
                 shuttle.game_character.as_source(),
@@ -1303,7 +1322,8 @@ mod tests {
         let mut u = Universe::new();
         let space1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let space2 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let character = u.insert_anonymous(Character::spawn_default(space1.clone()));
+        let character =
+            u.insert_anonymous(Character::spawn_default(u.read_ticket(), space1.clone()));
         let st = space::CubeTransaction::fluff(Fluff::Happened).at(Cube::ORIGIN);
 
         // Create session
@@ -1352,7 +1372,7 @@ mod tests {
                 ctx.set_universe(new_universe);
                 eprintln!("main task: have set new universe");
 
-                cameras.update();
+                ctx.with_universe(|u| cameras.update(u.read_ticket()));
                 assert!(cameras.character().is_some(), "has character");
 
                 // Now try noticing steps
@@ -1377,7 +1397,10 @@ mod tests {
             .insert(new_marker.clone(), Space::empty_positive(1, 1, 1))
             .unwrap();
         new_universe
-            .insert(Name::from("character"), Character::spawn_default(new_space))
+            .insert(
+                Name::from("character"),
+                Character::spawn_default(new_universe.read_ticket(), new_space),
+            )
             .unwrap();
         send.send(new_universe).unwrap();
 

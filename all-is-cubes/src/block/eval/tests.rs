@@ -17,7 +17,12 @@ use crate::math::{
     Vol, zo32,
 };
 use crate::space::Space;
-use crate::universe::Universe;
+use crate::universe::{ReadTicket, Universe};
+
+#[track_caller]
+fn evaluate(block: &Block) -> EvaluatedBlock {
+    block.evaluate(ReadTicket::stub()).unwrap()
+}
 
 /// `Evoxel`s are stored in large quantity, so we should think carefully any time we
 /// might make it bigger. Or maybe even try to make it smaller.
@@ -35,7 +40,7 @@ fn evoxel_size() {
 fn visible_or_animated() {
     #[expect(clippy::needless_pass_by_value)]
     fn va(block: Block) -> bool {
-        block.evaluate().unwrap().visible_or_animated()
+        evaluate(&block).visible_or_animated()
     }
     assert!(!va(AIR));
     assert!(!va(Block::builder().color(Rgba::TRANSPARENT).build()));
@@ -81,24 +86,18 @@ fn overall_color_ignores_interior() {
 
 #[test]
 fn air_self_consistent() {
-    AIR.evaluate().unwrap().consistency_check();
+    evaluate(&AIR).consistency_check();
 }
 
 #[test]
 fn air_consistent_with_constant() {
-    assert_eq!(AIR.evaluate().unwrap(), block::AIR_EVALUATED);
-    assert_eq!(
-        Block::from(Primitive::Air).evaluate().unwrap(),
-        block::AIR_EVALUATED
-    );
+    assert_eq!(evaluate(&AIR), block::AIR_EVALUATED);
+    assert_eq!(evaluate(&Block::from(Primitive::Air)), block::AIR_EVALUATED);
 }
 
 #[test]
 fn air_consistent_with_evoxel_air() {
-    assert_eq!(
-        AIR.evaluate().unwrap().voxels.single_voxel().unwrap(),
-        Evoxel::AIR
-    );
+    assert_eq!(evaluate(&AIR).voxels.single_voxel().unwrap(), Evoxel::AIR);
 }
 
 #[test]
@@ -108,10 +107,7 @@ fn air_in_recursive_block() {
         .voxels_fn(R1, |_| AIR)
         .unwrap()
         .build_into(&mut universe);
-    assert_eq!(
-        block.evaluate().unwrap().voxels.single_voxel().unwrap(),
-        Evoxel::AIR
-    );
+    assert_eq!(evaluate(&block).voxels.single_voxel().unwrap(), Evoxel::AIR);
 }
 
 #[test]
@@ -122,7 +118,7 @@ fn opaque_atom_and_attributes() {
         emission: Rgb::ONE,
         collision: BlockCollision::None,
     });
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
     assert_eq!(e.attributes(), BlockAttributes::DEFAULT_REF);
     assert_eq!(e.color(), color);
     assert_eq!(e.face_colors(), FaceMap::splat(color));
@@ -149,7 +145,7 @@ fn opaque_atom_and_attributes() {
 fn transparent_atom() {
     let color = Rgba::new(1.0, 2.0, 3.0, 0.5);
     let block = Block::from(color);
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
     assert_eq!(e.color(), color);
     assert_eq!(e.face_colors(), FaceMap::splat(color));
     assert_eq!(e.light_emission(), Rgb::ZERO);
@@ -169,7 +165,7 @@ fn emissive_only_atom() {
         .color(Rgba::TRANSPARENT)
         .light_emission(emissive_color)
         .build();
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
     assert_eq!(e.color(), Rgba::TRANSPARENT);
     assert_eq!(e.face_colors(), FaceMap::splat(Rgba::TRANSPARENT));
     assert_eq!(e.light_emission(), emissive_color);
@@ -185,7 +181,7 @@ fn emissive_only_atom() {
 #[test]
 fn invisible_atom() {
     let block = block::from_color!(Rgba::TRANSPARENT);
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
     assert_eq!(e.color(), Rgba::TRANSPARENT);
     assert_eq!(e.face_colors(), FaceMap::splat(Rgba::TRANSPARENT));
     assert!(e.voxels.single_voxel().is_some());
@@ -215,7 +211,7 @@ fn voxels_checked_individually() {
         .unwrap()
         .build_into(&mut universe);
 
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
     assert_eq!(e.attributes, attributes);
     assert_eq!(
         e.voxels,
@@ -283,8 +279,7 @@ fn voxels_emission_equivalence(
         .unwrap()
         .build_into(&mut universe);
 
-    let total_emission: Vector3D<f32, Intensity> =
-        voxel_block.evaluate().unwrap().light_emission().into();
+    let total_emission: Vector3D<f32, Intensity> = evaluate(&voxel_block).light_emission().into();
     let difference: Vector3D<f32, Intensity> = total_emission - atom_emission.into();
     assert!(
         difference.length() < 0.0001,
@@ -312,7 +307,7 @@ fn transparent_voxels_simple() {
         .unwrap()
         .build_into(&mut universe);
 
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
     // Transparency is (currently) computed by an orthographic view through all six
     // faces, and only two out of six faces in this test block don't fully cover
     // the light paths with opaque surfaces.
@@ -365,7 +360,7 @@ fn transparent_voxels_weighted() {
         .build_into(&mut universe);
     let surface_area: f32 = 4. * 6.;
 
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
 
     // for debugging, print the color multiplied by the surface area so that the
     // components end up round numbers
@@ -404,7 +399,7 @@ fn voxels_full_but_transparent() {
         .unwrap()
         .build_into(&mut universe);
 
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
     assert_eq!(
         e.color(),
         Rgba::new(0.0, 0.0, 0.0, 1.0 / f32::from(resolution).powi(2))
@@ -429,7 +424,7 @@ fn voxels_partial_not_filling() {
         .voxels_handle(resolution, space_handle)
         .build();
 
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
     // of 6 faces, 2 are opaque and 2 are half-transparent, thus there are 8 opaque half-faces.
     assert_eq!(e.color(), Rgba::new(1.0, 1.0, 1.0, 8. / 12.));
     assert_eq!(e.resolution(), resolution);
@@ -458,7 +453,7 @@ fn recur_with_offset() {
         space: space_handle,
     });
 
-    let e = block_at_offset.evaluate().unwrap();
+    let e = block_at_offset.evaluate(universe.read_ticket()).unwrap();
     assert_eq!(
         e.voxels,
         Evoxels::from_many(
@@ -491,7 +486,7 @@ fn recur_offset_negative_overflow() {
         space: universe.insert_anonymous(space),
     });
 
-    let e = block_at_offset.evaluate().unwrap();
+    let e = evaluate(&block_at_offset);
     assert!(!e.visible());
 }
 
@@ -510,7 +505,7 @@ fn recur_animation_hint_propagation() {
         .unwrap()
         .build_into(&mut universe);
 
-    let e = block.evaluate().unwrap();
+    let e = evaluate(&block);
     assert_eq!(
         e.attributes.animation_hint,
         AnimationHint {
@@ -541,10 +536,10 @@ fn indirect_equivalence() {
         .voxels_handle(resolution, space_handle)
         .build();
 
-    let eval_bare = block.evaluate().unwrap();
+    let eval_bare = evaluate(&block);
     let block_def_handle = universe.insert_anonymous(BlockDef::new(block));
     let indirect_block = Block::from(block_def_handle);
-    let eval_def = indirect_block.evaluate().unwrap();
+    let eval_def = evaluate(&indirect_block);
 
     assert_eq!(
         eval_def,
@@ -568,7 +563,7 @@ fn indirect_equivalence() {
     // by pointer insteed of value, as long as the resolution is not 1.)
     assert_eq!(
         EvKey::new(&eval_def),
-        EvKey::new(&indirect_block.evaluate().unwrap())
+        EvKey::new(&evaluate(&indirect_block))
     );
 }
 
@@ -580,7 +575,7 @@ fn indirect_has_derived_value_cache_internally() {
     let block = Block::from(universe.insert_anonymous(BlockDef::new(AIR)));
     assert!(
         block
-            .evaluate_impl(&block::EvalFilter::default())
+            .evaluate_impl(&block::EvalFilter::new(universe.read_ticket()))
             .unwrap()
             .has_derived()
     );
@@ -595,7 +590,7 @@ fn color_evaluation_regression_1() {
         // Modifier matters because it causes the block to become voxels
         .modifier(Modifier::Move(modifier::Move::new(Face6::NX, 0, 0)))
         .build();
-    block.evaluate().unwrap();
+    evaluate(&block);
 }
 
 /// Fuzz-discovered test case for a NaN sneaking in to a color.
@@ -608,5 +603,5 @@ fn color_evaluation_regression_2() {
             .build(),
         block::CompositeOperator::Over,
     ));
-    block.evaluate().unwrap().consistency_check();
+    evaluate(&block).consistency_check();
 }

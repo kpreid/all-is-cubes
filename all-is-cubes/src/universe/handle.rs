@@ -1,6 +1,7 @@
 use alloc::sync::{Arc, Weak};
 use core::fmt;
 use core::hash;
+use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
 use crate::transaction::{self, ExecuteError, Transaction, Transactional};
@@ -9,6 +10,9 @@ use crate::universe::{
     VisitHandles, owning_guard,
 };
 use crate::util::maybe_sync::{Mutex, MutexGuard, RwLock};
+
+#[cfg(doc)]
+use crate::block::Block;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -160,7 +164,7 @@ impl<T: 'static> Handle<T> {
     ///
     /// Returns an error if the value is currently being written to, or does not exist.
     #[inline(never)]
-    pub fn read(&self) -> Result<ReadGuard<T>, HandleError> {
+    pub fn read(&self, _read_ticket: ReadTicket<'_>) -> Result<ReadGuard<T>, HandleError> {
         let inner = owning_guard::ReadGuardImpl::new(self.upgrade()?)
             .map_err(|_| HandleError::InUse(self.name()))?;
         if inner.data.is_none() {
@@ -307,7 +311,7 @@ impl<T: 'static> Handle<T> {
         // TODO: This check (which also doesn't do anything yet)
         // should be applied to *both* transaction-based insertion and
         // direct `&mut self` insertions, but isn't.
-        match self.read() {
+        match self.read(ReadTicket::new()) {
             Ok(data_guard) => {
                 // TODO: We need to enforce rules about not referring to items from another
                 // universe, but also to be able to opt out for the UI containing world elements.
@@ -542,6 +546,56 @@ pub enum HandleError {
 }
 
 impl core::error::Error for HandleError {}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Permission to call [`Handle::read()`] to access the handle’s referent.
+///
+/// Functions which call [`Handle::read()`] need to run only when there is no possibility of a
+/// conflicting write operation; thus, they should take [`ReadTicket`] to notify their callers
+/// that they are going to perform reads.
+///
+/// To obtain a [`ReadTicket`], do one of the following:
+///
+/// * Call [`Universe::read_ticket()`].
+/// * If the operation will not actually read using any handles (e.g. calling [`Block::evaluate()`]
+///   on a [`Block`] that contains no handles), use [`ReadTicket::stub()`].
+///
+/// Currently, this is only an advisory mechanism — having the correct read ticket is not necessary
+/// for access — but it may become mandatory in the future.
+#[derive(Clone, Copy, Debug)]
+pub struct ReadTicket<'universe> {
+    // TODO(read_ticket): Ideally, a ReadTicket would specify the universe ID it belongs to,
+    // but currently we have cross-universe `Handle<BlockDef>`s in the UI, so that would fail.
+    // Get rid of those, or allow two universe IDs as an interim solution.
+    _phantom: PhantomData<&'universe Universe>,
+}
+
+impl ReadTicket<'_> {
+    /// Create a [`ReadTicket`] from nothing.
+    ///
+    /// Whenever possible, use [`Universe::read_ticket()`] instead.
+    //---
+    // TODO(read_ticket): eliminate all external uses of this
+    #[allow(clippy::new_without_default)]
+    #[doc(hidden)]
+    pub fn new() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Create a [`ReadTicket`] which does not guarantee access to anything.
+    ///
+    /// This may be used for evaluating universe-independent [`Block`](crate::block::Block)s.
+    //---
+    // TODO(read_ticket): eliminate all external uses of this
+    pub fn stub() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -837,7 +891,10 @@ mod tests {
         let mut u = Universe::new();
         let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         r.try_modify(|_| {
-            assert_eq!(r.read().unwrap_err(), HandleError::InUse(Name::Anonym(0)));
+            assert_eq!(
+                r.read(u.read_ticket()).unwrap_err(),
+                HandleError::InUse(Name::Anonym(0))
+            );
         })
         .unwrap();
     }
@@ -846,7 +903,7 @@ mod tests {
     fn handle_try_borrow_mut_in_use() {
         let mut u = Universe::new();
         let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let _borrow_1 = r.read().unwrap();
+        let _borrow_1 = r.read(u.read_ticket()).unwrap();
         assert_eq!(
             r.try_borrow_mut().unwrap_err(),
             HandleError::InUse(Name::Anonym(0))
@@ -857,7 +914,7 @@ mod tests {
     fn handle_try_modify_in_use() {
         let mut u = Universe::new();
         let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let _borrow_1 = r.read().unwrap();
+        let _borrow_1 = r.read(u.read_ticket()).unwrap();
         assert_eq!(
             r.try_modify(|_| {}).unwrap_err(),
             HandleError::InUse(Name::Anonym(0))
@@ -870,7 +927,10 @@ mod tests {
         let r: Handle<Space> = Handle::new_gone(name.clone());
         assert_eq!(r.name(), name);
         assert_eq!(r.universe_id(), None);
-        assert_eq!(r.read().unwrap_err(), HandleError::Gone(name.clone()));
+        assert_eq!(
+            r.read(ReadTicket::stub()).unwrap_err(),
+            HandleError::Gone(name.clone())
+        );
         assert_eq!(
             r.try_borrow_mut().unwrap_err(),
             HandleError::Gone(name.clone())

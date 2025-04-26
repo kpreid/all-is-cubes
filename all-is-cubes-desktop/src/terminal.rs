@@ -273,7 +273,10 @@ fn run(
                 cursor: dsession.session.cursor_result().cloned(),
                 frames_per_second: dsession.session.draw_fps_counter().frames_per_second(),
                 terminal_options: dsession.renderer.options.clone(),
-                inventory: InventoryDisplay::new(dsession.session.character().get()),
+                inventory: InventoryDisplay::new(
+                    dsession.session.universe().read_ticket(),
+                    dsession.session.character().get(),
+                ),
             })),
             // TODO: Even if we don't have a frame, we might want to update the UI anyway.
             Err(mpsc::TryRecvError::Empty) => {}
@@ -283,7 +286,7 @@ fn run(
         if dsession.session.frame_clock.should_draw() {
             // TODO: this is the only reason .cameras exists
             let c = &mut dsession.renderer.cameras;
-            c.update();
+            c.update(dsession.session.universe().read_ticket());
             dsession.session.update_cursor(&*c);
 
             dsession
@@ -301,7 +304,9 @@ impl TerminalRenderer {
     fn send_frame_to_render(&mut self, session: &mut Session) {
         // Fetch and update one of our recirculating renderers.
         let mut renderer = self.buffer_reuse_out.recv().unwrap();
-        renderer.update(session.cursor_result()).unwrap();
+        renderer
+            .update(session.universe().read_ticket(), session.cursor_result())
+            .unwrap();
 
         match self.render_pipe_in.try_send(FrameInput {
             options: self.options.clone(),

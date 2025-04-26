@@ -6,7 +6,7 @@ use all_is_cubes::block::{self, AIR, Block, Resolution::R16};
 use all_is_cubes::content::make_some_voxel_blocks;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_render::camera::GraphicsOptions;
 
 use all_is_cubes_mesh::testing::{Allocator, TextureMt as Mt};
@@ -83,7 +83,7 @@ fn block_mesh_benches(c: &mut Criterion) {
 }
 
 fn iter_reused_block_mesh(b: &mut criterion::Bencher<'_>, options: &MeshOptions, block: &Block) {
-    let evaluated = block.evaluate().unwrap();
+    let evaluated = block.evaluate(ReadTicket::stub()).unwrap();
     let mut shared_mesh = BlockMesh::<Mt>::default();
     b.iter_batched_ref(
         || (),
@@ -93,7 +93,7 @@ fn iter_reused_block_mesh(b: &mut criterion::Bencher<'_>, options: &MeshOptions,
 }
 
 fn iter_new_block_mesh(b: &mut criterion::Bencher<'_>, options: &MeshOptions, block: &Block) {
-    let evaluated = block.evaluate().unwrap();
+    let evaluated = block.evaluate(ReadTicket::stub()).unwrap();
     b.iter_batched_ref(
         || (),
         |()| BlockMesh::<Mt>::new(&evaluated, &Allocator::new(), options),
@@ -187,7 +187,12 @@ fn dynamic_benches(c: &mut Criterion) {
                 csm
             },
             |csm| {
-                let info = csm.update(&camera, time::DeadlineNt::Whenever, |_| {});
+                let info = csm.update(
+                    ReadTicket::stub(),
+                    &camera,
+                    time::DeadlineNt::Whenever,
+                    |_| {},
+                );
                 assert_eq!(info.flaws, Flaws::empty()); // should not be unfinished
             },
             BatchSize::LargeInput,

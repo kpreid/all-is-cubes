@@ -360,6 +360,7 @@ pub(crate) async fn export_gltf(
     source: ExportSet,
     destination: PathBuf,
 ) -> Result<(), ExportError> {
+    let read_ticket = source.contents.read_ticket();
     let ExportSet {
         contents:
             PartialUniverse {
@@ -389,10 +390,10 @@ pub(crate) async fn export_gltf(
         p.progress(0.01).await;
         {
             // constrained scope so we don't hold the read guard over an await
-            let block_def = block_def_handle.read()?;
+            let block_def = block_def_handle.read(read_ticket)?;
             let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
                 &block_def
-                    .evaluate()
+                    .evaluate(read_ticket)
                     .map_err(|eve| ExportError::NotRepresentable {
                         format: Format::Gltf,
                         name: Some(name.clone()),
@@ -426,7 +427,7 @@ pub(crate) async fn export_gltf(
         p.progress(0.01).await;
         {
             // constrained scope so we don't hold the read guard over an await
-            let space = space_handle.read()?;
+            let space = space_handle.read(read_ticket)?;
             let block_meshes = block_meshes_for_space::<GltfMt>(
                 &space,
                 &writer.texture_allocator(),

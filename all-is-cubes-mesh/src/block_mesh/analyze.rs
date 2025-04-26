@@ -384,7 +384,7 @@ mod tests {
         let mut u = Universe::new();
 
         let slab = all_is_cubes::content::make_slab(&mut u, thickness, Resolution::R4);
-        let ev = slab.evaluate().unwrap();
+        let ev = slab.evaluate(u.read_ticket()).unwrap();
         let analysis = analyze(
             ev.resolution(),
             ev.voxels().as_vol_ref(),
@@ -461,7 +461,7 @@ mod tests {
             })
             .unwrap()
             .build_into(&mut u);
-        let ev = block.evaluate().unwrap();
+        let ev = block.evaluate(u.read_ticket()).unwrap();
         let analysis = analyze(
             ev.resolution(),
             ev.voxels().as_vol_ref(),
@@ -487,7 +487,7 @@ mod tests {
             .voxels_fn(Resolution::R4, |_| block::from_color!(0.0, 0.0, 0.0, 0.5))
             .unwrap()
             .build_into(&mut u);
-        let ev = block.evaluate().unwrap();
+        let ev = block.evaluate(u.read_ticket()).unwrap();
         let analysis = analyze(
             ev.resolution(),
             ev.voxels().as_vol_ref(),

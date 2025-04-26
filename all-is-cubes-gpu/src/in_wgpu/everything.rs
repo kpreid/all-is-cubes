@@ -9,6 +9,7 @@ use all_is_cubes::drawing::embedded_graphics::{Drawable as _, pixelcolor::Gray8}
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::math::VectorOps as _;
 use all_is_cubes::time;
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
 use all_is_cubes_render::camera::{Layers, RenderMethod, StandardCameras};
 use all_is_cubes_render::info_text_drawable;
@@ -252,6 +253,8 @@ impl<I: time::Instant> EverythingRenderer<I> {
     /// to the GPU to prepare for actually drawing it.
     pub fn update(
         &mut self,
+        // TODO(read_ticket): needs to be a combined ticket or Layers<ReadTicket> to account for world & UI
+        read_ticket: ReadTicket<'_>,
         queue: &wgpu::Queue,
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
@@ -260,7 +263,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
         // This updates camera matrices and graphics options which we are going to consult
         // or copy to the GPU.
-        self.cameras.update();
+        self.cameras.update(read_ticket);
 
         // Recompile shaders if needed.
         // Note this must happen before the viewport update
@@ -324,21 +327,11 @@ impl<I: time::Instant> EverythingRenderer<I> {
         // TODO: we should be able to express this as something like "Layers::zip()"
         self.space_renderers
             .world
-            .set_space(
-                &self.executor,
-                &self.device,
-                &self.pipelines,
-                spaces_to_render.world,
-            )
+            .set_space(&self.executor, read_ticket, spaces_to_render.world)
             .map_err(RenderError::Read)?;
         self.space_renderers
             .ui
-            .set_space(
-                &self.executor,
-                &self.device,
-                &self.pipelines,
-                spaces_to_render.ui,
-            )
+            .set_space(&self.executor, read_ticket, spaces_to_render.ui)
             .map_err(RenderError::Read)?;
 
         let mut encoder = self
@@ -360,13 +353,14 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
         let space_infos: Layers<SpaceUpdateInfo> = if should_raytrace(&self.cameras) {
-            self.rt.update(cursor_result).unwrap(); // TODO: don't unwrap
+            self.rt.update(read_ticket, cursor_result).unwrap(); // TODO: don't unwrap
             // TODO: convey update info instead of zeroes
             Layers::default()
         } else {
             Layers {
                 world: self.space_renderers.world.update(
                     world_deadline,
+                    read_ticket,
                     &self.device,
                     queue,
                     &self.pipelines,
@@ -375,6 +369,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 )?,
                 ui: self.space_renderers.ui.update(
                     ui_deadline,
+                    read_ticket,
                     &self.device,
                     queue,
                     &self.pipelines,
@@ -404,15 +399,16 @@ impl<I: time::Instant> EverythingRenderer<I> {
             }
 
             gather_debug_lines(
+                read_ticket,
                 self.cameras
                     .character()
-                    .map(|c| c.read())
+                    .map(|c| c.read(read_ticket))
                     .transpose()
                     .map_err(RenderError::Read)?
                     .as_deref(),
                 spaces_to_render
                     .world
-                    .map(|s| s.read())
+                    .map(|s| s.read(read_ticket))
                     .transpose()
                     .map_err(RenderError::Read)?
                     .as_deref(),

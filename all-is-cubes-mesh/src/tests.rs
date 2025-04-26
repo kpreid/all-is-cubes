@@ -16,7 +16,7 @@ use all_is_cubes::math::{
     Face7, FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::TransparencyOption;
 
@@ -60,7 +60,7 @@ fn v_t(
 #[expect(clippy::needless_pass_by_value, reason = "convenience")]
 pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
-        &block.evaluate().unwrap(),
+        &block.evaluate(ReadTicket::stub()).unwrap(),
         &Allocator::new(),
         &MeshOptions {
             transparency: TransparencyOption::Volumetric,
@@ -74,7 +74,7 @@ pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<TextureMt> {
 #[expect(clippy::needless_pass_by_value, reason = "convenience")]
 fn test_block_mesh_threshold(block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
-        &block.evaluate().unwrap(),
+        &block.evaluate(ReadTicket::stub()).unwrap(),
         &Allocator::new(),
         &MeshOptions {
             transparency: TransparencyOption::Threshold(zo32(0.5)),
@@ -627,7 +627,7 @@ fn invisible_voxel_block() {
         })
         .build();
     assert_eq!(
-        block.evaluate().unwrap().voxels().bounds(),
+        block.evaluate(u.read_ticket()).unwrap().voxels().bounds(),
         GridAab::for_block(R8),
         "sanity check test data"
     );
@@ -678,7 +678,7 @@ fn handling_allocation_failure() {
         })
         .unwrap()
         .build_into(&mut u);
-    let block_derived_color = complex_block.evaluate().unwrap().color();
+    let block_derived_color = complex_block.evaluate(u.read_ticket()).unwrap().color();
 
     let space = Space::builder(GridAab::ORIGIN_CUBE)
         .filled_with(complex_block)

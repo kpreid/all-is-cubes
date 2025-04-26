@@ -26,7 +26,7 @@ use crate::save::schema;
 use crate::space::{CubeTransaction, Space};
 use crate::time::Tick;
 use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
-use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
+use crate::universe::{Handle, HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
 mod cursor;
@@ -229,8 +229,8 @@ impl Character {
 
     /// Constructs a [`Character`] within/looking at the given `space`
     /// with the initial state specified by [`Space::spawn`].
-    pub fn spawn_default(space: Handle<Space>) -> Self {
-        Self::spawn(space.read().unwrap().spawn(), space)
+    pub fn spawn_default(read_ticket: ReadTicket<'_>, space: Handle<Space>) -> Self {
+        Self::spawn(space.read(read_ticket).unwrap().spawn(), space)
     }
 
     /// Computes the view transform for this character's eye; translation and rotation from
@@ -283,9 +283,10 @@ impl Character {
 
     /// Advances time.
     ///
-    /// Normally, this is called from [`Universe::step`](crate::universe::Universe::step).
+    /// Normally, this is called from [`Universe::step`][crate::universe::Universe::step].
     pub fn step(
         &mut self,
+        read_ticket: ReadTicket<'_>,
         self_handle: Option<&Handle<Character>>,
         tick: Tick,
     ) -> (UniverseTransaction, CharacterStepInfo, Option<BodyStepInfo>) {
@@ -323,7 +324,7 @@ impl Character {
             * dt)
             .map(|c| NotNan::new(c).unwrap_or(notnan!(0.0)));
 
-        self.last_step_info = if let Ok(space) = self.space.read() {
+        self.last_step_info = if let Ok(space) = self.space.read(read_ticket) {
             self.exposure.step(&space, self.view(), dt);
 
             let colliding_cubes = &mut self.colliding_cubes;
@@ -363,17 +364,22 @@ impl Character {
         if let Some(self_handle) = self_handle.cloned() {
             if self.velocity_input.y > 0. {
                 if let Some((slot_index, false)) = find_jetpacks(&self.inventory).next() {
-                    if let Ok(t) = self.inventory.use_tool(None, self_handle, slot_index) {
+                    if let Ok(t) =
+                        self.inventory
+                            .use_tool(read_ticket, None, self_handle, slot_index)
+                    {
                         result_transaction.merge_from(t).unwrap();
                     }
                 }
             } else if self.is_on_ground() {
                 for (slot_index, active) in find_jetpacks(&self.inventory) {
                     if active {
-                        if let Ok(t) =
-                            self.inventory
-                                .use_tool(None, self_handle.clone(), slot_index)
-                        {
+                        if let Ok(t) = self.inventory.use_tool(
+                            read_ticket,
+                            None,
+                            self_handle.clone(),
+                            slot_index,
+                        ) {
                             result_transaction.merge_from(t).unwrap();
                         }
                     }
@@ -386,6 +392,7 @@ impl Character {
         // see other characters as not having been stepped yet.
         let behavior_step_info = if let Some(self_handle) = self_handle {
             let (t, info) = self.behaviors.step(
+                read_ticket,
                 self,
                 &(|t: CharacterTransaction| t.bind(self_handle.clone())),
                 CharacterTransaction::behaviors,
@@ -444,11 +451,12 @@ impl Character {
     /// * The tool is not usable.
     /// * The cursor does not refer to the same space as this character occupies.
     pub fn click(
+        read_ticket: ReadTicket<'_>,
         this: Handle<Character>,
         cursor: Option<&Cursor>,
         button: usize,
     ) -> Result<UniverseTransaction, inv::ToolError> {
-        let tb = this.read().unwrap();
+        let tb = this.read(read_ticket).unwrap();
 
         // Check that this is not a cursor into some other space.
         // This shouldn't happen according to game rules but it might due to a UI/session
@@ -467,7 +475,7 @@ impl Character {
             .get(button)
             .copied()
             .unwrap_or(tb.selected_slots[0]);
-        tb.inventory.use_tool(cursor, this, slot_index)
+        tb.inventory.use_tool(read_ticket, cursor, this, slot_index)
     }
 
     /// Make the character jump, if they are on ground to jump from as of the last [`step()`](Self::step).

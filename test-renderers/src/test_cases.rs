@@ -19,7 +19,7 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{Handle, HandleError, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Handle, HandleError, ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{UniverseTemplate, make_some_voxel_blocks, palette};
 use all_is_cubes_render::camera::{
@@ -236,7 +236,7 @@ async fn cursor_basic(mut context: RenderTestContext) {
         COMMON_VIEWPORT,
         &universe,
     );
-    let cursor = cameras.project_cursor(Point2D::origin());
+    let cursor = cameras.project_cursor(universe.read_ticket(), Point2D::origin());
     let overlays = Overlays {
         cursor: cursor.as_ref(),
         info_text: None,
@@ -392,17 +392,16 @@ async fn error_character_gone(context: RenderTestContext) {
     let mut renderer = context.renderer(&universe);
 
     // Run a first render because this test is about what happens afterward
-    renderer.update(None).unwrap();
+    renderer.update(universe.read_ticket(), None).unwrap();
     let _ = renderer.draw("").await.unwrap();
 
     let character_handle: Handle<Character> = universe.get(&"character".into()).unwrap();
     UniverseTransaction::delete(character_handle)
         .execute(&mut universe, &mut transaction::no_outputs)
         .unwrap();
-    drop(universe); // shouldn't make a difference but hey
 
     // Updating may fail, or it may succeed because there were no change notifications.
-    match renderer.update(None) {
+    match renderer.update(universe.read_ticket(), None) {
         Ok(()) => {}
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
@@ -429,9 +428,10 @@ async fn error_character_unavailable(context: RenderTestContext) {
     let mut renderer = context.renderer(&universe);
 
     // The simplest way for the character to be unavailable is to drop the entire universe.
+    // TODO(read_ticket): when read tickets are strict, we will need an alternative
     drop(universe);
 
-    match renderer.update(None) {
+    match renderer.update(ReadTicket::stub(), None) {
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from update(): {res:?}"),
@@ -465,13 +465,15 @@ async fn follow_character_change(context: RenderTestContext) {
         let space = Space::builder(GridAab::ORIGIN_CUBE)
             .sky_color(color)
             .build();
-        let character = Character::spawn_default(universe.insert_anonymous(space));
+        let space = universe.insert_anonymous(space);
+        let character = Character::spawn_default(universe.read_ticket(), space);
         universe.insert_anonymous(character)
     };
     let c1 = character_of_a_color(rgb_const!(1.0, 0.0, 0.0));
     let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
     let character_cell = listen::Cell::new(Some(c1));
     let cameras: StandardCameras = StandardCameras::new(
+        universe.read_ticket(),
         listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         listen::constant(COMMON_VIEWPORT),
         character_cell.as_source(),
@@ -480,7 +482,7 @@ async fn follow_character_change(context: RenderTestContext) {
     let mut renderer = context.renderer(cameras);
 
     // Draw the first character
-    renderer.update(None).unwrap();
+    renderer.update(universe.read_ticket(), None).unwrap();
     let image1 = renderer.draw("").await.unwrap();
 
     // Don't assert if they would fail because the renderer is stubbed
@@ -497,7 +499,7 @@ async fn follow_character_change(context: RenderTestContext) {
 
     // Switch characters and draw the second -- the resulting sky color should be from it
     character_cell.set(Some(c2));
-    renderer.update(None).unwrap();
+    renderer.update(universe.read_ticket(), None).unwrap();
     let image2 = renderer.draw("").await.unwrap();
 
     assert_eq!(
@@ -533,6 +535,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
 
     let options_cell = listen::Cell::new(Arc::new(options_1));
     let cameras: StandardCameras = StandardCameras::new(
+        universe.read_ticket(),
         options_cell.as_source(),
         listen::constant(COMMON_VIEWPORT),
         listen::constant(universe.get_default_character()),
@@ -794,12 +797,14 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.lighting_display = LightingOption::Flat;
     options.show_ui = show_ui;
+    let ui_space = ui_space(&mut universe);
     let cameras: StandardCameras = StandardCameras::new(
+        universe.read_ticket(),
         listen::constant(Arc::new(options.clone())),
         listen::constant(COMMON_VIEWPORT),
         listen::constant(universe.get_default_character()),
         listen::constant(Arc::new(UiViewState {
-            space: Some(ui_space(&mut universe)),
+            space: Some(ui_space),
             view_transform: ViewTransform::identity(),
             graphics_options: Arc::new(options),
         })),
@@ -841,12 +846,14 @@ async fn layers_none_but_text(mut context: RenderTestContext) {
 /// No world, but UI and info text.
 async fn layers_ui_only(mut context: RenderTestContext) {
     let mut universe = Universe::new();
+    let ui_space = ui_space(&mut universe);
     let cameras: StandardCameras = StandardCameras::new(
+        universe.read_ticket(),
         listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         listen::constant(COMMON_VIEWPORT),
         listen::constant(None),
         listen::constant(Arc::new(UiViewState {
-            space: Some(ui_space(&mut universe)),
+            space: Some(ui_space),
             view_transform: ViewTransform::identity(),
             graphics_options: Arc::new(GraphicsOptions::UNALTERED_COLORS),
         })),
@@ -964,7 +971,7 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
         universe
             .get_default_character()
             .unwrap()
-            .read()
+            .read(universe.read_ticket())
             .unwrap()
             .space
             .try_modify(|space| {
@@ -1048,6 +1055,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let zero = Viewport::with_scale(1.00, [0, 0]);
     let viewport_cell = listen::Cell::new(zero);
     let cameras: StandardCameras = StandardCameras::new(
+        universe.read_ticket(),
         listen::constant(Arc::new(GraphicsOptions::default())),
         viewport_cell.as_source(),
         listen::constant(universe.get_default_character()),
@@ -1062,7 +1070,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
 
     // Initially zero viewport
     {
-        renderer.update(None).unwrap();
+        renderer.update(universe.read_ticket(), None).unwrap();
         let zero_image = renderer
             .draw(overlays.info_text.as_ref().unwrap())
             .await
@@ -1078,7 +1086,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     // Now try *resizing to* zero and back
     {
         viewport_cell.set(zero);
-        renderer.update(None).unwrap();
+        renderer.update(universe.read_ticket(), None).unwrap();
         let zero_image = renderer
             .draw(overlays.info_text.as_ref().unwrap())
             .await

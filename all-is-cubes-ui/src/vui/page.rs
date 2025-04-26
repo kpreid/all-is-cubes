@@ -250,8 +250,8 @@ impl PageInst {
         universe: &mut Universe,
     ) -> Handle<Space> {
         if let Some(space) = self.space.as_ref() {
-            // TODO: We will need to be comparing the entire size if it gains other fields
-            if space.read().unwrap().bounds() == size.space_bounds() {
+            // TODO: We will need to be comparing the entire `UiSize` if it gains other fields
+            if space.read(universe.read_ticket()).unwrap().bounds() == size.space_bounds() {
                 return space.clone();
             }
         }

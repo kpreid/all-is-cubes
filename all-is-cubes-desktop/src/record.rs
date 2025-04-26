@@ -8,7 +8,7 @@ use std::time::Duration;
 use anyhow::Context;
 
 use all_is_cubes::listen::{self, Listen as _};
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 use all_is_cubes_port::{ExportSet, Format};
 use all_is_cubes_render::Flaws;
@@ -161,7 +161,7 @@ impl Recorder {
                 RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
             }
             RecordFormat::Export(export_format) => {
-                cameras.update();
+                cameras.update(universe.read_ticket());
 
                 // TODO: better rule than this special case. AicJson doesn't strictly require
                 // all of the universe, but it does require the transitive closure, and this is the
@@ -199,7 +199,7 @@ impl Recorder {
         })
     }
 
-    fn capture_frame(&mut self) {
+    fn capture_frame(&mut self, read_ticket: ReadTicket<'_>) {
         let this_frame_number = self.sending_frame_number;
         self.sending_frame_number += 1;
 
@@ -211,7 +211,7 @@ impl Recorder {
                     Box::new(|v| v),
                     listen::constant(Arc::new(())),
                 );
-                renderer.update(None).unwrap();
+                renderer.update(read_ticket, None).unwrap();
 
                 // TODO: instead of panic on send failure, log the problem
                 rec.scene_sender
@@ -219,7 +219,7 @@ impl Recorder {
                     .expect("channel closed; recorder render thread died?");
             }
 
-            RecorderInner::Mesh(rec) => rec.capture_frame(this_frame_number),
+            RecorderInner::Mesh(rec) => rec.capture_frame(read_ticket, this_frame_number),
 
             &mut RecorderInner::Export {
                 ref executor,
@@ -282,11 +282,11 @@ impl Recorder {
         let mut flaws_total = Flaws::empty();
 
         // Capture first (no step) frame
-        self.capture_frame();
+        ctx.with_universe(|u| self.capture_frame(u.read_ticket()));
         // Capture remaining frames
         while self.sending_frame_number < frame_range.clone().count() {
             ctx.yield_to_step().await;
-            self.capture_frame();
+            ctx.with_universe(|u| self.capture_frame(u.read_ticket()));
 
             // Drain channel and update progress bar.
             if let Ok(Status {

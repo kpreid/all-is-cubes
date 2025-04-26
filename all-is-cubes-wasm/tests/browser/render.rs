@@ -54,12 +54,12 @@ async fn renderer_test() {
             .await
             .unwrap()
             .build(cameras.clone());
-    renderer.update(None).unwrap();
+    renderer.update(universe.read_ticket(), None).unwrap();
     let image = renderer.draw("").await.unwrap();
 
     // TODO: hook up a full image comparison here
     let expected_pixel = world_space
-        .read()
+        .read(universe.read_ticket())
         .unwrap()
         .physics()
         .sky

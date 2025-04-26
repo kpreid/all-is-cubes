@@ -14,7 +14,7 @@ use crate::listen::{self, Listen as _, Listener};
 use crate::math::Cube;
 use crate::raytracer::{RtBlockData, RtOptionsRef, SpaceRaytracer, TracingBlock, TracingCubeData};
 use crate::space::{self, BlockIndex, Space, SpaceChange};
-use crate::universe::{Handle, HandleError};
+use crate::universe::{Handle, HandleError, ReadTicket};
 
 /// Manages a [`SpaceRaytracer`] so that it can be cheaply updated when the [`Space`] is
 /// changed.
@@ -101,7 +101,7 @@ where
     /// On success, returns whether any of the scene actually changed.
     ///
     /// Returns an error if reading the [`Space`] fails.
-    pub fn update(&mut self) -> Result<bool, HandleError> {
+    pub fn update(&mut self, read_ticket: ReadTicket<'_>) -> Result<bool, HandleError> {
         // Deadlock safety note:
         // If the space is being updated, that will acquire the space's lock and then our
         // todo's lock for notifications. Therefore, to avoid deadlock we would need to
@@ -115,7 +115,7 @@ where
             // Nothing to do
             return Ok(false);
         }
-        let space = self.space.read()?;
+        let space = self.space.read(read_ticket)?;
 
         if mem::take(&mut todo.listener) {
             space.listen(self.todo.listener());
@@ -242,8 +242,8 @@ mod tests {
     }
 
     impl EquivalenceTester {
-        fn new(space: Handle<Space>) -> Self {
-            let bounds = space.read().unwrap().bounds();
+        fn new(read_ticket: ReadTicket<'_>, space: Handle<Space>) -> Self {
+            let bounds = space.read(read_ticket).unwrap().bounds();
 
             // TODO: add tests of changing the options
             let graphics_options: listen::DynSource<_> =
@@ -272,10 +272,10 @@ mod tests {
             }
         }
 
-        fn update_and_assert(&mut self) -> Result<bool, HandleError> {
+        fn update_and_assert(&mut self, read_ticket: ReadTicket<'_>) -> Result<bool, HandleError> {
             self.camera
                 .set_options((*self.graphics_options.get()).clone());
-            let changed = self.updating.update()?;
+            let changed = self.updating.update(read_ticket)?;
             let image_updating = self
                 .updating
                 .get()
@@ -283,7 +283,7 @@ mod tests {
                 .to_string();
             #[expect(clippy::unit_arg)]
             let image_fresh = SpaceRaytracer::<CharacterRtData>::new(
-                &self.space.read().unwrap(),
+                &self.space.read(read_ticket).unwrap(),
                 (*self.graphics_options.get()).clone(),
                 *self.custom_options.get(),
             )
@@ -306,27 +306,28 @@ mod tests {
         space.set([0, 0, 0], &block1).unwrap();
 
         let space = universe.insert_anonymous(space);
-        let mut tester = EquivalenceTester::new(space.clone());
+        let read_ticket = universe.read_ticket();
+        let mut tester = EquivalenceTester::new(read_ticket, space.clone());
 
-        tester.update_and_assert().unwrap();
+        tester.update_and_assert(read_ticket).unwrap();
 
         // Make some light changes
         space
             .try_modify(|space| space.fast_evaluate_light())
             .unwrap();
-        tester.update_and_assert().unwrap();
+        tester.update_and_assert(read_ticket).unwrap();
 
         // Add a second block
         space
             .try_modify(|space| space.set([1, 0, 0], &block2).unwrap())
             .unwrap();
-        tester.update_and_assert().unwrap();
+        tester.update_and_assert(read_ticket).unwrap();
 
         // Delete existing block
         space
             .try_modify(|space| space.set([0, 0, 0], &AIR).unwrap())
             .unwrap();
-        tester.update_and_assert().unwrap();
+        tester.update_and_assert(read_ticket).unwrap();
 
         // TODO: Also test changing existing block's data
     }
@@ -341,24 +342,25 @@ mod tests {
         space.set([0, 0, 0], &block1).unwrap();
 
         let space = universe.insert_anonymous(space);
-        let mut tester = EquivalenceTester::new(space.clone());
+        let read_ticket = universe.read_ticket();
+        let mut tester = EquivalenceTester::new(read_ticket, space.clone());
 
         {
             let _obstruction = space.try_borrow_mut().unwrap();
 
             assert_eq!(
-                tester.updating.update().unwrap_err(),
+                tester.updating.update(read_ticket).unwrap_err(),
                 HandleError::InUse(space.name().clone()),
             );
         }
 
         // Now after the failure, we should still successfully update.
-        tester.update_and_assert().unwrap();
+        tester.update_and_assert(read_ticket).unwrap();
 
         // And also follow changes correctly.
         space
             .try_modify(|space| space.set([1, 0, 0], &block2).unwrap())
             .unwrap();
-        tester.update_and_assert().unwrap();
+        tester.update_and_assert(read_ticket).unwrap();
     }
 }

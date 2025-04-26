@@ -22,7 +22,7 @@ use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::UniverseTransaction;
+use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::alg::{NoiseFnExt as _, gradient_lookup, scale_color, square_radius};
@@ -521,7 +521,9 @@ pub async fn install_demo_blocks(
     // Join up blinker blocks
     for state in bool::exhaust() {
         modify_def(&provider_for_patch[BecomeBlinker(state)], |block| {
-            block.freezing_get_attributes_mut().tick_action = Some(TickAction {
+            block
+                .freezing_get_attributes_mut(ReadTicket::stub())
+                .tick_action = Some(TickAction {
                 operation: Operation::Become(provider_for_patch[BecomeBlinker(!state)].clone()),
                 schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
             });
@@ -532,7 +534,9 @@ pub async fn install_demo_blocks(
     for state in bool::exhaust() {
         for ctor in [Lamp, Sconce] {
             modify_def(&provider_for_patch[ctor(state)], |block| {
-                block.freezing_get_attributes_mut().activation_action =
+                block
+                    .freezing_get_attributes_mut(ReadTicket::stub())
+                    .activation_action =
                     Some(Operation::Become(provider_for_patch[ctor(!state)].clone()));
             });
         }
@@ -593,7 +597,9 @@ pub async fn install_demo_blocks(
                 .map(|&cube| (cube, next.clone()))
                 .collect()
             };
-            block.freezing_get_attributes_mut().tick_action = Some(TickAction {
+            block
+                .freezing_get_attributes_mut(ReadTicket::stub())
+                .tick_action = Some(TickAction {
                 operation: Operation::Neighbors(neighbor_ops),
                 schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
             });
@@ -611,7 +617,7 @@ fn modify_def(indirect: &Block, f: impl FnOnce(&mut Block)) {
         panic!("block not indirect, but {indirect:?}");
     };
     let mut block: Block = block_def_handle
-        .read()
+        .read(ReadTicket::new())
         .expect("could not read BlockDef")
         .block()
         .clone();

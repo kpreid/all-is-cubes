@@ -21,7 +21,8 @@ fuzz_target!(|input: FuzzUniverseTemplate| {
     // TODO: add some of all kinds of universe objects
     let space = universe.insert_anonymous(input.space);
     // TODO: arbitrary-ize character except for the ref
-    let _character = universe.insert_anonymous(Character::spawn_default(space));
+    let _character =
+        universe.insert_anonymous(Character::spawn_default(universe.read_ticket(), space));
 
     for _ in 1..100 {
         // TODO: give arbitrary "user" inputs to the character and other universe manipulations

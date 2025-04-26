@@ -8,6 +8,7 @@ use crate::listen::{Listen as _, Listener, Sink};
 use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgba, rgb_const};
 use crate::space::{GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
 use crate::time;
+use crate::universe::{ReadTicket, Universe};
 
 #[test]
 fn initial_value_in_empty_space() {
@@ -85,6 +86,7 @@ fn out_of_bounds_lighting_value() {
 
 #[test]
 fn step() {
+    let universe = Universe::new();
     let color = Rgb::new(1.0, 0.0, 0.0);
     let mut space = Space::builder(GridAab::from_lower_upper([0, 0, 0], [3, 1, 1]))
         .sky_color(color)
@@ -97,7 +99,12 @@ fn step() {
     assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::NO_RAYS);
     assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS);
 
-    let (info, _) = space.step(None, time::Tick::arbitrary(), time::DeadlineNt::Whenever);
+    let (info, _) = space.step(
+        universe.read_ticket(),
+        None,
+        time::Tick::arbitrary(),
+        time::DeadlineNt::Whenever,
+    );
     assert_eq!(
         info.light,
         LightUpdatesInfo {
@@ -280,7 +287,12 @@ fn disabled_lighting_does_not_update() {
         .light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
     assert_eq!(
         space
-            .step(None, time::Tick::arbitrary(), time::DeadlineNt::Whenever)
+            .step(
+                ReadTicket::stub(),
+                None,
+                time::Tick::arbitrary(),
+                time::DeadlineNt::Whenever
+            )
             .0
             .light,
         LightUpdatesInfo::default()

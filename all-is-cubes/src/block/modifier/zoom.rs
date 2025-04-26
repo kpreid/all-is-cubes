@@ -59,7 +59,7 @@ impl Zoom {
     pub(super) fn evaluate(
         &self,
         input: MinEval,
-        filter: &block::EvalFilter,
+        filter: &block::EvalFilter<'_>,
     ) -> Result<MinEval, block::InEvalError> {
         let Zoom {
             offset: offset_in_zoomed_blocks,
@@ -205,7 +205,7 @@ mod tests {
         let mut universe = Universe::new();
         let [original_block] = make_some_voxel_blocks(&mut universe);
 
-        let ev_original = original_block.evaluate().unwrap();
+        let ev_original = original_block.evaluate(universe.read_ticket()).unwrap();
         assert_eq!(ev_original.resolution(), Resolution::R16);
         let scale = R2; // scale up by two = divide resolution by two
         let zoom_resolution = ev_original.resolution().halve().unwrap();
@@ -217,7 +217,7 @@ mod tests {
             let zoomed = original_block
                 .clone()
                 .with_modifier(Zoom::new(scale, point3(x, 0, 0)));
-            let ev_zoomed = zoomed.evaluate().unwrap();
+            let ev_zoomed = zoomed.evaluate(universe.read_ticket()).unwrap();
             assert_eq!(
                 ev_zoomed,
                 if x >= 2 {
@@ -260,12 +260,16 @@ mod tests {
 
     #[test]
     fn atom_in_bounds() {
+        let universe = Universe::new();
         let [original] = make_some_blocks();
         let mut zoomed = original.clone();
         zoomed.modifiers_mut().push(Modifier::Zoom(Zoom {
             scale: R2,
             offset: point3(1, 0, 0),
         }));
-        assert_eq!(zoomed.evaluate().unwrap().color(), original.color());
+        assert_eq!(
+            zoomed.evaluate(universe.read_ticket()).unwrap().color(),
+            original.color()
+        );
     }
 }

@@ -6,7 +6,7 @@ use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{self, Block};
 use all_is_cubes::math::GridRotation;
-use all_is_cubes::universe::{self, VisitHandles as _};
+use all_is_cubes::universe::{self, ReadTicket, VisitHandles as _};
 
 fuzz_target!(|block: Block| check_block(block));
 
@@ -17,7 +17,7 @@ fn check_block(block: Block) {
     let rotationally_symmetric = block.rotationally_symmetric();
 
     let sink = all_is_cubes::listen::Sink::new();
-    match block.evaluate_and_listen(sink.listener()) {
+    match block.evaluate_and_listen(ReadTicket::stub(), sink.listener()) {
         Ok(evaluated) => {
             evaluated.consistency_check();
 
@@ -32,7 +32,7 @@ fn check_block(block: Block) {
                 rotated
                     .modifiers_mut()
                     .push(block::Modifier::Rotate(GridRotation::CLOCKWISE));
-                if let Ok(ev_rotated) = rotated.evaluate() {
+                if let Ok(ev_rotated) = rotated.evaluate(ReadTicket::stub()) {
                     assert_eq!(
                         (ev_rotated.attributes(), ev_rotated.voxels()),
                         (evaluated.attributes(), evaluated.voxels()),

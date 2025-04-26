@@ -9,7 +9,7 @@ use all_is_cubes::euclid::{self, point2, vec2};
 use all_is_cubes::listen::{self, Source as _};
 use all_is_cubes::math::{Rgba, ZeroOne};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::Handle;
+use all_is_cubes::universe::{Handle, ReadTicket};
 
 use crate::camera::{
     Camera, FogOption, GraphicsOptions, Layers, Ndc, NdcPoint2, StandardCameras, Viewport,
@@ -87,15 +87,20 @@ where
     /// This method is equivalent to [`HeadlessRenderer::update()`] except for
     /// fitting the raytracer's needs and capabilities (works with all types;
     /// not `async`).
-    pub fn update(&mut self, cursor: Option<&Cursor>) -> Result<bool, RenderError> {
+    pub fn update(
+        &mut self,
+        read_ticket: ReadTicket<'_>,
+        cursor: Option<&Cursor>,
+    ) -> Result<bool, RenderError> {
         let mut anything_changed = false;
 
         // TODO: raytracer needs to implement drawing the cursor
         self.had_cursor = cursor.is_some();
-        anything_changed |= self.cameras.update();
+        anything_changed |= self.cameras.update(read_ticket);
         self.custom_options_cache = self.custom_options.get();
 
         fn sync_space<D>(
+            read_ticket: ReadTicket<'_>,
             cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
             optional_space: Option<&Handle<Space>>,
             graphics_options_source: listen::DynSource<Arc<GraphicsOptions>>,
@@ -125,11 +130,12 @@ where
             }
             // Now that we have one if we should have one, update it.
             if let Some(rt) = cached_rt {
-                *anything_changed |= rt.update().map_err(RenderError::Read)?;
+                *anything_changed |= rt.update(read_ticket).map_err(RenderError::Read)?;
             }
             Ok(())
         }
         sync_space(
+            read_ticket,
             &mut self.rts.world,
             Option::as_ref(&self.cameras.world_space().get()),
             self.cameras.graphics_options_source(),
@@ -137,6 +143,7 @@ where
             &mut anything_changed,
         )?;
         sync_space(
+            read_ticket,
             &mut self.rts.ui,
             self.cameras.ui_space(),
             self.ui_graphics_options.clone(),
@@ -305,8 +312,12 @@ where
 /// This implementation is only available if the `std` feature is enabled.
 #[cfg(feature = "std")] // can't provide `Sync` futures otherwise
 impl HeadlessRenderer for RtRenderer<()> {
-    fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
-        let _anything_changed = self.update(cursor)?;
+    fn update(
+        &mut self,
+        read_ticket: ReadTicket<'_>,
+        cursor: Option<&Cursor>,
+    ) -> Result<(), RenderError> {
+        let _anything_changed = self.update(read_ticket, cursor)?;
         Ok(())
     }
 
@@ -695,7 +706,7 @@ mod tests {
 
         // See what options value is used.
         let mut result = [CatchCustomOptions::default()];
-        renderer.update(None).unwrap();
+        renderer.update(universe.read_ticket(), None).unwrap();
         renderer.draw(|_| String::new(), identity, &mut result);
 
         assert_eq!(

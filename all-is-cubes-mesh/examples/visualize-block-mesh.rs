@@ -35,7 +35,7 @@ fn main() {
     std::thread::scope(|scope| {
         let mut next_x = 0.;
         for (i, block) in blocks.iter().enumerate() {
-            let evaluated = block.evaluate().unwrap();
+            let evaluated = block.evaluate(universe.read_ticket()).unwrap();
 
             let x = next_x;
             next_x += f32::from(evaluated.resolution()) + 4.0;

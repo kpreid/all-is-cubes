@@ -140,10 +140,6 @@ fn todo_ignores_absent_chunks() {
 
 #[derive(Debug)]
 struct CsmTester<const MBM: usize> {
-    #[expect(
-        dead_code,
-        reason = "Universe must be kept alive but is not read after construction"
-    )]
     universe: Universe,
     space: Handle<Space>,
     camera: Camera,
@@ -179,10 +175,12 @@ impl<const MBM: usize> CsmTester<MBM> {
         F: FnMut(dynamic::RenderDataUpdate<'_, Mt<MBM>>) + Send,
     {
         let updater_cell = Mutex::new(render_data_updater);
-        self.csm
-            .update(&self.camera, time::DeadlineNt::Whenever, |u| {
-                updater_cell.lock().unwrap()(u)
-            })
+        self.csm.update(
+            self.universe.read_ticket(),
+            &self.camera,
+            time::DeadlineNt::Whenever,
+            |u| updater_cell.lock().unwrap()(u),
+        )
     }
 
     /// Move camera to a position measured in chunks.
@@ -328,9 +326,12 @@ fn did_not_finish_detection() {
 
     {
         eprintln!("--- timing out update");
-        let info = tester
-            .csm
-            .update(&tester.camera, time::DeadlineNt::Asap, |_| {});
+        let info = tester.csm.update(
+            tester.universe.read_ticket(),
+            &tester.camera,
+            time::DeadlineNt::Asap,
+            |_| {},
+        );
 
         // This is the state that should(n't) be affected.
         // (If we stop having `complete_time` then it's okay to just delete that part of

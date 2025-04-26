@@ -28,6 +28,7 @@ use crate::math::{
 use crate::physics::Acceleration;
 use crate::time;
 use crate::transaction::{self, Merge, Transaction as _};
+use crate::universe::ReadTicket;
 use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
@@ -154,7 +155,8 @@ impl Space {
         let (palette, contents, light) = match contents {
             builder::Fill::Block(block) => {
                 let volume = bounds.volume();
-                let palette = Palette::new(block, volume);
+                // TODO(read_ticket): figure out how to fit passing in a ReadTicket here
+                let palette = Palette::new(ReadTicket::new(), block, volume);
                 let opacity = palette.all_block_opacities_as_category();
                 (
                     palette,
@@ -357,6 +359,7 @@ impl Space {
         position: Cube,
         block: &Block,
     ) -> Result<bool, SetCubeError> {
+        let read_ticket = ReadTicket::new(); // TODO(read_ticket): need to pass one in...without complicating worldgen
         if let Some(contents_index) = ctx.contents.index(position) {
             let old_block_index = ctx.contents.as_linear()[contents_index];
             let old_block = ctx.palette.entry(old_block_index).block();
@@ -373,10 +376,12 @@ impl Space {
             //
             // It also means that the externally observable block index behavior is easier
             // to characterize and won't create unnecessary holes.
-            if ctx
-                .palette
-                .try_replace_unique(old_block_index, block, ctx.change_buffer)
-            {
+            if ctx.palette.try_replace_unique(
+                read_ticket,
+                old_block_index,
+                block,
+                ctx.change_buffer,
+            ) {
                 Self::side_effects_of_set(
                     ctx,
                     old_block_index,
@@ -388,7 +393,9 @@ impl Space {
             }
 
             // Find or allocate index for new block. This must be done before other mutations since it can fail.
-            let new_block_index = ctx.palette.ensure_index(block, ctx.change_buffer, true)?;
+            let new_block_index =
+                ctx.palette
+                    .ensure_index(read_ticket, block, ctx.change_buffer, true)?;
 
             // Update counts
             ctx.palette.decrement_maybe_free(old_block_index);
@@ -540,7 +547,11 @@ impl Space {
             {
                 let linear = self.contents.as_linear_mut();
                 let volume = linear.len();
-                self.palette = Palette::new(block.clone(), volume);
+                self.palette = Palette::new(
+                    ReadTicket::new(), // TODO(read_ticket)
+                    block.clone(),
+                    volume,
+                );
                 linear.fill(/* block index = */ 0);
             }
             // TODO: if opaque, don't schedule updates
@@ -594,12 +605,15 @@ impl Space {
     /// * `deadline` is when to stop computing flexible things such as light transport.
     pub fn step<I: time::Instant>(
         &mut self,
+        read_ticket: ReadTicket<'_>,
         self_handle: Option<&Handle<Space>>,
         tick: time::Tick,
         deadline: time::Deadline<I>,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
-        let evaluations = self.palette.step::<I>(&mut self.change_notifier.buffer());
+        let evaluations = self
+            .palette
+            .step::<I>(read_ticket, &mut self.change_notifier.buffer());
 
         // Process cubes_wanting_ticks.
         let start_cube_ticks = I::now();
@@ -614,6 +628,7 @@ impl Space {
         let (transaction, behavior_step_info) =
             if let Some(self_handle) = self_handle.filter(|_| !tick.paused()) {
                 self.behaviors.step(
+                    read_ticket,
                     &*self,
                     &(|t: SpaceTransaction| t.bind(self_handle.clone())),
                     SpaceTransaction::behaviors,

@@ -51,7 +51,11 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
         b.iter_with_large_drop(move || {
             txn1.execute(&mut universe, &mut drop).unwrap();
             txn2.execute(&mut universe, &mut drop).unwrap();
-            renderer.lock().unwrap().update(None).unwrap();
+            renderer
+                .lock()
+                .unwrap()
+                .update(universe.read_ticket(), None)
+                .unwrap();
         });
     });
 
@@ -96,7 +100,10 @@ async fn create_updated_renderer(
     .unwrap();
     let space = universe.insert_anonymous(space);
     universe
-        .insert("character".into(), Character::spawn_default(space.clone()))
+        .insert(
+            "character".into(),
+            Character::spawn_default(universe.read_ticket(), space.clone()),
+        )
         .unwrap();
 
     let adapter = init::create_adapter_for_test(instance).await;
@@ -109,7 +116,7 @@ async fn create_updated_renderer(
             &universe,
         ));
 
-    renderer.update(None).unwrap();
+    renderer.update(universe.read_ticket(), None).unwrap();
 
     // Arc<Mutex< needed to satisfy borrow checking of the benchmark closure
     (universe, space, Arc::new(Mutex::new(renderer)))

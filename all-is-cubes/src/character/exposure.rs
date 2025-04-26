@@ -188,7 +188,7 @@ mod tests {
             space.evaluate_light::<crate::time::NoTime>(0, |_| {});
             space
         });
-        let mut character = Character::spawn_default(space);
+        let mut character = Character::spawn_default(universe.read_ticket(), space);
         character.body.set_position(point3(5., 5., 5.));
 
         // Let exposure sampling reach steady state
@@ -198,7 +198,7 @@ mod tests {
                 exp_log = character.exposure.exposure_log,
                 exp = character.exposure.exposure(),
             );
-            let _ = character.step(None, Tick::from_seconds(1.0 / 10.0));
+            let _ = character.step(universe.read_ticket(), None, Tick::from_seconds(1.0 / 10.0));
         }
 
         // Luminance sampling should match the scene we set up.

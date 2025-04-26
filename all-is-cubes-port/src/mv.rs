@@ -84,7 +84,10 @@ async fn dot_vox_data_to_universe(
 
         if i == 0 {
             universe
-                .insert("character".into(), Character::spawn_default(space_handle))
+                .insert(
+                    "character".into(),
+                    Character::spawn_default(universe.read_ticket(), space_handle),
+                )
                 .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
         }
 
@@ -105,6 +108,7 @@ async fn export_to_dot_vox_data(
     p: YieldProgress,
     source: ExportSet,
 ) -> Result<dot_vox::DotVoxData, ExportError> {
+    let read_ticket = source.contents.read_ticket();
     let ExportSet {
         contents:
             PartialUniverse {
@@ -127,7 +131,11 @@ async fn export_to_dot_vox_data(
     #[expect(clippy::shadow_unrelated)]
     for (mut p, space_handle) in p.split_evenly(to_export.len()).zip(to_export) {
         p.set_label(format!("Exporting space {}", space_handle.name()));
-        models.push(space_to_dot_vox_model(&space_handle, &mut palette)?);
+        models.push(space_to_dot_vox_model(
+            read_ticket,
+            &space_handle,
+            &mut palette,
+        )?);
         p.finish().await
     }
 
@@ -210,10 +218,11 @@ fn dot_vox_model_to_space(
 }
 #[cfg(feature = "export")]
 fn space_to_dot_vox_model(
+    read_ticket: universe::ReadTicket<'_>,
     space_handle: &universe::Handle<Space>,
     palette: &mut Vec<dot_vox::Color>,
 ) -> Result<dot_vox::Model, ExportError> {
-    let space = space_handle.read()?;
+    let space = space_handle.read(read_ticket)?;
     let bounds = space.bounds();
     if bounds.size().width > 256 || bounds.size().height > 256 || bounds.size().depth > 256 {
         return Err(ExportError::NotRepresentable {
@@ -424,18 +433,24 @@ mod tests {
         export_space.set([-20, -30 + 1, -40 + 2], &block1).unwrap();
         export_space.set([-20, -30 + 1, -40], &block2).unwrap();
         let export_space = export_universe.insert_anonymous(export_space);
-        print_space(&export_space.read().unwrap(), [1., 1., 1.]);
+        print_space(
+            &export_space.read(export_universe.read_ticket()).unwrap(),
+            [1., 1., 1.],
+        );
 
         // Export and import.
         let import_universe = roundtrip(&export_universe).await.expect("roundtrip failed");
         // then find the one space in it.
         let import_space: Handle<Space> = import_universe.iter_by_type().next().unwrap().1;
 
-        print_space(&import_space.read().unwrap(), [1., 1., 1.]);
+        print_space(
+            &import_space.read(import_universe.read_ticket()).unwrap(),
+            [1., 1., 1.],
+        );
 
         // Compare.
         // (The lower bounds will be zero.)
-        let s = import_space.read().unwrap();
+        let s = import_space.read(import_universe.read_ticket()).unwrap();
         assert_eq!(
             s.bounds(),
             GridAab::from_lower_size([0, 0, 0], bounds.size())

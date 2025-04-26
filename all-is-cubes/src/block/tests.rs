@@ -16,7 +16,7 @@ use crate::listen::{self, NullListener, Sink};
 use crate::math::{GridRotation, Rgba};
 use crate::space::{Space, SpaceTransaction};
 use crate::time::DeadlineNt;
-use crate::universe::{HandleError, Name, Universe};
+use crate::universe::{HandleError, Name, ReadTicket, Universe};
 
 /// Just install a listener and discard the [`EvaluatedBlock`].
 ///
@@ -28,6 +28,7 @@ fn listen(
 ) -> Result<(), EvalBlockError> {
     block
         .evaluate2(&block::EvalFilter {
+            read_ticket: ReadTicket::stub(),
             skip_eval: true,
             listener: Some(listener.into_dyn_listener()),
             budget: Default::default(),
@@ -183,6 +184,8 @@ fn listen_recur() {
 
 #[test]
 fn overflow_evaluate() {
+    let universe = Universe::new();
+
     // The primitive counts as a component.
     let too_many_modifiers: u32 = block::Budget::default().components;
 
@@ -192,7 +195,7 @@ fn overflow_evaluate() {
         too_many_modifiers as usize,
     ));
     assert_eq!(
-        block.evaluate(),
+        block.evaluate(universe.read_ticket()),
         Err(EvalBlockError {
             block,
             budget: block::Budget::default().to_cost(),
@@ -211,7 +214,7 @@ fn self_referential_evaluate() {
     let mut universe = Universe::new();
     let block = self_referential_block(&mut universe);
     assert_eq!(
-        block.evaluate(),
+        block.evaluate(universe.read_ticket()),
         Err(EvalBlockError {
             block,
             budget: block::Budget::default().to_cost(),

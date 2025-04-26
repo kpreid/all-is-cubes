@@ -25,13 +25,14 @@ use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 /// ```
 /// use all_is_cubes::block::{Block, EvaluatedBlock};
 /// use all_is_cubes::math::Rgba;
+/// use all_is_cubes::universe::ReadTicket;
 ///
 /// let block = Block::builder()
 ///    .display_name("BROWN")
 ///    .color(Rgba::new(0.5, 0.5, 0., 1.))
 ///    .build();
 ///
-/// let evaluated: EvaluatedBlock = block.evaluate().unwrap();
+/// let evaluated: EvaluatedBlock = block.evaluate(ReadTicket::stub()).unwrap();
 /// assert_eq!(evaluated.color(), Rgba::new(0.5, 0.5, 0., 1.));
 /// assert_eq!(evaluated.attributes().display_name.as_str(), "BROWN");
 /// ```
@@ -598,7 +599,7 @@ mod tests {
         );
 
         // Check the space's characteristics
-        let space = space_handle.read().unwrap();
+        let space = space_handle.read(universe.read_ticket()).unwrap();
         assert_eq!(space.bounds(), expected_bounds);
         assert_eq!(space.physics(), &SpacePhysics::DEFAULT_FOR_BLOCK);
         assert_eq!(
@@ -636,7 +637,7 @@ mod tests {
 
         // Check the space's characteristics; not just that it has the smaller bounds, but that
         // it has the expected physics and contents.
-        let space = space_handle.read().unwrap();
+        let space = space_handle.read(universe.read_ticket()).unwrap();
         assert_eq!(space.bounds(), expected_bounds);
         assert_eq!(space.physics(), &SpacePhysics::DEFAULT_FOR_BLOCK);
         assert_eq!(

@@ -12,7 +12,7 @@ use all_is_cubes::listen;
 use all_is_cubes::math::Face6;
 use all_is_cubes::time::NoTime;
 use all_is_cubes::transaction::Transaction as _;
-use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 use all_is_cubes::{space, transaction};
 use all_is_cubes_render::Rendering;
@@ -205,7 +205,10 @@ fn advance_time(session: &mut Session<NoTime>) {
 
 fn render_session(session: &Session<NoTime>) -> Rendering {
     let start_time = Instant::now();
-    let rendering = render_orthographic(session.ui_view().get().space.as_ref().unwrap());
+    let rendering = render_orthographic(
+        session.universe().read_ticket(),
+        session.ui_view().get().space.as_ref().unwrap(),
+    );
     log::trace!(
         "rendered session ui in {}",
         start_time.elapsed().refmt(&ConciseDebug)
@@ -220,7 +223,7 @@ fn render_widget(widget: &vui::WidgetTree, gravity: vui::Gravity) -> Rendering {
         widget.to_space(space::Builder::default(), gravity).unwrap(),
     );
     let space_to_render_time = Instant::now();
-    let rendering = render_orthographic(&space_handle);
+    let rendering = render_orthographic(ReadTicket::stub(), &space_handle);
     let end_time = Instant::now();
     log::trace!(
         "render_widget: {} to_space, {} render",

@@ -47,7 +47,7 @@ fn clone_evaluated_block() {
     let universe = &mut Universe::new();
     let [block] = all_is_cubes::content::make_some_voxel_blocks(universe);
 
-    let original = block.evaluate().unwrap();
+    let original = block.evaluate(universe.read_ticket()).unwrap();
     let mut clone = None;
 
     assert_no_alloc(|| {

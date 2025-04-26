@@ -22,6 +22,7 @@ pub(crate) async fn export_stl(
     source: crate::ExportSet,
     destination: std::path::PathBuf,
 ) -> Result<(), crate::ExportError> {
+    let read_ticket = source.contents.read_ticket();
     // TODO: this should be doing reject_unsupported_members but that is incompatible with member_export_path() -- fix somehow
     let crate::ExportSet {
         contents:
@@ -37,14 +38,14 @@ pub(crate) async fn export_stl(
     for space in spaces {
         stl_io::write_stl(
             &mut fs::File::create(source.member_export_path(&destination, space))?,
-            space_to_stl_triangles(&*space.read()?).into_iter(),
+            space_to_stl_triangles(&*space.read(read_ticket)?).into_iter(),
         )?;
     }
 
     for block_def in block_defs {
         let ev = block_def
-            .read()?
-            .evaluate()
+            .read(read_ticket)?
+            .evaluate(read_ticket)
             .map_err(|error| crate::ExportError::Eval {
                 name: block_def.name(),
                 error,

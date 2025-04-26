@@ -4,6 +4,7 @@ use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Face7, FreePoint, LineVertex, Rgba, Wireframe};
 use all_is_cubes::space::Space;
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::MapExtend;
 use all_is_cubes_render::camera::GraphicsOptions;
 
@@ -14,6 +15,7 @@ pub(crate) trait DebugLineVertex {
 
 /// The `Character`'s space should be the given `Space` if both are present
 pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
+    read_ticket: ReadTicket<'_>,
     character: Option<&Character>,
     space: Option<&Space>,
     graphics_options: &GraphicsOptions,
@@ -41,7 +43,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
         // Lighting trace at cursor
         if graphics_options.debug_light_rays_at_cursor {
             if let Some(cursor) = cursor_result {
-                if std::ptr::eq(&raw const *cursor.space().read().unwrap(), space) {
+                if std::ptr::eq(&raw const *cursor.space().read(read_ticket).unwrap(), space) {
                     let result = space
                         .compute_lighting::<all_is_cubes::space::LightUpdateCubeInfo>(
                             cursor.preceding_cube(),

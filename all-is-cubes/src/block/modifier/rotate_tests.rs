@@ -46,10 +46,10 @@ fn rotate_evaluation() {
             replacement.clone(),
         ))))
         .build_into(&mut universe);
-    let be = block.evaluate().unwrap();
+    let be = block.evaluate(universe.read_ticket()).unwrap();
 
     let rotated = block.clone().rotate(rotation);
-    let re = rotated.evaluate().unwrap();
+    let re = rotated.evaluate(universe.read_ticket()).unwrap();
 
     assert_eq!(
         re,
@@ -120,8 +120,8 @@ fn rotate_rotated_consistency() {
         .extend([Modifier::Rotate(rotation_1), Modifier::Rotate(rotation_2)]);
     assert_ne!(rotated_twice, two_rotations, "Oops; test is ineffective");
 
-    let ev_rotated_twice = rotated_twice.evaluate().unwrap();
-    let ev_two_rotations = two_rotations.evaluate().unwrap();
+    let ev_rotated_twice = rotated_twice.evaluate(universe.read_ticket()).unwrap();
+    let ev_two_rotations = two_rotations.evaluate(universe.read_ticket()).unwrap();
 
     assert_eq!(
         EvaluatedBlock {

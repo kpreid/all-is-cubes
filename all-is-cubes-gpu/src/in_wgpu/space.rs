@@ -26,7 +26,7 @@ use all_is_cubes::raycast::Ray;
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{Sky, Space, SpaceChange, SpaceFluff};
 use all_is_cubes::time;
-use all_is_cubes::universe::{Handle, HandleError};
+use all_is_cubes::universe::{Handle, HandleError, ReadTicket};
 use all_is_cubes::util::Executor;
 use all_is_cubes_mesh::dynamic::{self, ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
@@ -175,8 +175,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
     pub(crate) fn set_space(
         &mut self,
         executor: &Arc<dyn Executor>,
-        _device: &wgpu::Device,
-        _pipelines: &Pipelines,
+        read_ticket: ReadTicket<'_>,
         space: Option<&Handle<Space>>,
     ) -> Result<(), HandleError> {
         if self.csm.as_ref().map(|csm| csm.space()) == space {
@@ -189,7 +188,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             return Ok(());
         };
 
-        let space_borrowed = space.read()?;
+        let space_borrowed = space.read(read_ticket)?;
 
         // Destructuring to explicitly skip or handle each field.
         let SpaceRenderer {
@@ -294,9 +293,11 @@ impl<I: time::Instant> SpaceRenderer<I> {
     /// Update renderer internal state from the given [`Camera`] and referenced [`Space`],
     /// so that the next rendered meshes will be up to date (or as far up to date as the
     /// given [`deadline`] permits).
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn update(
         &mut self,
         deadline: time::Deadline<I>,
+        read_ticket: ReadTicket<'_>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         pipelines: &Pipelines,
@@ -314,7 +315,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
             return Ok(SpaceUpdateInfo::default());
         };
-        let space = &*csm.space().read().map_err(RenderError::Read)?;
+        let space = &*csm.space().read(read_ticket).map_err(RenderError::Read)?;
 
         if mem::take(&mut todo.sky) {
             self.skybox.compute(device, queue, &space.physics().sky);
@@ -352,6 +353,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         let csm_info = {
             let bwp_mutex = Mutex::new(Msw::new(bwp.reborrow()));
             csm.update(
+                read_ticket,
                 camera,
                 deadline, // TODO: decrease deadline by some guess at texture writing time
                 |u| {

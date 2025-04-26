@@ -1,11 +1,12 @@
-use all_is_cubes::block::text;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::arcstr::{self, literal};
+use all_is_cubes::block::text;
 use all_is_cubes::math::{Face6, zo32};
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::camera::{self, AntialiasingOption, GraphicsOptions};
 
 use crate::apps::ControlMessage;
@@ -151,7 +152,7 @@ fn graphics_toggle_button(
     let text: Option<widgets::Label> = match style {
         OptionsStyle::CompactRow => None,
         OptionsStyle::LabeledColumn => Some(
-            icon.evaluate()
+            icon.evaluate(ReadTicket::new()) // TODO(read_ticket): figure out how to pass one in, or get the label text elsewhere
                 .unwrap()
                 .attributes()
                 .display_name

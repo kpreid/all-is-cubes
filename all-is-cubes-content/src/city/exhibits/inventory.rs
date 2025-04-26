@@ -43,12 +43,18 @@ fn INVENTORY(ctx: Context<'_>) {
     let pipe_table = prepare_pipes([
         // TODO: Should prepare_pipes() automatically fix the lack of inventories?
         PipeData {
-            block: straight_pipe_block.evaluate().unwrap().with_inventory([]),
+            block: straight_pipe_block
+                .evaluate(ctx.universe.read_ticket())
+                .unwrap()
+                .with_inventory([]),
             from_face: Face6::NZ,
             to_face: Face6::PZ,
         },
         PipeData {
-            block: elbow_pipe_block.evaluate().unwrap().with_inventory([]),
+            block: elbow_pipe_block
+                .evaluate(ctx.universe.read_ticket())
+                .unwrap()
+                .with_inventory([]),
             from_face: Face6::NZ,
             to_face: Face6::NX,
         },
@@ -59,19 +65,28 @@ fn INVENTORY(ctx: Context<'_>) {
         [0, 0, 0],
         [
             pedestal,
-            &tray.evaluate().unwrap().with_inventory([
-                inv::Tool::Block(demo_blocks[DemoBlocks::ExhibitBackground].clone()).into(),
-                inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
-                inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_GREEN)).into(),
-                inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_BLUE)).into(),
-                inv::Tool::Block(demo_blocks[DemoBlocks::Lamp(true)].clone()).into(),
-            ]),
+            &tray
+                .evaluate(ctx.universe.read_ticket())
+                .unwrap()
+                .with_inventory([
+                    inv::Tool::Block(demo_blocks[DemoBlocks::ExhibitBackground].clone()).into(),
+                    inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
+                    inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_GREEN)).into(),
+                    inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_BLUE)).into(),
+                    inv::Tool::Block(demo_blocks[DemoBlocks::Lamp(true)].clone()).into(),
+                ]),
         ],
     )?;
     stack(
         &mut space,
         [1, 0, 0],
-        [pedestal, &tray.evaluate().unwrap().with_inventory([])],
+        [
+            pedestal,
+            &tray
+                .evaluate(ctx.universe.read_ticket())
+                .unwrap()
+                .with_inventory([]),
+        ],
     )?;
 
     for (cube, block) in fit_pipes(
@@ -102,21 +117,18 @@ fn INVENTORY(ctx: Context<'_>) {
 
     // Place some items in the loop of pipe
     {
-        let pipe_with_item_1 =
-            straight_pipe_block
-                .evaluate()
-                .unwrap()
-                .with_inventory([
-                    inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
-                ]);
-        let pipe_with_item_2 =
-            straight_pipe_block
-                .evaluate()
-                .unwrap()
-                .with_inventory([inv::Tool::Block(block::from_color!(
-                    Rgb::UNIFORM_LUMINANCE_BLUE
-                ))
-                .into()]);
+        let pipe_with_item_1 = straight_pipe_block
+            .evaluate(ctx.universe.read_ticket())
+            .unwrap()
+            .with_inventory([
+                inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
+            ]);
+        let pipe_with_item_2 = straight_pipe_block
+            .evaluate(ctx.universe.read_ticket())
+            .unwrap()
+            .with_inventory([
+                inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_BLUE)).into(),
+            ]);
         space.set([2, 1, 0], pipe_with_item_1.rotate(GridRotation::RXzY))?;
         space.set([3, 1, 0], pipe_with_item_2.rotate(GridRotation::RXZy))?;
     }

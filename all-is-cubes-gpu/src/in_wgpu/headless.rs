@@ -8,6 +8,7 @@ use futures_core::future::BoxFuture;
 
 use all_is_cubes::character::Cursor;
 use all_is_cubes::listen;
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
 use all_is_cubes_render::camera::{StandardCameras, Viewport};
 use all_is_cubes_render::{Flaws, HeadlessRenderer, RenderError, Rendering};
@@ -128,9 +129,13 @@ impl Renderer {
 }
 
 impl HeadlessRenderer for Renderer {
-    fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
+    fn update(
+        &mut self,
+        read_ticket: ReadTicket<'_>,
+        cursor: Option<&Cursor>,
+    ) -> Result<(), RenderError> {
         // Note: this delegation is the simplest ways to
-        self.inner.update(cursor)
+        self.inner.update(read_ticket, cursor)
     }
 
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>> {
@@ -142,10 +147,17 @@ impl HeadlessRenderer for Renderer {
 }
 
 impl RendererImpl {
-    fn update(&mut self, cursor: Option<&Cursor>) -> Result<(), RenderError> {
-        let info =
-            self.everything
-                .update(&self.queue, cursor, &FrameBudget::PRACTICALLY_INFINITE)?;
+    fn update(
+        &mut self,
+        read_ticket: ReadTicket<'_>,
+        cursor: Option<&Cursor>,
+    ) -> Result<(), RenderError> {
+        let info = self.everything.update(
+            read_ticket,
+            &self.queue,
+            cursor,
+            &FrameBudget::PRACTICALLY_INFINITE,
+        )?;
         self.flaws = info.flaws();
         Ok(())
     }

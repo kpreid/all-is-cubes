@@ -13,7 +13,7 @@ use futures_util::stream;
 use futures_util::{FutureExt as _, StreamExt as _};
 use itertools::Itertools;
 
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes::util::{ConciseDebug, Refmt as _};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::{HeadlessRenderer, Rendering};
@@ -124,7 +124,12 @@ impl RenderTestContext {
         overlays: Overlays<'_>,
     ) {
         renderer
-            .update(overlays.cursor)
+            .update(
+                self.universe
+                    .as_ref()
+                    .map_or_else(ReadTicket::new, |u| u.read_ticket()),
+                overlays.cursor,
+            )
             .expect("renderer update() failed");
         let image = renderer
             .draw(overlays.info_text.unwrap_or(""))

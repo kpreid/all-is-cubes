@@ -89,7 +89,7 @@ impl Move {
         block: &Block,
         this_modifier_index: usize,
         mut input: MinEval,
-        filter: &block::EvalFilter,
+        filter: &block::EvalFilter<'_>,
     ) -> Result<MinEval, block::InEvalError> {
         let Move {
             direction,
@@ -243,7 +243,7 @@ mod tests {
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba, rgba_const, zo32};
     use crate::space::Space;
-    use crate::universe::Universe;
+    use crate::universe::{ReadTicket, Universe};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -259,9 +259,9 @@ mod tests {
 
         let expected_bounds = GridAab::from_lower_size([0, 8, 0], [16, 8, 16]);
 
-        let ev_original = original.evaluate().unwrap();
+        let ev_original = original.evaluate(ReadTicket::stub()).unwrap();
         assert_eq!(
-            moved.evaluate().unwrap(),
+            moved.evaluate(ReadTicket::stub()).unwrap(),
             EvaluatedBlock {
                 block: moved,
                 attributes: ev_original.attributes.clone(),
@@ -316,9 +316,9 @@ mod tests {
 
         let expected_bounds = GridAab::from_lower_size([0, 1, 0], [2, 1, 2]);
 
-        let ev_original = original.evaluate().unwrap();
+        let ev_original = original.evaluate(universe.read_ticket()).unwrap();
         assert_eq!(
-            moved.evaluate().unwrap(),
+            moved.evaluate(universe.read_ticket()).unwrap(),
             EvaluatedBlock {
                 block: moved,
                 attributes: ev_original.attributes.clone(),
@@ -358,6 +358,7 @@ mod tests {
     /// effects happen.
     #[test]
     fn move_also_quotes() {
+        let universe = Universe::new();
         let original = Block::builder()
             .color(Rgba::WHITE)
             .tick_action(Some(TickAction::from(Operation::Become(AIR))))
@@ -369,7 +370,14 @@ mod tests {
             schedule: time::Schedule::EVERY_TICK,
         });
 
-        assert_eq!(moved.evaluate().unwrap().attributes.tick_action, None);
+        assert_eq!(
+            moved
+                .evaluate(universe.read_ticket())
+                .unwrap()
+                .attributes
+                .tick_action,
+            None
+        );
     }
 
     /// Set up a `Modifier::Move`, let it run, and then allow assertions to be made about the result.
@@ -393,7 +401,7 @@ mod tests {
         for _ in 0..257 {
             universe.step(false, time::DeadlineNt::Whenever);
         }
-        checker(&space.read().unwrap(), &block);
+        checker(&space.read(universe.read_ticket()).unwrap(), &block);
     }
 
     #[test]
@@ -424,6 +432,7 @@ mod tests {
     /// In particular, we want to make sure the outcome doesn’t end up doubly-rotated.
     #[test]
     fn move_inside_rotation() {
+        let universe = Universe::new();
         let [base] = make_some_blocks();
         const R: Modifier = Modifier::Rotate(GridRotation::CLOCKWISE);
 
@@ -447,7 +456,11 @@ mod tests {
             .with_modifier(R);
 
         assert_eq!(
-            block.evaluate().unwrap().attributes.tick_action,
+            block
+                .evaluate(universe.read_ticket())
+                .unwrap()
+                .attributes
+                .tick_action,
             Some(TickAction::from(Operation::Become(expected_after_tick)))
         );
     }
@@ -455,6 +468,7 @@ mod tests {
     /// Test [`Move`] acting within another modifier ([`Composite`]).
     #[test]
     fn move_inside_composite_destination() {
+        let universe = Universe::new();
         let [base, extra] = make_some_blocks();
         let composite = Composite::new(extra, block::CompositeOperator::Over);
 
@@ -478,7 +492,11 @@ mod tests {
             .with_modifier(composite);
 
         assert_eq!(
-            block.evaluate().unwrap().attributes.tick_action,
+            block
+                .evaluate(universe.read_ticket())
+                .unwrap()
+                .attributes
+                .tick_action,
             Some(TickAction::from(Operation::Become(expected_after_tick)))
         );
     }
@@ -486,6 +504,7 @@ mod tests {
     /// Test [`Move`] acting within the `source` position of a [`Modifier::Composite`].
     #[test]
     fn move_inside_composite_source() {
+        let universe = Universe::new();
         let [base, extra] = make_some_blocks();
 
         let block = extra.clone().with_modifier(Composite::new(
@@ -509,7 +528,11 @@ mod tests {
         ));
 
         assert_eq!(
-            block.evaluate().unwrap().attributes.tick_action,
+            block
+                .evaluate(universe.read_ticket())
+                .unwrap()
+                .attributes
+                .tick_action,
             Some(TickAction::from(Operation::Become(expected_after_tick)))
         );
     }

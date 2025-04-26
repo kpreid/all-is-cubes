@@ -11,7 +11,7 @@ use all_is_cubes::listen::{self, Notifier};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
-use all_is_cubes::universe::{Handle, Universe, UniverseStepInfo, UniverseTransaction};
+use all_is_cubes::universe::{Handle, ReadTicket, Universe, UniverseStepInfo, UniverseTransaction};
 use all_is_cubes_render::camera::{FogOption, GraphicsOptions, UiViewState, Viewport};
 
 use crate::apps::{
@@ -255,7 +255,7 @@ impl Vui {
 
         let new_view_state = UiViewState {
             view_transform: page_layout.view_transform(
-                &next_space.read().unwrap(), // TODO: eliminate this unwrap
+                &next_space.read(universe.read_ticket()).unwrap(), // TODO: eliminate this unwrap
                 graphics_options.fov_y.into_inner(),
             ),
             space: Some(next_space),
@@ -303,8 +303,11 @@ impl Vui {
         self.universe.step(tick.paused(), deadline)
     }
 
+    /// Update the UI from its data sources
     #[inline(never)]
     fn step_pre_sync(&mut self) {
+        let world_read_ticket = ReadTicket::new(); // TODO(read_ticket): replace this with non-stub
+
         let mut anything_changed = false;
 
         if self.changed_graphics_options.get_and_clear() {
@@ -318,7 +321,11 @@ impl Vui {
         // TODO: This should possibly be the responsibility of the TooltipState itself?
         if self.changed_character.get_and_clear() {
             if let Some(character_handle) = self.hud_inputs.character_source.get() {
-                TooltipState::bind_to_character(&self.tooltip_state, character_handle);
+                TooltipState::bind_to_character(
+                    world_read_ticket,
+                    &self.tooltip_state,
+                    character_handle,
+                );
             }
         }
 
@@ -418,6 +425,7 @@ impl Vui {
         // TODO: We'll probably want to distinguish buttons eventually.
         // TODO: It should be easier to use a tool
         let transaction = Tool::Activate.use_immutable_tool(&ToolInput {
+            read_ticket: self.universe.read_ticket(),
             cursor,
             character: None,
         })?;
