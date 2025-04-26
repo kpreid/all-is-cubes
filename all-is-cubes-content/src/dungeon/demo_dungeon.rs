@@ -757,7 +757,7 @@ fn generate_dungeon_map(
     // Expand bounds to allow for extra-tall rooms.
     let expanded_bounds = maze.bounds().expand(FaceMap::symmetric([0, 1, 0]));
 
-    let map = Vol::from_fn(expanded_bounds, |room_position| {
+    Vol::from_fn(expanded_bounds, |room_position| {
         let maze_room = maze.get(room_position)?;
 
         let must_grant_item: Option<Tool> =
@@ -865,9 +865,7 @@ fn generate_dungeon_map(
                 && (grants_item.is_some() || rng.random_bool(0.75)),
             grants_item,
         })
-    });
-
-    map
+    })
 }
 
 fn choose_key_locations<const N: usize>(
