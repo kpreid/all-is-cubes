@@ -406,9 +406,16 @@ impl<I: time::Instant> EverythingRenderer<I> {
             gather_debug_lines(
                 self.cameras
                     .character()
-                    .map(|c| c.read().unwrap())
+                    .map(|c| c.read())
+                    .transpose()
+                    .map_err(RenderError::Read)?
                     .as_deref(),
-                spaces_to_render.world.map(|s| s.read().unwrap()).as_deref(),
+                spaces_to_render
+                    .world
+                    .map(|s| s.read())
+                    .transpose()
+                    .map_err(RenderError::Read)?
+                    .as_deref(),
                 self.cameras.graphics_options(),
                 &mut v,
                 cursor_result,
