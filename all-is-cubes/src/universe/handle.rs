@@ -164,7 +164,12 @@ impl<T: 'static> Handle<T> {
     ///
     /// Returns an error if the value is currently being written to, or does not exist.
     #[inline(never)]
-    pub fn read(&self, _read_ticket: ReadTicket<'_>) -> Result<ReadGuard<T>, HandleError> {
+    pub fn read(&self, read_ticket: ReadTicket<'_>) -> Result<ReadGuard<T>, HandleError> {
+        if let Some(id) = self.universe_id() {
+            if !read_ticket.allows_access_to(id) {
+                return Err(HandleError::InvalidTicket(self.name()));
+            }
+        }
         let inner = owning_guard::ReadGuardImpl::new(self.upgrade()?)
             .map_err(|_| HandleError::InUse(self.name()))?;
         if inner.data.is_none() {
@@ -311,7 +316,7 @@ impl<T: 'static> Handle<T> {
         // TODO: This check (which also doesn't do anything yet)
         // should be applied to *both* transaction-based insertion and
         // direct `&mut self` insertions, but isn't.
-        match self.read(ReadTicket::new()) {
+        match self.read(ReadTicket::stub()) {
             Ok(data_guard) => {
                 // TODO: We need to enforce rules about not referring to items from another
                 // universe, but also to be able to opt out for the UI containing world elements.
@@ -348,6 +353,14 @@ impl<T: 'static> Handle<T> {
                 return Err(InsertError {
                     name,
                     kind: InsertErrorKind::Gone,
+                });
+            }
+            Err(HandleError::InvalidTicket(name)) => {
+                // The only way we can get an invalid ticket error is if the handle was concurrently
+                // inserted into a different universe.
+                return Err(InsertError {
+                    name,
+                    kind: InsertErrorKind::AlreadyInserted,
                 });
             }
         }
@@ -543,6 +556,10 @@ pub enum HandleError {
     #[doc(hidden)]
     #[displaydoc("object was referenced but not defined: {0}")]
     NotReady(Name),
+
+    /// The presented [`ReadTicket`] is for a different universe.
+    #[displaydoc("object is from a different universe than the given ReadTicket: {0}")]
+    InvalidTicket(Name),
 }
 
 impl core::error::Error for HandleError {}
@@ -565,22 +582,32 @@ impl core::error::Error for HandleError {}
 /// for access — but it may become mandatory in the future.
 #[derive(Clone, Copy, Debug)]
 pub struct ReadTicket<'universe> {
-    // TODO(read_ticket): Ideally, a ReadTicket would specify the universe ID it belongs to,
-    // but currently we have cross-universe `Handle<BlockDef>`s in the UI, so that would fail.
-    // Get rid of those, or allow two universe IDs as an interim solution.
-    _phantom: PhantomData<&'universe Universe>,
+    pub(in crate::universe) rule: TicketRule,
+    pub(in crate::universe) _phantom: PhantomData<&'universe Universe>,
+}
+#[derive(Clone, Copy, Debug)]
+pub(in crate::universe) enum TicketRule {
+    /// Allow any universe.
+    // TODO(read_ticket): eliminate all uses of this
+    Any,
+    /// Allow no universes.
+    None,
+    /// Allow exactly this universe.
+    Eq(UniverseId),
 }
 
 impl ReadTicket<'_> {
-    /// Create a [`ReadTicket`] from nothing.
+    /// Create an unrestricted [`ReadTicket`].
     ///
     /// Whenever possible, use [`Universe::read_ticket()`] instead.
+    /// This will probably stop being available in a future version.
     //---
-    // TODO(read_ticket): eliminate all external uses of this
+    // TODO(read_ticket): eliminate all uses of this
     #[allow(clippy::new_without_default)]
     #[doc(hidden)]
     pub fn new() -> Self {
         Self {
+            rule: TicketRule::Any,
             _phantom: PhantomData,
         }
     }
@@ -592,7 +619,16 @@ impl ReadTicket<'_> {
     // TODO(read_ticket): eliminate all external uses of this
     pub fn stub() -> Self {
         Self {
+            rule: TicketRule::None,
             _phantom: PhantomData,
+        }
+    }
+
+    pub(crate) fn allows_access_to(&self, id: UniverseId) -> bool {
+        match self.rule {
+            TicketRule::Any => true,
+            TicketRule::None => false,
+            TicketRule::Eq(ticket_id) => id == ticket_id,
         }
     }
 }

@@ -315,7 +315,10 @@ impl Universe {
     pub fn read_ticket(&self) -> ReadTicket<'_> {
         // Currently unassociated with this universe, but might start being,
         // either by carrying the universe ID, or being an actual borrow of the storage.
-        ReadTicket::new()
+        ReadTicket {
+            rule: TicketRule::Eq(self.id),
+            _phantom: core::marker::PhantomData,
+        }
     }
 
     /// Advance time for all members.
