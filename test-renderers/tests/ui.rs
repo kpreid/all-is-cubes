@@ -206,7 +206,7 @@ fn advance_time(session: &mut Session<NoTime>) {
 fn render_session(session: &Session<NoTime>) -> Rendering {
     let start_time = Instant::now();
     let rendering = render_orthographic(
-        session.universe().read_ticket(),
+        session.read_tickets().ui,
         session.ui_view().get().space.as_ref().unwrap(),
     );
     log::trace!(
