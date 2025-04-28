@@ -165,7 +165,10 @@ impl StandardCameras {
         universe: &Universe,
     ) -> Self {
         Self::new(
-            Layers::splat(ReadTicket::stub()),
+            Layers {
+                world: universe.read_ticket(),
+                ui: ReadTicket::stub(),
+            },
             listen::constant(Arc::new(graphics_options)),
             listen::constant(viewport),
             listen::constant(universe.get_default_character()),
