@@ -694,7 +694,7 @@ mod tests {
     use crate::math::{Rgba, zo32};
     use crate::space::Space;
     use crate::time;
-    use crate::universe::{ReadTicket, Universe};
+    use crate::universe::Universe;
     use BlockCollision::{Hard, None as CNone};
     use CompositeOperator::{Atop, In, Over};
     use pretty_assertions::assert_eq;
@@ -745,10 +745,15 @@ mod tests {
     }
 
     #[track_caller]
-    fn eval_compose(src: &Block, operator: CompositeOperator, dst: &Block) -> EvaluatedBlock {
+    fn eval_compose(
+        universe: &Universe,
+        src: &Block,
+        operator: CompositeOperator,
+        dst: &Block,
+    ) -> EvaluatedBlock {
         dst.clone()
             .with_modifier(Composite::new(src.clone(), operator))
-            .evaluate(ReadTicket::stub())
+            .evaluate(universe.read_ticket())
             .expect("failed to evaluate in eval_compose()")
     }
 
@@ -769,17 +774,17 @@ mod tests {
         let intersection = GridAab::from_lower_size([1, 0, 0], [1, 1, 1]);
 
         assert_eq!(
-            eval_compose(&block1, Over, &block2).voxels_bounds(),
+            eval_compose(universe, &block1, Over, &block2).voxels_bounds(),
             union,
             "Over"
         );
         assert_eq!(
-            eval_compose(&block1, In, &block2).voxels_bounds(),
+            eval_compose(universe, &block1, In, &block2).voxels_bounds(),
             intersection,
             "In"
         );
         assert_eq!(
-            eval_compose(&block1, Atop, &block2).voxels_bounds(),
+            eval_compose(universe, &block1, Atop, &block2).voxels_bounds(),
             bounds2,
             "Atop"
         );
@@ -795,22 +800,22 @@ mod tests {
             .voxels_bounds();
 
         assert_eq!(
-            eval_compose(&slab, Over, &AIR).voxels_bounds(),
+            eval_compose(universe, &slab, Over, &AIR).voxels_bounds(),
             slab_bounds,
             "Over",
         );
         assert_eq!(
-            eval_compose(&slab, In, &AIR).voxels_bounds(),
+            eval_compose(universe, &slab, In, &AIR).voxels_bounds(),
             GridAab::ORIGIN_EMPTY,
             "In",
         );
         assert_eq!(
-            eval_compose(&slab, Atop, &AIR).voxels_bounds(),
+            eval_compose(universe, &slab, Atop, &AIR).voxels_bounds(),
             GridAab::ORIGIN_EMPTY,
             "Atop AIR",
         );
         assert_eq!(
-            eval_compose(&AIR, Atop, &slab).voxels_bounds(),
+            eval_compose(universe, &AIR, Atop, &slab).voxels_bounds(),
             slab_bounds,
             "AIR Atop",
         );
@@ -1030,27 +1035,29 @@ mod tests {
 
         #[test]
         fn selectable_if_either_is_selectable() {
+            let u = Universe::new();
             // TODO: make this a more thorough test by making the two blocks slabs so that
             // all four types of voxels are involved. This currently doesn't matter but it may.
-            let is_sel = &Block::builder().color(Rgba::WHITE).selectable(true).build();
-            let not_sel = &Block::builder()
+            let is_s = &Block::builder().color(Rgba::WHITE).selectable(true).build();
+            let not_s = &Block::builder()
                 .color(Rgba::WHITE)
                 .selectable(false)
                 .build();
 
-            assert!(eval_compose(is_sel, Over, is_sel).attributes().selectable);
-            assert!(eval_compose(is_sel, Over, not_sel).attributes().selectable);
-            assert!(eval_compose(not_sel, Over, is_sel).attributes().selectable);
-            assert!(!eval_compose(not_sel, Over, not_sel).attributes().selectable);
+            assert!(eval_compose(&u, is_s, Over, is_s).attributes().selectable);
+            assert!(eval_compose(&u, is_s, Over, not_s).attributes().selectable);
+            assert!(eval_compose(&u, not_s, Over, is_s).attributes().selectable);
+            assert!(!eval_compose(&u, not_s, Over, not_s).attributes().selectable);
 
-            assert!(eval_compose(is_sel, In, is_sel).attributes().selectable);
-            assert!(eval_compose(is_sel, In, not_sel).attributes().selectable);
-            assert!(eval_compose(not_sel, In, is_sel).attributes().selectable);
-            assert!(!eval_compose(not_sel, In, not_sel).attributes().selectable);
+            assert!(eval_compose(&u, is_s, In, is_s).attributes().selectable);
+            assert!(eval_compose(&u, is_s, In, not_s).attributes().selectable);
+            assert!(eval_compose(&u, not_s, In, is_s).attributes().selectable);
+            assert!(!eval_compose(&u, not_s, In, not_s).attributes().selectable);
         }
 
         #[test]
         fn activation_action_is_composed() {
+            let universe = Universe::new();
             let [result1, result2] = make_some_blocks();
             let b1 = &Block::builder()
                 .color(Rgba::WHITE)
@@ -1062,7 +1069,9 @@ mod tests {
                 .build();
 
             assert_eq!(
-                eval_compose(b1, Over, b2).attributes().activation_action,
+                eval_compose(&universe, b1, Over, b2)
+                    .attributes()
+                    .activation_action,
                 Some(Operation::Become(
                     result2.with_modifier(Composite::new(result1, Over))
                 ))
@@ -1073,6 +1082,7 @@ mod tests {
 
         #[test]
         fn tick_action_is_composed() {
+            let universe = Universe::new();
             let [result1, result2] = make_some_blocks();
             let b1 = &Block::builder()
                 .color(Rgba::WHITE)
@@ -1090,7 +1100,9 @@ mod tests {
                 .build();
 
             assert_eq!(
-                eval_compose(b1, Over, b2).attributes().tick_action,
+                eval_compose(&universe, b1, Over, b2)
+                    .attributes()
+                    .tick_action,
                 Some(block::TickAction {
                     schedule: time::Schedule::EVERY_TICK,
                     operation: Operation::Become(

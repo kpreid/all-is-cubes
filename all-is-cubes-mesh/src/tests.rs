@@ -16,7 +16,7 @@ use all_is_cubes::math::{
     Face7, FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
-use all_is_cubes::universe::{ReadTicket, Universe};
+use all_is_cubes::universe::Universe;
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::TransparencyOption;
 
@@ -58,9 +58,9 @@ fn v_t(
 
 /// Test helper to create [`BlockMesh`] alone without a `Space`.
 #[expect(clippy::needless_pass_by_value, reason = "convenience")]
-pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<TextureMt> {
+pub(crate) fn test_block_mesh(universe: &Universe, block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
-        &block.evaluate(ReadTicket::stub()).unwrap(),
+        &block.evaluate(universe.read_ticket()).unwrap(),
         &Allocator::new(),
         &MeshOptions {
             transparency: TransparencyOption::Volumetric,
@@ -72,9 +72,9 @@ pub(crate) fn test_block_mesh(block: Block) -> BlockMesh<TextureMt> {
 /// Test helper to create [`BlockMesh`] alone without a `Space`,
 /// and with the transparency option set to `Threshold(0.5)`.
 #[expect(clippy::needless_pass_by_value, reason = "convenience")]
-fn test_block_mesh_threshold(block: Block) -> BlockMesh<TextureMt> {
+fn test_block_mesh_threshold(universe: &Universe, block: Block) -> BlockMesh<TextureMt> {
     BlockMesh::new(
-        &block.evaluate(ReadTicket::stub()).unwrap(),
+        &block.evaluate(universe.read_ticket()).unwrap(),
         &Allocator::new(),
         &MeshOptions {
             transparency: TransparencyOption::Threshold(zo32(0.5)),
@@ -524,30 +524,38 @@ fn opacities<M: MeshTypes>(mesh: &BlockMesh<M>) -> FaceMap<bool> {
 
 #[test]
 fn atom_transparency() {
+    let universe = Universe::new();
     assert_eq!(
-        opacities(&test_block_mesh(block::from_color!(Rgba::WHITE))),
+        opacities(&test_block_mesh(&universe, block::from_color!(Rgba::WHITE))),
         FaceMap::splat(true)
     );
     assert_eq!(
-        opacities(&test_block_mesh(block::from_color!(Rgba::TRANSPARENT))),
+        opacities(&test_block_mesh(
+            &universe,
+            block::from_color!(Rgba::TRANSPARENT)
+        )),
         FaceMap::splat(false)
     );
     assert_eq!(
-        opacities(&test_block_mesh(block::from_color!(1.0, 1.0, 1.0, 0.5))),
+        opacities(&test_block_mesh(
+            &universe,
+            block::from_color!(1.0, 1.0, 1.0, 0.5)
+        )),
         FaceMap::splat(false)
     );
 }
 
 #[test]
 fn atom_transparency_thresholded() {
+    let universe = Universe::new();
     // Threshold means that partial transparency should produce exactly the same mesh as 0 or 1
     assert_eq!(
-        test_block_mesh_threshold(block::from_color!(1.0, 1.0, 1.0, 0.25)),
-        test_block_mesh_threshold(block::from_color!(1.0, 1.0, 1.0, 0.0)),
+        test_block_mesh_threshold(&universe, block::from_color!(1.0, 1.0, 1.0, 0.25)),
+        test_block_mesh_threshold(&universe, block::from_color!(1.0, 1.0, 1.0, 0.0)),
     );
     assert_eq!(
-        test_block_mesh_threshold(block::from_color!(1.0, 1.0, 1.0, 0.75)),
-        test_block_mesh_threshold(block::from_color!(1.0, 1.0, 1.0, 1.0)),
+        test_block_mesh_threshold(&universe, block::from_color!(1.0, 1.0, 1.0, 0.75)),
+        test_block_mesh_threshold(&universe, block::from_color!(1.0, 1.0, 1.0, 1.0)),
     );
 
     // TODO: also test voxels -- including self-occlusion (thresholded voxel in front of truly opaque voxel)
@@ -557,7 +565,7 @@ fn atom_transparency_thresholded() {
 #[test]
 fn fully_opaque_voxels() {
     let resolution = R8;
-    let mut u = Universe::new();
+    let mut universe = Universe::new();
     let block = Block::builder()
         .voxels_fn(resolution, |cube| {
             // Make a cube-corner shape
@@ -569,9 +577,9 @@ fn fully_opaque_voxels() {
             }
         })
         .unwrap()
-        .build_into(&mut u);
+        .build_into(&mut universe);
     assert_eq!(
-        opacities(&test_block_mesh(block)),
+        opacities(&test_block_mesh(&universe, block)),
         FaceMap {
             nx: true,
             ny: true,
@@ -587,11 +595,11 @@ fn fully_opaque_voxels() {
 /// but don't fill the cube.
 #[test]
 fn fully_opaque_partial_block() {
-    let mut u = Universe::new();
+    let mut universe = Universe::new();
     let block = Block::builder()
         .voxels_handle(R8, {
             // The dimensions don't meet the PX face, but the blocks are all opaque.
-            u.insert_anonymous(
+            universe.insert_anonymous(
                 Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 8, 8]))
                     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                     .filled_with(block::from_color!(Rgba::WHITE))
@@ -600,7 +608,7 @@ fn fully_opaque_partial_block() {
         })
         .build();
     assert_eq!(
-        opacities(&test_block_mesh(block)),
+        opacities(&test_block_mesh(&universe, block)),
         FaceMap {
             nx: true,
             ny: false,
@@ -615,11 +623,11 @@ fn fully_opaque_partial_block() {
 /// Test mesh opacity flags when the voxels fill the cube, but are transparent.
 #[test]
 fn invisible_voxel_block() {
-    let mut u = Universe::new();
+    let mut universe = Universe::new();
     let block = Block::builder()
         .voxels_handle(R8, {
             // Don't use voxels_fn() because it auto-shrinkwraps.
-            u.insert_anonymous(
+            universe.insert_anonymous(
                 Space::builder(GridAab::from_lower_size([0, 0, 0], [8, 8, 8]))
                     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                     .build(),
@@ -627,12 +635,19 @@ fn invisible_voxel_block() {
         })
         .build();
     assert_eq!(
-        block.evaluate(u.read_ticket()).unwrap().voxels().bounds(),
+        block
+            .evaluate(universe.read_ticket())
+            .unwrap()
+            .voxels()
+            .bounds(),
         GridAab::for_block(R8),
         "sanity check test data"
     );
 
-    assert_eq!(opacities(&test_block_mesh(block)), FaceMap::splat(false));
+    assert_eq!(
+        opacities(&test_block_mesh(&universe, block)),
+        FaceMap::splat(false)
+    );
 }
 
 #[test]
@@ -770,7 +785,7 @@ fn texture_clamp_coordinate_ordering() {
 
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);
-    let mesh = test_block_mesh(block);
+    let mesh = test_block_mesh(&universe, block);
     for (face, face_mesh) in mesh.all_face_meshes() {
         for vertex in face_mesh.vertices.iter() {
             let mut had_any_textured = false;
@@ -824,7 +839,7 @@ fn texture_coordinates_for_volumetric() {
         .unwrap()
         .build_into(&mut universe);
 
-    let mesh = test_block_mesh(block);
+    let mesh = test_block_mesh(&universe, block);
     dbg!(&mesh);
 
     assert!(mesh.texture_used.is_some());

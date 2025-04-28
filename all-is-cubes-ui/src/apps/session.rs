@@ -755,17 +755,14 @@ impl Shuttle {
         // Sync space_watch_state.ui.
         {
             // TODO: don't get() and clone every time, add a dirty flag
-            let space = self
-                .ui
-                .as_ref()
-                .and_then(|ui| ui.view().get().space.clone());
+            let (read_ticket, space) = match self.ui.as_ref() {
+                Some(ui) => (ui.read_ticket(), ui.view().get().space.clone()),
+                None => (ReadTicket::stub(), None),
+            };
             if space != self.space_watch_state.ui.space {
-                self.space_watch_state.ui = SpaceWatchState::new(
-                    self.game_universe.read_ticket(),
-                    space,
-                    &self.fluff_notifier,
-                )
-                .expect("TODO: decide how to handle error");
+                self.space_watch_state.ui =
+                    SpaceWatchState::new(read_ticket, space, &self.fluff_notifier)
+                        .expect("TODO: decide how to handle error");
             }
         }
     }

@@ -202,6 +202,11 @@ impl Vui {
         self.current_view.as_source()
     }
 
+    /// Returns a [`ReadTicket`] for use with the space handle in [`Self::view()`].
+    pub fn read_ticket(&self) -> ReadTicket<'_> {
+        self.universe.read_ticket()
+    }
+
     /// Returns whether the input/output mechanisms for this UI should direct input to the UI
     /// rather than gameplay controls. That is: disable mouselook and direct typing to text input.
     //---

@@ -64,7 +64,7 @@ fn voxel_opacity_mask_not_set_with_voxel_colors() {
         .unwrap()
         .build_into(&mut universe);
 
-    let mesh = test_block_mesh(block);
+    let mesh = test_block_mesh(&universe, block);
     // Check our setup is correct: the mesh has only vertex colors.
     assert!(!mesh.is_empty());
     assert_eq!(
