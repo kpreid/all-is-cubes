@@ -74,7 +74,7 @@ impl TooltipState {
     /// Advances time and returns the string that should be newly written to the screen, if different than the previous call.
     fn step(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        world_read_ticket: ReadTicket<'_>,
         hud_blocks: &HudBlocks,
         tick: Tick,
     ) -> &TooltipContents {
@@ -90,14 +90,18 @@ impl TooltipState {
             self.dirty_inventory = false;
 
             if let Some(character_handle) = &self.character {
-                let character = character_handle.read(read_ticket).unwrap();
+                let character = character_handle.read(world_read_ticket).unwrap();
                 let selected_slot = character
                     .selected_slots()
                     .get(1)
                     .copied()
                     .unwrap_or(inv::Ix::MAX);
                 if let Some(tool) = character.inventory().get(selected_slot).cloned() {
-                    let new_text = match tool.icon(&hud_blocks.icons).evaluate(read_ticket).ok() {
+                    let new_text = match tool
+                        .icon(&hud_blocks.icons)
+                        .evaluate(world_read_ticket)
+                        .ok()
+                    {
                         Some(ev_block) => ev_block.attributes().display_name.clone(),
                         None => literal!(""),
                     };

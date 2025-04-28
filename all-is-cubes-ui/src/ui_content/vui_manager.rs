@@ -393,13 +393,26 @@ impl Vui {
     }
 
     /// Enter some kind of debug view. Not yet defined for the long run exactly what that is.
-    pub(crate) fn enter_debug(&mut self, cursor: &Cursor) {
+    pub(crate) fn enter_debug(&mut self, read_ticket: ReadTicket<'_>, cursor: &Cursor) {
+        // TODO(read_ticket): kludge; perhaps instead the cursor information provided should
+        // include which layer's universe it came from.
+        // (Note that the caller can't supply this read ticket selection because it would be a
+        // borrow conflict.)
+        // This is probably something that will be easier to fix in the shiny ECS future that
+        // read_ticket is supposed to be an interim migration mechanism for.
+        let read_ticket = if cursor.space().universe_id() == Some(self.universe.universe_id()) {
+            self.universe.read_ticket()
+        } else {
+            read_ticket
+        };
+        let content = EphemeralOpaque::new(Arc::new(crate::editor::inspect_block_at_cursor(
+            read_ticket,
+            &self.hud_inputs,
+            cursor,
+        )));
         self.set_state(VuiPageState::Dump {
             previous: self.state.get(),
-            content: EphemeralOpaque::new(Arc::new(crate::editor::inspect_block_at_cursor(
-                &self.hud_inputs,
-                cursor,
-            ))),
+            content,
         });
     }
 

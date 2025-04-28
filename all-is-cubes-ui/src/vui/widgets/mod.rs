@@ -66,6 +66,8 @@ impl vui::WidgetController for OneshotController {
 }
 
 /// A block may act as a 1×1×1 non-interactive widget.
+///
+/// Note that this does not quote the block.
 impl vui::Widget for Block {
     fn controller(self: Arc<Self>, grant: &vui::LayoutGrant) -> Box<dyn vui::WidgetController> {
         OneshotController::new(if let Some(cube) = grant.shrink_to_cube() {

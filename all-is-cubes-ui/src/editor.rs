@@ -10,7 +10,7 @@ use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::math::Face6;
-use all_is_cubes::universe::Handle;
+use all_is_cubes::universe::{Handle, ReadTicket};
 
 use crate::ui_content::hud::HudInputs;
 use crate::ui_content::pages::back_button;
@@ -18,6 +18,7 @@ use crate::vui::parts::paragraph;
 use crate::vui::{self, widgets};
 
 pub fn inspect_block_at_cursor(
+    read_ticket: ReadTicket<'_>,
     inputs: &HudInputs, // TODO: need this for the back button only ... feels wrong
     cursor: &Cursor,
 ) -> vui::Page {
@@ -34,7 +35,7 @@ pub fn inspect_block_at_cursor(
                         direction: Face6::NY,
                         children: vec![
                             vui::leaf_widget(widgets::Label::new(literal!("Definition"))),
-                            inspect_block_definition(&hit.block),
+                            inspect_block_definition(read_ticket, &hit.block),
                         ],
                     }),
                     inspect_evaluated(&hit.evaluated),
@@ -51,11 +52,11 @@ pub fn inspect_block_at_cursor(
     )
 }
 
-fn inspect_block_definition(block: &Block) -> vui::WidgetTree {
+fn inspect_block_definition(read_ticket: ReadTicket<'_>, block: &Block) -> vui::WidgetTree {
     let mut stack = Vec::new();
-    stack.push(inspect_primitive(block.primitive()));
+    stack.push(inspect_primitive(read_ticket, block.primitive()));
     for i in 0..block.modifiers().len() {
-        stack.push(inspect_modifier(block, i));
+        stack.push(inspect_modifier(read_ticket, block, i));
     }
     Arc::new(vui::LayoutTree::Stack {
         direction: Face6::NY,
@@ -63,7 +64,7 @@ fn inspect_block_definition(block: &Block) -> vui::WidgetTree {
     })
 }
 
-fn inspect_primitive(primitive: &block::Primitive) -> vui::WidgetTree {
+fn inspect_primitive(read_ticket: ReadTicket<'_>, primitive: &block::Primitive) -> vui::WidgetTree {
     let (name, details): (ArcStr, vui::WidgetTree) = match primitive {
         block::Primitive::Indirect(block_def) => (literal!("Indirect"), inspect_handle(block_def)),
         block::Primitive::Atom(block::Atom {
@@ -122,9 +123,10 @@ fn inspect_primitive(primitive: &block::Primitive) -> vui::WidgetTree {
             Arc::new(vui::LayoutTree::Stack {
                 direction: Face6::PX,
                 children: vec![
-                    vui::leaf_widget(
-                        Block::from_primitive(primitive.clone()).with_modifier(block::Quote::new()),
-                    ),
+                    vui::leaf_widget(vui::quote_and_snapshot_block(
+                        read_ticket,
+                        &Block::from_primitive(primitive.clone()),
+                    )),
                     vui::leaf_widget(widgets::Label::new(name)),
                 ],
             }),
@@ -136,7 +138,11 @@ fn inspect_primitive(primitive: &block::Primitive) -> vui::WidgetTree {
     })
 }
 
-fn inspect_modifier(block: &Block, modifier_index: usize) -> vui::WidgetTree {
+fn inspect_modifier(
+    read_ticket: ReadTicket<'_>,
+    block: &Block,
+    modifier_index: usize,
+) -> vui::WidgetTree {
     let modifier = &block.modifiers()[modifier_index];
 
     let mut block_up_to_this = block.clone();
@@ -164,7 +170,7 @@ fn inspect_modifier(block: &Block, modifier_index: usize) -> vui::WidgetTree {
             Arc::new(vui::LayoutTree::Stack {
                 direction: Face6::NY,
                 children: vec![
-                    inspect_block_definition(source),
+                    inspect_block_definition(read_ticket, source),
                     paragraph(arcstr::format!(
                         "\
                         Operator: {operator:?}\n\
@@ -217,7 +223,10 @@ fn inspect_modifier(block: &Block, modifier_index: usize) -> vui::WidgetTree {
             Arc::new(vui::LayoutTree::Stack {
                 direction: Face6::PX,
                 children: vec![
-                    vui::leaf_widget(block_up_to_this.with_modifier(block::Quote::new())),
+                    vui::leaf_widget(vui::quote_and_snapshot_block(
+                        read_ticket,
+                        &block_up_to_this.with_modifier(block::Quote::new()),
+                    )),
                     vui::leaf_widget(widgets::Label::new(name)),
                 ],
             }),

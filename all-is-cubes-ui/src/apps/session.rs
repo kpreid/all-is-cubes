@@ -452,7 +452,7 @@ impl<I: time::Instant> Session<I> {
                         let shuttle = self.shuttle_mut();
                         if let Some(ui) = &mut shuttle.ui {
                             if let Some(cursor) = &shuttle.cursor_result {
-                                ui.enter_debug(cursor);
+                                ui.enter_debug(shuttle.game_universe.read_ticket(), cursor);
                             } else {
                                 // TODO: not actually a click
                                 ui.show_click_result(usize::MAX, Err(ToolError::NothingSelected));

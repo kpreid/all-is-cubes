@@ -152,13 +152,12 @@ impl ToolbarController {
             let info_cube = icon_cube + GridVector::new(-1, 0, 0);
 
             // Draw icon
-            txn.merge_from(
-                CubeTransaction::replacing(
-                    None,
-                    Some(stack.icon(&self.definition.hud_blocks.icons).into_owned()),
-                )
-                .at(icon_cube),
-            )?;
+            // TODO(read_ticket): migrate UI data sources such as this to where they can get a proper ticket
+            let icon_block = vui::quote_and_snapshot_block(
+                ReadTicket::new(),
+                &stack.icon(&self.definition.hud_blocks.icons),
+            );
+            txn.merge_from(CubeTransaction::replacing(None, Some(icon_block)).at(icon_cube))?;
 
             // Draw stack count text
             txn.merge_from(
