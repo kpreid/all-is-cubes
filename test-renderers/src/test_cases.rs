@@ -23,7 +23,7 @@ use all_is_cubes::universe::{Handle, HandleError, Universe, UniverseTransaction}
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{UniverseTemplate, make_some_voxel_blocks, palette};
 use all_is_cubes_render::camera::{
-    AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, LightingOption,
+    AntialiasingOption, ExposureOption, FogOption, GraphicsOptions, Layers, LightingOption,
     StandardCameras, ToneMappingOperator, TransparencyOption, UiViewState, ViewTransform, Viewport,
 };
 use all_is_cubes_render::{Flaws, RenderError};
@@ -236,7 +236,7 @@ async fn cursor_basic(mut context: RenderTestContext) {
         COMMON_VIEWPORT,
         &universe,
     );
-    let cursor = cameras.project_cursor(universe.read_ticket(), Point2D::origin());
+    let cursor = cameras.project_cursor(Layers::splat(universe.read_ticket()), Point2D::origin());
     let overlays = Overlays {
         cursor: cursor.as_ref(),
         info_text: None,
@@ -392,7 +392,9 @@ async fn error_character_gone(context: RenderTestContext) {
     let mut renderer = context.renderer(&universe);
 
     // Run a first render because this test is about what happens afterward
-    renderer.update(universe.read_ticket(), None).unwrap();
+    renderer
+        .update(Layers::splat(universe.read_ticket()), None)
+        .unwrap();
     let _ = renderer.draw("").await.unwrap();
 
     UniverseTransaction::delete(character_handle)
@@ -402,7 +404,7 @@ async fn error_character_gone(context: RenderTestContext) {
         .unwrap();
 
     // Updating may fail, or it may succeed because there were no change notifications.
-    match renderer.update(universe.read_ticket(), None) {
+    match renderer.update(Layers::splat(universe.read_ticket()), None) {
         Ok(()) => {}
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
@@ -434,7 +436,7 @@ async fn error_character_unavailable(context: RenderTestContext) {
         .execute(&mut universe, &mut transaction::no_outputs)
         .unwrap();
 
-    match renderer.update(universe.read_ticket(), None) {
+    match renderer.update(Layers::splat(universe.read_ticket()), None) {
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from update(): {res:?}"),
@@ -476,7 +478,7 @@ async fn follow_character_change(context: RenderTestContext) {
     let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
     let character_cell = listen::Cell::new(Some(c1));
     let cameras: StandardCameras = StandardCameras::new(
-        universe.read_ticket(),
+        Layers::splat(universe.read_ticket()),
         listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         listen::constant(COMMON_VIEWPORT),
         character_cell.as_source(),
@@ -485,7 +487,9 @@ async fn follow_character_change(context: RenderTestContext) {
     let mut renderer = context.renderer(cameras);
 
     // Draw the first character
-    renderer.update(universe.read_ticket(), None).unwrap();
+    renderer
+        .update(Layers::splat(universe.read_ticket()), None)
+        .unwrap();
     let image1 = renderer.draw("").await.unwrap();
 
     // Don't assert if they would fail because the renderer is stubbed
@@ -502,7 +506,9 @@ async fn follow_character_change(context: RenderTestContext) {
 
     // Switch characters and draw the second -- the resulting sky color should be from it
     character_cell.set(Some(c2));
-    renderer.update(universe.read_ticket(), None).unwrap();
+    renderer
+        .update(Layers::splat(universe.read_ticket()), None)
+        .unwrap();
     let image2 = renderer.draw("").await.unwrap();
 
     assert_eq!(
@@ -538,7 +544,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
 
     let options_cell = listen::Cell::new(Arc::new(options_1));
     let cameras: StandardCameras = StandardCameras::new(
-        universe.read_ticket(),
+        Layers::splat(universe.read_ticket()),
         options_cell.as_source(),
         listen::constant(COMMON_VIEWPORT),
         listen::constant(universe.get_default_character()),
@@ -802,7 +808,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     options.show_ui = show_ui;
     let ui_space = ui_space(&mut universe);
     let cameras: StandardCameras = StandardCameras::new(
-        universe.read_ticket(),
+        Layers::splat(universe.read_ticket()),
         listen::constant(Arc::new(options.clone())),
         listen::constant(COMMON_VIEWPORT),
         listen::constant(universe.get_default_character()),
@@ -851,7 +857,7 @@ async fn layers_ui_only(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let ui_space = ui_space(&mut universe);
     let cameras: StandardCameras = StandardCameras::new(
-        universe.read_ticket(),
+        Layers::splat(universe.read_ticket()),
         listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         listen::constant(COMMON_VIEWPORT),
         listen::constant(None),
@@ -1058,7 +1064,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let zero = Viewport::with_scale(1.00, [0, 0]);
     let viewport_cell = listen::Cell::new(zero);
     let cameras: StandardCameras = StandardCameras::new(
-        universe.read_ticket(),
+        Layers::splat(universe.read_ticket()),
         listen::constant(Arc::new(GraphicsOptions::default())),
         viewport_cell.as_source(),
         listen::constant(universe.get_default_character()),
@@ -1073,7 +1079,9 @@ async fn viewport_zero(mut context: RenderTestContext) {
 
     // Initially zero viewport
     {
-        renderer.update(universe.read_ticket(), None).unwrap();
+        renderer
+            .update(Layers::splat(universe.read_ticket()), None)
+            .unwrap();
         let zero_image = renderer
             .draw(overlays.info_text.as_ref().unwrap())
             .await
@@ -1089,7 +1097,9 @@ async fn viewport_zero(mut context: RenderTestContext) {
     // Now try *resizing to* zero and back
     {
         viewport_cell.set(zero);
-        renderer.update(universe.read_ticket(), None).unwrap();
+        renderer
+            .update(Layers::splat(universe.read_ticket()), None)
+            .unwrap();
         let zero_image = renderer
             .draw(overlays.info_text.as_ref().unwrap())
             .await

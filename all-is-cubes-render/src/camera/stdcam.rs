@@ -342,14 +342,17 @@ impl StandardCameras {
     /// up to date with game state.
     pub fn project_cursor(
         &self,
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         ndc_pos: NdcPoint2,
     ) -> Option<Cursor> {
         if let Some(ui_space_handle) = self.ui_space.as_ref() {
             let ray = self.cameras.ui.project_ndc_into_world(ndc_pos);
-            if let Some(cursor) =
-                cursor_raycast(read_ticket, ray, ui_space_handle, FreeCoordinate::INFINITY)
-            {
+            if let Some(cursor) = cursor_raycast(
+                read_tickets.ui,
+                ray,
+                ui_space_handle,
+                FreeCoordinate::INFINITY,
+            ) {
                 return Some(cursor);
             }
         }
@@ -359,9 +362,9 @@ impl StandardCameras {
             // TODO: maximum distance should be determined by character/universe parameters
             // instead of hardcoded
             if let Some(cursor) = cursor_raycast(
-                read_ticket,
+                read_tickets.world,
                 ray,
-                &character_handle.read(read_ticket).unwrap().space,
+                &character_handle.read(read_tickets.world).unwrap().space,
                 6.0,
             ) {
                 return Some(cursor);
