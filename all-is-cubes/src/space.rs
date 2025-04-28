@@ -611,9 +611,12 @@ impl Space {
         deadline: time::Deadline<I>,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         // Process changed block definitions.
+        // TODO(read_ticket): We are using the unrestricted ReadTicket::new() here because,
+        // currently, the UI system grabs blocks from other universes. We need to stop doing that,
+        // and replace it with explicit copying of some form.
         let evaluations = self
             .palette
-            .step::<I>(read_ticket, &mut self.change_notifier.buffer());
+            .step::<I>(ReadTicket::new(), &mut self.change_notifier.buffer());
 
         // Process cubes_wanting_ticks.
         let start_cube_ticks = I::now();
