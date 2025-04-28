@@ -15,8 +15,7 @@ use itertools::Itertools;
 
 use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes::util::{ConciseDebug, Refmt as _};
-use all_is_cubes_render::Flaws;
-use all_is_cubes_render::{HeadlessRenderer, Rendering};
+use all_is_cubes_render::{Flaws, HeadlessRenderer, Rendering, camera::Layers};
 
 use crate::{
     ComparisonOutcome, ComparisonRecord, ImageId, Overlays, RendererFactory, RendererId, Scene,
@@ -125,9 +124,11 @@ impl RenderTestContext {
     ) {
         renderer
             .update(
-                self.universe
-                    .as_ref()
-                    .map_or_else(ReadTicket::new, |u| u.read_ticket()),
+                Layers::splat(
+                    self.universe
+                        .as_ref()
+                        .map_or_else(ReadTicket::new, |u| u.read_ticket()),
+                ),
                 overlays.cursor,
             )
             .expect("renderer update() failed");

@@ -14,7 +14,7 @@ use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_gpu::in_wgpu::init;
 use all_is_cubes_render::HeadlessRenderer as _;
-use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
+use all_is_cubes_render::camera::{GraphicsOptions, Layers, StandardCameras, Viewport};
 use all_is_cubes_wasm::AdaptedInstant as Instant;
 
 #[wasm_bindgen_test]
@@ -54,7 +54,9 @@ async fn renderer_test() {
             .await
             .unwrap()
             .build(cameras.clone());
-    renderer.update(universe.read_ticket(), None).unwrap();
+    renderer
+        .update(Layers::splat(universe.read_ticket()), None)
+        .unwrap();
     let image = renderer.draw("").await.unwrap();
 
     // TODO: hook up a full image comparison here

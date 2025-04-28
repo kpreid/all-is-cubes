@@ -152,8 +152,8 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     /// TODO: This is a kludge which ought to be replaced with some architecture that
     /// doesn't require a very specific "do this before this"...
     #[doc(hidden)]
-    pub fn update_world_camera(&mut self, read_ticket: ReadTicket<'_>) {
-        self.everything.cameras.update(read_ticket);
+    pub fn update_world_camera(&mut self, read_tickets: Layers<ReadTicket<'_>>) {
+        self.everything.cameras.update(read_tickets);
     }
 
     /// Returns the [`StandardCameras`] which control what is rendered by this renderer.
@@ -165,7 +165,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     /// the given cursor and overlay text.
     pub fn render_frame(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
         info_text_fn: impl FnOnce(&RenderInfo) -> String,
@@ -173,7 +173,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
     ) -> Result<RenderInfo, RenderError> {
         let update_info =
             self.everything
-                .update(read_ticket, &self.queue, cursor_result, frame_budget)?;
+                .update(read_tickets, &self.queue, cursor_result, frame_budget)?;
 
         if self.viewport_dirty.get_and_clear() {
             // Test because wgpu insists on nonzero values -- we'd rather be inconsistent

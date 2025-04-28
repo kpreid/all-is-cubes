@@ -4,7 +4,6 @@ use std::mem;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use all_is_cubes::universe::ReadTicket;
 use anyhow::Context as _;
 use winit::event::{DeviceEvent, ElementState, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
@@ -12,9 +11,10 @@ use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen;
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_gpu::FrameBudget;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
-use all_is_cubes_render::camera::{self, StandardCameras, Viewport};
+use all_is_cubes_render::camera::{self, Layers, StandardCameras, Viewport};
 
 use all_is_cubes_ui::apps::InputProcessor;
 
@@ -413,7 +413,7 @@ fn handle_window_event<Ren: RendererToWinit>(
 
             dsession
                 .renderer
-                .update_world_camera(dsession.session.universe().read_ticket());
+                .update_world_camera(dsession.session.read_tickets());
             dsession.session.update_cursor(dsession.renderer.cameras());
             dsession
                 .window
@@ -545,7 +545,7 @@ fn handle_window_event<Ren: RendererToWinit>(
 #[expect(clippy::module_name_repetitions)]
 pub trait RendererToWinit: crate::glue::Renderer + 'static {
     #[doc(hidden)]
-    fn update_world_camera(&mut self, read_ticket: ReadTicket<'_>);
+    fn update_world_camera(&mut self, read_tickets: Layers<ReadTicket<'_>>);
     #[doc(hidden)]
     fn cameras(&self) -> &StandardCameras;
     #[doc(hidden)]
@@ -553,8 +553,8 @@ pub trait RendererToWinit: crate::glue::Renderer + 'static {
 }
 
 impl RendererToWinit for SurfaceRenderer<Instant> {
-    fn update_world_camera(&mut self, read_ticket: ReadTicket<'_>) {
-        self.update_world_camera(read_ticket)
+    fn update_world_camera(&mut self, read_tickets: Layers<ReadTicket<'_>>) {
+        self.update_world_camera(read_tickets)
     }
 
     fn cameras(&self) -> &StandardCameras {
@@ -574,7 +574,7 @@ impl RendererToWinit for SurfaceRenderer<Instant> {
 
         let _info = self
             .render_frame(
-                session.universe().read_ticket(),
+                session.read_tickets(),
                 session.cursor_result(),
                 &frame_budget,
                 |render_info| format!("{}", session.info_text(render_info)),

@@ -16,7 +16,7 @@ use all_is_cubes::transaction::Transaction;
 use all_is_cubes::universe::{self, Universe};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::HeadlessRenderer;
-use all_is_cubes_render::camera::{GraphicsOptions, StandardCameras, Viewport};
+use all_is_cubes_render::camera::{GraphicsOptions, Layers, StandardCameras, Viewport};
 
 use all_is_cubes_gpu::in_wgpu::{LightChunk, LightTexture, headless, init};
 
@@ -54,7 +54,7 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
             renderer
                 .lock()
                 .unwrap()
-                .update(universe.read_ticket(), None)
+                .update(Layers::splat(universe.read_ticket()), None)
                 .unwrap();
         });
     });
@@ -116,7 +116,9 @@ async fn create_updated_renderer(
             &universe,
         ));
 
-    renderer.update(universe.read_ticket(), None).unwrap();
+    renderer
+        .update(Layers::splat(universe.read_ticket()), None)
+        .unwrap();
 
     // Arc<Mutex< needed to satisfy borrow checking of the benchmark closure
     (universe, space, Arc::new(Mutex::new(renderer)))

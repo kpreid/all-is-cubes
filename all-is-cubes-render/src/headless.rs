@@ -8,7 +8,7 @@ use embedded_graphics::text::{Baseline, Text};
 
 use all_is_cubes::character::Cursor;
 
-use crate::camera::ImageSize;
+use crate::camera::{ImageSize, Layers};
 use crate::{Flaws, RenderError};
 
 /// Rendering a previously-specified scene to an in-memory image.
@@ -25,7 +25,7 @@ pub trait HeadlessRenderer {
     /// call.
     fn update(
         &mut self,
-        read_ticket: all_is_cubes::universe::ReadTicket<'_>,
+        read_tickets: Layers<all_is_cubes::universe::ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError>;
 

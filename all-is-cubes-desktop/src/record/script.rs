@@ -17,7 +17,10 @@ use all_is_cubes::physics::BodyTransaction;
 use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::{behavior, universe};
-use all_is_cubes_render::{Flaws, camera::StandardCameras};
+use all_is_cubes_render::{
+    Flaws,
+    camera::{Layers, StandardCameras},
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -205,15 +208,15 @@ impl ScriptRecorder {
 
     pub(crate) fn capture_frame(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         this_frame_number: usize,
         time_since_start: Duration,
     ) {
-        self.cameras.update(read_ticket);
+        self.cameras.update(read_tickets);
         let Some(character) = self.cameras.character() else {
             return;
         };
-        let character = character.read(read_ticket).unwrap();
+        let character = character.read(read_tickets.world).unwrap();
         self.script.add_frame(
             time_since_start,
             character.body.position().cast(),

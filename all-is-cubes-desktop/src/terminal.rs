@@ -286,7 +286,7 @@ fn run(
         if dsession.session.frame_clock.should_draw() {
             // TODO: this is the only reason .cameras exists
             let c = &mut dsession.renderer.cameras;
-            c.update(dsession.session.universe().read_ticket());
+            c.update(dsession.session.read_tickets());
             dsession.session.update_cursor(&*c);
 
             dsession
@@ -305,7 +305,7 @@ impl TerminalRenderer {
         // Fetch and update one of our recirculating renderers.
         let mut renderer = self.buffer_reuse_out.recv().unwrap();
         renderer
-            .update(session.universe().read_ticket(), session.cursor_result())
+            .update(session.read_tickets(), session.cursor_result())
             .unwrap();
 
         match self.render_pipe_in.try_send(FrameInput {

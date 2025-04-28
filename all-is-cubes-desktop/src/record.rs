@@ -12,7 +12,7 @@ use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_port::gltf::{GltfDataDestination, GltfWriter};
 use all_is_cubes_port::{ExportSet, Format};
 use all_is_cubes_render::Flaws;
-use all_is_cubes_render::camera::StandardCameras;
+use all_is_cubes_render::camera::{Layers, StandardCameras};
 use all_is_cubes_render::raytracer::RtRenderer;
 use all_is_cubes_ui::apps::MainTaskContext;
 
@@ -161,7 +161,10 @@ impl Recorder {
                 RecorderInner::Mesh(write_gltf::MeshRecorder::new(cameras, tex, scene_sender))
             }
             RecordFormat::Export(export_format) => {
-                cameras.update(universe.read_ticket());
+                cameras.update(Layers {
+                    world: universe.read_ticket(),
+                    ui: ReadTicket::stub(),
+                });
 
                 // TODO: better rule than this special case. AicJson doesn't strictly require
                 // all of the universe, but it does require the transitive closure, and this is the
@@ -211,7 +214,15 @@ impl Recorder {
                     Box::new(|v| v),
                     listen::constant(Arc::new(())),
                 );
-                renderer.update(read_ticket, None).unwrap();
+                renderer
+                    .update(
+                        Layers {
+                            world: read_ticket,
+                            ui: ReadTicket::stub(),
+                        },
+                        None,
+                    )
+                    .unwrap();
 
                 // TODO: instead of panic on send failure, log the problem
                 rec.scene_sender

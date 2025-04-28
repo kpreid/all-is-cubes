@@ -89,14 +89,14 @@ where
     /// not `async`).
     pub fn update(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<bool, RenderError> {
         let mut anything_changed = false;
 
         // TODO: raytracer needs to implement drawing the cursor
         self.had_cursor = cursor.is_some();
-        anything_changed |= self.cameras.update(read_ticket);
+        anything_changed |= self.cameras.update(read_tickets);
         self.custom_options_cache = self.custom_options.get();
 
         fn sync_space<D>(
@@ -135,7 +135,7 @@ where
             Ok(())
         }
         sync_space(
-            read_ticket,
+            read_tickets.world,
             &mut self.rts.world,
             Option::as_ref(&self.cameras.world_space().get()),
             self.cameras.graphics_options_source(),
@@ -143,7 +143,7 @@ where
             &mut anything_changed,
         )?;
         sync_space(
-            read_ticket,
+            read_tickets.ui,
             &mut self.rts.ui,
             self.cameras.ui_space(),
             self.ui_graphics_options.clone(),
@@ -314,10 +314,10 @@ where
 impl HeadlessRenderer for RtRenderer<()> {
     fn update(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
-        let _anything_changed = self.update(read_ticket, cursor)?;
+        let _anything_changed = self.update(read_tickets, cursor)?;
         Ok(())
     }
 
@@ -706,7 +706,15 @@ mod tests {
 
         // See what options value is used.
         let mut result = [CatchCustomOptions::default()];
-        renderer.update(universe.read_ticket(), None).unwrap();
+        renderer
+            .update(
+                Layers {
+                    world: universe.read_ticket(),
+                    ui: ReadTicket::stub(),
+                },
+                None,
+            )
+            .unwrap();
         renderer.draw(|_| String::new(), identity, &mut result);
 
         assert_eq!(

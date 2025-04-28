@@ -20,7 +20,9 @@ use all_is_cubes::listen;
 use all_is_cubes::math::{Rgba, VectorOps as _};
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::RenderError;
-use all_is_cubes_render::camera::{Camera, ImagePixel, StandardCameras, Viewport, area_usize};
+use all_is_cubes_render::camera::{
+    Camera, ImagePixel, Layers, StandardCameras, Viewport, area_usize,
+};
 use all_is_cubes_render::raytracer::{ColorBuf, RtRenderer};
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
@@ -91,13 +93,13 @@ impl RaytraceToTexture {
     /// Copy [`Space`] data from the camera spaces, and camera state from the [`StandardCameras`].
     pub fn update(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
         self.inner
             .lock()
             .unwrap()
-            .update_inputs(read_ticket, cursor)
+            .update_inputs(read_tickets, cursor)
     }
 
     /// Trace a frame's worth of rays (which may be less than the scene) and update the texture.
@@ -144,10 +146,10 @@ impl RaytraceToTexture {
 impl Inner {
     fn update_inputs(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
-        if self.rtr.update(read_ticket, cursor)? {
+        if self.rtr.update(read_tickets, cursor)? {
             self.dirty();
         }
         Ok(())

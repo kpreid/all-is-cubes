@@ -12,7 +12,8 @@ use all_is_cubes::listen;
 use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_render::camera::{
-    GraphicsOptions, LightingOption, StandardCameras, TransparencyOption, UiViewState, Viewport,
+    GraphicsOptions, Layers, LightingOption, StandardCameras, TransparencyOption, UiViewState,
+    Viewport,
 };
 use all_is_cubes_render::raytracer::RtRenderer;
 
@@ -46,7 +47,7 @@ impl TestData {
         options_fn(&mut options);
         let mut renderer = RtRenderer::new(
             StandardCameras::new(
-                self.universe.read_ticket(),
+                Layers::splat(self.universe.read_ticket()),
                 listen::constant(Arc::new(options)),
                 listen::constant(Viewport::with_scale(1.0, [64, 16])),
                 listen::constant(Some(self.character.clone())),
@@ -55,7 +56,9 @@ impl TestData {
             Box::new(core::convert::identity),
             listen::constant(Arc::new(())),
         );
-        renderer.update(self.universe.read_ticket(), None).unwrap();
+        renderer
+            .update(Layers::splat(self.universe.read_ticket()), None)
+            .unwrap();
         renderer
     }
 

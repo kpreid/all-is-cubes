@@ -405,7 +405,7 @@ impl WebSession {
             }
             match &mut inner.renderer {
                 WebRenderer::Wgpu(renderer) => {
-                    renderer.update_world_camera(inner.session.universe().read_ticket());
+                    renderer.update_world_camera(inner.session.read_tickets());
                     inner.session.update_cursor(renderer.cameras());
                 }
             }
@@ -429,7 +429,7 @@ impl WebSession {
                     // note: info text is HTML on web, so no string passed here
                     renderer
                         .render_frame(
-                            inner.session.universe().read_ticket(),
+                            inner.session.read_tickets(),
                             inner.session.cursor_result(),
                             &FrameBudget::SIXTY_FPS, // TODO: try to estimate real refresh rate
                             |_| String::new(),

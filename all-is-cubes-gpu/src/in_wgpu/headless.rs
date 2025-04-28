@@ -10,7 +10,7 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::listen;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
-use all_is_cubes_render::camera::{StandardCameras, Viewport};
+use all_is_cubes_render::camera::{Layers, StandardCameras, Viewport};
 use all_is_cubes_render::{Flaws, HeadlessRenderer, RenderError, Rendering};
 
 use crate::common::{AdaptedInstant, FrameBudget};
@@ -131,11 +131,11 @@ impl Renderer {
 impl HeadlessRenderer for Renderer {
     fn update(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
         // Note: this delegation is the simplest ways to
-        self.inner.update(read_ticket, cursor)
+        self.inner.update(read_tickets, cursor)
     }
 
     fn draw<'a>(&'a mut self, info_text: &'a str) -> BoxFuture<'a, Result<Rendering, RenderError>> {
@@ -149,11 +149,11 @@ impl HeadlessRenderer for Renderer {
 impl RendererImpl {
     fn update(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
         let info = self.everything.update(
-            read_ticket,
+            read_tickets,
             &self.queue,
             cursor,
             &FrameBudget::PRACTICALLY_INFINITE,

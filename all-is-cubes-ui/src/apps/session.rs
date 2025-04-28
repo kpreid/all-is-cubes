@@ -275,6 +275,12 @@ impl<I: time::Instant> Session<I> {
         self.shuttle().ui_view()
     }
 
+    /// Returns [`ReadTicket`]s for the current game universe and UI universe, suitable for passing to
+    /// a renderer.
+    pub fn read_tickets(&self) -> Layers<ReadTicket<'_>> {
+        self.shuttle().read_tickets()
+    }
+
     /// Allows reading, and observing changes to, the current graphics options.
     pub fn graphics_options(&self) -> listen::DynSource<Arc<GraphicsOptions>> {
         self.shuttle().settings.as_source()
@@ -291,7 +297,7 @@ impl<I: time::Instant> Session<I> {
     /// including following changes to the current character or universe.
     pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
         StandardCameras::new(
-            self.shuttle().game_universe.read_ticket(),
+            self.read_tickets(),
             self.graphics_options(),
             viewport_source,
             self.character(),
@@ -766,6 +772,16 @@ impl Shuttle {
             }
         }
     }
+
+    fn read_tickets(&self) -> Layers<ReadTicket<'_>> {
+        Layers {
+            world: self.game_universe.read_ticket(),
+            ui: match &self.ui {
+                Some(ui) => ui.read_ticket(),
+                None => ReadTicket::stub(),
+            },
+        }
+    }
 }
 
 /// Builder for providing the configuration of a new [`Session`].
@@ -1159,7 +1175,7 @@ impl MainTaskContext {
     pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
         self.with_ref(|shuttle| {
             StandardCameras::new(
-                shuttle.game_universe.read_ticket(),
+                shuttle.read_tickets(),
                 shuttle.settings.as_source(),
                 viewport_source,
                 shuttle.game_character.as_source(),
@@ -1171,6 +1187,11 @@ impl MainTaskContext {
     /// Provides a reference to the current game universe of this session.
     pub fn with_universe<R>(&self, f: impl FnOnce(&Universe) -> R) -> R {
         self.with_ref(|shuttle| f(&shuttle.game_universe))
+    }
+
+    /// Provides `ReadTicket`s for access to the game and UI universes.
+    pub fn with_read_tickets<R>(&self, f: impl FnOnce(Layers<ReadTicket<'_>>) -> R) -> R {
+        self.with_ref(|shuttle| f(shuttle.read_tickets()))
     }
 
     /// Replaces the game universe, such as for initial setup or because the player
@@ -1369,7 +1390,7 @@ mod tests {
                 ctx.set_universe(new_universe);
                 eprintln!("main task: have set new universe");
 
-                ctx.with_universe(|u| cameras.update(u.read_ticket()));
+                ctx.with_read_tickets(|read_tickets| cameras.update(read_tickets));
                 assert!(cameras.character().is_some(), "has character");
 
                 // Now try noticing steps

@@ -26,6 +26,17 @@ pub struct Layers<T> {
 }
 
 impl<T> Layers<T> {
+    /// Clone the given value for each layer.
+    pub fn splat(value: T) -> Self
+    where
+        T: Clone,
+    {
+        Layers {
+            world: value.clone(),
+            ui: value,
+        }
+    }
+
     // experimental API
     #[cfg(feature = "raytracer")]
     pub(crate) fn as_refs(&self) -> Layers<&T> {
@@ -104,7 +115,7 @@ impl StandardCameras {
     /// want to discourage use of this directly.
     #[doc(hidden)]
     pub fn new(
-        read_ticket: ReadTicket<'_>,
+        read_tickets: Layers<ReadTicket<'_>>,
         graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
         viewport_source: listen::DynSource<Viewport>,
         character_source: listen::DynSource<Option<Handle<Character>>>,
@@ -143,7 +154,7 @@ impl StandardCameras {
             viewport_source,
         };
 
-        new_self.update(read_ticket);
+        new_self.update(read_tickets);
         new_self
     }
 
@@ -154,7 +165,7 @@ impl StandardCameras {
         universe: &Universe,
     ) -> Self {
         Self::new(
-            ReadTicket::stub(),
+            Layers::splat(ReadTicket::stub()),
             listen::constant(Arc::new(graphics_options)),
             listen::constant(viewport),
             listen::constant(universe.get_default_character()),
@@ -170,7 +181,7 @@ impl StandardCameras {
     /// Returns whether any values actually changed.
     /// (This does not include tracking changes to space content — only which part of which spaces
     /// are being looked at.)
-    pub fn update(&mut self, read_ticket: ReadTicket<'_>) -> bool {
+    pub fn update(&mut self, read_tickets: Layers<ReadTicket<'_>>) -> bool {
         let mut anything_changed = false;
 
         let options_dirty = self.graphics_options_dirty.get_and_clear();
@@ -223,7 +234,7 @@ impl StandardCameras {
         }
 
         if let Some(character_handle) = &self.character {
-            match character_handle.read(read_ticket) {
+            match character_handle.read(read_tickets.world) {
                 Ok(character) => {
                     let view_transform = character.view();
                     if view_transform != self.cameras.world.view_transform() {
@@ -388,7 +399,7 @@ impl Clone for StandardCameras {
     /// the last updated camera state) is independent.
     fn clone(&self) -> Self {
         Self::new(
-            ReadTicket::new(), // TODO(read_ticket): need to either require one passed in, or figure out a way to not do any reads when cloning
+            Layers::splat(ReadTicket::new()), // TODO(read_ticket): need to either require one passed in, or figure out a way to not do any reads when cloning
             self.graphics_options.clone(),
             self.viewport_source.clone(),
             self.character_source.clone(),
@@ -442,7 +453,7 @@ mod tests {
     fn cameras_follow_character_and_world() {
         let character_cell = listen::Cell::new(None);
         let mut cameras = StandardCameras::new(
-            ReadTicket::new(),
+            Layers::splat(ReadTicket::new()),
             listen::constant(Arc::new(GraphicsOptions::default())),
             listen::constant(Viewport::ARBITRARY),
             character_cell.as_source(),
@@ -455,7 +466,7 @@ mod tests {
 
         // No redundant notification when world is absent
         {
-            let changed = cameras.update(ReadTicket::new());
+            let changed = cameras.update(Layers::splat(ReadTicket::new()));
             assert_eq!((changed, world_flag.get_and_clear()), (false, false));
         }
 
@@ -473,14 +484,20 @@ mod tests {
         // Now the world_source should be reporting the new space
         {
             assert!(!world_flag.get_and_clear());
-            let changed = cameras.update(universe.read_ticket());
+            let changed = cameras.update(Layers {
+                world: universe.read_ticket(),
+                ui: ReadTicket::stub(),
+            });
             assert_eq!((changed, world_flag.get_and_clear()), (true, true));
             assert_eq!(world_source.get().as_ref(), Some(&space_handle));
         }
 
         // No redundant notification when world is present
         {
-            let changed = cameras.update(universe.read_ticket());
+            let changed = cameras.update(Layers {
+                world: universe.read_ticket(),
+                ui: ReadTicket::stub(),
+            });
             assert_eq!((changed, world_flag.get_and_clear()), (false, false));
         }
 
@@ -491,7 +508,7 @@ mod tests {
     fn cameras_clone() {
         let options_cell = listen::Cell::new(Arc::new(GraphicsOptions::default()));
         let mut cameras = StandardCameras::new(
-            ReadTicket::new(),
+            Layers::splat(ReadTicket::new()),
             options_cell.as_source(),
             listen::constant(Viewport::ARBITRARY),
             listen::constant(None),
@@ -507,10 +524,10 @@ mod tests {
         // Each `StandardCameras` has independent updating from the same data sources.
         assert_eq!(cameras.cameras().world.options(), &default_o);
         assert_eq!(cameras2.cameras().world.options(), &default_o);
-        cameras.update(ReadTicket::new());
+        cameras.update(Layers::splat(ReadTicket::new()));
         assert_eq!(cameras.cameras().world.options(), &different_o);
         assert_eq!(cameras2.cameras().world.options(), &default_o);
-        cameras2.update(ReadTicket::new());
+        cameras2.update(Layers::splat(ReadTicket::new()));
         assert_eq!(cameras.cameras().world.options(), &different_o);
         assert_eq!(cameras2.cameras().world.options(), &different_o);
     }
