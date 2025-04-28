@@ -18,8 +18,8 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::time;
-use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{Handle, HandleError, ReadTicket, Universe, UniverseTransaction};
+use all_is_cubes::transaction::{self, Merge, Transaction as _};
+use all_is_cubes::universe::{Handle, HandleError, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{UniverseTemplate, make_some_voxel_blocks, palette};
 use all_is_cubes_render::camera::{
@@ -388,15 +388,16 @@ async fn error_character_gone(context: RenderTestContext) {
     space
         .set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
         .unwrap();
-    finish_universe_from_space(&mut universe, space);
+    let (space_handle, character_handle) = finish_universe_from_space(&mut universe, space);
     let mut renderer = context.renderer(&universe);
 
     // Run a first render because this test is about what happens afterward
     renderer.update(universe.read_ticket(), None).unwrap();
     let _ = renderer.draw("").await.unwrap();
 
-    let character_handle: Handle<Character> = universe.get(&"character".into()).unwrap();
     UniverseTransaction::delete(character_handle)
+        .merge(UniverseTransaction::delete(space_handle))
+        .unwrap()
         .execute(&mut universe, &mut transaction::no_outputs)
         .unwrap();
 
@@ -417,21 +418,23 @@ async fn error_character_gone(context: RenderTestContext) {
     }
 }
 
-/// Test what happens when the renderer's character goes away *before* the first frame.
+/// Test what happens when the renderer's character and space goes away *before* the first frame.
 async fn error_character_unavailable(context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut space = one_cube_space();
     space
         .set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
         .unwrap();
-    finish_universe_from_space(&mut universe, space);
+    let (space_handle, character_handle) = finish_universe_from_space(&mut universe, space);
     let mut renderer = context.renderer(&universe);
 
-    // The simplest way for the character to be unavailable is to drop the entire universe.
-    // TODO(read_ticket): when read tickets are strict, we will need an alternative
-    drop(universe);
+    UniverseTransaction::delete(character_handle)
+        .merge(UniverseTransaction::delete(space_handle))
+        .unwrap()
+        .execute(&mut universe, &mut transaction::no_outputs)
+        .unwrap();
 
-    match renderer.update(ReadTicket::stub(), None) {
+    match renderer.update(universe.read_ticket(), None) {
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from update(): {res:?}"),
