@@ -1,9 +1,5 @@
 //! Tests for [`Block`] as a whole.
-//! The following modules also have their own tests:
-//!
-//! * [`super::attributes`]
-//! * [`super::builder`]
-//! * [`super::modifier`]
+//! Other submodules also have their own tests.
 
 use pretty_assertions::assert_eq;
 

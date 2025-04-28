@@ -175,8 +175,11 @@ impl Tool {
                         Primitive::Indirect(handle) => {
                             find_space(read_ticket, handle.read(read_ticket)?.block())
                         }
-                        Primitive::Atom(_) | Primitive::Air | Primitive::Text { .. } => Ok(None),
                         Primitive::Recur { space, .. } => Ok(Some(space.clone())),
+                        Primitive::Atom(_)
+                        | Primitive::Air
+                        | Primitive::Text { .. }
+                        | Primitive::Raw { .. } => Ok(None),
                     }
                 }
                 match find_space(input.read_ticket, &input.cursor()?.hit().block) {

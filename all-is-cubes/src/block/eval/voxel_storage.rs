@@ -345,6 +345,14 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
     }
 }
 
+impl crate::universe::VisitHandles for Evoxels {
+    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
+        // Currently there are never any handles in voxels, but that could someday change,
+        // so we offer this implementation to be prepared.
+        let _ = visitor;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -159,6 +159,19 @@ pub enum Primitive {
         /// the adjacent blocks' positions.
         offset: GridVector,
     },
+
+    /// Arbitrary block data.
+    ///
+    /// This variant is intended for internal use in special cases where block data must
+    /// be stored without containing any dependencies; in particular, in the user interface,
+    /// displaying a block originating from a different universe.
+    ///
+    /// It cannot be serialized.
+    #[doc(hidden)]
+    Raw {
+        attributes: BlockAttributes,
+        voxels: Evoxels,
+    },
 }
 
 /// Data of [`Primitive::Atom`]. The definition of a single [block](Block) that has uniform
@@ -734,6 +747,11 @@ impl Block {
             }
 
             Primitive::Text { ref text, offset } => text.evaluate(offset, filter)?,
+
+            Primitive::Raw {
+                ref attributes,
+                ref voxels,
+            } => MinEval::new(attributes.clone(), voxels.clone()),
         };
 
         #[cfg(debug_assertions)]
@@ -756,7 +774,10 @@ impl Block {
         match *self.primitive() {
             Primitive::Atom(Atom { color, .. }) => color,
             Primitive::Air => AIR_EVALUATED.color(),
-            Primitive::Indirect(_) | Primitive::Recur { .. } | Primitive::Text { .. } => {
+            Primitive::Indirect(_)
+            | Primitive::Recur { .. }
+            | Primitive::Text { .. }
+            | Primitive::Raw { .. } => {
                 panic!("Block::color not defined for non-atom blocks")
             }
         }
@@ -974,11 +995,12 @@ impl Primitive {
         Primitive::Atom(Atom::from_color(color))
     }
 
-    /// Returns whether this primitive would be changed at all by a [`Modifier::Rotate`].
+    /// Returns whether this primitive would be left unchanged by a [`Modifier::Rotate`].
     ///
     /// Note that this does not account for symmetry of the block’s evaluation; it only checks
     /// the primitive’s own data, and so answers whether this primitive is *always* symmetric
-    /// under all possible conditions of the rest of the universe.
+    /// under all possible conditions of the rest of the universe. That is, it does not look
+    /// through a `Primitive::Indirect` or `Primitive::Recur` to see the indirect data.
     pub(in crate::block) fn rotationally_symmetric(&self) -> bool {
         match self {
             Primitive::Indirect(_) => false, // could point to anything
@@ -986,6 +1008,7 @@ impl Primitive {
             Primitive::Recur { .. } => false, // could point to anything
             Primitive::Air => true,
             Primitive::Text { .. } => false, // always asymmetric unless it's trivial
+            Primitive::Raw { .. } => false,  // not worth implementing
         }
     }
 }
@@ -1025,6 +1048,13 @@ impl fmt::Debug for Primitive {
                 .field("offset", offset)
                 .field("text", text)
                 .finish(),
+            Self::Raw {
+                attributes,
+                voxels: _,
+            } => f
+                .debug_struct("Raw")
+                .field("attributes", attributes)
+                .finish_non_exhaustive(),
         }
     }
 }
@@ -1060,6 +1090,10 @@ impl VisitHandles for Primitive {
                 visitor.visit(space);
             }
             Primitive::Text { text, offset: _ } => text.visit_handles(visitor),
+            Primitive::Raw { attributes, voxels } => {
+                attributes.visit_handles(visitor);
+                voxels.visit_handles(visitor);
+            }
         }
     }
 }

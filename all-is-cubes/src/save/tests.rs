@@ -383,6 +383,16 @@ fn block_text_with_optional() {
 }
 
 #[test]
+fn block_raw_not_serializable() {
+    let error = to_value(Block::from_primitive(block::Primitive::Raw {
+        attributes: block::BlockAttributes::default(),
+        voxels: block::AIR_EVALUATED.voxels().clone(),
+    }))
+    .unwrap_err();
+    assert!(dbg!(error).to_string().contains("Primitive::Raw"));
+}
+
+#[test]
 fn block_with_modifiers() {
     assert_round_trip_value(
         &Block::builder()

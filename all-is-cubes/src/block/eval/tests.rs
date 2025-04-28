@@ -590,6 +590,40 @@ fn indirect_has_derived_value_cache_internally() {
     );
 }
 
+#[test]
+fn raw_primitive() {
+    let attributes = BlockAttributes {
+        display_name: arcstr::literal!("foo"),
+        ..Default::default()
+    };
+    let voxels = Evoxels::from_many(
+        R4,
+        Vol::repeat(
+            GridAab::for_block(R4),
+            Evoxel {
+                color: Rgba::WHITE,
+                ..Evoxel::AIR
+            },
+        ),
+    );
+    let block = Block::from_primitive(Primitive::Raw {
+        attributes: attributes.clone(),
+        voxels: voxels.clone(),
+    });
+    let e = block.evaluate(ReadTicket::stub()).unwrap();
+
+    assert_eq!(e.attributes(), &attributes);
+    assert_eq!(e.voxels(), &voxels);
+    assert_eq!(
+        e.cost,
+        Cost {
+            components: 1,
+            voxels: 0,
+            recursion: 0,
+        }
+    )
+}
+
 /// Fuzz-discovered test case for panic during evaluation,
 /// in `raytracer::apply_transmittance`.
 #[test]

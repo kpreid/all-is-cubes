@@ -93,7 +93,45 @@ mod block {
     impl Serialize for Block {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             BlockSer::BlockV1 {
-                primitive: schema::PrimitiveSer::from(self.primitive()),
+                primitive: match self.primitive() {
+                    Primitive::Indirect(definition) => schema::PrimitiveSer::IndirectV1 {
+                        definition: definition.clone(),
+                    },
+                    &Primitive::Atom(Atom {
+                        color,
+                        emission,
+                        collision,
+                    }) => schema::PrimitiveSer::AtomV1 {
+                        // attributes on the primitive are no longer used, but still supported
+                        // by deserialization.
+                        attributes: BlockAttributes::DEFAULT_REF.into(),
+                        color: color.into(),
+                        light_emission: emission.into(),
+                        collision: collision.into(),
+                    },
+                    &Primitive::Recur {
+                        ref space,
+                        offset,
+                        resolution,
+                    } => schema::PrimitiveSer::RecurV1 {
+                        // attributes on the primitive are no longer used, but still supported
+                        // by deserialization.
+                        attributes: BlockAttributes::DEFAULT_REF.into(),
+                        space: space.clone(),
+                        offset: offset.into(),
+                        resolution,
+                    },
+                    &Primitive::Air => schema::PrimitiveSer::AirV1,
+                    &Primitive::Text { ref text, offset } => {
+                        schema::PrimitiveSer::TextPrimitiveV1 {
+                            text: text.into(),
+                            offset: offset.into(),
+                        }
+                    }
+                    &Primitive::Raw { .. } => {
+                        return Err(serde::ser::Error::custom("cannot serialize Primitive::Raw"));
+                    }
+                },
                 modifiers: self.modifiers().iter().map(ModifierSer::from).collect(),
             }
             .serialize(serializer)
@@ -122,45 +160,6 @@ mod block {
                     block
                 }
             })
-        }
-    }
-
-    impl<'a> From<&'a Primitive> for schema::PrimitiveSer {
-        fn from(value: &'a Primitive) -> Self {
-            match value {
-                Primitive::Indirect(definition) => schema::PrimitiveSer::IndirectV1 {
-                    definition: definition.clone(),
-                },
-                &Primitive::Atom(Atom {
-                    color,
-                    emission,
-                    collision,
-                }) => schema::PrimitiveSer::AtomV1 {
-                    // attributes on the primitive are no longer used, but still supported
-                    // by deserialization.
-                    attributes: BlockAttributes::DEFAULT_REF.into(),
-                    color: color.into(),
-                    light_emission: emission.into(),
-                    collision: collision.into(),
-                },
-                &Primitive::Recur {
-                    ref space,
-                    offset,
-                    resolution,
-                } => schema::PrimitiveSer::RecurV1 {
-                    // attributes on the primitive are no longer used, but still supported
-                    // by deserialization.
-                    attributes: BlockAttributes::DEFAULT_REF.into(),
-                    space: space.clone(),
-                    offset: offset.into(),
-                    resolution,
-                },
-                &Primitive::Air => schema::PrimitiveSer::AirV1,
-                &Primitive::Text { ref text, offset } => schema::PrimitiveSer::TextPrimitiveV1 {
-                    text: text.into(),
-                    offset: offset.into(),
-                },
-            }
         }
     }
 
