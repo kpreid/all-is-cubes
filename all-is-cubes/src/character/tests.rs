@@ -260,7 +260,8 @@ fn click_wrong_space_or_correct_space() {
             Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]),
             &sp1,
             10.,
-        );
+        )
+        .unwrap();
         assert!(cursor.is_some());
         let error = Character::click(
             universe.read_ticket(),
@@ -279,7 +280,8 @@ fn click_wrong_space_or_correct_space() {
             Ray::new([0.5, 0.5, 0.5], [1., 0., 0.]),
             &sp2,
             10.,
-        );
+        )
+        .unwrap();
         assert!(cursor.is_some());
         let error =
             Character::click(universe.read_ticket(), character, cursor.as_ref(), 0).unwrap_err();

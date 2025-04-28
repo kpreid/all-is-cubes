@@ -516,7 +516,11 @@ impl<I: time::Instant> Session<I> {
         let cursor_result = self
             .input_processor
             .cursor_ndc_position()
-            .and_then(|ndc_pos| cameras.project_cursor(self.read_tickets(), ndc_pos));
+            .and_then(|ndc_pos| {
+                cameras
+                    .project_cursor(self.read_tickets(), ndc_pos)
+                    .expect("shouldn't happen: read error in update_cursor()")
+            });
         self.shuttle_mut().cursor_result = cursor_result;
     }
 

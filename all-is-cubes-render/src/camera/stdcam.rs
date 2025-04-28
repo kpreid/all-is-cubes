@@ -5,7 +5,7 @@ use all_is_cubes::character::{Character, Cursor, cursor_raycast};
 use all_is_cubes::listen;
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{Handle, ReadTicket, Universe};
+use all_is_cubes::universe::{Handle, HandleError, ReadTicket, Universe};
 
 use crate::camera::{Camera, GraphicsOptions, NdcPoint2, ViewTransform, Viewport};
 
@@ -344,16 +344,16 @@ impl StandardCameras {
         &self,
         read_tickets: Layers<ReadTicket<'_>>,
         ndc_pos: NdcPoint2,
-    ) -> Option<Cursor> {
+    ) -> Result<Option<Cursor>, HandleError> {
         if let Some(ui_space_handle) = self.ui_space.as_ref() {
             let ray = self.cameras.ui.project_ndc_into_world(ndc_pos);
-            if let Some(cursor) = cursor_raycast(
+            if let res @ (Ok(Some(_)) | Err(_)) = cursor_raycast(
                 read_tickets.ui,
                 ray,
                 ui_space_handle,
                 FreeCoordinate::INFINITY,
             ) {
-                return Some(cursor);
+                return res;
             }
         }
 
@@ -361,17 +361,17 @@ impl StandardCameras {
             let ray = self.cameras.world.project_ndc_into_world(ndc_pos);
             // TODO: maximum distance should be determined by character/universe parameters
             // instead of hardcoded
-            if let Some(cursor) = cursor_raycast(
+            if let res @ (Ok(Some(_)) | Err(_)) = cursor_raycast(
                 read_tickets.world,
                 ray,
                 &character_handle.read(read_tickets.world).unwrap().space,
                 6.0,
             ) {
-                return Some(cursor);
+                return res;
             }
         }
 
-        None
+        Ok(None)
     }
 }
 

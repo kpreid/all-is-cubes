@@ -711,7 +711,8 @@ mod tests {
                     Ray::new([0., 0.5, 0.5], [1., 0., 0.]),
                     &self.space_handle,
                     FreeCoordinate::INFINITY,
-                ),
+                )
+                .unwrap(),
                 character: Some(self.character_handle.clone()),
             }
         }
