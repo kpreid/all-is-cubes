@@ -237,6 +237,7 @@ async fn cursor_basic(mut context: RenderTestContext) {
         &universe,
     );
     let cursor = cameras.project_cursor(Layers::splat(universe.read_ticket()), Point2D::origin());
+    assert!(cursor.is_some(), "project_cursor() unexpectedly missed");
     let overlays = Overlays {
         cursor: cursor.as_ref(),
         info_text: None,
