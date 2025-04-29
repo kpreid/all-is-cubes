@@ -29,21 +29,33 @@ fn block_mesh_benches(c: &mut Criterion) {
     // Exercise the code paths that only apply to resolution 1;
     // all the other benchmarks use larger resolutions.
     g.bench_function("r1-new", |b| {
-        iter_new_block_mesh(b, options, &Block::builder().color(Rgba::WHITE).build());
+        let universe = Universe::new();
+        iter_new_block_mesh(
+            b,
+            &universe,
+            options,
+            &Block::builder().color(Rgba::WHITE).build(),
+        );
     });
     g.bench_function("r1-reused", |b| {
-        iter_reused_block_mesh(b, options, &Block::builder().color(Rgba::WHITE).build());
+        let universe = Universe::new();
+        iter_reused_block_mesh(
+            b,
+            &universe,
+            options,
+            &Block::builder().color(Rgba::WHITE).build(),
+        );
     });
 
     g.bench_function("checker-new", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
-        iter_new_block_mesh(b, options, &block);
+        iter_new_block_mesh(b, &universe, options, &block);
     });
     g.bench_function("checker-reused", |b| {
         let mut universe = Universe::new();
         let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
-        iter_reused_block_mesh(b, options, &block);
+        iter_reused_block_mesh(b, &universe, options, &block);
     });
 
     g.bench_function("half", |b| {
@@ -58,7 +70,7 @@ fn block_mesh_benches(c: &mut Criterion) {
                 universe.insert_anonymous(half_space(&block::from_color!(Rgba::WHITE))),
             )
             .build();
-        iter_new_block_mesh(b, options, &block);
+        iter_new_block_mesh(b, &universe, options, &block);
     });
 
     g.bench_function("opaque", |b| {
@@ -70,20 +82,25 @@ fn block_mesh_benches(c: &mut Criterion) {
                 block::from_color!(Rgba::WHITE),
             ],
         );
-        iter_new_block_mesh(b, options, &block);
+        iter_new_block_mesh(b, &universe, options, &block);
     });
 
     g.bench_function("msvb", |b| {
         let mut universe = Universe::new();
         let [block] = make_some_voxel_blocks(&mut universe);
-        iter_new_block_mesh(b, options, &block);
+        iter_new_block_mesh(b, &universe, options, &block);
     });
 
     // TODO: Add meshing a block that has a complex but not worst-case shape.
 }
 
-fn iter_reused_block_mesh(b: &mut criterion::Bencher<'_>, options: &MeshOptions, block: &Block) {
-    let evaluated = block.evaluate(ReadTicket::stub()).unwrap();
+fn iter_reused_block_mesh(
+    b: &mut criterion::Bencher<'_>,
+    universe: &Universe,
+    options: &MeshOptions,
+    block: &Block,
+) {
+    let evaluated = block.evaluate(universe.read_ticket()).unwrap();
     let mut shared_mesh = BlockMesh::<Mt>::default();
     b.iter_batched_ref(
         || (),
@@ -92,8 +109,13 @@ fn iter_reused_block_mesh(b: &mut criterion::Bencher<'_>, options: &MeshOptions,
     );
 }
 
-fn iter_new_block_mesh(b: &mut criterion::Bencher<'_>, options: &MeshOptions, block: &Block) {
-    let evaluated = block.evaluate(ReadTicket::stub()).unwrap();
+fn iter_new_block_mesh(
+    b: &mut criterion::Bencher<'_>,
+    universe: &Universe,
+    options: &MeshOptions,
+    block: &Block,
+) {
+    let evaluated = block.evaluate(universe.read_ticket()).unwrap();
     b.iter_batched_ref(
         || (),
         |()| BlockMesh::<Mt>::new(&evaluated, &Allocator::new(), options),
