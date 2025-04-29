@@ -24,22 +24,51 @@ impl Quote {
         value: block::MinEval,
         filter: &block::EvalFilter<'_>,
     ) -> Result<block::MinEval, block::InEvalError> {
+        // Fully destructure so we don't forget anything.
         let &Quote { suppress_ambient } = self;
-        let (mut attributes, mut voxels) = value.into_parts();
+        let (
+            block::BlockAttributes {
+                display_name,
+                selectable,
+                inventory,
+                rotation_rule,
+                mut placement_action,
+                mut tick_action,
+                mut activation_action,
+                animation_hint,
+            },
+            mut voxels,
+        ) = value.into_parts();
 
-        attributes.tick_action = None;
-        if suppress_ambient && !filter.skip_eval {
-            block::Budget::decrement_voxels(&filter.budget, voxels.count())?;
-            for voxel in voxels.as_vol_mut().as_linear_mut().iter_mut() {
-                voxel.emission = Rgb::ZERO;
+        if !filter.skip_eval {
+            // All `Operation`s must be disabled.
+            tick_action = None;
+            placement_action = None;
+            activation_action = None;
+
+            // If `suppress_ambient`, then avoid the block having any light or sound emission.
+            if suppress_ambient {
+                block::Budget::decrement_voxels(&filter.budget, voxels.count())?;
+                for voxel in voxels.as_vol_mut().as_linear_mut().iter_mut() {
+                    voxel.emission = Rgb::ZERO;
+                }
             }
         }
 
-        Ok(block::MinEval::new(attributes, voxels))
+        Ok(block::MinEval::new(
+            block::BlockAttributes {
+                display_name,
+                selectable,
+                inventory,
+                rotation_rule,
+                placement_action,
+                tick_action,
+                activation_action,
+                animation_hint,
+            },
+            voxels,
+        ))
     }
-
-    // The evaluation implementation is simple enough that it's in `Modifier::evaluate`
-    // directly.
 }
 
 impl From<Quote> for block::Modifier {
@@ -59,40 +88,57 @@ impl universe::VisitHandles for Quote {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::block::{Block, Modifier};
+    use crate::block::Block;
     use crate::math::Rgba;
+    use crate::{op, time};
     use pretty_assertions::assert_eq;
 
     #[test]
     fn quote_evaluation() {
-        let read_ticket = universe::ReadTicket::stub();
         let l = Rgb::new(1.0, 2.0, 3.0);
-        let mut block = Block::builder()
+
+        let block = Block::builder()
             .color(Rgba::WHITE)
             .light_emission(l)
+            .placement_action(block::PlacementAction {
+                operation: op::Operation::Become(block::AIR),
+                in_front: true,
+            })
+            .tick_action(block::TickAction {
+                operation: op::Operation::Become(block::AIR),
+                schedule: time::Schedule::EVERY_TICK,
+            })
+            .activation_action(op::Operation::Become(block::AIR))
             .build();
+
         assert_eq!(
-            block
-                .evaluate(read_ticket)
-                .unwrap()
-                .voxels
-                .single_voxel()
-                .unwrap()
-                .emission,
-            l
+            eval_without_metadata(&block.clone().with_modifier(Quote {
+                suppress_ambient: false,
+            })),
+            eval_without_metadata(
+                &Block::builder()
+                    .color(Rgba::WHITE)
+                    .light_emission(l)
+                    .build()
+            ),
+            "suppress_ambient = false"
         );
-        block.modifiers_mut().push(Modifier::Quote(Quote {
-            suppress_ambient: true,
-        }));
+
         assert_eq!(
-            block
-                .evaluate(read_ticket)
-                .unwrap()
-                .voxels
-                .single_voxel()
-                .unwrap()
-                .emission,
-            Rgb::ZERO
+            eval_without_metadata(&block.with_modifier(Quote {
+                suppress_ambient: true,
+            })),
+            eval_without_metadata(&Block::builder().color(Rgba::WHITE).build()),
+            "suppress_ambient = true"
         );
+    }
+
+    // TODO: there should be a less one-off way to express this narrowing of EvaluatedBlock
+    // to only the data and not the metadata (cost and original block).
+    // `MinEval` is not quite it.
+    #[inline(never)]
+    fn eval_without_metadata(block: &Block) -> (block::BlockAttributes, block::Evoxels) {
+        let evaluated = block.evaluate(universe::ReadTicket::stub()).unwrap();
+        (evaluated.attributes().clone(), evaluated.voxels().clone())
     }
 }
