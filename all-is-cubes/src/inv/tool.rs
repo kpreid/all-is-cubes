@@ -250,6 +250,9 @@ impl Tool {
     /// same appearance as the block to be placed. The display name of the block should be
     /// the display name of the tool.
     ///
+    /// If the returned block is not from `predefined`, then it will be
+    /// [quoted][crate::block::Modifier::Quote] to ensure it has no unwanted side effects.
+    ///
     /// TODO (API instability): Eventually we will probably want additional decorations
     /// that probably should not need to be painted into the block itself.
     pub fn icon<'a>(&'a self, predefined: &'a BlockProvider<Icons>) -> Cow<'a, Block> {
@@ -268,7 +271,11 @@ impl Tool {
             Self::Jetpack { active } => {
                 Cow::Borrowed(&predefined[Icons::Jetpack { active: *active }])
             }
-            Self::Custom { icon, op: _ } => Cow::Borrowed(icon),
+            // We don’t trust the provided icon not to cause trouble, so it is quoted even
+            // though it is meant to be an icon.
+            Self::Custom { icon, op: _ } => {
+                Cow::Owned(icon.clone().with_modifier(block::Quote::default()))
+            }
         }
     }
 
