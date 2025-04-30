@@ -226,8 +226,12 @@ mod tests {
     #[test]
     fn member_export_path() {
         let mut universe = Universe::new();
-        let foo = universe.insert("foo".into(), BlockDef::new(AIR)).unwrap();
-        let _bar = universe.insert("bar".into(), BlockDef::new(AIR)).unwrap();
+        let foo = universe
+            .insert("foo".into(), BlockDef::new(universe.read_ticket(), AIR))
+            .unwrap();
+        let _bar = universe
+            .insert("bar".into(), BlockDef::new(universe.read_ticket(), AIR))
+            .unwrap();
 
         assert_eq!(
             ExportSet::all_of_universe(&universe)

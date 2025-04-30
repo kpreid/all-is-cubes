@@ -496,7 +496,10 @@ mod tests {
     async fn export_block_def() {
         let mut universe = Universe::new();
         universe
-            .insert("x".into(), BlockDef::new(block::AIR))
+            .insert(
+                "x".into(),
+                BlockDef::new(universe.read_ticket(), block::AIR),
+            )
             .unwrap();
 
         let error = export_to_dot_vox_data(

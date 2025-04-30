@@ -35,7 +35,9 @@ async fn port_whence_load_then_save() {
             .unwrap();
 
     // Make a change.
-    universe.insert("hello".into(), BlockDef::new(AIR)).unwrap();
+    universe
+        .insert("hello".into(), BlockDef::new(universe.read_ticket(), AIR))
+        .unwrap();
 
     // Save it.
     universe

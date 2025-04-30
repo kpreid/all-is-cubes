@@ -21,7 +21,7 @@ use hashbrown::HashMap as HbHashMap;
 use crate::block::{Block, BlockDef};
 use crate::space::{SetCubeError, SpaceTransaction};
 use crate::transaction::ExecuteError;
-use crate::universe::{Handle, InsertError, Name, Universe, UniverseTransaction};
+use crate::universe::{Handle, InsertError, Name, ReadTicket, Universe, UniverseTransaction};
 use crate::util::YieldProgress;
 use crate::util::maybe_sync;
 
@@ -134,7 +134,9 @@ impl<E: BlockModule> Provider<E, Block> {
             name: Name,
             block: &Block,
         ) -> Result<Block, InsertError> {
-            let block_def_handle = Handle::new_pending(name, BlockDef::new(block.clone()));
+            // TODO(read_ticket): not sure how to properly handle this one
+            let block_def_handle =
+                Handle::new_pending(name, BlockDef::new(ReadTicket::new(), block.clone()));
             txn.insert_mut(block_def_handle.clone())?;
             let indirect_block = Block::from(block_def_handle);
             Ok(indirect_block)

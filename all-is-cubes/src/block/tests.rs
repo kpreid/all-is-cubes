@@ -90,8 +90,10 @@ fn listen_atom() {
 #[test]
 fn listen_indirect_atom() {
     let mut universe = Universe::new();
-    let block_def_handle =
-        universe.insert_anonymous(BlockDef::new(block::from_color!(Rgba::WHITE)));
+    let block_def_handle = universe.insert_anonymous(BlockDef::new(
+        universe.read_ticket(),
+        block::from_color!(Rgba::WHITE),
+    ));
     let indirect = Block::from(block_def_handle.clone());
     let sink = Sink::new();
     listen(&universe, &indirect, sink.listener()).unwrap();
@@ -113,10 +115,13 @@ fn listen_indirect_atom() {
 #[test]
 fn listen_indirect_double() {
     let mut universe = Universe::new();
-    let block_def_handle1 =
-        universe.insert_anonymous(BlockDef::new(block::from_color!(Rgba::WHITE)));
+    let block_def_handle1 = universe.insert_anonymous(BlockDef::new(
+        universe.read_ticket(),
+        block::from_color!(Rgba::WHITE),
+    ));
     let indirect1 = Block::from(block_def_handle1.clone());
-    let block_def_handle2 = universe.insert_anonymous(BlockDef::new(indirect1.clone()));
+    let block_def_handle2 =
+        universe.insert_anonymous(BlockDef::new(universe.read_ticket(), indirect1.clone()));
     let indirect2 = Block::from(block_def_handle2.clone());
     let sink1 = Sink::new();
     let sink2 = Sink::new();
@@ -238,7 +243,7 @@ fn self_referential_listen() {
 
 /// Helper for overflow_ tests
 fn self_referential_block(universe: &mut Universe) -> Block {
-    let block_def = universe.insert_anonymous(BlockDef::new(AIR));
+    let block_def = universe.insert_anonymous(BlockDef::new(universe.read_ticket(), AIR));
     let indirect = Block::from(block_def.clone());
     block_def
         .execute(&BlockDefTransaction::overwrite(indirect.clone()))
@@ -268,6 +273,7 @@ mod modify {
 mod txn {
     use super::*;
     use crate::transaction::{Merge, TransactionTester};
+    use crate::universe::ReadTicket;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -276,7 +282,7 @@ mod txn {
         // realistic scenario
         let [b1, b2] = make_some_blocks();
         let mut universe = Universe::new();
-        let block_def_handle = universe.insert_anonymous(BlockDef::new(b1));
+        let block_def_handle = universe.insert_anonymous(BlockDef::new(universe.read_ticket(), b1));
         let indirect = Block::from(block_def_handle.clone());
         let sink = Sink::new();
         listen(&universe, &indirect, sink.listener()).unwrap();
@@ -367,9 +373,9 @@ mod txn {
                 }
                 Ok(())
             })
-            .target(|| BlockDef::new(AIR))
-            .target(|| BlockDef::new(b1.clone()))
-            .target(|| BlockDef::new(b2.clone()))
+            .target(|| BlockDef::new(ReadTicket::stub(), AIR))
+            .target(|| BlockDef::new(ReadTicket::stub(), b1.clone()))
+            .target(|| BlockDef::new(ReadTicket::stub(), b2.clone()))
             .test();
     }
 }

@@ -153,7 +153,10 @@ mod tests {
             .enumerate()
             .map(|(i, block)| {
                 universe
-                    .insert(Name::from(format!("block{i}")), BlockDef::new(block))
+                    .insert(
+                        Name::from(format!("block{i}")),
+                        BlockDef::new(universe.read_ticket(), block),
+                    )
                     .unwrap()
             })
             .collect();

@@ -856,7 +856,10 @@ fn universe_with_one_of_each() -> Universe {
     let [mut block] = make_some_blocks();
     block.modifiers_mut().push(Modifier::Tag(tag::Be(tag)));
     let block_handle = universe
-        .insert("a_block".into(), BlockDef::new(block))
+        .insert(
+            "a_block".into(),
+            BlockDef::new(universe.read_ticket(), block),
+        )
         .unwrap();
 
     universe

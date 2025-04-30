@@ -17,8 +17,8 @@ use crate::space::Space;
 use crate::time;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
-    self, Handle, HandleError, InsertError, InsertErrorKind, Name, Universe, UniverseTransaction,
-    list_handles,
+    self, Handle, HandleError, InsertError, InsertErrorKind, Name, ReadTicket, Universe,
+    UniverseTransaction, list_handles,
 };
 use crate::util::{assert_conditional_send_sync, yield_progress_for_testing};
 
@@ -60,7 +60,7 @@ fn universe_debug_elements() {
     let mut u = Universe::new();
     u.insert("foo".into(), Space::empty_positive(1, 2, 3))
         .unwrap();
-    u.insert_anonymous(BlockDef::new(AIR));
+    u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     assert_eq!(
         format!("{u:?}"),
         "Universe { \
@@ -119,7 +119,8 @@ fn universe_default_whence() {
 #[test]
 fn get_any() {
     let mut u = Universe::new();
-    u.insert("test_block".into(), BlockDef::new(AIR)).unwrap();
+    u.insert("test_block".into(), BlockDef::new(u.read_ticket(), AIR))
+        .unwrap();
     let sp = u
         .insert("test_space".into(), Space::empty_positive(1, 1, 1))
         .unwrap();
@@ -149,8 +150,8 @@ fn get_any() {
 fn insert_anonymous_makes_distinct_names() {
     let [block_0, block_1] = make_some_blocks();
     let mut u = Universe::new();
-    let handle_a = u.insert_anonymous(BlockDef::new(AIR));
-    let handle_b = u.insert_anonymous(BlockDef::new(AIR));
+    let handle_a = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
+    let handle_b = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     handle_a
         .execute(&BlockDefTransaction::overwrite(block_0))
         .unwrap();
@@ -168,9 +169,10 @@ fn insert_anonymous_makes_distinct_names() {
 #[test]
 fn insert_duplicate_name_same_type() {
     let mut u = Universe::new();
-    u.insert("test_block".into(), BlockDef::new(AIR)).unwrap();
+    u.insert("test_block".into(), BlockDef::new(u.read_ticket(), AIR))
+        .unwrap();
     assert_eq!(
-        u.insert("test_block".into(), BlockDef::new(AIR)),
+        u.insert("test_block".into(), BlockDef::new(u.read_ticket(), AIR)),
         Err(InsertError {
             name: "test_block".into(),
             kind: InsertErrorKind::AlreadyExists,
@@ -181,7 +183,8 @@ fn insert_duplicate_name_same_type() {
 #[test]
 fn insert_duplicate_name_different_type() {
     let mut u = Universe::new();
-    u.insert("test_thing".into(), BlockDef::new(AIR)).unwrap();
+    u.insert("test_thing".into(), BlockDef::new(u.read_ticket(), AIR))
+        .unwrap();
     assert_eq!(
         u.insert("test_thing".into(), Space::empty_positive(1, 1, 1)),
         Err(InsertError {
@@ -194,7 +197,8 @@ fn insert_duplicate_name_different_type() {
 #[test]
 fn insert_duplicate_name_via_txn() {
     let mut u = Universe::new();
-    u.insert("test_thing".into(), BlockDef::new(AIR)).unwrap();
+    u.insert("test_thing".into(), BlockDef::new(u.read_ticket(), AIR))
+        .unwrap();
     let error = UniverseTransaction::insert(Handle::new_pending(
         "test_thing".into(),
         Space::empty_positive(1, 1, 1),
@@ -219,7 +223,7 @@ fn insert_duplicate_name_via_txn() {
 #[test]
 fn insert_anonym_prohibited_direct() {
     assert_eq!(
-        Universe::new().insert(Name::Anonym(0), BlockDef::new(AIR)),
+        Universe::new().insert(Name::Anonym(0), BlockDef::new(ReadTicket::stub(), AIR)),
         Err(InsertError {
             name: Name::Anonym(0),
             kind: InsertErrorKind::InvalidName
@@ -253,7 +257,8 @@ fn insert_anonym_prohibited_via_txn() {
 #[test]
 fn insert_pending_becomes_anonym_direct() {
     let mut u = Universe::new();
-    u.insert(Name::Pending, BlockDef::new(AIR)).unwrap();
+    u.insert(Name::Pending, BlockDef::new(u.read_ticket(), AIR))
+        .unwrap();
     assert_eq!(
         u.tables.blocks.keys().collect::<Vec<_>>(),
         vec![&Name::Anonym(0)]
@@ -263,9 +268,12 @@ fn insert_pending_becomes_anonym_direct() {
 #[test]
 fn insert_pending_becomes_anonym_via_txn() {
     let mut u = Universe::new();
-    UniverseTransaction::insert(Handle::new_pending(Name::Pending, BlockDef::new(AIR)))
-        .execute(&mut u, &mut drop)
-        .unwrap();
+    UniverseTransaction::insert(Handle::new_pending(
+        Name::Pending,
+        BlockDef::new(u.read_ticket(), AIR),
+    ))
+    .execute(&mut u, &mut drop)
+    .unwrap();
     assert_eq!(
         u.tables.blocks.keys().collect::<Vec<_>>(),
         vec![&Name::Anonym(0)]
@@ -279,7 +287,10 @@ fn delete_success() {
     let blocks: [Block; 2] = make_some_blocks();
 
     let handle_1 = u
-        .insert(name.clone(), BlockDef::new(blocks[0].clone()))
+        .insert(
+            name.clone(),
+            BlockDef::new(u.read_ticket(), blocks[0].clone()),
+        )
         .unwrap();
     let _ = handle_1.read(u.read_ticket()).unwrap();
 
@@ -297,7 +308,10 @@ fn delete_success() {
     // (Note: We might make this possible in the future, but it'll be required to be done with
     // the ref in hand, not by name.)
     let handle_2 = u
-        .insert(name.clone(), BlockDef::new(blocks[1].clone()))
+        .insert(
+            name.clone(),
+            BlockDef::new(u.read_ticket(), blocks[1].clone()),
+        )
         .unwrap();
     assert_eq!(
         handle_1
@@ -312,7 +326,7 @@ fn delete_success() {
 #[test]
 fn delete_anonymous_fails() {
     let mut u = Universe::new();
-    let anon = u.insert_anonymous(BlockDef::new(AIR));
+    let anon = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     UniverseTransaction::delete(anon)
         .execute(&mut u, &mut drop)
         .unwrap_err();
@@ -323,7 +337,9 @@ fn delete_twice_fails() {
     let mut u = Universe::new();
     let name: Name = "test_thing".into();
     let [block] = make_some_blocks();
-    let handle = u.insert(name.clone(), BlockDef::new(block)).unwrap();
+    let handle = u
+        .insert(name.clone(), BlockDef::new(u.read_ticket(), block))
+        .unwrap();
 
     let txn = UniverseTransaction::delete(handle);
 
@@ -339,7 +355,9 @@ fn delete_wrong_universe_fails() {
     let mut u2 = Universe::new();
     let name: Name = "test_thing".into();
     let [block] = make_some_blocks();
-    let handle = u1.insert(name.clone(), BlockDef::new(block)).unwrap();
+    let handle = u1
+        .insert(name.clone(), BlockDef::new(ReadTicket::stub(), block))
+        .unwrap();
 
     let txn = UniverseTransaction::delete(handle);
 
@@ -366,7 +384,10 @@ fn universe_behavior() {
             _context: &behavior::Context<'_, Universe>,
         ) -> (UniverseTransaction, behavior::Then) {
             (
-                UniverseTransaction::insert(Handle::new_pending("foo".into(), BlockDef::new(AIR))),
+                UniverseTransaction::insert(Handle::new_pending(
+                    "foo".into(),
+                    BlockDef::new(ReadTicket::stub(), AIR),
+                )),
                 behavior::Then::Drop,
             )
         }
@@ -402,7 +423,7 @@ fn universe_behavior() {
 #[test]
 fn gc_explicit() {
     let mut u = Universe::new();
-    u.insert_anonymous(BlockDef::new(AIR));
+    u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
     u.gc();
     assert_eq!(0, u.iter_by_type::<BlockDef>().count());
@@ -411,7 +432,7 @@ fn gc_explicit() {
 #[test]
 fn gc_implicit() {
     let mut u = Universe::new();
-    u.insert_anonymous(BlockDef::new(AIR));
+    u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
     u.step(false, time::DeadlineNt::Whenever);
     assert_eq!(0, u.iter_by_type::<BlockDef>().count());
@@ -422,7 +443,8 @@ fn gc_implicit() {
 #[test]
 fn gc_preserves_named() {
     let mut u = Universe::new();
-    u.insert("foo".into(), BlockDef::new(AIR)).unwrap();
+    u.insert("foo".into(), BlockDef::new(u.read_ticket(), AIR))
+        .unwrap();
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
     u.gc();
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
@@ -431,7 +453,10 @@ fn gc_preserves_named() {
 
 #[test]
 fn visit_handles_block_def_no_handle() {
-    assert_eq!(list_handles(&BlockDef::new(AIR)), vec![]);
+    assert_eq!(
+        list_handles(&BlockDef::new(ReadTicket::stub(), AIR)),
+        vec![]
+    );
 }
 
 #[test]
@@ -441,6 +466,7 @@ fn visit_handles_block_def_space() {
         .insert("s".into(), Space::empty_positive(1, 1, 1))
         .unwrap();
     let block_def = BlockDef::new(
+        u.read_ticket(),
         Block::builder()
             .voxels_handle(Resolution::R1, space_handle)
             .build(),
@@ -451,15 +477,15 @@ fn visit_handles_block_def_space() {
 #[test]
 fn visit_handles_block_def_indirect() {
     let mut u = Universe::new();
-    let b1 = BlockDef::new(AIR);
+    let b1 = BlockDef::new(u.read_ticket(), AIR);
     let b1_handle = u.insert("destination".into(), b1).unwrap();
-    let b2 = BlockDef::new(Block::from(b1_handle));
+    let b2 = BlockDef::new(u.read_ticket(), Block::from(b1_handle));
     assert_eq!(list_handles(&b2), vec!["destination".into()]);
 }
 
 #[test]
 fn visit_handles_block_tick_action() {
-    let b1 = Handle::new_pending("foo".into(), BlockDef::new(AIR));
+    let b1 = Handle::new_pending("foo".into(), BlockDef::new(ReadTicket::stub(), AIR));
     let b2 = Block::builder()
         .color(Rgba::WHITE)
         .tick_action(Some(TickAction::from(Operation::Become(Block::from(b1)))))
@@ -479,7 +505,9 @@ fn visit_handles_character() {
     let mut character = Character::spawn_default(u.read_ticket(), space_handle.clone());
 
     // A block handle in inventory.
-    let block_handle = u.insert("block".into(), BlockDef::new(AIR)).unwrap();
+    let block_handle = u
+        .insert("block".into(), BlockDef::new(u.read_ticket(), AIR))
+        .unwrap();
     CharacterTransaction::inventory(InventoryTransaction::insert([Tool::Block(Block::from(
         block_handle,
     ))]))
@@ -496,8 +524,10 @@ fn visit_handles_character() {
 fn visit_handles_space() {
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(1, 1, 1);
-    let block_def_handle =
-        universe.insert_anonymous(BlockDef::new(block::from_color!(Rgba::WHITE)));
+    let block_def_handle = universe.insert_anonymous(BlockDef::new(
+        universe.read_ticket(),
+        block::from_color!(Rgba::WHITE),
+    ));
     space
         .set([0, 0, 0], Block::from(block_def_handle.clone()))
         .unwrap();

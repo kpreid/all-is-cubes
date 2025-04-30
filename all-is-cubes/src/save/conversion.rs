@@ -1253,9 +1253,10 @@ mod universe {
                 schema::UniverseDe::UniverseV1 { members } => {
                     for MemberEntrySer { name, value } in members {
                         match value {
-                            MemberDe::Block { value: block } => {
-                                universe.insert_deserialized(name, BlockDef::new(block))
-                            }
+                            MemberDe::Block { value: block } => universe.insert_deserialized(
+                                name,
+                                BlockDef::new(universe.read_ticket(), block),
+                            ),
                             MemberDe::Character { value } => {
                                 universe.insert_deserialized(name, value)
                             }

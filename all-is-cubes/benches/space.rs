@@ -14,7 +14,7 @@ use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridSize};
 use all_is_cubes::raytracer::UpdatingSpaceRaytracer;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{Handle, Name};
+use all_is_cubes::universe::{Handle, Name, ReadTicket};
 
 fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("bulk");
@@ -68,11 +68,14 @@ fn space_bulk_mutation(c: &mut Criterion) {
                         });
                         // 2. Block definitions
                         let blocks = std::array::from_fn(|_| {
-                            block::BlockDef::new(block::Block::from(block::Primitive::Recur {
-                                space: space.clone(),
-                                offset: GridPoint::zero(),
-                                resolution: block::Resolution::R32,
-                            }))
+                            block::BlockDef::new(
+                                ReadTicket::stub(),
+                                block::Block::from(block::Primitive::Recur {
+                                    space: space.clone(),
+                                    offset: GridPoint::zero(),
+                                    resolution: block::Resolution::R32,
+                                }),
+                            )
                         });
                         (space, (rts, blocks))
                     },

@@ -1017,7 +1017,7 @@ mod tests {
         // * a member-modifying part
         let mut transaction = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
         // * an anonymous insertion part
-        transaction.insert_anonymous(BlockDef::new(AIR));
+        transaction.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
         // * a behavior set part
         transaction
             .merge_from(UniverseTransaction::behaviors(

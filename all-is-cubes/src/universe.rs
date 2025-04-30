@@ -561,8 +561,8 @@ impl Universe {
     ///
     /// let mut universe = Universe::new();
     /// let [block_1, block_2] = make_some_blocks();
-    /// universe.insert(Name::from("b1"), BlockDef::new(block_1.clone()));
-    /// universe.insert(Name::from("b2"), BlockDef::new(block_2.clone()));
+    /// universe.insert(Name::from("b1"), BlockDef::new(universe.read_ticket(), block_1.clone()));
+    /// universe.insert(Name::from("b2"), BlockDef::new(universe.read_ticket(), block_2.clone()));
     ///
     /// let mut found_blocks = universe.iter_by_type()
     ///     .map(|(name, value): (Name, Handle<BlockDef>)| {

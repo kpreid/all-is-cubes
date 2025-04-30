@@ -410,8 +410,10 @@ fn replace_last_block_regression() {
 fn listens_to_block_changes() {
     // Set up indirect block
     let mut universe = Universe::new();
-    let block_def_handle =
-        universe.insert_anonymous(BlockDef::new(block::from_color!(Rgba::WHITE)));
+    let block_def_handle = universe.insert_anonymous(BlockDef::new(
+        universe.read_ticket(),
+        block::from_color!(Rgba::WHITE),
+    ));
     let indirect = Block::from(block_def_handle.clone());
 
     // Set up space and listener
@@ -456,7 +458,7 @@ fn indirect_becomes_evaluation_error() {
     let block_def_ref = universe
         .insert(
             block_name.clone(),
-            BlockDef::new(block::from_color!(Rgba::WHITE)),
+            BlockDef::new(universe.read_ticket(), block::from_color!(Rgba::WHITE)),
         )
         .unwrap();
     let block = Block::from(block_def_ref.clone());

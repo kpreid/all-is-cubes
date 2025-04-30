@@ -423,6 +423,7 @@ fn instances_dont_dirty_mesh_when_block_changes() {
     let mut universe = Universe::new();
     let [not_anim, will_be_anim] = make_some_blocks();
     let anim_def = universe.insert_anonymous(BlockDef::new(
+        universe.read_ticket(),
         Block::builder()
             .display_name("animated")
             .color(will_be_anim.color())

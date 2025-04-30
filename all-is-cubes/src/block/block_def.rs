@@ -66,10 +66,9 @@ struct BlockDefState {
 impl BlockDef {
     /// Constructs a new [`BlockDef`] that stores the given block (which may be replaced
     /// in the future).
-    pub fn new(block: Block) -> Self {
+    pub fn new(read_ticket: ReadTicket<'_>, block: Block) -> Self {
         BlockDef {
-            // TODO: Pass ReadTicket explicitly
-            state: BlockDefState::new(block, ReadTicket::new()),
+            state: BlockDefState::new(block, read_ticket),
             notifier: Arc::new(Notifier::new()),
         }
     }
@@ -283,7 +282,7 @@ impl transaction::Transactional for BlockDef {
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for BlockDef {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(BlockDef::new(Block::arbitrary(u)?))
+        Ok(BlockDef::new(ReadTicket::stub(), Block::arbitrary(u)?))
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
@@ -503,7 +502,7 @@ mod tests {
             .build();
 
         let eval_bare = block.evaluate(universe.read_ticket()).unwrap();
-        let block_def = BlockDef::new(block.clone());
+        let block_def = BlockDef::new(universe.read_ticket(), block.clone());
         let eval_def = block_def.evaluate(universe.read_ticket()).unwrap();
         let block_def_handle = universe.insert_anonymous(block_def);
         let indirect_block = Block::from(block_def_handle);

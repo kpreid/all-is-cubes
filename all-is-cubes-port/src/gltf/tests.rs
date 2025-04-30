@@ -103,7 +103,10 @@ async fn export_block_defs() {
         .map(|(i, block)| {
             // TODO: should be able to construct `Name` better here
             universe
-                .insert(Name::from(format!("block{i}")), BlockDef::new(block))
+                .insert(
+                    Name::from(format!("block{i}")),
+                    BlockDef::new(universe.read_ticket(), block),
+                )
                 .unwrap()
         })
         .collect();

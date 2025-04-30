@@ -546,7 +546,7 @@ fn indirect_equivalence() {
         .build();
 
     let eval_bare = eval_in(&block, &universe);
-    let block_def_handle = universe.insert_anonymous(BlockDef::new(block));
+    let block_def_handle = universe.insert_anonymous(BlockDef::new(universe.read_ticket(), block));
     let indirect_block = Block::from(block_def_handle);
     let eval_def = eval_in(&indirect_block, &universe);
 
@@ -581,7 +581,7 @@ fn indirect_equivalence() {
 #[test]
 fn indirect_has_derived_value_cache_internally() {
     let mut universe = Universe::new();
-    let block = Block::from(universe.insert_anonymous(BlockDef::new(AIR)));
+    let block = Block::from(universe.insert_anonymous(BlockDef::new(universe.read_ticket(), AIR)));
     assert!(
         block
             .evaluate_impl(&block::EvalFilter::new(universe.read_ticket()))

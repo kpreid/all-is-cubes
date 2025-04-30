@@ -836,7 +836,9 @@ mod tests {
             .voxels_fn(R4, |_| block::from_color!(1.0, 0.0, 0.0, 1.0))
             .unwrap()
             .build_into(universe);
-        let base_block = Block::from(universe.insert_anonymous(block::BlockDef::new(base_block)));
+        let base_block = Block::from(
+            universe.insert_anonymous(block::BlockDef::new(universe.read_ticket(), base_block)),
+        );
         let base_key = EvKey::new(&base_block.evaluate(universe.read_ticket()).unwrap());
         assert_eq!(
             base_key,

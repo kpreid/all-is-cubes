@@ -878,7 +878,10 @@ mod tests {
     fn handle_debug_in_universe() {
         let mut u = Universe::new();
         let handle = u
-            .insert("foo".into(), BlockDef::new(block::from_color!(Rgba::WHITE)))
+            .insert(
+                "foo".into(),
+                BlockDef::new(ReadTicket::stub(), block::from_color!(Rgba::WHITE)),
+            )
             .unwrap();
         assert_eq!(format!("{handle:?}"), "Handle('foo')");
         assert_eq!(format!("{handle:#?}"), "Handle('foo')");
@@ -891,8 +894,10 @@ mod tests {
 
     #[test]
     fn handle_debug_pending() {
-        let handle =
-            Handle::new_pending("foo".into(), BlockDef::new(block::from_color!(Rgba::WHITE)));
+        let handle = Handle::new_pending(
+            "foo".into(),
+            BlockDef::new(ReadTicket::stub(), block::from_color!(Rgba::WHITE)),
+        );
         assert_eq!(
             format!("{handle:?}"),
             "Handle('foo' in no universe = BlockDef { \
