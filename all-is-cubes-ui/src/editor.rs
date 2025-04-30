@@ -114,6 +114,10 @@ fn inspect_primitive(read_ticket: ReadTicket<'_>, primitive: &block::Primitive) 
                 "
             )),
         ),
+        block::Primitive::Raw {
+            attributes: _,
+            voxels: _,
+        } => (literal!("Raw"), vui::LayoutTree::empty()),
         // TODO: do a debug print instead of nothing
         _ => (literal!("<unknown>"), vui::LayoutTree::empty()),
     };
