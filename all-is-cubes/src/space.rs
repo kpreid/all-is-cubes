@@ -7,30 +7,31 @@ use core::fmt;
 use core::ops;
 use core::time::Duration;
 
-use euclid::{Vector3D, vec3};
 use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
 use manyfmt::Fmt;
 
+use crate::behavior::BehaviorSet;
 use crate::behavior::BehaviorSetStepInfo;
-use crate::behavior::{self, BehaviorSet};
 use crate::block::{AIR, AIR_EVALUATED_REF, Block, EvaluatedBlock, Resolution, TickAction};
 #[cfg(doc)]
 use crate::character::Character;
 use crate::character::Spawn;
 use crate::drawing::DrawingPlane;
 use crate::fluff::{self, Fluff};
-use crate::inv::{EphemeralOpaque, InventoryTransaction};
+use crate::inv::InventoryTransaction;
 use crate::listen::{self, Listen, Notifier};
-use crate::math::{
-    Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, Gridgid, NotNan, Vol, notnan,
-    rgb_const,
-};
-use crate::physics::Acceleration;
+use crate::math::{Cube, GridAab, GridCoordinate, Gridgid, Vol};
 use crate::time;
 use crate::transaction::{self, Merge, Transaction as _};
 use crate::universe::ReadTicket;
 use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
+
+// -------------------------------------------------------------------------------------------------
+
+mod behaviors;
+#[expect(clippy::module_name_repetitions)] // TODO: consider renaming
+pub use behaviors::{ActivatableRegion, SpaceBehaviorAttachment};
 
 pub mod builder;
 pub use builder::Builder;
@@ -48,6 +49,9 @@ pub use palette::PaletteError;
 #[expect(clippy::module_name_repetitions)] // TODO: consider renaming
 pub use palette::SpaceBlockData;
 
+mod physics;
+pub use physics::*;
+
 mod sky;
 pub use sky::*;
 
@@ -56,6 +60,8 @@ pub use space_txn::*;
 
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Container for [`Block`]s arranged in three-dimensional space. The main “game world”
 /// data structure.
@@ -1030,142 +1036,7 @@ impl Listen for Space {
     }
 }
 
-impl behavior::Host for Space {
-    type Attachment = SpaceBehaviorAttachment;
-}
-
-/// Description of where in a [`Space`] a [`Behavior<Space>`](crate::behavior::Behavior)
-/// exists.
-// ---
-// TODO: This shouldn't directly implement Serialize
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "save", derive(serde::Serialize, serde::Deserialize))]
-#[expect(clippy::module_name_repetitions)] // TODO: consider renaming all Space* types
-pub struct SpaceBehaviorAttachment {
-    bounds: GridAab,
-    rotation: GridRotation,
-}
-
-impl SpaceBehaviorAttachment {
-    /// Constructs a new [`SpaceBehaviorAttachment`] with no rotation.
-    pub fn new(bounds: GridAab) -> Self {
-        Self {
-            bounds,
-            rotation: GridRotation::IDENTITY,
-        }
-    }
-
-    /// Returns the bounds of this attachment, which specify (without mandating) what
-    /// region the behavior should affect.
-    pub fn bounds(&self) -> GridAab {
-        self.bounds
-    }
-
-    /// Returns the rotation of this attachment, which specifies, if applicable, which
-    /// orientation the behavior should operate in relative to the space.
-    /// The exact meaning of this is up to the behavior.
-    ///
-    /// TODO: explain with an example once we have a good one
-    pub fn rotation(&self) -> GridRotation {
-        self.rotation
-    }
-}
-
-/// The global characteristics of a [`Space`], more or less independent of location within
-/// the block grid.
-///
-/// This is a separate type so that [`Space`] does not need many miscellaneous accessors,
-/// and so an instance of it can be reused for similar spaces (e.g.
-/// [`DEFAULT_FOR_BLOCK`](Self::DEFAULT_FOR_BLOCK)).
-#[derive(Clone, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[non_exhaustive]
-#[expect(clippy::module_name_repetitions)] // TODO: consider renaming all Space* types
-pub struct SpacePhysics {
-    /// Gravity vector for moving objects, in cubes/s².
-    ///
-    /// TODO: Expand this to an enum which allows non-uniform gravity patterns.
-    pub gravity: Vector3D<NotNan<FreeCoordinate>, Acceleration>,
-
-    /// Light arriving from outside the space, used for light calculation
-    /// and rendering the background.
-    pub sky: Sky,
-
-    /// Method used to compute the illumination of individual blocks.
-    pub light: LightPhysics,
-}
-
-impl SpacePhysics {
-    pub(crate) const DEFAULT: Self = Self {
-        gravity: vec3(notnan!(0.), notnan!(-20.), notnan!(0.)),
-        sky: Sky::DEFAULT,
-        light: LightPhysics::DEFAULT,
-    };
-
-    /// Recommended defaults for spaces which are going to define a [`Block`]'s voxels.
-    /// In particular, disables light since it will not be used.
-    pub const DEFAULT_FOR_BLOCK: Self = Self {
-        gravity: vec3(notnan!(0.), notnan!(0.), notnan!(0.)),
-        sky: Sky::Uniform(rgb_const!(0.5, 0.5, 0.5)),
-        light: LightPhysics::None,
-    };
-}
-
-impl fmt::Debug for SpacePhysics {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            gravity,
-            sky,
-            light,
-        } = self;
-        f.debug_struct("SpacePhysics")
-            .field(
-                "gravity",
-                &gravity.map(NotNan::into_inner).refmt(&ConciseDebug),
-            )
-            .field("sky", &sky)
-            .field("light", &light)
-            .finish()
-    }
-}
-
-impl Default for SpacePhysics {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
-
-/// Method used to compute the illumination of individual blocks in a [`Space`].
-#[non_exhaustive]
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub enum LightPhysics {
-    /// No light. All surface colors are taken exactly as displayed colors. The
-    /// [`SpacePhysics::sky`] is used solely as a background image.
-    None,
-    /// Raycast-based light propagation and diffuse reflections.
-    ///
-    /// TODO: Need to provide a builder so that this can be constructed
-    /// even when more parameters are added.
-    // TODO: #[non_exhaustive]
-    Rays {
-        /// The maximum distance a simulated light ray will travel; blocks farther than
-        /// that distance apart will never have direct influence on each other.
-        maximum_distance: u8,
-    },
-}
-
-impl LightPhysics {
-    pub(crate) const DEFAULT: Self = Self::Rays {
-        maximum_distance: 30,
-    };
-}
-
-impl Default for LightPhysics {
-    fn default() -> Self {
-        Self::DEFAULT
-    }
-}
+// -------------------------------------------------------------------------------------------------
 
 /// Ways that [`Space::set`] can fail to make a change.
 ///
@@ -1206,7 +1077,11 @@ impl fmt::Display for SetCubeError {
     }
 }
 
-/// Description of a change to a [`Space`] for use in listeners.
+// -------------------------------------------------------------------------------------------------
+
+/// Description of a change to a [`Space`].
+///
+/// This message type may be received via [`Space::listen()`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[expect(
     clippy::exhaustive_enums,
@@ -1254,6 +1129,8 @@ pub enum SpaceChange {
     Physics,
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// [`Fluff`] happening at a point in space.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 #[non_exhaustive]
@@ -1265,6 +1142,8 @@ pub struct SpaceFluff {
     #[allow(missing_docs)]
     pub fluff: Fluff,
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Performance data returned by [`Space::step`].
 ///
@@ -1357,49 +1236,7 @@ impl Fmt<StatusText> for SpaceStepInfo {
     }
 }
 
-/// A region of a [`Space`] that does something if [`Tool::Activate`] is used on it.
-///
-/// TODO: This is a placeholder for a better design; it's too specific (external side
-/// effect) and yet also not general enough (we would like buttons to have detailed
-/// reactions to clicking) considering that it's hardcoded in Space.
-///
-/// [`Tool::Activate`]: crate::inv::Tool::Activate
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[expect(clippy::exhaustive_structs)]
-pub struct ActivatableRegion {
-    /// The function to call when this region is activated.
-    pub effect: EphemeralOpaque<dyn Fn() + Send + Sync>,
-}
-
-impl ActivatableRegion {
-    /// Activate this region, calling the embedded function.
-    pub fn activate(&self) {
-        if let Some(f) = self.effect.try_ref() {
-            f();
-        }
-    }
-}
-
-impl behavior::Behavior<Space> for ActivatableRegion {
-    fn step(
-        &self,
-        _context: &behavior::Context<'_, Space>,
-    ) -> (UniverseTransaction, behavior::Then) {
-        // TODO: Give a way for this to be deleted automatically when
-        // its effect is gone
-        (UniverseTransaction::default(), behavior::Then::Step)
-    }
-    fn persistence(&self) -> Option<behavior::Persistence> {
-        // Not useful to serialize since `EphemeralOpaque` can't be.
-        None
-    }
-}
-
-impl VisitHandles for ActivatableRegion {
-    fn visit_handles(&self, _: &mut dyn HandleVisitor) {
-        // Our only interesting member is an EphemeralOpaque — which is opaque.
-    }
-}
+// -------------------------------------------------------------------------------------------------
 
 /// Access to data of a single cube of a [`Space`], provided by [`Space::extract()`].
 ///
@@ -1444,6 +1281,8 @@ impl<'s> Extract<'s> {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 // TODO: Tune this buffer size parameter, and validate it isn't overly large on the stack.
 type ChangeBuffer<'notifier> =
