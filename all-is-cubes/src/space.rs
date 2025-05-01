@@ -571,14 +571,13 @@ impl Space {
     ///
     /// The returned [`Mutation`] contains methods to perform various mutations.
     //---
-    // TODO(read_ticket): make this public and replace other mutation methods that need a ReadTicket
     // Design note: The reason this is a function with callback, rather than returning a
     // `Mutation`, is so that the `Mutation` is guaranteed to be dropped and deliver its
     // notifications.
     //
     // In the future, there may also be ways in which the space can be in a temporarily invalid
     // state (e.g. allocating a block index before it is used anywhere).
-    pub(crate) fn mutate<R>(
+    pub fn mutate<R>(
         &mut self,
         read_ticket: ReadTicket<'_>,
         f: impl FnOnce(&mut Mutation<'_, '_>) -> R,
@@ -1301,8 +1300,11 @@ impl<'s> Extract<'s> {
 type ChangeBuffer<'notifier> =
     listen::Buffer<'notifier, SpaceChange, listen::DynListener<SpaceChange>, 16>;
 
-/// Argument passed to [`Space`] mutation methods that are used in bulk mutations.
-pub(crate) struct Mutation<'m, 'space> {
+/// Access to a [`Space`]’s contents to perform several modifications.
+///
+/// Obtain this using [`Space::mutate()`].
+#[allow(missing_debug_implementations, reason = "TODO")]
+pub struct Mutation<'m, 'space> {
     /// Used for evaluating blocks that are added.
     read_ticket: ReadTicket<'m>,
 

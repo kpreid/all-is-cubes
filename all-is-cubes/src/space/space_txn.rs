@@ -291,11 +291,8 @@ impl SpaceTransaction {
     }
 
     /// As [`Transaction::execute()`], but taking a [`Mutation`] instead of a [`Space`].
-    #[expect(dead_code, reason = "TODO(read_ticket): this will be needed later")]
-    pub(crate) fn execute_ctx(
-        &self,
-        target: &mut Mutation<'_, '_>,
-    ) -> Result<(), ExecuteError<Self>> {
+    // TODO: better name
+    pub fn execute_m(&self, target: &mut Mutation<'_, '_>) -> Result<(), ExecuteError<Self>> {
         let check = self
             .check_common(target.palette, target.contents.as_ref(), target.behaviors)
             .map_err(ExecuteError::Check)?;

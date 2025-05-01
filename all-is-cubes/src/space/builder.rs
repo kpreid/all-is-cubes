@@ -9,7 +9,8 @@ use crate::block::{AIR, Block};
 use crate::character::Spawn;
 use crate::math::{FreePoint, Rgb, Vol};
 use crate::space::{
-    BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, Sky, Space, SpacePhysics,
+    BlockIndex, GridAab, LightPhysics, PackedLight, Palette, PaletteError, SetCubeError, Sky,
+    Space, SpacePhysics,
 };
 use crate::universe::ReadTicket;
 
@@ -259,6 +260,23 @@ impl Builder<'_, Vol<()>> {
     /// The builder must have had bounds specified.
     pub fn build(self) -> Space {
         Space::new_from_builder(self)
+    }
+
+    /// Convenience combination of [`Builder::build()`] and [`Space::mutate()`].
+    ///
+    /// Use this when [`Builder::filled_with()`] is not enough control over the initial contents
+    /// of the space.
+    ///
+    /// If an error type other than [`SetCubeError`] is needed, use [`Space::mutate()`] instead
+    /// of this.
+    pub fn build_and_mutate(
+        self,
+        f: impl FnOnce(&mut super::Mutation<'_, '_>) -> Result<(), SetCubeError>,
+    ) -> Result<Space, SetCubeError> {
+        let mut space = self.build();
+        // TODO(read_ticket): appropriate ticket should be supplied as another builder argument
+        space.mutate(ReadTicket::new(), f)?;
+        Ok(space)
     }
 }
 
