@@ -346,6 +346,7 @@ impl Space {
         // This may reduce compile time and code size.
         Self::set_impl(
             &mut MutationCtx {
+                read_ticket: ReadTicket::new(),
                 palette: &mut self.palette,
                 contents: self.contents.as_mut(),
                 light: &mut self.light,
@@ -365,7 +366,6 @@ impl Space {
         position: Cube,
         block: &Block,
     ) -> Result<bool, SetCubeError> {
-        let read_ticket = ReadTicket::new(); // TODO(read_ticket): need to pass one in...without complicating worldgen
         if let Some(contents_index) = ctx.contents.index(position) {
             let old_block_index = ctx.contents.as_linear()[contents_index];
             let old_block = ctx.palette.entry(old_block_index).block();
@@ -383,7 +383,7 @@ impl Space {
             // It also means that the externally observable block index behavior is easier
             // to characterize and won't create unnecessary holes.
             if ctx.palette.try_replace_unique(
-                read_ticket,
+                ctx.read_ticket,
                 old_block_index,
                 block,
                 ctx.change_buffer,
@@ -401,7 +401,7 @@ impl Space {
             // Find or allocate index for new block. This must be done before other mutations since it can fail.
             let new_block_index =
                 ctx.palette
-                    .ensure_index(read_ticket, block, ctx.change_buffer, true)?;
+                    .ensure_index(ctx.read_ticket, block, ctx.change_buffer, true)?;
 
             // Update counts
             ctx.palette.decrement_maybe_free(old_block_index);
@@ -505,6 +505,7 @@ impl Space {
         }
 
         let mutation_ctx = &mut MutationCtx {
+            read_ticket: ReadTicket::new(),
             palette: &mut self.palette,
             contents: self.contents.as_mut(),
             light: &mut self.light,
@@ -1290,9 +1291,14 @@ type ChangeBuffer<'notifier> =
 
 /// Argument passed to [`Space`] mutation methods that are used in bulk mutations.
 struct MutationCtx<'a, 'n> {
+    /// Used for evaluating blocks that are added.
+    read_ticket: ReadTicket<'a>,
+
     contents: Vol<&'a mut [BlockIndex]>,
     light: &'a mut LightStorage,
     palette: &'a mut Palette,
     cubes_wanting_ticks: &'a mut HbHashSet<Cube>,
+
+    /// Buffers outgoing change notifications; flushed as needed and on drop.
     change_buffer: &'a mut ChangeBuffer<'n>,
 }

@@ -16,6 +16,7 @@ use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
 use crate::transaction::{
     CommitError, Equal, Merge, NoOutput, Transaction, Transactional, no_outputs,
 };
+use crate::universe::ReadTicket;
 use crate::util::{ConciseDebug, Refmt as _};
 
 #[cfg(doc)]
@@ -232,6 +233,7 @@ impl Transaction for SpaceTransaction {
 
         // Create a mutation context, which lets us batch change notifications from this commit.
         let mut ctx = crate::space::MutationCtx {
+            read_ticket: ReadTicket::new(), // TODO(read_ticket): transactions will need reworking in general
             palette: &mut space.palette,
             contents: space.contents.as_mut(),
             light: &mut space.light,
