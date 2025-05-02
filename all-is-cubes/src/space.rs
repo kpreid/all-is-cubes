@@ -344,18 +344,9 @@ impl Space {
     ) -> Result<bool, SetCubeError> {
         // Delegate to a monomorphic function.
         // This may reduce compile time and code size.
-        Self::set_impl(
-            &mut MutationCtx {
-                read_ticket: ReadTicket::new(),
-                palette: &mut self.palette,
-                contents: self.contents.as_mut(),
-                light: &mut self.light,
-                change_buffer: &mut self.change_notifier.buffer(),
-                cubes_wanting_ticks: &mut self.cubes_wanting_ticks,
-            },
-            position.into(),
-            &block.into(),
-        )
+        self.mutate(ReadTicket::new(), |ctx| {
+            Self::set_impl(ctx, position.into(), &block.into())
+        })
     }
 
     /// Implementation of replacing the block in a single cube, as in [`Self::set()`].
@@ -504,23 +495,16 @@ impl Space {
             });
         }
 
-        let mutation_ctx = &mut MutationCtx {
-            read_ticket: ReadTicket::new(),
-            palette: &mut self.palette,
-            contents: self.contents.as_mut(),
-            light: &mut self.light,
-            change_buffer: &mut self.change_notifier.buffer(),
-            cubes_wanting_ticks: &mut self.cubes_wanting_ticks,
-        };
-
-        for cube in region.interior_iter() {
-            if let Some(block) = function(cube) {
-                // TODO: Optimize side effect processing by batching lighting updates for
-                // when we know what's now opaque or not.
-                Self::set_impl(mutation_ctx, cube, block.borrow())?;
+        self.mutate(ReadTicket::new(), |mutation_ctx| {
+            for cube in region.interior_iter() {
+                if let Some(block) = function(cube) {
+                    // TODO: Optimize side effect processing by batching lighting updates for
+                    // when we know what's now opaque or not.
+                    Self::set_impl(mutation_ctx, cube, block.borrow())?;
+                }
             }
-        }
-        Ok(())
+            Ok::<(), SetCubeError>(())
+        })
     }
 
     /// Replace blocks in `region` with the given block.
@@ -581,6 +565,30 @@ impl Space {
     /// [`all_is_cubes::drawing`](crate::drawing).
     pub fn draw_target<C>(&mut self, transform: Gridgid) -> DrawingPlane<'_, Space, C> {
         DrawingPlane::new(self, transform)
+    }
+
+    /// Provides a [`MutationCtx`] to `f`, which may be used to replace one or many blocks in the
+    /// [`Space`].
+    ///
+    /// `read_ticket` should be a [`ReadTicket`] obtained from the [`Universe`] which contains
+    /// the [`BlockDef`]s used and will eventually contain this [`Space`] too.
+    //---
+    // TODO(read_ticket): make this public and replace other mutation methods that need a ReadTicket
+    pub(crate) fn mutate<R>(
+        &mut self,
+        read_ticket: ReadTicket<'_>,
+        f: impl FnOnce(&mut MutationCtx<'_, '_>) -> R,
+    ) -> R {
+        f(&mut MutationCtx {
+            read_ticket,
+            palette: &mut self.palette,
+            contents: self.contents.as_mut(),
+            light: &mut self.light,
+            behaviors: &mut self.behaviors,
+            change_buffer: &mut self.change_notifier.buffer(),
+            fluff_buffer: &mut self.fluff_notifier.buffer(),
+            cubes_wanting_ticks: &mut self.cubes_wanting_ticks,
+        })
     }
 
     /// Returns all distinct block types found in the space.
@@ -1290,15 +1298,17 @@ type ChangeBuffer<'notifier> =
     listen::Buffer<'notifier, SpaceChange, listen::DynListener<SpaceChange>, 16>;
 
 /// Argument passed to [`Space`] mutation methods that are used in bulk mutations.
-struct MutationCtx<'a, 'n> {
+pub(crate) struct MutationCtx<'ctx, 'buf> {
     /// Used for evaluating blocks that are added.
-    read_ticket: ReadTicket<'a>,
+    read_ticket: ReadTicket<'ctx>,
 
-    contents: Vol<&'a mut [BlockIndex]>,
-    light: &'a mut LightStorage,
-    palette: &'a mut Palette,
-    cubes_wanting_ticks: &'a mut HbHashSet<Cube>,
+    contents: Vol<&'ctx mut [BlockIndex]>,
+    light: &'ctx mut LightStorage,
+    palette: &'ctx mut Palette,
+    cubes_wanting_ticks: &'ctx mut HbHashSet<Cube>,
+    behaviors: &'ctx mut BehaviorSet<Space>,
 
-    /// Buffers outgoing change notifications; flushed as needed and on drop.
-    change_buffer: &'a mut ChangeBuffer<'n>,
+    // Buffers outgoing notifications; flushed as needed and on drop.
+    change_buffer: &'ctx mut ChangeBuffer<'buf>,
+    fluff_buffer: &'ctx mut listen::Buffer<'buf, SpaceFluff, listen::DynListener<SpaceFluff>, 16>,
 }

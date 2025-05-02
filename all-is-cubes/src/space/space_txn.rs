@@ -1,5 +1,6 @@
 //! TODO: Maybe this file is too small
 
+use all_is_cubes_base::math::Vol;
 use alloc::collections::BTreeMap;
 use alloc::collections::btree_map::Entry::*;
 use alloc::string::ToString;
@@ -12,9 +13,9 @@ use crate::block::Block;
 use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
 use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid};
-use crate::space::{ActivatableRegion, GridAab, SetCubeError, Space};
+use crate::space::{self, ActivatableRegion, GridAab, MutationCtx, SetCubeError, Space};
 use crate::transaction::{
-    CommitError, Equal, Merge, NoOutput, Transaction, Transactional, no_outputs,
+    CommitError, Equal, ExecuteError, Merge, NoOutput, Transaction, Transactional, no_outputs,
 };
 use crate::universe::ReadTicket;
 use crate::util::{ConciseDebug, Refmt as _};
@@ -170,15 +171,18 @@ impl SpaceTransaction {
 
         bounds
     }
-}
 
-impl Transaction for SpaceTransaction {
-    type Target = Space;
-    type CommitCheck = <BehaviorSetTransaction<Space> as Transaction>::CommitCheck;
-    type Output = NoOutput;
-    type Mismatch = SpaceTransactionMismatch;
-
-    fn check(&self, space: &Space) -> Result<Self::CommitCheck, Self::Mismatch> {
+    /// As [`SpaceTransaction::check()`], but does not require borrowing the whole `Space`.
+    ///
+    /// This cannot practically be a [`Transaction`] implementation due to the lifetime
+    /// parameters. TODO: Consider if there is a `Transaction` redesign to be had here.
+    fn check_common(
+        &self,
+        palette: &space::Palette,
+        contents: Vol<&[space::BlockIndex]>,
+        behaviors: &behavior::BehaviorSet<Space>,
+    ) -> Result<<BehaviorSetTransaction<Space> as Transaction>::CommitCheck, SpaceTransactionMismatch>
+    {
         for (
             &cube,
             CubeTransaction {
@@ -191,16 +195,11 @@ impl Transaction for SpaceTransaction {
         ) in &self.cubes
         {
             let cube = Cube::from(cube);
-            if let Some(cube_index) = space.contents.index(cube) {
+            if let Some(cube_index) = contents.index(cube) {
                 if let Equal(Some(old)) = old {
                     // Raw lookup because we already computed the index for a bounds check
                     // (TODO: Put this in a function, like get_block_index)
-                    if space
-                        .palette
-                        .entry(space.contents.as_linear()[cube_index])
-                        .block()
-                        != old
-                    {
+                    if palette.entry(contents.as_linear()[cube_index]).block() != old {
                         return Err(SpaceTransactionMismatch::Cube(cube));
                     }
                 }
@@ -213,33 +212,22 @@ impl Transaction for SpaceTransaction {
                     // making AIR more special.
                     return Err(SpaceTransactionMismatch::OutOfBounds {
                         transaction: cube.grid_aab(),
-                        space: space.bounds(),
+                        space: contents.bounds(),
                     });
                 }
             }
         }
         self.behaviors
-            .check(&space.behaviors)
+            .check(behaviors)
             .map_err(SpaceTransactionMismatch::Behaviors)
     }
 
-    fn commit(
+    fn commit_common(
         &self,
-        space: &mut Space,
-        check: Self::CommitCheck,
-        _outputs: &mut dyn FnMut(Self::Output),
+        ctx: &mut MutationCtx<'_, '_>,
+        check: behavior::CommitCheck,
     ) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
-
-        // Create a mutation context, which lets us batch change notifications from this commit.
-        let mut ctx = crate::space::MutationCtx {
-            read_ticket: ReadTicket::new(), // TODO(read_ticket): transactions will need reworking in general
-            palette: &mut space.palette,
-            contents: space.contents.as_mut(),
-            light: &mut space.light,
-            change_buffer: &mut space.change_notifier.buffer(),
-            cubes_wanting_ticks: &mut space.cubes_wanting_ticks,
-        };
 
         for (
             &cube,
@@ -255,7 +243,7 @@ impl Transaction for SpaceTransaction {
             let cube = Cube::from(cube);
 
             if let Equal(Some(new)) = new {
-                match Space::set_impl(&mut ctx, cube, new) {
+                match Space::set_impl(ctx, cube, new) {
                     Ok(_) => Ok(()),
                     Err(SetCubeError::OutOfBounds { .. }) if !conserved => {
                         // ignore
@@ -275,7 +263,7 @@ impl Transaction for SpaceTransaction {
                 reason = "https://github.com/rust-lang/rust-clippy/issues/11827"
             )]
             for fluff in fluff.iter().cloned() {
-                space.fluff_notifier.notify(&super::SpaceFluff {
+                ctx.fluff_buffer.push(super::SpaceFluff {
                     position: cube,
                     fluff,
                 });
@@ -283,11 +271,11 @@ impl Transaction for SpaceTransaction {
         }
 
         self.behaviors
-            .commit(&mut space.behaviors, check, &mut no_outputs)
+            .commit(ctx.behaviors, check, &mut no_outputs)
             .map_err(|e| e.context("behaviors".into()))?;
 
         if !to_activate.is_empty() {
-            'b: for query_item in space.behaviors.query::<ActivatableRegion>() {
+            'b: for query_item in ctx.behaviors.query::<ActivatableRegion>() {
                 // TODO: error return from the function? error report for nonexistence?
                 for cube in to_activate.iter().copied() {
                     // TODO: this should be part of the query instead, to allow efficient search
@@ -300,6 +288,39 @@ impl Transaction for SpaceTransaction {
         }
 
         Ok(())
+    }
+
+    /// As [`Transaction::execute()`], but taking a [`MutationCtx`] instead of a [`Space`].
+    #[expect(dead_code, reason = "TODO(read_ticket): this will be needed later")]
+    pub(crate) fn execute_ctx(
+        &self,
+        target: &mut MutationCtx<'_, '_>,
+    ) -> Result<(), ExecuteError<Self>> {
+        let check = self
+            .check_common(target.palette, target.contents.as_ref(), target.behaviors)
+            .map_err(ExecuteError::Check)?;
+        self.commit_common(target, check)
+            .map_err(ExecuteError::Commit)
+    }
+}
+
+impl Transaction for SpaceTransaction {
+    type Target = Space;
+    type CommitCheck = <BehaviorSetTransaction<Space> as Transaction>::CommitCheck;
+    type Output = NoOutput;
+    type Mismatch = SpaceTransactionMismatch;
+
+    fn check(&self, space: &Space) -> Result<Self::CommitCheck, Self::Mismatch> {
+        self.check_common(&space.palette, space.contents.as_ref(), &space.behaviors)
+    }
+
+    fn commit(
+        &self,
+        space: &mut Space,
+        check: Self::CommitCheck,
+        _outputs: &mut dyn FnMut(Self::Output),
+    ) -> Result<(), CommitError> {
+        space.mutate(ReadTicket::new(), |ctx| self.commit_common(ctx, check))
     }
 }
 
