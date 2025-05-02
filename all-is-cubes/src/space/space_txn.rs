@@ -560,7 +560,7 @@ impl CubeTransaction {
     /// Sets the block to be placed at this cube, replacing any existing modification instruction
     /// This does not affect a precondition on the existing block, or the conservative option.
     ///
-    /// This is thus comparable to the effect of a direct [`Space::set()`] after the rest of the
+    /// This is thus comparable to the effect of a direct [`Mutation::set()`] after the rest of the
     /// transaction.
     //---
     // TODO: no tests

@@ -350,7 +350,7 @@ fn fill_out_of_bounds() {
     );
 }
 
-/// Test filling an entire space with one block using [`Space::fill`].
+/// Test filling an entire space with one block using [`Mutation::fill`].
 #[test]
 fn fill_entire_space() {
     let block = block::from_color!(0., 0., 0., 0.5); // transparent so light gets involved
@@ -369,7 +369,7 @@ fn fill_entire_space() {
     }
 }
 
-/// Test filling an entire space with one block using [`Space::fill_uniform`].
+/// Test filling an entire space with one block using [`Mutation::fill_uniform`].
 #[test]
 fn fill_uniform_entire_space() {
     let [block] = make_some_blocks();
@@ -418,7 +418,7 @@ fn listens_to_block_changes() {
 
     // Set up space and listener
     let mut space = Space::builder(GridAab::ORIGIN_CUBE)
-    .read_ticket(universe.read_ticket())
+        .read_ticket(universe.read_ticket())
         .filled_with(indirect)
         .build();
     let sink = Sink::new();

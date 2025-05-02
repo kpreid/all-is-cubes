@@ -13,8 +13,6 @@ use manyfmt::Fmt;
 use crate::behavior::BehaviorSet;
 use crate::behavior::BehaviorSetStepInfo;
 use crate::block::{AIR, AIR_EVALUATED_REF, Block, EvaluatedBlock, Resolution, TickAction};
-#[cfg(doc)]
-use crate::character::Character;
 use crate::character::Spawn;
 use crate::drawing::DrawingPlane;
 use crate::fluff::{self, Fluff};
@@ -26,6 +24,9 @@ use crate::transaction::{self, Merge, Transaction as _};
 use crate::universe::ReadTicket;
 use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
+
+#[cfg(doc)]
+use crate::{block::BlockDef, character::Character, universe::Universe};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -342,11 +343,7 @@ impl Space {
         position: impl Into<Cube>,
         block: impl Into<Cow<'a, Block>>,
     ) -> Result<bool, SetCubeError> {
-        // Delegate to a monomorphic function.
-        // This may reduce compile time and code size.
-        self.mutate(ReadTicket::new(), |ctx| {
-            Self::set_impl(ctx, position.into(), &block.into())
-        })
+        self.mutate(ReadTicket::new(), |m| m.set(position.into(), block.into()))
     }
 
     /// Implementation of replacing the block in a single cube, as in [`Self::set()`].
@@ -452,107 +449,20 @@ impl Space {
         });
     }
 
-    /// Replace blocks in `region` with a block computed by the function.
-    ///
-    /// The function may return a reference to a block or a block. If it returns [`None`],
-    /// the existing block is left unchanged.
-    ///
-    /// The operation will stop on the first error, potentially leaving some blocks
-    /// replaced. (Exception: If the `region` extends outside of
-    /// [`self.bounds()`](Self::bounds), that will always be rejected before any changes
-    /// are made.)
-    ///
-    /// ```
-    /// use all_is_cubes::block::{AIR, Block};
-    /// use all_is_cubes::math::{GridAab, Rgba};
-    /// use all_is_cubes::space::Space;
-    ///
-    /// let mut space = Space::empty_positive(10, 10, 10);
-    /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();
-    ///
-    /// space.fill(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]), |_point| Some(&a_block)).unwrap();
-    ///
-    /// assert_eq!(space[[0, 0, 0]], a_block);
-    /// assert_eq!(space[[1, 0, 0]], a_block);
-    /// assert_eq!(space[[0, 1, 0]], AIR);
-    /// ```
-    ///
-    /// TODO: Support providing the previous block as a parameter (take cues from `extract`).
-    ///
-    /// See also [`Space::fill_uniform`] for filling a region with one block.
-    pub fn fill<F, B>(&mut self, region: GridAab, mut function: F) -> Result<(), SetCubeError>
+    #[allow(missing_docs)]
+    #[deprecated = "use Space::mutate() first"]
+    pub fn fill<F, B>(&mut self, region: GridAab, function: F) -> Result<(), SetCubeError>
     where
         F: FnMut(Cube) -> Option<B>,
         B: core::borrow::Borrow<Block>,
     {
-        if !self.bounds().contains_box(region) {
-            return Err(SetCubeError::OutOfBounds {
-                modification: region,
-                space_bounds: self.bounds(),
-            });
-        }
-
-        self.mutate(ReadTicket::new(), |mutation_ctx| {
-            for cube in region.interior_iter() {
-                if let Some(block) = function(cube) {
-                    // TODO: Optimize side effect processing by batching lighting updates for
-                    // when we know what's now opaque or not.
-                    Self::set_impl(mutation_ctx, cube, block.borrow())?;
-                }
-            }
-            Ok::<(), SetCubeError>(())
-        })
+        self.mutate(ReadTicket::new(), |m| m.fill(region, function))
     }
 
-    /// Replace blocks in `region` with the given block.
-    ///
-    /// TODO: Document error behavior
-    ///
-    /// ```
-    /// use all_is_cubes::block::{AIR, Block};
-    /// use all_is_cubes::math::{GridAab, Rgba};
-    /// use all_is_cubes::space::Space;
-    ///
-    /// let mut space = Space::empty_positive(10, 10, 10);
-    /// let a_block: Block = Rgba::new(1.0, 0.0, 0.0, 1.0).into();
-    ///
-    /// space.fill_uniform(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]), &a_block).unwrap();
-    ///
-    /// assert_eq!(&space[[0, 0, 0]], &a_block);
-    /// assert_eq!(&space[[1, 0, 0]], &a_block);
-    /// assert_eq!(&space[[0, 1, 0]], &AIR);
-    /// ```
-    ///
-    /// See also [`Space::fill`] for non-uniform fill and bulk copies.
+    #[allow(missing_docs)]
+    #[deprecated = "use Space::mutate() first"]
     pub fn fill_uniform(&mut self, region: GridAab, block: &Block) -> Result<(), SetCubeError> {
-        if !self.bounds().contains_box(region) {
-            Err(SetCubeError::OutOfBounds {
-                modification: region,
-                space_bounds: self.bounds(),
-            })
-        } else if self.bounds() == region {
-            // We're overwriting the entire space, so we might as well re-initialize it.
-            {
-                let linear = self.contents.as_linear_mut();
-                let volume = linear.len();
-                self.palette = Palette::new(
-                    ReadTicket::new(), // TODO(read_ticket)
-                    block.clone(),
-                    volume,
-                );
-                linear.fill(/* block index = */ 0);
-            }
-            // TODO: if opaque, don't schedule updates
-            self.light
-                .light_needs_update_in_region(region, light::Priority::UNINIT);
-            // TODO: also need to activate tick_action if present.
-            // And see if we can share more of the logic of this with new_from_builder().
-            self.change_notifier.notify(&SpaceChange::EveryBlock);
-            Ok(())
-        } else {
-            // Fall back to the generic strategy.
-            self.fill(region, |_| Some(block))
-        }
+        self.mutate(ReadTicket::new(), |m| m.fill_uniform(region, block))
     }
 
     /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
@@ -1009,7 +919,7 @@ impl<T: Into<Cube>> ops::Index<T> for Space {
     /// If the position is out of bounds, returns [`AIR`].
     ///
     /// Note that [`Space`] does not implement [`IndexMut`](core::ops::IndexMut);
-    /// use [`Space::set`] or [`Space::fill`] to modify blocks.
+    /// use [`Mutation::set()`] or [`Mutation::fill()`] to modify blocks.
     #[inline(always)]
     fn index(&self, position: T) -> &Self::Output {
         if let Some(&block_index) = self.contents.get(position.into()) {
@@ -1050,7 +960,7 @@ impl Listen for Space {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Ways that [`Space::set`] can fail to make a change.
+/// Ways that [`Mutation::set()`] can fail to make a change.
 ///
 /// Note that "already contained the given block" is considered a success.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -1317,4 +1227,188 @@ pub struct Mutation<'m, 'space> {
     // Buffers outgoing notifications; flushed as needed and on drop.
     change_buffer: &'m mut ChangeBuffer<'space>,
     fluff_buffer: &'m mut listen::Buffer<'space, SpaceFluff, listen::DynListener<SpaceFluff>, 16>,
+}
+
+#[allow(missing_docs, reason = "TODO")]
+impl Mutation<'_, '_> {
+    /// Same as [`Space::bounds()`].
+    pub fn bounds(&self) -> GridAab {
+        self.contents.bounds()
+    }
+
+    /// Returns the [`EvaluatedBlock`] of the block in this space at the given position.
+    ///
+    /// If out of bounds, returns the evaluation of [`AIR`].
+    #[inline(always)]
+    pub fn get_evaluated(&self, position: impl Into<Cube>) -> &EvaluatedBlock {
+        if let Some(block_index) = self.contents.get(position.into()).copied() {
+            self.palette.entry(block_index).evaluated()
+        } else {
+            AIR_EVALUATED_REF
+        }
+    }
+
+    /// Replace the block in this space at the given position.
+    ///
+    /// If the position is out of bounds, there is no effect.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(true)` if the change was made, `Ok(false)` if the same block was
+    /// already present, and `Err(_)` if the replacement could not be made; see
+    /// [`SetCubeError`] for possible errors.
+    ///
+    // TODO(read_ticket): fix example to use Mutation
+    /// ```
+    /// use all_is_cubes::block;
+    /// use all_is_cubes::math::Rgba;
+    /// use all_is_cubes::space::Space;
+    /// use all_is_cubes::universe::ReadTicket;
+    ///
+    /// let mut space = Space::empty_positive(1, 1, 1);
+    /// let a_block = block::from_color!(1.0, 0.0, 0.0, 1.0);
+    ///
+    /// space.mutate(ReadTicket::stub(), |m| {
+    ///     m.set([0, 0, 0], &a_block)
+    /// }).unwrap();
+    ///
+    /// assert_eq!(space[[0, 0, 0]], a_block);
+    /// ```
+    pub fn set<'block>(
+        &mut self,
+        position: impl Into<Cube>,
+        block: impl Into<Cow<'block, Block>>,
+    ) -> Result<bool, SetCubeError> {
+        Space::set_impl(self, position.into(), &block.into())
+    }
+
+    /// Replace blocks in `region` with a block computed by the function.
+    ///
+    /// The function may return a reference to a block or a block. If it returns [`None`],
+    /// the existing block is left unchanged.
+    ///
+    /// The operation will stop on the first error, potentially leaving some blocks
+    /// replaced. (Exception: If the `region` extends outside of
+    /// [`self.bounds()`](Self::bounds), that will always be rejected before any changes
+    /// are made.)
+    ///
+    /// ```
+    /// use all_is_cubes::block;
+    /// use all_is_cubes::math::{GridAab, Rgba};
+    /// use all_is_cubes::space::Space;
+    /// use all_is_cubes::universe::ReadTicket;
+    ///
+    /// let mut space = Space::empty_positive(10, 10, 10);
+    /// let a_block: block::Block = block::from_color!(1.0, 0.0, 0.0, 1.0);
+    ///
+    /// space.mutate(ReadTicket::stub(), |m| {
+    ///     m.fill(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]), |_point| Some(&a_block))
+    /// }).unwrap();
+    ///
+    /// assert_eq!(space[[0, 0, 0]], a_block);
+    /// assert_eq!(space[[1, 0, 0]], a_block);
+    /// assert_eq!(space[[0, 1, 0]], block::AIR);
+    /// ```
+    ///
+    /// TODO: Support providing the previous block as a parameter (take cues from `extract`).
+    ///
+    /// See also [`Mutation::fill_uniform()`] for filling a region with one block.
+    pub fn fill<F, B>(&mut self, region: GridAab, mut function: F) -> Result<(), SetCubeError>
+    where
+        F: FnMut(Cube) -> Option<B>,
+        B: core::borrow::Borrow<Block>,
+    {
+        if !self.bounds().contains_box(region) {
+            return Err(SetCubeError::OutOfBounds {
+                modification: region,
+                space_bounds: self.bounds(),
+            });
+        }
+
+        for cube in region.interior_iter() {
+            if let Some(block) = function(cube) {
+                // TODO: Optimize side effect processing by batching lighting updates for
+                // when we know what's now opaque or not.
+                Space::set_impl(self, cube, block.borrow())?;
+            }
+        }
+        Ok(())
+    }
+
+    /// As [`Mutation::fill()`], but fills the entire space instead of a specified region.
+    pub fn fill_all<F, B>(&mut self, function: F) -> Result<(), SetCubeError>
+    where
+        F: FnMut(Cube) -> Option<B>,
+        B: core::borrow::Borrow<Block>,
+    {
+        self.fill(self.bounds(), function)
+    }
+
+    /// Replace blocks in `region` with the given block.
+    ///
+    /// TODO: Document error behavior
+    ///
+    /// ```
+    /// use all_is_cubes::block;
+    /// use all_is_cubes::math::{GridAab, Rgba};
+    /// use all_is_cubes::space::Space;
+    /// use all_is_cubes::universe::ReadTicket;
+    ///
+    /// let mut space = Space::empty_positive(10, 10, 10);
+    /// let a_block: block::Block = block::from_color!(1.0, 0.0, 0.0, 1.0);
+    ///
+    /// space.mutate(ReadTicket::stub(), |m| {
+    ///     m.fill_uniform(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]), &a_block)
+    /// }).unwrap();
+    ///
+    /// assert_eq!(&space[[0, 0, 0]], &a_block);
+    /// assert_eq!(&space[[1, 0, 0]], &a_block);
+    /// assert_eq!(&space[[0, 1, 0]], &block::AIR);
+    /// ```
+    ///
+    /// See also [`Mutation::fill()`] for non-uniform fill and bulk copies.
+    pub fn fill_uniform(&mut self, region: GridAab, block: &Block) -> Result<(), SetCubeError> {
+        if !self.bounds().contains_box(region) {
+            Err(SetCubeError::OutOfBounds {
+                modification: region,
+                space_bounds: self.bounds(),
+            })
+        } else if self.bounds() == region {
+            // We're overwriting the entire space, so we might as well re-initialize it.
+            {
+                let linear = self.contents.as_linear_mut();
+                let volume = linear.len();
+                *self.palette = Palette::new(self.read_ticket, block.clone(), volume);
+                linear.fill(/* block index = */ 0);
+            }
+            // TODO: if opaque, don't schedule updates
+            self.light
+                .light_needs_update_in_region(region, light::Priority::UNINIT);
+            // TODO: also need to activate tick_action if present.
+            // And see if we can share more of the logic of this with new_from_builder().
+            self.change_buffer.push(SpaceChange::EveryBlock);
+            Ok(())
+        } else {
+            // Fall back to the generic strategy.
+            self.fill(region, |_| Some(block))
+        }
+    }
+
+    /// As [`Mutation::fill_uniform()`], but fills the entire space instead of a specified region.
+    pub fn fill_all_uniform(&mut self, block: &Block) -> Result<(), SetCubeError> {
+        self.fill_uniform(self.bounds(), block)
+    }
+}
+
+impl<T: Into<Cube>> ops::Index<T> for Mutation<'_, '_> {
+    type Output = Block;
+
+    #[inline(always)]
+    fn index(&self, position: T) -> &Self::Output {
+        if let Some(&block_index) = self.contents.get(position.into()) {
+            self.palette.entry(block_index).block()
+        } else {
+            &AIR
+        }
+    }
 }

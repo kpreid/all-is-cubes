@@ -13,6 +13,9 @@ use crate::space::{SetCubeError, Space};
 use crate::transaction::{self, Merge, Transaction};
 use crate::universe::{Handle, Name, Universe, UniverseTransaction};
 
+#[cfg(doc)]
+use crate::space;
+
 /// Tool for constructing [`Block`] values conveniently.
 ///
 /// It can also be used to construct [`BlockAttributes`] values.
@@ -192,7 +195,7 @@ impl<P, Txn> Builder<P, Txn> {
     }
 
     /// Constructs a `Space` for building a [`Primitive::Recur`], and calls
-    /// the given function to fill it with blocks, in the manner of [`Space::fill`].
+    /// the given function to fill it with blocks, in the manner of [`space::Mutation::fill()`].
     ///
     /// If the voxels do not fill the entire volume of the block being built — that is, there is
     /// some smaller region outside of which they are all [`AIR`] — then the [`Space`] will be
