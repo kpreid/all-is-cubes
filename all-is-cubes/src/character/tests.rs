@@ -203,6 +203,7 @@ fn no_superjumping() {
     let mut universe = Universe::new();
     let space = universe.insert_anonymous(
         Space::builder(GridAab::ORIGIN_CUBE)
+        .read_ticket(universe.read_ticket())
             .filled_with(block::from_color!(Rgb::ONE))
             .build(),
     );
@@ -242,6 +243,7 @@ fn click_wrong_space_or_correct_space() {
         // something for the raycast to hit
         universe.insert_anonymous(
             Space::builder(GridAab::ORIGIN_CUBE)
+            .read_ticket(universe.read_ticket())
                 .filled_with(block::from_color!(Rgb::ONE))
                 .build(),
         )

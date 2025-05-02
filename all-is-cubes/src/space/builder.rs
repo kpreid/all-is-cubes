@@ -1,5 +1,7 @@
 //! Lesser-used helpers for [`Builder`].
 
+#![allow(clippy::needless_lifetimes)]
+
 use alloc::boxed::Box;
 
 use crate::behavior::BehaviorSet;
@@ -20,7 +22,8 @@ use crate::universe::ReadTicket;
 /// * `B` is either `()` or `Vol<()>` according to whether the bounds have been specified.
 #[derive(Clone, Debug)]
 #[must_use]
-pub struct Builder<B> {
+pub struct Builder<'universe, B> {
+    pub(super) read_ticket: ReadTicket<'universe>,
     pub(super) bounds: B,
     pub(super) spawn: Option<Spawn>,
     pub(super) physics: SpacePhysics,
@@ -39,7 +42,21 @@ pub(super) enum Fill {
     },
 }
 
-impl<B> Builder<B> {
+impl<'universe, B> Builder<'universe, B> {
+    /// Sets the [`ReadTicket`] that will be used by builder operations that evaluate blocks.
+    ///
+    /// The default is [`ReadTicket::stub()`].
+    pub fn read_ticket<'u2>(self, read_ticket: ReadTicket<'u2>) -> Builder<'u2, B> {
+        Builder {
+            read_ticket,
+            bounds: self.bounds,
+            spawn: self.spawn,
+            physics: self.physics,
+            behaviors: self.behaviors,
+            contents: self.contents,
+        }
+    }
+
     /// Sets the [`Block`] that the space's volume will be filled with.
     ///
     /// Calling this method will replace any previous specification of the contents,
@@ -92,18 +109,22 @@ impl<B> Builder<B> {
     }
 }
 
-impl<B: Bounds> Builder<B> {
+impl<'universe, B: Bounds> Builder<'universe, B> {
     /// Set the bounds unless they have already been set.
-    pub fn bounds_if_not_set(self, bounds_fn: impl FnOnce() -> GridAab) -> Builder<Vol<()>> {
+    pub fn bounds_if_not_set(
+        self,
+        bounds_fn: impl FnOnce() -> GridAab,
+    ) -> Builder<'universe, Vol<()>> {
         // Delegate to the trait. (This method exists so the trait need not be imported.)
         Bounds::bounds_if_not_set(self, bounds_fn)
     }
 }
 
-impl Builder<()> {
+impl<'universe> Builder<'universe, ()> {
     /// Use [`Builder::default()`] as the public way to call this.
     pub(super) fn new() -> Self {
         Self {
+            read_ticket: ReadTicket::stub(),
             bounds: (),
             spawn: None,
             physics: SpacePhysics::DEFAULT,
@@ -116,8 +137,9 @@ impl Builder<()> {
     ///
     /// Panics if `bounds` has a volume exceeding `usize::MAX`.
     /// (But there will likely be a memory allocation failure well below that point.)
-    pub fn bounds(self, bounds: GridAab) -> Builder<Vol<()>> {
+    pub fn bounds(self, bounds: GridAab) -> Builder<'universe, Vol<()>> {
         Builder {
+            read_ticket: self.read_ticket,
             bounds: bounds.to_vol().unwrap(),
             spawn: self.spawn,
             physics: self.physics,
@@ -127,7 +149,7 @@ impl Builder<()> {
     }
 }
 
-impl Builder<Vol<()>> {
+impl Builder<'_, Vol<()>> {
     /// Sets the default spawn location of new characters.
     ///
     /// Panics if any of the given coordinates is infinite or NaN.
@@ -165,7 +187,6 @@ impl Builder<Vol<()>> {
     /// such as [`filled_with()`](Self::filled_with()).
     pub fn palette_and_contents<P>(
         self,
-        read_ticket: ReadTicket<'_>,
         palette: P,
         contents: Vol<Box<[BlockIndex]>>,
         light: Option<Vol<Box<[PackedLight]>>>,
@@ -173,7 +194,8 @@ impl Builder<Vol<()>> {
     where
         P: IntoIterator<IntoIter: ExactSizeIterator<Item = Block>>,
     {
-        self.palette_and_contents_impl(read_ticket, &mut palette.into_iter(), contents, light)
+        let ticket = self.read_ticket;
+        self.palette_and_contents_impl(ticket, &mut palette.into_iter(), contents, light)
     }
 
     fn palette_and_contents_impl(
@@ -240,7 +262,7 @@ impl Builder<Vol<()>> {
     }
 }
 
-impl Default for Builder<()> {
+impl Default for Builder<'_, ()> {
     fn default() -> Self {
         Self::new()
     }
@@ -253,26 +275,26 @@ pub trait Bounds: sealed::Sealed + Sized {
     /// This function is an implementation detail; call
     /// [`Builder::bounds_if_not_set()`] instead.
     #[doc(hidden)]
-    fn bounds_if_not_set(
-        builder: Builder<Self>,
+    fn bounds_if_not_set<'u>(
+        builder: Builder<'u, Self>,
         bounds_fn: impl FnOnce() -> GridAab,
-    ) -> Builder<Vol<()>>;
+    ) -> Builder<'u, Vol<()>>;
 }
 
 impl Bounds for () {
-    fn bounds_if_not_set(
-        builder: Builder<Self>,
+    fn bounds_if_not_set<'u>(
+        builder: Builder<'u, Self>,
         bounds_fn: impl FnOnce() -> GridAab,
-    ) -> Builder<Vol<()>> {
+    ) -> Builder<'u, Vol<()>> {
         builder.bounds(bounds_fn())
     }
 }
 
 impl Bounds for Vol<()> {
-    fn bounds_if_not_set(
-        builder: Builder<Self>,
+    fn bounds_if_not_set<'u>(
+        builder: Builder<'u, Self>,
         _bounds_fn: impl FnOnce() -> GridAab,
-    ) -> Builder<Vol<()>> {
+    ) -> Builder<'u, Vol<()>> {
         builder
     }
 }
@@ -384,11 +406,10 @@ mod tests {
 
     #[test]
     fn palette_err_too_long() {
-        let read_ticket = ReadTicket::new();
         let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
-                .palette_and_contents(read_ticket, vec![AIR; 65537], Vol::from_element(2), None,)
+                .palette_and_contents(vec![AIR; 65537], Vol::from_element(2), None,)
                 .unwrap_err(),
             PaletteError::PaletteTooLarge { len: 65537 }
         );
@@ -396,11 +417,10 @@ mod tests {
 
     #[test]
     fn palette_err_too_short_for_contents() {
-        let read_ticket = ReadTicket::new();
         let bounds = GridAab::ORIGIN_CUBE;
         assert_eq!(
             Space::builder(bounds)
-                .palette_and_contents(read_ticket, [AIR], Vol::from_element(2), None,)
+                .palette_and_contents([AIR], Vol::from_element(2), None,)
                 .unwrap_err(),
             PaletteError::Index {
                 index: 2,
@@ -412,10 +432,9 @@ mod tests {
 
     #[test]
     fn palette_err_contents_wrong_bounds() {
-        let read_ticket = ReadTicket::new();
         assert_eq!(
             Space::builder(GridAab::single_cube(Cube::new(1, 0, 0)))
-                .palette_and_contents(read_ticket, [AIR], Vol::from_element(0), None)
+                .palette_and_contents([AIR], Vol::from_element(0), None)
                 .unwrap_err(),
             PaletteError::WrongDataBounds {
                 expected: GridAab::single_cube(Cube::new(1, 0, 0)),
@@ -434,7 +453,6 @@ mod tests {
         let [block0, block1] = make_some_blocks();
         let space = Space::builder(bounds)
             .palette_and_contents(
-                ReadTicket::new(),
                 [block0.clone(), block1.clone(), block0.clone()],
                 Vol::from_elements(bounds, [0, 1, 2]).unwrap(),
                 None,
@@ -458,7 +476,6 @@ mod tests {
         let blocks = make_some_blocks::<3>();
         let space = Space::builder(bounds)
             .palette_and_contents(
-                ReadTicket::new(),
                 blocks.clone(),
                 Vol::from_elements(bounds, [0, 2]).unwrap(),
                 None,

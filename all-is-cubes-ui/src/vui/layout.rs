@@ -432,7 +432,7 @@ impl LayoutTree<Arc<dyn Widget>> {
     /// space is stepped.
     pub fn to_space<B: space::builder::Bounds>(
         self: &Arc<Self>,
-        builder: space::Builder<B>,
+        builder: space::Builder<'_, B>,
         gravity: Gravity,
     ) -> Result<Space, InstallVuiError> {
         let mut space = builder

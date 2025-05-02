@@ -931,6 +931,7 @@ mod tests {
         // Print for debugging
         {
             let space = Space::builder(GridAab::ORIGIN_CUBE)
+                .read_ticket(universe.read_ticket())
                 .filled_with(block.clone())
                 .build();
             print_space(&space, [0., 0., 1.]);

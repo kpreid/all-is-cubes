@@ -658,7 +658,6 @@ mod tests {
         let bounds = GridAab::from_lower_size([0, 0, 0], [3, 1, 1]);
         let space = Space::builder(bounds)
             .palette_and_contents(
-                ReadTicket::new(),
                 blocks.clone(),
                 Vol::from_elements(bounds, [0, 1, 0]).unwrap(),
                 None,

@@ -159,11 +159,13 @@ fn trivial_voxels_equals_atom() {
 
     let (_, _, space_rendered_a) = mesh_blocks_and_space(
         &Space::builder(GridAab::ORIGIN_CUBE)
+            .read_ticket(u.read_ticket())
             .filled_with(atom_block)
             .build(),
     );
     let (tex, _, space_rendered_r) = mesh_blocks_and_space(
         &Space::builder(GridAab::ORIGIN_CUBE)
+            .read_ticket(u.read_ticket())
             .filled_with(trivial_recursive_block)
             .build(),
     );
@@ -216,6 +218,7 @@ fn animated_voxels_uses_texture() {
 
     let (allocator, _, mesh) = mesh_blocks_and_space(
         &Space::builder(GridAab::ORIGIN_CUBE)
+            .read_ticket(u.read_ticket())
             .filled_with(block)
             .build(),
     );
@@ -341,6 +344,7 @@ fn space_mesh_equals_block_mesh() {
         .unwrap()
         .build_into(&mut u);
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+        .read_ticket(u.read_ticket())
         .filled_with(recursive_block)
         .build();
 
@@ -374,6 +378,7 @@ fn block_resolution_greater_than_tile() {
         .unwrap()
         .build_into(&mut u);
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+        .read_ticket(u.read_ticket())
         .filled_with(block)
         .build();
 
@@ -400,6 +405,7 @@ fn shrunken_box_has_no_extras() {
         .unwrap()
         .build_into(&mut u,);
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+    .read_ticket(u.read_ticket())
         .filled_with(less_than_full_block)
         .build();
 
@@ -467,6 +473,7 @@ fn shrunken_box_uniform_color() {
         .unwrap()
         .build_into(&mut u, );
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+    .read_ticket(u.read_ticket())
         .filled_with(less_than_full_block)
         .build();
 
@@ -602,6 +609,7 @@ fn fully_opaque_partial_block() {
             universe.insert_anonymous(
                 Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 8, 8]))
                     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+                    .read_ticket(universe.read_ticket())
                     .filled_with(block::from_color!(Rgba::WHITE))
                     .build(),
             )
@@ -696,6 +704,7 @@ fn handling_allocation_failure() {
     let block_derived_color = complex_block.evaluate(u.read_ticket()).unwrap().color();
 
     let space = Space::builder(GridAab::ORIGIN_CUBE)
+        .read_ticket(u.read_ticket())
         .filled_with(complex_block)
         .build();
 

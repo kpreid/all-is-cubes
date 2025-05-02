@@ -75,7 +75,7 @@ fn COLORS(ctx: Context<'_>) {
     subtitle: "RGBCMY lights in an enclosed room",
     placement: Placement::Surface,
 )]
-fn COLOR_LIGHTS(_: Context<'_>) {
+fn COLOR_LIGHTS(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     let room_width = 11;
@@ -122,6 +122,7 @@ fn COLOR_LIGHTS(_: Context<'_>) {
         let colors_as_blocks: Vec<Block> =
             surface_colors.iter().copied().map(Block::from).collect();
         let mut wall_block_space = Space::for_block(wall_resolution)
+        .read_ticket(ctx.universe.read_ticket())
             .filled_with(wall_color_block.clone())
             .build();
         for rotation in [

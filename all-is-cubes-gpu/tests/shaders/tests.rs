@@ -81,7 +81,6 @@ async fn light_texture_write_read(
     #[values(16, 19, 30, 50)] space_size_param: u32,
 ) {
     use all_is_cubes::block::AIR;
-    use all_is_cubes::universe::ReadTicket;
 
     let instance = crate::harness::instance().await;
     let adapter = init::create_adapter_for_test(instance).await;
@@ -95,7 +94,6 @@ async fn light_texture_write_read(
     // Create a space with well-defined (though nonsensical) light data.
     let space = Space::builder(bounds)
         .palette_and_contents(
-            ReadTicket::stub(),
             [AIR],
             Vol::repeat(bounds, 0),
             Some(Vol::from_fn(bounds, |cube| {

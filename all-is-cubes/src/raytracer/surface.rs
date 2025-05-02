@@ -604,6 +604,7 @@ mod tests {
         let universe = &mut Universe::new();
         let slab = content::make_slab(universe, 1, R2);
         let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+            .read_ticket(universe.read_ticket())
             .filled_with(slab)
             .build();
         let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());

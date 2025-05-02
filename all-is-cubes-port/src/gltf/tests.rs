@@ -45,6 +45,7 @@ fn gltf_smoke_test() {
         .unwrap()
         .build_into(&mut u);
     let outer_space = Space::builder(GridAab::ORIGIN_CUBE)
+        .read_ticket(u.read_ticket())
         .filled_with(recursive_block)
         .build();
 
@@ -122,6 +123,7 @@ async fn export_space() {
         .insert(
             "x".into(),
             Space::builder(GridAab::ORIGIN_CUBE)
+                .read_ticket(universe.read_ticket())
                 .filled_with(block)
                 .build(),
         )

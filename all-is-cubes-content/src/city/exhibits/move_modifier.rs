@@ -103,6 +103,7 @@ fn PROJECTILE(ctx: Context<'_>) {
         .build();
 
     let space = Space::builder(GridAab::ORIGIN_CUBE)
+    .read_ticket(ctx.universe.read_ticket())
         .filled_with(launcher)
         .build();
 

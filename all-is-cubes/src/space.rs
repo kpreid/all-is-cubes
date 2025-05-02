@@ -126,7 +126,7 @@ impl Space {
     /// [`physics`](Self::physics) is [`SpacePhysics::DEFAULT_FOR_BLOCK`].
     ///
     /// [recursive]: crate::block::Primitive::Recur
-    pub fn for_block(resolution: Resolution) -> Builder<Vol<()>> {
+    pub fn for_block(resolution: Resolution) -> Builder<'static, Vol<()>> {
         Builder::new()
             .bounds(GridAab::for_block(resolution))
             .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
@@ -137,7 +137,7 @@ impl Space {
     ///
     /// Panics if `bounds` has a volume exceeding `usize::MAX`.
     /// (But there will likely be a memory allocation failure well below that point.)
-    pub fn builder(bounds: GridAab) -> Builder<Vol<()>> {
+    pub fn builder(bounds: GridAab) -> Builder<'static, Vol<()>> {
         Builder::new().bounds(bounds)
     }
 
@@ -149,8 +149,9 @@ impl Space {
     }
 
     /// Implementation of [`Builder`]'s terminal methods.
-    fn new_from_builder(builder: Builder<Vol<()>>) -> Self {
+    fn new_from_builder(builder: Builder<'_, Vol<()>>) -> Self {
         let Builder {
+            read_ticket,
             bounds,
             spawn,
             physics,
@@ -161,8 +162,7 @@ impl Space {
         let (palette, contents, light) = match contents {
             builder::Fill::Block(block) => {
                 let volume = bounds.volume();
-                // TODO(read_ticket): figure out how to fit passing in a ReadTicket here
-                let palette = Palette::new(ReadTicket::new(), block, volume);
+                let palette = Palette::new(read_ticket, block, volume);
                 let opacity = palette.all_block_opacities_as_category();
                 (
                     palette,

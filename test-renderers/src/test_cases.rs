@@ -932,6 +932,7 @@ async fn sky(mut context: RenderTestContext, face: Face6) {
     let sky = space::Sky::Octants([Rgb::ZERO, b, g, g + b, r, r + b, r + g, r + g + b]);
 
     let space = Space::builder(GridAab::ORIGIN_CUBE)
+        .read_ticket(universe.read_ticket())
         .sky(sky)
         .filled_with(block)
         .spawn({

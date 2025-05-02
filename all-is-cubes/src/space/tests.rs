@@ -418,6 +418,7 @@ fn listens_to_block_changes() {
 
     // Set up space and listener
     let mut space = Space::builder(GridAab::ORIGIN_CUBE)
+    .read_ticket(universe.read_ticket())
         .filled_with(indirect)
         .build();
     let sink = Sink::new();
