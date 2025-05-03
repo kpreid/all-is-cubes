@@ -16,6 +16,7 @@ use all_is_cubes::math::{
     Face7, FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::universe::Universe;
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::TransparencyOption;
@@ -133,7 +134,9 @@ fn no_panic_on_missing_blocks() {
     );
     assert_eq!(block_meshes.len(), 1); // check our assumption
 
-    space.set([0, 0, 0], &block).unwrap(); // render data does not know about this
+    space
+        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
+        .unwrap(); // render data does not know about this
 
     // This should not panic; visual glitches are preferable to failure.
     let space_mesh = SpaceMesh::new(
@@ -662,13 +665,13 @@ fn invisible_voxel_block() {
 
 #[test]
 fn transparency_split() {
-    let mut space = Space::empty_positive(3, 1, 1);
-    // One opaque block and one transparent block
-    space
-        .set([0, 0, 0], block::from_color!(1.0, 0.0, 0.0, 1.0))
-        .unwrap();
-    space
-        .set([2, 0, 0], block::from_color!(0.0, 0.0, 1.0, 0.5))
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1]))
+        .build_and_mutate(|m| {
+            // One opaque block and one transparent block
+            m.set([0, 0, 0], block::from_color!(1.0, 0.0, 0.0, 1.0))?;
+            m.set([2, 0, 0], block::from_color!(0.0, 0.0, 1.0, 0.5))?;
+            Ok(())
+        })
         .unwrap();
 
     let (_, _, space_rendered) = mesh_blocks_and_space(&space);

@@ -2,7 +2,7 @@
 
 use all_is_cubes::block::{AIR, Block, BlockCollision};
 use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, Rgb, zo32};
-use all_is_cubes::space::{SetCubeError, Space};
+use all_is_cubes::space::{self, SetCubeError};
 
 use crate::alg::NoiseFnExt as _;
 
@@ -12,7 +12,11 @@ use crate::alg::NoiseFnExt as _;
 /// `density` should be in the approximate range 0 to 1, where 0 or less is no clouds.
 ///
 /// TODO: Use named block definitions or not?
-pub fn clouds(region: GridAab, space: &mut Space, density: f32) -> Result<(), SetCubeError> {
+pub fn clouds(
+    region: GridAab,
+    m: &mut space::Mutation<'_, '_>,
+    density: f32,
+) -> Result<(), SetCubeError> {
     let large_noise =
         noise::ScaleBias::new(noise::ScalePoint::new(noise::Perlin::default()).set_scale(0.02))
             .set_scale(10.0);
@@ -46,7 +50,7 @@ pub fn clouds(region: GridAab, space: &mut Space, density: f32) -> Result<(), Se
             let surface = noise_value as GridCoordinate;
             for y in region.y_range() {
                 let cube = GridPoint::new(x, y, z);
-                if space[cube] != AIR {
+                if m[cube] != AIR {
                     continue;
                 }
                 // TODO: This math isn't really doing what we want -- isn't using the highest levels.
@@ -57,7 +61,7 @@ pub fn clouds(region: GridAab, space: &mut Space, density: f32) -> Result<(), Se
                     continue;
                 }
                 let block = &blocks[(alpha / (LEVELS as f32 + 0.99)) as usize];
-                space.set(cube, block)?;
+                m.set(cube, block)?;
             }
         }
     }

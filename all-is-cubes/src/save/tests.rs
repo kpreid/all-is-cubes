@@ -22,7 +22,7 @@ use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
 use crate::time::{self, Tick};
 use crate::transaction::Transaction as _;
-use crate::universe::{Handle, Name, PartialUniverse, Universe};
+use crate::universe::{Handle, Name, PartialUniverse, ReadTicket, Universe};
 use crate::{behavior, op, tag};
 
 #[track_caller]
@@ -649,6 +649,7 @@ fn space_success() {
     // TODO: set more properties
     // TODO: Specify spawn explicitly, so these tests do not rely on the default spawn value
     let bounds = GridAab::from_lower_upper([1, 2, 3], [4, 5, 6]);
+    let [block] = make_some_blocks();
     let mut space = Space::builder(bounds)
         .physics(SpacePhysics {
             gravity: vec3(notnan!(0.0), notnan!(0.25), notnan!(1.0)),
@@ -657,10 +658,12 @@ fn space_success() {
                 maximum_distance: 123,
             },
         })
-        .build();
+        .build_and_mutate(|m| {
+            m.set([1, 2, 5], block)?;
+            Ok(())
+        })
+        .unwrap();
 
-    let [block] = make_some_blocks();
-    space.set([1, 2, 5], block).unwrap();
     space.evaluate_light::<time::NoTime>(0, |_| {});
 
     const NL: [u8; 4] = [0, 0, 0, 1];
@@ -775,13 +778,19 @@ fn space_de_invalid_index() {
 #[test]
 fn space_with_sparse_indices() {
     let [block0, block1, block2] = make_some_blocks();
-    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 1, 1])).build();
-    space.set([0, 0, 0], &block0).unwrap();
-    space.set([1, 0, 0], &block1).unwrap();
-    space.set([2, 0, 0], &block2).unwrap();
+    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 1, 1]))
+        .build_and_mutate(|m| {
+            m.set([0, 0, 0], &block0)?;
+            m.set([1, 0, 0], &block1)?;
+            m.set([2, 0, 0], &block2)?;
+            Ok(())
+        })
+        .unwrap();
     // Now overwrite with AIR, resulting in a discontinuity in the indices because
     // there are no block1s left.
-    space.set([1, 0, 0], AIR).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set([1, 0, 0], AIR))
+        .unwrap();
 
     // Check that we produced the expected sparse indices.
     // If this assertion fails, then `Space` behavior has changed, which may not be wrong
@@ -810,8 +819,12 @@ fn space_light_queue_remembered() {
 
     use space::LightStatus::{NoRays, Opaque, Uninitialized, Visible};
     let [block0] = make_some_blocks();
-    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1])).build();
-    space.set([0, 0, 0], block0).unwrap();
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1]))
+        .build_and_mutate(|m| {
+            m.set([0, 0, 0], block0)?;
+            Ok(())
+        })
+        .unwrap();
     // The space now has [1, 0, 0] in its light update queue, but not [2, 0, 0],
     // and [0, 0, 0] has been updated immediately.
     assert_eq!(
@@ -875,8 +888,14 @@ fn universe_with_one_of_each() -> Universe {
 
     // Note: space has no light (which simplifies our work here)
     // TODO: Specify spawn explicitly, so these tests do not rely on the default spawn value
-    let mut space = Space::for_block(Resolution::R2).build();
-    space.set([0, 0, 0], Block::from(block_handle)).unwrap();
+    let space = Space::for_block(Resolution::R2)
+        .read_ticket(universe.read_ticket())
+        .build_and_mutate(|m| {
+            m.set([0, 0, 0], Block::from(block_handle))?;
+            Ok(())
+        })
+        .unwrap();
+
     let space_handle = universe.insert("a_space".into(), space).unwrap();
 
     let character = Character::spawn_default(universe.read_ticket(), space_handle);

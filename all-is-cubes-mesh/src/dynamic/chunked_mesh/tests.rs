@@ -261,10 +261,9 @@ fn graphics_options_change() {
     options.view_distance = 1u8.into();
     options.transparency = TransparencyOption::Volumetric;
 
-    let mut space = Space::empty_positive(1, 1, 1);
-    space
-        .set([0, 0, 0], block::from_color!(1., 1., 1., 0.25))
-        .unwrap();
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+        .filled_with(block::from_color!(1., 1., 1., 0.25))
+        .build();
 
     let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(space, 200.0);
     tester.camera.set_options(options.clone());
@@ -368,11 +367,18 @@ fn did_not_finish_detection() {
 #[test]
 fn instances_grouped_by_block() {
     let [block1, block2] = make_some_blocks();
-    let mut space = Space::empty_positive(CHUNK_SIZE * 2, 1, 1);
-    space.set([0, 0, 0], &block1).unwrap();
-    space.set([1, 0, 0], &block2).unwrap();
-    space.set([CHUNK_SIZE + 0, 0, 0], &block1).unwrap();
-    space.set([CHUNK_SIZE + 1, 0, 0], &block2).unwrap();
+    let space = Space::builder(GridAab::from_lower_size(
+        [0, 0, 0],
+        [CHUNK_SIZE as u32 * 2, 1, 1],
+    ))
+    .build_and_mutate(|m| {
+        m.set([0, 0, 0], &block1).unwrap();
+        m.set([1, 0, 0], &block2).unwrap();
+        m.set([CHUNK_SIZE + 0, 0, 0], &block1).unwrap();
+        m.set([CHUNK_SIZE + 1, 0, 0], &block2).unwrap();
+        Ok(())
+    })
+    .unwrap();
 
     let mut tester: CsmTester<ALL_INSTANCES> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
     tester.update(|_| {});
@@ -398,9 +404,13 @@ fn instances_for_animated() {
             block::AnimationChange::Shape,
         ))
         .build();
-    let mut space = Space::empty_positive(2, 1, 1);
-    space.set([0, 0, 0], &not_anim).unwrap();
-    space.set([1, 0, 0], &anim).unwrap();
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+        .build_and_mutate(|m| {
+            m.set([0, 0, 0], &not_anim).unwrap();
+            m.set([1, 0, 0], &anim).unwrap();
+            Ok(())
+        })
+        .unwrap();
     let index_of_anim = space.get_block_index([1, 0, 0]).unwrap();
 
     // TODO(instancing): Kludge: the question "should we use instances *at all*" has not yet been
@@ -432,9 +442,13 @@ fn instances_dont_dirty_mesh_when_block_changes() {
             ))
             .build(),
     ));
-    let mut space = Space::empty_positive(2, 1, 1);
-    space.set([0, 0, 0], &not_anim).unwrap();
-    space.set([1, 0, 0], Block::from(anim_def.clone())).unwrap();
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+        .build_and_mutate(|m| {
+            m.set([0, 0, 0], &not_anim).unwrap();
+            m.set([1, 0, 0], Block::from(anim_def.clone())).unwrap();
+            Ok(())
+        })
+        .unwrap();
 
     let mut tester: CsmTester<1000> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
     tester.update(|_| {});
@@ -470,10 +484,14 @@ fn instances_dont_dirty_mesh_when_space_changes() {
             block::AnimationChange::Shape,
         ))
         .build();
-    let mut space = Space::empty_positive(3, 1, 1);
-    space.set([0, 0, 0], &not_anim).unwrap();
-    space.set([1, 0, 0], &anim).unwrap();
-    space.set([2, 0, 0], &anim).unwrap(); // unchanged copy of the block to confirm the right change is made
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1]))
+        .build_and_mutate(|m| {
+            m.set([0, 0, 0], &not_anim).unwrap();
+            m.set([1, 0, 0], &anim).unwrap();
+            m.set([2, 0, 0], &anim).unwrap(); // unchanged copy of the block to confirm the right change is made
+            Ok(())
+        })
+        .unwrap();
     let index_of_anim = space.get_block_index([1, 0, 0]).unwrap();
 
     // Initialize

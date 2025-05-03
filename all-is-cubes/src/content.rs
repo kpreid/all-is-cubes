@@ -12,7 +12,7 @@ use crate::inv::{Slot, Tool};
 use crate::math::{
     Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb, Rgba, rgb_const,
 };
-use crate::space::{SetCubeError, Space};
+use crate::space::{self, SetCubeError, Space};
 use crate::transaction::Transactional as _;
 use crate::universe::{Universe, UniverseTransaction};
 
@@ -93,10 +93,10 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
     let label_voxel = Block::from(palette::ALMOST_BLACK);
     let label = arcstr::format!("{i}");
 
-    let mut block_space = Space::for_block(resolution)
+    let block_space = Space::for_block(resolution)
         .filled_with(Block::from(color))
-        .build();
-    axes(&mut block_space).unwrap();
+        .build_and_mutate(axes)
+        .unwrap();
 
     let base_block = Block::builder()
         .display_name(label.clone())
@@ -210,10 +210,11 @@ pub fn make_slab_txn(
 /// use all_is_cubes::block::AIR;
 /// use all_is_cubes::math::GridAab;
 /// use all_is_cubes::space::Space;
-/// use all_is_cubes::content::axes;
+/// use all_is_cubes::universe::ReadTicket;
+/// # use all_is_cubes::content::axes; // hide because wrong import path
 ///
 /// let mut space = Space::empty(GridAab::from_lower_upper([-10, -10, -10], [11, 11, 11]));
-/// axes(&mut space);
+/// space.mutate(ReadTicket::stub(), axes);
 ///
 /// assert_ne!(space[[10, 0, 0]], AIR);
 /// assert_ne!(space[[0, 10, 0]], AIR);
@@ -222,7 +223,7 @@ pub fn make_slab_txn(
 /// assert_ne!(space[[0, -10, 0]], AIR);
 /// assert_ne!(space[[0, 0, -10]], AIR);
 /// ```
-pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
+pub fn axes(m: &mut space::Mutation<'_, '_>) -> Result<(), SetCubeError> {
     const DIR_NAMES: FaceMap<ArcStr> = FaceMap {
         nx: literal!("x"),
         ny: literal!("y"),
@@ -237,7 +238,7 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
         let direction = face.normal_vector::<GridCoordinate, ()>()[axis];
         let raycaster = crate::raycast::AaRay::new(Cube::ORIGIN, face.into())
             .cast()
-            .within(space.bounds());
+            .within(m.bounds());
         for step in raycaster {
             let i = step.cube_ahead().lower_bounds()[axis] * direction; // always positive
             let (color, display_name): (Rgb, ArcStr) = if i.rem_euclid(2) == 0 {
@@ -249,7 +250,7 @@ pub fn axes(space: &mut Space) -> Result<(), SetCubeError> {
                     (rgb_const!(0.0, 0.0, 0.0), DIR_NAMES[face].clone())
                 }
             };
-            space.set(
+            m.set(
                 step.cube_ahead(),
                 Block::builder()
                     .display_name(display_name)

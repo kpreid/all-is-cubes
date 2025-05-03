@@ -24,17 +24,19 @@ fn SMALLEST(ctx: Context<'_>) {
         .build();
 
     let mut exhibit_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 1])).build();
-    stack(
-        &mut exhibit_space,
-        [0, 0, 0],
-        [
-            pedestal,
-            &Block::builder()
-                .display_name("World's Smallest Voxel")
-                .voxels_handle(resolution, txn.insert_anonymous(block_space))
-                .build(),
-        ],
-    )?;
+    exhibit_space.mutate(ctx.universe.read_ticket(), |m| {
+        stack(
+            m,
+            [0, 0, 0],
+            [
+                pedestal,
+                &Block::builder()
+                    .display_name("World's Smallest Voxel")
+                    .voxels_handle(resolution, txn.insert_anonymous(block_space))
+                    .build(),
+            ],
+        )
+    })?;
 
     Ok((exhibit_space, txn))
 }

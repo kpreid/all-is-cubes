@@ -115,11 +115,12 @@ fn TRANSPARENCY_GLASS_AND_WATER(ctx: Context<'_>) {
             &water_voxel,
         )?;
         m.fill_uniform(pool.abut(Face6::PY, -1).unwrap(), &water_surface_block)?;
+
+        let [floater] = make_some_voxel_blocks_txn(&mut txn);
+        m.set([3, 1, 3], floater)?;
+
         Ok::<(), InGenError>(())
     })?;
-
-    let [floater] = make_some_voxel_blocks_txn(&mut txn);
-    space.set([3, 1, 3], floater)?;
 
     Ok((space, txn))
 }
@@ -152,8 +153,9 @@ fn TRANSPARENCY_VOX(ctx: Context<'_>) {
         })?
         .build_txn(&mut txn);
 
-    let mut exhibit_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 1])).build();
-    stack(&mut exhibit_space, [0, 0, 0], [pedestal, &block])?;
+    let exhibit_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 1]))
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| stack(m, [0, 0, 0], [pedestal, &block]))?;
 
     Ok((exhibit_space, txn))
 }

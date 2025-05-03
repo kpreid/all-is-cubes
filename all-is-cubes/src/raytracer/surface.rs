@@ -459,12 +459,13 @@ mod tests {
             })
             .unwrap()
             .build_into(universe);
-        let space = {
-            let mut space = Space::empty(GridAab::from_lower_size([0, 0, 0], [1, 3, 1]));
-            space.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
-            space.set([0, 2, 0], slab_with_extra_space).unwrap();
-            space
-        };
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 3, 1]))
+            .build_and_mutate(|m| {
+                m.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
+                m.set([0, 2, 0], slab_with_extra_space).unwrap();
+                Ok(())
+            })
+            .unwrap();
 
         let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
         let ray = Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]);

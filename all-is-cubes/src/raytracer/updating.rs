@@ -303,7 +303,9 @@ mod tests {
 
         // Initial state
         let [block1, block2] = make_some_voxel_blocks(&mut universe);
-        space.set([0, 0, 0], &block1).unwrap();
+        space
+            .mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block1))
+            .unwrap();
 
         let space = universe.insert_anonymous(space);
         let read_ticket = universe.read_ticket();
@@ -319,13 +321,21 @@ mod tests {
 
         // Add a second block
         space
-            .try_modify(|space| space.set([1, 0, 0], &block2).unwrap())
+            .try_modify(|space| {
+                space
+                    .mutate(read_ticket, |m| m.set([1, 0, 0], &block2))
+                    .unwrap()
+            })
             .unwrap();
         tester.update_and_assert(read_ticket).unwrap();
 
         // Delete existing block
         space
-            .try_modify(|space| space.set([0, 0, 0], &AIR).unwrap())
+            .try_modify(|space| {
+                space
+                    .mutate(read_ticket, |m| m.set([0, 0, 0], &AIR))
+                    .unwrap()
+            })
             .unwrap();
         tester.update_and_assert(read_ticket).unwrap();
 
@@ -339,7 +349,9 @@ mod tests {
 
         // Initial state
         let [block1, block2] = make_some_voxel_blocks(&mut universe);
-        space.set([0, 0, 0], &block1).unwrap();
+        space
+            .mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block1))
+            .unwrap();
 
         let space = universe.insert_anonymous(space);
         let read_ticket = universe.read_ticket();
@@ -359,7 +371,11 @@ mod tests {
 
         // And also follow changes correctly.
         space
-            .try_modify(|space| space.set([1, 0, 0], &block2).unwrap())
+            .try_modify(|space| {
+                space
+                    .mutate(read_ticket, |m| m.set([1, 0, 0], &block2))
+                    .unwrap()
+            })
             .unwrap();
         tester.update_and_assert(read_ticket).unwrap();
     }

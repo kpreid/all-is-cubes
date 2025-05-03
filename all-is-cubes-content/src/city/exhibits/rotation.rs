@@ -15,33 +15,38 @@ fn ROTATIONS(ctx: Context<'_>) {
     let pointing_block = &demo_blocks[DemoBlocks::Arrow];
 
     let center = GridPoint::new(0, 0, 0);
-    space.set(center, central_block)?;
 
-    let mut place_rotated_arrow = |pos: GridPoint, rot: GridRotation| -> Result<(), InGenError> {
-        stack(
-            &mut space,
-            pos,
-            [
-                &pointing_block.clone().rotate(rot),
-                &text::Text::builder()
-                    .string(arcstr::format!("{rot:?}"))
-                    .font(text::Font::SmallerBodyText)
-                    .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
-                    .resolution(R32)
-                    .positioning(text::Positioning::LOW)
-                    .build()
-                    .single_block(),
-            ],
-        )?;
-        Ok(())
-    };
+    space.mutate(ctx.universe.read_ticket(), |m| {
+        m.set(center, central_block)?;
 
-    for face in [Face6::PX, Face6::PZ, Face6::NX, Face6::NZ] {
-        place_rotated_arrow(
-            center + face.normal_vector() * 2,
-            GridRotation::from_to(Face6::NZ, face.opposite(), Face6::PY).unwrap(),
-        )?;
-    }
+        let mut place_rotated_arrow =
+            |pos: GridPoint, rot: GridRotation| -> Result<(), InGenError> {
+                stack(
+                    m,
+                    pos,
+                    [
+                        &pointing_block.clone().rotate(rot),
+                        &text::Text::builder()
+                            .string(arcstr::format!("{rot:?}"))
+                            .font(text::Font::SmallerBodyText)
+                            .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
+                            .resolution(R32)
+                            .positioning(text::Positioning::LOW)
+                            .build()
+                            .single_block(),
+                    ],
+                )?;
+                Ok(())
+            };
+
+        for face in [Face6::PX, Face6::PZ, Face6::NX, Face6::NZ] {
+            place_rotated_arrow(
+                center + face.normal_vector() * 2,
+                GridRotation::from_to(Face6::NZ, face.opposite(), Face6::PY).unwrap(),
+            )?;
+        }
+        Ok::<(), InGenError>(())
+    })?;
 
     Ok((space, txn))
 }

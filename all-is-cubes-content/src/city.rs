@@ -86,7 +86,9 @@ pub(crate) async fn demo_city<I: Instant>(
     progress.progress(0.3).await;
 
     // Roads and lamps
-    place_roads_and_tunnels(&mut state.space, &state.demo_blocks)?;
+    state.space.mutate(state.universe.read_ticket(), |m| {
+        place_roads_and_tunnels(m, &state.demo_blocks)
+    })?;
     progress.progress(0.4).await;
 
     let blank_city_time = I::now();
@@ -104,12 +106,14 @@ pub(crate) async fn demo_city<I: Instant>(
         m.fill_uniform(state.planner.landscape_region(), &AIR)
     })?;
     landscape_progress.progress(0.5).await;
-    wavy_landscape(
-        state.planner.landscape_region(),
-        &mut state.space,
-        &state.landscape_blocks,
-        1.0,
-    )?;
+    state.space.mutate(state.universe.read_ticket(), |m| {
+        wavy_landscape(
+            state.planner.landscape_region(),
+            m,
+            &state.landscape_blocks,
+            1.0,
+        )
+    })?;
     state
         .planner
         .occupied_plots
@@ -120,11 +124,9 @@ pub(crate) async fn demo_city<I: Instant>(
     // TODO: Enable this once transparency rendering is better.
     if false {
         let sky_height = state.space.bounds().upper_bounds().y;
-        clouds(
-            state.planner.y_range(sky_height - 2, sky_height),
-            &mut state.space,
-            0.1,
-        )?;
+        state.space.mutate(state.universe.read_ticket(), |m| {
+            clouds(state.planner.y_range(sky_height - 2, sky_height), m, 0.1)
+        })?;
     }
 
     // TODO: Integrate logging and YieldProgress
@@ -303,30 +305,32 @@ impl<'u> State<'u> {
 
     fn place_lampposts(&mut self) -> Result<(), InGenError> {
         let bounds = self.planner.space_bounds;
-        'directions: for direction in CityPlanner::ROAD_DIRECTIONS {
-            let lamp_spacing = 20;
-            let perpendicular: GridVector =
-                GridRotation::CLOCKWISE.transform(direction).normal_vector();
-            for distance in (CityPlanner::LAMP_POSITION_RADIUS..).step_by(lamp_spacing) {
-                for side_of_road in [-1, 1] {
-                    let globe_cube = Cube::new(0, 4, 0)
-                        + direction.normal_vector() * distance
-                        + perpendicular * (side_of_road * CityPlanner::LAMP_POSITION_RADIUS);
-                    if !bounds.contains_cube(globe_cube) {
-                        continue 'directions;
-                    }
+        let lamp_spacing = 20;
+        self.space.mutate(self.universe.read_ticket(), |m| {
+            'directions: for direction in CityPlanner::ROAD_DIRECTIONS {
+                let perpendicular: GridVector =
+                    GridRotation::CLOCKWISE.transform(direction).normal_vector();
+                for distance in (CityPlanner::LAMP_POSITION_RADIUS..).step_by(lamp_spacing) {
+                    for side_of_road in [-1, 1] {
+                        let globe_cube = Cube::new(0, 4, 0)
+                            + direction.normal_vector() * distance
+                            + perpendicular * (side_of_road * CityPlanner::LAMP_POSITION_RADIUS);
+                        if !bounds.contains_cube(globe_cube) {
+                            continue 'directions;
+                        }
 
-                    let Some(base_cube) = self.planner.find_cube_near(
-                        globe_cube - GridVector::new(0, 3, 0),
-                        &[direction, direction.opposite()],
-                    ) else {
-                        continue;
-                    };
-                    place_lamppost(base_cube, globe_cube, &mut self.space, &self.demo_blocks)?;
+                        let Some(base_cube) = self.planner.find_cube_near(
+                            globe_cube - GridVector::new(0, 3, 0),
+                            &[direction, direction.opposite()],
+                        ) else {
+                            continue;
+                        };
+                        place_lamppost(base_cube, globe_cube, m, &self.demo_blocks)?;
+                    }
                 }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     fn spawn(
@@ -673,7 +677,7 @@ fn place_one_exhibit<I: Instant>(
 }
 
 fn place_roads_and_tunnels(
-    space: &mut Space,
+    m: &mut space::Mutation<'_, '_>,
     demo_blocks: &BlockProvider<DemoBlocks>,
 ) -> Result<(), InGenError> {
     use DemoBlocks::*;
@@ -686,12 +690,12 @@ fn place_roads_and_tunnels(
         let rotations = [other_side_of_road, road_aligned_rotation];
         let raycaster = all_is_cubes::raycast::AaRay::new(Cube::ORIGIN, face.into())
             .cast()
-            .within(space.bounds());
+            .within(m.bounds());
         let curb_y = GridVector::new(0, 1, 0);
         for (i, step) in (0i32..).zip(raycaster) {
             // Road surface
             for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
-                space.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
+                m.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
             }
 
             // Curbs
@@ -703,14 +707,14 @@ fn place_roads_and_tunnels(
                     let position = step.cube_ahead() + perpendicular * p + curb_y;
 
                     // Place curb and combine it with other curb blocks .
-                    let mut to_compose_with = space[position].clone();
+                    let mut to_compose_with = m[position].clone();
                     // TODO: .unspecialize() is a maybe expensive way to make this test, and
                     // this isn't the first time this has come up. Benchmark a "block view"
                     // to cheaply filter out modifiers.
                     if to_compose_with.clone().unspecialize() != *vec![demo_blocks[Curb].clone()] {
                         to_compose_with = AIR;
                     }
-                    space.set(
+                    m.set(
                         position,
                         block::Composite::new(
                             demo_blocks[Curb].clone().rotate(rotations[side]),
@@ -725,7 +729,7 @@ fn place_roads_and_tunnels(
             // Dig underground passages
             for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
                 for y in CityPlanner::UNDERGROUND_FLOOR_Y..0 {
-                    space.set(
+                    m.set(
                         step.cube_ahead() + perpendicular * p + GridVector::new(0, y, 0),
                         &AIR,
                     )?;
@@ -739,7 +743,7 @@ fn place_roads_and_tunnels(
                     .iter()
                     .enumerate()
                 {
-                    space.set(
+                    m.set(
                         step.cube_ahead() + GridVector::new(0, -2, 0) + perpendicular * p,
                         demo_blocks[Sconce(true)]
                             .clone()
@@ -756,7 +760,7 @@ fn place_roads_and_tunnels(
 fn place_lamppost(
     base_position: Cube,
     globe_position: Cube,
-    space: &mut Space,
+    m: &mut space::Mutation<'_, '_>,
     demo_blocks: &BlockProvider<DemoBlocks>,
 ) -> Result<(), InGenError> {
     use DemoBlocks::*;
@@ -769,7 +773,7 @@ fn place_lamppost(
             .unwrap()
     }
 
-    space.set(base_position, &demo_blocks[LamppostBase])?;
+    m.set(base_position, &demo_blocks[LamppostBase])?;
 
     for (step1, step2) in walk(base_position, globe_position).tuple_windows() {
         // let prev_cube = step1.cube;
@@ -798,10 +802,10 @@ fn place_lamppost(
             .compose_or_replace(block)
         };
 
-        space.set(this_cube, block)?;
+        m.set(this_cube, block)?;
     }
 
-    space.set(globe_position, &demo_blocks[Lamp(true)])?;
+    m.set(globe_position, &demo_blocks[Lamp(true)])?;
 
     Ok(())
 }

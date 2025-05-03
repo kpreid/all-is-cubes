@@ -14,7 +14,7 @@ use all_is_cubes::math::{
     Cube, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
-use all_is_cubes::universe::{self, Name, PartialUniverse, Universe};
+use all_is_cubes::universe::{self, Name, PartialUniverse, ReadTicket, Universe};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 
 #[cfg(feature = "export")]
@@ -198,27 +198,29 @@ fn dot_vox_model_to_space(
         .sky_color(Rgb::ONE)
         .build();
 
-    for v in model.voxels.iter() {
-        let converted_cube: Cube = Cube::from(Point3D::new(v.x, v.y, v.z).map(i32::from));
-        let transformed_cube = transform.transform_cube(converted_cube);
+    space.mutate(ReadTicket::stub(), |m| {
+        for v in model.voxels.iter() {
+            let converted_cube: Cube = Cube::from(Point3D::new(v.x, v.y, v.z).map(i32::from));
+            let transformed_cube = transform.transform_cube(converted_cube);
 
-        let block = palette_blocks.get(v.i as usize).ok_or_else(|| {
-            DotVoxConversionError::PaletteTooShort {
-                len: palette_blocks.len(),
-                index: v.i,
-            }
-        })?;
+            let block = palette_blocks.get(v.i as usize).ok_or_else(|| {
+                DotVoxConversionError::PaletteTooShort {
+                    len: palette_blocks.len(),
+                    index: v.i,
+                }
+            })?;
 
-        space
-            .set(transformed_cube, block)
-            .map_err(DotVoxConversionError::SetCube)?;
-    }
+            m.set(transformed_cube, block)
+                .map_err(DotVoxConversionError::SetCube)?;
+        }
+        Ok::<(), DotVoxConversionError>(())
+    })?;
 
     Ok(space)
 }
 #[cfg(feature = "export")]
 fn space_to_dot_vox_model(
-    read_ticket: universe::ReadTicket<'_>,
+    read_ticket: ReadTicket<'_>,
     space_handle: &universe::Handle<Space>,
     palette: &mut Vec<dot_vox::Color>,
 ) -> Result<dot_vox::Model, ExportError> {
@@ -429,9 +431,13 @@ mod tests {
 
         // Construct universe for export.
         let mut export_universe = Universe::new();
-        let mut export_space = Space::builder(bounds).build();
-        export_space.set([-20, -30 + 1, -40 + 2], &block1).unwrap();
-        export_space.set([-20, -30 + 1, -40], &block2).unwrap();
+        let export_space = Space::builder(bounds)
+            .build_and_mutate(|m| {
+                m.set([-20, -30 + 1, -40 + 2], &block1)?;
+                m.set([-20, -30 + 1, -40], &block2)?;
+                Ok(())
+            })
+            .unwrap();
         let export_space = export_universe.insert_anonymous(export_space);
         print_space(
             &export_space.read(export_universe.read_ticket()).unwrap(),

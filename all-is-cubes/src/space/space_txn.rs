@@ -890,14 +890,20 @@ mod tests {
             )
             .target(|| Space::empty_positive(2, 1, 1))
             .target(|| {
-                let mut space = Space::empty_positive(2, 1, 1);
-                space.set([0, 0, 0], &b1).unwrap();
-                space
+                Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+                    .build_and_mutate(|m| {
+                        m.set([0, 0, 0], &b1)?;
+                        Ok(())
+                    })
+                    .unwrap()
             })
             .target(|| {
-                let mut space = Space::empty_positive(2, 1, 1);
-                space.set([0, 0, 0], &b2).unwrap();
-                space
+                Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+                    .build_and_mutate(|m| {
+                        m.set([0, 0, 0], &b2)?;
+                        Ok(())
+                    })
+                    .unwrap()
             })
             .target(|| {
                 // This space makes the test transactions at [0, 0, 0] out of bounds

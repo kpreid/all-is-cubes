@@ -33,7 +33,9 @@ fn IMAGES(ctx: Context<'_>) {
             .display_name(format!("{rotation:?}"))
             .build_txn(&mut txn);
 
-        stack(&mut outer_space, position, [pedestal, &block])?;
+        outer_space.mutate(ctx.universe.read_ticket(), |m| {
+            stack(m, position, [pedestal, &block])
+        })?;
         Ok(())
     };
     place([0, 0, 0], GridRotation::RXYZ)?;

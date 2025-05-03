@@ -260,7 +260,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
             max = max.max(chunk.to_point().cast_unit());
         }
         let extent = GridAab::from_lower_upper(max.map(|c| -c - 1), max.map(|c| c + 2));
-        let mut space = crate::space::Space::empty(extent);
+
         // TODO: use wireframe blocks instead, or something that will highlight the counts better
         let base_octant_chunk = Block::builder()
             .display_name("Base octant chunk")
@@ -274,20 +274,25 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
             .display_name("Mirrored octant chunk")
             .color(Rgba::new(0.6, 0.6, 0.6, 1.0))
             .build();
-        for ChunkPos(pos) in self.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL) {
-            let px = pos.x >= 0;
-            let py = pos.y >= 0;
-            let pz = pos.z >= 0;
-            let block = if px && py && pz {
-                &base_octant_chunk
-            } else if px ^ py ^ pz {
-                &other_octant_chunk_1
-            } else {
-                &other_octant_chunk_2
-            };
-            space.set(pos, block).unwrap();
-        }
-        space
+
+        crate::space::Space::builder(extent)
+            .build_and_mutate(|m| {
+                for ChunkPos(pos) in self.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL) {
+                    let px = pos.x >= 0;
+                    let py = pos.y >= 0;
+                    let pz = pos.z >= 0;
+                    let block = if px && py && pz {
+                        &base_octant_chunk
+                    } else if px ^ py ^ pz {
+                        &other_octant_chunk_1
+                    } else {
+                        &other_octant_chunk_2
+                    };
+                    m.set(pos, block).unwrap();
+                }
+                Ok(())
+            })
+            .unwrap()
     }
 
     /// Returns the total number of chunks in this chart.

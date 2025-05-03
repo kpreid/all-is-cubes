@@ -25,59 +25,61 @@ fn COMPOSITE(ctx: Context<'_>) {
         CompositeOperator::Out,
         CompositeOperator::Atop,
     ];
+    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
-    let mut space = Space::empty(GridAab::from_lower_upper(
+    let space = Space::builder(GridAab::from_lower_upper(
         [0, 0, 0],
         [
             destinations.len() as GridCoordinate * 2,
             operators.len() as GridCoordinate * 3,
             sources.len() as GridCoordinate * 2,
         ],
-    ));
-    let pedestal = &demo_blocks[DemoBlocks::Pedestal];
+    ))
+    .build_and_mutate(|m| {
+        for (di, destination) in (0i32..).zip(destinations) {
+            for (si, source) in (0i32..).zip(sources) {
+                for (oi, operator) in (0i32..).zip(operators) {
+                    let composite = destination.clone().with_modifier(Composite::new(
+                        source.clone().rotate(GridRotation::CLOCKWISE),
+                        operator,
+                    ));
 
-    for (di, destination) in (0i32..).zip(destinations) {
-        for (si, source) in (0i32..).zip(sources) {
-            for (oi, operator) in (0i32..).zip(operators) {
-                let composite = destination.clone().with_modifier(Composite::new(
-                    source.clone().rotate(GridRotation::CLOCKWISE),
-                    operator,
-                ));
+                    let label_str = arcstr::format!(
+                        "{s}\n{operator:?}\n{d}",
+                        s = source
+                            .evaluate(ctx.universe.read_ticket())
+                            .unwrap()
+                            .attributes()
+                            .display_name,
+                        d = destination
+                            .evaluate(ctx.universe.read_ticket())
+                            .unwrap()
+                            .attributes()
+                            .display_name
+                    );
+                    let label = text::Text::builder()
+                        .string(label_str)
+                        .resolution(R64)
+                        .font(text::Font::SmallerBodyText)
+                        .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
+                        .positioning(text::Positioning {
+                            // TODO: this should be "last line at the bottom" but that isn't implemented
+                            line_y: text::PositioningY::BodyTop,
+                            ..text::Positioning::LOW
+                        })
+                        .build()
+                        .single_block();
 
-                let label_str = arcstr::format!(
-                    "{s}\n{operator:?}\n{d}",
-                    s = source
-                        .evaluate(ctx.universe.read_ticket())
-                        .unwrap()
-                        .attributes()
-                        .display_name,
-                    d = destination
-                        .evaluate(ctx.universe.read_ticket())
-                        .unwrap()
-                        .attributes()
-                        .display_name
-                );
-                let label = text::Text::builder()
-                    .string(label_str)
-                    .resolution(R64)
-                    .font(text::Font::SmallerBodyText)
-                    .foreground(demo_blocks[DemoBlocks::LabelTextVoxel].clone())
-                    .positioning(text::Positioning {
-                        // TODO: this should be "last line at the bottom" but that isn't implemented
-                        line_y: text::PositioningY::BodyTop,
-                        ..text::Positioning::LOW
-                    })
-                    .build()
-                    .single_block();
-
-                stack(
-                    &mut space,
-                    GridPoint::new(di * 2, oi * 3, si * 2),
-                    [if oi == 0 { pedestal } else { &AIR }, &composite, &label],
-                )?;
+                    stack(
+                        m,
+                        GridPoint::new(di * 2, oi * 3, si * 2),
+                        [if oi == 0 { pedestal } else { &AIR }, &composite, &label],
+                    )?;
+                }
             }
         }
-    }
+        Ok(())
+    })?;
     Ok((space, ExhibitTransaction::default()))
 }
 

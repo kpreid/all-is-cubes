@@ -62,10 +62,12 @@ fn ANIMATION(ctx: Context<'_>) {
             .voxels_handle(fire_resolution, {
                 let fire_bounds = GridAab::for_block(fire_resolution);
                 let mut fire_space = Space::for_block(fire_resolution).build();
-                fire_space.set([0, 0, 0], block::from_color!(Rgb::ONE))?; // placeholder for not fully transparent so first pass lighting is better
-                SpaceTransaction::add_behavior(fire_bounds, Fire::new(fire_bounds))
-                    .execute(&mut fire_space, &mut transaction::no_outputs)
-                    .unwrap();
+                fire_space.mutate(ctx.universe.read_ticket(), |m| {
+                    m.set([0, 0, 0], block::from_color!(Rgb::ONE))?; // placeholder for not fully transparent so first pass lighting is better
+                    SpaceTransaction::add_behavior(fire_bounds, Fire::new(fire_bounds))
+                        .execute_m(m)?;
+                    Ok::<(), InGenError>(())
+                })?;
                 txn.insert_anonymous(fire_space)
             })
             .build()
@@ -97,14 +99,17 @@ fn BECOME(ctx: Context<'_>) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
-    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 3])).build();
-    for (state, z) in [(false, 0), (true, 2)] {
-        stack(
-            &mut space,
-            [0, 0, z],
-            [pedestal, &demo_blocks[DemoBlocks::BecomeBlinker(state)]],
-        )?;
-    }
+    let space =
+        Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 3])).build_and_mutate(|m| {
+            for (state, z) in [(false, 0), (true, 2)] {
+                stack(
+                    m,
+                    [0, 0, z],
+                    [pedestal, &demo_blocks[DemoBlocks::BecomeBlinker(state)]],
+                )?;
+            }
+            Ok(())
+        })?;
 
     Ok((space, ExhibitTransaction::default()))
 }

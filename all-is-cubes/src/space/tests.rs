@@ -26,6 +26,7 @@ use crate::universe::{Handle, HandleError, Name, ReadTicket, Universe, UniverseT
 
 // TODO: test consistency between the index and get_* methods
 // TODO: test fill() equivalence and error handling
+// TODO: Most of these tests were written before the introduction of `Space::mutate()` and might not be as relevant and thorough any more
 
 #[test]
 fn initial_state_consistency() {
@@ -49,11 +50,20 @@ fn set_success() {
     let [first, second] = make_some_blocks();
     let mut space = Space::empty_positive(1, 1, 1);
     let pt = GridPoint::origin();
-    assert_eq!(Ok(true), space.set(pt, &first));
+    assert_eq!(
+        Ok(true),
+        space.mutate(ReadTicket::stub(), |m| m.set(pt, &first))
+    );
     assert_eq!(&space[pt], &first);
-    assert_eq!(Ok(false), space.set(pt, &first));
+    assert_eq!(
+        Ok(false),
+        space.mutate(ReadTicket::stub(), |m| m.set(pt, &first))
+    );
     assert_eq!(&space[pt], &first);
-    assert_eq!(Ok(true), space.set(pt, &second));
+    assert_eq!(
+        Ok(true),
+        space.mutate(ReadTicket::stub(), |m| m.set(pt, &second))
+    );
     assert_eq!(&space[pt], &second);
 
     space.consistency_check(); // bonus testing
@@ -70,7 +80,10 @@ fn set_success_despite_eval_error_gone() {
         .build();
     let mut space = Space::empty_positive(1, 1, 1);
 
-    assert_eq!(Ok(true), space.set([0, 0, 0], &block));
+    assert_eq!(
+        Ok(true),
+        space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
+    );
 
     // Check for the expected placeholder.
     assert_eq!(
@@ -107,8 +120,10 @@ fn set_failure_out_of_bounds() {
         modification: cube.grid_aab(),
         space_bounds,
     });
-    assert_eq!(space.set(cube, &block), error);
-    assert_eq!(space.set(cube, &AIR), error);
+    space.mutate(ReadTicket::stub(), |m| {
+        assert_eq!(m.set(cube, &block), error);
+        assert_eq!(m.set(cube, &AIR), error);
+    });
 
     space.consistency_check(); // bonus testing
 }
@@ -118,13 +133,15 @@ fn set_failure_too_many() {
     const N: u16 = 300_u16;
     let blocks = make_some_blocks::<{ N as usize }>();
     let mut space = Space::empty_positive(N.into(), 1, 1);
-    for i in 0..N {
-        match space.set([i.into(), 0, 0], &blocks[usize::from(i)]) {
-            Ok(true) => {}
-            Err(SetCubeError::TooManyBlocks()) => break,
-            unexpected => panic!("unexpected result: {unexpected:?}"),
+    space.mutate(ReadTicket::stub(), |m| {
+        for i in 0..N {
+            match m.set([i.into(), 0, 0], &blocks[usize::from(i)]) {
+                Ok(true) => {}
+                Err(SetCubeError::TooManyBlocks()) => break,
+                unexpected => panic!("unexpected result: {unexpected:?}"),
+            }
         }
-    }
+    });
     space.consistency_check(); // bonus testing
 }
 
@@ -150,7 +167,9 @@ fn set_error_format() {
 fn set_updates_evaluated_on_added_block() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    space.set([0, 0, 0], &block).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
+        .unwrap();
     // Confirm the expected indices
     assert_eq!(Some(1), space.get_block_index([0, 0, 0]));
     assert_eq!(Some(0), space.get_block_index([1, 0, 0]));
@@ -171,7 +190,9 @@ fn set_updates_evaluated_and_notifies_on_replaced_block() {
     space.listen(sink.listener());
 
     let cube = Cube::ORIGIN;
-    space.set(cube, &block).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set(cube, &block))
+        .unwrap();
 
     // Confirm the expected indices
     assert_eq!(Some(0), space.get_block_index(cube));
@@ -204,7 +225,9 @@ fn set_no_neighbor_overflow_high() {
     let one_less = GridCoordinate::MAX - 1;
     let high_corner = GridPoint::new(one_less, one_less, one_less);
     let mut space = Space::empty(GridAab::from_lower_size(high_corner, [1, 1, 1]));
-    space.set(high_corner, block.clone()).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set(high_corner, block.clone()))
+        .unwrap();
 }
 /// No arithmetic overflow when modifying a block at the numeric range lower bound.
 #[test]
@@ -216,7 +239,9 @@ fn set_no_neighbor_overflow_low() {
         GridCoordinate::MIN,
     );
     let mut space = Space::empty(GridAab::from_lower_size(low_corner, [1, 1, 1]));
-    space.set(low_corner, block.clone()).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set(low_corner, block.clone()))
+        .unwrap();
 }
 
 #[test]
@@ -227,21 +252,27 @@ fn removed_blocks_are_forgotten() {
     let pt2 = GridPoint::new(1, 0, 0);
     // TODO: This test depends on block allocation order. distinct_blocks() ought to be stable or explicitly return a HashSet or something.
     assert_eq!(space.distinct_blocks(), vec![AIR.clone()], "step 1");
-    space.set(pt1, &block_0).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set(pt1, &block_0))
+        .unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
         vec![AIR.clone(), block_0.clone()],
         "step 2"
     );
-    space.set(pt2, &block_1).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set(pt2, &block_1))
+        .unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
         vec![block_1.clone(), block_0.clone()],
         "step 3"
     );
-    space.set(pt1, &block_2).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set(pt1, &block_2))
+        .unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
@@ -250,7 +281,9 @@ fn removed_blocks_are_forgotten() {
     );
 
     // Make sure that reinserting an old block correctly allocates an index rather than using the old one.
-    space.set(pt2, &block_0).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set(pt2, &block_0))
+        .unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
@@ -266,7 +299,10 @@ fn change_listener_simple() {
     let sink = Sink::new();
     space.listen(sink.listener());
 
-    assert_eq!(Ok(true), space.set([0, 0, 0], &block));
+    assert_eq!(
+        Ok(true),
+        space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
+    );
     assert_eq!(
         sink.drain(),
         vec![
@@ -283,7 +319,10 @@ fn change_listener_simple() {
     );
 
     // No change, no notification
-    assert_eq!(Ok(false), space.set([0, 0, 0], &block));
+    assert_eq!(
+        Ok(false),
+        space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
+    );
     assert_eq!(sink.drain(), vec![]);
 }
 
@@ -310,8 +349,12 @@ fn fluff_listener() {
 fn extract() {
     let [block_0, block_1] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    space.set([0, 0, 0], &block_0).unwrap();
-    space.set([1, 0, 0], &block_1).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| {
+            m.set([0, 0, 0], &block_0)?;
+            m.set([1, 0, 0], &block_1)
+        })
+        .unwrap();
 
     let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 1, 1]);
     let extracted: Vol<Box<[Block]>> = space.extract(extract_bounds, |e| {
@@ -407,7 +450,9 @@ fn replace_last_block_regression() {
     let bounds = GridAab::from_lower_size([0, 0, 0], [3, 1, 1]);
     let mut space = Space::empty(bounds);
     for i in 0..3 {
-        space.set([i, 0, 0], &block).unwrap();
+        space
+            .mutate(ReadTicket::stub(), |m| m.set([i, 0, 0], &block))
+            .unwrap();
         space.consistency_check();
     }
 }
@@ -472,7 +517,9 @@ fn indirect_becomes_evaluation_error() {
 
     // Set up space and listener
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], &block).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
+        .unwrap();
     let sink = Sink::new();
     space.listen(sink.listener());
 
@@ -545,7 +592,9 @@ fn space_debug() {
 fn set_physics_light_none() {
     let mut space = Space::empty_positive(1, 1, 1);
     space
-        .set([0, 0, 0], block::from_color!(1.0, 1.0, 1.0, 0.5))
+        .mutate(ReadTicket::stub(), |m| {
+            m.set([0, 0, 0], block::from_color!(1.0, 1.0, 1.0, 0.5))
+        })
         .unwrap();
     assert_eq!(space.light.light_update_queue.len(), 1);
     // Check that a no-op update doesn't clear
@@ -567,10 +616,10 @@ fn set_physics_light_none() {
 fn set_physics_light_rays() {
     let mut space = Space::empty_positive(2, 1, 1);
     space
-        .set([0, 0, 0], block::from_color!(1.0, 1.0, 1.0, 0.5))
-        .unwrap();
-    space
-        .set([1, 0, 0], block::from_color!(1.0, 1.0, 1.0, 1.0))
+        .mutate(ReadTicket::stub(), |m| {
+            m.set([0, 0, 0], block::from_color!(1.0, 1.0, 1.0, 0.5))?;
+            m.set([1, 0, 0], block::from_color!(1.0, 1.0, 1.0, 1.0))
+        })
         .unwrap();
     space.set_physics(SpacePhysics {
         light: LightPhysics::None,
@@ -623,7 +672,9 @@ fn block_tick_action_does_not_run_paused() {
         })
         .build();
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], &vanisher).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &vanisher))
+        .unwrap();
     let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
 
     // No effect when paused
@@ -661,7 +712,9 @@ fn block_tick_action_timing() {
     connect(universe.read_ticket(), &mut block1, &block2);
 
     let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], &block1).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block1))
+        .unwrap();
 
     // Setup done, now simulate.
     let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
@@ -736,8 +789,12 @@ fn block_tick_action_conflict() {
     let left = Cube::new(0, 0, 0);
     let middle = Cube::new(1, 0, 0);
     let right = Cube::new(2, 0, 0);
-    space.set(left, &modifies_px_neighbor).unwrap();
-    space.set(right, &modifies_nx_neighbor).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| {
+            m.set(left, &modifies_px_neighbor)?;
+            m.set(right, &modifies_nx_neighbor)
+        })
+        .unwrap();
 
     {
         let (_info, step_txn) = space.step(
@@ -770,7 +827,9 @@ fn block_tick_action_conflict() {
 
     // Now if we delete one of the conflicting blocks, the tick action of the remaining one
     // should take effect.
-    space.set(right, &AIR).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set(right, &AIR))
+        .unwrap();
 
     {
         let (_info, step_txn) = space.step(
@@ -810,7 +869,9 @@ fn block_tick_action_repeats() {
         })
         .build();
     let mut space = Space::empty_positive(1, 2, 1);
-    space.set([0, 0, 0], &ticker).unwrap();
+    space
+        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &ticker))
+        .unwrap();
     let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
 
     for t in 0..2 {

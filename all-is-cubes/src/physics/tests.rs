@@ -66,8 +66,9 @@ fn paused_does_not_move() {
 #[test]
 fn falling_collision() {
     let [block] = make_some_blocks();
-    let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], &block).unwrap();
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+        .filled_with(block.clone())
+        .build();
     let mut body = test_body();
     body.set_velocity(vec3(2.0, 0.0, 0.0));
     body.flying = false;
@@ -96,8 +97,10 @@ fn falling_collision_partial_block() {
     let u = &mut Universe::new();
     let block = make_slab(u, RES.halve().unwrap().into(), RES);
 
-    let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], &block).unwrap();
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+        .read_ticket(u.read_ticket())
+        .filled_with(block.clone())
+        .build();
     let mut body = test_body();
     body.set_velocity(vec3(x_velocity, 0.0, 0.0));
     body.flying = false;
@@ -151,8 +154,9 @@ fn falling_collision_partial_block() {
 #[test]
 fn push_out_simple() {
     let [block] = make_some_blocks();
-    let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], &block).unwrap();
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+        .filled_with(block.clone())
+        .build();
     let mut body = test_body();
     body.set_position(point3(1.25, 0.5, 0.5)); // intersection of 0.25
     body.set_velocity(Vector3D::zero());
@@ -173,8 +177,10 @@ fn push_out_simple() {
 fn push_out_voxels() {
     let u = &mut Universe::new();
     let block = make_slab(u, 1, R2);
-    let mut space = Space::empty_positive(1, 1, 1);
-    space.set([0, 0, 0], &block).unwrap();
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+        .read_ticket(u.read_ticket())
+        .filled_with(block.clone())
+        .build();
     let mut body = test_body();
     body.set_position(point3(0.5, 0.75, 0.5)); // intersection of 0.25 in the Y axis
     body.flying = true;

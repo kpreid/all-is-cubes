@@ -800,9 +800,13 @@ mod tests {
     ) {
         let u = &mut Universe::new();
         let blocks = block_gen(u);
-        let mut space = Space::empty_positive(2, 1, 1);
-        space.set([0, 0, 0], &blocks[0]).unwrap();
-        space.set([1, 0, 0], &blocks[1]).unwrap();
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .build_and_mutate(|m| {
+                m.set([0, 0, 0], &blocks[0]).unwrap();
+                m.set([1, 0, 0], &blocks[1]).unwrap();
+                Ok(())
+            })
+            .unwrap();
         print_space(&space, [1., 1., 1.]);
 
         // Set up to collide with the block such that the ray doesn't pass through it, to
@@ -823,11 +827,15 @@ mod tests {
     #[test]
     fn already_colliding() {
         let mut u = Universe::new();
-        let mut space = Space::empty_positive(2, 1, 1);
         let [block] = make_some_blocks();
         let half_block = make_slab(&mut u, 1, R2);
-        space.set([0, 0, 0], &block).unwrap();
-        space.set([1, 0, 0], &half_block).unwrap();
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .build_and_mutate(|m| {
+                m.set([0, 0, 0], &block).unwrap();
+                m.set([1, 0, 0], &half_block).unwrap();
+                Ok(())
+            })
+            .unwrap();
 
         let aab = Aab::from_lower_upper([-1., -1., -1.], [2., 1., 1.]);
         let ray = Ray::new([0.5, 0.0, 0.5], [1., 0., 0.]);
@@ -963,8 +971,12 @@ mod tests {
     fn escape_random_test() {
         // TODO: increase coverage via voxel blocks and random Space arrangements
         let [block1] = make_some_blocks();
-        let mut space = Space::empty_positive(2, 1, 1);
-        space.set([0, 0, 0], &block1).unwrap();
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .build_and_mutate(|m| {
+                m.set([0, 0, 0], &block1).unwrap();
+                Ok(())
+            })
+            .unwrap();
 
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for _ in 0..1000 {
@@ -991,9 +1003,13 @@ mod tests {
     ) {
         let u = &mut Universe::new();
         let blocks = block_gen(u);
-        let mut space = Space::empty_positive(2, 1, 1);
-        space.set([0, 0, 0], &blocks[0]).unwrap();
-        space.set([1, 0, 0], &blocks[1]).unwrap();
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .build_and_mutate(|m| {
+                m.set([0, 0, 0], &blocks[0]).unwrap();
+                m.set([1, 0, 0], &blocks[1]).unwrap();
+                Ok(())
+            })
+            .unwrap();
         print_space(&space, [1., 1., 1.]);
 
         let aab = Aab::from_lower_upper([0., 0., 0.], [1.5, 1.5, 1.5]);

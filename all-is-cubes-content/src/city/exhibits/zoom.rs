@@ -12,27 +12,29 @@ fn ZOOM(ctx: Context<'_>) {
     let specimen = &demo_blocks[DemoBlocks::LamppostBase];
 
     let scale = R8;
-    let mut space = Space::builder(GridAab::for_block(scale)).build();
-
-    // TODO: This algorithm should be generically available for creating Zoom instances,
-    // rather than only an exhibit.
-    for cube in space.bounds().interior_iter() {
-        space
-            .set(cube, {
-                let mut zoom_block = specimen.clone();
-                zoom_block
-                    .modifiers_mut()
-                    .push(Zoom::new(scale, cube.lower_bounds().cast()).into());
-                zoom_block
-            })
-            .unwrap();
-        if !space.get_evaluated(cube).visible() {
-            // Cancel placing useless invisible zoomed blocks.
-            // Note: This is not an equivalent optimization (if the original block has
-            // BlockCollision::Hard or animation).
-            space.set(cube, AIR).unwrap();
-        }
-    }
+    let space = Space::builder(GridAab::for_block(scale))
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| {
+            // TODO: This algorithm should be generically available for creating Zoom instances,
+            // rather than only an exhibit.
+            for cube in m.bounds().interior_iter() {
+                m.set(cube, {
+                    let mut zoom_block = specimen.clone();
+                    zoom_block
+                        .modifiers_mut()
+                        .push(Zoom::new(scale, cube.lower_bounds().cast()).into());
+                    zoom_block
+                })
+                .unwrap();
+                if !m.get_evaluated(cube).visible() {
+                    // Cancel placing useless invisible zoomed blocks.
+                    // Note: This is not an equivalent optimization (if the original block has
+                    // BlockCollision::Hard or animation).
+                    m.set(cube, AIR).unwrap();
+                }
+            }
+            Ok(())
+        })?;
 
     Ok((space, ExhibitTransaction::default()))
 }

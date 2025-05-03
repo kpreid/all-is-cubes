@@ -383,16 +383,16 @@ mod tests {
     /// Set up a `Modifier::Move`, let it run, and then allow assertions to be made about the result.
     fn move_block_test(direction: Face6, velocity: i16, checker: impl FnOnce(&Space, &Block)) {
         let [block] = make_some_blocks();
-        let mut space = Space::empty(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]));
         let [move_out, move_in] = Move::new(direction, 0, velocity).into_paired();
-        space
-            .set([0, 0, 0], block.clone().with_modifier(move_out))
-            .unwrap();
-        space
-            .set(
-                GridPoint::origin() + direction.normal_vector(),
-                block.clone().with_modifier(move_in),
-            )
+        let space = Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]))
+            .build_and_mutate(|m| {
+                m.set([0, 0, 0], block.clone().with_modifier(move_out))?;
+                m.set(
+                    GridPoint::origin() + direction.normal_vector(),
+                    block.clone().with_modifier(move_in),
+                )?;
+                Ok(())
+            })
             .unwrap();
         let mut universe = Universe::new();
         let space = universe.insert_anonymous(space);

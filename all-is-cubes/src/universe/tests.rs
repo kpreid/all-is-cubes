@@ -11,7 +11,7 @@ use crate::block::{self, AIR, Block, BlockDef, BlockDefTransaction, Resolution, 
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
 use crate::inv::{InventoryTransaction, Tool};
-use crate::math::Rgba;
+use crate::math::{GridAab, Rgba};
 use crate::op::Operation;
 use crate::space::Space;
 use crate::time;
@@ -523,14 +523,15 @@ fn visit_handles_character() {
 #[test]
 fn visit_handles_space() {
     let mut universe = Universe::new();
-    let mut space = Space::empty_positive(1, 1, 1);
     let block_def_handle = universe.insert_anonymous(BlockDef::new(
         universe.read_ticket(),
         block::from_color!(Rgba::WHITE),
     ));
-    space
-        .set([0, 0, 0], Block::from(block_def_handle.clone()))
-        .unwrap();
+    let space = {
+        Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+            .filled_with(Block::from(block_def_handle.clone()))
+            .build()
+    };
 
     // TODO: Also add a behavior and a spawn inventory item containing handles and check those
     assert_eq!(list_handles(&space), vec![block_def_handle.name().clone()]);

@@ -100,14 +100,17 @@ async fn binary_fractal(
             .component_div(fractal.pattern.bounds().size().to_i32().to_vector())
             .dot(Vector3D::splat(1))
             .rem_euclid(2);
-        space.set(
-            cube,
-            if coloring == 0 {
-                &leaf_block_1
-            } else {
-                &leaf_block_2
-            },
-        )?;
+        // TODO: refactor so we can use mutate() for each whole batch
+        space.mutate(universe.read_ticket(), |m| {
+            m.set(
+                cube,
+                if coloring == 0 {
+                    &leaf_block_1
+                } else {
+                    &leaf_block_2
+                },
+            )
+        })?;
         if i.rem_euclid(20_000) == 0 {
             building_progress.progress((i as f32) / total_cubes).await;
         }

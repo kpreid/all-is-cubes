@@ -6,38 +6,42 @@ use super::prelude::*;
     subtitle: "Stationary but not animated cases.",
     placement: Placement::Surface,
 )]
-fn MOVED_BLOCKS(_: Context<'_>) {
+fn MOVED_BLOCKS(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
-    let mut space = Space::empty(GridAab::from_lower_upper([0, 0, -3], [16, 2, 3]));
-
     let blocks: [Block; 16] = make_some_voxel_blocks_txn(&mut txn);
-    for x in 0..8 {
-        for z in 0..2 {
-            let i = x + z * 8;
-            let distance = (i * 16).try_into().unwrap();
-            let block = &blocks[i as usize];
 
-            // Vertical
-            {
-                let [move_out, move_in] = Move::new(Face6::PY, distance, 0).into_paired();
-                space.set(
-                    [x * 2, 0, (1 - z) * 2],
-                    block.clone().with_modifier(move_out),
-                )?;
-                space.set(
-                    [x * 2, 1, (1 - z) * 2],
-                    block.clone().with_modifier(move_in),
-                )?;
-            }
+    let space = Space::builder(GridAab::from_lower_upper([0, 0, -3], [16, 2, 3]))
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| {
+            for x in 0..8 {
+                for z in 0..2 {
+                    let i = x + z * 8;
+                    let distance = (i * 16).try_into().unwrap();
+                    let block = &blocks[i as usize];
 
-            // Horizontal
-            {
-                let [move_out, move_in] = Move::new(Face6::PZ, distance, 0).into_paired();
-                space.set([i, 0, -2], block.clone().with_modifier(move_out))?;
-                space.set([i, 0, -1], block.clone().with_modifier(move_in))?;
+                    // Vertical
+                    {
+                        let [move_out, move_in] = Move::new(Face6::PY, distance, 0).into_paired();
+                        m.set(
+                            [x * 2, 0, (1 - z) * 2],
+                            block.clone().with_modifier(move_out),
+                        )?;
+                        m.set(
+                            [x * 2, 1, (1 - z) * 2],
+                            block.clone().with_modifier(move_in),
+                        )?;
+                    }
+
+                    // Horizontal
+                    {
+                        let [move_out, move_in] = Move::new(Face6::PZ, distance, 0).into_paired();
+                        m.set([i, 0, -2], block.clone().with_modifier(move_out))?;
+                        m.set([i, 0, -1], block.clone().with_modifier(move_in))?;
+                    }
+                }
             }
-        }
-    }
+            Ok(())
+        })?;
     Ok((space, txn))
 }
 
@@ -103,7 +107,7 @@ fn PROJECTILE(ctx: Context<'_>) {
         .build();
 
     let space = Space::builder(GridAab::ORIGIN_CUBE)
-    .read_ticket(ctx.universe.read_ticket())
+        .read_ticket(ctx.universe.read_ticket())
         .filled_with(launcher)
         .build();
 

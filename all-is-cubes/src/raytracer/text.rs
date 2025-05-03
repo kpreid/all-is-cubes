@@ -156,11 +156,18 @@ mod tests {
 
     #[test]
     fn print_space_test() {
-        let mut space = Space::empty_positive(3, 1, 1);
-        let [b0, b1, b2] = make_some_blocks();
-        space.set([0, 0, 0], &b0).unwrap();
-        space.set([1, 0, 0], &b1).unwrap();
-        space.set([2, 0, 0], &b2).unwrap();
+        let space = Space::builder(GridAab::from_lower_size(
+            [0, 0, 0],
+            euclid::Size3D::new(3, 1, 1).cast(),
+        ))
+        .build_and_mutate(|m| {
+            let [b0, b1, b2] = make_some_blocks();
+            m.set([0, 0, 0], &b0).unwrap();
+            m.set([1, 0, 0], &b1).unwrap();
+            m.set([2, 0, 0], &b2).unwrap();
+            Ok(())
+        })
+        .unwrap();
 
         let output = PrintSpace {
             space: &space,

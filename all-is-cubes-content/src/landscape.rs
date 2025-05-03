@@ -1,3 +1,4 @@
+use all_is_cubes::space;
 use alloc::boxed::Box;
 use core::array;
 use core::fmt;
@@ -12,7 +13,7 @@ use all_is_cubes::block::{
 };
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, zo32};
-use all_is_cubes::space::{SetCubeError, Sky, Space};
+use all_is_cubes::space::{SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
@@ -318,20 +319,17 @@ pub async fn install_landscape_blocks(
 /// ```
 /// use all_is_cubes::space::Space;
 /// use all_is_cubes::linking::BlockProvider;
+/// use all_is_cubes::universe::ReadTicket;
 /// use all_is_cubes_content::{LandscapeBlocks, wavy_landscape};
 ///
+/// let blocks = BlockProvider::<LandscapeBlocks>::default();
 /// let mut space = Space::empty_positive(10, 10, 10);
-/// wavy_landscape(
-///     space.bounds(),
-///     &mut space,
-///     &BlockProvider::<LandscapeBlocks>::default(),
-///     1.0,
-/// ).unwrap();
+/// space.mutate(ReadTicket::stub(), |m| wavy_landscape(m.bounds(), m, &blocks, 1.0)).unwrap();
 /// # // TODO: It didn't panic, but how about some assertions?
 /// ```
 pub fn wavy_landscape(
     region: GridAab,
-    space: &mut Space,
+    m: &mut space::Mutation<'_, '_>,
     blocks: &BlockProvider<LandscapeBlocks>,
     max_slope: FreeCoordinate,
 ) -> Result<(), SetCubeError> {
@@ -370,7 +368,7 @@ pub fn wavy_landscape(
                 } else {
                     &blocks[Stone]
                 };
-                space.set(cube, block)?;
+                m.set(cube, block)?;
                 // TODO: Add various decorations on the ground. And trees.
             }
         }

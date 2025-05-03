@@ -137,13 +137,15 @@ fn space_bulk_mutation(c: &mut Criterion) {
                 || Space::empty(bounds),
                 |space: &mut Space| {
                     let mutation_size = GridCoordinate::from(mutation_size);
-                    for x in 0..mutation_size {
-                        for y in 0..mutation_size {
-                            for z in 0..mutation_size {
-                                space.set([x, y, z], &block).unwrap();
+                    space.mutate(ReadTicket::stub(), |m| {
+                        for x in 0..mutation_size {
+                            for y in 0..mutation_size {
+                                for z in 0..mutation_size {
+                                    m.set([x, y, z], &block).unwrap();
+                                }
                             }
                         }
-                    }
+                    });
                 },
                 BatchSize::SmallInput,
             )

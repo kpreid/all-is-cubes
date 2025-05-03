@@ -33,7 +33,8 @@ use crate::math::{
     Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb,
     Rgba, Vol,
 };
-use crate::space::{SetCubeError, Space, SpaceTransaction};
+use crate::space::{self, SetCubeError, Space, SpaceTransaction};
+use crate::universe::ReadTicket;
 
 #[cfg(doc)]
 use crate::space::CubeTransaction;
@@ -155,9 +156,10 @@ where
             // TODO: Add a cache so we're not reconstructing the block for every single pixel.
             // (This is possible because `PixelColor: PartialEq`.)
             // TODO: Need to rotate the brush to match our transform
-            color
-                .into_blocks()
-                .paint(self.space, self.convert_point(point))?;
+            let cube = self.convert_point(point);
+            // TODO(read_ticket): migrate DrawingPlane as a whole to operate on Mutation
+            self.space
+                .mutate(ReadTicket::new(), |m| color.into_blocks().paint(m, cube))?;
         }
         Ok(())
     }
@@ -349,14 +351,14 @@ impl<'a> VoxelBrush<'a> {
         Self::new(range.map(|z| (GridVector::new(0, 0, z), block.clone())))
     }
 
-    /// Copies each of the brush's blocks into the `Space` relative to the given origin
+    /// Copies each of the brush's blocks into `m` relative to the given origin
     /// point.
     ///
-    /// Unlike [`Space::set`], it is not considered an error if any of the affected cubes
+    /// Unlike [`space::Mutation::set()`], it is not considered an error if any of the affected cubes
     /// fall outside of the `Space`'s bounds.
-    pub fn paint(&self, space: &mut Space, origin: Cube) -> Result<(), SetCubeError> {
+    pub fn paint(&self, m: &mut space::Mutation<'_, '_>, origin: Cube) -> Result<(), SetCubeError> {
         for &(offset, ref block) in &self.0 {
-            ignore_out_of_bounds(space.set(origin + offset, Cow::borrow(block)))?;
+            ignore_out_of_bounds(m.set(origin + offset, Cow::borrow(block)))?;
         }
         Ok(())
     }

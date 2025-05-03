@@ -642,8 +642,12 @@ mod tests {
         let mut universe = Universe::new();
         // must use voxel blocks because they aren't considered symmetric
         let [block] = make_some_voxel_blocks(&mut universe);
-        let mut space = Space::empty_positive(2, 1, 1);
-        space.set([0, 0, 0], block.clone()).unwrap();
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .build_and_mutate(|m| {
+                m.set([0, 0, 0], block.clone())?;
+                Ok(())
+            })
+            .unwrap();
 
         let op = Operation::AddModifiers([block::Modifier::Rotate(GridRotation::CLOCKWISE)].into());
 
@@ -672,8 +676,9 @@ mod tests {
     fn add_modifier_not_rotate_txn() {
         let [block] = make_some_blocks();
         let block = block.with_modifier(block::Modifier::Quote(block::Quote::default()));
-        let mut space = Space::empty_positive(1, 1, 1);
-        space.set([0, 0, 0], block.clone()).unwrap();
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+            .filled_with(block.clone())
+            .build();
 
         let modifier = block::Modifier::Move(block::Move::new(Face6::PX, 4, 0));
         let op = Operation::AddModifiers([modifier.clone()].into());
@@ -806,9 +811,13 @@ mod tests {
     /// This function should be called at least once for each Operation variant.
     fn transform_consistent_with_rotate(initial_block: Block, op: Operation) {
         let rotation = GridRotation::CLOCKWISE;
-        let mut space = Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2])).build();
-        // TODO: a translation as well as a rotation would be a more thorough test
-        space.set(Cube::ORIGIN, initial_block).unwrap();
+        let space = Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]))
+            .build_and_mutate(|m| {
+                // TODO: a translation as well as a rotation would be a more thorough test
+                m.set(Cube::ORIGIN, initial_block)?;
+                Ok(())
+            })
+            .unwrap();
 
         let txns_transform = op.apply(&space, None, rotation.to_positive_octant_transform(1));
         let rotated_op = op.rotate(rotation);

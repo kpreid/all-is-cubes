@@ -50,25 +50,27 @@ fn UI_BLOCKS(ctx: Context<'_>) {
     );
 
     // Fill space with blocks
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         .spawn_position(Point3D::new(
             FreeCoordinate::from(bounds.size().width) / 2.,
             FreeCoordinate::from(bounds.size().height) / 2.,
             FreeCoordinate::from(bounds.size().height) * 1.5,
         ))
-        .build();
-    for (index, block) in (0i32..).zip(all_blocks) {
-        space
-            .set(
-                [
-                    index.rem_euclid(row_length),
-                    index.div_euclid(row_length),
-                    0,
-                ],
-                block,
-            )
-            .unwrap();
-    }
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| {
+            for (index, block) in (0i32..).zip(all_blocks) {
+                m.set(
+                    [
+                        index.rem_euclid(row_length),
+                        index.div_euclid(row_length),
+                        0,
+                    ],
+                    block,
+                )
+                .unwrap();
+            }
+            Ok(())
+        })?;
 
     Ok((space, ExhibitTransaction::default()))
 }

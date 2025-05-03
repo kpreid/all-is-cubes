@@ -9,7 +9,7 @@ use super::prelude::*;
 fn MAKE_SOME_BLOCKS(_: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
-    const ROWS: GridCoordinate = 5;
+    const ROWS: GridSizeCoord = 5;
     fn make_both_blocks<const N: usize>(txn: &mut ExhibitTransaction) -> (Vec<Block>, Vec<Block>) {
         (
             Vec::from(make_some_blocks::<N>()),
@@ -23,12 +23,15 @@ fn MAKE_SOME_BLOCKS(_: Context<'_>) {
         make_both_blocks::<2>(&mut txn),
         make_both_blocks::<1>(&mut txn),
     ];
-    let mut space = Space::empty_positive(3, ROWS, ROWS);
-    for (y, (blocks_a, blocks_v)) in (0i32..).zip(rows) {
-        for (h, (block_a, block_v)) in (0i32..).zip(blocks_a.into_iter().zip(blocks_v)) {
-            space.set([0, y, h], block_a)?;
-            space.set([2, y, h], block_v)?;
-        }
-    }
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, ROWS, ROWS]))
+        .build_and_mutate(|m| {
+            for (y, (blocks_a, blocks_v)) in (0i32..).zip(rows) {
+                for (h, (block_a, block_v)) in (0i32..).zip(blocks_a.into_iter().zip(blocks_v)) {
+                    m.set([0, y, h], block_a)?;
+                    m.set([2, y, h], block_v)?;
+                }
+            }
+            Ok(())
+        })?;
     Ok((space, txn))
 }

@@ -170,7 +170,7 @@ async fn bloom(mut context: RenderTestContext, bloom_intensity: f32) {
 async fn color_srgb_ramp(mut context: RenderTestContext) {
     let bounds = GridAab::from_lower_size([0, 0, 0], [16 * 2, 16 * 2, 1]);
     let mut universe = Universe::new();
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         .light_physics(LightPhysics::None)
         .spawn({
             let mut spawn = Spawn::default_for_new_space(bounds);
@@ -178,30 +178,27 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
             spawn.set_look_direction([0., 0., -1.]);
             spawn
         })
-        .build();
-
-    let dr = GridVector::new(1, 0, 0);
-    let dg = GridVector::new(1, 1, 0);
-    let db = GridVector::new(0, 1, 0);
-    for i in 0..=255u8 {
-        let p = GridPoint::new(
-            i32::from(i.rem_euclid(16)) * 2,
-            i32::from(i.div_euclid(16)) * 2,
-            0,
-        );
-        space
-            .set(p, Block::from(Rgb::from_srgb8([i, i, i])))
-            .unwrap();
-        space
-            .set(p + dr, Block::from(Rgb::from_srgb8([i, 0, 0])))
-            .unwrap();
-        space
-            .set(p + dg, Block::from(Rgb::from_srgb8([0, i, 0])))
-            .unwrap();
-        space
-            .set(p + db, Block::from(Rgb::from_srgb8([0, 0, i])))
-            .unwrap();
-    }
+        .build_and_mutate(|m| {
+            let dr = GridVector::new(1, 0, 0);
+            let dg = GridVector::new(1, 1, 0);
+            let db = GridVector::new(0, 1, 0);
+            for i in 0..=255u8 {
+                let p = GridPoint::new(
+                    i32::from(i.rem_euclid(16)) * 2,
+                    i32::from(i.div_euclid(16)) * 2,
+                    0,
+                );
+                m.set(p, Block::from(Rgb::from_srgb8([i, i, i]))).unwrap();
+                m.set(p + dr, Block::from(Rgb::from_srgb8([i, 0, 0])))
+                    .unwrap();
+                m.set(p + dg, Block::from(Rgb::from_srgb8([0, i, 0])))
+                    .unwrap();
+                m.set(p + db, Block::from(Rgb::from_srgb8([0, 0, i])))
+                    .unwrap();
+            }
+            Ok(())
+        })
+        .unwrap();
 
     finish_universe_from_space(&mut universe, space);
 
@@ -297,8 +294,9 @@ async fn emission(mut context: RenderTestContext) {
         .unwrap()
         .build_into(&mut universe);
 
-    // TODO: use voxels
-    space.set([0, 0, 0], block).unwrap();
+    space
+        .mutate(universe.read_ticket(), |m| m.set([0, 0, 0], block))
+        .unwrap();
 
     finish_universe_from_space(&mut universe, space);
 
@@ -354,13 +352,17 @@ async fn voxel_shape_test(
         .unwrap()
         .build_into(&mut universe);
     let bounds = GridAab::from_lower_upper([-1, 0, 0], [3, 1, 1]);
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         // Single-channel sky color so we can distinguish it from the contribution of the emission
         .sky_color(Rgb::from_srgb8([0, 0, 127]))
         .spawn(looking_at_one_cube_spawn(bounds))
-        .build();
-    space.set([-1, 0, 0], atom_block).unwrap();
-    space.set([1, 0, 0], voxel_block).unwrap();
+        .read_ticket(universe.read_ticket())
+        .build_and_mutate(|m| {
+            m.set([-1, 0, 0], atom_block).unwrap();
+            m.set([1, 0, 0], voxel_block).unwrap();
+            Ok(())
+        })
+        .unwrap();
 
     finish_universe_from_space(&mut universe, space);
 
@@ -389,7 +391,9 @@ async fn error_character_gone(context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut space = one_cube_space();
     space
-        .set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
+        .mutate(universe.read_ticket(), |m| {
+            m.set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
+        })
         .unwrap();
     let (space_handle, character_handle) = finish_universe_from_space(&mut universe, space);
     let mut renderer = context.renderer(&universe);
@@ -428,7 +432,9 @@ async fn error_character_unavailable(context: RenderTestContext) {
     let mut universe = Universe::new();
     let mut space = one_cube_space();
     space
-        .set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
+        .mutate(universe.read_ticket(), |m| {
+            m.set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
+        })
         .unwrap();
     let (space_handle, character_handle) = finish_universe_from_space(&mut universe, space);
     let mut renderer = context.renderer(&universe);
@@ -524,15 +530,15 @@ async fn follow_character_change(context: RenderTestContext) {
 async fn follow_options_change(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let bounds = GridAab::from_lower_upper([-1, 0, 0], [2, 1, 1]);
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         .sky_color(rgb_const!(0.5, 0.5, 0.5))
         .spawn(looking_at_one_cube_spawn(bounds))
-        .build();
-    space
-        .set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
-        .unwrap();
-    space
-        .set([1, 0, 0], block::from_color!(0.0, 0.0, 1.0, 0.5))
+        .read_ticket(universe.read_ticket())
+        .build_and_mutate(|m| {
+            m.set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))?;
+            m.set([1, 0, 0], block::from_color!(0.0, 0.0, 1.0, 0.5))?;
+            Ok(())
+        })
         .unwrap();
     finish_universe_from_space(&mut universe, space);
 
@@ -577,6 +583,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
 /// But it’s still a test case worth looking at. (And perhaps we should remove that fudge factor.)
 async fn furnace(mut context: RenderTestContext) {
     let mut universe = Universe::new();
+    let white_block = block::from_color!(Rgba::WHITE);
     let bounds = GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]);
     let mut space = Space::builder(bounds)
         .sky(space::Sky::Uniform(Rgb::ONE * 0.75))
@@ -586,12 +593,15 @@ async fn furnace(mut context: RenderTestContext) {
             spawn.set_look_direction(vec3(1., -1., -1.));
             spawn
         })
-        .build();
-    let white_block = block::from_color!(Rgba::WHITE);
-    // Make a pattern of blocks that has room for some reflections.
-    space.set([-1, -1, 1], &white_block).unwrap();
-    space.set([1, -1, 0], &white_block).unwrap();
-    space.set([-1, 1, -1], &white_block).unwrap();
+        .read_ticket(universe.read_ticket())
+        .build_and_mutate(|m| {
+            // Make a pattern of blocks that has room for some reflections.
+            m.set([-1, -1, 1], &white_block).unwrap();
+            m.set([1, -1, 0], &white_block).unwrap();
+            m.set([-1, 1, -1], &white_block).unwrap();
+            Ok(())
+        })
+        .unwrap();
     space.evaluate_light::<std::time::Instant>(0, drop);
     finish_universe_from_space(&mut universe, space);
 
@@ -756,19 +766,20 @@ async fn icons(mut context: RenderTestContext) {
             FreeCoordinate::from(bounds.size().height) / 2.,
             FreeCoordinate::from(bounds.size().height) * 1.5,
         ))
-        .build();
-    for (index, block) in (0i32..).zip(all_blocks) {
-        space
-            .set(
-                [
-                    index.rem_euclid(row_length),
-                    index.div_euclid(row_length),
-                    0,
-                ],
-                block,
-            )
-            .unwrap();
-    }
+        .build_and_mutate(|m| {
+            for (index, block) in (0i32..).zip(all_blocks) {
+                m.set(
+                    [
+                        index.rem_euclid(row_length),
+                        index.div_euclid(row_length),
+                        0,
+                    ],
+                    block,
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
 
     let aspect_ratio =
         f64::from(space.bounds().size().height) / f64::from(space.bounds().size().width);
@@ -1042,7 +1053,9 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
     // this should be a 50% mix of [1, 0, 0] and [0.5, 0.5, 0.5], i.e.
     // [0.75, 0.25, 0.25], whose closest sRGB8 approximation is [225, 137, 137] = #E18989.
     space
-        .set([0, 0, 0], block::from_color!(1.0, 0.0, 0.0, 0.5))
+        .mutate(universe.read_ticket(), |m| {
+            m.set([0, 0, 0], block::from_color!(1.0, 0.0, 0.0, 0.5))
+        })
         .unwrap();
 
     finish_universe_from_space(&mut universe, space);

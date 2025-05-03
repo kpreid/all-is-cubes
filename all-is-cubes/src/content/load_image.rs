@@ -18,7 +18,7 @@ use crate::camera::ImageSize;
 use crate::drawing::{VoxelBrush, rectangle_to_aab};
 use crate::math::{GridAab, GridCoordinate, GridRotation, Rgba};
 use crate::space::{SetCubeError, Space, SpacePhysics};
-use crate::universe::UniverseTransaction;
+use crate::universe::{ReadTicket, UniverseTransaction};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -157,18 +157,20 @@ pub fn space_from_image<'b>(
         ia.max_brush,
     );
 
-    let mut space = Space::builder(bounds)
+    Space::builder(bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build();
-    for y in 0..(size.height) {
-        for x in 0..(size.width) {
-            ia.get_brush(x, y).paint(
-                &mut space,
-                Cube::from(transform.transform_point(GridPoint::new(x, y, 0))),
-            )?;
-        }
-    }
-    Ok(space)
+        .read_ticket(ReadTicket::new()) // TODO(read_ticket): replace this with a parameter
+        .build_and_mutate(|m| {
+            for y in 0..(size.height) {
+                for x in 0..(size.width) {
+                    ia.get_brush(x, y).paint(
+                        m,
+                        Cube::from(transform.transform_point(GridPoint::new(x, y, 0))),
+                    )?;
+                }
+            }
+            Ok(())
+        })
 }
 
 /// Convert a decoded PNG image into a [`BlockBuilder`] with voxels (which can then create a
