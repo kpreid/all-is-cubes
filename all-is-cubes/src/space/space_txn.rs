@@ -13,7 +13,7 @@ use crate::block::Block;
 use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
 use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid};
-use crate::space::{self, ActivatableRegion, GridAab, MutationCtx, SetCubeError, Space};
+use crate::space::{self, ActivatableRegion, GridAab, Mutation, SetCubeError, Space};
 use crate::transaction::{
     CommitError, Equal, ExecuteError, Merge, NoOutput, Transaction, Transactional, no_outputs,
 };
@@ -224,7 +224,7 @@ impl SpaceTransaction {
 
     fn commit_common(
         &self,
-        ctx: &mut MutationCtx<'_, '_>,
+        m: &mut Mutation<'_, '_>,
         check: behavior::CommitCheck,
     ) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
@@ -243,7 +243,7 @@ impl SpaceTransaction {
             let cube = Cube::from(cube);
 
             if let Equal(Some(new)) = new {
-                match Space::set_impl(ctx, cube, new) {
+                match Space::set_impl(m, cube, new) {
                     Ok(_) => Ok(()),
                     Err(SetCubeError::OutOfBounds { .. }) if !conserved => {
                         // ignore
@@ -263,7 +263,7 @@ impl SpaceTransaction {
                 reason = "https://github.com/rust-lang/rust-clippy/issues/11827"
             )]
             for fluff in fluff.iter().cloned() {
-                ctx.fluff_buffer.push(super::SpaceFluff {
+                m.fluff_buffer.push(super::SpaceFluff {
                     position: cube,
                     fluff,
                 });
@@ -271,11 +271,11 @@ impl SpaceTransaction {
         }
 
         self.behaviors
-            .commit(ctx.behaviors, check, &mut no_outputs)
+            .commit(m.behaviors, check, &mut no_outputs)
             .map_err(|e| e.context("behaviors".into()))?;
 
         if !to_activate.is_empty() {
-            'b: for query_item in ctx.behaviors.query::<ActivatableRegion>() {
+            'b: for query_item in m.behaviors.query::<ActivatableRegion>() {
                 // TODO: error return from the function? error report for nonexistence?
                 for cube in to_activate.iter().copied() {
                     // TODO: this should be part of the query instead, to allow efficient search
@@ -290,11 +290,11 @@ impl SpaceTransaction {
         Ok(())
     }
 
-    /// As [`Transaction::execute()`], but taking a [`MutationCtx`] instead of a [`Space`].
+    /// As [`Transaction::execute()`], but taking a [`Mutation`] instead of a [`Space`].
     #[expect(dead_code, reason = "TODO(read_ticket): this will be needed later")]
     pub(crate) fn execute_ctx(
         &self,
-        target: &mut MutationCtx<'_, '_>,
+        target: &mut Mutation<'_, '_>,
     ) -> Result<(), ExecuteError<Self>> {
         let check = self
             .check_common(target.palette, target.contents.as_ref(), target.behaviors)

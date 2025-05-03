@@ -353,13 +353,13 @@ impl Space {
     /// Monomorphic to keep codegen costs low.
     /// Takes individual borrowed fields to enable use of `ChangeBuffer`.
     fn set_impl(
-        ctx: &mut MutationCtx<'_, '_>,
+        m: &mut Mutation<'_, '_>,
         position: Cube,
         block: &Block,
     ) -> Result<bool, SetCubeError> {
-        if let Some(contents_index) = ctx.contents.index(position) {
-            let old_block_index = ctx.contents.as_linear()[contents_index];
-            let old_block = ctx.palette.entry(old_block_index).block();
+        if let Some(contents_index) = m.contents.index(position) {
+            let old_block_index = m.contents.as_linear()[contents_index];
+            let old_block = m.palette.entry(old_block_index).block();
             if *old_block == *block {
                 // No change.
                 return Ok(false);
@@ -373,14 +373,11 @@ impl Space {
             //
             // It also means that the externally observable block index behavior is easier
             // to characterize and won't create unnecessary holes.
-            if ctx.palette.try_replace_unique(
-                ctx.read_ticket,
-                old_block_index,
-                block,
-                ctx.change_buffer,
-            ) {
+            if m.palette
+                .try_replace_unique(m.read_ticket, old_block_index, block, m.change_buffer)
+            {
                 Self::side_effects_of_set(
-                    ctx,
+                    m,
                     old_block_index,
                     old_block_index,
                     position,
@@ -391,18 +388,18 @@ impl Space {
 
             // Find or allocate index for new block. This must be done before other mutations since it can fail.
             let new_block_index =
-                ctx.palette
-                    .ensure_index(ctx.read_ticket, block, ctx.change_buffer, true)?;
+                m.palette
+                    .ensure_index(m.read_ticket, block, m.change_buffer, true)?;
 
             // Update counts
-            ctx.palette.decrement_maybe_free(old_block_index);
-            ctx.palette.increment(new_block_index);
+            m.palette.decrement_maybe_free(old_block_index);
+            m.palette.increment(new_block_index);
 
             // Write actual space change.
-            ctx.contents.as_linear_mut()[contents_index] = new_block_index;
+            m.contents.as_linear_mut()[contents_index] = new_block_index;
 
             Self::side_effects_of_set(
-                ctx,
+                m,
                 old_block_index,
                 new_block_index,
                 position,
@@ -412,7 +409,7 @@ impl Space {
         } else {
             Err(SetCubeError::OutOfBounds {
                 modification: GridAab::single_cube(position),
-                space_bounds: ctx.contents.bounds(),
+                space_bounds: m.contents.bounds(),
             })
         }
     }
@@ -422,33 +419,33 @@ impl Space {
     /// `contents_index` is redundant with `position` but saves computation.
     #[inline]
     fn side_effects_of_set(
-        ctx: &mut MutationCtx<'_, '_>,
+        m: &mut Mutation<'_, '_>,
         old_block_index: BlockIndex,
         new_block_index: BlockIndex,
         cube: Cube,
         contents_index: usize,
     ) {
-        let evaluated = &ctx.palette.entry(new_block_index).evaluated;
+        let evaluated = &m.palette.entry(new_block_index).evaluated;
 
         if evaluated.attributes().tick_action.is_some() {
-            ctx.cubes_wanting_ticks.insert(cube);
+            m.cubes_wanting_ticks.insert(cube);
         }
         // We could also *remove* the cube from `cubes_wanting_ticks` if it has no action,
         // but that would be frequently wasted. Instead, let the tick come around and remove
         // it then.
 
-        ctx.light.modified_cube_needs_update(
+        m.light.modified_cube_needs_update(
             light::UpdateCtx {
-                contents: ctx.contents.as_ref(),
-                palette: ctx.palette,
+                contents: m.contents.as_ref(),
+                palette: m.palette,
             },
-            ctx.change_buffer,
+            m.change_buffer,
             cube,
             evaluated,
             contents_index,
         );
 
-        ctx.change_buffer.push(SpaceChange::CubeBlock {
+        m.change_buffer.push(SpaceChange::CubeBlock {
             cube,
             old_block_index,
             new_block_index,
@@ -567,19 +564,26 @@ impl Space {
         DrawingPlane::new(self, transform)
     }
 
-    /// Provides a [`MutationCtx`] to `f`, which may be used to replace one or many blocks in the
-    /// [`Space`].
+    /// Begins a batch of mutations to the contents of this space.
     ///
     /// `read_ticket` should be a [`ReadTicket`] obtained from the [`Universe`] which contains
     /// the [`BlockDef`]s used and will eventually contain this [`Space`] too.
+    ///
+    /// The returned [`Mutation`] contains methods to perform various mutations.
     //---
     // TODO(read_ticket): make this public and replace other mutation methods that need a ReadTicket
+    // Design note: The reason this is a function with callback, rather than returning a
+    // `Mutation`, is so that the `Mutation` is guaranteed to be dropped and deliver its
+    // notifications.
+    //
+    // In the future, there may also be ways in which the space can be in a temporarily invalid
+    // state (e.g. allocating a block index before it is used anywhere).
     pub(crate) fn mutate<R>(
         &mut self,
         read_ticket: ReadTicket<'_>,
-        f: impl FnOnce(&mut MutationCtx<'_, '_>) -> R,
+        f: impl FnOnce(&mut Mutation<'_, '_>) -> R,
     ) -> R {
-        f(&mut MutationCtx {
+        f(&mut Mutation {
             read_ticket,
             palette: &mut self.palette,
             contents: self.contents.as_mut(),
@@ -1298,17 +1302,17 @@ type ChangeBuffer<'notifier> =
     listen::Buffer<'notifier, SpaceChange, listen::DynListener<SpaceChange>, 16>;
 
 /// Argument passed to [`Space`] mutation methods that are used in bulk mutations.
-pub(crate) struct MutationCtx<'ctx, 'buf> {
+pub(crate) struct Mutation<'m, 'space> {
     /// Used for evaluating blocks that are added.
-    read_ticket: ReadTicket<'ctx>,
+    read_ticket: ReadTicket<'m>,
 
-    contents: Vol<&'ctx mut [BlockIndex]>,
-    light: &'ctx mut LightStorage,
-    palette: &'ctx mut Palette,
-    cubes_wanting_ticks: &'ctx mut HbHashSet<Cube>,
-    behaviors: &'ctx mut BehaviorSet<Space>,
+    contents: Vol<&'m mut [BlockIndex]>,
+    light: &'m mut LightStorage,
+    palette: &'m mut Palette,
+    cubes_wanting_ticks: &'m mut HbHashSet<Cube>,
+    behaviors: &'m mut BehaviorSet<Space>,
 
     // Buffers outgoing notifications; flushed as needed and on drop.
-    change_buffer: &'ctx mut ChangeBuffer<'buf>,
-    fluff_buffer: &'ctx mut listen::Buffer<'buf, SpaceFluff, listen::DynListener<SpaceFluff>, 16>,
+    change_buffer: &'m mut ChangeBuffer<'space>,
+    fluff_buffer: &'m mut listen::Buffer<'space, SpaceFluff, listen::DynListener<SpaceFluff>, 16>,
 }
