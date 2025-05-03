@@ -449,22 +449,6 @@ impl Space {
         });
     }
 
-    #[allow(missing_docs)]
-    #[deprecated = "use Space::mutate() first"]
-    pub fn fill<F, B>(&mut self, region: GridAab, function: F) -> Result<(), SetCubeError>
-    where
-        F: FnMut(Cube) -> Option<B>,
-        B: core::borrow::Borrow<Block>,
-    {
-        self.mutate(ReadTicket::new(), |m| m.fill(region, function))
-    }
-
-    #[allow(missing_docs)]
-    #[deprecated = "use Space::mutate() first"]
-    pub fn fill_uniform(&mut self, region: GridAab, block: &Block) -> Result<(), SetCubeError> {
-        self.mutate(ReadTicket::new(), |m| m.fill_uniform(region, block))
-    }
-
     /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
     /// adapter for 2.5D drawing.
     ///
