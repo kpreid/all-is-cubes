@@ -338,6 +338,7 @@ impl Space {
     /// space.set([0, 0, 0], &a_block);
     /// assert_eq!(space[[0, 0, 0]], a_block);
     /// ```
+    #[deprecated = "use Space::mutate() first"]
     pub fn set<'a>(
         &mut self,
         position: impl Into<Cube>,
