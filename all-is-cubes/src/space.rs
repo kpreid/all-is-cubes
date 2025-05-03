@@ -319,35 +319,7 @@ impl Space {
         self.light.in_light_update_queue(cube)
     }
 
-    /// Replace the block in this space at the given position.
-    ///
-    /// If the position is out of bounds, there is no effect.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(true)` if the change was made, `Ok(false)` if the same block was
-    /// already present, and `Err(_)` if the replacement could not be made; see
-    /// [`SetCubeError`] for possible errors.
-    ///
-    /// ```
-    /// use all_is_cubes::block::*;
-    /// use all_is_cubes::math::Rgba;
-    /// use all_is_cubes::space::Space;
-    /// let mut space = Space::empty_positive(1, 1, 1);
-    /// let a_block = Block::builder().color(Rgba::new(1.0, 0.0, 0.0, 1.0)).build();
-    /// space.set([0, 0, 0], &a_block);
-    /// assert_eq!(space[[0, 0, 0]], a_block);
-    /// ```
-    #[deprecated = "use Space::mutate() first"]
-    pub fn set<'a>(
-        &mut self,
-        position: impl Into<Cube>,
-        block: impl Into<Cow<'a, Block>>,
-    ) -> Result<bool, SetCubeError> {
-        self.mutate(ReadTicket::new(), |m| m.set(position.into(), block.into()))
-    }
-
-    /// Implementation of replacing the block in a single cube, as in [`Self::set()`].
+    /// Implementation of replacing the block in a single cube, as in [`Mutation::set()`].
     /// Monomorphic to keep codegen costs low.
     /// Takes individual borrowed fields to enable use of `ChangeBuffer`.
     fn set_impl(
