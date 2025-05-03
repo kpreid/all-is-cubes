@@ -335,12 +335,6 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
 
         // TODO: Should be reusing Vol as Arbitrary for this.
 
-        let bounds = Vol::<()>::arbitrary_with_max_volume(u, 2048)?;
-        let mut space = Space::builder(bounds.bounds()) // TODO: builder should accept Vol
-            .physics(u.arbitrary()?)
-            .spawn(u.arbitrary()?)
-            .build();
-
         // Generate some blocks to put in the space
         let mut blocks = alloc::vec::Vec::from(make_some_blocks::<2>()); // TODO: generate arbitrary blocks with attributes
         #[expect(clippy::same_item_push)]
@@ -349,21 +343,28 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
             blocks.push(AIR);
         }
 
-        // Fill space with blocks
-        // TODO: use palette mechanism instead now that we have it
         let mut failure = None;
-        space
-            .fill(space.bounds(), |_| {
-                match u.choose(&blocks) {
-                    Ok(block) => Some(block),
-                    Err(e) => {
-                        // We can't abort a space.fill() early unless we resort to catch_unwind.
-                        failure = Some(e);
-                        None
+
+        let bounds = Vol::<()>::arbitrary_with_max_volume(u, 2048)?;
+        let space = Space::builder(bounds.bounds()) // TODO: builder should accept Vol
+            .physics(u.arbitrary()?)
+            .spawn(u.arbitrary()?)
+            .build_and_mutate(|m| {
+                // Fill space with blocks
+                // TODO: use palette mechanism instead now that we have it
+                m.fill_all(|_| {
+                    match u.choose(&blocks) {
+                        Ok(block) => Some(block),
+                        Err(e) => {
+                            // We can't abort a space.fill() early unless we resort to catch_unwind.
+                            failure = Some(e);
+                            None
+                        }
                     }
-                }
+                })
             })
             .unwrap();
+
         if let Some(e) = failure {
             return Err(e);
         }

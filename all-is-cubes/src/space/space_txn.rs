@@ -317,7 +317,7 @@ impl Transaction for SpaceTransaction {
         check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        space.mutate(ReadTicket::new(), |ctx| self.commit_common(ctx, check))
+        space.mutate(ReadTicket::new(), |m| self.commit_common(m, check))
     }
 }
 

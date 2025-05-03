@@ -1214,7 +1214,8 @@ async fn antialias_test_universe() -> Arc<Universe> {
     };
 
     let bounds = GridAab::from_lower_size([-5, -2, -60], [10, 10, 60]);
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
+        .read_ticket(universe.read_ticket())
         // No light needed or desirable because we want to focus on geometry edges
         .light_physics(LightPhysics::None)
         .spawn({
@@ -1223,16 +1224,14 @@ async fn antialias_test_universe() -> Arc<Universe> {
             spawn.set_look_direction(vec3(0.4, -0.2, -1.0));
             spawn
         })
-        .build();
+        .build_and_mutate(|m| {
+            // Bottom floor
+            m.fill(bounds.abut(Face6::NY, -1).unwrap(), voxel_block_pattern)?;
 
-    // Bottom floor
-    space
-        .fill(bounds.abut(Face6::NY, -1).unwrap(), voxel_block_pattern)
-        .unwrap();
-
-    // Right wall
-    space
-        .fill(bounds.abut(Face6::PX, -1).unwrap(), solid_block_pattern)
+            // Right wall
+            m.fill(bounds.abut(Face6::PX, -1).unwrap(), solid_block_pattern)?;
+            Ok(())
+        })
         .unwrap();
 
     finish_universe_from_space(&mut universe, space);
@@ -1250,42 +1249,41 @@ async fn fog_test_universe() -> Arc<Universe> {
             spawn.set_look_direction(vec3(0.4, 0., -1.0));
             spawn
         })
-        .build();
+        .build_and_mutate(|m| {
+            // Bottom floor
+            m.fill_uniform(
+                bounds.abut(Face6::NY, -1).unwrap(),
+                &block::from_color!(0.0, 1.0, 0.5, 1.0),
+            )?;
 
-    // Bottom floor
-    space
-        .fill_uniform(
-            bounds.abut(Face6::NY, -1).unwrap(),
-            &block::from_color!(0.0, 1.0, 0.5, 1.0),
-        )
+            // Right wall
+            m.fill_uniform(
+                bounds.abut(Face6::PX, -1).unwrap(),
+                &block::from_color!(1.0, 0.5, 0.5, 1.0),
+            )?;
+
+            let pillar_block = block::from_color!(palette::ALMOST_BLACK);
+            let pillar_lamp_block = Block::builder()
+                .color(rgba_const!(1.0, 0.05, 0.05, 1.0))
+                .light_emission(rgb_const!(40.0, 0.05, 0.05))
+                .build();
+            for z in bounds.z_range().step_by(2) {
+                let x =
+                    (z * 19i32).rem_euclid(bounds.size().to_i32().width) + bounds.lower_bounds().x;
+
+                m.fill_uniform(
+                    GridAab::from_lower_size([x, 1, z], [1, 10, 1]),
+                    &pillar_block,
+                )
+                .unwrap();
+
+                // lamp block placed in front of pillar so that its emission is reflected by the pillar
+                m.set([x, 8, z + 1], &pillar_lamp_block).unwrap();
+            }
+
+            Ok(())
+        })
         .unwrap();
-
-    // Right wall
-    space
-        .fill_uniform(
-            bounds.abut(Face6::PX, -1).unwrap(),
-            &block::from_color!(1.0, 0.5, 0.5, 1.0),
-        )
-        .unwrap();
-
-    let pillar_block = block::from_color!(palette::ALMOST_BLACK);
-    let pillar_lamp_block = Block::builder()
-        .color(rgba_const!(1.0, 0.05, 0.05, 1.0))
-        .light_emission(rgb_const!(40.0, 0.05, 0.05))
-        .build();
-    for z in bounds.z_range().step_by(2) {
-        let x = (z * 19i32).rem_euclid(bounds.size().to_i32().width) + bounds.lower_bounds().x;
-
-        space
-            .fill_uniform(
-                GridAab::from_lower_size([x, 1, z], [1, 10, 1]),
-                &pillar_block,
-            )
-            .unwrap();
-
-        // lamp block placed in front of pillar so that its emission is reflected by the pillar
-        space.set([x, 8, z + 1], &pillar_lamp_block).unwrap();
-    }
 
     space.fast_evaluate_light();
     space.evaluate_light::<time::NoTime>(1, |_| {});
@@ -1300,29 +1298,30 @@ async fn light_test_universe() -> Arc<Universe> {
     let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
     let mut space = Space::builder(bounds)
         .spawn_position(point3(0., 0., 8.))
-        .build();
+        .build_and_mutate(|m| {
+            // Back wall
+            m.fill_uniform(
+                bounds.abut(Face6::NZ, -1).unwrap(),
+                &block::from_color!(0.5, 0.5, 0.5, 1.0),
+            )
+            .unwrap();
 
-    // Back wall
-    space
-        .fill_uniform(
-            bounds.abut(Face6::NZ, -1).unwrap(),
-            &block::from_color!(0.5, 0.5, 0.5, 1.0),
-        )
+            let pillar_block = block::from_color!(palette::ALMOST_BLACK);
+            let light_source_block = Block::builder()
+                .color(rgba_const!(1.0, 0.05, 0.05, 1.0))
+                .light_emission(rgb_const!(10.0, 5.0, 0.0))
+                .build();
+
+            m.set([-2, 2, 0], &light_source_block).unwrap();
+            m.set([-3, -1, 1], &light_source_block).unwrap();
+
+            for i in -4..=4 {
+                m.set([i, i, 0], &pillar_block).unwrap();
+                m.set([i, i, 0], &pillar_block).unwrap();
+            }
+            Ok(())
+        })
         .unwrap();
-
-    let pillar_block = block::from_color!(palette::ALMOST_BLACK);
-    let light_source_block = Block::builder()
-        .color(rgba_const!(1.0, 0.05, 0.05, 1.0))
-        .light_emission(rgb_const!(10.0, 5.0, 0.0))
-        .build();
-
-    space.set([-2, 2, 0], &light_source_block).unwrap();
-    space.set([-3, -1, 1], &light_source_block).unwrap();
-
-    for i in -4..=4 {
-        space.set([i, i, 0], &pillar_block).unwrap();
-        space.set([i, i, 0], &pillar_block).unwrap();
-    }
 
     space.fast_evaluate_light();
     space.evaluate_light::<time::NoTime>(1, |_| {});
@@ -1392,43 +1391,42 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
         // .sky_color(rgb_const!(0., 0.5, 0.5))
         .sky_color(Rgb::ZERO)
         .spawn_position(bounds.center() + vec3(0., 0., 65.))
-        .build();
+        .build_and_mutate(|m| {
+            // Back wall
+            m.fill_uniform(
+                bounds.abut(Face6::NZ, -1).unwrap(),
+                &block::from_color!(0.5, 0.5, 0.5, 1.0),
+            )
+            .unwrap();
 
-    // Back wall
-    space
-        .fill_uniform(
-            bounds.abut(Face6::NZ, -1).unwrap(),
-            &block::from_color!(0.5, 0.5, 0.5, 1.0),
-        )
-        .unwrap();
-
-    // Front air space
-    space
-        .fill_uniform(bounds.abut(Face6::PZ, -1).unwrap(), &AIR)
-        .unwrap();
-
-    for (i, luminance) in (0i32..).zip(luminance_ramp) {
-        let x = i * x_spacing;
-        for (j, color) in (0i32..).zip(colors) {
-            let y = j * y_spacing;
-            let light_source_block = Block::builder()
-                .color(Rgba::WHITE)
-                .light_emission(color * luminance)
-                .build();
-
-            // An emissive block and air space next to it.
-            space
-                .fill_uniform(
-                    GridAab::from_lower_size(
-                        [x, y, 0],
-                        Size3D::new(x_spacing - 1, y_spacing - 1, 1).to_u32(),
-                    ),
-                    &AIR,
-                )
+            // Front air space
+            m.fill_uniform(bounds.abut(Face6::PZ, -1).unwrap(), &AIR)
                 .unwrap();
-            space.set([x + 1, y, 0], light_source_block).unwrap();
-        }
-    }
+
+            for (i, luminance) in (0i32..).zip(luminance_ramp) {
+                let x = i * x_spacing;
+                for (j, color) in (0i32..).zip(colors) {
+                    let y = j * y_spacing;
+                    let light_source_block = Block::builder()
+                        .color(Rgba::WHITE)
+                        .light_emission(color * luminance)
+                        .build();
+
+                    // An emissive block and air space next to it.
+                    m.fill_uniform(
+                        GridAab::from_lower_size(
+                            [x, y, 0],
+                            Size3D::new(x_spacing - 1, y_spacing - 1, 1).to_u32(),
+                        ),
+                        &AIR,
+                    )
+                    .unwrap();
+                    m.set([x + 1, y, 0], light_source_block).unwrap();
+                }
+            }
+            Ok(())
+        })
+        .unwrap();
 
     space.fast_evaluate_light();
     space.evaluate_light::<time::NoTime>(1, |_| {});

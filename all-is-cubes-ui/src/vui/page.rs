@@ -10,7 +10,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{self, Space, SpacePhysics};
 use all_is_cubes::time;
-use all_is_cubes::universe::{Handle, Universe};
+use all_is_cubes::universe::{Handle, ReadTicket, Universe};
 use all_is_cubes_render::camera::{self, ViewTransform};
 
 use crate::vui::{
@@ -78,12 +78,12 @@ impl UiSize {
             // TODO: Use `BoxStyle` to draw this instead
             let mut add_frame = |z, color| {
                 let frame_block = Block::from(color);
-                space
-                    .fill_uniform(GridAab::from_lower_size([0, 0, z], [w, h, 1]), &frame_block)
-                    .unwrap();
-                space
-                    .fill_uniform(GridAab::from_lower_size([1, 1, z], [w - 2, h - 2, 1]), &AIR)
-                    .unwrap();
+                space.mutate(ReadTicket::stub(), |m| {
+                    m.fill_uniform(GridAab::from_lower_size([0, 0, z], [w, h, 1]), &frame_block)
+                        .unwrap();
+                    m.fill_uniform(GridAab::from_lower_size([1, 1, z], [w - 2, h - 2, 1]), &AIR)
+                        .unwrap();
+                });
             };
             add_frame(bounds.lower_bounds().z, Rgba::new(0.5, 0., 0., 1.));
             add_frame(-1, Rgba::new(0.5, 0.5, 0.5, 1.));

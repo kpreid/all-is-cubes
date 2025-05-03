@@ -492,7 +492,7 @@ impl crate::universe::VisitHandles for VoxelBrush<'_> {
     }
 }
 
-/// Converts the return value of [`Space::set`] to the return value of
+/// Converts the return value of [`Mutation::set`] to the return value of
 /// [`DrawTarget::draw_pixel`], by making out-of-bounds not an error.
 fn ignore_out_of_bounds(result: Result<bool, SetCubeError>) -> Result<(), SetCubeError> {
     match result {

@@ -425,9 +425,10 @@ fn voxels_partial_not_filling() {
     let resolution = R4;
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(2, 4, 4);
-    space
-        .fill_uniform(space.bounds(), &block::from_color!(Rgba::WHITE))
-        .unwrap();
+    space.mutate(universe.read_ticket(), |m| {
+        m.fill_all_uniform(&block::from_color!(Rgba::WHITE))
+            .unwrap()
+    });
     let space_handle = universe.insert_anonymous(space);
     let block = Block::builder()
         .voxels_handle(resolution, space_handle)
@@ -449,12 +450,13 @@ fn recur_with_offset() {
     let offset = GridVector::new(i32::from(resolution), 0, 0);
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(resolution_g * 2, resolution_g, resolution_g);
-    space
-        .fill(space.bounds(), |point| {
+    space.mutate(universe.read_ticket(), |m| {
+        m.fill_all(|point| {
             let point = point.lower_bounds().cast::<f32>();
             Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
         })
-        .unwrap();
+        .unwrap()
+    });
     let space_handle = universe.insert_anonymous(space);
     let block_at_offset = Block::from_primitive(Primitive::Recur {
         offset: offset.to_point(),
@@ -531,13 +533,14 @@ fn recur_animation_hint_propagation() {
 fn indirect_equivalence() {
     let resolution = R4;
     let mut universe = Universe::new();
-    let mut space = Space::empty(GridAab::for_block(resolution));
-    // TODO: block::Builder should support constructing indirects (by default, even)
-    // and we can use the more concise version
-    space
-        .fill(space.bounds(), |point| {
-            let point = point.lower_bounds().cast::<f32>();
-            Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
+    // TODO: block::Builder should support constructing indirects
+    // and we can use the more concise `block::Builder::voxels_fn()` version.
+    let space = Space::builder(GridAab::for_block(resolution))
+        .build_and_mutate(|m| {
+            m.fill_all(|point| {
+                let point = point.lower_bounds().cast::<f32>();
+                Some(Block::from(Rgba::new(point.x, point.y, point.z, 1.0)))
+            })
         })
         .unwrap();
     let space_handle = universe.insert_anonymous(space);

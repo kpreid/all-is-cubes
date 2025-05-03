@@ -19,7 +19,7 @@ use all_is_cubes::math::{
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
 use all_is_cubes::transaction::Transaction as _;
-use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes::{time, transaction};
 
@@ -429,28 +429,32 @@ fn cornell_box(requested_size: GridSize) -> Result<Space, InGenError> {
         .light_emission(Rgb::ONE * (1.07 * (box_size as f32).sqrt()))
         .build();
 
-    // Floor.
-    space.fill_uniform(GridAab::from_lower_size([0, -1, 0], [box_size, 1, box_size]), &white)?;
-    // Ceiling.
-    space.fill_uniform(GridAab::from_lower_size([0, box_size_c, 0], [box_size, 1, box_size]), &white)?;
-    // Light in ceiling.
-    space.fill_uniform(
-        GridAab::from_lower_upper([21, 55, 23], [34, 55, 33])
-            .multiply(box_size_c).divide(55)
-            .abut(Face6::PY, 1).unwrap(),
-        &light,
-    )?;
-    // Back wall.
-    space.fill_uniform(GridAab::from_lower_size([0, 0, -1], [box_size, box_size, 1]), &white)?;
-    // Right wall (green).
-    space.fill_uniform(GridAab::from_lower_size([box_size_c, 0, 0], [1, box_size, box_size]), &green)?;
-    // Left wall (red).
-    space.fill_uniform(GridAab::from_lower_size([-1, 0, 0], [1, box_size, box_size]), &red)?;
+    space.mutate(ReadTicket::stub(), |m| {
+        // Floor.
+        m.fill_uniform(GridAab::from_lower_size([0, -1, 0], [box_size, 1, box_size]), &white)?;
+        // Ceiling.
+        m.fill_uniform(GridAab::from_lower_size([0, box_size_c, 0], [box_size, 1, box_size]), &white)?;
+        // Light in ceiling.
+        m.fill_uniform(
+            GridAab::from_lower_upper([21, 55, 23], [34, 55, 33])
+                .multiply(box_size_c).divide(55)
+                .abut(Face6::PY, 1).unwrap(),
+            &light,
+        )?;
+        // Back wall.
+        m.fill_uniform(GridAab::from_lower_size([0, 0, -1], [box_size, box_size, 1]), &white)?;
+        // Right wall (green).
+        m.fill_uniform(GridAab::from_lower_size([box_size_c, 0, 0], [1, box_size, box_size]), &green)?;
+        // Left wall (red).
+        m.fill_uniform(GridAab::from_lower_size([-1, 0, 0], [1, box_size, box_size]), &red)?;
 
-    // Block #1
-    space.fill_uniform(GridAab::from_lower_size([29, 0, 36], [16, 16, 15]).multiply(box_size_c).divide(55), &white)?;
-    // Block #2
-    space.fill_uniform(GridAab::from_lower_size([10, 0, 13], [18, 33, 15]).multiply(box_size_c).divide(55), &white)?;
+        // Block #1
+        m.fill_uniform(GridAab::from_lower_size([29, 0, 36], [16, 16, 15]).multiply(box_size_c).divide(55), &white)?;
+        // Block #2
+        m.fill_uniform(GridAab::from_lower_size([10, 0, 13], [18, 33, 15]).multiply(box_size_c).divide(55), &white)?;
+
+        Ok::<(), InGenError>(())
+    })?;
 
     // This won't figure out the correct light values, but it will reset everything to
     // uninitialized, which will help the updater get going faster.

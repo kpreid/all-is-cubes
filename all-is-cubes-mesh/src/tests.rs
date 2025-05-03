@@ -93,9 +93,11 @@ fn non_uniform_fill(cube: Cube) -> &'static Block {
 
 #[test]
 fn excludes_hidden_faces_of_blocks() {
-    let mut space = Space::empty_positive(2, 2, 2);
-    space
-        .fill(space.bounds(), |p| Some(non_uniform_fill(p)))
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 2, 2]))
+        .build_and_mutate(|m| {
+            m.fill_all(|p| Some(non_uniform_fill(p)))?;
+            Ok(())
+        })
         .unwrap();
     let (_, _, space_mesh) = mesh_blocks_and_space(&space);
 

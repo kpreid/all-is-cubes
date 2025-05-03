@@ -1212,12 +1212,14 @@ pub fn space_to_blocks(
     let destination_bounds = source_bounds.divide(resolution_g);
 
     let mut destination_space = Space::empty(destination_bounds);
-    destination_space.fill(destination_bounds, move |cube| {
-        Some(block_transform(Block::from_primitive(Primitive::Recur {
-            offset: (cube.lower_bounds().to_vector() * resolution_g).to_point(),
-            resolution,
-            space: space_handle.clone(),
-        })))
+    destination_space.mutate(ReadTicket::new(), |m| {
+        m.fill(destination_bounds, move |cube| {
+            Some(block_transform(Block::from_primitive(Primitive::Recur {
+                offset: (cube.lower_bounds().to_vector() * resolution_g).to_point(),
+                resolution,
+                space: space_handle.clone(),
+            })))
+        })
     })?;
     Ok(destination_space)
 }

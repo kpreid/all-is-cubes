@@ -17,7 +17,7 @@ use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
     GridSizeCoord, GridVector, Gridgid, Rgb, Rgba, Vol, rgb_const,
 };
-use all_is_cubes::space::{SetCubeError, Space, SpacePhysics, SpaceTransaction};
+use all_is_cubes::space::{self, SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
@@ -94,157 +94,161 @@ pub(crate) async fn atrium(
             spawn
         })
         .sky_color(rgb_const!(0.242, 0.617, 0.956) * 1.0)
-        .light_physics(all_is_cubes::space::LightPhysics::Rays {
+        .light_physics(space::LightPhysics::Rays {
             maximum_distance: space_bounds.size().to_vector().map(f64::from).length() as u8,
         })
         .build();
 
-    // "Directional" sky light source
-    if !MOVING_LIGHT {
-        space.fill_uniform(
-            space_bounds
-                .abut(Face6::PY, -1)
-                .unwrap()
-                .abut(Face6::PX, -6)
-                .unwrap()
-                .abut(Face6::PZ, -30) // TODO: we can shrink this once we manage to have denser ray distribution
-                .unwrap(),
-            &blocks[AtriumBlocks::Sun],
-        )?;
-    }
-
-    // Outer walls
-    four_walls(
-        outer_walls_footprint
-            .expand(FaceMap::default().with(Face6::PY, ceiling_height * floor_count)),
-        |_origin, direction, _length, wall_excluding_corners| -> Result<(), InGenError> {
-            space.fill_uniform(
-                wall_excluding_corners,
-                &blocks[AtriumBlocks::GroundFloor]
-                    .clone()
-                    .rotate(GridRotation::from_to(Face6::PZ, direction, Face6::PY).unwrap()),
+    space.mutate(universe.read_ticket(), |m| {
+        // "Directional" sky light source
+        if !MOVING_LIGHT {
+            m.fill_uniform(
+                m.bounds()
+                    .abut(Face6::PY, -1)
+                    .unwrap()
+                    .abut(Face6::PX, -6)
+                    .unwrap()
+                    .abut(Face6::PZ, -30) // TODO: we can shrink this once we manage to have denser ray distribution
+                    .unwrap(),
+                &blocks[AtriumBlocks::Sun],
             )?;
-            Ok(())
-        },
-    )?;
+        }
 
-    // Ground floor
-    space.fill_uniform(outer_walls_footprint, &blocks[AtriumBlocks::GroundFloor])?;
-
-    // Balcony floor
-    space.fill(
-        outer_walls_footprint.translate(balcony_floor_pos),
-        floor_with_cutout,
-    )?;
-
-    // Top floor (solid)
-    space.fill(
-        outer_walls_footprint
-            .translate(top_floor_pos)
-            .expand(FaceMap::from_fn(|f| {
-                GridSizeCoord::from(f == Face6::PY) * ceiling_height
-            })),
-        floor_with_cutout,
-    )?;
-
-    // Arches and atrium walls
-    #[rustfmt::skip]
-    let arches_pattern = Vol::<Box<[u8]>>::from_y_flipped_array([[
-        *br"########", // Roof edge height
-        *br"####.###",
-        *br"########",
-        *br"########",
-        *br"########",
-        *br"####.###",
-        *br"########",
-        *br"aaaaaaaa", // top floor height
-        *br"aaaaaaaa",
-        *br"aa aaa a",
-        *br"|   o   ",
-        *br"|   o   ", 
-        *br"########",
-        *br"##AAAAA#", // balcony floor height
-        *br"AAAA AAA",
-        *br"AAbbbbbA",
-        *br"AAbbbbbA",
-        *br"G bbbbb ",
-        *br"G BBBBB ", 
-        *br"G       ",
-    ], [
-        *br"TTTTTTTT", // roof edge height
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"TTTTTTTT",
-        *br"    f   ", // top floor height
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"TTTTTTTT",
-        *br"        ", // balcony floor height
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ", 
-        *br"P       ",
-    ], [
-        *br"        ", // roof edge height
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"    f   ", // top floor height
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ", // balcony floor height
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ",
-        *br"        ", 
-        *br"        ",
-    ]]);
-    four_walls(
-        arches_footprint.translate([0, IWALL, 0]),
-        |origin, direction, length, _box| {
-            arch_row(
-                &mut space,
-                &blocks,
-                origin,
-                between_large_arches + UWALL,
-                length / (between_large_arches + UWALL),
-                direction,
-                arches_pattern.as_ref(),
-            )
-        },
-    )?;
-
-    if MOVING_LIGHT {
-        let mut movement = block::Move::new(Face6::PZ, 16, 16);
-        movement.schedule = time::Schedule::from_period(NonZero::new(2).unwrap());
-        let tick_action = block::TickAction {
-            operation: crate::animation::back_and_forth_movement(movement),
-            schedule: time::Schedule::from_period(NonZero::new(1).unwrap()),
-        };
-
-        space.set(
-            [0, 5, -10],
-            Block::builder()
-                .color(Rgba::WHITE)
-                .light_emission(rgb_const!(10., 10., 10.))
-                .tick_action(tick_action)
-                .build(),
+        // Outer walls
+        four_walls(
+            outer_walls_footprint
+                .expand(FaceMap::default().with(Face6::PY, ceiling_height * floor_count)),
+            |_origin, direction, _length, wall_excluding_corners| -> Result<(), InGenError> {
+                m.fill_uniform(
+                    wall_excluding_corners,
+                    &blocks[AtriumBlocks::GroundFloor]
+                        .clone()
+                        .rotate(GridRotation::from_to(Face6::PZ, direction, Face6::PY).unwrap()),
+                )?;
+                Ok(())
+            },
         )?;
-    }
+
+        // Ground floor
+        m.fill_uniform(outer_walls_footprint, &blocks[AtriumBlocks::GroundFloor])?;
+
+        // Balcony floor
+        m.fill(
+            outer_walls_footprint.translate(balcony_floor_pos),
+            floor_with_cutout,
+        )?;
+
+        // Top floor (solid)
+        m.fill(
+            outer_walls_footprint
+                .translate(top_floor_pos)
+                .expand(FaceMap::from_fn(|f| {
+                    GridSizeCoord::from(f == Face6::PY) * ceiling_height
+                })),
+            floor_with_cutout,
+        )?;
+
+        // Arches and atrium walls
+        #[rustfmt::skip]
+        let arches_pattern = Vol::<Box<[u8]>>::from_y_flipped_array([[
+            *br"########", // Roof edge height
+            *br"####.###",
+            *br"########",
+            *br"########",
+            *br"########",
+            *br"####.###",
+            *br"########",
+            *br"aaaaaaaa", // top floor height
+            *br"aaaaaaaa",
+            *br"aa aaa a",
+            *br"|   o   ",
+            *br"|   o   ", 
+            *br"########",
+            *br"##AAAAA#", // balcony floor height
+            *br"AAAA AAA",
+            *br"AAbbbbbA",
+            *br"AAbbbbbA",
+            *br"G bbbbb ",
+            *br"G BBBBB ", 
+            *br"G       ",
+        ], [
+            *br"TTTTTTTT", // roof edge height
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"TTTTTTTT",
+            *br"    f   ", // top floor height
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"TTTTTTTT",
+            *br"        ", // balcony floor height
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ", 
+            *br"P       ",
+        ], [
+            *br"        ", // roof edge height
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"    f   ", // top floor height
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ", // balcony floor height
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ",
+            *br"        ", 
+            *br"        ",
+        ]]);
+        four_walls(
+            arches_footprint.translate([0, IWALL, 0]),
+            |origin, direction, length, _box| {
+                arch_row(
+                    m,
+                    &blocks,
+                    origin,
+                    between_large_arches + UWALL,
+                    length / (between_large_arches + UWALL),
+                    direction,
+                    arches_pattern.as_ref(),
+                )
+            },
+        )?;
+
+        if MOVING_LIGHT {
+            let mut movement = block::Move::new(Face6::PZ, 16, 16);
+            movement.schedule = time::Schedule::from_period(NonZero::new(2).unwrap());
+            let tick_action = block::TickAction {
+                operation: crate::animation::back_and_forth_movement(movement),
+                schedule: time::Schedule::from_period(NonZero::new(1).unwrap()),
+            };
+
+            m.set(
+                [0, 5, -10],
+                Block::builder()
+                    .color(Rgba::WHITE)
+                    .light_emission(rgb_const!(10., 10., 10.))
+                    .tick_action(tick_action)
+                    .build(),
+            )?;
+        }
+
+        Ok::<(), InGenError>(())
+    })?;
 
     space.fast_evaluate_light();
 
@@ -350,7 +354,7 @@ fn map_text_block(
 }
 
 fn arch_row(
-    space: &mut Space,
+    ctx: &mut space::Mutation<'_, '_>,
     blocks: &BlockProvider<AtriumBlocks>,
     first_column_base: GridPoint,
     section_length: GridSizeCoord,
@@ -376,7 +380,7 @@ fn arch_row(
         fill_space_transformed(
             |p, block| map_text_block(pattern[p], blocks, p, block, banner_color),
             pattern.bounds(),
-            space,
+            ctx,
             Gridgid::from_translation(column_base.to_vector())
                 * rotation.to_positive_octant_transform(1),
         )?;
@@ -388,7 +392,7 @@ fn arch_row(
 fn fill_space_transformed(
     src: impl Fn(Cube, Block) -> Block,
     src_bounds: GridAab,
-    dst: &mut Space,
+    dst: &mut space::Mutation<'_, '_>,
     src_to_dst_transform: Gridgid,
 ) -> Result<(), SetCubeError> {
     // TODO: don't panic
@@ -712,39 +716,42 @@ async fn install_atrium_blocks(
                     block::AnimationChange::Shape,
                 ))
                 .voxels_handle(resolution, {
-                    let mut space = Space::for_block(resolution).build();
                     // Use a darker color to dampen the effect of interior light
                     let body_block = Block::from(palette::STEEL * 0.2);
-                    space.fill(
-                        GridAab::from_lower_upper(
-                            [0, 0, 0],
-                            [resolution_g, resolution_g / 2, resolution_g],
-                        ),
-                        |p| {
-                            let mid =
-                                (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
-                            if mid.x.max(mid.z) + (mid.y / 2) < resolution_g + 4 {
-                                Some(&body_block)
-                            } else {
-                                None
-                            }
-                        },
-                    )?;
-                    {
-                        let fire_inset = 2;
-                        let bounds = GridAab::from_lower_upper(
-                            // Vertical overlap will be overwritten, making a bowl shape
-                            [fire_inset, resolution_g / 2 - 2, fire_inset],
-                            [
-                                resolution_g - fire_inset,
-                                resolution_g,
-                                resolution_g - fire_inset,
-                            ],
-                        );
-                        SpaceTransaction::add_behavior(bounds, Fire::new(bounds))
-                            .execute(&mut space, &mut transaction::no_outputs)
-                            .unwrap();
-                    }
+                    let space = Space::for_block(resolution).build_and_mutate(|m| {
+                        m.fill(
+                            GridAab::from_lower_upper(
+                                [0, 0, 0],
+                                [resolution_g, resolution_g / 2, resolution_g],
+                            ),
+                            |p| {
+                                let mid =
+                                    (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
+                                if mid.x.max(mid.z) + (mid.y / 2) < resolution_g + 4 {
+                                    Some(&body_block)
+                                } else {
+                                    None
+                                }
+                            },
+                        )?;
+                        {
+                            let fire_inset = 2;
+                            let bounds = GridAab::from_lower_upper(
+                                // Vertical overlap will be overwritten, making a bowl shape
+                                [fire_inset, resolution_g / 2 - 2, fire_inset],
+                                [
+                                    resolution_g - fire_inset,
+                                    resolution_g,
+                                    resolution_g - fire_inset,
+                                ],
+                            );
+                            SpaceTransaction::add_behavior(bounds, Fire::new(bounds))
+                                .execute_m(m)
+                                .unwrap();
+                        }
+                        Ok(())
+                    })?;
+
                     txn.insert_anonymous(space)
                 })
                 .build(),
@@ -770,7 +777,7 @@ fn generate_arch<'b>(
         let arch_opening_height = resolution_g * height_blocks;
         let arch_center_z_doubled = resolution_g * (width_blocks - 1) /* midpoint assuming odd width */
             + resolution_g * 3 /* offset by a block and a half */;
-        let mut space = Space::builder(GridAab::from_lower_upper(
+        let space = Space::builder(GridAab::from_lower_upper(
             [0, 0, 0],
             [
                 resolution_g,
@@ -779,43 +786,45 @@ fn generate_arch<'b>(
             ],
         ))
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build();
-        space.fill(space.bounds(), |p| {
-            // Flip middle of first block, so that the arch to our left appears on it
-            let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 {
-                resolution_g - 1 - p.z
-            } else {
-                p.z
-            };
-            let arch_z_doubled = z_for_arch * 2 - arch_center_z_doubled;
-            let arch_y_doubled = p.y * 2;
-            let distance_from_edge = p.x.min(resolution_g - 1 - p.x) as f32 / resolution_g as f32;
-            let r = (arch_z_doubled as f32 / arch_opening_width as f32)
-                .hypot(arch_y_doubled as f32 / (arch_opening_height as f32 * 2.));
-            if r < 1.0 {
-                // Empty space inside arch
-                None
-            } else if r < 1.04 {
-                // Beveled edge
-                if distance_from_edge < ((1. - r) * 2.0 + 0.1) {
-                    None
+        .build_and_mutate(|m| {
+            m.fill_all(|p| {
+                // Flip middle of first block, so that the arch to our left appears on it
+                let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 {
+                    resolution_g - 1 - p.z
                 } else {
+                    p.z
+                };
+                let arch_z_doubled = z_for_arch * 2 - arch_center_z_doubled;
+                let arch_y_doubled = p.y * 2;
+                let distance_from_edge =
+                    p.x.min(resolution_g - 1 - p.x) as f32 / resolution_g as f32;
+                let r = (arch_z_doubled as f32 / arch_opening_width as f32)
+                    .hypot(arch_y_doubled as f32 / (arch_opening_height as f32 * 2.));
+                if r < 1.0 {
+                    // Empty space inside arch
+                    None
+                } else if r < 1.04 {
+                    // Beveled edge
+                    if distance_from_edge < ((1. - r) * 2.0 + 0.1) {
+                        None
+                    } else {
+                        Some(&stone_range[3])
+                    }
+                } else if r < 1.1 {
+                    // Surface
                     Some(&stone_range[3])
-                }
-            } else if r < 1.1 {
-                // Surface
-                Some(&stone_range[3])
-            } else if r < 1.14 {
-                // Groove
-                if distance_from_edge == 0. {
-                    None
+                } else if r < 1.14 {
+                    // Groove
+                    if distance_from_edge == 0. {
+                        None
+                    } else {
+                        Some(&stone_range[4])
+                    }
                 } else {
-                    Some(&stone_range[4])
+                    // Body
+                    Some(brick_pattern(p))
                 }
-            } else {
-                // Body
-                Some(brick_pattern(p))
-            }
+            })
         })?;
         txn.insert_anonymous(space)
     };

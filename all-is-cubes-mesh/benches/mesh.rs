@@ -248,23 +248,23 @@ fn checkerboard_block(universe: &mut Universe, voxels: &[Block; 2]) -> Block {
 
 fn checkerboard_space(blocks: &[Block; 2]) -> Space {
     let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 16]);
-    let mut space = Space::empty(bounds);
-    space
-        .fill(bounds, |p| {
-            Some(&blocks[((p.x + p.y + p.z) as usize).rem_euclid(blocks.len())])
+    Space::builder(bounds)
+        .build_and_mutate(|m| {
+            m.fill(bounds, |p| {
+                Some(&blocks[((p.x + p.y + p.z) as usize).rem_euclid(blocks.len())])
+            })
         })
-        .unwrap();
-    space
+        .unwrap()
 }
 
 /// Space whose lower half is filled with the block.
 fn half_space(block: &Block) -> Space {
     let bounds = GridAab::from_lower_size([0, 0, 0], [16, 16, 16]);
-    let mut space = Space::empty(bounds);
-    space
-        .fill_uniform(GridAab::from_lower_size([0, 0, 0], [16, 8, 16]), block)
-        .unwrap();
-    space
+    Space::builder(bounds)
+        .build_and_mutate(|m| {
+            m.fill_uniform(GridAab::from_lower_size([0, 0, 0], [16, 8, 16]), block)
+        })
+        .unwrap()
 }
 
 /// Data prepared for a benchmark of [`SpaceMesh::new`] or [`SpaceMesh::compute`].

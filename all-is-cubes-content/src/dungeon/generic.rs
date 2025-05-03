@@ -1,10 +1,12 @@
+use all_is_cubes::character::Spawn;
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, GridVector,
     VectorOps as _, Vol,
 };
-use all_is_cubes::space::Space;
+use all_is_cubes::space::{self, Space};
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::YieldProgress;
 
 /// Defines the dimensions that dungeon room construction must live within.
@@ -107,15 +109,16 @@ pub trait Theme<R> {
     // TODO: Replace `&mut Space` with transactions so we can use this post-startup?
     fn place_room(
         &self,
-        space: &mut Space,
+        ctx: &mut space::Mutation<'_, '_>,
         pass_index: usize,
         map: Vol<&[R]>,
         position_in_room_grid: Cube,
         value: &R,
-    ) -> Result<(), InGenError>;
+    ) -> Result<Option<Spawn>, InGenError>;
 }
 
 pub async fn build_dungeon<Room, ThemeT: Theme<Room>>(
+    read_ticket: ReadTicket<'_>,
     space: &mut Space,
     theme: &ThemeT,
     map: Vol<&[Room]>,
@@ -135,13 +138,16 @@ pub async fn build_dungeon<Room, ThemeT: Theme<Room>>(
                 pass = pass + 1
             ));
             progress.progress(0.0).await;
-            theme.place_room(
-                space,
-                pass,
-                map,
-                room_position,
-                map.get(room_position).unwrap(),
-            )?;
+
+            // TODO: spawn as return value is a quick kludge to organize mutations,
+            // but there is probably some more general thing that is appropriate.
+            let maybe_spawn = space.mutate(read_ticket, |m| {
+                theme.place_room(m, pass, map, room_position, map.get(room_position).unwrap())
+            })?;
+            if let Some(spawn) = maybe_spawn {
+                space.set_spawn(spawn);
+            }
+
             progress.progress(1.0).await;
         }
     }

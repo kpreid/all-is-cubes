@@ -22,35 +22,30 @@ use crate::util::YieldProgress;
 /// to do that instead, so this can just live in the benchmark instead of indirect.
 #[doc(hidden)]
 pub async fn lighting_bench_space(
-    _universe: &mut Universe,
+    universe: &mut Universe,
     progress: YieldProgress,
     requested_space_size: GridSize,
 ) -> Result<Space, InGenError> {
     let layout = LightingBenchLayout::new(requested_space_size)?;
 
-    let mut space = {
-        let mut space = Space::builder(layout.space_bounds())
-            .light_physics(LightPhysics::None)
-            .spawn({
-                let mut spawn = Spawn::looking_at_space(layout.space_bounds(), [0., 0.5, 1.]);
-                spawn.set_inventory(free_editing_starter_inventory(true));
-                spawn
-            })
-            .build();
-
-        // Ground level
-        // TODO: Make this async-yielding somehow (will need work in Space itself)
-        space
-            .fill_uniform(
-                space
-                    .bounds()
+    let mut space = Space::builder(layout.space_bounds())
+        .light_physics(LightPhysics::None)
+        .read_ticket(universe.read_ticket())
+        .spawn({
+            let mut spawn = Spawn::looking_at_space(layout.space_bounds(), [0., 0.5, 1.]);
+            spawn.set_inventory(free_editing_starter_inventory(true));
+            spawn
+        })
+        .build_and_mutate(|m| {
+            // Ground level
+            m.fill_uniform(
+                m.bounds()
                     .shrink(FaceMap::default().with(Face6::PY, layout.yup()))
                     .unwrap(),
                 &block::from_color!(0.5, 0.5, 0.5),
             )
-            .unwrap();
-        space
-    };
+        })
+        .unwrap();
 
     let progress = progress.finish_and_cut(0.25).await;
 
@@ -79,48 +74,45 @@ pub async fn lighting_bench_space(
                 rng.random_range(0.0..=1.0),
                 if rng.random_bool(0.125) { 0.5 } else { 1.0 },
             ));
-            match rng.random_range(0..3) {
+            space.mutate(universe.read_ticket(), |m| match rng.random_range(0..3) {
                 0 => {
-                    space.fill_uniform(section_bounds, &color).unwrap();
+                    m.fill_uniform(section_bounds, &color).unwrap();
                 }
                 1 => {
-                    space
-                        .fill_uniform(
-                            section_bounds
-                                .shrink(FaceMap::default().with(Face6::PY, layout.yup()))
-                                .unwrap(),
-                            &color,
-                        )
-                        .unwrap();
-                    space
-                        .fill_uniform(
-                            section_bounds
-                                .shrink(FaceMap {
-                                    nx: 1,
-                                    ny: 0,
-                                    nz: 1,
-                                    px: 1,
-                                    py: 0,
-                                    pz: 1,
-                                })
-                                .unwrap(),
-                            &AIR,
-                        )
-                        .unwrap();
+                    m.fill_uniform(
+                        section_bounds
+                            .shrink(FaceMap::default().with(Face6::PY, layout.yup()))
+                            .unwrap(),
+                        &color,
+                    )
+                    .unwrap();
+                    m.fill_uniform(
+                        section_bounds
+                            .shrink(FaceMap {
+                                nx: 1,
+                                ny: 0,
+                                nz: 1,
+                                px: 1,
+                                py: 0,
+                                pz: 1,
+                            })
+                            .unwrap(),
+                        &AIR,
+                    )
+                    .unwrap();
                 }
                 2 => {
-                    space
-                        .fill(section_bounds, |_| {
-                            if rng.random_bool(0.25) {
-                                Some(&color)
-                            } else {
-                                Some(&AIR)
-                            }
-                        })
-                        .unwrap();
+                    m.fill(section_bounds, |_| {
+                        if rng.random_bool(0.25) {
+                            Some(&color)
+                        } else {
+                            Some(&AIR)
+                        }
+                    })
+                    .unwrap();
                 }
                 _ => unreachable!("rng range"),
-            }
+            })
         }
         progress.finish().await;
     }

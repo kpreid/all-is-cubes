@@ -149,7 +149,7 @@ mod tests {
     use super::*;
     use crate::block::{self, Block, Resolution::R4};
     use crate::content::make_some_blocks;
-    use crate::math::Rgba;
+    use crate::math::{GridAab, Rgba};
     use crate::universe::Universe;
     use euclid::vec3;
     use std::string::ToString;
@@ -220,20 +220,27 @@ mod tests {
     fn partial_voxels() {
         let resolution = R4;
         let mut universe = Universe::new();
-        let mut block_space = Space::empty_positive(4, 2, 4);
-        block_space
-            .fill_uniform(block_space.bounds(), &block::from_color!(Rgba::WHITE))
-            .unwrap();
+        let block_space = Space::builder(GridAab::from_lower_size([0, 0, 0], [4, 2, 4]))
+            .filled_with(block::from_color!(Rgba::WHITE))
+            .build();
         let space_handle = universe.insert_anonymous(block_space);
         let partial_block = Block::builder()
             .voxels_handle(resolution, space_handle.clone())
             .display_name("P")
             .build();
 
-        let mut space = Space::empty_positive(2, 1, 1);
         let [b0] = make_some_blocks();
-        space.set([0, 0, 0], &b0).unwrap();
-        space.set([1, 0, 0], &partial_block).unwrap();
+        let space = Space::builder(GridAab::from_lower_size(
+            [0, 0, 0],
+            euclid::Size3D::new(2, 1, 1).cast(),
+        ))
+        .read_ticket(universe.read_ticket())
+        .build_and_mutate(|m| {
+            m.set([0, 0, 0], &b0).unwrap();
+            m.set([1, 0, 0], &partial_block).unwrap();
+            Ok(())
+        })
+        .unwrap();
 
         let output = PrintSpace {
             space: &space,

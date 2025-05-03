@@ -340,7 +340,9 @@ fn extract_out_of_bounds() {
 fn fill_out_of_bounds() {
     let mut space = Space::empty_positive(2, 1, 1);
     let fill_bounds = GridAab::from_lower_size([1, 0, 0], [1, 2, 1]);
-    let result = space.fill(fill_bounds, |_| None::<Block>);
+    let result = space.mutate(ReadTicket::stub(), |m| {
+        m.fill(fill_bounds, |_| None::<Block>)
+    });
     assert_eq!(
         result,
         Err(SetCubeError::OutOfBounds {
@@ -357,7 +359,9 @@ fn fill_entire_space() {
     let bounds = GridAab::from_lower_size([0, 3, 0], [25 * 16, 16, 2]);
     let mut space = Space::empty(bounds);
 
-    space.fill(bounds, |_| Some(&block)).unwrap();
+    space.mutate(ReadTicket::stub(), |m| {
+        m.fill(bounds, |_| Some(&block)).unwrap()
+    });
 
     space.consistency_check();
     for cube in bounds.interior_iter() {
@@ -378,7 +382,9 @@ fn fill_uniform_entire_space() {
     let sink = Sink::new();
     space.listen(sink.listener());
 
-    space.fill_uniform(bounds, &block).unwrap();
+    space.mutate(ReadTicket::stub(), |m| {
+        m.fill_uniform(bounds, &block).unwrap()
+    });
 
     assert_eq!(sink.drain(), vec![SpaceChange::EveryBlock]);
 

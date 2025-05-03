@@ -11,7 +11,7 @@ use crate::block::{
 use crate::math::{Cube, GridAab, GridPoint, Rgb, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::transaction::{self, Merge, Transaction};
-use crate::universe::{Handle, Name, Universe, UniverseTransaction};
+use crate::universe::{Handle, Name, ReadTicket, Universe, UniverseTransaction};
 
 #[cfg(doc)]
 use crate::space;
@@ -231,20 +231,22 @@ impl<P, Txn> Builder<P, Txn> {
 
             let mut space = Space::for_block(resolution).build();
             // TODO: Teach the Space Builder to accept a function in the same way?
-            space.fill(space.bounds(), |cube| {
-                let block = function(cube);
+            space.mutate(ReadTicket::new(), |m| {
+                m.fill_all(|cube| {
+                    let block = function(cube);
 
-                // Track which of the blocks are not equal to AIR, for later use.
-                if block.as_ref() != &AIR {
-                    let cube_bb = cube.grid_aab();
-                    not_air_bounds = Some(if let Some(bounds) = not_air_bounds {
-                        bounds.union_box(cube_bb)
-                    } else {
-                        cube_bb
-                    });
-                }
+                    // Track which of the blocks are not equal to AIR, for later use.
+                    if block.as_ref() != &AIR {
+                        let cube_bb = cube.grid_aab();
+                        not_air_bounds = Some(if let Some(bounds) = not_air_bounds {
+                            bounds.union_box(cube_bb)
+                        } else {
+                            cube_bb
+                        });
+                    }
 
-                Some(block)
+                    Some(block)
+                })
             })?;
 
             // If the block bounding box is not full of non-AIR blocks, then construct a replacement
@@ -257,7 +259,9 @@ impl<P, Txn> Builder<P, Txn> {
                 let mut shrunk = Space::builder(not_air_bounds)
                     .physics(space.physics().clone())
                     .build();
-                shrunk.fill(not_air_bounds, |cube| Some(&space[cube]))?;
+                shrunk.mutate(ReadTicket::new(), |m| {
+                    m.fill(not_air_bounds, |cube| Some(&space[cube]))
+                })?;
                 space = shrunk;
             }
 

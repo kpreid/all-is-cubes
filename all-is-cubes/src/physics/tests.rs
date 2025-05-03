@@ -192,10 +192,14 @@ fn push_out_voxels() {
 #[test]
 fn no_passing_through_blocks() {
     // Construct cubical box. TODO: worldgen utilities for this?
-    let mut space = Space::empty(GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]));
     let [wall_block] = make_some_blocks();
-    space.fill_uniform(space.bounds(), &wall_block).unwrap();
-    space.set([0, 0, 0], &AIR).unwrap();
+    let space = Space::builder(GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]))
+        .build_and_mutate(|m| {
+            m.fill_all_uniform(&wall_block).unwrap();
+            m.set([0, 0, 0], &AIR).unwrap();
+            Ok(())
+        })
+        .unwrap();
 
     let one_test = |velocity: Vector3D<FreeCoordinate, Velocity>| {
         print!("Velocity {velocity:?}... ");

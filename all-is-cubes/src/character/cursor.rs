@@ -316,9 +316,9 @@ mod tests {
     fn test_space<const N: usize>(universe: &mut Universe, blocks: [&Block; N]) -> Handle<Space> {
         let mut space =
             Space::builder(GridAab::from_lower_size([0, 0, 0], vec3(N, 1, 1).to_u32())).build();
-        space
-            .fill(space.bounds(), |p| Some(blocks[p.x as usize]))
-            .unwrap();
+        space.mutate(universe.read_ticket(), |m| {
+            m.fill_all(|p| Some(blocks[p.x as usize])).unwrap();
+        });
         universe.insert_anonymous(space)
     }
 

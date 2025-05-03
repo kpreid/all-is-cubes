@@ -188,11 +188,12 @@ pub fn make_slab_txn(
         ),
     );
 
-    let mut space = Space::builder(bounds).build();
     // Checkerboard pattern
-    space
-        .fill(space.bounds(), |cube| {
-            Some(&voxel_palette[(cube.x + cube.y + cube.z).rem_euclid(2) as usize])
+    let space = Space::builder(bounds)
+        .build_and_mutate(|m| {
+            m.fill_all(|cube| {
+                Some(&voxel_palette[(cube.x + cube.y + cube.z).rem_euclid(2) as usize])
+            })
         })
         .unwrap();
 

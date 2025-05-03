@@ -16,7 +16,7 @@ use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
     GridVector, Vol,
 };
-use all_is_cubes::space::{LightPhysics, Space};
+use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -125,7 +125,7 @@ impl DemoTheme {
     fn plain_room(
         &self,
         wall_block: Option<&Block>,
-        space: &mut Space,
+        ctx: &mut space::Mutation<'_, '_>,
         interior: GridAab,
     ) -> Result<(), InGenError> {
         let mut alt_style: BoxStyle;
@@ -143,14 +143,14 @@ impl DemoTheme {
 
         room_style
             .create_box(interior.expand(FaceMap::splat(1)))
-            .execute(space, &mut transaction::no_outputs)?;
+            .execute_m(ctx)?;
 
         Ok(())
     }
 
     fn inside_doorway(
         &self,
-        space: &mut Space,
+        ctx: &mut space::Mutation<'_, '_>,
         map: Vol<&[Option<DemoRoom>]>,
         mut room_1_position: Cube,
         face: Face6,
@@ -219,7 +219,7 @@ impl DemoTheme {
         });
         corridor_box_style
             .create_box(doorway_box_for_box_style)
-            .execute(space, &mut transaction::no_outputs)
+            .execute_m(ctx)
             .unwrap();
 
         // * If !gate_present, we don't generate a gate at all.
@@ -252,17 +252,18 @@ impl DemoTheme {
             } else {
                 GridAab::ORIGIN_EMPTY
             };
-            space.fill_uniform(
+
+            ctx.fill_uniform(
                 gate_side_2,
                 &self.blocks[Gate].clone().rotate(rotate_nz_to_face),
             )?;
-            space.fill_uniform(
+            ctx.fill_uniform(
                 gate_side_1,
                 &self.blocks[if gate_movable { GatePocket } else { Gate }]
                     .clone()
                     .rotate(rotate_nz_to_face),
             )?;
-            space.fill_uniform(
+            ctx.fill_uniform(
                 lock_box,
                 &self.locked_gate_block.clone().rotate(rotate_nz_to_face),
             )?;
@@ -336,14 +337,14 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
     fn place_room(
         &self,
-        space: &mut Space,
+        ctx: &mut space::Mutation<'_, '_>,
         pass_index: usize,
         map: Vol<&[Option<DemoRoom>]>,
         room_position: Cube,
         room_data: &Option<DemoRoom>,
-    ) -> Result<(), InGenError> {
+    ) -> Result<Option<Spawn>, InGenError> {
         let Some(room_data) = room_data.as_ref() else {
-            return Ok(());
+            return Ok(None);
         };
 
         // TODO: put in struct, or eliminate
@@ -363,21 +364,18 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
         match pass_index {
             0 => {
-                self.plain_room(wall_type, space, interior)?;
+                self.plain_room(wall_type, ctx, interior)?;
 
                 // Spikes on the bottom of the pit
                 // (TODO: revise this condition when staircase-ish rooms exist)
                 if room_data.extended_map_bounds().lower_bounds().y < 0 {
                     assert!(!room_data.corridor_only, "{room_data:?}");
-                    space.fill_uniform(
-                        interior.abut(Face6::NY, -1).unwrap(),
-                        &self.blocks[Spikes],
-                    )?;
+                    ctx.fill_uniform(interior.abut(Face6::NY, -1).unwrap(), &self.blocks[Spikes])?;
                 }
 
                 match room_data.floor {
                     FloorKind::Solid => {
-                        space.fill_uniform(floor_layer, &self.blocks[FloorTile])?;
+                        ctx.fill_uniform(floor_layer, &self.blocks[FloorTile])?;
                     }
                     FloorKind::Chasm => { /* TODO: little platforms */ }
                     FloorKind::Bridge => {
@@ -390,7 +388,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                 .unwrap();
                                 let bridge_box =
                                     GridAab::single_cube(midpoint).union_cube(wall_cube);
-                                space.fill_uniform(bridge_box, &self.blocks[FloorTile])?;
+                                ctx.fill_uniform(bridge_box, &self.blocks[FloorTile])?;
                             }
                         }
                     }
@@ -400,7 +398,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 if room_data.lit && room_data.corridor_only {
                     let top_middle =
                         Cube::containing(interior.abut(Face6::PY, -1).unwrap().center()).unwrap();
-                    space.set(top_middle, &self.blocks[CorridorLight])?;
+                    ctx.set(top_middle, &self.blocks[CorridorLight])?;
                 }
 
                 // Windowed walls and torches on walls
@@ -421,7 +419,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                     GridAab::from_lower_size(window_pos, [1, 3, 1])
                                         .intersection_cubes(wall_excluding_corners_box)
                                 {
-                                    space.fill_uniform(window_box, &self.window_glass_block)?;
+                                    ctx.fill_uniform(window_box, &self.window_glass_block)?;
                                 }
                             }
                         } else if room_data.lit && !room_data.corridor_only {
@@ -431,7 +429,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                                     + wall.opposite().normal_vector();
                                 torch_pos.y = torch_y;
 
-                                space.set(torch_pos, &self.blocks[Brazier])?;
+                                ctx.set(torch_pos, &self.blocks[Brazier])?;
                             }
                         }
 
@@ -445,18 +443,19 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                         Cube::containing(interior.abut(Face6::PY, 1).unwrap().center()).unwrap();
                     for x in WINDOW_PATTERN {
                         for z in WINDOW_PATTERN {
-                            space.set(
+                            ctx.set(
                                 midpoint + GridVector::new(x, 0, z),
                                 &self.window_glass_block,
                             )?;
                         }
                     }
                 }
+                Ok(None)
             }
             1 => {
                 for face in [Face6::PX, Face6::PZ] {
                     if let WallFeature::Passage(door) = room_data.wall_features[face] {
-                        self.inside_doorway(space, map, room_position, face, door)?;
+                        self.inside_doorway(ctx, map, room_position, face, door)?;
                     }
                 }
 
@@ -480,7 +479,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                         .build()
                         .single_block()
                         .rotate(GridRotation::IDENTITY);
-                    space.set(
+                    ctx.set(
                         Cube::from(interior.lower_bounds() + vec3(1, 3, 0)),
                         info_text_block,
                     )?;
@@ -491,8 +490,8 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     // note that this is the nominal floor, not the possibly extended downward floor
                     let floor_middle =
                         Cube::containing(floor_layer.abut(Face6::PY, 1).unwrap().center()).unwrap();
-                    space.set(floor_middle, &self.item_pedestal)?;
-                    space.set(
+                    ctx.set(floor_middle, &self.item_pedestal)?;
+                    ctx.set(
                         floor_middle + GridVector::new(0, 1, 0),
                         self.blocks[ItemHolder]
                             .clone()
@@ -503,7 +502,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Set spawn.
                 // TODO: Don't unconditionally override spawn; instead communicate this out.
                 if matches!(room_data.maze_kind, MazeRoomKind::Start) {
-                    let mut spawn = Spawn::default_for_new_space(space.bounds());
+                    let mut spawn = Spawn::default_for_new_space(ctx.bounds());
                     spawn.set_bounds(interior);
                     spawn.set_inventory(vec![
                         Tool::Activate.into(),
@@ -519,12 +518,13 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                         }
                     }
 
-                    space.set_spawn(spawn);
+                    Ok(Some(spawn))
+                } else {
+                    Ok(None)
                 }
             }
             _ => unreachable!(),
         }
-        Ok(())
     }
 }
 
@@ -690,32 +690,41 @@ pub(crate) async fn demo_dungeon(
         let space_bounds = dungeon_grid
             .minimum_space_for_rooms(dungeon_map.bounds())
             .expand(FaceMap::symmetric([perimeter_margin, 1, perimeter_margin]));
-        let mut space = Space::builder(space_bounds)
+        let space = Space::builder(space_bounds)
             .sky(crate::landscape::sky_with_grass(
                 palette::DAY_SKY_COLOR * 2.0,
             ))
             .light_physics(LightPhysics::None) // temporary
-            .build();
+            .build_and_mutate(|m| {
+                // Fill in (under)ground areas
+                m.fill_uniform(
+                    GridAab::from_ranges([space_bounds.x_range(), -1..0, space_bounds.z_range()]),
+                    &landscape_blocks[LandscapeBlocks::Grass],
+                )?;
+                m.fill_uniform(
+                    {
+                        let mut u = space_bounds.upper_bounds();
+                        u.y = -1;
+                        GridAab::from_lower_upper(space_bounds.lower_bounds(), u)
+                    },
+                    &landscape_blocks[LandscapeBlocks::Dirt],
+                )?;
+                Ok(())
+            })?;
 
-        // Fill in (under)ground areas
-        space.fill_uniform(
-            GridAab::from_ranges([space_bounds.x_range(), -1..0, space_bounds.z_range()]),
-            &landscape_blocks[LandscapeBlocks::Grass],
-        )?;
-        space.fill_uniform(
-            {
-                let mut u = space_bounds.upper_bounds();
-                u.y = -1;
-                GridAab::from_lower_upper(space_bounds.lower_bounds(), u)
-            },
-            &landscape_blocks[LandscapeBlocks::Dirt],
-        )?;
         space_construction_progress.finish().await;
         space
     };
 
     let build_progress = progress.start_and_cut(0.2, "building rooms").await;
-    build_dungeon(&mut space, &theme, dungeon_map.as_ref(), build_progress).await?;
+    build_dungeon(
+        universe.read_ticket(),
+        &mut space,
+        &theme,
+        dungeon_map.as_ref(),
+        build_progress,
+    )
+    .await?;
 
     // Enable lighting
     let mut light_progress = progress;

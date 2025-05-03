@@ -12,7 +12,6 @@ fn ANIMATION(ctx: Context<'_>) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
 
     let footprint = GridAab::from_lower_size([0, 0, -1], [5, 2, 3]);
-    let mut space = Space::empty(footprint);
     let mut txn = ExhibitTransaction::default();
 
     let sweep_block = {
@@ -72,13 +71,18 @@ fn ANIMATION(ctx: Context<'_>) {
             .build()
     };
 
-    space.set([0, 0, 0], sweep_block)?;
-    space.fill_uniform(
-        GridAab::from_lower_upper([2, 0, -1], [5, 1, 2]),
-        &fire_block,
-    )?;
-    space.set([3, 0, 0], &demo_blocks[DemoBlocks::Road])?; // in middle of fire
-    space.set([1, 1, -1], &demo_blocks[DemoBlocks::Clock])?;
+    let space = Space::builder(footprint)
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| {
+            m.set([0, 0, 0], sweep_block)?;
+            m.fill_uniform(
+                GridAab::from_lower_upper([2, 0, -1], [5, 1, 2]),
+                &fire_block,
+            )?;
+            m.set([3, 0, 0], &demo_blocks[DemoBlocks::Road])?; // in middle of fire
+            m.set([1, 1, -1], &demo_blocks[DemoBlocks::Clock])?;
+            Ok::<(), space::SetCubeError>(())
+        })?;
 
     Ok((space, txn))
 }

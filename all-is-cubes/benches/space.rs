@@ -31,7 +31,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
             b.iter_batched_ref(
                 || Space::empty(bounds),
                 |space: &mut Space| {
-                    space.fill(space.bounds(), |_| Some(&block)).unwrap();
+                    space
+                        .mutate(ReadTicket::stub(), |m| m.fill(bounds, |_| Some(&block)))
+                        .unwrap();
                 },
                 BatchSize::SmallInput,
             )
@@ -42,7 +44,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
             b.iter_batched_ref(
                 || Space::empty(bigger_bounds),
                 |space: &mut Space| {
-                    space.fill(bounds, |_| Some(&block)).unwrap();
+                    space
+                        .mutate(ReadTicket::stub(), |m| m.fill(bounds, |_| Some(&block)))
+                        .unwrap();
                 },
                 BatchSize::SmallInput,
             )
@@ -79,9 +83,15 @@ fn space_bulk_mutation(c: &mut Criterion) {
                         });
                         (space, (rts, blocks))
                     },
-                    |(space, _listening_things)| {
-                        space
-                            .try_modify(|space| space.fill(bounds, |_| Some(&block)).unwrap())
+                    |(space_handle, _listening_things)| {
+                        space_handle
+                            .try_modify(|space| {
+                                space
+                                    .mutate(ReadTicket::stub(), |m| {
+                                        m.fill(bounds, |_| Some(&block))
+                                    })
+                                    .unwrap()
+                            })
                             .unwrap();
                     },
                     BatchSize::SmallInput,
@@ -96,7 +106,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
                 b.iter_batched_ref(
                     || Space::empty(bounds),
                     |space: &mut Space| {
-                        space.fill_uniform(space.bounds(), &block).unwrap();
+                        space
+                            .mutate(ReadTicket::stub(), |m| m.fill_uniform(bounds, &block))
+                            .unwrap();
                     },
                     BatchSize::SmallInput,
                 )
@@ -110,7 +122,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
                 b.iter_batched_ref(
                     || Space::empty(bigger_bounds),
                     |space: &mut Space| {
-                        space.fill_uniform(bounds, &block).unwrap();
+                        space
+                            .mutate(ReadTicket::stub(), |m| m.fill_uniform(bounds, &block))
+                            .unwrap();
                     },
                     BatchSize::SmallInput,
                 )

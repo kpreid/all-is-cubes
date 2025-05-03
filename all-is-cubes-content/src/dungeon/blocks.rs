@@ -15,7 +15,6 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::op;
 use all_is_cubes::space::{Space, SpaceTransaction};
-use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::util::YieldProgress;
 
@@ -96,41 +95,44 @@ pub(crate) async fn install_dungeon_blocks(
             Brazier => Block::builder()
                 .display_name("Brazier")
                 .voxels_handle(resolution, {
-                    let mut space = Space::for_block(resolution).build();
                     // Use a darker color to dampen the effect of interior light
                     let body_block = Block::from(palette::STEEL * 0.2);
-                    space.fill(
-                        GridAab::from_lower_upper(
-                            [0, 0, 0],
-                            [resolution_g, resolution_g / 2, resolution_g],
-                        )
-                        .shrink(FaceMap::symmetric([2, 0, 2]))
-                        .unwrap(),
-                        |p| {
-                            let mid =
-                                (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
-                            if mid.x.max(mid.z) + (mid.y / 2) < resolution_g {
-                                Some(&body_block)
-                            } else {
-                                None
-                            }
-                        },
-                    )?;
-                    {
-                        let fire_inset = 4;
-                        let bounds = GridAab::from_lower_upper(
-                            // Vertical overlap will be overwritten, making a bowl shape
-                            [fire_inset, resolution_g / 2 - 2, fire_inset],
-                            [
-                                resolution_g - fire_inset,
-                                resolution_g,
-                                resolution_g - fire_inset,
-                            ],
-                        );
-                        SpaceTransaction::add_behavior(bounds, crate::Fire::new(bounds))
-                            .execute(&mut space, &mut transaction::no_outputs)
-                            .unwrap();
-                    }
+                    let space = Space::for_block(resolution).build_and_mutate(|m| {
+                        m.fill(
+                            GridAab::from_lower_upper(
+                                [0, 0, 0],
+                                [resolution_g, resolution_g / 2, resolution_g],
+                            )
+                            .shrink(FaceMap::symmetric([2, 0, 2]))
+                            .unwrap(),
+                            |p| {
+                                let mid =
+                                    (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
+                                if mid.x.max(mid.z) + (mid.y / 2) < resolution_g {
+                                    Some(&body_block)
+                                } else {
+                                    None
+                                }
+                            },
+                        )?;
+
+                        {
+                            let fire_inset = 4;
+                            let bounds = GridAab::from_lower_upper(
+                                // Vertical overlap will be overwritten, making a bowl shape
+                                [fire_inset, resolution_g / 2 - 2, fire_inset],
+                                [
+                                    resolution_g - fire_inset,
+                                    resolution_g,
+                                    resolution_g - fire_inset,
+                                ],
+                            );
+                            SpaceTransaction::add_behavior(bounds, crate::Fire::new(bounds))
+                                .execute_m(m)
+                                .unwrap();
+                        }
+                        Ok(())
+                    })?;
                     txn.insert_anonymous(space)
                 })
                 .build(),

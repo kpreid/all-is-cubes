@@ -8,27 +8,30 @@ use super::prelude::*;
         Lighting of volumes still needs work.",
     placement: Placement::Surface,
 )]
-fn TRANSPARENCY_WHOLE_BLOCK(_: Context<'_>) {
-    let mut space = Space::empty(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]));
+fn TRANSPARENCY_WHOLE_BLOCK(ctx: Context<'_>) {
+    let space = Space::builder(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]))
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| {
+            let colors = [
+                Rgb::new(1.0, 0.5, 0.5),
+                Rgb::new(0.5, 1.0, 0.5),
+                Rgb::new(0.5, 0.5, 1.0),
+                Rgb::new(0.9, 0.9, 0.9),
+            ];
+            let alphas = [0.25, 0.5, 0.75, 0.95].map(zo32);
+            for (rot, color) in GridRotation::CLOCKWISE.iterate().zip(&colors) {
+                let windowpane =
+                    GridAab::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);
+                m.fill(
+                    windowpane
+                        .transform(rot.to_positive_octant_transform(1))
+                        .unwrap(),
+                    |Cube { y, .. }| Some(Block::from(color.with_alpha(alphas[y as usize]))),
+                )?;
+            }
 
-    let colors = [
-        Rgb::new(1.0, 0.5, 0.5),
-        Rgb::new(0.5, 1.0, 0.5),
-        Rgb::new(0.5, 0.5, 1.0),
-        Rgb::new(0.9, 0.9, 0.9),
-    ];
-    let alphas = [0.25, 0.5, 0.75, 0.95].map(zo32);
-    for (rot, color) in GridRotation::CLOCKWISE.iterate().zip(&colors) {
-        let windowpane =
-            GridAab::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);
-        space.fill(
-            windowpane
-                .transform(rot.to_positive_octant_transform(1))
-                .unwrap(),
-            |Cube { y, .. }| Some(Block::from(color.with_alpha(alphas[y as usize]))),
-        )?;
-    }
-
+            Ok(())
+        })?;
     Ok((space, ExhibitTransaction::default()))
 }
 
@@ -39,7 +42,7 @@ fn TRANSPARENCY_WHOLE_BLOCK(_: Context<'_>) {
         "",
     placement: Placement::Surface,
 )]
-fn TRANSPARENCY_GLASS_AND_WATER(_: Context<'_>) {
+fn TRANSPARENCY_GLASS_AND_WATER(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     let footprint = GridAab::from_lower_size([0, 0, 0], [7, 4, 7]);
@@ -93,24 +96,27 @@ fn TRANSPARENCY_GLASS_AND_WATER(_: Context<'_>) {
             .build_txn(&mut txn)
     };
 
-    four_walls(
-        pool.expand(FaceMap::symmetric([1, 0, 1])),
-        |_origin, direction, _length, wall_excluding_corners| {
-            space.fill_uniform(
-                wall_excluding_corners,
-                &window_block
-                    .clone()
-                    .rotate(GridRotation::from_to(Face6::PX, direction, Face6::PY).unwrap()),
-            )?;
-            Ok::<(), InGenError>(())
-        },
-    )?;
+    space.mutate(ctx.universe.read_ticket(), |m| {
+        four_walls(
+            pool.expand(FaceMap::symmetric([1, 0, 1])),
+            |_origin, direction, _length, wall_excluding_corners| {
+                m.fill_uniform(
+                    wall_excluding_corners,
+                    &window_block
+                        .clone()
+                        .rotate(GridRotation::from_to(Face6::PX, direction, Face6::PY).unwrap()),
+                )?;
+                Ok::<(), InGenError>(())
+            },
+        )?;
 
-    space.fill_uniform(
-        pool.abut(Face6::NY, 0).unwrap().abut(Face6::PY, 1).unwrap(),
-        &water_voxel,
-    )?;
-    space.fill_uniform(pool.abut(Face6::PY, -1).unwrap(), &water_surface_block)?;
+        m.fill_uniform(
+            pool.abut(Face6::NY, 0).unwrap().abut(Face6::PY, 1).unwrap(),
+            &water_voxel,
+        )?;
+        m.fill_uniform(pool.abut(Face6::PY, -1).unwrap(), &water_surface_block)?;
+        Ok::<(), InGenError>(())
+    })?;
 
     let [floater] = make_some_voxel_blocks_txn(&mut txn);
     space.set([3, 1, 3], floater)?;
@@ -158,18 +164,20 @@ fn TRANSPARENCY_VOX(ctx: Context<'_>) {
     subtitle: "Transparent blocks that can be passed through",
     placement: Placement::Surface,
 )]
-fn SWIMMING_POOL(_: Context<'_>) {
+fn SWIMMING_POOL(ctx: Context<'_>) {
     let width = 6;
     let depth = 6;
     let water_area = GridAab::from_lower_upper([0, -depth, 0], [width, 0, width]);
     let mut space = Space::empty(water_area);
-    space.fill_uniform(
-        water_area,
-        &Block::builder()
-            .display_name("Not entirely unlike water")
-            .color(Rgba::new(0.96, 0.96, 1.0, 0.1))
-            .collision(BlockCollision::None)
-            .build(),
-    )?;
+    space.mutate(ctx.universe.read_ticket(), |m| {
+        m.fill_uniform(
+            water_area,
+            &Block::builder()
+                .display_name("Not entirely unlike water")
+                .color(Rgba::new(0.96, 0.96, 1.0, 0.1))
+                .collision(BlockCollision::None)
+                .build(),
+        )
+    })?;
     Ok((space, ExhibitTransaction::default()))
 }

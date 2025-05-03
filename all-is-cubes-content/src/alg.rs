@@ -13,7 +13,7 @@ use all_is_cubes::math::{
     Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
     GridSizeCoord, GridVector, Gridgid, PositiveSign, Vol,
 };
-use all_is_cubes::space::{CubeTransaction, SetCubeError, Space, SpaceTransaction};
+use all_is_cubes::space::{self, CubeTransaction, SetCubeError, Space, SpaceTransaction};
 
 mod noise;
 pub(crate) use noise::*;
@@ -139,11 +139,12 @@ where
 pub(crate) fn space_to_space_copy(
     src: &Space,
     src_bounds: GridAab,
-    dst: &mut Space,
+    dst: &mut space::Mutation<'_, '_>,
     src_to_dst_transform: Gridgid,
 ) -> Result<(), SetCubeError> {
     let dst_to_src_transform = src_to_dst_transform.inverse();
     let block_rotation = src_to_dst_transform.rotation;
+
     dst.fill(src_bounds.transform(src_to_dst_transform).unwrap(), |p| {
         Some(
             src[dst_to_src_transform.transform_cube(p)]

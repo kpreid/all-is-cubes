@@ -277,44 +277,46 @@ pub async fn install_demo_blocks(
             }
 
             Arrow => {
-                let mut space = Space::for_block(resolution).build();
+                let space = Space::for_block(resolution).build_and_mutate(|m| {
+                    // Support legs, identifying the down / -Y direction.
+                    let leg = block::from_color!(palette::STEEL);
+                    m.fill_uniform(
+                        GridAab::from_lower_size(
+                            [resolution_g / 2 - 1, 0, resolution_g / 2 - 1],
+                            [2, GridSizeCoord::from(resolution) / 2, 2],
+                        ),
+                        &leg,
+                    )?;
 
-                // Support legs, identifying the down / -Y direction.
-                let leg = block::from_color!(palette::STEEL);
-                space.fill_uniform(
-                    GridAab::from_lower_size(
-                        [resolution_g / 2 - 1, 0, resolution_g / 2 - 1],
-                        [2, GridSizeCoord::from(resolution) / 2, 2],
-                    ),
-                    &leg,
-                )?;
+                    // Arrow body
+                    let base_body_color = rgb_const!(0.5, 0.5, 0.5);
+                    m.fill_all(|cube| {
+                        // TODO: We really need better procgen tools
+                        let p2 = cube.lower_bounds() * 2 + one_diagonal - center_point_doubled;
+                        let r = p2
+                            .component_mul(Vector3D::new(1, 1, 0))
+                            .map(|c| f64::from(c) / 2.0)
+                            .length();
+                        let body_radius = if cube.z < 6 {
+                            f64::from(cube.z) / 1.5 + 1.0
+                        } else {
+                            2.0
+                        };
+                        if r < body_radius {
+                            // Shade the body with an axis-indicating color.
+                            Some(Block::from(Rgb::new(
+                                base_body_color.red().into_inner()
+                                    + (p2.x as f32 / resolution_g as f32),
+                                base_body_color.green().into_inner()
+                                    + (p2.y as f32 / resolution_g as f32),
+                                base_body_color.red().into_inner(),
+                            )))
+                        } else {
+                            None
+                        }
+                    })?;
 
-                // Arrow body
-                let base_body_color = rgb_const!(0.5, 0.5, 0.5);
-                space.fill(space.bounds(), |cube| {
-                    // TODO: We really need better procgen tools
-                    let p2 = cube.lower_bounds() * 2 + one_diagonal - center_point_doubled;
-                    let r = p2
-                        .component_mul(Vector3D::new(1, 1, 0))
-                        .map(|c| f64::from(c) / 2.0)
-                        .length();
-                    let body_radius = if cube.z < 6 {
-                        f64::from(cube.z) / 1.5 + 1.0
-                    } else {
-                        2.0
-                    };
-                    if r < body_radius {
-                        // Shade the body with an axis-indicating color.
-                        Some(Block::from(Rgb::new(
-                            base_body_color.red().into_inner()
-                                + (p2.x as f32 / resolution_g as f32),
-                            base_body_color.green().into_inner()
-                                + (p2.y as f32 / resolution_g as f32),
-                            base_body_color.red().into_inner(),
-                        )))
-                    } else {
-                        None
-                    }
+                    Ok(())
                 })?;
 
                 Block::builder()
@@ -373,43 +375,45 @@ pub async fn install_demo_blocks(
                 let bottom_edge = 3;
                 let top_edge = 12;
 
-                let mut space = Space::builder(GridAab::from_lower_upper(
+                let space = Space::builder(GridAab::from_lower_upper(
                     [0, 0, 9],
                     [resolution_g, resolution_g, resolution_g],
                 ))
                 .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-                .build();
-
-                // Sign board
-                space.fill_uniform(
-                    GridAab::from_lower_upper(
-                        [0, bottom_edge, resolution_g - 1],
-                        [resolution_g, top_edge, resolution_g],
-                    ),
-                    &sign_board,
-                )?;
-
-                // Support posts
-                // TODO: consider drawing this from an image or ascii-art instead,
-                // for more art control with less code.
-                for post_x in [2, resolution_g - 3] {
-                    let post_shape_depth = 6;
-                    space.fill(
-                        GridAab::from_lower_size(
-                            [post_x, 0, resolution_g - post_shape_depth - 1],
-                            [1, top_edge as u32 - 1, post_shape_depth as u32],
+                .build_and_mutate(|m| {
+                    // Sign board
+                    m.fill_uniform(
+                        GridAab::from_lower_upper(
+                            [0, bottom_edge, resolution_g - 1],
+                            [resolution_g, top_edge, resolution_g],
                         ),
-                        |cube| {
-                            let vertical_post = cube.z >= resolution_g - 3;
-                            let diagonal_brace = (9..11).contains(&(cube.z - cube.y));
-                            if vertical_post || diagonal_brace {
-                                Some(&sign_post)
-                            } else {
-                                None
-                            }
-                        },
+                        &sign_board,
                     )?;
-                }
+
+                    // Support posts
+                    // TODO: consider drawing this from an image or ascii-art instead,
+                    // for more art control with less code.
+                    for post_x in [2, resolution_g - 3] {
+                        let post_shape_depth = 6;
+                        m.fill(
+                            GridAab::from_lower_size(
+                                [post_x, 0, resolution_g - post_shape_depth - 1],
+                                [1, top_edge as u32 - 1, post_shape_depth as u32],
+                            ),
+                            |cube| {
+                                let vertical_post = cube.z >= resolution_g - 3;
+                                let diagonal_brace = (9..11).contains(&(cube.z - cube.y));
+                                if vertical_post || diagonal_brace {
+                                    Some(&sign_post)
+                                } else {
+                                    None
+                                }
+                            },
+                        )?;
+                    }
+
+                    Ok(())
+                })?;
 
                 Block::builder()
                     .display_name("Signboard")

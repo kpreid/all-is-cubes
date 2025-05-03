@@ -1091,12 +1091,13 @@ mod tests {
 
     #[test]
     fn bounding_box_excludes_hidden_faces() {
-        let mut space = Space::builder(GridAab::from_lower_upper([0, 0, 0], [4, 4, 4])).build();
-        space
-            .fill_uniform(
-                GridAab::from_lower_upper([0, 0, 0], [4, 2, 4]),
-                &block::from_color!(Rgba::WHITE),
-            )
+        let space = Space::builder(GridAab::from_lower_upper([0, 0, 0], [4, 4, 4]))
+            .build_and_mutate(|m| {
+                m.fill_uniform(
+                    GridAab::from_lower_upper([0, 0, 0], [4, 2, 4]),
+                    &block::from_color!(Rgba::WHITE),
+                )
+            })
             .unwrap();
 
         let mesh_region = GridAab::from_lower_upper([1, 1, 1], [3, 3, 3]);
