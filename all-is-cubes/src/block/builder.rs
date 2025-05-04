@@ -315,7 +315,15 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
     ///
     /// This is currently only necessary when using [`Builder::voxels_fn()`] with blocks that
     /// contain handles. It is not necessary when simple solid-color blocks are used.
-    #[allow(clippy::needless_lifetimes)]
+    ///
+    /// The default is [`ReadTicket::stub()`].
+    //---
+    // TODO: Remove unknown_lints after Rust 1.87
+    #[allow(
+        unknown_lints,
+        clippy::needless_lifetimes,
+        clippy::elidable_lifetime_names
+    )]
     pub fn read_ticket<'u2>(self, read_ticket: ReadTicket<'u2>) -> Builder<'u2, P, Txn> {
         Builder {
             read_ticket,

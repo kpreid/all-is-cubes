@@ -1,6 +1,11 @@
 //! Lesser-used helpers for [`Builder`].
 
-#![allow(clippy::needless_lifetimes)]
+// TODO: Remove unknown_lints after Rust 1.87
+#![allow(
+    unknown_lints,
+    clippy::needless_lifetimes,
+    clippy::elidable_lifetime_names
+)]
 
 use alloc::boxed::Box;
 
@@ -47,6 +52,12 @@ impl<'universe, B> Builder<'universe, B> {
     /// Sets the [`ReadTicket`] that will be used by builder operations that evaluate blocks.
     ///
     /// The default is [`ReadTicket::stub()`].
+    // TODO: Remove unknown_lints after Rust 1.87
+    #[allow(
+        unknown_lints,
+        clippy::needless_lifetimes,
+        clippy::elidable_lifetime_names
+    )]
     pub fn read_ticket<'u2>(self, read_ticket: ReadTicket<'u2>) -> Builder<'u2, B> {
         Builder {
             read_ticket,
