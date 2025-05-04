@@ -311,12 +311,13 @@ impl Universe {
     }
 
     /// Returns a [`ReadTicket`] that may be used for reading the members of this universe.
-    #[allow(clippy::unused_self)]
+    #[track_caller]
     pub fn read_ticket(&self) -> ReadTicket<'_> {
         // Currently unassociated with this universe, but might start being,
         // either by carrying the universe ID, or being an actual borrow of the storage.
         ReadTicket {
             rule: TicketRule::Eq(self.id),
+            origin: core::panic::Location::caller(),
             _phantom: core::marker::PhantomData,
         }
     }

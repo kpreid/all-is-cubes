@@ -138,6 +138,7 @@ impl Space {
     ///
     /// Panics if `bounds` has a volume exceeding `usize::MAX`.
     /// (But there will likely be a memory allocation failure well below that point.)
+    #[track_caller] // used for ReadTicket debugging
     pub fn builder(bounds: GridAab) -> Builder<'static, Vol<()>> {
         Builder::new().bounds(bounds)
     }

@@ -3,6 +3,7 @@ use core::fmt;
 use core::hash;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
+use core::panic::Location;
 
 use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::universe::{
@@ -167,6 +168,9 @@ impl<T: 'static> Handle<T> {
     pub fn read(&self, read_ticket: ReadTicket<'_>) -> Result<ReadGuard<T>, HandleError> {
         if let Some(id) = self.universe_id() {
             if !read_ticket.allows_access_to(id) {
+                // Invalid tickets can be a subtle bug due to `Space`'s retrying behavior.
+                // As a compromise, log them. TODO: Add a cfg or something to panic.
+                log::error!("invalid ticket {read_ticket:?} for reading {id:?}");
                 return Err(HandleError::InvalidTicket(self.name()));
             }
         }
@@ -582,7 +586,12 @@ impl core::error::Error for HandleError {}
 /// for access — but it may become mandatory in the future.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReadTicket<'universe> {
+    /// What universes are accepted.
     pub(in crate::universe) rule: TicketRule,
+
+    /// Where this ticket was created.
+    pub(in crate::universe) origin: &'static Location<'static>,
+
     pub(in crate::universe) _phantom: PhantomData<&'universe Universe>,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -605,9 +614,11 @@ impl ReadTicket<'_> {
     // TODO(read_ticket): eliminate all uses of this
     #[allow(clippy::new_without_default)]
     #[doc(hidden)]
+    #[track_caller]
     pub fn new() -> Self {
         Self {
             rule: TicketRule::Any,
+            origin: Location::caller(),
             _phantom: PhantomData,
         }
     }
@@ -615,11 +626,11 @@ impl ReadTicket<'_> {
     /// Create a [`ReadTicket`] which does not guarantee access to anything.
     ///
     /// This may be used for evaluating universe-independent [`Block`](crate::block::Block)s.
-    //---
-    // TODO(read_ticket): eliminate all external uses of this
+    #[track_caller]
     pub const fn stub() -> Self {
         Self {
             rule: TicketRule::None,
+            origin: Location::caller(),
             _phantom: PhantomData,
         }
     }

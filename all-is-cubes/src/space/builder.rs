@@ -123,6 +123,7 @@ impl<'universe, B: Bounds> Builder<'universe, B> {
 
 impl<'universe> Builder<'universe, ()> {
     /// Use [`Builder::default()`] as the public way to call this.
+    #[track_caller] // used for ReadTicket debugging
     pub(super) fn new() -> Self {
         Self {
             read_ticket: ReadTicket::stub(),
@@ -281,6 +282,7 @@ impl Builder<'_, Vol<()>> {
 }
 
 impl Default for Builder<'_, ()> {
+    #[track_caller] // used for ReadTicket debugging
     fn default() -> Self {
         Self::new()
     }
