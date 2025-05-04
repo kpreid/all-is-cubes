@@ -21,7 +21,7 @@ use all_is_cubes::euclid::{Vector2D, vec3};
 use all_is_cubes::linking::{self, InGenError};
 use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridRotation, GridSize, GridVector, Rgba};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{Handle, UniverseTransaction};
+use all_is_cubes::universe::{Handle, ReadTicket, UniverseTransaction};
 
 use crate::vui::{self, Layoutable as _};
 
@@ -159,7 +159,7 @@ pub(crate) fn make_button_label_block(
             .extend(0)
             .cast_unit::<Cube>();
 
-            let space = space_from_image(icon, GridRotation::RXyZ, &|color| {
+            let space = space_from_image(ReadTicket::stub(), icon, GridRotation::RXyZ, &|color| {
                 default_srgb(color).translate(centering)
             })?;
 
@@ -294,24 +294,29 @@ fn draw_button_multiblock_from_image(
     };
     let back_color_block = illuminate(Block::builder().color(back_color));
     let rim_color_block = illuminate(Block::builder().color(theme::rim_lightening(back_color)));
-    let space = space_from_image(image, GridRotation::RXyZ, &|color| match color {
-        image_palette::OUTSIDE => VoxelBrush::single(AIR),
-        image_palette::FRAME => VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME)),
-        image_palette::RIM => VoxelBrush::new((0..label_z).map(|z| {
-            // Highlight just the corner with a lighter color;
-            // otherwise identical to BACK.
-            (
-                [0, 0, z],
-                if z == label_z - 1 {
-                    &rim_color_block
-                } else {
-                    &back_color_block
-                },
-            )
-        })),
-        image_palette::BACK => VoxelBrush::with_thickness(back_color_block.clone(), 0..label_z),
-        _ => panic!("bad color in button image: {color:?}"),
-    })?;
+    let space = space_from_image(
+        ReadTicket::stub(),
+        image,
+        GridRotation::RXyZ,
+        &|color| match color {
+            image_palette::OUTSIDE => VoxelBrush::single(AIR),
+            image_palette::FRAME => VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME)),
+            image_palette::RIM => VoxelBrush::new((0..label_z).map(|z| {
+                // Highlight just the corner with a lighter color;
+                // otherwise identical to BACK.
+                (
+                    [0, 0, z],
+                    if z == label_z - 1 {
+                        &rim_color_block
+                    } else {
+                        &back_color_block
+                    },
+                )
+            })),
+            image_palette::BACK => VoxelBrush::with_thickness(back_color_block.clone(), 0..label_z),
+            _ => panic!("bad color in button image: {color:?}"),
+        },
+    )?;
     Ok(space)
 }
 

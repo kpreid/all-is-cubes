@@ -122,6 +122,7 @@ impl PngAdapter<'_> {
 #[doc(hidden)] // still experimental API
 #[inline(never)]
 pub fn space_from_image<'b>(
+    read_ticket: ReadTicket<'_>,
     png: &DecodedPng,
     rotation: GridRotation,
     // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
@@ -159,7 +160,7 @@ pub fn space_from_image<'b>(
 
     Space::builder(bounds)
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .read_ticket(ReadTicket::new()) // TODO(read_ticket): replace this with a parameter
+        .read_ticket(read_ticket)
         .build_and_mutate(|m| {
             for y in 0..(size.height) {
                 for x in 0..(size.width) {
@@ -177,6 +178,7 @@ pub fn space_from_image<'b>(
 /// [`Block`]).
 #[doc(hidden)] // still experimental API
 pub fn block_from_image<'b>(
+    read_ticket: ReadTicket<'_>,
     png: &DecodedPng,
     rotation: GridRotation,
     pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'b>,
@@ -191,7 +193,8 @@ pub fn block_from_image<'b>(
     // TODO: Implement the same bounds-shrinking feature as `Block::voxels_fn()` has.
     Ok(Block::builder().voxels_space(
         resolution,
-        space_from_image(png, rotation, pixel_function).map_err(BlockFromImageError::Space)?,
+        space_from_image(read_ticket, png, rotation, pixel_function)
+            .map_err(BlockFromImageError::Space)?,
     ))
 }
 
@@ -331,7 +334,13 @@ mod tests {
     #[test]
     fn basic_image() {
         let image = test_image();
-        let space = space_from_image(&image, GridRotation::IDENTITY, &default_srgb).unwrap();
+        let space = space_from_image(
+            ReadTicket::stub(),
+            &image,
+            GridRotation::IDENTITY,
+            &default_srgb,
+        )
+        .unwrap();
         assert_eq!(
             space.bounds(),
             GridAab::from_lower_upper([0, 0, 0], [2, 2, 1])
@@ -342,7 +351,13 @@ mod tests {
     #[test]
     fn basic_image_transformed() {
         let image = test_image();
-        let space = space_from_image(&image, GridRotation::RxZY, &default_srgb).unwrap();
+        let space = space_from_image(
+            ReadTicket::stub(),
+            &image,
+            GridRotation::RxZY,
+            &default_srgb,
+        )
+        .unwrap();
         assert_eq!(
             space.bounds(),
             GridAab::from_lower_upper([0, 0, 0], [2, 1, 2])
@@ -363,9 +378,12 @@ mod tests {
     #[test]
     fn bounds_are_affected_by_brush() {
         let image = test_image();
-        let space = space_from_image(&image, GridRotation::IDENTITY, &|pixel| {
-            default_srgb(pixel).translate([10, 0, 0])
-        })
+        let space = space_from_image(
+            ReadTicket::stub(),
+            &image,
+            GridRotation::IDENTITY,
+            &|pixel| default_srgb(pixel).translate([10, 0, 0]),
+        )
         .unwrap();
         assert_eq!(
             space.bounds(),

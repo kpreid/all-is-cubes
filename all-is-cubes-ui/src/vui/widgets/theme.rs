@@ -13,7 +13,7 @@ use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::inv::TOOL_SELECTIONS;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::GridRotation;
-use all_is_cubes::universe::UniverseTransaction;
+use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::vui::widgets;
@@ -137,6 +137,7 @@ impl WidgetBlocks {
         BlockProvider::new(p, |key| {
             Ok(match key {
                 WidgetBlocks::Crosshair => block_from_image(
+                    ReadTicket::stub(),
                     include_image!("theme/crosshair.png"),
                     GridRotation::RXyZ,
                     &default_srgb,
@@ -150,6 +151,7 @@ impl WidgetBlocks {
                         .voxels_handle(
                             R64,
                             txn.insert_anonymous(space_from_image(
+                                ReadTicket::stub(),
                                 include_image!("theme/toolbar-slot.png"),
                                 GridRotation::RXZY,
                                 // TODO: better way to do translations
@@ -166,6 +168,7 @@ impl WidgetBlocks {
                     ToolbarButtonState::Unmapped,
                 ]) => AIR,
                 WidgetBlocks::ToolbarPointer(buttons) => block_from_image(
+                    ReadTicket::stub(),
                     include_image!("theme/toolbar-sel-cursor.png"),
                     GridRotation::RXyZ,
                     &|color| match color {
@@ -181,6 +184,7 @@ impl WidgetBlocks {
 
                 WidgetBlocks::DialogBackground => {
                     block_from_image(
+                        ReadTicket::stub(),
                         include_image!("theme/dialog-background.png"),
                         GridRotation::RXYZ,
                         // place image on the front face (of the R16 individual blocks!)
@@ -198,9 +202,14 @@ impl WidgetBlocks {
                         include_image!("theme/progress-bar-empty.png")
                     };
 
-                    block_from_image(image, GridRotation::IDENTITY, &default_srgb)?
-                        .display_name(format! {"Progress Bar {}", if full {"Full"} else {"Empty"}})
-                        .build_txn(txn)
+                    block_from_image(
+                        ReadTicket::stub(),
+                        image,
+                        GridRotation::IDENTITY,
+                        &default_srgb,
+                    )?
+                    .display_name(format! {"Progress Bar {}", if full {"Full"} else {"Empty"}})
+                    .build_txn(txn)
                 }
 
                 WidgetBlocks::ActionButton(state) => state.button_block(txn)?,
@@ -211,6 +220,7 @@ impl WidgetBlocks {
                     .voxels_handle(
                         R32,
                         txn.insert_anonymous(space_from_image(
+                            ReadTicket::stub(),
                             include_image!("theme/layout-debug-box-corner.png"),
                             GridRotation::RXyZ,
                             &default_srgb,
@@ -222,6 +232,7 @@ impl WidgetBlocks {
                     .voxels_handle(
                         R32,
                         txn.insert_anonymous(space_from_image(
+                            ReadTicket::stub(),
                             include_image!("theme/layout-debug-box-edge.png"),
                             GridRotation::RZYX,
                             &default_srgb,

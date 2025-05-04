@@ -15,7 +15,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::op;
 use all_is_cubes::space::{Space, SpaceTransaction};
-use all_is_cubes::universe::UniverseTransaction;
+use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 // -------------------------------------------------------------------------------------------------
@@ -139,11 +139,16 @@ pub(crate) async fn install_dungeon_blocks(
 
             FloorTile => {
                 let resolution = R32;
-                block_from_image(include_image!("floor.png"), GridRotation::RXZY, &|pixel| {
-                    let block = Block::from(Rgba::from_srgb8(pixel));
-                    VoxelBrush::with_thickness(block, 0..resolution.into())
-                        .rotate(GridRotation::RXZY)
-                })?
+                block_from_image(
+                    ReadTicket::stub(),
+                    include_image!("floor.png"),
+                    GridRotation::RXZY,
+                    &|pixel| {
+                        let block = Block::from(Rgba::from_srgb8(pixel));
+                        VoxelBrush::with_thickness(block, 0..resolution.into())
+                            .rotate(GridRotation::RXZY)
+                    },
+                )?
                 .display_name("Floor Tile")
                 .build_txn(txn)
             }
@@ -162,18 +167,23 @@ pub(crate) async fn install_dungeon_blocks(
                 .build_txn(txn),
 
             Gate => {
-                let space =
-                    block_from_image(include_image!("fence.png"), GridRotation::RXyZ, &|pixel| {
+                let space = block_from_image(
+                    ReadTicket::stub(),
+                    include_image!("fence.png"),
+                    GridRotation::RXyZ,
+                    &|pixel| {
                         // Note that this produces selectable collidable transparent blocks --
                         // that's preferred here.
                         let block = Block::builder().color(Rgba::from_srgb8(pixel)).build();
                         VoxelBrush::with_thickness(block, 7..9)
-                    })?;
+                    },
+                )?;
                 space.display_name("Gate").build_txn(txn)
             }
 
             GatePocket => {
                 let space = block_from_image(
+                    ReadTicket::stub(),
                     include_image!("fence-pocket.png"),
                     GridRotation::RXyZ,
                     &|pixel| {
@@ -186,6 +196,7 @@ pub(crate) async fn install_dungeon_blocks(
 
             GateLock => {
                 let space = block_from_image(
+                    ReadTicket::stub(),
                     include_image!("gate-lock.png"),
                     GridRotation::RXyZ,
                     &|pixel| {
@@ -205,14 +216,19 @@ pub(crate) async fn install_dungeon_blocks(
                 space.display_name("Keyhole").build_txn(txn)
             }
 
-            Key => block_from_image(include_image!("key.png"), GridRotation::RXyZ, &|pixel| {
-                let block = if pixel[3] == 0 {
-                    AIR
-                } else {
-                    Block::builder().color(Rgba::from_srgb8(pixel)).build()
-                };
-                VoxelBrush::with_thickness(block, 7..9)
-            })?
+            Key => block_from_image(
+                ReadTicket::stub(),
+                include_image!("key.png"),
+                GridRotation::RXyZ,
+                &|pixel| {
+                    let block = if pixel[3] == 0 {
+                        AIR
+                    } else {
+                        Block::builder().color(Rgba::from_srgb8(pixel)).build()
+                    };
+                    VoxelBrush::with_thickness(block, 7..9)
+                },
+            )?
             .display_name("Key")
             .build_txn(txn),
 

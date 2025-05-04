@@ -13,7 +13,7 @@ use crate::content::load_image::{block_from_image, default_srgb, include_image};
 use crate::drawing::VoxelBrush;
 use crate::linking::{BlockModule, BlockProvider};
 use crate::math::{FreeCoordinate, GridCoordinate, GridRotation, Rgba, rgb_const, rgba_const};
-use crate::universe::UniverseTransaction;
+use crate::universe::{ReadTicket, UniverseTransaction};
 
 #[cfg(doc)]
 use crate::inv::Tool;
@@ -82,6 +82,7 @@ impl Icons {
                     .build(),
 
                 Icons::Activate => block_from_image(
+                    ReadTicket::stub(),
                     include_image!("icons/hand.png"),
                     GridRotation::RXyZ,
                     &default_srgb,
@@ -90,6 +91,7 @@ impl Icons {
                 .build_txn(txn),
 
                 Icons::Delete => block_from_image(
+                    ReadTicket::stub(),
                     include_image!("icons/placeholder-hammer.png"),
                     GridRotation::RXyZ,
                     &default_srgb,
@@ -113,6 +115,7 @@ impl Icons {
                     let dots = [block::from_color!(Rgba::BLACK), AIR];
                     let dots = move |y: GridCoordinate| dots[y.rem_euclid(2) as usize].clone();
                     block_from_image(
+                        ReadTicket::stub(),
                         include_image!("icons/push.png"),
                         GridRotation::RXZY,
                         &|color| {

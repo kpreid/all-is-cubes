@@ -29,9 +29,14 @@ fn IMAGES(ctx: Context<'_>) {
         };
 
         let image = include_image!("terrain-image.png");
-        let block = block_from_image(image, rotation, &terrain_map_function)?
-            .display_name(format!("{rotation:?}"))
-            .build_txn(&mut txn);
+        let block = block_from_image(
+            ctx.universe.read_ticket(),
+            image,
+            rotation,
+            &terrain_map_function,
+        )?
+        .display_name(format!("{rotation:?}"))
+        .build_txn(&mut txn);
 
         outer_space.mutate(ctx.universe.read_ticket(), |m| {
             stack(m, position, [pedestal, &block])
