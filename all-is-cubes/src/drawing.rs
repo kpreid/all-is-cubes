@@ -33,11 +33,10 @@ use crate::math::{
     Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb,
     Rgba, Vol,
 };
-use crate::space::{self, SetCubeError, Space, SpaceTransaction};
-use crate::universe::ReadTicket;
+use crate::space::{Mutation, SetCubeError, SpaceTransaction};
 
 #[cfg(doc)]
-use crate::space::CubeTransaction;
+use crate::space::{CubeTransaction, Space};
 #[cfg(doc)]
 use embedded_graphics::Drawable;
 
@@ -104,10 +103,11 @@ pub fn rectangle_to_aab(rectangle: Rectangle, transform: Gridgid, max_brush: Gri
     }
 }
 
-/// Adapter to use a [`Space`] or [`SpaceTransaction`] as a [`DrawTarget`].
-/// Use [`Space::draw_target`] to construct this.
+/// Adapter to use a [`Mutation`] or [`SpaceTransaction`] as a [`DrawTarget`].
 ///
-/// `'s` is the lifetime of the [`Space`].
+/// Use [`Mutation::draw_target()`] or [`SpaceTransaction::draw_target()`] to construct this.
+///
+/// `'s` is the lifetime of the borrowed target.
 /// `C` is the “color” type to use, which should implement [`VoxelColor`].
 #[derive(Debug)]
 #[expect(clippy::module_name_repetitions)]
@@ -141,7 +141,7 @@ impl<'s, T, C> DrawingPlane<'s, T, C> {
 }
 
 /// A [`DrawingPlane`] accepts any color type that implements [`VoxelColor`].
-impl<'c, C> DrawTarget for DrawingPlane<'_, Space, C>
+impl<'c, C> DrawTarget for DrawingPlane<'_, Mutation<'_, '_>, C>
 where
     C: VoxelColor<'c>,
 {
@@ -158,8 +158,7 @@ where
             // TODO: Need to rotate the brush to match our transform
             let cube = self.convert_point(point);
             // TODO(read_ticket): migrate DrawingPlane as a whole to operate on Mutation
-            self.space
-                .mutate(ReadTicket::new(), |m| color.into_blocks().paint(m, cube))?;
+            color.into_blocks().paint(self.space, cube)?;
         }
         Ok(())
     }
@@ -213,7 +212,7 @@ where
     }
 }
 
-impl<C> Dimensions for DrawingPlane<'_, Space, C> {
+impl<C> Dimensions for DrawingPlane<'_, Mutation<'_, '_>, C> {
     fn bounding_box(&self) -> Rectangle {
         rectangle_from_bounds(self.transform, self.space.bounds())
     }
@@ -354,9 +353,9 @@ impl<'a> VoxelBrush<'a> {
     /// Copies each of the brush's blocks into `m` relative to the given origin
     /// point.
     ///
-    /// Unlike [`space::Mutation::set()`], it is not considered an error if any of the affected cubes
+    /// Unlike [`Mutation::set()`], it is not considered an error if any of the affected cubes
     /// fall outside of the `Space`'s bounds.
-    pub fn paint(&self, m: &mut space::Mutation<'_, '_>, origin: Cube) -> Result<(), SetCubeError> {
+    pub fn paint(&self, m: &mut Mutation<'_, '_>, origin: Cube) -> Result<(), SetCubeError> {
         for &(offset, ref block) in &self.0 {
             ignore_out_of_bounds(m.set(origin + offset, Cow::borrow(block)))?;
         }
@@ -510,6 +509,8 @@ mod tests {
     use super::*;
     use crate::block::{self, AIR};
     use crate::content::make_some_blocks;
+    use crate::space::Space;
+    use crate::universe::ReadTicket;
     use embedded_graphics::Drawable as _;
     use embedded_graphics::primitives::{Primitive, PrimitiveStyle};
 
@@ -594,48 +595,50 @@ mod tests {
         );
 
         let mut all_good = true;
-        for rotation in GridRotation::ALL {
-            // Pick a translation to test.
-            // Note: these translations must not cause the depth axis to exit the space_bounds.
-            for translation in [
-                GridVector::zero(),
-                GridVector::new(10, 5, 0),
-                GridVector::new(-10, -5, 0),
-            ] {
-                // The transform we're testing with.
-                let transform = Gridgid {
-                    rotation,
-                    translation,
-                };
+        space.mutate(ReadTicket::stub(), |m| {
+            for rotation in GridRotation::ALL {
+                // Pick a translation to test.
+                // Note: these translations must not cause the depth axis to exit the space_bounds.
+                for translation in [
+                    GridVector::zero(),
+                    GridVector::new(10, 5, 0),
+                    GridVector::new(-10, -5, 0),
+                ] {
+                    // The transform we're testing with.
+                    let transform = Gridgid {
+                        rotation,
+                        translation,
+                    };
 
-                // Fetch what DrawingPlane thinks the nominal bounding box is.
-                let plane: DrawingPlane<'_, _, VoxelBrush<'static>> = space.draw_target(transform);
-                let plane_bbox = plane.bounding_box();
-                // Convert that back to a GridAab in the space's coordinate system.
-                let bounds_converted = rectangle_to_aab(plane_bbox, transform, brush_box);
-                // We can't do an equality test, because the bounds_converted will be flat
-                // on some axis (which axis depending on the rotation), but it should
-                // always be contained within the space bounds (given that the space bounds
-                // contain the transformed origin).
-                let bounding_box_fits = space_bounds.contains_box(bounds_converted);
+                    // Fetch what DrawingPlane thinks the nominal bounding box is.
+                    let plane: DrawingPlane<'_, _, VoxelBrush<'static>> = m.draw_target(transform);
+                    let plane_bbox = plane.bounding_box();
+                    // Convert that back to a GridAab in the space's coordinate system.
+                    let bounds_converted = rectangle_to_aab(plane_bbox, transform, brush_box);
+                    // We can't do an equality test, because the bounds_converted will be flat
+                    // on some axis (which axis depending on the rotation), but it should
+                    // always be contained within the space bounds (given that the space bounds
+                    // contain the transformed origin).
+                    let bounding_box_fits = space_bounds.contains_box(bounds_converted);
 
-                // Try actually drawing (to transaction, since that has an easy bounds check),
-                // and see what the bounds of the drawing are.
-                let mut txn = SpaceTransaction::default();
-                plane_bbox
-                    .into_styled(style)
-                    .draw(&mut txn.draw_target(transform))
-                    .unwrap();
-                let txn_bounds = txn.bounds().unwrap();
-                let txn_matches_bounding_box = txn_bounds == bounds_converted;
+                    // Try actually drawing (to transaction, since that has an easy bounds check),
+                    // and see what the bounds of the drawing are.
+                    let mut txn = SpaceTransaction::default();
+                    plane_bbox
+                        .into_styled(style)
+                        .draw(&mut txn.draw_target(transform))
+                        .unwrap();
+                    let txn_bounds = txn.bounds().unwrap();
+                    let txn_matches_bounding_box = txn_bounds == bounds_converted;
 
-                println!("{transform:?} → rect {plane_bbox:?}");
-                println!("  rectangle_to_aab() = {bounds_converted:?} ({bounding_box_fits:?})");
-                println!("  drawn = {txn_bounds:?} ({txn_matches_bounding_box:?})");
-                println!();
-                all_good &= bounding_box_fits && txn_matches_bounding_box;
+                    println!("{transform:?} → rect {plane_bbox:?}");
+                    println!("  rectangle_to_aab() = {bounds_converted:?} ({bounding_box_fits:?})");
+                    println!("  drawn = {txn_bounds:?} ({txn_matches_bounding_box:?})");
+                    println!();
+                    all_good &= bounding_box_fits && txn_matches_bounding_box;
+                }
             }
-        }
+        });
         assert!(all_good);
     }
 
@@ -645,10 +648,12 @@ mod tests {
         C: VoxelColor<'c>,
     {
         let mut space = Space::empty_positive(100, 100, 100);
-        let mut display = space.draw_target(Gridgid::from_translation([1, 2, 4]));
-        Pixel(Point::new(2, 3), color_value)
-            .draw(&mut display)
-            .unwrap();
+        space.mutate(ReadTicket::stub(), |m| {
+            let mut display = m.draw_target(Gridgid::from_translation([1, 2, 4]));
+            Pixel(Point::new(2, 3), color_value)
+                .draw(&mut display)
+                .unwrap();
+        });
         assert_eq!(space[[3, 5, 4]], *expected_block);
     }
 
@@ -685,8 +690,10 @@ mod tests {
         let mut space = Space::empty_positive(100, 100, 100);
 
         let brush = VoxelBrush::new([([0, 0, 0], &block_0), ([0, 1, 1], &block_1)]);
-        Pixel(Point::new(2, 3), &brush)
-            .draw(&mut space.draw_target(Gridgid::from_translation([0, 0, 4])))?;
+        space.mutate(ReadTicket::stub(), |m| {
+            Pixel(Point::new(2, 3), &brush)
+                .draw(&mut m.draw_target(Gridgid::from_translation([0, 0, 4])))
+        })?;
 
         assert_eq!(&space[[2, 3, 4]], &block_0);
         assert_eq!(&space[[2, 4, 5]], &block_1);
@@ -698,8 +705,10 @@ mod tests {
         let mut space = Space::empty_positive(100, 100, 100);
 
         // This should not fail with SetCubeError::OutOfBounds
-        Pixel(Point::new(-10, 0), Rgb888::new(0, 127, 255))
-            .draw(&mut space.draw_target(Gridgid::from_translation([0, 0, 4])))?;
+        space.mutate(ReadTicket::stub(), |m| {
+            Pixel(Point::new(-10, 0), Rgb888::new(0, 127, 255))
+                .draw(&mut m.draw_target(Gridgid::from_translation([0, 0, 4])))
+        })?;
         Ok(())
     }
 

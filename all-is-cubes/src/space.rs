@@ -422,15 +422,6 @@ impl Space {
         });
     }
 
-    /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
-    /// adapter for 2.5D drawing.
-    ///
-    /// For more information on how to use this, see
-    /// [`all_is_cubes::drawing`](crate::drawing).
-    pub fn draw_target<C>(&mut self, transform: Gridgid) -> DrawingPlane<'_, Space, C> {
-        DrawingPlane::new(self, transform)
-    }
-
     /// Begins a batch of mutations to the contents of this space.
     ///
     /// `read_ticket` should be a [`ReadTicket`] obtained from the [`Universe`] which contains
@@ -1354,6 +1345,15 @@ impl Mutation<'_, '_> {
     /// As [`Mutation::fill_uniform()`], but fills the entire space instead of a specified region.
     pub fn fill_all_uniform(&mut self, block: &Block) -> Result<(), SetCubeError> {
         self.fill_uniform(self.bounds(), block)
+    }
+
+    /// Provides an [`DrawTarget`](embedded_graphics::prelude::DrawTarget)
+    /// adapter for 2.5D drawing.
+    ///
+    /// For more information on how to use this, see
+    /// [`all_is_cubes::drawing`](crate::drawing).
+    pub fn draw_target<C>(&mut self, transform: Gridgid) -> DrawingPlane<'_, Self, C> {
+        DrawingPlane::new(self, transform)
     }
 }
 
