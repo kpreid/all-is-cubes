@@ -460,6 +460,7 @@ mod tests {
             .unwrap()
             .build_into(universe);
         let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 3, 1]))
+            .read_ticket(universe.read_ticket())
             .build_and_mutate(|m| {
                 m.set([0, 1, 0], Block::from(solid_test_color)).unwrap();
                 m.set([0, 2, 0], slab_with_extra_space).unwrap();

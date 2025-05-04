@@ -273,9 +273,9 @@ impl Builder<'_, Vol<()>> {
         self,
         f: impl FnOnce(&mut super::Mutation<'_, '_>) -> Result<(), SetCubeError>,
     ) -> Result<Space, SetCubeError> {
+        let read_ticket = self.read_ticket;
         let mut space = self.build();
-        // TODO(read_ticket): appropriate ticket should be supplied as another builder argument
-        space.mutate(ReadTicket::new(), f)?;
+        space.mutate(read_ticket, f)?;
         Ok(space)
     }
 }

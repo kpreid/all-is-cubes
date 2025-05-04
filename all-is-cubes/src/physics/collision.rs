@@ -801,6 +801,7 @@ mod tests {
         let u = &mut Universe::new();
         let blocks = block_gen(u);
         let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .read_ticket(u.read_ticket())
             .build_and_mutate(|m| {
                 m.set([0, 0, 0], &blocks[0]).unwrap();
                 m.set([1, 0, 0], &blocks[1]).unwrap();
@@ -830,6 +831,7 @@ mod tests {
         let [block] = make_some_blocks();
         let half_block = make_slab(&mut u, 1, R2);
         let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .read_ticket(u.read_ticket())
             .build_and_mutate(|m| {
                 m.set([0, 0, 0], &block).unwrap();
                 m.set([1, 0, 0], &half_block).unwrap();
@@ -1004,6 +1006,7 @@ mod tests {
         let u = &mut Universe::new();
         let blocks = block_gen(u);
         let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .read_ticket(u.read_ticket())
             .build_and_mutate(|m| {
                 m.set([0, 0, 0], &blocks[0]).unwrap();
                 m.set([1, 0, 0], &blocks[1]).unwrap();
