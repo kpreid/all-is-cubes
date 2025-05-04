@@ -293,7 +293,12 @@ mod tests {
 
         let mut universe = Universe::new();
         let mut install_txn = UniverseTransaction::default();
-        let hud_blocks = &HudBlocks::new(&mut install_txn, yield_progress_for_testing()).await;
+        let hud_blocks = &HudBlocks::new(
+            universe.read_ticket(),
+            &mut install_txn,
+            yield_progress_for_testing(),
+        )
+        .await;
         install_txn
             .execute(&mut universe, &mut transaction::no_outputs)
             .unwrap();

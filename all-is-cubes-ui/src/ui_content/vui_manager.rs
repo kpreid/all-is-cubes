@@ -125,6 +125,7 @@ impl Vui {
         // TODO: take YieldProgress as a parameter
         let hud_blocks = Arc::new(
             HudBlocks::new(
+                universe.read_ticket(),
                 &mut content_txn,
                 all_is_cubes::util::YieldProgressBuilder::new().build(),
             )

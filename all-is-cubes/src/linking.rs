@@ -126,17 +126,21 @@ impl<E: BlockModule> Provider<E, Block> {
     /// Add the block definitions stored in this [`BlockProvider`] into `universe` as
     /// [`BlockDef`]s, returning a new [`BlockProvider`] whose blocks refer to those
     /// definitions (via [`Primitive::Indirect`]).
-    pub fn install(&self, txn: &mut UniverseTransaction) -> Result<Self, InsertError> {
+    pub fn install(
+        &self,
+        read_ticket: ReadTicket<'_>,
+        txn: &mut UniverseTransaction,
+    ) -> Result<Self, InsertError> {
         // The non-generic part of the code.
         #[inline(never)]
         fn create_block_def_and_indirect(
+            read_ticket: ReadTicket<'_>,
             txn: &mut UniverseTransaction,
             name: Name,
             block: &Block,
         ) -> Result<Block, InsertError> {
-            // TODO(read_ticket): not sure how to properly handle this one
             let block_def_handle =
-                Handle::new_pending(name, BlockDef::new(ReadTicket::new(), block.clone()));
+                Handle::new_pending(name, BlockDef::new(read_ticket, block.clone()));
             txn.insert_mut(block_def_handle.clone())?;
             let indirect_block = Block::from(block_def_handle);
             Ok(indirect_block)
@@ -145,7 +149,7 @@ impl<E: BlockModule> Provider<E, Block> {
         let mut map = HbHashMap::with_capacity(self.map.len());
         for key in E::exhaust() {
             let indirect_block =
-                create_block_def_and_indirect(txn, name_in_module(&key), &self[&key])?;
+                create_block_def_and_indirect(read_ticket, txn, name_in_module(&key), &self[&key])?;
             map.insert(key, indirect_block);
         }
         Ok(Self { map })
@@ -543,7 +547,7 @@ mod tests {
 
         // TODO: double-unwrap in this case is a bad sign (InsertError != UniverseConflict)
         let installed = universe
-            .transact(|txn, _| Ok(provider.install(txn)))
+            .transact(|txn, u| Ok(provider.install(u.read_ticket(), txn)))
             .unwrap()
             .unwrap();
 

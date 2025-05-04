@@ -184,7 +184,7 @@ async fn create_session() -> Session<NoTime> {
 async fn create_widget_theme_universe() -> Arc<Universe> {
     let mut u = Universe::new();
     let mut txn = UniverseTransaction::default();
-    widgets::WidgetTheme::new(&mut txn, YieldProgress::noop())
+    widgets::WidgetTheme::new(u.read_ticket(), &mut txn, YieldProgress::noop())
         .await
         .unwrap();
     txn.execute(&mut u, &mut transaction::no_outputs).unwrap();

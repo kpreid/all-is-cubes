@@ -520,7 +520,7 @@ pub async fn install_demo_blocks(
         })
     })
     .await?
-    .install(txn)?;
+    .install(ReadTicket::stub(), txn)?;
 
     // Join up blinker blocks
     for state in bool::exhaust() {

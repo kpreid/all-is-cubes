@@ -265,7 +265,7 @@ pub(crate) async fn install_dungeon_blocks(
         })
     })
     .await?
-    .install(txn)?;
+    .install(ReadTicket::stub(), txn)?;
 
     Ok(())
 }

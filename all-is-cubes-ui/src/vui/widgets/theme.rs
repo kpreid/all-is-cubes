@@ -37,10 +37,13 @@ impl WidgetTheme {
     ///
     /// Returns an error if the universe already contains the items that were to be installed.
     pub async fn new(
+        read_ticket: ReadTicket<'_>,
         txn: &mut UniverseTransaction,
         progress: YieldProgress,
     ) -> Result<Self, GenError> {
-        let widget_blocks = WidgetBlocks::new(txn, progress).await.install(txn)?;
+        let widget_blocks = WidgetBlocks::new(txn, progress)
+            .await
+            .install(read_ticket, txn)?;
 
         Ok(Self::from_provider(widget_blocks))
     }

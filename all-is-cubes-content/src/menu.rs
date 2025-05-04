@@ -30,8 +30,12 @@ pub async fn template_menu_space(
         let mut install_txn = UniverseTransaction::default();
 
         let widget_theme_progress = progress.start_and_cut(0.05, "WidgetTheme").await;
-        let widget_theme =
-            widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress).await?;
+        let widget_theme = widgets::WidgetTheme::new(
+            universe.read_ticket(),
+            &mut install_txn,
+            widget_theme_progress,
+        )
+        .await?;
 
         // doesn't actually do anything (yet)
         let (tree, widget_txn) = template_menu_widget_tree(&widget_theme, action)?;

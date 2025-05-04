@@ -20,7 +20,7 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{self, SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{Universe, UniverseTransaction};
+use all_is_cubes::universe::{ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::Fire;
@@ -758,7 +758,7 @@ async fn install_atrium_blocks(
         })
     })
     .await?
-    .install(txn)?)
+    .install(ReadTicket::stub(), txn)?)
 }
 
 const MULTIBLOCK_SCALE: Resolution = Resolution::R8;

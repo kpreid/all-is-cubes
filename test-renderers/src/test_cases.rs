@@ -665,15 +665,19 @@ async fn icons(mut context: RenderTestContext) {
     let mut install_txn = UniverseTransaction::default();
     Icons::new(&mut install_txn, yield_progress_for_testing())
         .await
-        .install(&mut install_txn)
+        .install(universe.read_ticket(), &mut install_txn)
         .unwrap();
     let ui_blocks_p = UiBlocks::new(&mut install_txn, yield_progress_for_testing())
         .await
-        .install(&mut install_txn)
+        .install(universe.read_ticket(), &mut install_txn)
         .unwrap();
-    let widget_theme = WidgetTheme::new(&mut install_txn, yield_progress_for_testing())
-        .await
-        .unwrap();
+    let widget_theme = WidgetTheme::new(
+        universe.read_ticket(),
+        &mut install_txn,
+        yield_progress_for_testing(),
+    )
+    .await
+    .unwrap();
     install_txn
         .execute(universe, &mut transaction::no_outputs)
         .unwrap();

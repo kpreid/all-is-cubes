@@ -309,7 +309,7 @@ pub async fn install_landscape_blocks(
         })
     })
     .await?
-    .install(txn)?;
+    .install(ReadTicket::stub(), txn)?;
     Ok(())
 }
 

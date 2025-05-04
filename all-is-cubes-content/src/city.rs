@@ -51,18 +51,22 @@ pub(crate) async fn demo_city<I: Instant>(
     // TODO: We want a "module loading" system that allows expressing dependencies.
     let mut install_txn = UniverseTransaction::default();
     let widget_theme_progress = progress.start_and_cut(0.05, "WidgetTheme").await;
-    let widget_theme = widgets::WidgetTheme::new(&mut install_txn, widget_theme_progress)
-        .await
-        .unwrap();
+    let widget_theme = widgets::WidgetTheme::new(
+        universe.read_ticket(),
+        &mut install_txn,
+        widget_theme_progress,
+    )
+    .await
+    .unwrap();
     let ui_blocks_progress = progress.start_and_cut(0.05, "UiBlocks").await;
     vui::blocks::UiBlocks::new(&mut install_txn, ui_blocks_progress)
         .await
-        .install(&mut install_txn)
+        .install(universe.read_ticket(), &mut install_txn)
         .unwrap();
     let icons_blocks_progress = progress.start_and_cut(0.05, "Icons").await;
     all_is_cubes::inv::Icons::new(&mut install_txn, icons_blocks_progress)
         .await
-        .install(&mut install_txn)
+        .install(universe.read_ticket(), &mut install_txn)
         .unwrap();
     install_txn.execute(universe, &mut transaction::no_outputs)?;
 

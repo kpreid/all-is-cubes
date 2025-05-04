@@ -215,9 +215,13 @@ mod tests {
         // TODO: this theme setup logic should be part of a widget test setup helper
         let mut universe = universe::Universe::new();
         let mut install_txn = universe::UniverseTransaction::default();
-        let widget_theme = WidgetTheme::new(&mut install_txn, yield_progress_for_testing())
-            .await
-            .unwrap();
+        let widget_theme = WidgetTheme::new(
+            universe.read_ticket(),
+            &mut install_txn,
+            yield_progress_for_testing(),
+        )
+        .await
+        .unwrap();
         install_txn
             .execute(&mut universe, &mut transaction::no_outputs)
             .unwrap();
