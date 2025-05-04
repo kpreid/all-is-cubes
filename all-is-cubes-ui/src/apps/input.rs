@@ -516,6 +516,7 @@ mod tests {
     use all_is_cubes::euclid::vec3;
     use all_is_cubes::space::Space;
     use all_is_cubes::time;
+    use all_is_cubes::universe::ReadTicket;
 
     fn apply_input_helper(
         input: &mut InputProcessor,
@@ -602,7 +603,11 @@ mod tests {
 
         // But when paused, the UI enters the pause menu and, as a consequence, cancels mouselook.
         paused.set(true);
-        ui.step(Tick::arbitrary(), time::DeadlineNt::Asap);
+        ui.step(
+            Tick::arbitrary(),
+            time::DeadlineNt::Asap,
+            ReadTicket::stub(),
+        );
         input.apply_input(
             InputTargets {
                 ui: Some(&ui),

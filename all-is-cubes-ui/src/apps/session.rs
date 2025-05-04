@@ -364,7 +364,7 @@ impl<I: time::Instant> Session<I> {
 
                 let mut info = shuttle.game_universe.step(paused, deadlines.world);
                 if let Some(ui) = &mut shuttle.ui {
-                    info += ui.step(ui_tick, deadlines.ui);
+                    info += ui.step(ui_tick, deadlines.ui, shuttle.game_universe.read_ticket());
                 }
 
                 if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {

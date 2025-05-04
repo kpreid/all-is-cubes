@@ -303,16 +303,15 @@ impl Vui {
         &mut self,
         tick: time::Tick,
         deadline: time::Deadline<impl time::Instant>,
+        world_read_ticket: ReadTicket<'_>,
     ) -> UniverseStepInfo {
-        self.step_pre_sync();
+        self.step_pre_sync(world_read_ticket);
         self.universe.step(tick.paused(), deadline)
     }
 
     /// Update the UI from its data sources
     #[inline(never)]
-    fn step_pre_sync(&mut self) {
-        let world_read_ticket = ReadTicket::new(); // TODO(read_ticket): replace this with non-stub
-
+    fn step_pre_sync(&mut self, world_read_ticket: ReadTicket<'_>) {
         let mut anything_changed = false;
 
         if self.changed_graphics_options.get_and_clear() {
