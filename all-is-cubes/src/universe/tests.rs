@@ -527,11 +527,10 @@ fn visit_handles_space() {
         universe.read_ticket(),
         block::from_color!(Rgba::WHITE),
     ));
-    let space = {
-        Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
-            .filled_with(Block::from(block_def_handle.clone()))
-            .build()
-    };
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]))
+        .read_ticket(universe.read_ticket())
+        .filled_with(Block::from(block_def_handle.clone()))
+        .build();
 
     // TODO: Also add a behavior and a spawn inventory item containing handles and check those
     assert_eq!(list_handles(&space), vec![block_def_handle.name().clone()]);

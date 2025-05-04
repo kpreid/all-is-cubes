@@ -518,7 +518,7 @@ fn indirect_becomes_evaluation_error() {
     // Set up space and listener
     let mut space = Space::empty_positive(1, 1, 1);
     space
-        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
+        .mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block))
         .unwrap();
     let sink = Sink::new();
     space.listen(sink.listener());

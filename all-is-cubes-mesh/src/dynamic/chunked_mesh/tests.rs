@@ -443,6 +443,7 @@ fn instances_dont_dirty_mesh_when_block_changes() {
             .build(),
     ));
     let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+        .read_ticket(universe.read_ticket())
         .build_and_mutate(|m| {
             m.set([0, 0, 0], &not_anim).unwrap();
             m.set([1, 0, 0], Block::from(anim_def.clone())).unwrap();

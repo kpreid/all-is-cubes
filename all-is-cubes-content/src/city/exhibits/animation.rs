@@ -99,8 +99,9 @@ fn BECOME(ctx: Context<'_>) {
     let demo_blocks = BlockProvider::<DemoBlocks>::using(ctx.universe)?;
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
-    let space =
-        Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 3])).build_and_mutate(|m| {
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 2, 3]))
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| {
             for (state, z) in [(false, 0), (true, 2)] {
                 stack(
                     m,

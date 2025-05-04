@@ -20,6 +20,7 @@ fn SMALLEST(ctx: Context<'_>) {
     let rg = GridCoordinate::from(resolution);
 
     let block_space = Space::builder(GridAab::from_lower_size([rg / 2, 0, rg / 2], [1, 1, 1]))
+        .read_ticket(ctx.universe.read_ticket())
         .filled_with(block::from_color!(palette::ALMOST_BLACK))
         .build();
 

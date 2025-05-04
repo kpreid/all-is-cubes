@@ -20,6 +20,7 @@ fn KNOT(ctx: Context<'_>) {
     let paint2 = block::from_color!(0.1, 0.1, 0.9, 1.0);
     let paint3 = block::from_color!(0.9, 0.7, 0.1, 1.0);
     let drawing_space = Space::builder(footprint.multiply(resolution.into()))
+        .read_ticket(ctx.universe.read_ticket())
         .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
         .build_and_mutate(|m| {
             m.fill_all(|p| {

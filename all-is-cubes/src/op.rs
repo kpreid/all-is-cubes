@@ -643,6 +643,7 @@ mod tests {
         // must use voxel blocks because they aren't considered symmetric
         let [block] = make_some_voxel_blocks(&mut universe);
         let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [2, 1, 1]))
+            .read_ticket(universe.read_ticket())
             .build_and_mutate(|m| {
                 m.set([0, 0, 0], block.clone())?;
                 Ok(())
@@ -809,9 +810,10 @@ mod tests {
     /// Test that `.rotate()` is consistent with passing a rotation `transform` to `apply()`.
     ///
     /// This function should be called at least once for each Operation variant.
-    fn transform_consistent_with_rotate(initial_block: Block, op: Operation) {
+    fn transform_consistent_with_rotate(universe: &Universe, initial_block: Block, op: Operation) {
         let rotation = GridRotation::CLOCKWISE;
         let space = Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]))
+            .read_ticket(universe.read_ticket())
             .build_and_mutate(|m| {
                 // TODO: a translation as well as a rotation would be a more thorough test
                 m.set(Cube::ORIGIN, initial_block)?;
@@ -834,6 +836,7 @@ mod tests {
         let universe = &mut Universe::new();
         let [b1] = make_some_voxel_blocks(universe);
         transform_consistent_with_rotate(
+            universe,
             b1,
             Operation::Alt([Operation::StartMove(block::Move::new(Face6::PX, 4, 0))].into()),
         );
@@ -843,6 +846,7 @@ mod tests {
         let universe = &mut Universe::new();
         let [b1] = make_some_voxel_blocks(universe);
         transform_consistent_with_rotate(
+            universe,
             b1,
             Operation::AddModifiers([block::Move::new(Face6::PX, 4, 0).into()].into()),
         );
@@ -851,13 +855,14 @@ mod tests {
     fn rot_consistent_become() {
         let universe = &mut Universe::new();
         let [b1, b2] = make_some_voxel_blocks(universe);
-        transform_consistent_with_rotate(b1, Operation::Become(b2));
+        transform_consistent_with_rotate(universe, b1, Operation::Become(b2));
     }
     #[test]
     fn rot_consistent_start_move() {
         let universe = &mut Universe::new();
         let [b1] = make_some_voxel_blocks(universe);
         transform_consistent_with_rotate(
+            universe,
             b1,
             Operation::StartMove(block::Move::new(Face6::PX, 4, 0)),
         );
@@ -867,6 +872,7 @@ mod tests {
         let universe = &mut Universe::new();
         let [b1] = make_some_voxel_blocks(universe);
         transform_consistent_with_rotate(
+            universe,
             b1,
             Operation::Neighbors(
                 [(

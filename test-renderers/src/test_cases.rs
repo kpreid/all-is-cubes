@@ -761,6 +761,7 @@ async fn icons(mut context: RenderTestContext) {
 
     // Fill space with blocks
     let mut space = Space::builder(bounds)
+        .read_ticket(universe.read_ticket())
         .spawn_position(point3(
             FreeCoordinate::from(bounds.size().width) / 2.,
             FreeCoordinate::from(bounds.size().height) / 2.,

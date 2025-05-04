@@ -6,7 +6,7 @@ use super::prelude::*;
     subtitle: "",
     placement: Placement::Surface,
 )]
-fn MAKE_SOME_BLOCKS(_: Context<'_>) {
+fn MAKE_SOME_BLOCKS(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     const ROWS: GridSizeCoord = 5;
@@ -24,6 +24,7 @@ fn MAKE_SOME_BLOCKS(_: Context<'_>) {
         make_both_blocks::<1>(&mut txn),
     ];
     let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, ROWS, ROWS]))
+        .read_ticket(ctx.universe.read_ticket())
         .build_and_mutate(|m| {
             for (y, (blocks_a, blocks_v)) in (0i32..).zip(rows) {
                 for (h, (block_a, block_v)) in (0i32..).zip(blocks_a.into_iter().zip(blocks_v)) {

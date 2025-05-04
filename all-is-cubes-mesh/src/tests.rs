@@ -319,6 +319,7 @@ fn emissive_only_voxels() {
         .build_into(&mut u);
     let (allocator, block_meshes, space_mesh) = mesh_blocks_and_space(
         &Space::builder(GridAab::ORIGIN_CUBE)
+            .read_ticket(u.read_ticket())
             .filled_with(voxel_block)
             .build(),
     );

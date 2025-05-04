@@ -105,7 +105,9 @@ fn UI_PROGRESS_BAR(ctx: Context<'_>) {
     });
 
     let space = tree.to_space(
-        space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
+        space::Builder::default()
+            .read_ticket(ctx.universe.read_ticket())
+            .physics(SpacePhysics::DEFAULT_FOR_BLOCK),
         vui::Gravity::new(vui::Align::Center, vui::Align::Low, vui::Align::Center),
     )?;
 

@@ -35,6 +35,7 @@ fn COMPOSITE(ctx: Context<'_>) {
             sources.len() as GridCoordinate * 2,
         ],
     ))
+    .read_ticket(ctx.universe.read_ticket())
     .build_and_mutate(|m| {
         for (di, destination) in (0i32..).zip(destinations) {
             for (si, source) in (0i32..).zip(sources) {

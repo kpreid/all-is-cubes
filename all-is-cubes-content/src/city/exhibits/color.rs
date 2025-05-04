@@ -18,6 +18,7 @@ fn COLORS(ctx: Context<'_>) {
             gradient_resolution * 2 - 1,
         ],
     ))
+    .read_ticket(ctx.universe.read_ticket())
     .build_and_mutate(|m| {
         m.fill_all(|p| {
             let color_point = p.lower_bounds() / 2;
@@ -248,7 +249,7 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
     subtitle: "Light colored by surface reflections",
     placement: Placement::Underground,
 )]
-fn COLORED_BOUNCE(_: Context<'_>) {
+fn COLORED_BOUNCE(ctx: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
     let interior_radius = 3i32;
@@ -284,8 +285,9 @@ fn COLORED_BOUNCE(_: Context<'_>) {
         GridPoint::splat(-interior_radius),
         GridSize::splat(u32::try_from(interior_radius).unwrap() * 2 + 1),
     );
-    let space =
-        Space::builder(interior.expand(FaceMap::splat(wall_thickness))).build_and_mutate(|m| {
+    let space = Space::builder(interior.expand(FaceMap::splat(wall_thickness)))
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| {
             // Thick walls + interior cavity
             m.fill_all_uniform(&wall_block).unwrap();
             m.fill_uniform(interior, &AIR).unwrap();
