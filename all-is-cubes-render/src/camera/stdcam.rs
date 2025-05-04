@@ -459,7 +459,7 @@ mod tests {
     fn cameras_follow_character_and_world() {
         let character_cell = listen::Cell::new(None);
         let mut cameras = StandardCameras::new(
-            Layers::splat(ReadTicket::new()),
+            Layers::splat(ReadTicket::stub()),
             listen::constant(Arc::new(GraphicsOptions::default())),
             listen::constant(Viewport::ARBITRARY),
             character_cell.as_source(),
@@ -472,7 +472,7 @@ mod tests {
 
         // No redundant notification when world is absent
         {
-            let changed = cameras.update(Layers::splat(ReadTicket::new()));
+            let changed = cameras.update(Layers::splat(ReadTicket::stub()));
             assert_eq!((changed, world_flag.get_and_clear()), (false, false));
         }
 
@@ -514,7 +514,7 @@ mod tests {
     fn cameras_clone() {
         let options_cell = listen::Cell::new(Arc::new(GraphicsOptions::default()));
         let mut cameras = StandardCameras::new(
-            Layers::splat(ReadTicket::new()),
+            Layers::splat(ReadTicket::stub()),
             options_cell.as_source(),
             listen::constant(Viewport::ARBITRARY),
             listen::constant(None),
@@ -530,10 +530,10 @@ mod tests {
         // Each `StandardCameras` has independent updating from the same data sources.
         assert_eq!(cameras.cameras().world.options(), &default_o);
         assert_eq!(cameras2.cameras().world.options(), &default_o);
-        cameras.update(Layers::splat(ReadTicket::new()));
+        cameras.update(Layers::splat(ReadTicket::stub()));
         assert_eq!(cameras.cameras().world.options(), &different_o);
         assert_eq!(cameras2.cameras().world.options(), &default_o);
-        cameras2.update(Layers::splat(ReadTicket::new()));
+        cameras2.update(Layers::splat(ReadTicket::stub()));
         assert_eq!(cameras.cameras().world.options(), &different_o);
         assert_eq!(cameras2.cameras().world.options(), &different_o);
     }

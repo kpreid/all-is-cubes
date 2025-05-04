@@ -176,7 +176,7 @@ fn set_updates_evaluated_on_added_block() {
     // Confirm the data is correct
     assert_eq!(
         space.get_evaluated([0, 0, 0]),
-        &block.evaluate(ReadTicket::new()).unwrap()
+        &block.evaluate(ReadTicket::stub()).unwrap()
     );
     space.consistency_check(); // bonus testing
 }
@@ -199,7 +199,7 @@ fn set_updates_evaluated_and_notifies_on_replaced_block() {
     // Confirm the data is correct
     assert_eq!(
         space.get_evaluated(cube),
-        &block.evaluate(ReadTicket::new()).unwrap()
+        &block.evaluate(ReadTicket::stub()).unwrap()
     );
     // Confirm expected notifications
     assert_eq!(
@@ -361,7 +361,7 @@ fn extract() {
         // TODO: arrange to sanity check index and lighting
         let block = e.block_data().block().clone();
         assert_eq!(
-            block.evaluate(ReadTicket::new()).unwrap(),
+            block.evaluate(ReadTicket::stub()).unwrap(),
             e.block_data().evaluated
         );
         block

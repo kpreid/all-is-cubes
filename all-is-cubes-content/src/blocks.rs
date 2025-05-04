@@ -621,7 +621,9 @@ fn modify_def(indirect: &Block, f: impl FnOnce(&mut Block)) {
         panic!("block not indirect, but {indirect:?}");
     };
     let mut block: Block = block_def_handle
-        .read(ReadTicket::new())
+        // It's OK to use the stub ticket because this handle is not yet in a universe.
+        // If that ever changes, the impact will be larger than just passing one here.
+        .read(ReadTicket::stub())
         .expect("could not read BlockDef")
         .block()
         .clone();
