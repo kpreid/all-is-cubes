@@ -278,7 +278,7 @@ fn draw_button_multiblock_from_image(
     image: &DecodedPng,
 ) -> Result<Space, InGenError> {
     let label_z = state.button_label_z();
-    let illuminate = move |builder: Builder<block::builder::Atom, ()>| {
+    let illuminate = move |builder: Builder<'static, block::builder::Atom, ()>| {
         if active {
             builder.light_emission(palette::BUTTON_ACTIVATED_GLOW)
         } else {

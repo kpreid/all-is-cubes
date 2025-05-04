@@ -580,12 +580,12 @@ impl core::error::Error for HandleError {}
 ///
 /// Currently, this is only an advisory mechanism — having the correct read ticket is not necessary
 /// for access — but it may become mandatory in the future.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ReadTicket<'universe> {
     pub(in crate::universe) rule: TicketRule,
     pub(in crate::universe) _phantom: PhantomData<&'universe Universe>,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::universe) enum TicketRule {
     /// Allow any universe.
     // TODO(read_ticket): eliminate all uses of this
@@ -617,7 +617,7 @@ impl ReadTicket<'_> {
     /// This may be used for evaluating universe-independent [`Block`](crate::block::Block)s.
     //---
     // TODO(read_ticket): eliminate all external uses of this
-    pub fn stub() -> Self {
+    pub const fn stub() -> Self {
         Self {
             rule: TicketRule::None,
             _phantom: PhantomData,

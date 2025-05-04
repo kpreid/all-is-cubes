@@ -92,7 +92,7 @@ macro_rules! derive_attribute_helpers {
         }
 
         /// Methods for setting [attributes](BlockAttributes) of the block.
-        impl<P, Txn> crate::block::Builder<P, Txn> {
+        impl<P, Txn> crate::block::Builder<'_, P, Txn> {
             $(
                 attribute_builder_method!($(#[doc = $field_doc] )* $builder_param_style $field_name: $field_type);
             )*

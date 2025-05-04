@@ -47,7 +47,9 @@ use crate::space;
 ///   that must be executed, and [`()`] otherwise.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
-pub struct Builder<P, Txn> {
+pub struct Builder<'u, P, Txn> {
+    read_ticket: ReadTicket<'u>,
+
     /// public so that `BlockAttributes`'s macros can define methods for us
     pub(in crate::block) attributes: BlockAttributes,
 
@@ -60,16 +62,17 @@ pub struct Builder<P, Txn> {
     transaction: Txn,
 }
 
-impl Default for Builder<NeedsPrimitive, ()> {
+impl Default for Builder<'_, NeedsPrimitive, ()> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Builder<NeedsPrimitive, ()> {
+impl Builder<'_, NeedsPrimitive, ()> {
     /// Common implementation of [`Block::builder`] and [`Default::default`]; use one of those to call this.
     pub(super) const fn new() -> Self {
         Builder {
+            read_ticket: ReadTicket::stub(),
             attributes: BlockAttributes::default(),
             primitive_builder: NeedsPrimitive,
             modifiers: Vec::new(),
@@ -83,6 +86,7 @@ impl Builder<NeedsPrimitive, ()> {
     #[track_caller]
     pub fn build_attributes(self) -> BlockAttributes {
         let Self {
+            read_ticket: _,
             attributes,
             primitive_builder: NeedsPrimitive,
             modifiers,
@@ -93,7 +97,7 @@ impl Builder<NeedsPrimitive, ()> {
     }
 }
 
-impl<P, Txn> Builder<P, Txn> {
+impl<'u, P, Txn> Builder<'u, P, Txn> {
     /// Sets the [`BlockAttributes`] the block will have.
     /// This replaces individual attribute values set using other builder methods.
     pub fn attributes(mut self, value: BlockAttributes) -> Self {
@@ -112,14 +116,16 @@ impl<P, Txn> Builder<P, Txn> {
     /// Sets the color value for building a [`Primitive::Atom`].
     ///
     /// This will replace any previous color **or voxels.**
-    pub fn color(self, color: impl Into<Rgba>) -> Builder<Atom, ()> {
+    pub fn color(self, color: impl Into<Rgba>) -> Builder<'u, Atom, ()> {
         let Self {
+            read_ticket,
             attributes,
             primitive_builder: _,
             modifiers,
             transaction: _,
         } = self;
         Builder {
+            read_ticket,
             attributes,
             primitive_builder: Atom {
                 color: color.into(),
@@ -141,14 +147,16 @@ impl<P, Txn> Builder<P, Txn> {
         self,
         resolution: Resolution,
         space: Handle<Space>,
-    ) -> Builder<Voxels, ()> {
+    ) -> Builder<'u, Voxels, ()> {
         let Self {
+            read_ticket,
             attributes,
             primitive_builder: _,
             modifiers,
             transaction: _,
         } = self;
         Builder {
+            read_ticket,
             attributes,
             primitive_builder: Voxels {
                 space,
@@ -170,16 +178,18 @@ impl<P, Txn> Builder<P, Txn> {
         self,
         resolution: Resolution,
         space: Space,
-    ) -> Builder<Voxels, UniverseTransaction> {
+    ) -> Builder<'u, Voxels, UniverseTransaction> {
         let space_handle = Handle::new_pending(Name::Pending, space);
 
         let Self {
+            read_ticket,
             attributes,
             primitive_builder: _,
             modifiers,
             transaction: _,
         } = self;
         Builder {
+            read_ticket,
             attributes,
             primitive_builder: Voxels {
                 space: space_handle.clone(),
@@ -197,6 +207,10 @@ impl<P, Txn> Builder<P, Txn> {
     /// Constructs a `Space` for building a [`Primitive::Recur`], and calls
     /// the given function to fill it with blocks, in the manner of [`space::Mutation::fill()`].
     ///
+    /// You must provide a [`ReadTicket`] using [`Builder::read_ticket()`]
+    /// if any of the provided voxel blocks contain relevant handles.
+    /// (Blocks constructed purely from colors do not.)
+    ///
     /// If the voxels do not fill the entire volume of the block being built — that is, there is
     /// some smaller region outside of which they are all [`AIR`] — then the [`Space`] will be
     /// shrunk to tightly enclose that region, to improve performance. However, this still requires
@@ -212,7 +226,7 @@ impl<P, Txn> Builder<P, Txn> {
         // TODO: Maybe resolution should be a separate method? Check usage patterns later.
         resolution: Resolution,
         mut function: F,
-    ) -> Result<Builder<Voxels, UniverseTransaction>, SetCubeError>
+    ) -> Result<Builder<'u, Voxels, UniverseTransaction>, SetCubeError>
     where
         F: FnMut(Cube) -> B,
         B: Into<Cow<'a, Block>>,
@@ -221,17 +235,18 @@ impl<P, Txn> Builder<P, Txn> {
         // `Builder::palette_and_contents()`), so save quite a lot of code generation
         // by keeping it monomorphic and not inlined.
         #[inline(never)]
-        fn voxels_fn_impl<'a>(
+        fn voxels_fn_impl<'a, 'u>(
+            read_ticket: ReadTicket<'u>,
             attributes: BlockAttributes,
             modifiers: Vec<Modifier>,
             resolution: Resolution,
             function: &mut dyn FnMut(Cube) -> Cow<'a, Block>,
-        ) -> Result<Builder<Voxels, UniverseTransaction>, SetCubeError> {
+        ) -> Result<Builder<'u, Voxels, UniverseTransaction>, SetCubeError> {
             let mut not_air_bounds: Option<GridAab> = None;
 
             let mut space = Space::for_block(resolution).build();
             // TODO: Teach the Space Builder to accept a function in the same way?
-            space.mutate(ReadTicket::new(), |m| {
+            space.mutate(read_ticket, |m| {
                 m.fill_all(|cube| {
                     let block = function(cube);
 
@@ -259,7 +274,7 @@ impl<P, Txn> Builder<P, Txn> {
                 let mut shrunk = Space::builder(not_air_bounds)
                     .physics(space.physics().clone())
                     .build();
-                shrunk.mutate(ReadTicket::new(), |m| {
+                shrunk.mutate(read_ticket, |m| {
                     m.fill(not_air_bounds, |cube| Some(&space[cube]))
                 })?;
                 space = shrunk;
@@ -268,6 +283,7 @@ impl<P, Txn> Builder<P, Txn> {
             let space_handle = Handle::new_pending(Name::Pending, space);
 
             Ok(Builder {
+                read_ticket,
                 attributes,
                 primitive_builder: Voxels {
                     space: space_handle.clone(),
@@ -280,14 +296,34 @@ impl<P, Txn> Builder<P, Txn> {
         }
 
         let Self {
+            read_ticket,
             attributes,
             primitive_builder: _,
             modifiers,
             transaction: _,
         } = self;
-        voxels_fn_impl(attributes, modifiers, resolution, &mut |cube| {
-            function(cube).into()
-        })
+        voxels_fn_impl(
+            read_ticket,
+            attributes,
+            modifiers,
+            resolution,
+            &mut |cube| function(cube).into(),
+        )
+    }
+
+    /// Set the [`ReadTicket`] used by this builder.
+    ///
+    /// This is currently only necessary when using [`Builder::voxels_fn()`] with blocks that
+    /// contain handles. It is not necessary when simple solid-color blocks are used.
+    #[allow(clippy::needless_lifetimes)]
+    pub fn read_ticket<'u2>(self, read_ticket: ReadTicket<'u2>) -> Builder<'u2, P, Txn> {
+        Builder {
+            read_ticket,
+            attributes: self.attributes,
+            primitive_builder: self.primitive_builder,
+            modifiers: self.modifiers,
+            transaction: self.transaction,
+        }
     }
 
     fn build_block_and_txn_internal(self) -> (Block, Txn)
@@ -295,6 +331,7 @@ impl<P, Txn> Builder<P, Txn> {
         P: BuildPrimitive,
     {
         let Self {
+            read_ticket: _,
             attributes,
             primitive_builder,
             mut modifiers,
@@ -320,7 +357,7 @@ impl<P, Txn> Builder<P, Txn> {
     }
 }
 
-impl<P: BuildPrimitive> Builder<P, ()> {
+impl<P: BuildPrimitive> Builder<'_, P, ()> {
     /// Converts this builder into a block value.
     ///
     /// This method may only be used when the builder has *not* been used with `voxels_fn()`,
@@ -331,7 +368,7 @@ impl<P: BuildPrimitive> Builder<P, ()> {
     }
 }
 
-impl<P: BuildPrimitive> Builder<P, UniverseTransaction> {
+impl<P: BuildPrimitive> Builder<'_, P, UniverseTransaction> {
     // TODO: Also allow extracting the transaction for later use
 
     /// Converts this builder into a block value, and inserts its associated [`Space`] into the
@@ -357,7 +394,7 @@ impl<P: BuildPrimitive> Builder<P, UniverseTransaction> {
 }
 
 /// Atom-specific builder methods.
-impl<Txn> Builder<Atom, Txn> {
+impl<Txn> Builder<'_, Atom, Txn> {
     /// Sets the collision behavior of a [`Primitive::Atom`] block.
     pub const fn collision(mut self, collision: BlockCollision) -> Self {
         self.primitive_builder.collision = collision;
@@ -374,7 +411,7 @@ impl<Txn> Builder<Atom, Txn> {
 }
 
 /// Voxel-specific builder methods.
-impl<Txn> Builder<Voxels, Txn> {
+impl<Txn> Builder<'_, Voxels, Txn> {
     /// Sets the coordinate offset for building a [`Primitive::Recur`]:
     /// the lower-bound corner of the region of the [`Space`]
     /// which will be used for block voxels. The default is zero.
@@ -388,19 +425,19 @@ impl<Txn> Builder<Voxels, Txn> {
 }
 
 /// Allows implicitly converting [`Builder`] to the block it would build.
-impl<C: BuildPrimitive> From<Builder<C, ()>> for Block {
-    fn from(builder: Builder<C, ()>) -> Self {
+impl<C: BuildPrimitive> From<Builder<'_, C, ()>> for Block {
+    fn from(builder: Builder<'_, C, ()>) -> Self {
         builder.build()
     }
 }
 /// Equivalent to `Block::builder().color(color)`.
-impl From<Rgba> for Builder<Atom, ()> {
+impl From<Rgba> for Builder<'_, Atom, ()> {
     fn from(color: Rgba) -> Self {
         Block::builder().color(color)
     }
 }
 /// Equivalent to `Block::builder().color(color.with_alpha_one())`.
-impl From<Rgb> for Builder<Atom, ()> {
+impl From<Rgb> for Builder<'_, Atom, ()> {
     fn from(color: Rgb) -> Self {
         Block::builder().color(color.with_alpha_one())
     }
@@ -489,7 +526,7 @@ mod tests {
     fn default_equivalent() {
         assert_eq!(
             Builder::new(),
-            <Builder<NeedsPrimitive, ()> as Default>::default()
+            <Builder<'_, NeedsPrimitive, ()> as Default>::default()
         );
     }
 

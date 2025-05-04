@@ -288,7 +288,7 @@ impl fmt::Debug for Block {
 impl Block {
     /// Returns a new [`Builder`] which may be used to construct a [`Block`] value
     /// from various inputs with convenient syntax.
-    pub const fn builder() -> Builder<builder::NeedsPrimitive, ()> {
+    pub const fn builder<'u>() -> Builder<'u, builder::NeedsPrimitive, ()> {
         Builder::new()
     }
 
@@ -1213,7 +1213,7 @@ pub fn space_to_blocks(
     let destination_bounds = source_bounds.divide(resolution_g);
 
     let mut destination_space = Space::empty(destination_bounds);
-    destination_space.mutate(ReadTicket::new(), |m| {
+    destination_space.mutate(read_ticket, |m| {
         m.fill(destination_bounds, move |cube| {
             Some(block_transform(Block::from_primitive(Primitive::Recur {
                 offset: (cube.lower_bounds().to_vector() * resolution_g).to_point(),

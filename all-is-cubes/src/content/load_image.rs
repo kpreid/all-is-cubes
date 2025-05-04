@@ -177,12 +177,13 @@ pub fn space_from_image<'b>(
 /// Convert a decoded PNG image into a [`BlockBuilder`] with voxels (which can then create a
 /// [`Block`]).
 #[doc(hidden)] // still experimental API
-pub fn block_from_image<'b>(
-    read_ticket: ReadTicket<'_>,
+pub fn block_from_image<'b, 'ticket>(
+    read_ticket: ReadTicket<'ticket>,
     png: &DecodedPng,
     rotation: GridRotation,
     pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'b>,
-) -> Result<block::Builder<block::builder::Voxels, UniverseTransaction>, BlockFromImageError> {
+) -> Result<block::Builder<'ticket, block::builder::Voxels, UniverseTransaction>, BlockFromImageError>
+{
     let size = png.size();
     let resolution =
         Resolution::try_from(size.width).map_err(|_| BlockFromImageError::Size(size))?;
@@ -191,7 +192,7 @@ pub fn block_from_image<'b>(
     }
 
     // TODO: Implement the same bounds-shrinking feature as `Block::voxels_fn()` has.
-    Ok(Block::builder().voxels_space(
+    Ok(Block::builder().read_ticket(read_ticket).voxels_space(
         resolution,
         space_from_image(read_ticket, png, rotation, pixel_function)
             .map_err(BlockFromImageError::Space)?,
