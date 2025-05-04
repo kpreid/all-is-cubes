@@ -1200,13 +1200,14 @@ impl BlockChange {
 //---
 // TODO: This is only used once ... is it really a good public API?
 pub fn space_to_blocks(
+    read_ticket: ReadTicket<'_>,
     resolution: Resolution,
     space_handle: Handle<Space>,
     block_transform: &mut dyn FnMut(Block) -> Block,
 ) -> Result<Space, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();
     let source_bounds = space_handle
-        .read(ReadTicket::new())
+        .read(read_ticket)
         .expect("space_to_blocks() could not read() provided space")
         .bounds();
     let destination_bounds = source_bounds.divide(resolution_g);

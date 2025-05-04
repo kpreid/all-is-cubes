@@ -68,6 +68,7 @@ fn KNOT(ctx: Context<'_>) {
             Ok(())
         })?;
     let space = space_to_blocks(
+        ctx.universe.read_ticket(),
         resolution,
         txn.insert_anonymous(drawing_space),
         &mut |block| {
