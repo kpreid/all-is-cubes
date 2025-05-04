@@ -106,7 +106,7 @@ pub fn create_terminal_session(
     for _ in 0..number_of_scene_buffers {
         buffer_reuse_in
             .send(RtRenderer::new(
-                cameras.clone(),
+                cameras.clone_unupdated(),
                 Box::new(|v| v),
                 listen::constant(Arc::new(())),
             ))

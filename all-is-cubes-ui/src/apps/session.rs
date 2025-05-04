@@ -295,14 +295,17 @@ impl<I: time::Instant> Session<I> {
 
     /// Returns a [`StandardCameras`] which may be used in rendering a view of this session,
     /// including following changes to the current character or universe.
+    ///
+    /// They will be freshly [updated][StandardCameras::update].
     pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
-        StandardCameras::new(
-            self.read_tickets(),
+        let mut c = StandardCameras::new(
             self.graphics_options(),
             viewport_source,
             self.character(),
             self.ui_view(),
-        )
+        );
+        c.update(self.read_tickets());
+        c
     }
 
     /// Listen for [`Fluff`] events from this session. Fluff constitutes short-duration
@@ -1174,15 +1177,18 @@ impl fmt::Debug for MainTaskContext {
 impl MainTaskContext {
     /// Returns a [`StandardCameras`] which may be used in rendering a view of this session,
     /// including following changes to the current character or universe.
+    ///
+    /// They will be freshly [updated][StandardCameras::update].
     pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
         self.with_ref(|shuttle| {
-            StandardCameras::new(
-                shuttle.read_tickets(),
+            let mut c = StandardCameras::new(
                 shuttle.settings.as_source(),
                 viewport_source,
                 shuttle.game_character.as_source(),
                 shuttle.ui_view(),
-            )
+            );
+            c.update(shuttle.read_tickets());
+            c
         })
     }
 

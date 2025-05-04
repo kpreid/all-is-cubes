@@ -206,7 +206,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 ),
                 ui: SpaceRenderer::new("ui".into(), &device, &pipelines, block_texture, true),
             },
-            rt: RaytraceToTexture::new(cameras.clone()),
+            rt: RaytraceToTexture::new(cameras.clone_unupdated()),
 
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,

@@ -113,9 +113,11 @@ pub struct StandardCameras {
 impl StandardCameras {
     /// Most general constructor; hidden because the details needed might vary and so we
     /// want to discourage use of this directly.
+    ///
+    /// Note that the initial state is not a correct snapshot of the data sources;
+    /// you must call [`Self::update()`] at least once.
     #[doc(hidden)]
     pub fn new(
-        read_tickets: Layers<ReadTicket<'_>>,
         graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
         viewport_source: listen::DynSource<Viewport>,
         character_source: listen::DynSource<Option<Handle<Character>>>,
@@ -132,7 +134,7 @@ impl StandardCameras {
 
         let ui_state = ui_source.get();
 
-        let mut new_self = Self {
+        Self {
             cameras: Layers {
                 ui: Camera::new((*ui_state.graphics_options).clone(), initial_viewport),
                 world: Camera::new(initial_options.clone(), initial_viewport),
@@ -152,10 +154,7 @@ impl StandardCameras {
 
             viewport_dirty,
             viewport_source,
-        };
-
-        new_self.update(read_tickets);
-        new_self
+        }
     }
 
     #[doc(hidden)]
@@ -164,16 +163,17 @@ impl StandardCameras {
         viewport: Viewport,
         universe: &Universe,
     ) -> Self {
-        Self::new(
-            Layers {
-                world: universe.read_ticket(),
-                ui: ReadTicket::stub(),
-            },
+        let mut new_self = Self::new(
             listen::constant(Arc::new(graphics_options)),
             listen::constant(viewport),
             listen::constant(universe.get_default_character()),
             listen::constant(Default::default()),
-        )
+        );
+        new_self.update(Layers {
+            world: universe.read_ticket(),
+            ui: ReadTicket::stub(),
+        });
+        new_self
     }
 
     /// Updates camera state from data sources.
@@ -376,6 +376,22 @@ impl StandardCameras {
 
         Ok(None)
     }
+
+    /// Returns a [`StandardCameras`] which tracks the same data sources (graphics
+    /// options, scene sources, viewport) as `self`, but whose local state (such as
+    /// the last updated camera state) is independent.
+    ///
+    /// The local state is also not updated; you must call [`StandardCameras::update()`]
+    /// on the clone before reading anything from it.
+    #[must_use]
+    pub fn clone_unupdated(&self) -> Self {
+        Self::new(
+            self.graphics_options.clone(),
+            self.viewport_source.clone(),
+            self.character_source.clone(),
+            self.ui_source.clone(),
+        )
+    }
 }
 
 impl fmt::Pointer for StandardCameras {
@@ -395,21 +411,6 @@ impl fmt::Pointer for StandardCameras {
             viewport_source = self.viewport_source,
             character_source = self.character_source,
             ui_source = self.ui_source,
-        )
-    }
-}
-
-impl Clone for StandardCameras {
-    /// Returns a [`StandardCameras`] which tracks the same data sources (graphics
-    /// options, scene sources, viewport) as `self`, but whose local state (such as
-    /// the last updated camera state) is independent.
-    fn clone(&self) -> Self {
-        Self::new(
-            Layers::splat(ReadTicket::new()), // TODO(read_ticket): need to either require one passed in, or figure out a way to not do any reads when cloning
-            self.graphics_options.clone(),
-            self.viewport_source.clone(),
-            self.character_source.clone(),
-            self.ui_source.clone(),
         )
     }
 }
@@ -459,12 +460,12 @@ mod tests {
     fn cameras_follow_character_and_world() {
         let character_cell = listen::Cell::new(None);
         let mut cameras = StandardCameras::new(
-            Layers::splat(ReadTicket::stub()),
             listen::constant(Arc::new(GraphicsOptions::default())),
             listen::constant(Viewport::ARBITRARY),
             character_cell.as_source(),
             listen::constant(Arc::new(UiViewState::default())),
         );
+        cameras.update(Layers::splat(ReadTicket::stub()));
 
         let world_source = cameras.world_space();
         let world_flag = listen::Flag::listening(false, &world_source);
@@ -514,13 +515,14 @@ mod tests {
     fn cameras_clone() {
         let options_cell = listen::Cell::new(Arc::new(GraphicsOptions::default()));
         let mut cameras = StandardCameras::new(
-            Layers::splat(ReadTicket::stub()),
             options_cell.as_source(),
             listen::constant(Viewport::ARBITRARY),
             listen::constant(None),
             listen::constant(Arc::new(UiViewState::default())),
         );
-        let mut cameras2 = cameras.clone();
+        cameras.update(Layers::splat(ReadTicket::stub()));
+        let mut cameras2 = cameras.clone_unupdated();
+        cameras2.update(Layers::splat(ReadTicket::stub()));
 
         let default_o = GraphicsOptions::default();
         let mut different_o = default_o.clone();

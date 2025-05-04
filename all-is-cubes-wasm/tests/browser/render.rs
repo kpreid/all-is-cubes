@@ -53,7 +53,7 @@ async fn renderer_test() {
         all_is_cubes_gpu::in_wgpu::headless::Builder::from_adapter("renderer_test", adapter)
             .await
             .unwrap()
-            .build(cameras.clone());
+            .build(cameras.clone_unupdated());
     renderer
         .update(Layers::splat(universe.read_ticket()), None)
         .unwrap();

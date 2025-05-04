@@ -487,7 +487,6 @@ async fn follow_character_change(context: RenderTestContext) {
     let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
     let character_cell = listen::Cell::new(Some(c1));
     let cameras: StandardCameras = StandardCameras::new(
-        Layers::splat(universe.read_ticket()),
         listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         listen::constant(COMMON_VIEWPORT),
         character_cell.as_source(),
@@ -553,7 +552,6 @@ async fn follow_options_change(mut context: RenderTestContext) {
 
     let options_cell = listen::Cell::new(Arc::new(options_1));
     let cameras: StandardCameras = StandardCameras::new(
-        Layers::splat(universe.read_ticket()),
         options_cell.as_source(),
         listen::constant(COMMON_VIEWPORT),
         listen::constant(universe.get_default_character()),
@@ -827,7 +825,6 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     options.show_ui = show_ui;
     let ui_space = ui_space(&mut universe);
     let cameras: StandardCameras = StandardCameras::new(
-        Layers::splat(universe.read_ticket()),
         listen::constant(Arc::new(options.clone())),
         listen::constant(COMMON_VIEWPORT),
         listen::constant(universe.get_default_character()),
@@ -876,7 +873,6 @@ async fn layers_ui_only(mut context: RenderTestContext) {
     let mut universe = Universe::new();
     let ui_space = ui_space(&mut universe);
     let cameras: StandardCameras = StandardCameras::new(
-        Layers::splat(universe.read_ticket()),
         listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         listen::constant(COMMON_VIEWPORT),
         listen::constant(None),
@@ -1086,7 +1082,6 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let zero = Viewport::with_scale(1.00, [0, 0]);
     let viewport_cell = listen::Cell::new(zero);
     let cameras: StandardCameras = StandardCameras::new(
-        Layers::splat(universe.read_ticket()),
         listen::constant(Arc::new(GraphicsOptions::default())),
         viewport_cell.as_source(),
         listen::constant(universe.get_default_character()),

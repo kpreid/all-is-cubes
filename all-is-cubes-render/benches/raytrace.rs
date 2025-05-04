@@ -47,7 +47,6 @@ impl TestData {
         options_fn(&mut options);
         let mut renderer = RtRenderer::new(
             StandardCameras::new(
-                Layers::splat(self.universe.read_ticket()),
                 listen::constant(Arc::new(options)),
                 listen::constant(Viewport::with_scale(1.0, [64, 16])),
                 listen::constant(Some(self.character.clone())),

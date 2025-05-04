@@ -210,7 +210,7 @@ impl Recorder {
             RecorderInner::Raytrace(rec) => {
                 // TODO: Start reusing renderers instead of recreating them.
                 let mut renderer = RtRenderer::new(
-                    rec.cameras.clone(),
+                    rec.cameras.clone_unupdated(),
                     Box::new(|v| v),
                     listen::constant(Arc::new(())),
                 );
