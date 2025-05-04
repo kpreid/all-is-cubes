@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::fmt;
+use core::{fmt, mem};
 
 use hashbrown::hash_map::Entry;
 use indoc::indoc;
@@ -71,6 +71,9 @@ where
     /// because blank world is a worse outcome than slightly stale world.
     pub(in crate::dynamic) did_not_finish_chunks: bool,
 
+    /// Whether we have not yet installed the listener on `self.space`.
+    install_listener: bool,
+
     /// True until we have meshed all chunks at least once.
     /// During this period, we prioritize chunks (with placeholder block meshes) over
     /// block meshes, to get a sketch of the world up faster.
@@ -103,20 +106,15 @@ where
     /// If `interactive` is true, will prioritize getting a rough view of the world over
     /// a fully detailed one, by using placeholder block meshes on the first pass.
     pub fn new(space: Handle<Space>, texture_allocator: M::Alloc, interactive: bool) -> Self {
-        // TODO(read_ticket): Note that we *only* need this ticket to install the listener.
-        // We should add a way to defer adding listeners till the next access, or add without locking.
-        let space_borrowed = space.read(ReadTicket::new()).unwrap();
-        let todo = listen::StoreLock::new(CsmTodo::initially_dirty());
-        space_borrowed.listen(todo.listener());
-
         Self {
             space,
-            todo,
+            todo: listen::StoreLock::new(CsmTodo::initially_dirty()),
             block_meshes: dynamic::VersionedBlockMeshes::new(texture_allocator),
             chunks: Default::default(),
             chunk_chart: ChunkChart::new(0.0),
             view_chunk: ChunkPos(Cube::new(0, 0, 0)),
             did_not_finish_chunks: true,
+            install_listener: true,
             startup_chunks_only: interactive,
             last_mesh_options: None,
             zero_time: M::Instant::now(),
@@ -292,6 +290,10 @@ where
                 false,
             );
         };
+
+        if mem::take(&mut self.install_listener) {
+            space.listen(self.todo.listener());
+        }
 
         // Check for mesh options changes that would invalidate the meshes.
         let mesh_options = {
