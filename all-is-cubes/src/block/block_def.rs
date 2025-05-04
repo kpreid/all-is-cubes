@@ -177,7 +177,7 @@ impl BlockDefState {
             info.attempted = 1;
             // If there was an evaluation error, then we may also be missing listeners.
             // Start over.
-            *self = BlockDefState::new(self.block.clone(), ReadTicket::new());
+            *self = BlockDefState::new(self.block.clone(), read_ticket);
             notifier.notify(&BlockChange::new());
             info.updated = 1;
         } else if self.cache_dirty.get_and_clear() {
