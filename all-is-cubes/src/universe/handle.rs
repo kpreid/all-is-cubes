@@ -1,7 +1,10 @@
+#![expect(clippy::needless_lifetimes, reason = "names for clarity")]
+
 use alloc::sync::{Arc, Weak};
 use core::fmt;
 use core::hash;
 use core::marker::PhantomData;
+use core::mem;
 use core::ops::{Deref, DerefMut};
 use core::panic::Location;
 
@@ -610,28 +613,25 @@ impl core::error::Error for HandleError {}
 ///
 /// Currently, this is only an advisory mechanism — having the correct read ticket is not necessary
 /// for access — but it may become mandatory in the future.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub struct ReadTicket<'universe> {
-    /// What universes are accepted.
-    pub(in crate::universe) rule: TicketRule,
+    access: TicketAccess<'universe>,
+
+    universe_id: Option<UniverseId>,
 
     /// Where this ticket was created.
-    pub(in crate::universe) origin: &'static Location<'static>,
-
-    pub(in crate::universe) _phantom: PhantomData<&'universe Universe>,
+    origin: &'static Location<'static>,
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::universe) enum TicketRule {
-    /// Allow any universe.
-    // TODO(read_ticket): eliminate all uses of this
+
+#[derive(Clone, Copy, Debug)]
+enum TicketAccess<'u> {
+    // Temporary placeholder ability to access handles from all universes.
     Any,
-    /// Allow no universes.
-    None,
-    /// Allow exactly this universe.
-    Eq(UniverseId),
+    Universe(&'u Universe),
+    Stub,
 }
 
-impl ReadTicket<'_> {
+impl<'universe> ReadTicket<'universe> {
     /// Create an unrestricted [`ReadTicket`].
     ///
     /// Whenever possible, use [`Universe::read_ticket()`] instead.
@@ -641,11 +641,20 @@ impl ReadTicket<'_> {
     #[allow(clippy::new_without_default)]
     #[doc(hidden)]
     #[track_caller]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
-            rule: TicketRule::Any,
+            access: TicketAccess::Any,
+            universe_id: None,
             origin: Location::caller(),
-            _phantom: PhantomData,
+        }
+    }
+
+    #[track_caller]
+    pub(crate) fn from_universe(universe: &'universe Universe) -> Self {
+        Self {
+            access: TicketAccess::Universe(universe),
+            universe_id: Some(universe.universe_id()),
+            origin: Location::caller(),
         }
     }
 
@@ -655,20 +664,40 @@ impl ReadTicket<'_> {
     #[track_caller]
     pub const fn stub() -> Self {
         Self {
-            rule: TicketRule::None,
+            access: TicketAccess::Stub,
+            universe_id: None,
             origin: Location::caller(),
-            _phantom: PhantomData,
         }
     }
 
     pub(crate) fn allows_access_to(&self, id: UniverseId) -> bool {
-        match self.rule {
-            TicketRule::Any => true,
-            TicketRule::None => false,
-            TicketRule::Eq(ticket_id) => id == ticket_id,
+        match self.access {
+            TicketAccess::Any => true,
+            TicketAccess::Stub => false,
+            TicketAccess::Universe(universe) => universe.universe_id() == id,
         }
     }
+
+    /// Returns the ID of the universe this ticket allows access to, if there is exactly one
+    /// such universe.
+    pub fn universe_id(&self) -> Option<UniverseId> {
+        self.universe_id
+    }
 }
+
+impl<'a, 'b> PartialEq<ReadTicket<'b>> for ReadTicket<'a> {
+    /// This implementation is for pragmatic purposes like assertions on data structures that
+    /// contain tickets. Precise outcomes are not guaranteed, only:
+    ///
+    /// * Tickets for different universes will always be unequal.
+    /// * Tickets created by the same function call site for the same universe will always be equal.
+    fn eq(&self, other: &ReadTicket<'b>) -> bool {
+        self.origin == other.origin
+            && self.universe_id == other.universe_id
+            && mem::discriminant(&self.access) == mem::discriminant(&other.access)
+    }
+}
+impl Eq for ReadTicket<'_> {}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -1076,5 +1105,36 @@ mod tests {
         assert_eq!(handle_a_1, handle_a_1, "reflexive eq");
         assert_eq!(handle_a_1, handle_a_2, "clones are equal");
         assert!(handle_a_1 != handle_b_1, "not equal");
+    }
+
+    #[test]
+    fn read_ticket_equality() {
+        let universes: [Universe; 2] = std::array::from_fn(|_| Universe::new());
+
+        assert_ne!(
+            ReadTicket::stub(),
+            ReadTicket::stub(),
+            "different by location"
+        );
+
+        let stubs: [ReadTicket<'_>; 2] = std::array::from_fn(|_| ReadTicket::stub());
+        assert_eq!(stubs[0], stubs[1], "identical stub()");
+
+        let unrestricteds: [ReadTicket<'_>; 2] = std::array::from_fn(|_| ReadTicket::new());
+        assert_eq!(unrestricteds[0], unrestricteds[1], "identical new()");
+
+        let different_universe_tickets: [ReadTicket<'_>; 2] =
+            std::array::from_fn(|i| universes[i].read_ticket());
+        assert_ne!(
+            different_universe_tickets[0], different_universe_tickets[1],
+            "different universes"
+        );
+
+        let same_universe_tickets: [ReadTicket<'_>; 2] =
+            std::array::from_fn(|_| universes[0].read_ticket());
+        assert_eq!(
+            same_universe_tickets[0], same_universe_tickets[1],
+            "same universes"
+        );
     }
 }

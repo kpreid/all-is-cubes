@@ -313,13 +313,7 @@ impl Universe {
     /// Returns a [`ReadTicket`] that may be used for reading the members of this universe.
     #[track_caller]
     pub fn read_ticket(&self) -> ReadTicket<'_> {
-        // Currently unassociated with this universe, but might start being,
-        // either by carrying the universe ID, or being an actual borrow of the storage.
-        ReadTicket {
-            rule: TicketRule::Eq(self.id),
-            origin: core::panic::Location::caller(),
-            _phantom: core::marker::PhantomData,
-        }
+        ReadTicket::from_universe(self)
     }
 
     /// Execute the given transaction on the given handle's referent.
@@ -342,17 +336,12 @@ impl Universe {
         T::Transaction: Transaction<Output = transaction::NoOutput, Context<'u> = ReadTicket<'u>>,
         T: UniverseMember + Transactional,
     {
-        let id = self.id;
         let outcome: Result<
             Result<(), ExecuteError<<T as Transactional>::Transaction>>,
             HandleError,
         > = self.try_modify(handle, |data| {
-            // Make a read ticket for "the rest of the universe" without borrowing &Universe
-            let read_ticket = ReadTicket {
-                rule: TicketRule::Eq(id),
-                origin: core::panic::Location::caller(),
-                _phantom: core::marker::PhantomData,
-            };
+            // TODO(ecs): need to arrange a read ticket for the disjoint access
+            let read_ticket = ReadTicket::new();
             transaction.execute(data, read_ticket, &mut transaction::no_outputs)
         });
         outcome.map_err(ExecuteError::Handle)?
