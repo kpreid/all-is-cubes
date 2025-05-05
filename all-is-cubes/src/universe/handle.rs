@@ -1,4 +1,4 @@
-#![expect(clippy::needless_lifetimes, reason = "names for clarity")]
+#![expect(clippy::elidable_lifetime_names, reason = "names for clarity")]
 
 use alloc::sync::{Arc, Weak};
 use core::fmt;

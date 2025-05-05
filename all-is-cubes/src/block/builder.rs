@@ -318,12 +318,7 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
     ///
     /// The default is [`ReadTicket::stub()`].
     //---
-    // TODO: Remove unknown_lints after Rust 1.87
-    #[allow(
-        unknown_lints,
-        clippy::needless_lifetimes,
-        clippy::elidable_lifetime_names
-    )]
+    #[expect(clippy::elidable_lifetime_names, reason = "names for clarity")]
     pub fn read_ticket<'u2>(self, read_ticket: ReadTicket<'u2>) -> Builder<'u2, P, Txn> {
         Builder {
             read_ticket,
