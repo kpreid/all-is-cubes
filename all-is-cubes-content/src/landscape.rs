@@ -335,7 +335,7 @@ pub fn wavy_landscape(
 ) -> Result<(), SetCubeError> {
     // TODO: justify this constant (came from cubes v1 code).
     let slope_scaled = max_slope / 0.904087;
-    let middle_y = (region.lower_bounds().y + region.upper_bounds().y) / 2;
+    let middle_y = region.lower_bounds().y.midpoint(region.upper_bounds().y);
 
     let grass_at = grass_placement_function(0x21b5cc6b);
 

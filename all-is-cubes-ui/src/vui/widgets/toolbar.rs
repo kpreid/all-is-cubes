@@ -104,7 +104,7 @@ impl Widget for Toolbar {
             todo_more,
             // TODO: obey gravity when positioning within the grant
             first_slot_position: Cube::new(
-                (bounds.lower_bounds().x + bounds.upper_bounds().x) / 2
+                bounds.lower_bounds().x.midpoint(bounds.upper_bounds().x)
                     - GridCoordinate::from(self.slot_count()) * Toolbar::TOOLBAR_STEP / 2
                     + 1,
                 bounds.lower_bounds().y + 1,
