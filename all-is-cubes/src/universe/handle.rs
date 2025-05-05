@@ -165,7 +165,7 @@ impl<T: 'static> Handle<T> {
     ///
     /// Returns an error if the value is currently being written to, or does not exist.
     #[inline(never)]
-    pub fn read(&self, read_ticket: ReadTicket<'_>) -> Result<ReadGuard<T>, HandleError> {
+    pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<ReadGuard<'t, T>, HandleError> {
         if let Some(id) = self.universe_id() {
             if !read_ticket.allows_access_to(id) {
                 // Invalid tickets can be a subtle bug due to `Space`'s retrying behavior.
@@ -179,7 +179,10 @@ impl<T: 'static> Handle<T> {
         if inner.data.is_none() {
             return Err(HandleError::NotReady(self.name()));
         }
-        Ok(ReadGuard(inner))
+        Ok(ReadGuard {
+            guard: inner,
+            _phantom: PhantomData,
+        })
     }
 
     /// Apply the given function to the `&mut T` inside.
@@ -654,28 +657,33 @@ impl ReadTicket<'_> {
 ///
 /// You can create this by calling [`Handle::read()`], and must drop it before the next time
 /// the handle's referent is mutated.
-pub struct ReadGuard<T: 'static>(owning_guard::ReadGuardImpl<T>);
+pub struct ReadGuard<'ticket, T: 'static> {
+    guard: owning_guard::ReadGuardImpl<T>,
+    // The `'ticket` lifetime exists to enforce that `ReadGuard`s are used only as long as the
+    // corresponding `ReadTicket`. This will become mandatory in the future.
+    _phantom: PhantomData<&'ticket ReadTicket<'ticket>>,
+}
 
-impl<T: fmt::Debug> fmt::Debug for ReadGuard<T> {
+impl<T: fmt::Debug> fmt::Debug for ReadGuard<'_, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "ReadGuard({:?})", **self)
     }
 }
-impl<T> Deref for ReadGuard<T> {
+impl<T> Deref for ReadGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &T {
-        self.0
+        self.guard
             .data
             .as_ref()
             .expect("can't happen: universe::ReadGuard lost its data")
     }
 }
-impl<T> AsRef<T> for ReadGuard<T> {
+impl<T> AsRef<T> for ReadGuard<'_, T> {
     fn as_ref(&self) -> &T {
         self
     }
 }
-impl<T> core::borrow::Borrow<T> for ReadGuard<T> {
+impl<T> core::borrow::Borrow<T> for ReadGuard<'_, T> {
     fn borrow(&self) -> &T {
         self
     }

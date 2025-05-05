@@ -341,9 +341,9 @@ impl VisitHandles for Tool {
 /// parameter list for `Tool::use_tool`.
 #[derive(Debug)]
 #[expect(clippy::exhaustive_structs, reason = "TODO: should be non_exhaustive")]
-pub struct ToolInput<'a> {
+pub struct ToolInput<'ticket> {
     /// Access to the universe being operated on.
-    pub read_ticket: ReadTicket<'a>,
+    pub read_ticket: ReadTicket<'ticket>,
 
     /// Cursor identifying block(s) to act on. If [`None`] then the tool was used while
     /// pointing at nothing or by an agent without an ability to aim.
@@ -355,7 +355,7 @@ pub struct ToolInput<'a> {
     pub character: Option<Handle<Character>>,
 }
 
-impl ToolInput<'_> {
+impl<'ticket> ToolInput<'ticket> {
     /// Generic handler for a tool that replaces one cube.
     ///
     /// TODO: This should probably be replaced with a `Transaction` whose failure
@@ -478,7 +478,7 @@ impl ToolInput<'_> {
         // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
 
         let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail if this returns None?
-        let character_guard: Option<ReadGuard<Character>> = self
+        let character_guard: Option<ReadGuard<'ticket, Character>> = self
             .character
             .as_ref()
             .map(|c| c.read(self.read_ticket))
@@ -762,13 +762,13 @@ mod tests {
             Ok(())
         }
 
-        fn space(&self) -> ReadGuard<Space> {
+        fn space(&self) -> ReadGuard<'_, Space> {
             self.space_handle.read(self.universe.read_ticket()).unwrap()
         }
         fn space_handle(&self) -> &Handle<Space> {
             &self.space_handle
         }
-        fn character(&self) -> ReadGuard<Character> {
+        fn character(&self) -> ReadGuard<'_, Character> {
             self.character_handle
                 .read(self.universe.read_ticket())
                 .unwrap()

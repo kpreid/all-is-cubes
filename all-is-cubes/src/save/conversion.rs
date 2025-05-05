@@ -1164,7 +1164,7 @@ mod universe {
         }
     }
 
-    impl Serialize for PartialUniverse<'_> {
+    impl<'t> Serialize for PartialUniverse<'t> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             let &Self {
                 read_ticket,
@@ -1180,7 +1180,7 @@ mod universe {
 
             let blocks = blocks.iter().map(|member_handle: &Handle<BlockDef>| {
                 let name = member_handle.name();
-                let read_guard: ReadGuard<BlockDef> =
+                let read_guard: ReadGuard<'t, BlockDef> =
                     member_handle.read(read_ticket).map_err(|e| {
                         serde::ser::Error::custom(format!(
                             "Failed to read universe member {name}: {e}"
@@ -1353,7 +1353,7 @@ mod universe {
             S: Serializer,
         {
             let &schema::SerializeHandle(read_ticket, ref handle) = self;
-            let read_guard: ReadGuard<T> = handle.read(read_ticket).map_err(|e| {
+            let read_guard: ReadGuard<'_, T> = handle.read(read_ticket).map_err(|e| {
                 serde::ser::Error::custom(format!(
                     "Failed to read universe member {name}: {e}",
                     name = handle.name()
