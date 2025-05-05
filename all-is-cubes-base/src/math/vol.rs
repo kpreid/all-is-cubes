@@ -857,8 +857,7 @@ fn find_zmaj_subdivision(vol: Vol<()>) -> Option<(Vol<()>, Vol<()>, usize)> {
         let axis_range = bounds.axis_range(axis);
         let size: u32 = bounds.size()[axis];
         if size >= 2 {
-            #[expect(clippy::cast_possible_wrap, reason = "known to fit")]
-            let split_coordinate = axis_range.start + (size / 2) as i32;
+            let split_coordinate = axis_range.start + (size / 2).cast_signed();
 
             let mut lower_half_ub = bounds.upper_bounds();
             lower_half_ub[axis] = split_coordinate;

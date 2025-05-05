@@ -581,7 +581,7 @@ fn place_one_exhibit<I: Instant>(
                 .unwrap()
                 .abut(Face6::PY, 0)
                 .unwrap()
-                .abut(front_face, enclosure_thickness.pz as GridCoordinate) // re-add enclosure bounds
+                .abut(front_face, enclosure_thickness.pz.cast_signed()) // re-add enclosure bounds
                 .unwrap()
                 .abut(
                     front_face,

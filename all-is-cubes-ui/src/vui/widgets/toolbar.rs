@@ -83,7 +83,7 @@ impl Layoutable for Toolbar {
     fn requirements(&self) -> LayoutRequest {
         LayoutRequest {
             minimum: GridSize::new(
-                GridSizeCoord::from(self.slot_count()) * Self::TOOLBAR_STEP as GridSizeCoord + 1,
+                GridSizeCoord::from(self.slot_count()) * Self::TOOLBAR_STEP.cast_unsigned() + 1,
                 3,
                 3,
             ),

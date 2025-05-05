@@ -328,11 +328,9 @@ impl GridAab {
             //
             // Declaring the parameter type ensures that if we ever decide to change the numeric
             // type of `GridCoordinate`, this will fail to compile.
-            //
-            // TODO: Replace `as u32` with `.cast_unsigned()` after Rust 1.87.
-            i32::wrapping_sub(self.upper_bounds.x, self.lower_bounds.x) as u32,
-            i32::wrapping_sub(self.upper_bounds.y, self.lower_bounds.y) as u32,
-            i32::wrapping_sub(self.upper_bounds.z, self.lower_bounds.z) as u32,
+            i32::wrapping_sub(self.upper_bounds.x, self.lower_bounds.x).cast_unsigned(),
+            i32::wrapping_sub(self.upper_bounds.y, self.lower_bounds.y).cast_unsigned(),
+            i32::wrapping_sub(self.upper_bounds.z, self.lower_bounds.z).cast_unsigned(),
         )
     }
 

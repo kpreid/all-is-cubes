@@ -334,12 +334,11 @@ async fn islands(
     let size = size.unwrap_or(GridSize::new(1000, 400, 1000));
 
     // Set up dimensions
-    #[expect(clippy::cast_possible_wrap, reason = "big numbers will break anyway")]
     let bounds = GridAab::checked_from_lower_size(
         [
-            -((size.width / 2) as i32),
-            -((size.height / 2) as i32),
-            size.depth as i32,
+            -((size.width / 2).cast_signed()),
+            -((size.height / 2).cast_signed()),
+            size.depth.cast_signed(),
         ],
         size,
     )
@@ -400,7 +399,7 @@ fn cornell_box(requested_size: GridSize) -> Result<Space, InGenError> {
             .min(requested_size.depth))
         .saturating_sub(2)
         .min(64); // TODO: tie this to max light chart size
-    let box_size_c: GridCoordinate = box_size as GridCoordinate;
+    let box_size_c: GridCoordinate = box_size.cast_signed();
 
     // Add one block to all sides for wall thickness.
     let bounds = GridAab::from_lower_size(

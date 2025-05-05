@@ -408,7 +408,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                     interior.expand(FaceMap::splat(1)),
                     |origin, along_wall, length, wall_excluding_corners_box| {
                         let wall = GridRotation::CLOCKWISE.transform(along_wall); // TODO: make four_walls provide this in a nice name
-                        let midpoint = (length / 2) as GridCoordinate;
+                        let midpoint = (length / 2).cast_signed();
 
                         if let WallFeature::Window = room_data.wall_features[wall] {
                             for step in WINDOW_PATTERN {

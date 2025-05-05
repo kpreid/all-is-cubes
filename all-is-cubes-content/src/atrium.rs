@@ -66,8 +66,8 @@ pub(crate) async fn atrium(
         arches_footprint.expand(FaceMap::symmetric([balcony_radius, 0, balcony_radius]));
     let outer_walls_footprint = balconies_footprint.expand(FaceMap::symmetric([UWALL, 0, UWALL]));
 
-    let balcony_floor_pos = GridVector::new(0, (ceiling_height + UWALL) as i32, 0);
-    let top_floor_pos = GridVector::new(0, (ceiling_height + UWALL) as i32 * 2, 0);
+    let balcony_floor_pos = GridVector::new(0, (ceiling_height + UWALL).cast_signed(), 0);
+    let top_floor_pos = GridVector::new(0, (ceiling_height + UWALL).cast_signed() * 2, 0);
 
     let space_bounds = outer_walls_footprint
         .expand(FaceMap::default().with(Face6::PY, sun_height + ceiling_height * floor_count));
