@@ -381,7 +381,7 @@ fn instances_grouped_by_block() {
     let [block1, block2] = make_some_blocks();
     let space = Space::builder(GridAab::from_lower_size(
         [0, 0, 0],
-        [CHUNK_SIZE as u32 * 2, 1, 1],
+        [CHUNK_SIZE.cast_unsigned() * 2, 1, 1],
     ))
     .build_and_mutate(|m| {
         m.set([0, 0, 0], &block1).unwrap();

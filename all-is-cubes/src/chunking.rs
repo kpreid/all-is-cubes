@@ -76,7 +76,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     pub fn bounds(self) -> GridAab {
         GridAab::from_lower_size(
             self.0.lower_bounds() * CHUNK_SIZE,
-            GridSize::splat(CHUNK_SIZE as u32),
+            GridSize::splat(CHUNK_SIZE.cast_unsigned()),
         )
     }
 

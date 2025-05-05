@@ -398,7 +398,11 @@ pub async fn install_demo_blocks(
                         m.fill(
                             GridAab::from_lower_size(
                                 [post_x, 0, resolution_g - post_shape_depth - 1],
-                                [1, top_edge as u32 - 1, post_shape_depth as u32],
+                                [
+                                    1,
+                                    top_edge.cast_unsigned() - 1,
+                                    post_shape_depth.cast_unsigned(),
+                                ],
                             ),
                             |cube| {
                                 let vertical_post = cube.z >= resolution_g - 3;
