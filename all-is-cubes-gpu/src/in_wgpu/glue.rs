@@ -1,7 +1,6 @@
 //! Miscellaneous conversion functions and trait impls for [`wgpu`].
 
 use core::marker::PhantomData;
-use core::mem;
 use core::ops::Range;
 
 use bytemuck::Pod;
@@ -256,11 +255,9 @@ impl<'buf, T: bytemuck::NoUninit> MapVec<'buf, T> {
     /// Push an element if possible, and return whether there was room to do so.
     #[must_use]
     pub fn push(&mut self, value: &T) -> bool {
-        if self.unwritten.len() < size_of::<T>() {
+        let Some(to_write) = self.unwritten.split_off_mut(..size_of::<T>()) else {
             return false;
-        }
-        let (to_write, remaining) = mem::take(&mut self.unwritten).split_at_mut(size_of::<T>());
-        self.unwritten = remaining;
+        };
         to_write.copy_from_slice(bytemuck::bytes_of(value));
         self.len += 1;
         true
