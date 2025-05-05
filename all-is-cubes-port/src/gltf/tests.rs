@@ -9,7 +9,7 @@ use all_is_cubes::character::Character;
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{Handle, Name, Universe};
+use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_mesh::{MeshOptions, SpaceMesh, block_meshes_for_space};
 use all_is_cubes_render::camera::GraphicsOptions;
@@ -73,12 +73,17 @@ fn gltf_smoke_test() {
     });
 }
 
-async fn export_snapshot_test(test_name: &'static str, export_set: ExportSet) {
+async fn export_snapshot_test(
+    test_name: &'static str,
+    read_ticket: ReadTicket<'_>,
+    export_set: ExportSet,
+) {
     let destination_dir = tempfile::tempdir().unwrap();
     let destination: PathBuf = destination_dir.path().join(format!("{test_name}.gltf"));
 
     crate::export_to_path(
         yield_progress_for_testing(),
+        read_ticket,
         Format::Gltf,
         export_set,
         PathBuf::from(&destination),
@@ -112,7 +117,12 @@ async fn export_block_defs() {
         })
         .collect();
 
-    export_snapshot_test("export_block_defs", ExportSet::from_block_defs(block_defs)).await;
+    export_snapshot_test(
+        "export_block_defs",
+        universe.read_ticket(),
+        ExportSet::from_block_defs(block_defs),
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -129,7 +139,12 @@ async fn export_space() {
         )
         .unwrap();
 
-    export_snapshot_test("export_space", ExportSet::all_of_universe(&universe)).await;
+    export_snapshot_test(
+        "export_space",
+        universe.read_ticket(),
+        ExportSet::all_of_universe(&universe),
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -148,6 +163,7 @@ async fn export_character_not_supported() {
 
     let error = crate::export_to_path(
         yield_progress_for_testing(),
+        universe.read_ticket(),
         Format::Gltf,
         ExportSet::all_of_universe(&universe),
         destination,

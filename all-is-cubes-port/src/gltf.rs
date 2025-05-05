@@ -17,7 +17,7 @@ pub use gltf_json as json;
 use gltf_json::Index;
 use gltf_json::validation::Checked::Valid;
 
-use all_is_cubes::universe::PartialUniverse;
+use all_is_cubes::universe::{HandleSet, ReadTicket};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{BlockMesh, MeshOptions, MeshTypes, SpaceMesh, block_meshes_for_space};
 use all_is_cubes_render::Flaws;
@@ -357,13 +357,13 @@ impl GltfWriter {
 
 pub(crate) async fn export_gltf(
     progress: YieldProgress,
+    read_ticket: ReadTicket<'_>,
     source: ExportSet,
     destination: PathBuf,
 ) -> Result<(), ExportError> {
-    let read_ticket = source.contents.read_ticket();
     let ExportSet {
         contents:
-            PartialUniverse {
+            HandleSet {
                 blocks: block_defs,
                 sounds,
                 spaces,

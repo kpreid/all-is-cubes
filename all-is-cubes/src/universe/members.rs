@@ -17,7 +17,7 @@ use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
-    ErasedHandle, Handle, InsertError, Name, PartialUniverse, ReadTicket, RootHandle, Universe,
+    ErasedHandle, Handle, HandleSet, InsertError, Name, ReadTicket, RootHandle, Universe,
     UniverseIter, universe_txn as ut,
 };
 use crate::util::Refmt as _;
@@ -73,14 +73,14 @@ where
     fn iter_by_type(&self) -> UniverseIter<'_, T>;
 }
 
-/// Trait implemented by [`PartialUniverse`] once for each type of object that can be
+/// Trait implemented by [`HandleSet`] once for each type of object that can be
 /// stored in a [`Universe`], that permits lookups of that type.
 ///
 /// This trait must be public(-in-private) so it can be a bound on public methods.
 /// It could be just public, but it's cleaner to not require importing it everywhere.
 #[doc(hidden)]
 #[expect(unnameable_types)]
-pub trait PartialUniverseOps<T>
+pub trait HandleSetOps<T>
 where
     T: UniverseMember,
 {
@@ -120,7 +120,7 @@ macro_rules! impl_universe_for_member {
             }
         }
 
-        impl UniverseTable<$member_type> for PartialUniverse {
+        impl UniverseTable<$member_type> for HandleSet {
             type Table = Vec<Handle<$member_type>>;
 
             fn table(&self) -> &Self::Table {
@@ -140,7 +140,7 @@ macro_rules! impl_universe_for_member {
             }
         }
 
-        impl PartialUniverseOps<$member_type> for PartialUniverse {
+        impl HandleSetOps<$member_type> for HandleSet {
             fn from_set(members: impl IntoIterator<Item = Handle<$member_type>>) -> Self {
                 // TODO: enforce exactly one universe id
                 let mut new_self = Self::default();

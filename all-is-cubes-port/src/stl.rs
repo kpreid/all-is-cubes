@@ -9,7 +9,7 @@ use all_is_cubes::block;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::{Cube, FreeCoordinate, zo32};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::PartialUniverse;
+use all_is_cubes::universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{
     self as mesh, BlockVertex,
@@ -19,21 +19,21 @@ use all_is_cubes_render::camera::GraphicsOptions;
 
 pub(crate) async fn export_stl(
     progress: YieldProgress,
+    read_ticket: universe::ReadTicket<'_>,
     source: crate::ExportSet,
     destination: std::path::PathBuf,
 ) -> Result<(), crate::ExportError> {
-    let read_ticket = source.contents.read_ticket();
     // TODO: this should be doing reject_unsupported_members but that is incompatible with member_export_path() -- fix somehow
     let crate::ExportSet {
         contents:
-            PartialUniverse {
-                blocks: block_defs,
+            universe::HandleSet {
+                blocks: ref block_defs,
                 sounds: _,
-                spaces,
+                ref spaces,
                 characters: _,
                 tags: _,
             },
-    } = &source;
+    } = source;
 
     for space in spaces {
         stl_io::write_stl(
@@ -165,6 +165,7 @@ mod tests {
 
         crate::export_to_path(
             yield_progress_for_testing(),
+            universe.read_ticket(),
             Format::Stl,
             ExportSet::from_block_defs(block_defs),
             destination,

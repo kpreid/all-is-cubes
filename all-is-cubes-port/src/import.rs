@@ -114,11 +114,11 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
     }
 
     #[cfg(feature = "export")]
-    fn save(
+    fn save<'u>(
         &self,
-        universe: &Universe,
+        universe: &'u Universe,
         progress: YieldProgress,
-    ) -> BoxFuture<'static, Result<(), Box<dyn std::error::Error + Send + Sync>>> {
+    ) -> BoxFuture<'u, Result<(), Box<dyn std::error::Error + Send + Sync>>> {
         use crate::ExportSet;
 
         let source = ExportSet::all_of_universe(universe);
@@ -130,7 +130,13 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
                 #[cfg(feature = "native")]
                 Format::AicJson => {
                     let mut buf = Vec::new();
-                    crate::native::export_native_json(progress, source, &mut buf).await?;
+                    crate::native::export_native_json(
+                        progress,
+                        universe.read_ticket(),
+                        source,
+                        &mut buf,
+                    )
+                    .await?;
                     file.write(&buf)?;
                     Ok(())
                 }

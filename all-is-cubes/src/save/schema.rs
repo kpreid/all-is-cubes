@@ -38,7 +38,7 @@ use crate::{behavior, block, character, inv, op, sound, space, tag, universe};
 
 /// Placeholder type for when we want to serialize the *contents* of a `Handle`,
 /// without cloning or referencing those contents immediately.
-pub(crate) struct SerializeHandle<T>(pub(crate) Handle<T>);
+pub(crate) struct SerializeHandle<'t, T>(pub(crate) universe::ReadTicket<'t>, pub(crate) Handle<T>);
 
 //------------------------------------------------------------------------------------------------//
 // Schema corresponding to the `behavior` module
@@ -555,11 +555,11 @@ pub(crate) enum UniverseSchema<C, So, Sp, T> {
         members: Vec<MemberEntrySer<MemberSchema<C, So, Sp, T>>>,
     },
 }
-pub(crate) type UniverseSer = UniverseSchema<
-    SerializeHandle<character::Character>,
-    SerializeHandle<sound::SoundDef>,
-    SerializeHandle<space::Space>,
-    SerializeHandle<tag::TagDef>,
+pub(crate) type UniverseSer<'t> = UniverseSchema<
+    SerializeHandle<'t, character::Character>,
+    SerializeHandle<'t, sound::SoundDef>,
+    SerializeHandle<'t, space::Space>,
+    SerializeHandle<'t, tag::TagDef>,
 >;
 pub(crate) type UniverseDe =
     UniverseSchema<character::Character, sound::SoundDef, space::Space, tag::TagDef>;
@@ -583,11 +583,11 @@ pub(crate) enum MemberSchema<C, So, Sp, T> {
     Space { value: Sp },
     Tag { value: T },
 }
-pub(crate) type MemberSer = MemberSchema<
-    SerializeHandle<character::Character>,
-    SerializeHandle<sound::SoundDef>,
-    SerializeHandle<space::Space>,
-    SerializeHandle<tag::TagDef>,
+pub(crate) type MemberSer<'t> = MemberSchema<
+    SerializeHandle<'t, character::Character>,
+    SerializeHandle<'t, sound::SoundDef>,
+    SerializeHandle<'t, space::Space>,
+    SerializeHandle<'t, tag::TagDef>,
 >;
 pub(crate) type MemberDe =
     MemberSchema<character::Character, sound::SoundDef, space::Space, tag::TagDef>;

@@ -53,13 +53,15 @@ pub trait WhenceUniverse: fmt::Debug + Send + Sync + Any + 'static {
     ///
     /// If this is called even though [`Self::can_save()`] returned false, it should return
     /// an `Err`, not panic.
-    ///
-    /// TODO: Define an error type for this to have at least broad categories.
-    fn save(
+    //---
+    // TODO: Define an error type for this to have at least broad categories.
+    // TODO: Borrowing the universe for the entire operation is very difficult to work with;
+    // consider alternatives.
+    fn save<'u>(
         &self,
-        universe: &Universe,
+        universe: &'u Universe,
         progress: YieldProgress,
-    ) -> MaybeLocalBoxFuture<'static, Result<(), Box<dyn Error + Send + Sync>>>;
+    ) -> MaybeLocalBoxFuture<'u, Result<(), Box<dyn Error + Send + Sync>>>;
 }
 
 /// Implementation of [`WhenceUniverse`] used by [`Universe`]s freshly created.

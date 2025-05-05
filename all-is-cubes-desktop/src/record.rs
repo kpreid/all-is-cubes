@@ -244,12 +244,14 @@ impl Recorder {
                 if let Some(export_set) = export_set.take() {
                     // TODO: Stop using block_on(), and instead be able to ask the main loop to
                     // suspend stepping until we're done with this operation that is both async
-                    // and reading the universe.
+                    // and reading the universe. Doing this will require, in order to borrow the
+                    // universe, something like temporarily stuffing it into an `Arc`.
                     executor
                         .tokio()
                         .block_on(all_is_cubes_port::export_to_path(
                             // TODO: hook up a progress bar
                             crate::glue::tokio_yield_progress().build(),
+                            read_ticket,
                             export_format,
                             export_set,
                             options.output_path.clone(),

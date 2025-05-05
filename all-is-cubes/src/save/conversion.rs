@@ -1152,11 +1152,11 @@ mod universe {
     use crate::space::Space;
     use crate::tag::TagDef;
     use crate::time;
-    use crate::universe::{self, Handle, Name, PartialUniverse, ReadGuard, Universe};
+    use crate::universe::{self, Handle, HandleSet, Name, PartialUniverse, ReadGuard, Universe};
     use core::cell::RefCell;
     use schema::{HandleSer, MemberDe, NameSer};
 
-    impl From<&BlockDef> for schema::MemberSer {
+    impl From<&BlockDef> for schema::MemberSer<'_> {
         fn from(block_def: &BlockDef) -> Self {
             schema::MemberSer::Block {
                 value: block_def.block().clone(),
@@ -1164,20 +1164,24 @@ mod universe {
         }
     }
 
-    impl Serialize for PartialUniverse {
+    impl Serialize for PartialUniverse<'_> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            let Self {
-                blocks,
-                characters,
-                sounds,
-                spaces,
-                tags,
+            let &Self {
+                read_ticket,
+                handles:
+                    HandleSet {
+                        ref blocks,
+                        ref characters,
+                        ref sounds,
+                        ref spaces,
+                        ref tags,
+                    },
             } = self;
 
             let blocks = blocks.iter().map(|member_handle: &Handle<BlockDef>| {
                 let name = member_handle.name();
                 let read_guard: ReadGuard<BlockDef> =
-                    member_handle.read(ReadTicket::new()).map_err(|e| {
+                    member_handle.read(read_ticket).map_err(|e| {
                         serde::ser::Error::custom(format!(
                             "Failed to read universe member {name}: {e}"
                         ))
@@ -1192,7 +1196,7 @@ mod universe {
                 Ok(MemberEntrySer {
                     name: member_handle.name(),
                     value: schema::MemberSer::Character {
-                        value: schema::SerializeHandle(member_handle.clone()),
+                        value: schema::SerializeHandle(read_ticket, member_handle.clone()),
                     },
                 })
             });
@@ -1200,7 +1204,7 @@ mod universe {
                 Ok(MemberEntrySer {
                     name: member_handle.name(),
                     value: schema::MemberSer::Sound {
-                        value: schema::SerializeHandle(member_handle.clone()),
+                        value: schema::SerializeHandle(read_ticket, member_handle.clone()),
                     },
                 })
             });
@@ -1208,7 +1212,7 @@ mod universe {
                 Ok(MemberEntrySer {
                     name: member_handle.name(),
                     value: schema::MemberSer::Space {
-                        value: schema::SerializeHandle(member_handle.clone()),
+                        value: schema::SerializeHandle(read_ticket, member_handle.clone()),
                     },
                 })
             });
@@ -1216,7 +1220,7 @@ mod universe {
                 Ok(MemberEntrySer {
                     name: member_handle.name(),
                     value: schema::MemberSer::Tag {
-                        value: schema::SerializeHandle(member_handle.clone()),
+                        value: schema::SerializeHandle(read_ticket, member_handle.clone()),
                     },
                 })
             });
@@ -1227,7 +1231,7 @@ mod universe {
                     .chain(sounds)
                     .chain(spaces)
                     .chain(tags)
-                    .collect::<Result<Vec<MemberEntrySer<schema::MemberSer>>, S::Error>>()?,
+                    .collect::<Result<Vec<MemberEntrySer<schema::MemberSer<'_>>>, S::Error>>()?,
             }
             .serialize(serializer)
         }
@@ -1235,7 +1239,11 @@ mod universe {
 
     impl Serialize for Universe {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            PartialUniverse::all_of(self).serialize(serializer)
+            PartialUniverse {
+                handles: HandleSet::all_of(self),
+                read_ticket: self.read_ticket(),
+            }
+            .serialize(serializer)
         }
     }
 
@@ -1339,13 +1347,13 @@ mod universe {
         }
     }
 
-    impl<T: Serialize + 'static> Serialize for schema::SerializeHandle<T> {
+    impl<T: Serialize + 'static> Serialize for schema::SerializeHandle<'_, T> {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
-            let handle: &Handle<T> = &self.0;
-            let read_guard: ReadGuard<T> = handle.read(ReadTicket::new()).map_err(|e| {
+            let &schema::SerializeHandle(read_ticket, ref handle) = self;
+            let read_guard: ReadGuard<T> = handle.read(read_ticket).map_err(|e| {
                 serde::ser::Error::custom(format!(
                     "Failed to read universe member {name}: {e}",
                     name = handle.name()

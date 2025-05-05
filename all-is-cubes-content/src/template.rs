@@ -311,11 +311,11 @@ impl WhenceUniverse for TemplateAndParameters {
         false
     }
 
-    fn save(
+    fn save<'u>(
         &self,
-        universe: &Universe,
+        universe: &'u Universe,
         progress: YieldProgress,
-    ) -> futures_core::future::BoxFuture<'static, Result<(), Box<dyn Error + Send + Sync>>> {
+    ) -> futures_core::future::BoxFuture<'u, Result<(), Box<dyn Error + Send + Sync>>> {
         // Delegate to the same error as () would produce. TODO: Have an error enum instead
         <() as WhenceUniverse>::save(&(), universe, progress)
     }

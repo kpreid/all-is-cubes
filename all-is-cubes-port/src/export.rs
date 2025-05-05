@@ -5,7 +5,7 @@ use std::{fs, io};
 
 use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{self, Handle, HandleError, PartialUniverse, Universe};
+use all_is_cubes::universe::{self, Handle, HandleError, HandleSet, Universe};
 use all_is_cubes::util::YieldProgress;
 
 use crate::Format;
@@ -18,6 +18,7 @@ use crate::Format;
 /// TODO: Generalize this or add a parallel function for non-filesystem destinations.
 pub async fn export_to_path(
     progress: YieldProgress,
+    read_ticket: universe::ReadTicket<'_>,
     format: Format,
     source: ExportSet,
     destination: PathBuf,
@@ -26,17 +27,23 @@ pub async fn export_to_path(
         #[cfg(feature = "native")]
         Format::AicJson => {
             let mut writer = io::BufWriter::new(fs::File::create(destination)?);
-            crate::native::export_native_json(progress, source, &mut writer).await
+            crate::native::export_native_json(progress, read_ticket, source, &mut writer).await
         }
         #[cfg(feature = "dot-vox")]
         Format::DotVox => {
             // TODO: async file IO?
-            crate::mv::export_dot_vox(progress, source, fs::File::create(destination)?).await
+            crate::mv::export_dot_vox(
+                progress,
+                read_ticket,
+                source,
+                fs::File::create(destination)?,
+            )
+            .await
         }
         #[cfg(feature = "gltf")]
-        Format::Gltf => crate::gltf::export_gltf(progress, source, destination).await,
+        Format::Gltf => crate::gltf::export_gltf(progress, read_ticket, source, destination).await,
         #[cfg(feature = "stl")]
-        Format::Stl => crate::stl::export_stl(progress, source, destination).await,
+        Format::Stl => crate::stl::export_stl(progress, read_ticket, source, destination).await,
 
         #[allow(unreachable_patterns)]
         // TODO: distinguish between disabled and unsupported
@@ -48,10 +55,7 @@ pub async fn export_to_path(
 /// Selection of the data to be exported.
 #[derive(Clone, Debug, Default)]
 pub struct ExportSet {
-    /// `PartialUniverse` is defined in the `all_is_cubes` crate so that it can get access
-    /// to the same serialization helpers as `Universe` and be guaranteed to serialize the
-    /// exact same way.
-    pub(crate) contents: PartialUniverse,
+    pub(crate) contents: HandleSet,
 }
 
 impl ExportSet {
@@ -67,21 +71,21 @@ impl ExportSet {
     /// not be included; removals may cause errors.
     pub fn all_of_universe(universe: &Universe) -> Self {
         Self {
-            contents: PartialUniverse::all_of(universe),
+            contents: HandleSet::all_of(universe),
         }
     }
 
     /// Construct an [`ExportSet`] specifying exporting only the given [`BlockDef`]s.
     pub fn from_block_defs(block_defs: Vec<Handle<BlockDef>>) -> Self {
         Self {
-            contents: PartialUniverse::from_set(block_defs),
+            contents: HandleSet::from_set(block_defs),
         }
     }
 
     /// Construct an [`ExportSet`] specifying exporting only the given [`Space`]s.
     pub fn from_spaces(spaces: Vec<Handle<Space>>) -> Self {
         Self {
-            contents: PartialUniverse::from_set(spaces),
+            contents: HandleSet::from_set(spaces),
         }
     }
 
@@ -216,6 +220,7 @@ mod tests {
     fn _export_to_path_future_is_send() {
         #![expect(unreachable_code, clippy::diverging_sub_expression)]
         tokio::spawn(export_to_path(
+            unreachable!(),
             unreachable!(),
             unreachable!(),
             unreachable!(),

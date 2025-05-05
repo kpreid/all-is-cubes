@@ -966,15 +966,12 @@ fn gc_members<T>(table: &mut Storage<T>) {
 
 /// A subset of the [`Handle`]s in one universe.
 ///
-/// May be serialized as if it was a [`Universe`].
-///
-/// This structure is not currently exposed because it is a helper for
+/// This structure is not currently publicly documented because it is a helper for
 /// `all_is_cubes_port::ExportSet` and doesn't play a role in the API itself.
 #[doc(hidden)]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[expect(clippy::exhaustive_structs)]
-#[expect(clippy::module_name_repetitions)]
-pub struct PartialUniverse {
+pub struct HandleSet {
     // TODO: design API that doesn't rely on making these public, but still allows
     // exports to be statically exhaustive.
     pub blocks: Vec<Handle<block::BlockDef>>,
@@ -984,7 +981,7 @@ pub struct PartialUniverse {
     pub tags: Vec<Handle<crate::tag::TagDef>>,
 }
 
-impl PartialUniverse {
+impl HandleSet {
     pub fn all_of(universe: &Universe) -> Self {
         Self {
             blocks: universe.iter_by_type().map(|(_, r)| r).collect(),
@@ -999,9 +996,9 @@ impl PartialUniverse {
     pub fn from_set<T>(members: impl IntoIterator<Item = Handle<T>>) -> Self
     where
         T: UniverseMember,
-        Self: PartialUniverseOps<T>,
+        Self: HandleSetOps<T>,
     {
-        <Self as PartialUniverseOps<T>>::from_set(members)
+        <Self as HandleSetOps<T>>::from_set(members)
     }
 
     #[doc(hidden)]
@@ -1015,15 +1012,34 @@ impl PartialUniverse {
         } = self;
         blocks.len() + characters.len() + sounds.len() + spaces.len() + tags.len()
     }
+}
 
-    /// TODO(read_ticket): Placeholder for actually being able to offer a `ReadTicket` from the
-    /// universe.
-    /// The signature will have to change as well as the implementation -- the exporters in
-    /// all-is-cubes-port currently destructure PartialUniverse, which is incompatible with
-    /// borrowing from self here.
-    #[doc(hidden)]
-    #[allow(clippy::unused_self)]
-    pub fn read_ticket<'a>(&self) -> ReadTicket<'a> {
-        ReadTicket::new()
+/// A subset of the [`Handle`]s in one universe, that may be serialized as if it was a [`Universe`].
+#[doc(hidden)] // public to allow all-is-cubes-port to do exports
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[expect(clippy::exhaustive_structs)]
+#[expect(clippy::module_name_repetitions)]
+pub struct PartialUniverse<'t> {
+    // TODO: design API that doesn't rely on making these public, but still allows
+    // exports to be statically exhaustive.
+    pub read_ticket: ReadTicket<'t>,
+    pub handles: HandleSet,
+}
+
+impl<'t> PartialUniverse<'t> {
+    pub fn all_of(universe: &'t Universe) -> Self {
+        Self {
+            read_ticket: universe.read_ticket(),
+            handles: HandleSet::all_of(universe),
+        }
+    }
+}
+
+impl Default for PartialUniverse<'_> {
+    fn default() -> Self {
+        Self {
+            read_ticket: ReadTicket::stub(),
+            handles: HandleSet::default(),
+        }
     }
 }

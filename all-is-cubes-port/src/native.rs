@@ -1,6 +1,6 @@
 use std::io;
 
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{self, Universe};
 use all_is_cubes::util::YieldProgress;
 
 use crate::file::Fileish;
@@ -36,12 +36,21 @@ pub(crate) fn import_native_json(
 #[cfg(feature = "export")]
 pub(crate) async fn export_native_json(
     progress: YieldProgress,
+    read_ticket: universe::ReadTicket<'_>,
     source: ExportSet,
     destination: &mut (dyn io::Write + Send),
 ) -> Result<(), ExportError> {
     // TODO: Spin off a blocking thread to perform this export
+
     let ExportSet { contents } = source;
-    serde_json::to_writer(destination, &contents).map_err(|error| {
+    serde_json::to_writer(
+        destination,
+        &universe::PartialUniverse {
+            read_ticket,
+            handles: contents,
+        },
+    )
+    .map_err(|error| {
         // TODO: report non-IO errors distinctly
         ExportError::Write(io::Error::other(error))
     })?;

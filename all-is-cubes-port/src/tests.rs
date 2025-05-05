@@ -19,14 +19,18 @@ async fn port_whence_load_then_save() {
     let path: PathBuf = tmp_dir.path().join("foo.alliscubesjson");
 
     // Write initial state.
-    export_to_path(
-        yield_progress_for_testing(),
-        Format::AicJson,
-        ExportSet::all_of_universe(&Universe::new()),
-        path.clone(),
-    )
-    .await
-    .unwrap();
+    {
+        let init_universe = Universe::new();
+        export_to_path(
+            yield_progress_for_testing(),
+            init_universe.read_ticket(),
+            Format::AicJson,
+            ExportSet::all_of_universe(&init_universe),
+            path.clone(),
+        )
+        .await
+        .unwrap();
+    }
 
     // Load it again, producing a universe containing `PortWhence`.
     let mut universe =

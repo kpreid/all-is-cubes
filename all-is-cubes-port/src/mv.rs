@@ -14,7 +14,7 @@ use all_is_cubes::math::{
     Cube, GridAab, GridCoordinate, GridRotation, GridVector, Gridgid, Rgb, Rgba,
 };
 use all_is_cubes::space::{LightPhysics, SetCubeError, Space};
-use all_is_cubes::universe::{self, Name, PartialUniverse, ReadTicket, Universe};
+use all_is_cubes::universe::{self, Name, ReadTicket, Universe};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 
 #[cfg(feature = "export")]
@@ -35,10 +35,11 @@ pub(crate) async fn load_dot_vox(
 #[cfg(feature = "export")]
 pub(crate) async fn export_dot_vox(
     p: YieldProgress,
+    read_ticket: ReadTicket<'_>,
     source: ExportSet,
     mut destination: impl std::io::Write,
 ) -> Result<(), ExportError> {
-    let data: dot_vox::DotVoxData = export_to_dot_vox_data(p, source).await?;
+    let data: dot_vox::DotVoxData = export_to_dot_vox_data(p, read_ticket, source).await?;
     data.write_vox(&mut destination)?;
     Ok(())
 }
@@ -106,12 +107,12 @@ async fn dot_vox_data_to_universe(
 #[cfg(feature = "export")]
 async fn export_to_dot_vox_data(
     p: YieldProgress,
+    read_ticket: ReadTicket<'_>,
     source: ExportSet,
 ) -> Result<dot_vox::DotVoxData, ExportError> {
-    let read_ticket = source.contents.read_ticket();
     let ExportSet {
         contents:
-            PartialUniverse {
+            universe::HandleSet {
                 blocks: block_defs,
                 sounds,
                 spaces: to_export,
@@ -405,6 +406,7 @@ mod tests {
         // TODO: also roundtrip through bytes, for maximum rigor
         let data = export_to_dot_vox_data(
             yield_progress_for_testing(),
+            export_universe.read_ticket(),
             ExportSet::all_of_universe(export_universe),
         )
         .await
@@ -490,6 +492,7 @@ mod tests {
 
         let error = export_to_dot_vox_data(
             yield_progress_for_testing(),
+            universe.read_ticket(),
             ExportSet::from_spaces(vec![space]),
         )
         .await
@@ -510,6 +513,7 @@ mod tests {
 
         let error = export_to_dot_vox_data(
             yield_progress_for_testing(),
+            universe.read_ticket(),
             ExportSet::all_of_universe(&universe),
         )
         .await
