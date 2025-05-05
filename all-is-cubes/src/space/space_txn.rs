@@ -271,7 +271,7 @@ impl SpaceTransaction {
         }
 
         self.behaviors
-            .commit(m.behaviors, check, &mut no_outputs)
+            .commit(m.behaviors, (), check, &mut no_outputs)
             .map_err(|e| e.context("behaviors".into()))?;
 
         if !to_activate.is_empty() {
@@ -303,6 +303,7 @@ impl SpaceTransaction {
 
 impl Transaction for SpaceTransaction {
     type Target = Space;
+    type Context<'a> = ReadTicket<'a>;
     type CommitCheck = <BehaviorSetTransaction<Space> as Transaction>::CommitCheck;
     type Output = NoOutput;
     type Mismatch = SpaceTransactionMismatch;
@@ -314,10 +315,11 @@ impl Transaction for SpaceTransaction {
     fn commit(
         &self,
         space: &mut Space,
+        context: Self::Context<'_>,
         check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        space.mutate(ReadTicket::new(), |m| self.commit_common(m, check))
+        space.mutate(context, |m| self.commit_common(m, check))
     }
 }
 
@@ -708,7 +710,11 @@ mod tests {
         let [block] = make_some_blocks();
         SpaceTransaction::set_cube([1, 0, 0], None, Some(block))
             .nonconserved()
-            .execute(&mut Space::empty_positive(1, 1, 1), &mut no_outputs)
+            .execute(
+                &mut Space::empty_positive(1, 1, 1),
+                ReadTicket::stub(),
+                &mut no_outputs,
+            )
             .unwrap();
     }
 
@@ -828,12 +834,12 @@ mod tests {
                 })),
             },
         )
-        .execute(&mut space, &mut no_outputs)
+        .execute(&mut space, ReadTicket::stub(), &mut no_outputs)
         .unwrap();
 
         CubeTransaction::ACTIVATE_BEHAVIOR
             .at(cube)
-            .execute(&mut space, &mut drop)
+            .execute(&mut space, ReadTicket::stub(), &mut drop)
             .unwrap();
         assert_eq!(signal.load(Ordering::Relaxed), 1);
     }
@@ -910,7 +916,7 @@ mod tests {
                 Space::empty(GridAab::from_lower_size([1, 0, 0], [1, 1, 1]))
             })
             // TODO: more spaces
-            .test();
+            .test(ReadTicket::stub());
     }
 
     #[test]

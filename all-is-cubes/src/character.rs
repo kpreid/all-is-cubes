@@ -259,7 +259,7 @@ impl Character {
         B: Behavior<Character> + 'static,
     {
         BehaviorSetTransaction::insert((), Arc::new(behavior))
-            .execute(&mut self.behaviors, &mut transaction::no_outputs)
+            .execute(&mut self.behaviors, (), &mut transaction::no_outputs)
             .unwrap();
     }
 
@@ -704,6 +704,8 @@ impl CharacterTransaction {
 
 impl Transaction for CharacterTransaction {
     type Target = Character;
+    // This ReadTicket is not currently used, but at least for now, *all* universe member transactions are to have ReadTicket as their context type.
+    type Context<'a> = ReadTicket<'a>;
     type CommitCheck = (
         <BodyTransaction as Transaction>::CommitCheck,
         <InventoryTransaction as Transaction>::CommitCheck,
@@ -734,23 +736,24 @@ impl Transaction for CharacterTransaction {
     fn commit(
         &self,
         target: &mut Character,
+        _read_ticket: Self::Context<'_>,
         (body_check, inventory_check, behaviors_check): Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
         self.set_space.commit(&mut target.space);
 
         self.body
-            .commit(&mut target.body, body_check, outputs)
+            .commit(&mut target.body, (), body_check, outputs)
             .map_err(|e| e.context("body".into()))?;
 
         self.inventory
-            .commit(&mut target.inventory, inventory_check, &mut |change| {
+            .commit(&mut target.inventory, (), inventory_check, &mut |change| {
                 target.notifier.notify(&CharacterChange::Inventory(change));
             })
             .map_err(|e| e.context("inventory".into()))?;
 
         self.behaviors
-            .commit(&mut target.behaviors, behaviors_check, outputs)
+            .commit(&mut target.behaviors, (), behaviors_check, outputs)
             .map_err(|e| e.context("behaviors".into()))?;
 
         Ok(())

@@ -332,6 +332,7 @@ impl BlockDefTransaction {
 
 impl Transaction for BlockDefTransaction {
     type Target = BlockDef;
+    type Context<'a> = ReadTicket<'a>;
     type CommitCheck = ();
     type Output = transaction::NoOutput;
     type Mismatch = BlockDefMismatch;
@@ -345,11 +346,12 @@ impl Transaction for BlockDefTransaction {
     fn commit(
         &self,
         target: &mut BlockDef,
+        read_ticket: Self::Context<'_>,
         (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
         if let Equal(Some(new)) = &self.new {
-            target.state = BlockDefState::new(new.clone(), ReadTicket::new());
+            target.state = BlockDefState::new(new.clone(), read_ticket);
             target.notifier.notify(&BlockChange::new());
         }
         Ok(())

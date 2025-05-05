@@ -184,6 +184,7 @@ macro_rules! impl_transaction_for_tuple {
                 $( [<Tr $name>]: Transaction<Output = NoOutput>  ),*
             {
                 type Target = ($( [<Tr $name>]::Target, )*);
+                type Context<'a> = ($( [<Tr $name>]::Context<'a>, )*);
                 type CommitCheck = (
                     $( <[<Tr $name>] as Transaction>::CommitCheck, )*
                 );
@@ -211,13 +212,15 @@ macro_rules! impl_transaction_for_tuple {
                     &self,
                     #[allow(unused_variables, reason = "empty tuple case")]
                     target: &mut ($( [<Tr $name>]::Target, )*),
+                    context: ($( [<Tr $name>]::Context<'_>, )*),
                     check: Self::CommitCheck,
                     outputs: &mut dyn FnMut(Self::Output),
                 ) -> Result<(), super::CommitError> {
                     let ($( [<txn_ $name>], )*) = self;
+                    let ($( [<context_ $name>], )*) = context;
                     let ($( [<check_ $name>], )*) = check;
                     let ($( [<target_ $name>], )*) = target;
-                    $( [<txn_ $name>].commit([<target_ $name>], [<check_ $name>], outputs)?; )*
+                    $( [<txn_ $name>].commit([<target_ $name>], [<context_ $name>], [<check_ $name>], outputs)?; )*
                     Ok(())
                 }
             }
@@ -326,6 +329,7 @@ impl_transaction_for_tuple!(6: 0, 1, 2, 3, 4, 5);
 // Other than that, this is identical to the macro-generated code.
 impl Transaction for () {
     type Target = ();
+    type Context<'a> = ();
     type CommitCheck = ();
     type Output = core::convert::Infallible;
     type Mismatch = core::convert::Infallible;
@@ -337,6 +341,7 @@ impl Transaction for () {
     fn commit(
         &self,
         (): &mut (),
+        (): Self::Context<'_>,
         (): Self::CommitCheck,
         _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), super::CommitError> {

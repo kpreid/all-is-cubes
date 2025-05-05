@@ -403,6 +403,7 @@ impl InventoryTransaction {
 
 impl Transaction for InventoryTransaction {
     type Target = Inventory;
+    type Context<'a> = ();
     type CommitCheck = Option<InventoryCheck>;
     type Output = InventoryChange;
     type Mismatch = InventoryMismatch;
@@ -465,6 +466,7 @@ impl Transaction for InventoryTransaction {
     fn commit(
         &self,
         inventory: &mut Inventory,
+        (): Self::Context<'_>,
         check: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
@@ -556,9 +558,11 @@ mod tests {
     #[test]
     fn txn_identity_no_notification() {
         InventoryTransaction::default()
-            .execute(&mut Inventory::from_slots(vec![Slot::Empty]), &mut |_| {
-                unreachable!("shouldn't notify")
-            })
+            .execute(
+                &mut Inventory::from_slots(vec![Slot::Empty]),
+                (),
+                &mut |_| unreachable!("shouldn't notify"),
+            )
             .unwrap()
     }
 
@@ -594,7 +598,7 @@ mod tests {
 
         let mut outputs = Vec::new();
         InventoryTransaction::insert([new_item.clone()])
-            .execute(&mut inventory, &mut |x| outputs.push(x))
+            .execute(&mut inventory, (), &mut |x| outputs.push(x))
             .unwrap();
 
         assert_eq!(
@@ -637,7 +641,7 @@ mod tests {
             Slot::Empty,
         ]);
         InventoryTransaction::insert([this.clone()])
-            .execute(&mut inventory, &mut drop)
+            .execute(&mut inventory, (), &mut drop)
             .unwrap();
         assert_eq!(
             inventory.slots,
@@ -707,7 +711,7 @@ mod tests {
             .target(|| Inventory::from_slots(vec![Slot::Empty]))
             .target(|| Inventory::from_slots(vec![Slot::Empty; 10]))
             .target(|| Inventory::from_slots(vec![Slot::from(old_item.clone()), Slot::Empty]))
-            .test();
+            .test(());
     }
 
     #[test]

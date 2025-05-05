@@ -1,3 +1,4 @@
+use all_is_cubes::universe::ReadTicket;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::sync::Arc;
@@ -432,6 +433,7 @@ impl LayoutTree<Arc<dyn Widget>> {
     /// space is stepped.
     pub fn to_space<B: space::builder::Bounds>(
         self: &Arc<Self>,
+        read_ticket: ReadTicket<'_>,
         builder: space::Builder<'_, B>,
         gravity: Gravity,
     ) -> Result<Space, InstallVuiError> {
@@ -446,7 +448,7 @@ impl LayoutTree<Arc<dyn Widget>> {
             },
             self,
         )?
-        .execute(&mut space, &mut transaction::no_outputs)
+        .execute(&mut space, read_ticket, &mut transaction::no_outputs)
         .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
 
         Ok(space)

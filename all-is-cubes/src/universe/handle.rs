@@ -241,8 +241,9 @@ impl<T: 'static> Handle<T> {
     /// was already being read or written (which is expressed as an
     /// [`ExecuteError::Commit`], because it is a shouldn’t-happen kind of error).
     #[inline(never)]
-    pub fn execute(
+    pub fn execute<'ticket>(
         &self,
+        read_ticket: ReadTicket<'ticket>,
         transaction: &<T as Transactional>::Transaction,
     ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
     where
@@ -250,12 +251,15 @@ impl<T: 'static> Handle<T> {
         // `Output = NoOutput` is required because, if there *were* outputs,
         // they would need to be directed to some destination in the `Universe`,
         // not the caller.
-        T::Transaction: Transaction<Output = transaction::NoOutput>,
+        T::Transaction:
+            Transaction<Output = transaction::NoOutput, Context<'ticket> = ReadTicket<'ticket>>,
     {
         let outcome: Result<
             Result<(), ExecuteError<<T as Transactional>::Transaction>>,
             HandleError,
-        > = self.try_modify(|data| transaction.execute(data, &mut transaction::no_outputs));
+        > = self.try_modify(|data| {
+            transaction.execute(data, read_ticket, &mut transaction::no_outputs)
+        });
         outcome.map_err(ExecuteError::Handle)?
     }
 
@@ -1038,7 +1042,7 @@ mod tests {
             UniverseTransaction::insert(handle_b_1.clone()),
             UniverseTransaction::delete(handle_b_1.clone()),
         ] {
-            txn.execute(&mut universe, &mut transaction::no_outputs)
+            txn.execute(&mut universe, (), &mut transaction::no_outputs)
                 .unwrap()
         }
 

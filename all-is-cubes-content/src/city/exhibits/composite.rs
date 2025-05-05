@@ -123,15 +123,15 @@ fn DASHED_BOXES(_: Context<'_>) {
     // Unit sized box
     style
         .create_box(GridAab::from_lower_size([0, 0, 1], [1, 1, 1]))
-        .execute(&mut space, &mut transaction::no_outputs)?;
+        .execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)?;
     // Tall box
     style
         .create_box(GridAab::from_lower_size([2, 0, 1], [1, 3, 1]))
-        .execute(&mut space, &mut transaction::no_outputs)?;
+        .execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)?;
     // Large box
     style
         .create_box(GridAab::from_lower_size([4, 0, 0], [3, 3, 3]))
-        .execute(&mut space, &mut transaction::no_outputs)?;
+        .execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)?;
 
     Ok((space, txn))
 }

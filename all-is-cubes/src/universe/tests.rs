@@ -153,10 +153,10 @@ fn insert_anonymous_makes_distinct_names() {
     let handle_a = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     let handle_b = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     handle_a
-        .execute(&BlockDefTransaction::overwrite(block_0))
+        .execute(u.read_ticket(), &BlockDefTransaction::overwrite(block_0))
         .unwrap();
     handle_b
-        .execute(&BlockDefTransaction::overwrite(block_1))
+        .execute(u.read_ticket(), &BlockDefTransaction::overwrite(block_1))
         .unwrap();
     assert_ne!(handle_a, handle_b, "not equal");
     assert_ne!(
@@ -203,7 +203,7 @@ fn insert_duplicate_name_via_txn() {
         "test_thing".into(),
         Space::empty_positive(1, 1, 1),
     ))
-    .execute(&mut u, &mut transaction::no_outputs)
+    .execute(&mut u, (), &mut transaction::no_outputs)
     .unwrap_err();
 
     assert_eq!(
@@ -237,7 +237,7 @@ fn insert_anonym_prohibited_via_txn() {
         Name::Anonym(0),
         Space::empty_positive(1, 1, 1),
     ))
-    .execute(&mut Universe::new(), &mut drop)
+    .execute(&mut Universe::new(), (), &mut drop)
     .unwrap_err();
 
     assert_eq!(
@@ -272,7 +272,7 @@ fn insert_pending_becomes_anonym_via_txn() {
         Name::Pending,
         BlockDef::new(u.read_ticket(), AIR),
     ))
-    .execute(&mut u, &mut drop)
+    .execute(&mut u, (), &mut drop)
     .unwrap();
     assert_eq!(
         u.tables.blocks.keys().collect::<Vec<_>>(),
@@ -295,7 +295,7 @@ fn delete_success() {
     let _ = handle_1.read(u.read_ticket()).unwrap();
 
     UniverseTransaction::delete(handle_1.clone())
-        .execute(&mut u, &mut drop)
+        .execute(&mut u, (), &mut drop)
         .unwrap();
     assert_eq!(
         handle_1
@@ -328,7 +328,7 @@ fn delete_anonymous_fails() {
     let mut u = Universe::new();
     let anon = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     UniverseTransaction::delete(anon)
-        .execute(&mut u, &mut drop)
+        .execute(&mut u, (), &mut drop)
         .unwrap_err();
 }
 
@@ -344,9 +344,9 @@ fn delete_twice_fails() {
     let txn = UniverseTransaction::delete(handle);
 
     // Deletion should succeed...
-    txn.execute(&mut u, &mut drop).unwrap();
+    txn.execute(&mut u, (), &mut drop).unwrap();
     // ...but not trying to delete the same thing again.
-    txn.execute(&mut u, &mut drop).unwrap_err();
+    txn.execute(&mut u, (), &mut drop).unwrap_err();
 }
 
 #[test]
@@ -361,7 +361,7 @@ fn delete_wrong_universe_fails() {
 
     let txn = UniverseTransaction::delete(handle);
 
-    txn.execute(&mut u2, &mut drop).unwrap_err();
+    txn.execute(&mut u2, (), &mut drop).unwrap_err();
 }
 
 #[test]
@@ -406,7 +406,7 @@ fn universe_behavior() {
         (),
         Arc::new(UTestBehavior {}),
     ))
-    .execute(&mut u, &mut transaction::no_outputs)
+    .execute(&mut u, (), &mut transaction::no_outputs)
     .unwrap();
     dbg!(&u);
     assert!(u.get_any(&"foo".into()).is_none());
@@ -511,7 +511,7 @@ fn visit_handles_character() {
     CharacterTransaction::inventory(InventoryTransaction::insert([Tool::Block(Block::from(
         block_handle,
     ))]))
-    .execute(&mut character, &mut drop)
+    .execute(&mut character, u.read_ticket(), &mut drop)
     .unwrap();
 
     assert_eq!(

@@ -113,6 +113,8 @@ impl DefTransaction {
 impl Transaction for DefTransaction {
     type Target = SoundDef;
     type CommitCheck = ();
+    // This ReadTicket is not currently used, but at least for now, *all* universe member transactions are to have ReadTicket as their context type.
+    type Context<'a> = universe::ReadTicket<'a>;
     type Output = transaction::NoOutput;
     type Mismatch = Mismatch;
 
@@ -123,6 +125,7 @@ impl Transaction for DefTransaction {
     fn commit(
         &self,
         target: &mut SoundDef,
+        _: Self::Context<'_>,
         (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {

@@ -120,15 +120,15 @@ async fn widget_button_action(mut context: RenderTestContext) {
     ));
     context.compare_image(
         0,
-        render_widget(&widget, vui::Gravity::splat(vui::Align::Low)),
+        render_widget(&context, &widget, vui::Gravity::splat(vui::Align::Low)),
     );
     context.compare_image(
         0,
-        render_widget(&widget, vui::Gravity::splat(vui::Align::Center)),
+        render_widget(&context, &widget, vui::Gravity::splat(vui::Align::Center)),
     );
     context.compare_image(
         0,
-        render_widget(&widget, vui::Gravity::splat(vui::Align::High)),
+        render_widget(&context, &widget, vui::Gravity::splat(vui::Align::High)),
     );
 }
 
@@ -146,7 +146,7 @@ async fn widget_button_toggle(mut context: RenderTestContext) {
         cell.set(value);
         context.compare_image(
             0,
-            render_widget(&widget, vui::Gravity::splat(vui::Align::Center)),
+            render_widget(&context, &widget, vui::Gravity::splat(vui::Align::Center)),
         );
     }
 }
@@ -163,7 +163,7 @@ async fn widget_progress_bar(mut context: RenderTestContext) {
         cell.set(widgets::ProgressBarState::new(value));
         context.compare_image(
             0,
-            render_widget(&widget, vui::Gravity::splat(vui::Align::Center)),
+            render_widget(&context, &widget, vui::Gravity::splat(vui::Align::Center)),
         );
     }
 }
@@ -187,7 +187,8 @@ async fn create_widget_theme_universe() -> Arc<Universe> {
     widgets::WidgetTheme::new(u.read_ticket(), &mut txn, YieldProgress::noop())
         .await
         .unwrap();
-    txn.execute(&mut u, &mut transaction::no_outputs).unwrap();
+    txn.execute(&mut u, (), &mut transaction::no_outputs)
+        .unwrap();
     Arc::new(u)
 }
 
@@ -216,11 +217,21 @@ fn render_session(session: &Session<NoTime>) -> Rendering {
     rendering
 }
 
-fn render_widget(widget: &vui::WidgetTree, gravity: vui::Gravity) -> Rendering {
+fn render_widget(
+    context: &RenderTestContext,
+    widget: &vui::WidgetTree,
+    gravity: vui::Gravity,
+) -> Rendering {
     let start_time = Instant::now();
     let space_handle = Handle::new_pending(
         Name::Pending,
-        widget.to_space(space::Builder::default(), gravity).unwrap(),
+        widget
+            .to_space(
+                context.universe().read_ticket(),
+                space::Builder::default(),
+                gravity,
+            )
+            .unwrap(),
     );
     let space_to_render_time = Instant::now();
     let rendering = render_orthographic(ReadTicket::stub(), &space_handle);

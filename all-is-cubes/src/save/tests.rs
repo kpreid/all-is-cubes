@@ -99,7 +99,7 @@ fn behavior_not_persistent() {
             effect: EphemeralOpaque::new(Arc::new(|| {})),
         }),
     )
-    .execute(&mut set, &mut drop)
+    .execute(&mut set, (), &mut drop)
     .unwrap();
 
     assert_serdeser(

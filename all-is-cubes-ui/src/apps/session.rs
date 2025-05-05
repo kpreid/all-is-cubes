@@ -713,7 +713,7 @@ impl Shuttle {
                     button,
                 )?;
                 transaction
-                    .execute(&mut self.game_universe, &mut transaction::no_outputs)
+                    .execute(&mut self.game_universe, (), &mut transaction::no_outputs)
                     .map_err(|e| ToolError::Internal(e.to_string()))?;
 
                 // Spend a little time doing light updates, to ensure that changes right in front of
@@ -1360,19 +1360,28 @@ mod tests {
         session.listen_fluff(sink.listener());
 
         // Try some fluff with the initial state (we haven't even stepped the session)
-        space1.execute(&st).unwrap();
+        space1
+            .execute(session.universe().read_ticket(), &st)
+            .unwrap();
         assert_eq!(sink.drain(), vec![Fluff::Happened]);
 
         // Change spaces
         character
-            .execute(&CharacterTransaction::move_to_space(space2.clone()))
+            .execute(
+                session.universe().read_ticket(),
+                &CharacterTransaction::move_to_space(space2.clone()),
+            )
             .unwrap();
         session.maybe_step_universe();
 
         // Check we're now listening to the new space only
-        space1.execute(&st).unwrap();
+        space1
+            .execute(session.universe().read_ticket(), &st)
+            .unwrap();
         assert_eq!(sink.drain(), vec![]);
-        space2.execute(&st).unwrap();
+        space2
+            .execute(session.universe().read_ticket(), &st)
+            .unwrap();
         assert_eq!(sink.drain(), vec![Fluff::Happened]);
     }
 

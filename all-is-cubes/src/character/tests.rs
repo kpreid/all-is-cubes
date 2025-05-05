@@ -89,9 +89,10 @@ fn inventory_transaction() {
 
     let item = Tool::InfiniteBlocks(AIR);
     character_handle
-        .execute(&CharacterTransaction::inventory(
-            InventoryTransaction::insert([item.clone()]),
-        ))
+        .execute(
+            universe.read_ticket(),
+            &CharacterTransaction::inventory(InventoryTransaction::insert([item.clone()])),
+        )
         .unwrap();
 
     // Check notification
@@ -191,11 +192,15 @@ fn transaction_systematic() {
             let mut character =
                 Character::spawn_default(universe.read_ticket(), space_handle.clone());
             CharacterTransaction::inventory(InventoryTransaction::insert([old_item.clone()]))
-                .execute(&mut character, &mut transaction::no_outputs)
+                .execute(
+                    &mut character,
+                    universe.read_ticket(),
+                    &mut transaction::no_outputs,
+                )
                 .unwrap();
             character
         })
-        .test();
+        .test(universe.read_ticket());
 }
 
 #[test]

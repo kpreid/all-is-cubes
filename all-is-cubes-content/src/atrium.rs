@@ -42,7 +42,7 @@ pub(crate) async fn atrium(
     let blocks = {
         let mut install_txn = UniverseTransaction::default();
         let blocks = install_atrium_blocks(&mut install_txn, progress).await?;
-        install_txn.execute(universe, &mut transaction::no_outputs)?;
+        install_txn.execute(universe, (), &mut transaction::no_outputs)?;
         blocks
     };
 

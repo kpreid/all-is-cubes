@@ -546,7 +546,7 @@ pub(crate) async fn demo_dungeon(
         let mut install_txn = UniverseTransaction::default();
         let blocks_progress = progress.start_and_cut(0.2, "dungeon blocks").await;
         super::install_dungeon_blocks(&mut install_txn, blocks_progress).await?;
-        install_txn.execute(universe, &mut transaction::no_outputs)?;
+        install_txn.execute(universe, (), &mut transaction::no_outputs)?;
     }
 
     let dungeon_grid = DungeonGrid {

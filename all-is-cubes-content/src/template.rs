@@ -153,7 +153,7 @@ impl UniverseTemplate {
         {
             let mut install_txn = UniverseTransaction::default();
             install_demo_blocks(&mut install_txn, demo_blocks_progress).await?;
-            install_txn.execute(&mut universe, &mut transaction::no_outputs)?;
+            install_txn.execute(&mut universe, (), &mut transaction::no_outputs)?;
         }
         p.progress(0.).await;
 

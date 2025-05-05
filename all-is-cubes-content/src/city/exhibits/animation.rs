@@ -44,7 +44,11 @@ fn ANIMATION(ctx: Context<'_>) {
                     .clone()
             }),
         )
-        .execute(&mut block_space, &mut transaction::no_outputs)?;
+        .execute(
+            &mut block_space,
+            ctx.universe.read_ticket(),
+            &mut transaction::no_outputs,
+        )?;
         Block::builder()
             .animation_hint(block::AnimationHint::redefinition(
                 block::AnimationChange::Shape,

@@ -495,7 +495,7 @@ impl Space {
         // Process cubes_wanting_ticks.
         let start_cube_ticks = I::now();
         let cube_ticks = if !tick.paused() {
-            self.execute_tick_actions(tick)
+            self.execute_tick_actions(read_ticket, tick)
         } else {
             0
         };
@@ -543,7 +543,7 @@ impl Space {
     }
 
     /// Process the block `tick_action` part of a [`Self::step()`].
-    fn execute_tick_actions(&mut self, tick: time::Tick) -> usize {
+    fn execute_tick_actions(&mut self, read_ticket: ReadTicket<'_>, tick: time::Tick) -> usize {
         // Review self.cubes_wanting_ticks, and filter out actions that shouldn't
         // happen this tick.
         // TODO: Use a schedule-aware structure for cubes_wanting_ticks so we can iterate over
@@ -657,7 +657,8 @@ impl Space {
         // efficiently. Instead, we'll just stop *all* tick actions, which is correct-in-a-sense
         // even if it's very suboptimal game mechanics.
         if first_pass_conflicts.is_empty() {
-            if let Err(e) = first_pass_txn.execute(self, &mut transaction::no_outputs) {
+            if let Err(e) = first_pass_txn.execute(self, read_ticket, &mut transaction::no_outputs)
+            {
                 // This really shouldn't happen, because we already check()ed every part of
                 // first_pass_txn, but we don't want it to be fatal.
                 // TODO: this logging should use util::ErrorChain

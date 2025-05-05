@@ -299,7 +299,7 @@ impl PageInst {
         let space = universe.insert_anonymous(size.create_space());
         let txn = install_widgets(LayoutGrant::new(size.space_bounds()), &self.page.tree)?;
         space
-            .execute(&txn)
+            .execute(universe.read_ticket(), &txn)
             .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
 
         // Initialize lighting
@@ -342,6 +342,7 @@ pub(crate) mod parts {
         large: &WidgetTree,
     ) -> Result<Arc<dyn Widget>, InstallVuiError> {
         let space = large.to_space(
+            universe.read_ticket(),
             space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
             Gravity::new(Align::Center, Align::Center, Align::Low),
         )?;

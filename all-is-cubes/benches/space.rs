@@ -163,7 +163,8 @@ fn space_bulk_mutation(c: &mut Criterion) {
                 b.iter_batched_ref(
                     || Space::empty(bounds),
                     |space: &mut Space| {
-                        txn.execute(space, &mut transaction::no_outputs).unwrap();
+                        txn.execute(space, ReadTicket::stub(), &mut transaction::no_outputs)
+                            .unwrap();
                     },
                     BatchSize::SmallInput,
                 )

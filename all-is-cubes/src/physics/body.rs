@@ -963,6 +963,7 @@ impl transaction::Transactional for Body {
 
 impl Transaction for BodyTransaction {
     type Target = Body;
+    type Context<'a> = ();
     type CommitCheck = ();
     type Output = transaction::NoOutput;
     type Mismatch = BodyMismatch;
@@ -975,6 +976,7 @@ impl Transaction for BodyTransaction {
     fn commit(
         &self,
         body: &mut Body,
+        (): Self::Context<'_>,
         (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
@@ -1168,6 +1170,6 @@ mod tests {
                 check_look_direction(vec3(0., 1., 0.)),
             )
             .target(test_body)
-            .test();
+            .test(());
     }
 }

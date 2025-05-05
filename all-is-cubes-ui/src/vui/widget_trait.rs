@@ -321,6 +321,7 @@ impl From<InstallVuiError> for all_is_cubes::linking::InGenError {
 #[cfg(test)]
 #[track_caller]
 pub(crate) fn instantiate_widget<W: Widget + 'static>(
+    read_ticket: ReadTicket<'_>,
     grant: LayoutGrant,
     widget: W,
 ) -> (Option<GridAab>, Space) {
@@ -329,7 +330,7 @@ pub(crate) fn instantiate_widget<W: Widget + 'static>(
 
     let mut space = Space::builder(grant.bounds).build();
     let txn = vui::install_widgets(grant, &vui::leaf_widget(widget)).expect("widget instantiation");
-    txn.execute(&mut space, &mut transaction::no_outputs)
+    txn.execute(&mut space, read_ticket, &mut transaction::no_outputs)
         .expect("widget transaction");
     (txn.bounds_only_cubes(), space)
 }

@@ -433,7 +433,7 @@ pub async fn install_demo_blocks(
                     .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
                     .build();
                 SpaceTransaction::add_behavior(space.bounds(), crate::animation::Clock::new())
-                    .execute(&mut space, &mut transaction::no_outputs)
+                    .execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)
                     .unwrap();
                 Block::builder()
                     .display_name("Clock")
@@ -629,7 +629,7 @@ fn modify_def(indirect: &Block, f: impl FnOnce(&mut Block)) {
         .clone();
     f(&mut block);
     block_def_handle
-        .execute(&BlockDefTransaction::overwrite(block))
+        .execute(ReadTicket::stub(), &BlockDefTransaction::overwrite(block))
         .expect("BlockDef mutation transaction failed");
 }
 

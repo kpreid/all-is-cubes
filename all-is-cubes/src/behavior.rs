@@ -580,6 +580,7 @@ impl<H: Host> BehaviorSetTransaction<H> {
 
 impl<H: Host> Transaction for BehaviorSetTransaction<H> {
     type Target = BehaviorSet<H>;
+    type Context<'a> = ();
     type CommitCheck = CommitCheck;
     type Output = transaction::NoOutput;
     type Mismatch = BehaviorTransactionMismatch;
@@ -623,6 +624,7 @@ impl<H: Host> Transaction for BehaviorSetTransaction<H> {
     fn commit(
         &self,
         target: &mut BehaviorSet<H>,
+        (): Self::Context<'_>,
         _: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
@@ -929,7 +931,7 @@ mod tests {
         assert_eq!(format!("{set:#?}"), "BehaviorSet({})");
 
         BehaviorSetTransaction::insert((), Arc::new(NoopBehavior(1)))
-            .execute(&mut set, &mut no_outputs)
+            .execute(&mut set, (), &mut no_outputs)
             .unwrap();
         let key = *set.members.keys().next().unwrap();
 
@@ -1056,12 +1058,12 @@ mod tests {
         let mut set = BehaviorSet::<Character>::new();
         let arc_qe = Arc::new(NoopBehavior(Expected));
         BehaviorSetTransaction::insert((), arc_qe.clone())
-            .execute(&mut set, &mut no_outputs)
+            .execute(&mut set, (), &mut no_outputs)
             .unwrap();
         // different type, so it should not be found
         let arc_qu = Arc::new(NoopBehavior(Unexpected));
         BehaviorSetTransaction::insert((), arc_qu.clone())
-            .execute(&mut set, &mut no_outputs)
+            .execute(&mut set, (), &mut no_outputs)
             .unwrap();
 
         // Type-specific query should find one
@@ -1113,7 +1115,7 @@ mod tests {
             .unwrap();
         SpaceTransaction::add_behavior(GridAab::ORIGIN_CUBE, SleepBehavior { tx })
             .bind(space)
-            .execute(&mut u, &mut no_outputs)
+            .execute(&mut u, (), &mut no_outputs)
             .unwrap();
         assert_eq!(mpsc::TryRecvError::Empty, rx.try_recv().unwrap_err());
 
@@ -1178,7 +1180,7 @@ mod tests {
             SpaceBehaviorAttachment::new(GridAab::from_lower_size([0, 0, 0], [1, 1, 1]));
         let correct_old_behavior = Arc::new(NoopBehavior(1));
         BehaviorSetTransaction::insert(attachment, correct_old_behavior.clone())
-            .execute(&mut set, &mut no_outputs)
+            .execute(&mut set, (), &mut no_outputs)
             .unwrap();
         let key = *set.members.keys().next().unwrap();
 
@@ -1275,6 +1277,6 @@ mod tests {
                 Ok(())
             })
             .target(BehaviorSet::new)
-            .test()
+            .test(())
     }
 }

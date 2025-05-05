@@ -231,11 +231,14 @@ fn sort_view_every_frame_only_if_transparent() {
     });
     tester
         .space
-        .execute(&SpaceTransaction::set_cube(
-            [0, 0, 0],
-            None,
-            Some(block::from_color!(1.0, 1.0, 1.0, 0.5)),
-        ))
+        .execute(
+            tester.universe.read_ticket(),
+            &SpaceTransaction::set_cube(
+                [0, 0, 0],
+                None,
+                Some(block::from_color!(1.0, 1.0, 1.0, 0.5)),
+            ),
+        )
         .unwrap();
     let mut did_call = false;
     tester.update(|u| {
@@ -456,12 +459,15 @@ fn instances_dont_dirty_mesh_when_block_changes() {
 
     // Make a change to the block defunition...
     anim_def
-        .execute(&BlockDefTransaction::overwrite(
-            Block::builder()
-                .display_name("replaced")
-                .color(will_be_anim.color())
-                .build(),
-        ))
+        .execute(
+            tester.universe.read_ticket(),
+            &BlockDefTransaction::overwrite(
+                Block::builder()
+                    .display_name("replaced")
+                    .color(will_be_anim.color())
+                    .build(),
+            ),
+        )
         .unwrap();
 
     // ...and an update should not include updating any meshes.
@@ -508,11 +514,10 @@ fn instances_dont_dirty_mesh_when_space_changes() {
     // Make a change to the space...
     tester
         .space
-        .execute(&SpaceTransaction::set_cube(
-            [1, 0, 0],
-            Some(anim.clone()),
-            Some(AIR),
-        ))
+        .execute(
+            tester.universe.read_ticket(),
+            &SpaceTransaction::set_cube([1, 0, 0], Some(anim.clone()), Some(AIR)),
+        )
         .unwrap();
 
     // ...and an update should not include updating any meshes.

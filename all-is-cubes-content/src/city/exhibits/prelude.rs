@@ -32,6 +32,7 @@ pub(super) use all_is_cubes::op::Operation;
 pub(super) use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};
 pub(super) use all_is_cubes::time;
 pub(super) use all_is_cubes::transaction::{self, Transaction as _};
+pub(super) use all_is_cubes::universe::ReadTicket;
 
 pub(super) use crate::alg::{self, four_walls, stack};
 pub(super) use crate::city::exhibit::{Context, Exhibit, ExhibitTransaction, Placement, exhibit};

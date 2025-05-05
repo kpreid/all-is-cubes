@@ -361,7 +361,7 @@ impl Universe {
             tick,
         );
         info.behaviors += behavior_info;
-        if let Err(e) = behavior_txn.execute(self, &mut transaction::no_outputs) {
+        if let Err(e) = behavior_txn.execute(self, (), &mut transaction::no_outputs) {
             // TODO: Need to report these failures back to the source
             // ... and perhaps in the UniverseStepInfo
             log::info!("Transaction failure: {e}");
@@ -414,7 +414,7 @@ impl Universe {
 
         // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
         for t in transactions {
-            if let Err(e) = t.execute(self, &mut transaction::no_outputs) {
+            if let Err(e) = t.execute(self, (), &mut transaction::no_outputs) {
                 // TODO: Need to report these failures back to the source
                 // ... and perhaps in the UniverseStepInfo
                 log::info!("Transaction failure: {e}");

@@ -13,7 +13,7 @@ use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{Face6, GridAab};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
-use all_is_cubes::universe::{Handle, Name, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::logo::logo_text;
 use all_is_cubes_ui::vui::{self, Align, LayoutTree, Layoutable as _, install_widgets, widgets};
@@ -41,7 +41,7 @@ pub async fn template_menu_space(
         let (tree, widget_txn) = template_menu_widget_tree(&widget_theme, action)?;
         install_txn.merge_from(widget_txn).unwrap();
 
-        install_txn.execute(universe, &mut transaction::no_outputs)?;
+        install_txn.execute(universe, (), &mut transaction::no_outputs)?;
         tree
     };
 
@@ -63,8 +63,11 @@ pub async fn template_menu_space(
         })
         .build();
 
-    install_widgets(vui::LayoutGrant::new(bounds), &tree)?
-        .execute(&mut space, &mut transaction::no_outputs)?;
+    install_widgets(vui::LayoutGrant::new(bounds), &tree)?.execute(
+        &mut space,
+        universe.read_ticket(),
+        &mut transaction::no_outputs,
+    )?;
 
     Ok(space)
 }
@@ -78,6 +81,7 @@ fn template_menu_widget_tree(
 
     // TODO: the scaled-down logo should exist as a widget itself
     let logo_text_space = vui::leaf_widget(logo_text()).to_space(
+        ReadTicket::stub(),
         space::Builder::default().physics(space::SpacePhysics::DEFAULT_FOR_BLOCK),
         Vector3D::new(Align::Center, Align::Center, Align::Low),
     )?;

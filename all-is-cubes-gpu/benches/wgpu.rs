@@ -49,8 +49,8 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
         let txn2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
 
         b.iter_with_large_drop(move || {
-            txn1.execute(&mut universe, &mut drop).unwrap();
-            txn2.execute(&mut universe, &mut drop).unwrap();
+            txn1.execute(&mut universe, (), &mut drop).unwrap();
+            txn2.execute(&mut universe, (), &mut drop).unwrap();
             renderer
                 .lock()
                 .unwrap()

@@ -178,7 +178,11 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
         Some(corner.rotate(GridRotation::RxYz)),
     )
     .create_box(interior.expand(FaceMap::splat(1)))
-    .execute(&mut space, &mut transaction::no_outputs)?;
+    .execute(
+        &mut space,
+        ctx.universe.read_ticket(),
+        &mut transaction::no_outputs,
+    )?;
 
     space.mutate(ctx.universe.read_ticket(), |m| {
         // Separators between floors

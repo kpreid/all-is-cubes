@@ -262,9 +262,12 @@ mod tests {
 
         // Make a change to the character and observe update
         t.character
-            .execute(&CharacterTransaction::inventory(
-                inv::InventoryTransaction::insert([inv::Tool::Activate]),
-            ))
+            .execute(
+                t.universe.read_ticket(),
+                &CharacterTransaction::inventory(inv::InventoryTransaction::insert([
+                    inv::Tool::Activate,
+                ])),
+            )
             .unwrap();
         assert_eq!(t.sink.drain(), vec![WatcherChange::NeedsUpdate]);
         t.update();
@@ -281,9 +284,12 @@ mod tests {
             t.space.clone(),
         ));
         new_character
-            .execute(&CharacterTransaction::inventory(
-                inv::InventoryTransaction::insert([inv::Tool::Activate]),
-            ))
+            .execute(
+                t.universe.read_ticket(),
+                &CharacterTransaction::inventory(inv::InventoryTransaction::insert([
+                    inv::Tool::Activate,
+                ])),
+            )
             .unwrap();
 
         t.character_cell.set(Some(new_character.clone()));

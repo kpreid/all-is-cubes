@@ -333,7 +333,7 @@ fn fluff_listener() {
     let sink = Sink::new();
     space.fluff().listen(sink.listener());
 
-    txn.execute(&mut space, &mut transaction::no_outputs)
+    txn.execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)
         .unwrap();
 
     assert_eq!(
@@ -479,7 +479,10 @@ fn listens_to_block_changes() {
     // Now mutate the block def .
     let new_block = block::from_color!(Rgba::BLACK);
     block_def_handle
-        .execute(&BlockDefTransaction::overwrite(new_block))
+        .execute(
+            universe.read_ticket(),
+            &BlockDefTransaction::overwrite(new_block),
+        )
         .unwrap();
     let new_evaluated = Block::from(block_def_handle)
         .evaluate(universe.read_ticket())
@@ -525,7 +528,10 @@ fn indirect_becomes_evaluation_error() {
 
     // Make the block def refer to itself, guaranteeing an evaluation error
     block_def_ref
-        .execute(&BlockDefTransaction::overwrite(block.clone()))
+        .execute(
+            universe.read_ticket(),
+            &BlockDefTransaction::overwrite(block.clone()),
+        )
         .unwrap();
 
     // Step the space to let it notice.

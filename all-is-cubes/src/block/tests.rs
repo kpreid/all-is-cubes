@@ -101,9 +101,10 @@ fn listen_indirect_atom() {
 
     // Now mutate it and we should see a notification.
     block_def_handle
-        .execute(&BlockDefTransaction::overwrite(block::from_color!(
-            Rgba::BLACK
-        )))
+        .execute(
+            universe.read_ticket(),
+            &BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
+        )
         .unwrap();
     assert_eq!(sink.drain().len(), 1);
 }
@@ -132,9 +133,10 @@ fn listen_indirect_double() {
 
     // Mutate the first BlockDef and we should see a notification for it alone.
     block_def_handle1
-        .execute(&BlockDefTransaction::overwrite(block::from_color!(
-            Rgba::BLACK
-        )))
+        .execute(
+            universe.read_ticket(),
+            &BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
+        )
         .unwrap();
     assert_eq!([sink1.drain().len(), sink2.drain().len()], [1, 0]);
 
@@ -144,16 +146,18 @@ fn listen_indirect_double() {
 
     // Remove block_def_handle1 from the contents of block_def_handle2...
     block_def_handle2
-        .execute(&BlockDefTransaction::overwrite(block::from_color!(
-            Rgba::BLACK
-        )))
+        .execute(
+            universe.read_ticket(),
+            &BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
+        )
         .unwrap();
     assert_eq!(sink2.drain().len(), 1);
     // ...and then block_def_handle1's changes should NOT be forwarded.
     block_def_handle1
-        .execute(&BlockDefTransaction::overwrite(block::from_color!(
-            Rgba::WHITE
-        )))
+        .execute(
+            universe.read_ticket(),
+            &BlockDefTransaction::overwrite(block::from_color!(Rgba::WHITE)),
+        )
         .unwrap();
     assert_eq!(sink2.drain(), vec![]);
 }
@@ -173,7 +177,10 @@ fn listen_recur() {
 
     // Now mutate the space and we should see a notification.
     space_handle
-        .execute(&SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)))
+        .execute(
+            universe.read_ticket(),
+            &SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)),
+        )
         .unwrap();
     assert_eq!(sink.drain().len(), 1);
 
@@ -181,7 +188,10 @@ fn listen_recur() {
 
     // A mutation out of bounds should not trigger a notification
     space_handle
-        .execute(&SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)))
+        .execute(
+            universe.read_ticket(),
+            &SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)),
+        )
         .unwrap();
     assert_eq!(sink.drain(), vec![]);
 }
@@ -246,7 +256,10 @@ fn self_referential_block(universe: &mut Universe) -> Block {
     let block_def = universe.insert_anonymous(BlockDef::new(universe.read_ticket(), AIR));
     let indirect = Block::from(block_def.clone());
     block_def
-        .execute(&BlockDefTransaction::overwrite(indirect.clone()))
+        .execute(
+            universe.read_ticket(),
+            &BlockDefTransaction::overwrite(indirect.clone()),
+        )
         .unwrap();
     indirect
 }
@@ -290,7 +303,7 @@ mod txn {
 
         // Now mutate it and we should see a notification.
         block_def_handle
-            .execute(&BlockDefTransaction::overwrite(b2))
+            .execute(universe.read_ticket(), &BlockDefTransaction::overwrite(b2))
             .unwrap();
         assert_eq!(sink.drain().len(), 1);
     }
@@ -376,6 +389,6 @@ mod txn {
             .target(|| BlockDef::new(ReadTicket::stub(), AIR))
             .target(|| BlockDef::new(ReadTicket::stub(), b1.clone()))
             .target(|| BlockDef::new(ReadTicket::stub(), b2.clone()))
-            .test();
+            .test(ReadTicket::stub());
     }
 }

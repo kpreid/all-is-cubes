@@ -23,8 +23,8 @@ use all_is_cubes::op::Operation;
 use all_is_cubes::space::{self, LightPhysics, Space, SpacePhysics};
 use all_is_cubes::time::Instant;
 use all_is_cubes::transaction::{self, Transaction};
-use all_is_cubes::universe::Universe;
 use all_is_cubes::universe::UniverseTransaction;
+use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
@@ -68,7 +68,7 @@ pub(crate) async fn demo_city<I: Instant>(
         .await
         .install(universe.read_ticket(), &mut install_txn)
         .unwrap();
-    install_txn.execute(universe, &mut transaction::no_outputs)?;
+    install_txn.execute(universe, (), &mut transaction::no_outputs)?;
 
     let mut state = State::new(universe, params)?;
 
@@ -241,7 +241,11 @@ impl<'u> State<'u> {
             vui::LayoutGrant::new(logo_location),
             &vui::leaf_widget(logo_text()),
         )?
-        .execute(&mut self.space, &mut transaction::no_outputs)?;
+        .execute(
+            &mut self.space,
+            self.universe.read_ticket(),
+            &mut transaction::no_outputs,
+        )?;
         self.planner.occupied_plots.push(logo_location);
         Ok(())
     }
@@ -300,7 +304,11 @@ impl<'u> State<'u> {
                 && !self.planner.is_occupied(tree_bounds)
             {
                 crate::tree::make_tree(&self.landscape_blocks, &mut rng, tree_origin, tree_bounds)
-                    .execute(&mut self.space, &mut transaction::no_outputs)?;
+                    .execute(
+                        &mut self.space,
+                        self.universe.read_ticket(),
+                        &mut transaction::no_outputs,
+                    )?;
             }
             progress.finish().await;
         }
@@ -505,7 +513,7 @@ fn place_one_exhibit<I: Instant>(
     // Prepare exhibit info content
     let info_voxels_widget: vui::WidgetTree = {
         let info_resolution = R64;
-        let exhibit_info_space = draw_exhibit_info(exhibit)?; // TODO: on failure, place an error marker and continue ... or at least produce a GenError for context
+        let exhibit_info_space = draw_exhibit_info(universe.read_ticket(), exhibit)?; // TODO: on failure, place an error marker and continue ... or at least produce a GenError for context
 
         // Enforce maximum width (TODO: this should be done inside draw_exhibit_info instead)
         let bounds_for_info_voxels = GridAab::from_lower_size(
@@ -597,6 +605,7 @@ fn place_one_exhibit<I: Instant>(
             // Install the signboard-and-text widgets in a space.
             let info_sign_space = info_voxels_widget
                 .to_space(
+                    universe.read_ticket(),
                     space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
                     vui::Gravity::new(vui::Align::Center, vui::Align::Center, vui::Align::Low),
                 )
@@ -650,7 +659,7 @@ fn place_one_exhibit<I: Instant>(
 
     // As the last step before we actually copy the exhibit into the city,
     // execute its transaction.
-    match exhibit_transaction.execute(universe, &mut transaction::no_outputs) {
+    match exhibit_transaction.execute(universe, (), &mut transaction::no_outputs) {
         Ok(()) => {}
         Err(error) => {
             // TODO: put the error on a sign in place of the exhibit
@@ -817,7 +826,7 @@ fn place_lamppost(
 /// Generate a Space containing text voxels to put on the signboard for an exhibit.
 ///
 /// The space's bounds extend upward from [0, 0, 0].
-fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
+fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<Space, InGenError> {
     let info_widgets: vui::WidgetTree = Arc::new(vui::LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
@@ -850,6 +859,7 @@ fn draw_exhibit_info(exhibit: &Exhibit) -> Result<Space, InGenError> {
 
     // TODO: give it a maximum size, instead of what we currently do which is truncating later
     let space = info_widgets.to_space(
+        read_ticket,
         space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
         vui::Gravity::new(vui::Align::Low, vui::Align::Low, vui::Align::Low),
     )?;

@@ -19,7 +19,7 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
-use all_is_cubes::universe::{Handle, HandleError, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Handle, HandleError, ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{UniverseTemplate, make_some_voxel_blocks, palette};
 use all_is_cubes_render::camera::{
@@ -407,7 +407,7 @@ async fn error_character_gone(context: RenderTestContext) {
     UniverseTransaction::delete(character_handle)
         .merge(UniverseTransaction::delete(space_handle))
         .unwrap()
-        .execute(&mut universe, &mut transaction::no_outputs)
+        .execute(&mut universe, (), &mut transaction::no_outputs)
         .unwrap();
 
     // Updating may fail, or it may succeed because there were no change notifications.
@@ -442,7 +442,7 @@ async fn error_character_unavailable(context: RenderTestContext) {
     UniverseTransaction::delete(character_handle)
         .merge(UniverseTransaction::delete(space_handle))
         .unwrap()
-        .execute(&mut universe, &mut transaction::no_outputs)
+        .execute(&mut universe, (), &mut transaction::no_outputs)
         .unwrap();
 
     match renderer.update(Layers::splat(universe.read_ticket()), None) {
@@ -677,7 +677,7 @@ async fn icons(mut context: RenderTestContext) {
     .await
     .unwrap();
     install_txn
-        .execute(universe, &mut transaction::no_outputs)
+        .execute(universe, (), &mut transaction::no_outputs)
         .unwrap();
 
     fn get_blocks<E: BlockModule + 'static>(
@@ -712,9 +712,10 @@ async fn icons(mut context: RenderTestContext) {
         ],
     );
 
-    fn block_from_widget(w: &vui::WidgetTree) -> Block {
+    fn block_from_widget(read_ticket: ReadTicket<'_>, w: &vui::WidgetTree) -> Block {
         let space = w
             .to_space(
+                read_ticket,
                 space::Builder::default(),
                 Vector3D::new(Align::Low, Align::Low, Align::Low),
             )
@@ -724,11 +725,14 @@ async fn icons(mut context: RenderTestContext) {
     }
 
     let action_widgets = [UiBlocks::BackButtonLabel].map(|label_key| {
-        block_from_widget(&vui::leaf_widget(widgets::ActionButton::new(
-            ui_blocks_p[label_key].clone(),
-            &widget_theme,
-            || { /* do nothing */ },
-        )))
+        block_from_widget(
+            universe.read_ticket(),
+            &vui::leaf_widget(widgets::ActionButton::new(
+                ui_blocks_p[label_key].clone(),
+                &widget_theme,
+                || { /* do nothing */ },
+            )),
+        )
     });
 
     let toggle_widgets = [
@@ -738,13 +742,16 @@ async fn icons(mut context: RenderTestContext) {
         (UiBlocks::DebugLightRaysButtonLabel, true),
     ]
     .map(|(label_key, state)| {
-        block_from_widget(&vui::leaf_widget(widgets::ToggleButton::new(
-            listen::constant(state),
-            |state| *state,
-            ui_blocks_p[label_key].clone(),
-            &widget_theme,
-            || { /* do nothing */ },
-        )))
+        block_from_widget(
+            universe.read_ticket(),
+            &vui::leaf_widget(widgets::ToggleButton::new(
+                listen::constant(state),
+                |state| *state,
+                ui_blocks_p[label_key].clone(),
+                &widget_theme,
+                || { /* do nothing */ },
+            )),
+        )
     });
 
     let all_blocks: Vec<Block> = icons

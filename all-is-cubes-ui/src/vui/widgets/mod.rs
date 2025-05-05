@@ -93,6 +93,7 @@ mod tests {
     use all_is_cubes::content::make_some_blocks;
     use all_is_cubes::euclid::Vector3D;
     use all_is_cubes::math::{GridAab, GridPoint};
+    use all_is_cubes::universe::ReadTicket;
 
     #[test]
     fn block_widget_in_position() {
@@ -102,7 +103,7 @@ mod tests {
             bounds: GridAab::from_lower_size(origin, [1, 1, 1]),
             gravity: Vector3D::new(Align::Low, Align::Center, Align::High),
         };
-        let (bounds, space) = vui::instantiate_widget(grant, block.clone());
+        let (bounds, space) = vui::instantiate_widget(ReadTicket::stub(), grant, block.clone());
         assert_eq!(bounds, Some(grant.bounds));
         assert_eq!(&space[origin], &block);
     }
@@ -115,7 +116,7 @@ mod tests {
             bounds: GridAab::from_lower_size(origin, [0, 1, 1]),
             gravity: Vector3D::new(Align::Low, Align::Center, Align::High),
         };
-        let (bounds, _space) = vui::instantiate_widget(grant, block);
+        let (bounds, _space) = vui::instantiate_widget(ReadTicket::stub(), grant, block);
         assert_eq!(bounds, None);
     }
 }

@@ -132,7 +132,7 @@ impl Vui {
             .await,
         );
         content_txn
-            .execute(&mut universe, &mut transaction::no_outputs)
+            .execute(&mut universe, (), &mut transaction::no_outputs)
             .unwrap();
 
         let (control_send, control_recv) = flume::bounded(100);
@@ -448,7 +448,7 @@ impl Vui {
             character: None,
         })?;
         transaction
-            .execute(&mut self.universe, &mut transaction::no_outputs)
+            .execute(&mut self.universe, (), &mut transaction::no_outputs)
             .map_err(|e| ToolError::Internal(e.to_string()))?;
         Ok(())
     }

@@ -352,6 +352,7 @@ mod tests {
     use all_is_cubes::euclid::size3;
     use all_is_cubes::math::{GridSizeCoord, Rgba};
     use all_is_cubes::space::{self, SpacePhysics};
+    use all_is_cubes::universe::ReadTicket;
 
     #[test]
     fn large_text_size() {
@@ -376,6 +377,7 @@ mod tests {
 
         // to_space() serves as a widget building sanity check. TODO: make a proper widget tester
         tree.to_space(
+            ReadTicket::stub(),
             space::Builder::default().physics(SpacePhysics::DEFAULT_FOR_BLOCK),
             vui::Gravity::new(vui::Align::Center, vui::Align::Center, vui::Align::Low),
         )

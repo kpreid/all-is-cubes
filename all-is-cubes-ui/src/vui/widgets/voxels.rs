@@ -113,10 +113,9 @@ mod tests {
     use super::*;
     use crate::vui::{Align, instantiate_widget};
     use all_is_cubes::block::Resolution::*;
-
     use all_is_cubes::euclid::Vector3D;
     use all_is_cubes::math::Cube;
-    use all_is_cubes::universe::Universe;
+    use all_is_cubes::universe::{ReadTicket, Universe};
 
     fn test_voxels_widget(
         voxel_space_bounds: GridAab,
@@ -124,6 +123,7 @@ mod tests {
     ) -> (Option<GridAab>, Space) {
         let mut universe = Universe::new();
         instantiate_widget(
+            ReadTicket::stub(),
             grant,
             Voxels::new(
                 voxel_space_bounds,

@@ -386,7 +386,7 @@ impl<P: BuildPrimitive> Builder<'_, P, UniverseTransaction> {
 
         // The transaction is always an insert_anonymous, which cannot fail.
         transaction
-            .execute(universe, &mut transaction::no_outputs)
+            .execute(universe, (), &mut transaction::no_outputs)
             .unwrap();
 
         block

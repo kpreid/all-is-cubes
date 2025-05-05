@@ -300,7 +300,7 @@ mod tests {
         )
         .await;
         install_txn
-            .execute(&mut universe, &mut transaction::no_outputs)
+            .execute(&mut universe, (), &mut transaction::no_outputs)
             .unwrap();
 
         // Initial state: no update.

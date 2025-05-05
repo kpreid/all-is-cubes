@@ -72,7 +72,7 @@ fn make_example_blocks(universe: &mut Universe) -> Vec<Block> {
         ))
         .unwrap();
         install_txn
-            .execute(universe, &mut transaction::no_outputs)
+            .execute(universe, (), &mut transaction::no_outputs)
             .unwrap();
     }
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe).unwrap();

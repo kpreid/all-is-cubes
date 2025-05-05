@@ -104,7 +104,7 @@ fn TEXT(_: Context<'_>) {
     // TODO: detect collisions
     for Texhibit { text, f, offset } in texts {
         text.installation(Gridgid::from_translation(offset), f)
-            .execute(&mut space, &mut transaction::no_outputs)
+            .execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)
             .unwrap();
     }
 

@@ -67,7 +67,10 @@ where
     }
 
     /// Executes the tests and panics on failure.
-    pub fn test(self) {
+    pub fn test<'t>(self, context: Tr::Context<'t>)
+    where
+        Tr::Context<'t>: Clone,
+    {
         assert!(!self.transactions.is_empty());
         assert!(!self.target_factories.is_empty());
         for tap in self.derived_transactions() {
@@ -79,7 +82,12 @@ where
                     let output_callback = &mut |_| {
                         // TODO: allow assertions about the output
                     };
-                    match tap.transaction.commit(&mut target, check, output_callback) {
+                    match tap.transaction.commit(
+                        &mut target,
+                        context.clone(),
+                        check,
+                        output_callback,
+                    ) {
                         Ok(()) => {}
                         Err(e) => {
                             panic!(

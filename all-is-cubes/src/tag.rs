@@ -107,6 +107,8 @@ impl transaction::Merge for DefTransaction {
 
 impl transaction::Transaction for DefTransaction {
     type Target = TagDef;
+    // This ReadTicket is not currently used, but at least for now, *all* universe member transactions are to have ReadTicket as their context type.
+    type Context<'a> = universe::ReadTicket<'a>;
     type CommitCheck = ();
     type Output = transaction::NoOutput;
     type Mismatch = Infallible;
@@ -118,6 +120,7 @@ impl transaction::Transaction for DefTransaction {
     fn commit(
         &self,
         _: &mut Self::Target,
+        _: Self::Context<'_>,
         (): Self::CommitCheck,
         _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {

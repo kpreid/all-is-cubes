@@ -11,8 +11,8 @@ use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transacti
 #[cfg(doc)]
 use crate::universe::HandleError;
 use crate::universe::{
-    AnyHandle, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, Universe, UniverseId,
-    UniverseMember, UniverseTable, WriteGuard,
+    AnyHandle, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadTicket, Universe,
+    UniverseId, UniverseMember, UniverseTable, WriteGuard,
 };
 
 // Reëxports for macro-generated types
@@ -53,6 +53,7 @@ where
     O: Transactional + 'static,
 {
     type Target = ();
+    type Context<'a> = <O::Transaction as Transaction>::Context<'a>;
     type CommitCheck = TransactionInUniverseCheck<O>;
     type Output = <O::Transaction as Transaction>::Output;
     type Mismatch = <O::Transaction as Transaction>::Mismatch;
@@ -70,11 +71,12 @@ where
     fn commit(
         &self,
         _dummy_target: &mut (),
+        context: Self::Context<'_>,
         mut tu_check: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
         self.transaction
-            .commit(&mut tu_check.guard, tu_check.check, outputs)
+            .commit(&mut tu_check.guard, context, tu_check.check, outputs)
     }
 }
 
@@ -164,21 +166,22 @@ pub(in crate::universe) fn anytxn_merge_helper<O>(
     t1.commit_merge(t2, *check.downcast().unwrap())
 }
 
-/// Called from `impl Commit for AnyTransaction`
-pub(in crate::universe) fn anytxn_commit_helper<O>(
+/// Called from `impl Transaction for AnyTransaction`
+pub(in crate::universe) fn anytxn_commit_helper<'t, O>(
     transaction: &TransactionInUniverse<O>,
+    read_ticket: ReadTicket<'t>,
     check: AnyTransactionCheck,
     outputs: &mut dyn FnMut(<TransactionInUniverse<O> as Transaction>::Output),
 ) -> Result<(), CommitError>
 where
     O: Transactional,
-    TransactionInUniverse<O>: Transaction<Target = ()>,
+    TransactionInUniverse<O>: Transaction<Target = (), Context<'t> = ReadTicket<'t>>,
 {
     let check: <TransactionInUniverse<O> as Transaction>::CommitCheck =
         *(check.downcast().map_err(|_| {
             CommitError::message::<AnyTransaction>("type mismatch in check data".into())
         })?);
-    transaction.commit(&mut (), check, outputs)
+    transaction.commit(&mut (), read_ticket, check, outputs)
 }
 
 /// A [`Transaction`] which operates on one or more objects in a [`Universe`]
@@ -468,6 +471,7 @@ impl From<AnyTransaction> for UniverseTransaction {
 
 impl Transaction for UniverseTransaction {
     type Target = Universe;
+    type Context<'a> = ();
     type CommitCheck = UniverseCommitCheck;
     type Output = transaction::NoOutput;
     type Mismatch = UniverseMismatch;
@@ -531,6 +535,7 @@ impl Transaction for UniverseTransaction {
     fn commit(
         &self,
         target: &mut Universe,
+        (): Self::Context<'_>,
         checks: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
@@ -567,6 +572,7 @@ impl Transaction for UniverseTransaction {
 
         behaviors.commit(
             &mut target.behaviors,
+            (),
             check_behaviors,
             &mut transaction::no_outputs,
         )?;
@@ -739,9 +745,12 @@ impl MemberTxn {
                 assert!(check.is_none());
                 Ok(())
             }
-            MemberTxn::Modify(txn) => {
-                txn.commit(&mut (), check.expect("missing check value"), outputs)
-            }
+            MemberTxn::Modify(txn) => txn.commit(
+                &mut (),
+                universe.read_ticket(),
+                check.expect("missing check value"),
+                outputs,
+            ),
             MemberTxn::Insert(pending_handle) => {
                 pending_handle
                     .insert_and_upgrade_pending(universe)
@@ -1139,7 +1148,7 @@ mod tests {
         let pending_2 = pending_1.clone();
 
         UniverseTransaction::insert(pending_2)
-            .execute(&mut u, &mut drop)
+            .execute(&mut u, (), &mut drop)
             .unwrap();
 
         assert_eq!(pending_1.universe_id(), Some(u.universe_id()));
@@ -1159,7 +1168,7 @@ mod tests {
         UniverseTransaction::insert(foo.clone())
             .merge(UniverseTransaction::insert(bar.clone()))
             .expect("merge should allow 2 pending")
-            .execute(&mut u, &mut drop)
+            .execute(&mut u, (), &mut drop)
             .expect("execute");
 
         // Now check all the naming turned out correctly.
@@ -1193,7 +1202,7 @@ mod tests {
             )
             .target(Universe::new)
             // TODO: target with existing members
-            .test();
+            .test(());
     }
 
     #[test]
@@ -1204,7 +1213,7 @@ mod tests {
         let s1 = u1.insert_anonymous(Space::empty_positive(1, 1, 1));
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(s1);
 
-        let e = t1.execute(&mut u2, &mut drop).unwrap_err();
+        let e = t1.execute(&mut u2, (), &mut drop).unwrap_err();
         assert!(matches!(e, ExecuteError::Check(_)));
     }
 
@@ -1231,7 +1240,7 @@ mod tests {
             .unwrap();
         let txn = UniverseTransaction::insert(handle);
 
-        let e = txn.execute(&mut u2, &mut drop).unwrap_err();
+        let e = txn.execute(&mut u2, (), &mut drop).unwrap_err();
         assert_eq!(
             dbg!(e),
             ExecuteError::Check(UniverseMismatch::Member(transaction::MapMismatch {
@@ -1251,8 +1260,8 @@ mod tests {
         let mut u2 = Universe::new();
         let txn = UniverseTransaction::insert(handle);
 
-        txn.execute(&mut u1, &mut drop).unwrap();
-        let e = txn.execute(&mut u2, &mut drop).unwrap_err();
+        txn.execute(&mut u1, (), &mut drop).unwrap();
+        let e = txn.execute(&mut u2, (), &mut drop).unwrap_err();
 
         assert_eq!(
             dbg!(e),
@@ -1269,7 +1278,7 @@ mod tests {
     #[test]
     fn handle_error_from_handle_execute() {
         let e = Handle::<Space>::new_gone("foo".into())
-            .execute(&SpaceTransaction::default())
+            .execute(ReadTicket::stub(), &SpaceTransaction::default())
             .unwrap_err();
 
         assert_eq!(e, ExecuteError::Handle(HandleError::Gone("foo".into())));
@@ -1282,6 +1291,6 @@ mod tests {
         let mut u = Universe::new();
         let txn = SpaceTransaction::default().bind(Handle::<Space>::new_gone("foo".into()));
 
-        _ = txn.execute(&mut u, &mut transaction::no_outputs);
+        _ = txn.execute(&mut u, (), &mut transaction::no_outputs);
     }
 }

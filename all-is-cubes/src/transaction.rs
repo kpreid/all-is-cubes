@@ -52,6 +52,10 @@ pub trait Transaction: Merge {
     /// call `commit` without `check`.
     type CommitCheck: 'static;
 
+    /// Data which must be passed when committing the transaction.
+    /// Use `()` if none is needed.
+    type Context<'a>;
+
     /// The results of a [`Transaction::commit()`] or [`Transaction::execute()`].
     /// Each commit may produce any number of these messages.
     ///
@@ -97,6 +101,7 @@ pub trait Transaction: Merge {
     fn commit(
         &self,
         target: &mut Self::Target,
+        context: Self::Context<'_>,
         check: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError>;
@@ -109,9 +114,10 @@ pub trait Transaction: Merge {
     /// # use all_is_cubes::universe::{Universe, UniverseTransaction};
     /// # let transaction = UniverseTransaction::default();
     /// # let target = &mut Universe::new();
+    /// # let context = ();
     /// # let outputs = &mut no_outputs;
     /// let check = transaction.check(target).map_err(ExecuteError::Check)?;
-    /// transaction.commit(target, check, outputs).map_err(ExecuteError::Commit)?;
+    /// transaction.commit(target, context, check, outputs).map_err(ExecuteError::Commit)?;
     /// # Ok::<(), ExecuteError<UniverseTransaction>>(())
     /// ```
     ///
@@ -119,10 +125,11 @@ pub trait Transaction: Merge {
     fn execute(
         &self,
         target: &mut Self::Target,
+        context: Self::Context<'_>,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), ExecuteError<Self>> {
         let check = self.check(target).map_err(ExecuteError::Check)?;
-        self.commit(target, check, outputs)
+        self.commit(target, context, check, outputs)
             .map_err(ExecuteError::Commit)
     }
 
@@ -417,17 +424,18 @@ pub trait Transactional {
     /// Ideally, we would have an `async` version of this function too, but that
     /// is not possible, because the required borrowing pattern is not currently
     /// expressible when writing the future-returning closure it would require.
-    fn transact<F, O>(&mut self, f: F) -> Result<O, ExecuteError<Self::Transaction>>
+    fn transact<'c, F, O>(&mut self, f: F) -> Result<O, ExecuteError<Self::Transaction>>
     where
         F: FnOnce(
             &mut Self::Transaction,
             &Self,
         ) -> Result<O, <Self::Transaction as Merge>::Conflict>,
-        Self::Transaction: Transaction<Target = Self, Output = NoOutput> + Default,
+        Self::Transaction:
+            Transaction<Target = Self, Context<'c> = (), Output = NoOutput> + Default,
     {
         let mut transaction = Self::Transaction::default();
         let output = f(&mut transaction, self).map_err(ExecuteError::Merge)?;
-        transaction.execute(self, &mut no_outputs)?;
+        transaction.execute(self, (), &mut no_outputs)?;
         Ok(output)
     }
 }
