@@ -147,8 +147,7 @@ struct CsmTester<const MBM: usize> {
 }
 
 impl<const MBM: usize> CsmTester<MBM> {
-    fn new(space: Space, view_distance: f64) -> Self {
-        let mut universe = Universe::new();
+    fn new(universe: Universe, space: Space, view_distance: f64) -> Self {
         let space_handle = universe.insert_anonymous(space);
         let csm = ChunkedSpaceMesh::new(space_handle.clone(), NoTextures, true);
         let camera = Camera::new(
@@ -213,8 +212,11 @@ impl<const MBM: usize> CsmTester<MBM> {
 
 #[test]
 fn basic_chunk_presence() {
-    let mut tester: CsmTester<NO_INSTANCES> =
-        CsmTester::new(Space::empty_positive(1, 1, 1), LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(
+        Universe::new(),
+        Space::empty_positive(1, 1, 1),
+        LARGE_VIEW_DISTANCE,
+    );
     tester.update(|_| {});
     assert_ne!(None, tester.csm.chunk(ChunkPos::new(0, 0, 0)));
     // There should not be a chunk where there's no Space
@@ -224,8 +226,11 @@ fn basic_chunk_presence() {
 
 #[test]
 fn sort_view_every_frame_only_if_transparent() {
-    let mut tester: CsmTester<NO_INSTANCES> =
-        CsmTester::new(Space::empty_positive(1, 1, 1), LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(
+        Universe::new(),
+        Space::empty_positive(1, 1, 1),
+        LARGE_VIEW_DISTANCE,
+    );
     tester.update(|u| {
         assert!(!u.indices_only);
     });
@@ -268,7 +273,7 @@ fn graphics_options_change() {
         .filled_with(block::from_color!(1., 1., 1., 0.25))
         .build();
 
-    let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(space, 200.0);
+    let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(Universe::new(), space, 200.0);
     tester.camera.set_options(options.clone());
 
     let mut vertices = None;
@@ -289,6 +294,7 @@ fn graphics_options_change() {
 fn drop_chunks_when_moving() {
     // use small view distance in a large space (especially large in x)
     let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(
+        Universe::new(),
         Space::builder(GridAab::from_lower_upper(
             [-1000, -100, -100],
             [1000, 100, 100],
@@ -323,8 +329,11 @@ fn drop_chunks_when_moving() {
 /// update itself.
 #[test]
 fn did_not_finish_detection() {
-    let mut tester: CsmTester<NO_INSTANCES> =
-        CsmTester::new(Space::empty_positive(1000, 1, 1), LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(
+        Universe::new(),
+        Space::empty_positive(1000, 1, 1),
+        LARGE_VIEW_DISTANCE,
+    );
 
     {
         eprintln!("--- timing out update");
@@ -383,7 +392,8 @@ fn instances_grouped_by_block() {
     })
     .unwrap();
 
-    let mut tester: CsmTester<ALL_INSTANCES> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<ALL_INSTANCES> =
+        CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
     tester.update(|_| {});
 
     assert_eq!(
@@ -419,7 +429,7 @@ fn instances_for_animated() {
     // TODO(instancing): Kludge: the question "should we use instances *at all*" has not yet been
     // separated from the question of "should we use instances always". We care about the former
     // and not the latter here.
-    let mut tester: CsmTester<1000> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<1000> = CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
     tester.update(|_| {});
 
     assert_eq!(tester.instances(), vec![(index_of_anim, vec![[1, 0, 0]])]);
@@ -454,7 +464,7 @@ fn instances_dont_dirty_mesh_when_block_changes() {
         })
         .unwrap();
 
-    let mut tester: CsmTester<1000> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<1000> = CsmTester::new(universe, space, LARGE_VIEW_DISTANCE);
     tester.update(|_| {});
 
     // Make a change to the block defunition...
@@ -502,7 +512,7 @@ fn instances_dont_dirty_mesh_when_space_changes() {
     let index_of_anim = space.get_block_index([1, 0, 0]).unwrap();
 
     // Initialize
-    let mut tester: CsmTester<1000> = CsmTester::new(space, LARGE_VIEW_DISTANCE);
+    let mut tester: CsmTester<1000> = CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
     tester.update(|_| {});
 
     // Check initial state
