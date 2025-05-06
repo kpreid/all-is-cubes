@@ -183,6 +183,22 @@ impl<T: ?Sized> RwLock<T> {
 
         result.map(RwLockWriteGuard)
     }
+
+    pub fn into_inner(self) -> Result<T, LockError<T>>
+    where
+        T: Sized,
+    {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "std")] {
+                match self.0.into_inner() {
+                    Ok(value) => Ok(value),
+                    Err(poison_error) => Err(LockError::Poisoned(poison_error.into_inner())),
+                }
+            } else {
+                Ok(self.0.into_inner())
+            }
+        }
+    }
 }
 
 impl<T: ?Sized> ops::Deref for MutexGuard<'_, T> {
