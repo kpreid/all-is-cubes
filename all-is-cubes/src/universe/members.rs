@@ -17,8 +17,8 @@ use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
-    ErasedHandle, Handle, HandleSet, InsertError, Name, ReadTicket, RootHandle, Universe,
-    UniverseIter, universe_txn as ut,
+    ErasedHandle, Handle, HandleSet, InsertError, Name, RootHandle, Universe, UniverseIter,
+    universe_txn as ut,
 };
 use crate::util::Refmt as _;
 
@@ -271,20 +271,20 @@ macro_rules! member_enums_and_impls {
         }
 
         impl transaction::Transaction for AnyTransaction {
-            type Target = ();
-            type Context<'a> = ReadTicket<'a>;
+            type Target = Universe;
+            type Context<'a> = ();
             type CommitCheck = ut::AnyTransactionCheck;
             type Output = transaction::NoOutput;
             type Mismatch = AnyTransactionMismatch;
 
             fn check(
                 &self,
-                _target: &(),
+                universe: &Universe,
             ) -> Result<Self::CommitCheck, Self::Mismatch> {
                 Ok::<Self::CommitCheck, Self::Mismatch>(match self {
                     Self::Noop => Box::new(()),
                     $(
-                        Self::$member_type(t) => Box::new(t.check(&())
+                        Self::$member_type(t) => Box::new(t.check(universe)
                             .map_err(AnyTransactionMismatch::$member_type)?),
                     )*
                 })
@@ -292,14 +292,14 @@ macro_rules! member_enums_and_impls {
 
             fn commit(
                 &self,
-                _target: &mut (),
-                read_ticket: Self::Context<'_>,
+                universe: &mut Universe,
+                (): Self::Context<'_>,
                 check: Self::CommitCheck,
                 outputs: &mut dyn FnMut(Self::Output),
             ) -> Result<(), transaction::CommitError> {
                 match self {
                     Self::Noop => Ok(()),
-                    $( Self::$member_type(t) => ut::anytxn_commit_helper(t, read_ticket, check, outputs), )*
+                    $( Self::$member_type(t) => ut::anytxn_commit_helper(t, universe, check, outputs), )*
                 }
             }
         }

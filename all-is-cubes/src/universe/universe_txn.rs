@@ -51,14 +51,15 @@ pub(in crate::universe) struct TransactionInUniverse<O: Transactional + 'static>
 impl<O> Transaction for TransactionInUniverse<O>
 where
     O: Transactional + 'static,
+    for<'a> O::Transaction: Transaction<Context<'a> = ReadTicket<'a>>,
 {
-    type Target = ();
-    type Context<'a> = <O::Transaction as Transaction>::Context<'a>;
+    type Target = Universe;
+    type Context<'a> = ();
     type CommitCheck = TransactionInUniverseCheck<O>;
     type Output = <O::Transaction as Transaction>::Output;
     type Mismatch = <O::Transaction as Transaction>::Mismatch;
 
-    fn check(&self, (): &()) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(&self, _universe: &Universe) -> Result<Self::CommitCheck, Self::Mismatch> {
         let guard = self
             .target
             .try_borrow_mut()
@@ -70,13 +71,17 @@ where
 
     fn commit(
         &self,
-        _dummy_target: &mut (),
-        context: Self::Context<'_>,
+        universe: &mut Universe,
+        (): Self::Context<'_>,
         mut tu_check: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        self.transaction
-            .commit(&mut tu_check.guard, context, tu_check.check, outputs)
+        self.transaction.commit(
+            &mut tu_check.guard,
+            universe.read_ticket(),
+            tu_check.check,
+            outputs,
+        )
     }
 }
 
@@ -167,21 +172,21 @@ pub(in crate::universe) fn anytxn_merge_helper<O>(
 }
 
 /// Called from `impl Transaction for AnyTransaction`
-pub(in crate::universe) fn anytxn_commit_helper<'t, O>(
+pub(in crate::universe) fn anytxn_commit_helper<'c, O>(
     transaction: &TransactionInUniverse<O>,
-    read_ticket: ReadTicket<'t>,
+    universe: &mut Universe,
     check: AnyTransactionCheck,
     outputs: &mut dyn FnMut(<TransactionInUniverse<O> as Transaction>::Output),
 ) -> Result<(), CommitError>
 where
     O: Transactional,
-    TransactionInUniverse<O>: Transaction<Target = (), Context<'t> = ReadTicket<'t>>,
+    TransactionInUniverse<O>: Transaction<Target = Universe, Context<'c> = ()>,
 {
     let check: <TransactionInUniverse<O> as Transaction>::CommitCheck =
         *(check.downcast().map_err(|_| {
             CommitError::message::<AnyTransaction>("type mismatch in check data".into())
         })?);
-    transaction.commit(&mut (), read_ticket, check, outputs)
+    transaction.commit(universe, (), check, outputs)
 }
 
 /// A [`Transaction`] which operates on one or more objects in a [`Universe`]
@@ -680,11 +685,10 @@ impl MemberTxn {
             MemberTxn::Noop => Ok(MemberCommitCheck(None)),
             // Kludge: The individual `AnyTransaction`s embed the `Handle<T>` they operate on --
             // so we don't actually pass anything here.
-            MemberTxn::Modify(txn) => {
-                Ok(MemberCommitCheck(Some(txn.check(&()).map_err(|e| {
-                    MemberMismatch::Modify(ModifyMemberMismatch(e))
-                })?)))
-            }
+            MemberTxn::Modify(txn) => Ok(MemberCommitCheck(Some(
+                txn.check(universe)
+                    .map_err(|e| MemberMismatch::Modify(ModifyMemberMismatch(e)))?,
+            ))),
             MemberTxn::Insert(pending_handle) => {
                 {
                     if pending_handle.name() != *name {
@@ -745,12 +749,9 @@ impl MemberTxn {
                 assert!(check.is_none());
                 Ok(())
             }
-            MemberTxn::Modify(txn) => txn.commit(
-                &mut (),
-                universe.read_ticket(),
-                check.expect("missing check value"),
-                outputs,
-            ),
+            MemberTxn::Modify(txn) => {
+                txn.commit(universe, (), check.expect("missing check value"), outputs)
+            }
             MemberTxn::Insert(pending_handle) => {
                 pending_handle
                     .insert_and_upgrade_pending(universe)
