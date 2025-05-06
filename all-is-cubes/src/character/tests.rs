@@ -88,9 +88,9 @@ fn inventory_transaction() {
     let character_handle = universe.insert_anonymous(character);
 
     let item = Tool::InfiniteBlocks(AIR);
-    character_handle
-        .execute(
-            universe.read_ticket(),
+    universe
+        .execute_1(
+            &character_handle,
             &CharacterTransaction::inventory(InventoryTransaction::insert([item.clone()])),
         )
         .unwrap();

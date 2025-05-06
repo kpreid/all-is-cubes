@@ -244,9 +244,10 @@ pub enum ExecuteError<Txn: Transaction = UniverseTransaction> {
     /// unlike [`ExecuteError::Commit`], does not indicate data corruption,
     /// but code which triggers it should generally be considered incorrect.
     ///
-    /// Note that this error is returned by [`Handle::execute()`], but transactions whose
-    /// `check` involves accessing handles will instead produce [`ExecuteError::Check`]s.
-    /// This may change in the future.
+    /// Note that not all cases of failure due to handle access will return this error;
+    /// those means of transaction execution which are specifically asked to
+    /// act on a handle do, whereas handles read during the check phase will produce
+    /// [`ExecuteError::Check`], and so on. This may change in the future.
     Handle(HandleError),
 }
 

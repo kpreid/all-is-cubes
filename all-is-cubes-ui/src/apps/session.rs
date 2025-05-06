@@ -21,7 +21,9 @@ use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{self, Handle, ReadTicket, Universe, UniverseId, UniverseStepInfo};
+use all_is_cubes::universe::{
+    self, Handle, ReadTicket, Universe, UniverseId, UniverseStepInfo, UniverseTransaction,
+};
 use all_is_cubes::util::{
     ConciseDebug, Fmt, Refmt as _, ShowStatus, StatusText, YieldProgressBuilder,
 };
@@ -1202,6 +1204,16 @@ impl MainTaskContext {
         self.with_ref(|shuttle| f(shuttle.read_tickets()))
     }
 
+    /// Executes a transaction on the game universe of this session..
+    pub fn execute(
+        &mut self,
+        transaction: &UniverseTransaction,
+    ) -> Result<(), transaction::ExecuteError> {
+        self.with_mut(|shuttle| {
+            transaction.execute(&mut shuttle.game_universe, (), &mut transaction::no_outputs)
+        })
+    }
+
     /// Replaces the game universe, such as for initial setup or because the player
     /// chose to load a new one.
     /// This also resets the character to be the new universe's default character.
@@ -1360,28 +1372,23 @@ mod tests {
         session.listen_fluff(sink.listener());
 
         // Try some fluff with the initial state (we haven't even stepped the session)
-        space1
-            .execute(session.universe().read_ticket(), &st)
-            .unwrap();
+        session.universe_mut().execute_1(&space1, &st).unwrap();
         assert_eq!(sink.drain(), vec![Fluff::Happened]);
 
         // Change spaces
-        character
-            .execute(
-                session.universe().read_ticket(),
+        session
+            .universe_mut()
+            .execute_1(
+                &character,
                 &CharacterTransaction::move_to_space(space2.clone()),
             )
             .unwrap();
         session.maybe_step_universe();
 
         // Check we're now listening to the new space only
-        space1
-            .execute(session.universe().read_ticket(), &st)
-            .unwrap();
+        session.universe_mut().execute_1(&space1, &st).unwrap();
         assert_eq!(sink.drain(), vec![]);
-        space2
-            .execute(session.universe().read_ticket(), &st)
-            .unwrap();
+        session.universe_mut().execute_1(&space2, &st).unwrap();
         assert_eq!(sink.drain(), vec![Fluff::Happened]);
     }
 

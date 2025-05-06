@@ -478,9 +478,9 @@ fn listens_to_block_changes() {
 
     // Now mutate the block def .
     let new_block = block::from_color!(Rgba::BLACK);
-    block_def_handle
-        .execute(
-            universe.read_ticket(),
+    universe
+        .execute_1(
+            &block_def_handle,
             &BlockDefTransaction::overwrite(new_block),
         )
         .unwrap();
@@ -527,9 +527,9 @@ fn indirect_becomes_evaluation_error() {
     space.listen(sink.listener());
 
     // Make the block def refer to itself, guaranteeing an evaluation error
-    block_def_ref
-        .execute(
-            universe.read_ticket(),
+    universe
+        .execute_1(
+            &block_def_ref,
             &BlockDefTransaction::overwrite(block.clone()),
         )
         .unwrap();

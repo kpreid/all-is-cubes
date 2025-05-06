@@ -147,7 +147,7 @@ struct CsmTester<const MBM: usize> {
 }
 
 impl<const MBM: usize> CsmTester<MBM> {
-    fn new(universe: Universe, space: Space, view_distance: f64) -> Self {
+    fn new(mut universe: Universe, space: Space, view_distance: f64) -> Self {
         let space_handle = universe.insert_anonymous(space);
         let csm = ChunkedSpaceMesh::new(space_handle.clone(), NoTextures, true);
         let camera = Camera::new(
@@ -235,9 +235,9 @@ fn sort_view_every_frame_only_if_transparent() {
         assert!(!u.indices_only);
     });
     tester
-        .space
-        .execute(
-            tester.universe.read_ticket(),
+        .universe
+        .execute_1(
+            &tester.space,
             &SpaceTransaction::set_cube(
                 [0, 0, 0],
                 None,
@@ -468,9 +468,10 @@ fn instances_dont_dirty_mesh_when_block_changes() {
     tester.update(|_| {});
 
     // Make a change to the block defunition...
-    anim_def
-        .execute(
-            tester.universe.read_ticket(),
+    tester
+        .universe
+        .execute_1(
+            &anim_def,
             &BlockDefTransaction::overwrite(
                 Block::builder()
                     .display_name("replaced")
@@ -523,9 +524,9 @@ fn instances_dont_dirty_mesh_when_space_changes() {
 
     // Make a change to the space...
     tester
-        .space
-        .execute(
-            tester.universe.read_ticket(),
+        .universe
+        .execute_1(
+            &tester.space,
             &SpaceTransaction::set_cube([1, 0, 0], Some(anim.clone()), Some(AIR)),
         )
         .unwrap();

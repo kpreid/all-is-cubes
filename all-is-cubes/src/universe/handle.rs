@@ -191,7 +191,7 @@ impl<T: 'static> Handle<T> {
     /// Use [`Universe::try_modify`] otherwise.
     ///
     /// **Warning:** Misusing this operation can disrupt relationships;
-    /// prefer [`Handle::execute()`] if the desired mutation can be
+    /// prefer [`Handle::execute_on_pending()`] if the desired mutation can be
     /// expressed as a [`Transaction`]. If you must use this, the requirement for
     /// correctness is that you must not replace the referent with a different value;
     /// only use the mutation operations provided by `T`.
@@ -253,14 +253,17 @@ impl<T: 'static> Handle<T> {
         Ok(WriteGuard(inner))
     }
 
-    /// Execute the given transaction on the referent.
+    /// Execute the given transaction on the `T` inside.
+    ///
+    /// This handle must not have been inserted into a [`Universe`] yet.
+    /// Use [`Universe::execute_1()`] otherwise.
     ///
     /// Returns an error if the transaction's preconditions are not met,
     /// if the transaction encountered an internal error, or if the referent
     /// was already being read or written (which is expressed as an
     /// [`ExecuteError::Commit`], because it is a shouldn’t-happen kind of error).
     #[inline(never)]
-    pub fn execute<'ticket>(
+    pub fn execute_on_pending<'ticket>(
         &self,
         read_ticket: ReadTicket<'ticket>,
         transaction: &<T as Transactional>::Transaction,

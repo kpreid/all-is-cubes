@@ -298,8 +298,8 @@ impl PageInst {
     ) -> Result<Handle<Space>, InstallVuiError> {
         let space = universe.insert_anonymous(size.create_space());
         let txn = install_widgets(LayoutGrant::new(size.space_bounds()), &self.page.tree)?;
-        space
-            .execute(universe.read_ticket(), &txn)
+        universe
+            .execute_1(&space, &txn)
             .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
 
         // Initialize lighting

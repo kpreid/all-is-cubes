@@ -6,8 +6,8 @@ use all_is_cubes::character::{self, Character};
 use all_is_cubes::euclid::{self, num::Zero as _, vec3};
 use all_is_cubes::math::{Cube, NotNan};
 use all_is_cubes::physics::BodyTransaction;
-use all_is_cubes::transaction::Merge;
-use all_is_cubes::universe::Handle;
+use all_is_cubes::transaction::{Merge, Transaction as _};
+use all_is_cubes::universe::{Handle, UniverseTransaction};
 use all_is_cubes::{behavior, listen, universe};
 
 use crate::record::RecordOptions;
@@ -50,30 +50,26 @@ where
 pub(crate) fn configure_universe_for_recording(
     character_handle: Option<&Handle<Character>>,
     options: &RecordOptions,
-) {
+) -> UniverseTransaction {
     // Add some motion to animation recordings.
     // TODO: replace this with a general camera scripting mechanism
     if let Some(character_handle) = character_handle {
         if let Some(anim) = &options.animation {
-            character_handle
-                .execute(
-                    universe::ReadTicket::stub(),
-                    &character::CharacterTransaction::behaviors(
-                        behavior::BehaviorSetTransaction::insert(
-                            (),
-                            Arc::new(AutoRotate {
-                                angle: NotNan::zero(),
-                                rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64())
-                                    .unwrap(),
-                            }),
-                        ),
-                    ),
-                )
-                .unwrap();
+            return character::CharacterTransaction::behaviors(
+                behavior::BehaviorSetTransaction::insert(
+                    (),
+                    Arc::new(AutoRotate {
+                        angle: NotNan::zero(),
+                        rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
+                    }),
+                ),
+            )
+            .bind(character_handle.clone());
         }
     } else {
         log::warn!("Recording universe contains no character.");
     }
+    UniverseTransaction::default()
 }
 
 /// A simple behavior which causes a `Character`'s viewpoint to rotate without user input,
@@ -89,7 +85,7 @@ impl behavior::Behavior<Character> for AutoRotate {
     fn step(
         &self,
         context: &behavior::Context<'_, Character>,
-    ) -> (universe::UniverseTransaction, behavior::Then) {
+    ) -> (UniverseTransaction, behavior::Then) {
         let mut new_self = *self;
         new_self.angle += new_self.rate * context.tick.delta_t().as_secs_f64();
 

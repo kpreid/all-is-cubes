@@ -261,9 +261,9 @@ mod tests {
         assert_eq!(t.watcher.character(), Some(&t.character));
 
         // Make a change to the character and observe update
-        t.character
-            .execute(
-                t.universe.read_ticket(),
+        t.universe
+            .execute_1(
+                &t.character,
                 &CharacterTransaction::inventory(inv::InventoryTransaction::insert([
                     inv::Tool::Activate,
                 ])),
@@ -283,9 +283,9 @@ mod tests {
             t.universe.read_ticket(),
             t.space.clone(),
         ));
-        new_character
-            .execute(
-                t.universe.read_ticket(),
+        t.universe
+            .execute_1(
+                &new_character,
                 &CharacterTransaction::inventory(inv::InventoryTransaction::insert([
                     inv::Tool::Activate,
                 ])),

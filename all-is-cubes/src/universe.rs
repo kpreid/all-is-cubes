@@ -29,7 +29,7 @@ use crate::block::{self, BlockDefStepInfo};
 use crate::character::{Character, CharacterStepInfo};
 use crate::save::WhenceUniverse;
 use crate::space::{Space, SpaceStepInfo};
-use crate::transaction::{self, Transaction};
+use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::util::{ConciseDebug, Refmt as _, ShowStatus, StatusText};
 use crate::{behavior, time};
 
@@ -320,6 +320,35 @@ impl Universe {
             origin: core::panic::Location::caller(),
             _phantom: core::marker::PhantomData,
         }
+    }
+
+    /// Execute the given transaction on the given handle's referent.
+    ///
+    /// This equivalent to, but more efficient than, creating a single-member
+    /// [`UniverseTransaction`],
+    ///
+    /// Returns an error if the transaction's preconditions are not met,
+    /// if the transaction encountered an internal error, if the referent
+    /// was already being read or written (which is expressed as an
+    /// [`ExecuteError::Commit`], because it is a shouldn’t-happen kind of error),
+    /// or if the handle does not belong to this universe.
+    #[inline(never)]
+    pub fn execute_1<'u, T>(
+        &'u mut self,
+        handle: &Handle<T>,
+        transaction: &<T as Transactional>::Transaction,
+    ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
+    where
+        T::Transaction: Transaction<Output = transaction::NoOutput, Context<'u> = ReadTicket<'u>>,
+        T: UniverseMember + Transactional,
+    {
+        let outcome: Result<
+            Result<(), ExecuteError<<T as Transactional>::Transaction>>,
+            HandleError,
+        > = self.try_modify(handle, |data| {
+            transaction.execute(data, self.read_ticket(), &mut transaction::no_outputs)
+        });
+        outcome.map_err(ExecuteError::Handle)?
     }
 
     /// Advance time for all members.
@@ -679,7 +708,7 @@ impl Universe {
     /// Apply the given function to the referent of the given handle.
     ///
     /// **Warning:** Misusing this operation can disrupt connections between objects in
-    /// the [`Universe`]; prefer [`Handle::execute()`] if the desired mutation can be
+    /// the [`Universe`]; prefer [`Universe::execute_1()`] if the desired mutation can be
     /// expressed as a [`Transaction`]. If you must use this, the requirement for
     /// correctness is that you must not replace the referent with a different value;
     /// only use the mutation operations provided by `T`.

@@ -97,13 +97,14 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             }
             Err(e) => Err(e).context("failed to create universe from requested template or file"),
         };
-        let mut universe = universe_result.unwrap_or_else(|e| report_error_and_exit(&ctx, e));
+        let mut startup_universe =
+            universe_result.unwrap_or_else(|e| report_error_and_exit(&ctx, e));
         log::trace!("Startup universe ready; switching...");
 
         logging
-            .finish(&mut universe)
+            .finish(&mut startup_universe)
             .unwrap_or_else(|e| report_error_and_exit(&ctx, e));
-        ctx.set_universe(universe);
+        ctx.set_universe(startup_universe);
         _ = universe_ready_signal.send(Ok(()));
 
         #[cfg(feature = "record")]
@@ -114,12 +115,20 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             let recording_cameras =
                 ctx.create_cameras(all_is_cubes::listen::constant(record_options.viewport()));
 
-            #[expect(clippy::shadow_unrelated)]
-            let recorder = ctx.with_universe(|universe| {
+            let record_setup_transaction = ctx.with_universe(|universe| {
                 record::configure_universe_for_recording(
                     universe.get_default_character().as_ref(),
                     &record_options,
+                )
+            });
+            if let Err(e) = ctx.execute(&record_setup_transaction) {
+                report_error_and_exit(
+                    &ctx,
+                    anyhow::Error::from(e).context("failed to configure session for recording"),
                 );
+            }
+
+            let recorder = ctx.with_universe(|universe| {
                 match record::Recorder::new(
                     record_options,
                     recording_cameras,

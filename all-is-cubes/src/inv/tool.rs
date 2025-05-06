@@ -728,7 +728,7 @@ mod tests {
         }
 
         fn equip_and_use_tool(
-            &self,
+            &mut self,
             stack: impl Into<Slot>,
         ) -> Result<UniverseTransaction, ToolError> {
             // Put the tool in inventory.
@@ -738,8 +738,8 @@ mod tests {
                 self.character().inventory().slots[usize::from(index)].clone(),
                 stack.into(),
             ));
-            self.character_handle
-                .execute(self.universe.read_ticket(), &insert_txn)
+            self.universe
+                .execute_1(&self.character_handle, &insert_txn)
                 .unwrap();
 
             // Invoke Inventory::use_tool, which knows how to assemble the answer into a
@@ -802,7 +802,7 @@ mod tests {
     #[test]
     fn use_activate_on_behavior() {
         let [existing] = make_some_blocks();
-        let tester = ToolTester::new(|m| {
+        let mut tester = ToolTester::new(|m| {
             m.set([1, 0, 0], &existing).unwrap();
         });
         assert_eq!(
@@ -827,7 +827,7 @@ mod tests {
             .display_name("before")
             .activation_action(Operation::Become(after.clone()))
             .build();
-        let tester = ToolTester::new(|m| {
+        let mut tester = ToolTester::new(|m| {
             m.set([1, 0, 0], &before).unwrap();
         });
 
@@ -884,7 +884,7 @@ mod tests {
 
     #[test]
     fn use_remove_block_without_target() {
-        let tester = ToolTester::new(|_| {});
+        let mut tester = ToolTester::new(|_| {});
         assert_eq!(
             tester.equip_and_use_tool(Tool::RemoveBlock { keep: true }),
             Err(ToolError::NothingSelected)
@@ -982,7 +982,7 @@ mod tests {
     #[test]
     fn use_block_with_inventory_config() {
         let [existing] = make_some_blocks();
-        let tester = ToolTester::new(|m| {
+        let mut tester = ToolTester::new(|m| {
             m.set([1, 0, 0], &existing).unwrap();
         });
 
@@ -1117,14 +1117,15 @@ mod tests {
     ) {
         let [existing, tool_block, obstacle] = make_some_blocks();
         let tool = tool_ctor(tool_block);
-        let tester = ToolTester::new(|m| {
+        let mut tester = ToolTester::new(|m| {
             m.set([1, 0, 0], &existing).unwrap();
         });
         // Place the obstacle after the raycast
+        let space_handle = tester.space_handle().clone();
         tester
-            .space_handle()
-            .execute(
-                tester.universe.read_ticket(),
+            .universe
+            .execute_1(
+                &space_handle,
                 &SpaceTransaction::set_cube([0, 0, 0], None, Some(obstacle.clone())),
             )
             .unwrap();
@@ -1140,7 +1141,7 @@ mod tests {
     ) {
         let [tool_block] = make_some_blocks();
         let tool = tool_ctor(tool_block);
-        let tester = ToolTester::new(|_| {});
+        let mut tester = ToolTester::new(|_| {});
         assert_eq!(
             tester.equip_and_use_tool(tool),
             Err(ToolError::NothingSelected)
@@ -1177,7 +1178,7 @@ mod tests {
             op: Operation::Become(placed.clone()),
             icon,
         };
-        let tester = ToolTester::new(|m| {
+        let mut tester = ToolTester::new(|m| {
             m.set([0, 0, 0], &existing).unwrap();
         });
 

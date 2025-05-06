@@ -1278,7 +1278,7 @@ mod tests {
     #[test]
     fn handle_error_from_handle_execute() {
         let e = Handle::<Space>::new_gone("foo".into())
-            .execute(ReadTicket::stub(), &SpaceTransaction::default())
+            .execute_on_pending(ReadTicket::stub(), &SpaceTransaction::default())
             .unwrap_err();
 
         assert_eq!(e, ExecuteError::Handle(HandleError::Gone("foo".into())));
