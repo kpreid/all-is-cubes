@@ -227,6 +227,7 @@ mod tests {
     use crate::camera::{Camera, Viewport, eye_for_look_at};
     use crate::content::make_some_voxel_blocks;
     use crate::raytracer::{CharacterBuf, CharacterRtData};
+    use crate::space::CubeTransaction;
     use crate::universe::Universe;
     use alloc::string::ToString;
     use euclid::{size2, vec3};
@@ -308,36 +309,33 @@ mod tests {
             .unwrap();
 
         let space = universe.insert_anonymous(space);
-        let read_ticket = universe.read_ticket();
-        let mut tester = EquivalenceTester::new(read_ticket, space.clone());
+        let mut tester = EquivalenceTester::new(universe.read_ticket(), space.clone());
 
-        tester.update_and_assert(read_ticket).unwrap();
+        tester.update_and_assert(universe.read_ticket()).unwrap();
 
         // Make some light changes
         universe
             .try_modify(&space, |space| space.fast_evaluate_light())
             .unwrap();
-        tester.update_and_assert(read_ticket).unwrap();
+        tester.update_and_assert(universe.read_ticket()).unwrap();
 
         // Add a second block
         universe
-            .try_modify(&space, |space| {
-                space
-                    .mutate(read_ticket, |m| m.set([1, 0, 0], &block2))
-                    .unwrap()
-            })
+            .execute_1(
+                &space,
+                &CubeTransaction::replacing(None, Some(block2)).at(Cube::new(1, 0, 0)),
+            )
             .unwrap();
-        tester.update_and_assert(read_ticket).unwrap();
+        tester.update_and_assert(universe.read_ticket()).unwrap();
 
         // Delete existing block
         universe
-            .try_modify(&space, |space| {
-                space
-                    .mutate(read_ticket, |m| m.set([0, 0, 0], &AIR))
-                    .unwrap()
-            })
+            .execute_1(
+                &space,
+                &CubeTransaction::replacing(None, Some(AIR)).at(Cube::new(0, 0, 0)),
+            )
             .unwrap();
-        tester.update_and_assert(read_ticket).unwrap();
+        tester.update_and_assert(universe.read_ticket()).unwrap();
 
         // TODO: Also test changing existing block's data
     }
@@ -354,29 +352,27 @@ mod tests {
             .unwrap();
 
         let space = universe.insert_anonymous(space);
-        let read_ticket = universe.read_ticket();
-        let mut tester = EquivalenceTester::new(read_ticket, space.clone());
+        let mut tester = EquivalenceTester::new(universe.read_ticket(), space.clone());
 
         {
             let _obstruction = space.try_borrow_mut().unwrap();
 
             assert_eq!(
-                tester.updating.update(read_ticket).unwrap_err(),
+                tester.updating.update(universe.read_ticket()).unwrap_err(),
                 HandleError::InUse(space.name().clone()),
             );
         }
 
         // Now after the failure, we should still successfully update.
-        tester.update_and_assert(read_ticket).unwrap();
+        tester.update_and_assert(universe.read_ticket()).unwrap();
 
         // And also follow changes correctly.
         universe
-            .try_modify(&space, |space| {
-                space
-                    .mutate(read_ticket, |m| m.set([1, 0, 0], &block2))
-                    .unwrap()
-            })
+            .execute_1(
+                &space,
+                &CubeTransaction::replacing(None, Some(block2)).at(Cube::new(1, 0, 0)),
+            )
             .unwrap();
-        tester.update_and_assert(read_ticket).unwrap();
+        tester.update_and_assert(universe.read_ticket()).unwrap();
     }
 }

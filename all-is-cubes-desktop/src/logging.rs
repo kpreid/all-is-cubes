@@ -326,25 +326,23 @@ fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::univer
     }
 
     if kinds.contains(&RerunDataKind::RenderMesh) {
-        if let Some(c) = universe.get_default_character() {
-            universe
-                .try_modify(&c, |c| {
-                    // TODO: implement live updates -- need to permanently attach this to the session
-                    // as another renderer, sort of.
-                    let mut rm = crate::glue::rerun_mesh::RerunMesher::new(
-                        destination.child(&rg::entity_path!("world-mesh")),
-                        c.space.clone(),
-                    );
-                    rm.update(
-                        universe.read_ticket(),
-                        &Camera::new(
-                            GraphicsOptions::default(),
-                            Viewport::with_scale(1.0, [1, 1]),
-                        ),
-                    );
-                    core::mem::forget(rm);
-                })
-                .unwrap();
+        if let Some(character_handle) = universe.get_default_character() {
+            let character = character_handle.read(universe.read_ticket()).unwrap();
+
+            // TODO: implement live updates -- need to permanently attach this to the session
+            // as another renderer, sort of.
+            let mut rm = crate::glue::rerun_mesh::RerunMesher::new(
+                destination.child(&rg::entity_path!("world-mesh")),
+                character.space.clone(),
+            );
+            rm.update(
+                universe.read_ticket(),
+                &Camera::new(
+                    GraphicsOptions::default(),
+                    Viewport::with_scale(1.0, [1, 1]),
+                ),
+            );
+            core::mem::forget(rm);
         } else {
             panic!("no character to render mesh from");
         }
