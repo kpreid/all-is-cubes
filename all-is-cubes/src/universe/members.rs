@@ -8,6 +8,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::ToString;
 use alloc::vec::Vec;
+use core::any::Any;
 use core::fmt;
 
 use crate::block::BlockDef;
@@ -415,6 +416,15 @@ member_enums_and_impls!(
     (Space, spaces),
     (TagDef, tags),
 );
+
+impl AnyHandle {
+    /// Downcast to a specific `Handle<T>` type.
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&Handle<T>> {
+        let handle: &dyn ErasedHandle = self.as_ref();
+        let handle: &dyn Any = handle;
+        handle.downcast_ref()
+    }
+}
 
 impl AsRef<dyn ErasedHandle> for AnyHandle {
     fn as_ref(&self) -> &dyn ErasedHandle {
