@@ -1000,13 +1000,15 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
     // Fix that by adding a feature to precalculate lighting for specific templates and store
     // the light data to be loaded when the template is instantiated.
     if false {
-        universe
+        let space_handle = universe
             .get_default_character()
             .unwrap()
             .read(universe.read_ticket())
             .unwrap()
             .space
-            .try_modify(|space| {
+            .clone();
+        universe
+            .try_modify(&space_handle, |space| {
                 space.evaluate_light::<time::NoTime>(1, |_| {});
             })
             .unwrap();

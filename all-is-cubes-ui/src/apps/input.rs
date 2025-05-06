@@ -309,9 +309,9 @@ impl InputProcessor {
         }
 
         // Direct character controls
-        if let Some(character_ref) = character_opt {
-            character_ref
-                .try_modify(|character| {
+        if let (Some(universe), Some(character_handle)) = (&universe, character_opt) {
+            universe
+                .try_modify(character_handle, |character| {
                     let movement = self.movement();
                     character.set_velocity_input(movement);
 
@@ -415,9 +415,9 @@ impl InputProcessor {
                 Key::Character(numeral) if numeral.is_ascii_digit() => {
                     let digit = numeral.to_digit(10).unwrap() as inv::Ix;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
-                    if let Some(character_ref) = character_opt {
-                        character_ref
-                            .try_modify(|c| c.set_selected_slot(1, slot))
+                    if let (Some(universe), Some(character_handle)) = (&universe, character_opt) {
+                        universe
+                            .try_modify(character_handle, |c| c.set_selected_slot(1, slot))
                             .expect("character was borrowed during apply_input()");
                     }
                 }

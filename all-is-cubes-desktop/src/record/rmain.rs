@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 
 use all_is_cubes::character::{self, Character};
@@ -55,12 +56,19 @@ pub(crate) fn configure_universe_for_recording(
     if let Some(character_handle) = character_handle {
         if let Some(anim) = &options.animation {
             character_handle
-                .try_modify(|c| {
-                    c.add_behavior(AutoRotate {
-                        angle: NotNan::zero(),
-                        rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
-                    })
-                })
+                .execute(
+                    universe::ReadTicket::stub(),
+                    &character::CharacterTransaction::behaviors(
+                        behavior::BehaviorSetTransaction::insert(
+                            (),
+                            Arc::new(AutoRotate {
+                                angle: NotNan::zero(),
+                                rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64())
+                                    .unwrap(),
+                            }),
+                        ),
+                    ),
+                )
                 .unwrap();
         }
     } else {

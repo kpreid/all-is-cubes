@@ -185,10 +185,13 @@ impl<T: 'static> Handle<T> {
         })
     }
 
-    /// Apply the given function to the `&mut T` inside.
+    /// Apply the given function to the `T` inside.
     ///
-    /// **Warning:** Misusing this operation can disrupt connections between objects in
-    /// the [`Universe`]; prefer [`Handle::execute()`] if the desired mutation can be
+    /// This handle must not have been inserted into a [`Universe`] yet.
+    /// Use [`Universe::try_modify`] otherwise.
+    ///
+    /// **Warning:** Misusing this operation can disrupt relationships;
+    /// prefer [`Handle::execute()`] if the desired mutation can be
     /// expressed as a [`Transaction`]. If you must use this, the requirement for
     /// correctness is that you must not replace the referent with a different value;
     /// only use the mutation operations provided by `T`.
@@ -196,8 +199,21 @@ impl<T: 'static> Handle<T> {
     /// Returns an error if the value is currently being accessed, or does not exist.
     ///
     /// TODO: If possible, completely replace this operation with transactions.
-    #[inline(never)]
-    pub fn try_modify<F, Out>(&self, function: F) -> Result<Out, HandleError>
+    pub fn try_modify_pending<F, Out>(&self, function: F) -> Result<Out, HandleError>
+    where
+        F: FnOnce(&mut T) -> Out,
+    {
+        self.try_modify(function)
+    }
+
+    /// Apply the given function to the `T` inside.
+    ///
+    /// This is the implementation shared between [`Handle::try_modify_pending()`]
+    /// and [`Universe::try_modify()`].
+    /// See their documentation for correct usage information.
+    /// They are split in this way because of planned changes such that they will
+    /// no longer share an implementation.
+    pub(in crate::universe) fn try_modify<F, Out>(&self, function: F) -> Result<Out, HandleError>
     where
         F: FnOnce(&mut T) -> Out,
     {

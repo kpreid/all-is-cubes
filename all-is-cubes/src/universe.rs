@@ -29,7 +29,7 @@ use crate::block::{self, BlockDefStepInfo};
 use crate::character::{Character, CharacterStepInfo};
 use crate::save::WhenceUniverse;
 use crate::space::{Space, SpaceStepInfo};
-use crate::transaction::{self, Transaction as _};
+use crate::transaction::{self, Transaction};
 use crate::util::{ConciseDebug, Refmt as _, ShowStatus, StatusText};
 use crate::{behavior, time};
 
@@ -674,6 +674,37 @@ impl Universe {
         gc_members(sounds);
         gc_members(spaces);
         gc_members(tags);
+    }
+
+    /// Apply the given function to the referent of the given handle.
+    ///
+    /// **Warning:** Misusing this operation can disrupt connections between objects in
+    /// the [`Universe`]; prefer [`Handle::execute()`] if the desired mutation can be
+    /// expressed as a [`Transaction`]. If you must use this, the requirement for
+    /// correctness is that you must not replace the referent with a different value;
+    /// only use the mutation operations provided by `T`.
+    ///
+    /// Returns an error if the value is currently being accessed, does not exist,
+    /// or does not belong to this universe.
+    ///
+    /// TODO: If possible, completely replace this operation with transactions.
+    // TODO: We're going to need to make this take `&mut self`, and `InputProcessor` will have
+    // trouble with that but we will want to rework it anyway.
+    #[inline(never)]
+    pub fn try_modify<T: UniverseMember, F, Out>(
+        &self,
+        handle: &Handle<T>,
+        function: F,
+    ) -> Result<Out, HandleError>
+    where
+        F: FnOnce(&mut T) -> Out,
+    {
+        if handle.universe_id() == Some(self.id) {
+            handle.try_modify(function)
+        } else {
+            // TODO: not the exactly correct error
+            Err(HandleError::InvalidTicket(handle.name()))
+        }
     }
 
     /// Traverse all members and find [`Handle`]s that were deserialized in disconnected form.

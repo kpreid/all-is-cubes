@@ -303,8 +303,8 @@ impl PageInst {
             .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
 
         // Initialize lighting
-        space
-            .try_modify(|space| {
+        universe
+            .try_modify(&space, |space| {
                 space.fast_evaluate_light();
                 space.evaluate_light::<time::NoTime>(10, |_| {});
             })

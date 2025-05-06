@@ -720,7 +720,7 @@ impl Shuttle {
                 // the player are clean (and not flashes of blackness).
                 if let Some(space_handle) = self.cursor_result.as_ref().map(Cursor::space) {
                     // TODO: make this a kind of SpaceTransaction, eliminating this try_modify.
-                    let _ = space_handle.try_modify(|space| {
+                    let _ = self.game_universe.try_modify(space_handle, |space| {
                         space.evaluate_light_for_time::<I>(Duration::from_millis(1));
                     });
                 }

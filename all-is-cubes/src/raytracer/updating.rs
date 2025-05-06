@@ -314,14 +314,14 @@ mod tests {
         tester.update_and_assert(read_ticket).unwrap();
 
         // Make some light changes
-        space
-            .try_modify(|space| space.fast_evaluate_light())
+        universe
+            .try_modify(&space, |space| space.fast_evaluate_light())
             .unwrap();
         tester.update_and_assert(read_ticket).unwrap();
 
         // Add a second block
-        space
-            .try_modify(|space| {
+        universe
+            .try_modify(&space, |space| {
                 space
                     .mutate(read_ticket, |m| m.set([1, 0, 0], &block2))
                     .unwrap()
@@ -330,8 +330,8 @@ mod tests {
         tester.update_and_assert(read_ticket).unwrap();
 
         // Delete existing block
-        space
-            .try_modify(|space| {
+        universe
+            .try_modify(&space, |space| {
                 space
                     .mutate(read_ticket, |m| m.set([0, 0, 0], &AIR))
                     .unwrap()
@@ -370,8 +370,8 @@ mod tests {
         tester.update_and_assert(read_ticket).unwrap();
 
         // And also follow changes correctly.
-        space
-            .try_modify(|space| {
+        universe
+            .try_modify(&space, |space| {
                 space
                     .mutate(read_ticket, |m| m.set([1, 0, 0], &block2))
                     .unwrap()

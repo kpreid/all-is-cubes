@@ -85,7 +85,7 @@ fn space_bulk_mutation(c: &mut Criterion) {
                     },
                     |(space_handle, _listening_things)| {
                         space_handle
-                            .try_modify(|space| {
+                            .try_modify_pending(|space| {
                                 space
                                     .mutate(ReadTicket::stub(), |m| {
                                         m.fill(bounds, |_| Some(&block))

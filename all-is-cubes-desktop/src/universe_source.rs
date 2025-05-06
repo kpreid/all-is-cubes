@@ -130,10 +130,9 @@ impl UniverseSource {
 
         if precompute_light {
             if let Some(c) = universe.get_default_character() {
-                c.read(universe.read_ticket())
-                    .unwrap()
-                    .space
-                    .try_modify(evaluate_light_with_progress)
+                let space_handle = c.read(universe.read_ticket()).unwrap().space.clone();
+                universe
+                    .try_modify(&space_handle, evaluate_light_with_progress)
                     .unwrap();
             }
         }
