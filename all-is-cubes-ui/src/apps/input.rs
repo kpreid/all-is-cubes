@@ -286,7 +286,7 @@ impl InputProcessor {
     /// `targets` specifies the objects it should be applied to.
     pub(crate) fn apply_input(&mut self, targets: InputTargets<'_>, tick: Tick) {
         let InputTargets {
-            universe,
+            mut universe,
             character: character_opt,
             paused: paused_opt,
             settings,
@@ -309,7 +309,7 @@ impl InputProcessor {
         }
 
         // Direct character controls
-        if let (Some(universe), Some(character_handle)) = (&universe, character_opt) {
+        if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt) {
             universe
                 .try_modify(character_handle, |character| {
                     let movement = self.movement();
@@ -415,7 +415,8 @@ impl InputProcessor {
                 Key::Character(numeral) if numeral.is_ascii_digit() => {
                     let digit = numeral.to_digit(10).unwrap() as inv::Ix;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
-                    if let (Some(universe), Some(character_handle)) = (&universe, character_opt) {
+                    if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt)
+                    {
                         universe
                             .try_modify(character_handle, |c| c.set_selected_slot(1, slot))
                             .expect("character was borrowed during apply_input()");

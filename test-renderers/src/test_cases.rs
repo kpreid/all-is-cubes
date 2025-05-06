@@ -985,7 +985,7 @@ async fn sky(mut context: RenderTestContext, face: Face6) {
 
 async fn template(mut context: RenderTestContext, template_name: &'static str) {
     let template = UniverseTemplate::from_str(template_name).unwrap();
-    let universe = template
+    let mut universe = template
         .build::<std::time::Instant>(
             yield_progress_for_testing(),
             all_is_cubes_content::TemplateParameters {

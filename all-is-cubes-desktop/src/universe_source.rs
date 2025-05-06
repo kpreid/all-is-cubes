@@ -68,7 +68,7 @@ impl UniverseSource {
                 .build()
         };
 
-        let universe = match self.clone() {
+        let mut universe = match self.clone() {
             // TODO: awkward kludge for hooking up the menu's universe-selection buttons. Instead, `TemplateParameters` should have an extension mechanism by which we can pass the hook function.
             UniverseSource::Template(UniverseTemplate::Menu, _parameters) => {
                 let mut universe = Universe::new();

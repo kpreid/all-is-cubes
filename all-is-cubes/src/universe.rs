@@ -342,11 +342,18 @@ impl Universe {
         T::Transaction: Transaction<Output = transaction::NoOutput, Context<'u> = ReadTicket<'u>>,
         T: UniverseMember + Transactional,
     {
+        let id = self.id;
         let outcome: Result<
             Result<(), ExecuteError<<T as Transactional>::Transaction>>,
             HandleError,
         > = self.try_modify(handle, |data| {
-            transaction.execute(data, self.read_ticket(), &mut transaction::no_outputs)
+            // Make a read ticket for "the rest of the universe" without borrowing &Universe
+            let read_ticket = ReadTicket {
+                rule: TicketRule::Eq(id),
+                origin: core::panic::Location::caller(),
+                _phantom: core::marker::PhantomData,
+            };
+            transaction.execute(data, read_ticket, &mut transaction::no_outputs)
         });
         outcome.map_err(ExecuteError::Handle)?
     }
@@ -721,7 +728,7 @@ impl Universe {
     // trouble with that but we will want to rework it anyway.
     #[inline(never)]
     pub fn try_modify<T: UniverseMember, F, Out>(
-        &self,
+        &mut self,
         handle: &Handle<T>,
         function: F,
     ) -> Result<Out, HandleError>
