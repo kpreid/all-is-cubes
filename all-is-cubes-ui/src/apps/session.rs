@@ -698,12 +698,12 @@ impl Shuttle {
     fn click_impl<I: time::Instant>(&mut self, button: usize) -> Result<(), ToolError> {
         let cursor_space = self.cursor_result.as_ref().map(|c| c.space());
         // TODO: A better condition for this would be "is one of the spaces in the UI universe"
-        if cursor_space == Option::as_ref(&self.ui_view().get().space) {
-            // TODO: refactor away unwrap
-            self.ui
-                .as_mut()
-                .unwrap()
-                .click(button, self.cursor_result.clone())
+        if let Some(ui) = self
+            .ui
+            .as_mut()
+            .filter(|ui| cursor_space.is_some() && cursor_space == ui.view().get().space.as_ref())
+        {
+            ui.click(button, self.cursor_result.clone())
         } else {
             // Otherwise, it's a click inside the game world (even if the cursor hit nothing at all).
             // Character::click will validate against being a click in the wrong space.
