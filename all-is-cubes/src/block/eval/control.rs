@@ -238,7 +238,8 @@ pub struct EvalBlockError {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum ErrorKind {
+// TODO: should this be public? It may have been private by accident.
+pub(crate) enum ErrorKind {
     /// The evaluation budget was exceeded.
     BudgetExceeded,
 
@@ -345,14 +346,23 @@ impl EvalBlockError {
         }
     }
 
-    /// Returns whether this error is presumably transient because of simultaneous mutation
-    /// of the underlying data.
+    /// Returns whether this error relates to the timing or [`ReadTicket`] used to evaluate the
+    /// block, rather than the current state of the block’s definition or the evaluation budget.
     ///
-    /// This is a simple match, but we declare it as a method to ensure that any future introduced
-    /// variants of [`EvalBlockError`] or [`HandleError`], that are similar but not equal,
-    /// don't break the logic depending on this property.
-    pub(crate) fn is_in_use(&self) -> bool {
-        matches!(self.kind, ErrorKind::Handle(HandleError::InUse(_)))
+    /// If `true`, then reevaluating later or with a more proper [`ReadTicket`] may succeed.
+    pub(crate) fn is_transient(&self) -> bool {
+        match self.kind {
+            ErrorKind::Handle(HandleError::InUse(..)) => true,
+            ErrorKind::Handle(HandleError::InvalidTicket(..)) => true, // not right but less wrong
+
+            ErrorKind::BudgetExceeded => false,
+            ErrorKind::PriorBudgetExceeded { .. } => false,
+            ErrorKind::Handle(HandleError::Gone(..)) => false,
+            // TODO: Arguably NotReady is transient, but we just don't have a good way to
+            // make use of this either way. Revisit when we have a better story about failing to
+            // install listeners.
+            ErrorKind::Handle(HandleError::NotReady(..)) => false,
+        }
     }
 
     /// Convert this error into an [`EvaluatedBlock`] which represents that an error has
