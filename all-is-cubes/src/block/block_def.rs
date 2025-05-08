@@ -196,7 +196,7 @@ impl BlockDefState {
                 .map(MinEval::from);
 
             // Write the new cache data *unless* it is a transient error.
-            if !matches!(self.cache, Err(ref e) if e.is_in_use()) {
+            if !matches!(new_cache, Err(ref e) if e.is_in_use()) {
                 let old_cache = mem::replace(&mut self.cache, new_cache);
 
                 // In case the definition changed in the way which turned out not to affect the
