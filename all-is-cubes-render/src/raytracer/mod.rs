@@ -6,14 +6,15 @@
 //! It may also be used for visual output in tests via [`print_space()`].
 
 // As a workaround for <https://github.com/rust-lang/rust/issues/127445>,
-// we list some items explicitly even though they should be redundant with
-// the glob re-exports.
+// we list all items explicitly even though glob re-exports would be closer
+// to the intent here.
 
 #[cfg(feature = "std")]
 pub use all_is_cubes::raytracer::print_space;
 #[allow(clippy::module_name_repetitions)] // TODO: consider renamings of *Raytracer* items
 pub use all_is_cubes::raytracer::{
-    Accumulate, CharacterBuf, RtBlockData, SpaceRaytracer, UpdatingSpaceRaytracer, *,
+    Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef,
+    SpaceRaytracer, UpdatingSpaceRaytracer,
 };
 
 mod renderer;
