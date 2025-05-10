@@ -527,6 +527,7 @@ impl<P: Accumulate> TracingState<P> {
             // TODO: Should there be a dedicated method for this like hit_nothing()?
             self.accumulator.add(Hit {
                 surface: Rgba::WHITE.into(),
+                t_distance: None,
                 block: &P::BlockData::error(options),
             });
             true
@@ -547,8 +548,13 @@ impl<P: Accumulate> TracingState<P> {
             self.accumulator.hit_nothing();
         }
 
+        // TODO: The Accumulator should probably be allowed to tell the presence of sky.
+        // Right now, since finish() (this function) is called regardless of whether
+        // include_sky is true, we *always* give the accumulator this infinite hit even if
+        // `sky_color` is transparent via `include_sky` being false.
         self.accumulator.add(Hit {
             surface: sky_color.into(),
+            t_distance: Some(f64::INFINITY),
             block: sky_data,
         });
 
@@ -567,6 +573,7 @@ impl<P: Accumulate> TracingState<P> {
                     + rgb_const!(0.0, 0.0, 0.2) * original_color.luminance())
                 .with_alpha_one()
                 .into(),
+                t_distance: None, // TODO: would be nice to have distance available
                 block: sky_data,
             });
         }
@@ -589,6 +596,7 @@ impl<P: Accumulate> TracingState<P> {
         if let Some(light) = surface.to_light(rt) {
             self.accumulator.add(Hit {
                 surface: light,
+                t_distance: Some(surface.t_distance),
                 block: surface.block_data,
             });
         }
@@ -692,6 +700,7 @@ pub(crate) fn trace_for_eval(
         emission += Vector3D::from(voxel.emission * emission_coeff) * color_buf.transmittance;
         color_buf.add(Hit {
             surface: adjusted_color.into(),
+            t_distance: None, // we could compute this but it is not used
             block: &(),
         });
 
@@ -744,6 +753,10 @@ mod rayon_helper {
     }
 }
 
+/// Note: Further raytracer tests are found in
+///
+/// * child modules (particularly raytracer/text.rs)
+/// * the test-renderers package which does image comparison tests.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -768,6 +781,7 @@ mod tests {
             for _ in 0..count {
                 color_buf.add(Hit {
                     surface: modified_color.into(),
+                    t_distance: None,
                     block: &(),
                 });
             }

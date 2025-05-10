@@ -22,3 +22,6 @@ pub use renderer::{RtRenderer, RtScene};
 
 #[doc(hidden)] // experimental/internal, used only by test-renderers right now
 pub mod ortho;
+
+mod accum;
+pub use accum::DepthBuf;

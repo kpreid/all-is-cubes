@@ -61,6 +61,17 @@ pub struct Hit<'d, D> {
     /// when volume rendering is enabled, but it should be treated the same regardless.
     pub surface: ColorBuf,
 
+    /// Distance along the ray at which the encountered surface was intersected.
+    ///
+    /// This distance is in units of the length of the original ray’s direction vector.
+    /// Therefore, when forming an image, whether this value is Euclidean distance from
+    /// the camera, or distance along the Z axis, depends on whether the rays are constructed
+    /// with a constant length or a constant Z component.
+    ///
+    /// It is [`None`] when the event creating this hit does not correspond to a single
+    /// point in physical space, such as error indicators or 2D overlays.
+    pub t_distance: Option<f64>,
+
     /// [`RtBlockData`] value for the block this surface or volume is part of.
     pub block: &'d D,
 }
@@ -69,6 +80,7 @@ impl<'d, D> Hit<'d, D> {
     pub fn map_block_data<D2>(self, f: impl Fn(&D) -> &D2) -> Hit<'d, D2> {
         Hit {
             surface: self.surface,
+            t_distance: self.t_distance,
             block: f(self.block),
         }
     }
@@ -140,6 +152,7 @@ pub trait Accumulate: Default {
         // yet had a use case where it matters.
         result.add(Hit {
             surface: color.into(),
+            t_distance: None,
             block: &Self::BlockData::sky(options),
         });
         result
@@ -352,6 +365,7 @@ mod tests {
 
         buf.add(Hit {
             surface: color_1.into(),
+            t_distance: None,
             block: &(),
         });
         assert_eq!(Rgba::from(buf), color_1);
@@ -359,6 +373,7 @@ mod tests {
 
         buf.add(Hit {
             surface: color_2.into(),
+            t_distance: None,
             block: &(),
         });
         // TODO: this is not the right assertion because it's the premultiplied form.
@@ -371,6 +386,7 @@ mod tests {
 
         buf.add(Hit {
             surface: color_3.into(),
+            t_distance: None,
             block: &(),
         });
         assert!(Rgba::from(buf).fully_opaque());

@@ -19,6 +19,10 @@
 
 - `all-is-cubes-render` library:
     - `camera::GraphicsOptions::maximum_intensity` may be used to specify the maximum brightness of the output device and thus properly apply tone mapping to HDR output. It may also be used to choose to restrict output to SDR.
+    - `raytracer::Accumulate::add()` takes a new struct type `Hit` instead of separate arguments,
+      and `Hit` includes distance/depth information.
+    - `raytracer::DepthBuf` can be used to produce depth images.
+    - `raytracer::Hit`, used by `Accumulate` implementors.
 
 - `all-is-cubes-ui` library:
     - `apps::Settings` manages user-editable settings that eventually will be more than just the graphics options.
