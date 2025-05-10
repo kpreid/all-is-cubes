@@ -641,6 +641,7 @@ mod eg {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::raytracer;
     use all_is_cubes::universe::Universe;
     use all_is_cubes::util::assert_conditional_send_sync;
     use core::convert::identity;
@@ -682,9 +683,9 @@ mod tests {
             fn opaque(&self) -> bool {
                 self.custom_options.is_empty()
             }
-            fn add(&mut self, _: ColorBuf, block_data: &Self::BlockData) {
+            fn add(&mut self, hit: raytracer::Hit<'_, Self::BlockData>) {
                 if self.custom_options.is_empty() {
-                    *self = *block_data;
+                    *self = *hit.block;
                 }
             }
             fn mean<const N: usize>(_: [Self; N]) -> Self {

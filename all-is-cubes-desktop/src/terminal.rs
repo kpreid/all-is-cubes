@@ -17,7 +17,7 @@ use all_is_cubes::listen;
 use all_is_cubes::math::Rgba;
 use all_is_cubes_render::camera::{self, Camera, StandardCameras, Viewport};
 use all_is_cubes_render::raytracer::{
-    Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer,
+    self, Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer,
 };
 
 use crate::Session;
@@ -372,20 +372,17 @@ impl Accumulate for ColorCharacterBuf {
     }
 
     #[inline]
-    fn add(&mut self, surface: ColorBuf, text: &Self::BlockData) {
+    fn add(&mut self, hit: raytracer::Hit<'_, Self::BlockData>) {
         if self.override_color {
             return;
         }
 
-        self.color.add(surface, &());
-        self.text.add(surface, text);
+        self.color.add(hit.map_block_data(|_| &()));
+        self.text.add(hit);
     }
 
     fn hit_nothing(&mut self) {
-        self.text.add(
-            Rgba::TRANSPARENT.into(),
-            &CharacterRtData(literal_substr!(" ")),
-        );
+        self.text.add_character_hit(&literal_substr!(" "));
         self.override_color = true;
     }
 

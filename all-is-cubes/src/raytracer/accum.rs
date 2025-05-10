@@ -7,7 +7,11 @@ use crate::camera::GraphicsOptions;
 use crate::math::{Intensity, Rgb, Rgba, ZeroOne, rgb_const, zo32};
 use crate::space::SpaceBlockData;
 
+// -------------------------------------------------------------------------------------------------
+
 /// Borrowed data which may be used to customize the result of raytracing.
+///
+/// This is provided by the raytracer to implementations of [`RtBlockData`] and [`Accumulate`].
 #[derive(Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct RtOptionsRef<'a, C> {
@@ -38,6 +42,47 @@ impl<C> Clone for RtOptionsRef<'_, C> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+/// Data passed by the raytracer to [`Accumulate::add()`] implementations.
+//--
+// Design note: Not every accumulator uses every part of this struct.
+// We hope that optimization will drop the code to compute the unused parts.
+// However, further work might be wanted, in particular to explicitly skip color.
+//
+// Also, a name other than `Hit` might be better but I haven't thought of one.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct Hit<'d, D> {
+    /// Contains the opacity/transmittance and the light output of the encountered surface,
+    /// in the direction towards the camera.
+    ///
+    /// This may also represent the ray traversing a thickness of transparent material
+    /// when volume rendering is enabled, but it should be treated the same regardless.
+    pub surface: ColorBuf,
+
+    /// [`RtBlockData`] value for the block this surface or volume is part of.
+    pub block: &'d D,
+}
+
+impl<'d, D> Hit<'d, D> {
+    pub fn map_block_data<D2>(self, f: impl Fn(&D) -> &D2) -> Hit<'d, D2> {
+        Hit {
+            surface: self.surface,
+            block: f(self.block),
+        }
+    }
+}
+
+impl<D> Clone for Hit<'_, D> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<D> Copy for Hit<'_, D> {}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Implementations of [`Accumulate`] define output formats of the raytracer, by being
 /// responsible for accumulating the color (and/or other information) for each image
 /// pixel.
@@ -61,17 +106,12 @@ pub trait Accumulate: Default {
     /// be affected by future calls to [`Self::add`].
     fn opaque(&self) -> bool;
 
-    /// Adds the light from a surface, and the opacity of that surface, to the accumulator.
+    /// Adds the light from a surface or volume, and its opacity, to the accumulator.
     /// This surface is positioned behind/beyond all previous `add()`ed surfaces.
     ///
-    /// The given [`ColorBuf`] represents the opacity and the camera-ward light output of the
-    /// encountered surface.
-    /// Implementations are responsible for reducing it according to the transmittance (inverse
-    /// opacity) of previously encountered surfaces which obscure it.
-    ///
-    /// TODO: this interface might want even more information (e.g. depth); generalize it to be
-    /// more future-proof.
-    fn add(&mut self, surface: ColorBuf, block_data: &Self::BlockData);
+    /// Implementations are responsible for reducing this light according to the transmittance
+    /// (inverse opacity) of previously encountered surfaces which obscure it.
+    fn add(&mut self, hit: Hit<'_, Self::BlockData>);
 
     /// Called before the ray traverses any surfaces found in a block; that is,
     /// before all [`add()`](Self::add) calls pertaining to that block.
@@ -98,7 +138,10 @@ pub trait Accumulate: Default {
         let mut result = Self::default();
         // TODO: Should give RtBlockData a dedicated method for this, but we haven't
         // yet had a use case where it matters.
-        result.add(color.into(), &Self::BlockData::sky(options));
+        result.add(Hit {
+            surface: color.into(),
+            block: &Self::BlockData::sky(options),
+        });
         result
     }
 
@@ -112,6 +155,8 @@ pub trait Accumulate: Default {
         None
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Precomputed data about a [`Space`]'s blocks that may be used by [`Accumulate`] implementations.
 ///
@@ -163,6 +208,8 @@ impl RtBlockData for Resolution {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Implements [`Accumulate`] for RGB(A) color with [`f32`] components,
 /// and conversion to [`Rgba`].
 ///
@@ -207,11 +254,11 @@ impl Accumulate for ColorBuf {
     }
 
     #[inline]
-    fn add(&mut self, surface: ColorBuf, _block_data: &Self::BlockData) {
+    fn add(&mut self, hit: Hit<'_, Self::BlockData>) {
         // Note that the order of these assignments matters.
         // surface.transmittance is only applied to surfaces *after* this one.
-        self.light += surface.light * self.transmittance;
-        self.transmittance *= surface.transmittance;
+        self.light += hit.surface.light * self.transmittance;
+        self.transmittance *= hit.surface.transmittance;
     }
 
     #[inline]
@@ -282,6 +329,8 @@ impl From<Rgba> for ColorBuf {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,11 +350,17 @@ mod tests {
         assert_eq!(Rgba::from(buf), Rgba::TRANSPARENT);
         assert!(!buf.opaque());
 
-        buf.add(color_1.into(), &());
+        buf.add(Hit {
+            surface: color_1.into(),
+            block: &(),
+        });
         assert_eq!(Rgba::from(buf), color_1);
         assert!(!buf.opaque());
 
-        buf.add(color_2.into(), &());
+        buf.add(Hit {
+            surface: color_2.into(),
+            block: &(),
+        });
         // TODO: this is not the right assertion because it's the premultiplied form.
         // assert_eq!(
         //     buf.result(),
@@ -314,7 +369,10 @@ mod tests {
         // );
         assert!(!buf.opaque());
 
-        buf.add(color_3.into(), &());
+        buf.add(Hit {
+            surface: color_3.into(),
+            block: &(),
+        });
         assert!(Rgba::from(buf).fully_opaque());
         //assert_eq!(
         //    buf.result(),

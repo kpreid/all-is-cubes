@@ -13,8 +13,8 @@
 pub use all_is_cubes::raytracer::print_space;
 #[allow(clippy::module_name_repetitions)] // TODO: consider renamings of *Raytracer* items
 pub use all_is_cubes::raytracer::{
-    Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef,
-    SpaceRaytracer, UpdatingSpaceRaytracer,
+    Accumulate, CharacterBuf, CharacterRtData, ColorBuf, Hit, RaytraceInfo, RtBlockData,
+    RtOptionsRef, SpaceRaytracer, UpdatingSpaceRaytracer,
 };
 
 mod renderer;

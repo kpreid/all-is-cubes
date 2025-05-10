@@ -302,9 +302,9 @@ impl raytracer::Accumulate for OrthoBuf {
         self.color.opaque()
     }
 
-    fn add(&mut self, surface: raytracer::ColorBuf, &resolution: &Self::BlockData) {
-        self.color.add(surface, &());
-        self.max_resolution = self.max_resolution.max(resolution);
+    fn add(&mut self, hit: raytracer::Hit<'_, Self::BlockData>) {
+        self.color.add(hit.map_block_data(|_| &()));
+        self.max_resolution = self.max_resolution.max(*hit.block);
     }
 
     // This ensures we check the resolution of blocks the ray doesn't hit any voxels of.

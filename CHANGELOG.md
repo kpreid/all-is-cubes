@@ -45,6 +45,7 @@
 
 - `all-is-cubes-render` library:
     - `HeadlessRenderer::update()` is no longer async.
+    - `raytracer::Accumulate::add()` takes a new struct type `Hit` instead of separate arguments.
 
 - `all-is-cubes-ui` library:
     - `apps::Session::settings()` replaces `graphics_options_mut()`.

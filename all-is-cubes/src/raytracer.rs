@@ -524,8 +524,11 @@ impl<P: Accumulate> TracingState<P> {
         if self.cubes_traced > 1000 {
             // Abort excessively long traces.
             self.accumulator = Default::default();
-            self.accumulator
-                .add(Rgba::WHITE.into(), &P::BlockData::error(options));
+            // TODO: Should there be a dedicated method for this like hit_nothing()?
+            self.accumulator.add(Hit {
+                surface: Rgba::WHITE.into(),
+                block: &P::BlockData::error(options),
+            });
             true
         } else {
             self.accumulator.opaque()
@@ -544,7 +547,10 @@ impl<P: Accumulate> TracingState<P> {
             self.accumulator.hit_nothing();
         }
 
-        self.accumulator.add(sky_color.into(), sky_data);
+        self.accumulator.add(Hit {
+            surface: sky_color.into(),
+            block: sky_data,
+        });
 
         // Debug visualization of number of raytracing steps.
         // TODO: Make this less of a kludge — we'd like to be able to mix with
@@ -556,13 +562,13 @@ impl<P: Accumulate> TracingState<P> {
                 ._unstable_get_original_color()
                 .unwrap_or(Rgba::BLACK);
 
-            self.accumulator.add(
-                (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32
+            self.accumulator.add(Hit {
+                surface: (rgb_const!(0.02, 0.002, 0.0) * self.cubes_traced as f32
                     + rgb_const!(0.0, 0.0, 0.2) * original_color.luminance())
                 .with_alpha_one()
                 .into(),
-                sky_data,
-            );
+                block: sky_data,
+            });
         }
 
         (
@@ -581,7 +587,10 @@ impl<P: Accumulate> TracingState<P> {
         rt: &SpaceRaytracer<P::BlockData>,
     ) {
         if let Some(light) = surface.to_light(rt) {
-            self.accumulator.add(light, surface.block_data);
+            self.accumulator.add(Hit {
+                surface: light,
+                block: surface.block_data,
+            });
         }
     }
 
@@ -681,7 +690,10 @@ pub(crate) fn trace_for_eval(
     while let Some(voxel) = voxels.get(cube) {
         let (adjusted_color, emission_coeff) = apply_transmittance(voxel.color, thickness);
         emission += Vector3D::from(voxel.emission * emission_coeff) * color_buf.transmittance;
-        color_buf.add(adjusted_color.into(), &());
+        color_buf.add(Hit {
+            surface: adjusted_color.into(),
+            block: &(),
+        });
 
         if color_buf.opaque() {
             break;
@@ -754,7 +766,10 @@ mod tests {
                 apply_transmittance(color, (count as f32).recip());
             let mut color_buf = ColorBuf::default();
             for _ in 0..count {
-                color_buf.add(modified_color.into(), &());
+                color_buf.add(Hit {
+                    surface: modified_color.into(),
+                    block: &(),
+                });
             }
             let actual = Rgba::from(color_buf);
             let error: Vec<f32> = <[f32; 4]>::from(actual)

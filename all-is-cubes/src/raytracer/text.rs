@@ -52,6 +52,16 @@ pub struct CharacterBuf {
     hit_text: Option<Substr>,
 }
 
+impl CharacterBuf {
+    /// Update the state to include the given character if none is already present,
+    /// as if [`Accumulate::add()`] was called.
+    pub fn add_character_hit(&mut self, character: &Substr) {
+        if self.hit_text.is_none() {
+            self.hit_text = Some(character.clone());
+        }
+    }
+}
+
 impl Accumulate for CharacterBuf {
     type BlockData = CharacterRtData;
 
@@ -61,10 +71,8 @@ impl Accumulate for CharacterBuf {
     }
 
     #[inline]
-    fn add(&mut self, _surface: super::ColorBuf, d: &Self::BlockData) {
-        if self.hit_text.is_none() {
-            self.hit_text = Some(d.0.clone());
-        }
+    fn add(&mut self, hit: super::Hit<'_, Self::BlockData>) {
+        self.add_character_hit(&hit.block.0);
     }
 
     fn hit_nothing(&mut self) {
