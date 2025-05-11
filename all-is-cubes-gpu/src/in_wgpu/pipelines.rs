@@ -61,10 +61,10 @@ pub(crate) struct Pipelines {
     pub(crate) skybox_render_pipeline: wgpu::RenderPipeline,
 
     /// Bind group layout for the `frame-copy` shader's inputs.
-    pub(crate) frame_copy_layout: wgpu::BindGroupLayout,
+    pub(crate) rt_frame_copy_layout: wgpu::BindGroupLayout,
 
     /// Pipeline for the `frame-copy` shader.
-    pub(crate) frame_copy_pipeline: wgpu::RenderPipeline,
+    pub(crate) rt_frame_copy_pipeline: wgpu::RenderPipeline,
 
     /// Bind group layout for the `rerun-copy` shader's inputs.
     #[cfg(feature = "rerun")]
@@ -462,69 +462,83 @@ impl Pipelines {
                 cache,
             });
 
-        let frame_copy_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Pipelines::frame_copy_layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+        let rt_frame_copy_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Pipelines::rt_frame_copy_layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
 
-        let frame_copy_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Pipelines::frame_copy_pipeline"),
-            layout: Some(
-                &device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Pipelines::frame_copy_pipeline_layout"),
-                    bind_group_layouts: &[&frame_copy_layout],
-                    push_constant_ranges: &[],
+        let rt_frame_copy_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Pipelines::rt_frame_copy_pipeline"),
+                layout: Some(
+                    &device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                        label: Some("Pipelines::rt_frame_copy_pipeline_layout"),
+                        bind_group_layouts: &[&rt_frame_copy_layout],
+                        push_constant_ranges: &[],
+                    }),
+                ),
+                vertex: wgpu::VertexState {
+                    module: shaders.frame_copy.get(),
+                    entry_point: Some("rt_frame_copy_vertex"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: shaders.frame_copy.get(),
+                    entry_point: Some("rt_frame_copy_fragment"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
                 }),
-            ),
-            vertex: wgpu::VertexState {
-                module: shaders.frame_copy.get(),
-                entry_point: Some("frame_copy_vertex"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: shaders.frame_copy.get(),
-                entry_point: Some("frame_copy_fragment"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Rgba16Float,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                ..<_>::default()
-            },
-            // don't use depth, but it is configured anyway so that we can share the render pass
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: FramebufferTextures::DEPTH_FORMAT,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::Always,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample,
-            multiview: None,
-            cache,
-        });
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    ..<_>::default()
+                },
+                depth_stencil: Some(wgpu::DepthStencilState {
+                    format: FramebufferTextures::DEPTH_FORMAT,
+                    // Fragment shader outputs depth generated by the raytracer.
+                    depth_write_enabled: true,
+                    // Everything that needs a depth test (currently, debug lines) happens after this
+                    // pipeline runs, so we don't need a depth test for this pipeline.
+                    depth_compare: wgpu::CompareFunction::Always,
+                    stencil: wgpu::StencilState::default(),
+                    bias: wgpu::DepthBiasState::default(),
+                }),
+                multisample,
+                multiview: None,
+                cache,
+            });
 
         #[cfg(feature = "rerun")]
         let rerun_copy_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -698,8 +712,8 @@ impl Pipelines {
             transparent_overdraw_render_pipeline,
             depthless_overdraw_render_pipeline,
             skybox_render_pipeline,
-            frame_copy_layout,
-            frame_copy_pipeline,
+            rt_frame_copy_layout,
+            rt_frame_copy_pipeline,
             #[cfg(feature = "rerun")]
             rerun_copy_layout,
             #[cfg(feature = "rerun")]

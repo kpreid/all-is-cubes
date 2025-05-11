@@ -15,7 +15,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 use web_time::{Duration, Instant};
 
 use all_is_cubes::character::Cursor;
-use all_is_cubes::euclid::{Box2D, point2, vec2};
+use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{Rgba, VectorOps as _};
 use all_is_cubes::universe::ReadTicket;
@@ -23,7 +23,7 @@ use all_is_cubes_render::RenderError;
 use all_is_cubes_render::camera::{
     Camera, ImagePixel, Layers, StandardCameras, Viewport, area_usize,
 };
-use all_is_cubes_render::raytracer::{ColorBuf, RtRenderer};
+use all_is_cubes_render::raytracer::{ColorBuf, DepthBuf, RtRenderer};
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
 use crate::in_wgpu::pipelines::Pipelines;
@@ -35,7 +35,8 @@ type Point = all_is_cubes::euclid::Point2D<u32, ImagePixel>;
 #[derive(Debug)]
 pub(crate) struct RaytraceToTexture {
     inner: Arc<Mutex<Inner>>,
-    frame_copy_bind_group: Memo<crate::Id<wgpu::TextureView>, wgpu::BindGroup>,
+    rt_frame_copy_bind_group:
+        Memo<(crate::Id<wgpu::TextureView>, crate::Id<wgpu::TextureView>), wgpu::BindGroup>,
 }
 
 /// State for the possibly-asynchronous tracing job.
@@ -46,7 +47,8 @@ struct Inner {
     pixel_picker: PixelPicker,
     dirty_pixels: usize,
     rays_per_frame: usize,
-    render_target: DrawableTexture<[f16; 4], [f16; 4]>,
+    color_render_target: DrawableTexture<[f16; 4], [f16; 4]>,
+    depth_render_target: DrawableTexture<f32, f32>,
 }
 
 impl RaytraceToTexture {
@@ -62,7 +64,9 @@ impl RaytraceToTexture {
             pixel_picker: PixelPicker::new(initial_viewport),
             dirty_pixels: initial_viewport.pixel_count().unwrap(),
             rays_per_frame: 50000,
-            render_target: DrawableTexture::new(wgpu::TextureFormat::Rgba16Float),
+            color_render_target: DrawableTexture::new(wgpu::TextureFormat::Rgba16Float),
+            // Not using a depth texture format because float depth textures cannot be copied to.
+            depth_render_target: DrawableTexture::new(wgpu::TextureFormat::R32Float),
         }));
 
         #[cfg(feature = "auto-threads")]
@@ -85,7 +89,7 @@ impl RaytraceToTexture {
         }
 
         Self {
-            frame_copy_bind_group: Memo::new(),
+            rt_frame_copy_bind_group: Memo::new(),
             inner,
         }
     }
@@ -115,31 +119,39 @@ impl RaytraceToTexture {
         inner.set_viewport(device, raytracer_size_policy(camera.viewport()));
 
         // Update bind group if needed
-        let rt_texture_view: &Identified<wgpu::TextureView> = inner.render_target.view().unwrap();
-        self.frame_copy_bind_group
-            .get_or_insert(rt_texture_view.global_id(), || {
+        let color_view: &Identified<wgpu::TextureView> = inner.color_render_target.view().unwrap();
+        let depth_view: &Identified<wgpu::TextureView> = inner.depth_render_target.view().unwrap();
+        self.rt_frame_copy_bind_group.get_or_insert(
+            (color_view.global_id(), depth_view.global_id()),
+            || {
                 device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("rt to scene copy"),
-                    layout: &pipelines.frame_copy_layout,
+                    layout: &pipelines.rt_frame_copy_layout,
                     entries: &[
                         wgpu::BindGroupEntry {
                             binding: 0,
-                            resource: wgpu::BindingResource::TextureView(rt_texture_view),
+                            resource: wgpu::BindingResource::TextureView(color_view),
                         },
                         wgpu::BindGroupEntry {
                             binding: 1,
+                            resource: wgpu::BindingResource::TextureView(depth_view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
                             resource: wgpu::BindingResource::Sampler(&pipelines.linear_sampler),
                         },
                     ],
                 })
-            });
+            },
+        );
 
         inner.do_some_tracing();
-        inner.render_target.upload(queue);
+        inner.color_render_target.upload(queue);
+        inner.depth_render_target.upload(queue);
     }
 
-    pub fn frame_copy_bind_group(&self) -> Option<&wgpu::BindGroup> {
-        self.frame_copy_bind_group.get()
+    pub fn rt_frame_copy_bind_group(&self) -> Option<&wgpu::BindGroup> {
+        self.rt_frame_copy_bind_group.get()
     }
 }
 
@@ -161,9 +173,14 @@ impl Inner {
             return;
         }
         self.render_viewport = render_viewport;
-        self.render_target.resize(
+        self.color_render_target.resize(
             device,
-            Some("RaytraceToTexture::render_target"),
+            Some("RaytraceToTexture::color_render_target"),
+            render_viewport.framebuffer_size,
+        );
+        self.depth_render_target.resize(
+            device,
+            Some("RaytraceToTexture::depth_render_target"),
             render_viewport.framebuffer_size,
         );
         self.pixel_picker.resize(render_viewport);
@@ -175,6 +192,8 @@ impl Inner {
     }
 
     fn do_some_tracing(&mut self) {
+        type Trace = (Point, [f16; 4], f32);
+
         if self.dirty_pixels == 0 {
             // We've traced the entire frame buffer area, and no changes have occurred,
             // so we have no need to trace again.
@@ -182,6 +201,21 @@ impl Inner {
         }
 
         let render_viewport = self.render_viewport;
+        let scene = self.rtr.scene::<(ColorBuf, DepthBuf)>();
+        let camera = &scene.cameras().world;
+
+        // Compute the transformation which maps ray distance back to world-space distance.
+        //
+        // Note that this depends on the ray lengths that `RtScene`, and thus
+        // `Camera::project_ndc_into_world()`, use.
+        //
+        let depth_scale =
+            -(camera.view_distance().into_inner() - camera.near_plane_distance().into_inner());
+        let depth_bias = -camera.near_plane_distance().into_inner();
+        let depth_transform = camera
+            .projection_matrix()
+            .pre_translate(vec3(0., 0., depth_bias))
+            .pre_scale(0., 0., depth_scale);
 
         #[allow(clippy::needless_collect, reason = "needed with rayon and not without")]
         let this_frame_pixels: Vec<Point> =
@@ -190,11 +224,10 @@ impl Inner {
         self.dirty_pixels = self.dirty_pixels.saturating_sub(this_frame_pixels.len());
 
         let start_time = Instant::now();
-        let scene = self.rtr.scene::<ColorBuf>();
-        let trace = |point: Point| {
+        let trace = |point: Point| -> Trace {
             let x = point.x as usize;
             let y = point.y as usize;
-            let (color_buf, _info) = scene.trace_patch(Box2D {
+            let ((color_buf, depth_buf), _info) = scene.trace_patch(Box2D {
                 min: point2(
                     render_viewport.normalize_fb_x_edge(x),
                     render_viewport.normalize_fb_y_edge(y),
@@ -212,13 +245,21 @@ impl Inner {
                 f16::from_f32(color.blue().into_inner()),
                 f16::from_f32(color.alpha().into_inner()),
             ];
-            (point, color)
+
+            let linear_depth = depth_buf.depth().clamp(0.0, 1.0);
+            // Note that this assumes that depth doesn't interact with position in the image.
+            // If it did, we'd need to compute the NDC X and Y and pass them in here.
+            let projected_depth_homogeneous =
+                depth_transform.transform_point3d_homogeneous(point3(0., 0., linear_depth));
+            let projected_depth = projected_depth_homogeneous.z / projected_depth_homogeneous.w;
+
+            (point, color, projected_depth as f32)
         };
 
         #[cfg(feature = "auto-threads")]
-        let traces: Vec<(Point, [f16; 4])> = this_frame_pixels.into_par_iter().map(trace).collect();
+        let traces: Vec<Trace> = this_frame_pixels.into_par_iter().map(trace).collect();
         #[cfg(not(feature = "auto-threads"))]
-        let traces: Vec<(Point, [f16; 4])> = this_frame_pixels.into_iter().map(trace).collect();
+        let traces: Vec<Trace> = this_frame_pixels.into_iter().map(trace).collect();
 
         let tracing_duration = Instant::now().duration_since(start_time);
 
@@ -233,9 +274,11 @@ impl Inner {
             }
         }
 
-        let target = self.render_target.draw_target();
-        for (point, color) in traces {
-            target.set_pixel(point, color);
+        let color_target = self.color_render_target.draw_target();
+        let depth_target = self.depth_render_target.draw_target();
+        for (point, color, depth) in traces {
+            color_target.set_pixel(point, color);
+            depth_target.set_pixel(point, depth);
         }
     }
 }

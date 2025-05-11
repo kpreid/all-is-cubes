@@ -107,7 +107,12 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
                             y: dirty_rect.top_left.y as u32,
                             z: 0,
                         },
-                        aspect: wgpu::TextureAspect::All,
+                        // kludge that only works as long as we don't plan to use stencil textures
+                        aspect: if texture.format().has_depth_aspect() {
+                            wgpu::TextureAspect::DepthOnly
+                        } else {
+                            wgpu::TextureAspect::All
+                        },
                     },
                     bytemuck::must_cast_slice::<Out, u8>(
                         &self.local_buffer.data()[full_width as usize

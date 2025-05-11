@@ -531,7 +531,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         let (world_draw_info, is_raytracing): (SpaceDrawInfo, bool) =
             if let (true, Some(rt_bind_group)) = (
                 should_raytrace(&self.cameras),
-                self.rt.frame_copy_bind_group(),
+                self.rt.rt_frame_copy_bind_group(),
             ) {
                 // Update camera buffer since space_renderers.world.draw() won't be doing that,
                 // but the lines pass wants to have it available.
@@ -543,7 +543,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
                 // texture. This is the simplest way to get it fed into both bloom and postprocessing
                 // passes.
                 world_render_pass.set_bind_group(0, rt_bind_group, &[]);
-                world_render_pass.set_pipeline(&self.pipelines.frame_copy_pipeline);
+                world_render_pass.set_pipeline(&self.pipelines.rt_frame_copy_pipeline);
                 world_render_pass.draw(0..3, 0..1);
 
                 (SpaceDrawInfo::default(), true)
