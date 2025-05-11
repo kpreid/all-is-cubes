@@ -405,6 +405,11 @@ impl<P: Accumulate> RtScene<'_, P> {
             RaytraceInfo::default(),
         )
     }
+
+    #[doc(hidden)] // TODO: good public API? Required by raytrace_to_texture.
+    pub fn cameras(&self) -> &Layers<Camera> {
+        &self.cameras
+    }
 }
 
 fn trace_patch_in_one_space<P: Accumulate>(
