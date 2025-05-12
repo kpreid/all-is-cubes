@@ -43,6 +43,7 @@ struct FragmentOutput {
     @location(1) depth: f32,
 }
 
+// Note: This code is duplicated between rerun-copy.wgsl and rt-copy.wgsl
 fn linearize_depth_value(depth_texel: f32) -> f32 {
     if depth_texel == 1.0 {
         // didn't hit anything; set the distance to zero so the point doesn't appear anywhere in space

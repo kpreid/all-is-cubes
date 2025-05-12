@@ -1,5 +1,6 @@
 //! Runs the software raytracer and writes the results into a texture.
 
+use all_is_cubes::util::{ConciseDebug, Refmt};
 use alloc::sync::Arc;
 // TODO: if not using threads, don't even use a Mutex as it's entirely wasted
 use alloc::boxed::Box;
@@ -23,7 +24,7 @@ use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::camera::{
     Camera, ImagePixel, Layers, StandardCameras, Viewport, area_usize,
 };
-use all_is_cubes_render::raytracer::{ColorBuf, DepthBuf, RtRenderer};
+use all_is_cubes_render::raytracer::{self, RtRenderer};
 use all_is_cubes_render::{Flaws, RenderError};
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
@@ -38,18 +39,29 @@ type Point = all_is_cubes::euclid::Point2D<u32, ImagePixel>;
 #[derive(Debug)]
 pub(crate) struct RaytraceToTexture {
     inner: Arc<Mutex<Inner>>,
-    rt_frame_copy_bind_group:
+    reprojection_uniform_buffer: wgpu::Buffer,
+    rt_bind_group:
         Memo<(crate::Id<wgpu::TextureView>, crate::Id<wgpu::TextureView>), wgpu::BindGroup>,
 
     /// Whether it is allowed for an `update()` to actually change camera and the scene data.
     /// This only has an effect when `update_strategy` is `Consistent`.
     may_start_next_frame: bool,
+
+    /// If `Some` if we should render with reprojection.
+    ///
+    /// The `Viewport` is that which was used for the previously rendered image,
+    /// providing the inputs for the reprojection draw command,
+    /// in case that size might be different from the current size.
+    should_reproject: Option<Viewport>,
+
+    /// Camera that was used for the frame currently stored in `Inner::color_render_target`.
+    camera_used: Camera,
 }
 
 /// State for the possibly-asynchronous tracing job.
 #[derive(Debug)]
 struct Inner {
-    rtr: RtRenderer,
+    rtr: RtRenderer<InLayer>,
     update_strategy: UpdateStrategy,
     dirty_pixels: usize,
     rays_per_frame: usize,
@@ -66,29 +78,38 @@ enum UpdateStrategy {
     /// to provide lower average latency. The central area of the image will be traced more often.
     Incremental(PixelPicker),
 
-    /// Don't update anything; produce wholly consistent frames only.
+    /// Don't update mid-render; produce wholly consistent frames only.
     /// This does less work than waiting for the same frames to appear in incremental mode,
     /// but has higher latency.
+    /// It can also be used with reprojection.
     Consistent {
         render_viewport: Viewport,
-        /// Index of the next pixel to render.
+
+        /// Index of the next pixel to render in the batch.
         next: usize,
+
+        /// Whether to reproject old scenes into the latest camera projection.
+        /// This results in visual artifacts while moving but allows smooth camera movement
+        /// between traced frames.
+        want_reprojection: bool,
     },
 }
 
 // -------------------------------------------------------------------------------------------------
 
 impl RaytraceToTexture {
-    pub fn new(cameras: StandardCameras) -> Self {
+    pub fn new(device: &wgpu::Device, cameras: StandardCameras) -> Self {
         let initial_viewport = Viewport::with_scale(1.0, vec2(1, 1));
+        let camera_used = cameras.cameras().world.clone();
 
-        // TODO: allow choice of incremental mode.
+        // TODO: allow configuration of incremental and reprojection options.
         let update_strategy = if true {
             UpdateStrategy::Incremental(PixelPicker::new(initial_viewport))
         } else {
             UpdateStrategy::Consistent {
                 render_viewport: initial_viewport,
                 next: 0,
+                want_reprojection: true,
             }
         };
 
@@ -101,7 +122,10 @@ impl RaytraceToTexture {
             rtr: RtRenderer::new(
                 cameras,
                 Box::new(raytracer_size_policy),
-                listen::constant(Default::default()),
+                listen::constant(Layers {
+                    world: Arc::new(InLayer::World),
+                    ui: Arc::new(InLayer::Ui),
+                }),
             ),
             dirty_pixels: update_strategy.cycle_length(),
             update_strategy,
@@ -130,9 +154,17 @@ impl RaytraceToTexture {
         }
 
         Self {
-            rt_frame_copy_bind_group: Memo::new(),
+            rt_bind_group: Memo::new(),
+            reprojection_uniform_buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("RaytraceToTexture::reprojection_uniform_buffer"),
+                size: size_of::<ReprojectionUniforms>().try_into().unwrap(),
+                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+                mapped_at_creation: false,
+            }),
             inner,
             may_start_next_frame: true,
+            should_reproject: None,
+            camera_used,
         }
     }
 
@@ -158,16 +190,24 @@ impl RaytraceToTexture {
         pipelines: &Pipelines,
         camera: &Camera,
     ) {
+        let start_time = Instant::now();
         let inner = &mut *self.inner.lock().unwrap(); // not handling poisoning, just fail
+        let got_lock_time = Instant::now();
+        log::trace!(
+            "waiting for raytracer lock lock for {}",
+            got_lock_time
+                .saturating_duration_since(start_time)
+                .refmt(&ConciseDebug)
+        );
 
-        inner.set_viewport(device, raytracer_size_policy(camera.viewport()));
+        let adjusted_viewport = raytracer_size_policy(camera.viewport());
+        inner.set_viewport(device, adjusted_viewport);
 
         // Update bind group if needed
         let color_view: &Identified<wgpu::TextureView> = inner.color_render_target.view().unwrap();
         let depth_view: &Identified<wgpu::TextureView> = inner.depth_render_target.view().unwrap();
-        self.rt_frame_copy_bind_group.get_or_insert(
-            (color_view.global_id(), depth_view.global_id()),
-            || {
+        self.rt_bind_group
+            .get_or_insert((color_view.global_id(), depth_view.global_id()), || {
                 device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("rt to scene copy"),
                     layout: &pipelines.rt_frame_copy_layout,
@@ -184,17 +224,67 @@ impl RaytraceToTexture {
                             binding: 2,
                             resource: wgpu::BindingResource::Sampler(&pipelines.linear_sampler),
                         },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
+                            resource: self.reprojection_uniform_buffer.as_entire_binding(),
+                        },
                     ],
                 })
-            },
-        );
+            });
 
         inner.do_some_tracing();
         // Copy to GPU texture if we are in incremental mode or the frame is finished.
         if inner.update_strategy.incremental() || inner.dirty_pixels == 0 {
             inner.color_render_target.upload(queue);
             inner.depth_render_target.upload(queue);
+            self.camera_used = inner.rtr.cameras().cameras().world.clone();
             self.may_start_next_frame = true;
+        }
+
+        // If needed, compute reprojection matrix from the traced image's view to the current view.
+        self.should_reproject = None;
+        if inner.update_strategy.want_reprojection()
+            // TODO: Compare transforms with some epsilon rather than exact equality.
+            && self.camera_used.view_transform() != camera.view_transform()
+        {
+            // Prepare reprojection matrix.
+            // Note that our reprojection is “forward” rather than “backward”: rather than
+            // reprojecting the current frame back to the image position in a previous frame,
+            // we are reprojecting positions in the most recently traced frame to the latest
+            // camera which hasn’t got any tracing done yet.
+            // Therefore, this matrix is inverted from what it might be otherwise.
+
+            let reprojection_matrix = self
+                .camera_used
+                .view_matrix()
+                .then(&self.camera_used.projection_matrix())
+                .inverse()
+                .unwrap()
+                .then(&camera.view_matrix())
+                .then(&camera.projection_matrix());
+
+            queue.write_buffer(
+                &self.reprojection_uniform_buffer,
+                0,
+                bytemuck::bytes_of(&ReprojectionUniforms {
+                    reprojection_matrix: super::camera::convert_matrix(reprojection_matrix),
+                    inverse_projection: super::camera::convert_matrix(
+                        camera
+                            .projection_matrix()
+                            .inverse()
+                            .unwrap_or(all_is_cubes::euclid::Transform3D::identity()),
+                    ),
+                    output_pixel_scale: camera
+                        .viewport()
+                        .framebuffer_size
+                        .to_f32()
+                        .to_vector()
+                        .component_div(adjusted_viewport.framebuffer_size.to_f32().to_vector())
+                        .into(),
+                    _padding: Default::default(),
+                }),
+            );
+            self.should_reproject = Some(inner.update_strategy.render_viewport());
         }
     }
 
@@ -204,13 +294,35 @@ impl RaytraceToTexture {
         pipelines: &Pipelines,
         render_pass: &mut wgpu::RenderPass<'_>,
     ) -> Flaws {
-        let Some(rt_bind_group) = self.rt_frame_copy_bind_group.get() else {
+        let Some(rt_bind_group) = self.rt_bind_group.get() else {
             return Flaws::UNFINISHED;
         };
 
         render_pass.set_bind_group(0, rt_bind_group, &[]);
-        render_pass.set_pipeline(&pipelines.rt_frame_copy_pipeline);
-        render_pass.draw(0..3, 0..1);
+
+        if let Some(render_viewport) = self.should_reproject {
+            // Draw with reprojection.
+            //
+            // Note that our reprojection is “forward” rather than “backward”: rather than
+            // reprojecting the current frame back to the image position in a previous frame,
+            // we are reprojecting positions in the most recently traced frame to the latest
+            // camera which hasn’t got any tracing done yet.
+            // Therefore, we are not simply computing texture coordinates, but drawing a new point
+            // (triangle) for every single old pixel.
+            //
+            // TODO: Improve performance and quality by drawing single points instead of
+            // triangles, then filling in the gaps using
+            // <https://en.wikipedia.org/wiki/Jump_flooding_algorithm> or some other algorithm
+            // to fill the gaps between points.
+            let size = render_viewport.framebuffer_size;
+            let vertex_count = size.width.saturating_mul(size.height).saturating_mul(3);
+            render_pass.set_pipeline(&pipelines.rt_reproject_pipeline);
+            render_pass.draw(0..vertex_count, 0..1);
+        } else {
+            // Draw a straightforward upscaling with no reprojection.
+            render_pass.set_pipeline(&pipelines.rt_frame_copy_pipeline);
+            render_pass.draw(0..3, 0..1);
+        }
 
         Flaws::empty()
     }
@@ -261,7 +373,7 @@ impl Inner {
         }
 
         let render_viewport = self.update_strategy.render_viewport();
-        let scene = self.rtr.scene::<(ColorBuf, DepthBuf)>();
+        let scene = self.rtr.scene::<Split>();
         let camera = &scene.cameras().world;
 
         // Compute the transformation which maps ray distance back to world-space distance.
@@ -283,7 +395,14 @@ impl Inner {
         let trace_one = |point: Point| -> Trace {
             let x = point.x as usize;
             let y = point.y as usize;
-            let ((color_buf, depth_buf), _info) = scene.trace_patch(Box2D {
+            let (
+                Split {
+                    color: color_buf,
+                    depth: depth_buf,
+                    layer,
+                },
+                _info,
+            ) = scene.trace_patch(Box2D {
                 min: point2(
                     render_viewport.normalize_fb_x_edge(x),
                     render_viewport.normalize_fb_y_edge(y),
@@ -309,7 +428,11 @@ impl Inner {
                 depth_transform.transform_point3d_homogeneous(point3(0., 0., linear_depth));
             let projected_depth = projected_depth_homogeneous.z / projected_depth_homogeneous.w;
 
-            (point, color, projected_depth as f32)
+            // Encode which layer — hence, which camera — this pixel belongs to using the
+            // sign bit of the depth value.
+            let layer_factor = f32::from(layer.unwrap_or(InLayer::Ui) as i8);
+
+            (point, color, projected_depth as f32 * layer_factor)
         };
 
         // Function to write the trace results to storage.
@@ -340,10 +463,7 @@ impl Inner {
                     }
                 }
             }
-            UpdateStrategy::Consistent {
-                render_viewport: _,
-                ref mut next,
-            } => {
+            UpdateStrategy::Consistent { ref mut next, .. } => {
                 let pixel_iter = (0..self.rays_per_frame)
                     .map(|i| point_from_pixel_index(render_viewport, i + *next));
                 cfg_if::cfg_if! {
@@ -384,6 +504,8 @@ impl Inner {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(feature = "auto-threads")]
 /// Runs raytracing, periodically releasing the lock to allow updating input and retrieving output.
 #[expect(
@@ -406,8 +528,7 @@ impl UpdateStrategy {
         match *self {
             UpdateStrategy::Incremental(ref pixel_picker) => pixel_picker.viewport,
             UpdateStrategy::Consistent {
-                render_viewport,
-                next: _,
+                render_viewport, ..
             } => render_viewport,
         }
     }
@@ -418,8 +539,7 @@ impl UpdateStrategy {
         match self {
             UpdateStrategy::Incremental(picker) => picker.cycle_length,
             UpdateStrategy::Consistent {
-                render_viewport,
-                next: _,
+                render_viewport, ..
             } => render_viewport.pixel_count().unwrap_or(usize::MAX),
         }
     }
@@ -437,11 +557,19 @@ impl UpdateStrategy {
                 pixel_picker.resize(new_render_viewport);
             }
             UpdateStrategy::Consistent {
-                render_viewport,
-                next: _,
+                render_viewport, ..
             } => {
                 *render_viewport = new_render_viewport;
             }
+        }
+    }
+
+    fn want_reprojection(&self) -> bool {
+        match *self {
+            UpdateStrategy::Incremental(_) => false,
+            UpdateStrategy::Consistent {
+                want_reprojection, ..
+            } => want_reprojection,
         }
     }
 }
@@ -532,6 +660,81 @@ fn point_from_pixel_index(viewport: Viewport, index: usize) -> Point {
         index.rem_euclid(size.width) as u32,
         index.div_euclid(size.width).rem_euclid(size.height) as u32,
     )
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Accumulator that distinguishes world pixels from UI pixels (insofar as this is possible).
+#[derive(Clone, Copy, Default)]
+struct Split {
+    color: raytracer::ColorBuf,
+    depth: raytracer::DepthBuf,
+    // Which layer the depth value came from.
+    layer: Option<InLayer>,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum InLayer {
+    World = 1,
+    Ui = -1,
+}
+
+// TODO: It should be possible to avoid this — in particular, to pass data from custom options
+// to the accumulator without duplicating it to all block data.
+impl raytracer::RtBlockData for InLayer {
+    type Options = Self;
+    fn from_block(
+        options: raytracer::RtOptionsRef<'_, Self::Options>,
+        _: &all_is_cubes::space::SpaceBlockData,
+    ) -> Self {
+        *options.custom_options
+    }
+    fn error(options: raytracer::RtOptionsRef<'_, Self::Options>) -> Self {
+        *options.custom_options
+    }
+    fn sky(options: raytracer::RtOptionsRef<'_, Self::Options>) -> Self {
+        *options.custom_options
+    }
+}
+
+impl raytracer::Accumulate for Split {
+    type BlockData = InLayer;
+
+    fn opaque(&self) -> bool {
+        self.color.opaque()
+    }
+
+    fn add(&mut self, hit: raytracer::Hit<'_, Self::BlockData>) {
+        self.color.add(hit.map_block_data(|_| &()));
+        self.depth.add(hit.map_block_data(|_| &()));
+        self.layer = self.layer.or(Some(*hit.block));
+    }
+
+    fn mean<const N: usize>(items: [Self; N]) -> Self {
+        Self {
+            color: <_>::mean(items.map(|s| s.color)),
+            depth: <_>::mean(items.map(|s| s.depth)),
+            layer: items.into_iter().find_map(|s| s.layer),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+#[repr(C, align(16))] // align triggers bytemuck error if the size doesn't turn out to be a multiple
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct ReprojectionUniforms {
+    /// Matrix transforming points in the old camera's clip space to the new camera's clip space.
+    reprojection_matrix: [[f32; 4]; 4],
+    /// Inverse of the current projection matrix, used for transforming depths.
+    /// (In principle we should be passing the old projection matrix and new projection matrix,
+    /// but that's overkill.
+    inverse_projection: [[f32; 4]; 4],
+
+    /// Scale factors which scale texels in the input textures, the raytracing buffer textures,
+    /// into the viewport of the render target. Inverse of what `raytracer_size_policy()` did.
+    output_pixel_scale: [f32; 2],
+    _padding: [f32; 2],
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -89,6 +89,7 @@ impl ShaderSpaceCamera {
         }
     }
 }
-fn convert_matrix<Src, Dst>(matrix: Transform3D<f64, Src, Dst>) -> [[f32; 4]; 4] {
+
+pub(crate) fn convert_matrix<Src, Dst>(matrix: Transform3D<f64, Src, Dst>) -> [[f32; 4]; 4] {
     matrix.cast::<f32>().to_arrays()
 }

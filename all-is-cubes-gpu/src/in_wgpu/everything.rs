@@ -206,7 +206,7 @@ impl EverythingRenderer {
                 ),
                 ui: SpaceRenderer::new("ui".into(), &device, &pipelines, block_texture, true),
             },
-            rt: RaytraceToTexture::new(cameras.clone_unupdated()),
+            rt: RaytraceToTexture::new(&device, cameras.clone_unupdated()),
 
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
@@ -530,10 +530,12 @@ impl EverythingRenderer {
             if should_raytrace(&self.cameras) {
                 // Update camera buffer since space_renderers.world.draw() won't be doing that,
                 // but the lines pass wants to have it available.
+                let world_camera = &self.cameras.cameras().world;
                 self.space_renderers
                     .world
-                    .write_camera_only(bwp.reborrow(), &self.cameras.cameras().world);
+                    .write_camera_only(bwp.reborrow(), world_camera);
 
+                // Draw the raytracing results
                 let flaws = self.rt.draw(&self.pipelines, &mut world_render_pass);
                 // TODO: actually produce info from raytracing
                 let info = SpaceDrawInfo {
