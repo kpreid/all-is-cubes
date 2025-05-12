@@ -344,6 +344,64 @@ impl From<Rgba> for ColorBuf {
 
 // -------------------------------------------------------------------------------------------------
 
+impl Accumulate for () {
+    type BlockData = ();
+
+    fn opaque(&self) -> bool {
+        // "Opaque" is more precisely "no longer collecting information"
+        true
+    }
+
+    fn add(&mut self, _: Hit<'_, Self::BlockData>) {}
+
+    fn mean<const N: usize>(_: [Self; N]) -> Self {}
+}
+
+impl<A> Accumulate for (A,)
+where
+    A: Accumulate,
+{
+    type BlockData = A::BlockData;
+
+    fn opaque(&self) -> bool {
+        self.0.opaque()
+    }
+
+    fn add(&mut self, hit: Hit<'_, Self::BlockData>) {
+        self.0.add(hit);
+    }
+
+    fn mean<const N: usize>(items: [Self; N]) -> Self {
+        (A::mean(items.map(|(a,)| a)),)
+    }
+}
+
+impl<A, B> Accumulate for (A, B)
+where
+    A: Copy + Accumulate,
+    B: Copy + Accumulate<BlockData = A::BlockData>,
+{
+    type BlockData = A::BlockData;
+
+    fn opaque(&self) -> bool {
+        self.0.opaque() && self.1.opaque()
+    }
+
+    fn add(&mut self, hit: Hit<'_, Self::BlockData>) {
+        self.0.add(hit);
+        self.1.add(hit);
+    }
+
+    fn mean<const N: usize>(items: [Self; N]) -> Self {
+        // TODO: Rewrite this in a way which avoids the `Copy` requirement
+        (
+            A::mean(items.map(|(a, _)| a)),
+            B::mean(items.map(|(_, b)| b)),
+        )
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 #[cfg(test)]
 mod tests {
     use super::*;
