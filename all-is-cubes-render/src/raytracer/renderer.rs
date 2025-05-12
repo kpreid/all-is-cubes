@@ -383,6 +383,9 @@ impl<P: Accumulate> Clone for RtScene<'_, P> {
 impl<P: Accumulate> RtScene<'_, P> {
     /// Given the `patch` which is the bounding box of a single image pixel in normalized device
     /// coordinates (range -1 to 1), produce the [`Accumulate`]d value of that pixel in this scene.
+    ///
+    /// The depth axis of the rays used, and hence the depth information provided to `P`,
+    /// corresponds to that specified by [`Camera::project_ndc_into_world()`].
     #[inline]
     pub fn trace_patch(&self, patch: NdcRect) -> (P, RaytraceInfo) {
         if let Some(ui) = self.rts.ui {

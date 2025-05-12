@@ -1,3 +1,4 @@
+use euclid::approxeq::ApproxEq;
 use euclid::{Point3D, Rotation3D, Size2D, point2, point3, vec2, vec3};
 use pretty_assertions::assert_eq;
 use rand::SeedableRng;
@@ -191,6 +192,38 @@ fn viewport_is_empty() {
 
     // nominal size does not matter
     assert!(!Viewport::with_scale(0.0, vec2(10, 10)).is_empty());
+}
+
+#[test]
+fn project_ndc_into_world() {
+    let mut camera = Camera::new(GraphicsOptions::default(), Viewport::ARBITRARY);
+    let near = camera.near_plane_distance().into_inner();
+
+    {
+        let ray = dbg!(camera.project_ndc_into_world(point2(0.0, 0.0)));
+        assert_eq!(ray.origin, point3(0., 0., -near));
+        assert!(ray.direction.approx_eq(&vec3(
+            0.,
+            0.,
+            -(camera.view_distance().into_inner() - near),
+        )));
+    }
+
+    // Test with non-identity view transform
+    {
+        camera.set_view_transform(ViewTransform {
+            rotation: Rotation3D::around_y(euclid::Angle::frac_pi_2()),
+            translation: vec3(0.0, 100.0, 0.0),
+        });
+
+        let ray = dbg!(camera.project_ndc_into_world(point2(0.0, 0.0)));
+        assert!(ray.origin.approx_eq(&point3(-near, 100., 0.)));
+        assert!(ray.direction.approx_eq(&vec3(
+            -(camera.view_distance().into_inner() - near),
+            0.,
+            0.,
+        )));
+    }
 }
 
 #[test]

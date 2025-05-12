@@ -228,8 +228,13 @@ impl Camera {
     ///
     /// The input coordinates should be within the range -1 to 1, inclusive.
     /// If they are not, the result may be a ray whose components are NaN.
+    ///
+    /// The ray’s origin’s distance along the view direction axis is equal to
+    /// [`Camera::near_plane_distance()`].
+    /// The ray's [`Ray::unit_endpoint()`] along the view direction axis is equal to
+    /// [`Camera::view_distance()`].
     pub fn project_ndc_into_world(&self, ndc: NdcPoint2) -> Ray {
-        let ndc_near = ndc.extend(-1.0);
+        let ndc_near = ndc.extend(0.0);
         let ndc_far = ndc.extend(1.0);
 
         // World-space endpoints of the ray.
