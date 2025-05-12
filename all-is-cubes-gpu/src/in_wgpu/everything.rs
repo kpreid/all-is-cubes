@@ -529,24 +529,20 @@ impl<I: time::Instant> EverythingRenderer<I> {
         });
 
         let (world_draw_info, is_raytracing): (SpaceDrawInfo, bool) =
-            if let (true, Some(rt_bind_group)) = (
-                should_raytrace(&self.cameras),
-                self.rt.rt_frame_copy_bind_group(),
-            ) {
+            if should_raytrace(&self.cameras) {
                 // Update camera buffer since space_renderers.world.draw() won't be doing that,
                 // but the lines pass wants to have it available.
                 self.space_renderers
                     .world
                     .write_camera_only(bwp.reborrow(), &self.cameras.cameras().world);
 
-                // Copy the raytracing target texture (incrementally updated) to the linear scene
-                // texture. This is the simplest way to get it fed into both bloom and postprocessing
-                // passes.
-                world_render_pass.set_bind_group(0, rt_bind_group, &[]);
-                world_render_pass.set_pipeline(&self.pipelines.rt_frame_copy_pipeline);
-                world_render_pass.draw(0..3, 0..1);
-
-                (SpaceDrawInfo::default(), true)
+                let flaws = self.rt.draw(&self.pipelines, &mut world_render_pass);
+                // TODO: actually produce info from raytracing
+                let info = SpaceDrawInfo {
+                    flaws,
+                    ..Default::default()
+                };
+                (info, true)
             } else {
                 // Not raytracing, so render the meshes
                 let info = self.space_renderers.world.draw(

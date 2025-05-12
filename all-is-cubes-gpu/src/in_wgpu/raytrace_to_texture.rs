@@ -19,11 +19,11 @@ use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{Rgba, VectorOps as _};
 use all_is_cubes::universe::ReadTicket;
-use all_is_cubes_render::RenderError;
 use all_is_cubes_render::camera::{
     Camera, ImagePixel, Layers, StandardCameras, Viewport, area_usize,
 };
 use all_is_cubes_render::raytracer::{ColorBuf, DepthBuf, RtRenderer};
+use all_is_cubes_render::{Flaws, RenderError};
 
 use crate::in_wgpu::frame_texture::DrawableTexture;
 use crate::in_wgpu::pipelines::Pipelines;
@@ -150,8 +150,21 @@ impl RaytraceToTexture {
         inner.depth_render_target.upload(queue);
     }
 
-    pub fn rt_frame_copy_bind_group(&self) -> Option<&wgpu::BindGroup> {
-        self.rt_frame_copy_bind_group.get()
+    /// Draw a copy of the raytraced scene (as of the last [`Self::prepare_frame()`]).
+    pub(crate) fn draw(
+        &self,
+        pipelines: &Pipelines,
+        render_pass: &mut wgpu::RenderPass<'_>,
+    ) -> Flaws {
+        let Some(rt_bind_group) = self.rt_frame_copy_bind_group.get() else {
+            return Flaws::UNFINISHED;
+        };
+
+        render_pass.set_bind_group(0, rt_bind_group, &[]);
+        render_pass.set_pipeline(&pipelines.rt_frame_copy_pipeline);
+        render_pass.draw(0..3, 0..1);
+
+        Flaws::empty()
     }
 }
 
