@@ -38,20 +38,38 @@ pub(crate) fn graphics_options_widgets(
             },
         )));
     }
+    // TODO: Find a way to offer the lists of enum values that is closer to the definitions
+    // of the enums, to reduce the chances of unintentional non-exhaustiveness.
+    // TODO: allow setting fov_y, tone_mapping, exposure, view_distance
     w.extend([
+        graphics_enum_button(
+            hud_inputs,
+            style,
+            literal!("Render Method"),
+            |g| &g.render_method,
+            |g, v| g.render_method = v,
+            [camera::RenderMethod::Mesh, camera::RenderMethod::Reference],
+        ),
         graphics_enum_button(
             hud_inputs,
             style,
             literal!("Fog"),
             |g| &g.fog,
             |g, v| g.fog = v,
-            // TODO: put these lists somewhere that is not individual UI code
             [
                 camera::FogOption::None,
                 camera::FogOption::Abrupt,
                 camera::FogOption::Compromise,
                 camera::FogOption::Physical,
             ],
+        ),
+        graphics_enum_button(
+            hud_inputs,
+            style,
+            literal!("Bloom"),
+            |g| &g.bloom_intensity,
+            |g, v| g.bloom_intensity = v,
+            [zo32(0.0), zo32(0.03125), zo32(0.125)],
         ),
         graphics_enum_button(
             hud_inputs,
@@ -77,9 +95,9 @@ pub(crate) fn graphics_options_widgets(
                 camera::TransparencyOption::Threshold(zo32(0.5)),
             ],
         ),
-        // TODO: this needs to be an enum button set for the multiple states, in principle. But
-        // for now, while we aren't actually saving the options, there's no reason to select
-        // IfCheap.
+        // TODO: this properly should be a graphics_enum_button with 3 states,
+        // but it is currently convenient to have toggleability for testing.
+        // Find a way to support this better.
         graphics_toggle_button(
             hud_inputs,
             style,
