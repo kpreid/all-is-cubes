@@ -60,10 +60,10 @@ pub(crate) struct Pipelines {
     /// geometry instead of using vertex buffers.
     pub(crate) skybox_render_pipeline: wgpu::RenderPipeline,
 
-    /// Bind group layout for the `frame-copy` shader's inputs.
+    /// Bind group layout for the `rt-copy` shader's inputs.
     pub(crate) rt_frame_copy_layout: wgpu::BindGroupLayout,
 
-    /// Pipeline for the `frame-copy` shader.
+    /// Pipeline for the `rt_frame_copy` entry points in `rt-copy.wgsl`.
     pub(crate) rt_frame_copy_pipeline: wgpu::RenderPipeline,
 
     /// Bind group layout for the `rerun-copy` shader's inputs.
@@ -506,13 +506,13 @@ impl Pipelines {
                     }),
                 ),
                 vertex: wgpu::VertexState {
-                    module: shaders.frame_copy.get(),
+                    module: shaders.rt_copy.get(),
                     entry_point: Some("rt_frame_copy_vertex"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[],
                 },
                 fragment: Some(wgpu::FragmentState {
-                    module: shaders.frame_copy.get(),
+                    module: shaders.rt_copy.get(),
                     entry_point: Some("rt_frame_copy_fragment"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {

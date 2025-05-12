@@ -18,7 +18,7 @@ use crate::reloadable::{Reloadable, reloadable_str};
 pub(crate) struct Shaders {
     pub(crate) blocks_and_lines: ReloadableShader,
     pub(crate) bloom: ReloadableShader,
-    pub(crate) frame_copy: ReloadableShader,
+    pub(crate) rt_copy: ReloadableShader,
     pub(crate) postprocess: ReloadableShader,
     #[cfg(feature = "rerun")]
     pub(crate) rerun_copy: ReloadableShader,
@@ -29,8 +29,8 @@ pub(crate) struct Shaders {
 static BLOCKS_AND_LINES: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));
 static BLOOM: Lazy<Reloadable> = Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/bloom.wgsl"));
-static FRAME_COPY: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/frame-copy.wgsl"));
+static RT_COPY: Lazy<Reloadable> =
+    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/rt-copy.wgsl"));
 static POSTPROCESS: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/postprocess.wgsl"));
 #[cfg(feature = "rerun")]
@@ -46,7 +46,7 @@ impl Shaders {
                 BLOCKS_AND_LINES.as_source(),
             ),
             bloom: ReloadableShader::new(device, "bloom".into(), BLOOM.as_source()),
-            frame_copy: ReloadableShader::new(device, "frame_copy".into(), FRAME_COPY.as_source()),
+            rt_copy: ReloadableShader::new(device, "rt_copy".into(), RT_COPY.as_source()),
             postprocess: ReloadableShader::new(
                 device,
                 "postprocess".into(),
@@ -65,7 +65,7 @@ impl Shaders {
         let Self {
             blocks_and_lines,
             bloom,
-            frame_copy,
+            rt_copy,
             postprocess,
             #[cfg(feature = "rerun")]
             rerun_copy,
@@ -75,7 +75,7 @@ impl Shaders {
 
         changed |= blocks_and_lines.update(device);
         changed |= bloom.update(device);
-        changed |= frame_copy.update(device);
+        changed |= rt_copy.update(device);
         changed |= postprocess.update(device);
         #[cfg(feature = "rerun")]
         {
