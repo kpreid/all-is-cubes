@@ -1208,7 +1208,6 @@ impl Mutation<'_, '_> {
     /// already present, and `Err(_)` if the replacement could not be made; see
     /// [`SetCubeError`] for possible errors.
     ///
-    // TODO(read_ticket): fix example to use Mutation
     /// ```
     /// use all_is_cubes::block;
     /// use all_is_cubes::math::Rgba;
