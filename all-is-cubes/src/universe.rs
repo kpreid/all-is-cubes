@@ -725,7 +725,7 @@ impl Universe {
         F: FnOnce(&mut T) -> Out,
     {
         if handle.universe_id() == Some(self.id) {
-            handle.try_modify(function)
+            handle.try_modify_impl(function)
         } else {
             // TODO: not the exactly correct error
             Err(HandleError::InvalidTicket(handle.name()))

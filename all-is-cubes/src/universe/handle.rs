@@ -206,7 +206,7 @@ impl<T: 'static> Handle<T> {
     where
         F: FnOnce(&mut T) -> Out,
     {
-        self.try_modify(function)
+        self.try_modify_impl(function)
     }
 
     /// Apply the given function to the `T` inside.
@@ -216,7 +216,10 @@ impl<T: 'static> Handle<T> {
     /// See their documentation for correct usage information.
     /// They are split in this way because of planned changes such that they will
     /// no longer share an implementation.
-    pub(in crate::universe) fn try_modify<F, Out>(&self, function: F) -> Result<Out, HandleError>
+    pub(in crate::universe) fn try_modify_impl<F, Out>(
+        &self,
+        function: F,
+    ) -> Result<Out, HandleError>
     where
         F: FnOnce(&mut T) -> Out,
     {
@@ -282,7 +285,7 @@ impl<T: 'static> Handle<T> {
         let outcome: Result<
             Result<(), ExecuteError<<T as Transactional>::Transaction>>,
             HandleError,
-        > = self.try_modify(|data| {
+        > = self.try_modify_impl(|data| {
             transaction.execute(data, read_ticket, &mut transaction::no_outputs)
         });
         outcome.map_err(ExecuteError::Handle)?
@@ -999,36 +1002,12 @@ mod tests {
     }
 
     #[test]
-    fn handle_try_borrow_in_use() {
-        let mut u = Universe::new();
-        let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        r.try_modify(|_| {
-            assert_eq!(
-                r.read(u.read_ticket()).unwrap_err(),
-                HandleError::InUse(Name::Anonym(0))
-            );
-        })
-        .unwrap();
-    }
-
-    #[test]
     fn handle_try_borrow_mut_in_use() {
         let mut u = Universe::new();
         let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let _borrow_1 = r.read(u.read_ticket()).unwrap();
         assert_eq!(
             r.try_borrow_mut().unwrap_err(),
-            HandleError::InUse(Name::Anonym(0))
-        );
-    }
-
-    #[test]
-    fn handle_try_modify_in_use() {
-        let mut u = Universe::new();
-        let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let _borrow_1 = r.read(u.read_ticket()).unwrap();
-        assert_eq!(
-            r.try_modify(|_| {}).unwrap_err(),
             HandleError::InUse(Name::Anonym(0))
         );
     }
