@@ -20,7 +20,7 @@ use crate::inv::{self, EphemeralOpaque, Inventory, Tool};
 use crate::math::{Cube, Face6, GridAab, GridRotation, Rgb, Rgba, notnan, ps32, zo32};
 use crate::save::compress::{GzSerde, Leu16};
 use crate::space::{self, BlockIndex, LightPhysics, Space, SpacePhysics};
-use crate::time::{self, Tick};
+use crate::time;
 use crate::transaction::Transaction as _;
 use crate::universe::{Handle, Name, PartialUniverse, ReadTicket, Universe};
 use crate::{behavior, op, tag};
@@ -815,8 +815,6 @@ fn space_with_sparse_indices() {
 
 #[test]
 fn space_light_queue_remembered() {
-    let universe = Universe::new();
-
     use space::LightStatus::{NoRays, Opaque, Uninitialized, Visible};
     let [block0] = make_some_blocks();
     let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1]))
@@ -833,7 +831,8 @@ fn space_light_queue_remembered() {
     );
 
     let serialized = to_value(&space).unwrap();
-    let mut space2: Space = from_value(serialized).unwrap();
+    let mut universe2 = Universe::new();
+    let space2: Space = from_value(serialized).unwrap();
 
     // On deserialization, all cubes that were in the queue are marked uninitialized.
     assert_eq!(
@@ -842,12 +841,9 @@ fn space_light_queue_remembered() {
     );
 
     // Then, when stepped, they are updated
-    let (_, _) = space2.step(
-        universe.read_ticket(),
-        None,
-        Tick::arbitrary(),
-        time::DeadlineNt::Whenever,
-    );
+    let space2 = universe2.insert_anonymous(space2);
+    universe2.step(false, time::DeadlineNt::Whenever);
+    let space2 = space2.read(universe2.read_ticket()).unwrap();
     assert_eq!(
         [0, 1, 2].map(|x| space2.get_lighting([x, 0, 0]).status()),
         [Opaque, Visible, NoRays]

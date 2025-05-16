@@ -958,13 +958,13 @@ pub struct UniverseStepInfo {
     #[doc(hidden)]
     pub computation_time: time::Duration,
     /// Number of members which needed to do something specific.
-    active_members: usize,
+    pub(crate) active_members: usize,
     /// Number of members which were processed at all.
-    total_members: usize,
-    block_def_step: BlockDefStepInfo,
-    character_step: CharacterStepInfo,
-    space_step: SpaceStepInfo,
-    behaviors: BehaviorSetStepInfo,
+    pub(crate) total_members: usize,
+    pub(crate) block_def_step: BlockDefStepInfo,
+    pub(crate) character_step: CharacterStepInfo,
+    pub(crate) space_step: SpaceStepInfo,
+    pub(crate) behaviors: BehaviorSetStepInfo,
 }
 impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
     fn add_assign(&mut self, other: Self) {

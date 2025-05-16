@@ -20,9 +20,9 @@ use crate::space::{
     CubeTransaction, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpaceFluff,
     SpacePhysics,
 };
-use crate::time::{self, Tick};
+use crate::time;
 use crate::transaction::{self, Transaction as _};
-use crate::universe::{Handle, HandleError, Name, ReadTicket, Universe, UniverseTransaction};
+use crate::universe::{Handle, HandleError, Name, ReadTicket, Universe};
 
 // TODO: test consistency between the index and get_* methods
 // TODO: test fill() equivalence and error handling
@@ -468,12 +468,13 @@ fn listens_to_block_changes() {
     let indirect = Block::from(block_def_handle.clone());
 
     // Set up space and listener
-    let mut space = Space::builder(GridAab::ORIGIN_CUBE)
+    let space = Space::builder(GridAab::ORIGIN_CUBE)
         .read_ticket(universe.read_ticket())
         .filled_with(indirect)
         .build();
     let sink = Sink::new();
     space.listen(sink.listener());
+    let space = universe.insert_anonymous(space);
     assert_eq!(sink.drain(), vec![]);
 
     // Now mutate the block def .
@@ -492,15 +493,16 @@ fn listens_to_block_changes() {
     // computations like reevaluation to happen during the notification process.
     assert_eq!(sink.drain(), vec![]);
     // Instead, it only happens the next time the space is stepped.
-    let (_, _) = space.step(
-        universe.read_ticket(),
-        None,
-        Tick::arbitrary(),
-        time::DeadlineNt::Whenever,
-    );
+    universe.step(false, time::DeadlineNt::Whenever);
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(sink.drain(), vec![SpaceChange::BlockEvaluation(0)]);
-    assert_eq!(space.get_evaluated([0, 0, 0]), &new_evaluated);
+    assert_eq!(
+        space
+            .read(universe.read_ticket())
+            .unwrap()
+            .get_evaluated([0, 0, 0]),
+        &new_evaluated
+    );
 }
 
 #[test]
@@ -525,6 +527,7 @@ fn indirect_becomes_evaluation_error() {
         .unwrap();
     let sink = Sink::new();
     space.listen(sink.listener());
+    let space = universe.insert_anonymous(space);
 
     // Make the block def refer to itself, guaranteeing an evaluation error
     universe
@@ -535,17 +538,15 @@ fn indirect_becomes_evaluation_error() {
         .unwrap();
 
     // Step the space to let it notice.
-    let (_, _) = space.step(
-        universe.read_ticket(),
-        None,
-        Tick::arbitrary(),
-        time::DeadlineNt::Whenever,
-    );
+    universe.step(false, time::DeadlineNt::Whenever);
 
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(sink.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
-        space.get_evaluated([0, 0, 0]),
+        space
+            .read(universe.read_ticket())
+            .unwrap()
+            .get_evaluated([0, 0, 0]),
         &block
             .evaluate(universe.read_ticket())
             .unwrap_err()
@@ -669,7 +670,7 @@ fn set_physics_notification() {
 
 #[test]
 fn block_tick_action_does_not_run_paused() {
-    let universe = Universe::new();
+    let mut universe = Universe::new();
     let vanisher = Block::builder()
         .color(Rgba::WHITE)
         .tick_action(TickAction {
@@ -681,30 +682,23 @@ fn block_tick_action_does_not_run_paused() {
     space
         .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &vanisher))
         .unwrap();
-    let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
+    let space = universe.insert_anonymous(space);
 
     // No effect when paused
-    _ = space.step(
-        universe.read_ticket(),
-        None,
-        clock.advance(true),
-        time::DeadlineNt::Whenever,
+    universe.step(true, time::DeadlineNt::Whenever);
+    assert_eq!(
+        space.read(universe.read_ticket()).unwrap()[[0, 0, 0]],
+        vanisher
     );
-    assert_eq!(space[[0, 0, 0]], vanisher);
 
     // Operation applied when unpaused
-    _ = space.step(
-        universe.read_ticket(),
-        None,
-        clock.advance(false),
-        time::DeadlineNt::Whenever,
-    );
-    assert_eq!(space[[0, 0, 0]], AIR);
+    universe.step(false, time::DeadlineNt::Whenever);
+    assert_eq!(space.read(universe.read_ticket()).unwrap()[[0, 0, 0]], AIR);
 }
 
 #[test]
 fn block_tick_action_timing() {
-    let universe = Universe::new();
+    let mut universe = Universe::new();
     let [mut block1, mut block2, block3] = make_some_blocks();
 
     // Hook them up to turn into each other
@@ -721,32 +715,26 @@ fn block_tick_action_timing() {
     space
         .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block1))
         .unwrap();
+    let space = universe.insert_anonymous(space);
 
     // Setup done, now simulate.
-    let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
     let mut blocks_found = Vec::new();
     for _ in 0..6 {
-        // Record the current state in a readable fashion
-        let found = &space[[0, 0, 0]];
-        blocks_found.push(if found == &block1 {
-            1
-        } else if found == &block2 {
-            2
-        } else if found == &block3 {
-            3
-        } else {
-            99
-        });
+        {
+            // Record the current state in a readable fashion
+            let found = &space.read(universe.read_ticket()).unwrap()[[0, 0, 0]];
+            blocks_found.push(if found == &block1 {
+                1
+            } else if found == &block2 {
+                2
+            } else if found == &block3 {
+                3
+            } else {
+                99
+            });
+        }
 
-        let (_info, step_txn) = space.step(
-            universe.read_ticket(),
-            None,
-            clock.advance(false),
-            time::DeadlineNt::Whenever,
-        );
-        // TODO: the block effect isn't a returned transaction yet but it perhaps should be.
-        // This test will need reworking at that point.
-        assert_eq!(step_txn, UniverseTransaction::default());
+        universe.step(false, time::DeadlineNt::Whenever);
     }
 
     // Check sequence of changes
@@ -759,7 +747,7 @@ fn block_tick_action_timing() {
 fn block_tick_action_conflict() {
     use pretty_assertions::assert_eq;
 
-    let universe = Universe::new();
+    let mut universe = Universe::new();
 
     // Create an active block.
     let [
@@ -788,7 +776,6 @@ fn block_tick_action_conflict() {
 
     // Create test setup.
     let fluff_sink = Sink::new();
-    let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
     let mut space = Space::empty_positive(3, 1, 1);
     space.fluff().listen(fluff_sink.listener());
     // These two blocks will both try to mutate [1, 0, 0], with different results.
@@ -801,21 +788,19 @@ fn block_tick_action_conflict() {
             m.set(right, &modifies_nx_neighbor)
         })
         .unwrap();
+    let space = universe.insert_anonymous(space);
 
     {
-        let (_info, step_txn) = space.step(
-            universe.read_ticket(),
-            None,
-            clock.advance(false),
-            time::DeadlineNt::Whenever,
-        );
-        assert_eq!(step_txn, UniverseTransaction::default());
+        universe.step(false, time::DeadlineNt::Whenever);
 
-        assert_eq!(
-            [&space[left], &space[middle], &space[right]],
-            [&modifies_px_neighbor, &AIR, &modifies_nx_neighbor],
-            "expecting no change"
-        );
+        {
+            let space = space.read(universe.read_ticket()).unwrap();
+            assert_eq!(
+                [&space[left], &space[middle], &space[right]],
+                [&modifies_px_neighbor, &AIR, &modifies_nx_neighbor],
+                "expecting no change"
+            );
+        }
         assert_eq!(
             fluff_sink.drain(),
             vec![
@@ -833,19 +818,19 @@ fn block_tick_action_conflict() {
 
     // Now if we delete one of the conflicting blocks, the tick action of the remaining one
     // should take effect.
-    space
-        .mutate(ReadTicket::stub(), |m| m.set(right, &AIR))
+    universe
+        .execute_1(
+            &space,
+            &CubeTransaction::replacing(Some(modifies_nx_neighbor), Some(AIR)).at(right),
+        )
         .unwrap();
 
+    universe.step(false, time::DeadlineNt::Whenever);
+
     {
-        let (_info, step_txn) = space.step(
-            universe.read_ticket(),
-            None,
-            clock.advance(false),
-            time::DeadlineNt::Whenever,
-        );
-        assert_eq!(step_txn, UniverseTransaction::default());
         assert_eq!(fluff_sink.drain(), vec![]);
+
+        let space = space.read(universe.read_ticket()).unwrap();
         assert_eq!(
             [&space[left], &space[middle], &space[right]],
             [&modifies_px_neighbor, &output1, &AIR],
@@ -858,7 +843,7 @@ fn block_tick_action_conflict() {
 /// itself.
 #[test]
 fn block_tick_action_repeats() {
-    let universe = Universe::new();
+    let mut universe = Universe::new();
     let ticker = Block::builder()
         .color(Rgba::WHITE)
         .tick_action(TickAction {
@@ -878,15 +863,15 @@ fn block_tick_action_repeats() {
     space
         .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &ticker))
         .unwrap();
-    let mut clock = time::Clock::new(time::TickSchedule::per_second(10), 0);
+    let space = universe.insert_anonymous(space);
 
     for t in 0..2 {
-        _ = space.step(
-            universe.read_ticket(),
-            None,
-            clock.advance(false),
-            time::DeadlineNt::Whenever,
+        universe.step(false, time::DeadlineNt::Whenever);
+        assert_eq!(
+            space.read(universe.read_ticket()).unwrap()[[0, 1, 0]]
+                .modifiers()
+                .len(),
+            t + 1
         );
-        assert_eq!(space[[0, 1, 0]].modifiers().len(), t + 1);
     }
 }

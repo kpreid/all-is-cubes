@@ -480,7 +480,7 @@ impl Space {
     ///
     /// * `tick` is how much time is to pass in the simulation.
     /// * `deadline` is when to stop computing flexible things such as light transport.
-    pub fn step<I: time::Instant>(
+    pub(crate) fn step<I: time::Instant>(
         &mut self,
         read_ticket: ReadTicket<'_>,
         self_handle: Option<&Handle<Space>>,
@@ -1017,7 +1017,7 @@ pub struct SpaceFluff {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Performance data returned by [`Space::step`].
+/// Performance data about stepping a [`Space`].
 ///
 /// The exact contents of this structure
 /// are unstable; use only `Debug` formatting to examine its contents unless you have

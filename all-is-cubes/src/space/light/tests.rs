@@ -6,7 +6,7 @@ use super::{LightUpdatesInfo, PackedLight, Priority, data::LightStatus};
 use crate::block::{self, AIR, Block};
 use crate::listen::{Listen as _, Listener, Sink};
 use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgba, rgb_const};
-use crate::space::{GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
+use crate::space::{CubeTransaction, GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
 use crate::time;
 use crate::universe::{ReadTicket, Universe};
 
@@ -88,31 +88,32 @@ fn out_of_bounds_lighting_value() {
 
 #[test]
 fn step() {
-    let universe = Universe::new();
+    let mut universe = Universe::new();
     let color = Rgb::new(1.0, 0.0, 0.0);
-    let mut space = Space::builder(GridAab::from_lower_upper([0, 0, 0], [3, 1, 1]))
-        .sky_color(color)
-        .build();
+    let space = universe.insert_anonymous(
+        Space::builder(GridAab::from_lower_upper([0, 0, 0], [3, 1, 1]))
+            .sky_color(color)
+            .build(),
+    );
     let sky_light = PackedLight::from(color);
 
-    space
-        .mutate(ReadTicket::stub(), |m| {
-            m.set([0, 0, 0], block::from_color!(Rgb::ONE))
-        })
+    universe
+        .execute_1(
+            &space,
+            &CubeTransaction::replacing(None, Some(block::from_color!(Rgb::ONE))).at(Cube::ORIGIN),
+        )
         .unwrap();
     // Not changed yet... except for the now-opaque block
-    assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
-    assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::NO_RAYS);
-    assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS);
+    {
+        let space = space.read(universe.read_ticket()).unwrap();
+        assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
+        assert_eq!(space.get_lighting([1, 0, 0]), PackedLight::NO_RAYS);
+        assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS);
+    }
 
-    let (info, _) = space.step(
-        universe.read_ticket(),
-        None,
-        time::Tick::arbitrary(),
-        time::DeadlineNt::Whenever,
-    );
+    let info = universe.step(false, time::DeadlineNt::Whenever);
     assert_eq!(
-        info.light,
+        info.space_step.light,
         LightUpdatesInfo {
             update_count: 1,
             max_update_difference: sky_light.difference_priority(PackedLight::NO_RAYS),
@@ -121,9 +122,12 @@ fn step() {
         }
     );
 
-    assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE); // opaque
-    assert_eq!(space.get_lighting([1, 0, 0]), sky_light); // updated
-    assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS); // not updated/not relevant
+    {
+        let space = space.read(universe.read_ticket()).unwrap();
+        assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE); // opaque
+        assert_eq!(space.get_lighting([1, 0, 0]), sky_light); // updated
+        assert_eq!(space.get_lighting([2, 0, 0]), PackedLight::NO_RAYS); // not updated/not relevant
+    }
 }
 
 #[test]
@@ -302,22 +306,20 @@ fn disabled_lighting_returns_one_always() {
 
 #[test]
 fn disabled_lighting_does_not_update() {
+    let mut universe = Universe::new();
     let mut space = space_with_disabled_light();
     space
         .light
         .light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
+    universe.insert_anonymous(space);
     assert_eq!(
-        space
-            .step(
-                ReadTicket::stub(),
-                None,
-                time::Tick::arbitrary(),
-                time::DeadlineNt::Whenever
-            )
-            .0
+        universe
+            .step(false, time::DeadlineNt::Whenever)
+            .space_step
             .light,
         LightUpdatesInfo::default()
     );
+    // TODO: this test could really easily fail to report anything meaningful; also test non-disabled lighting.
 }
 
 // TODO: test sky lighting propagation onto blocks after quiescing
