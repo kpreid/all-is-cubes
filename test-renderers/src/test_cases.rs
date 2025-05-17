@@ -169,7 +169,6 @@ async fn bloom(mut context: RenderTestContext, bloom_intensity: f32) {
 /// This should detect failures of output color mapping.
 async fn color_srgb_ramp(mut context: RenderTestContext) {
     let bounds = GridAab::from_lower_size([0, 0, 0], [16 * 2, 16 * 2, 1]);
-    let mut universe = Universe::new();
     let space = Space::builder(bounds)
         .light_physics(LightPhysics::None)
         .spawn({
@@ -200,7 +199,7 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
         })
         .unwrap();
 
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     // TODO: if we ever get an orthographic camera this would be a great time to use it
     let cameras = StandardCameras::from_constant_for_test(
@@ -209,7 +208,7 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
             1.0,
             Size2D::splat((f64::from(bounds.size().width) * 4.) as u32),
         ),
-        &universe,
+        context.universe(),
     );
 
     context
@@ -219,10 +218,9 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
 
 /// Test rendering of the cursor.
 async fn cursor_basic(mut context: RenderTestContext) {
-    let mut universe = Universe::new();
     let space = one_cube_space();
 
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     let cameras = StandardCameras::from_constant_for_test(
         {
@@ -231,10 +229,13 @@ async fn cursor_basic(mut context: RenderTestContext) {
             options
         },
         COMMON_VIEWPORT,
-        &universe,
+        context.universe(),
     );
     let cursor = cameras
-        .project_cursor(Layers::splat(universe.read_ticket()), Point2D::origin())
+        .project_cursor(
+            Layers::splat(context.universe().read_ticket()),
+            Point2D::origin(),
+        )
         .unwrap();
     assert!(cursor.is_some(), "project_cursor() unexpectedly missed");
     let overlays = Overlays {
@@ -261,7 +262,6 @@ async fn debug_pixel_cost(mut context: RenderTestContext) {
 
 /// Test rendering of emitted light from opaque voxels.
 async fn emission(mut context: RenderTestContext) {
-    let mut universe = Universe::new();
     let mut space = one_cube_space(); // TODO: also test with surrounding light
 
     let has_emission_and_reflectance = Block::builder()
@@ -292,18 +292,20 @@ async fn emission(mut context: RenderTestContext) {
             }
         })
         .unwrap()
-        .build_into(&mut universe);
+        .build_into(context.universe_mut());
 
     space
-        .mutate(universe.read_ticket(), |m| m.set([0, 0, 0], block))
+        .mutate(context.universe().read_ticket(), |m| {
+            m.set([0, 0, 0], block)
+        })
         .unwrap();
 
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     let cameras = StandardCameras::from_constant_for_test(
         GraphicsOptions::UNALTERED_COLORS,
         COMMON_VIEWPORT,
-        &universe,
+        context.universe(),
     );
 
     // In CI, macOS on GitHub Actions, this test sometimes produces a 1-level difference.
@@ -340,7 +342,6 @@ async fn voxel_shape_test(
     atom_block: Block,
     transparency_option: &str,
 ) {
-    let mut universe = Universe::new();
     let voxel_block = Block::builder()
         .voxels_fn(R2, |cube| {
             if cube.x == 0 || cube.y == 0 || cube.z == 0 {
@@ -350,13 +351,13 @@ async fn voxel_shape_test(
             }
         })
         .unwrap()
-        .build_into(&mut universe);
+        .build_into(context.universe_mut());
     let bounds = GridAab::from_lower_upper([-1, 0, 0], [3, 1, 1]);
     let space = Space::builder(bounds)
         // Single-channel sky color so we can distinguish it from the contribution of the emission
         .sky_color(Rgb::from_srgb8([0, 0, 127]))
         .spawn(looking_at_one_cube_spawn(bounds))
-        .read_ticket(universe.read_ticket())
+        .read_ticket(context.universe().read_ticket())
         .build_and_mutate(|m| {
             m.set([-1, 0, 0], atom_block).unwrap();
             m.set([1, 0, 0], voxel_block).unwrap();
@@ -364,7 +365,7 @@ async fn voxel_shape_test(
         })
         .unwrap();
 
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.transparency = match transparency_option {
@@ -372,7 +373,8 @@ async fn voxel_shape_test(
         "vol" => TransparencyOption::Volumetric,
         _ => unreachable!(),
     };
-    let cameras = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
+    let cameras =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
 
     // TODO: tighten up these bounds once we are no longer using approximate raymarching
     context
@@ -387,31 +389,31 @@ async fn voxel_shape_test(
 /// Test what happens when the renderer's character goes away *after* the first frame.
 ///
 /// TODO: also test case of space gone but character not gone
-async fn error_character_gone(context: RenderTestContext) {
-    let mut universe = Universe::new();
+async fn error_character_gone(mut context: RenderTestContext) {
     let mut space = one_cube_space();
     space
-        .mutate(universe.read_ticket(), |m| {
+        .mutate(context.universe().read_ticket(), |m| {
             m.set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
         })
         .unwrap();
-    let (space_handle, character_handle) = finish_universe_from_space(&mut universe, space);
-    let mut renderer = context.renderer(&universe);
+    let (space_handle, character_handle) =
+        finish_universe_from_space(context.universe_mut(), space);
+    let mut renderer = context.renderer(context.universe());
 
     // Run a first render because this test is about what happens afterward
     renderer
-        .update(Layers::splat(universe.read_ticket()), None)
+        .update(Layers::splat(context.universe().read_ticket()), None)
         .unwrap();
     let _ = renderer.draw("").await.unwrap();
 
     UniverseTransaction::delete(character_handle)
         .merge(UniverseTransaction::delete(space_handle))
         .unwrap()
-        .execute(&mut universe, (), &mut transaction::no_outputs)
+        .execute(context.universe_mut(), (), &mut transaction::no_outputs)
         .unwrap();
 
     // Updating may fail, or it may succeed because there were no change notifications.
-    match renderer.update(Layers::splat(universe.read_ticket()), None) {
+    match renderer.update(Layers::splat(context.universe().read_ticket()), None) {
         Ok(()) => {}
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
@@ -428,24 +430,24 @@ async fn error_character_gone(context: RenderTestContext) {
 }
 
 /// Test what happens when the renderer's character and space goes away *before* the first frame.
-async fn error_character_unavailable(context: RenderTestContext) {
-    let mut universe = Universe::new();
+async fn error_character_unavailable(mut context: RenderTestContext) {
     let mut space = one_cube_space();
     space
-        .mutate(universe.read_ticket(), |m| {
+        .mutate(context.universe().read_ticket(), |m| {
             m.set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))
         })
         .unwrap();
-    let (space_handle, character_handle) = finish_universe_from_space(&mut universe, space);
-    let mut renderer = context.renderer(&universe);
+    let (space_handle, character_handle) =
+        finish_universe_from_space(context.universe_mut(), space);
+    let mut renderer = context.renderer(context.universe());
 
     UniverseTransaction::delete(character_handle)
         .merge(UniverseTransaction::delete(space_handle))
         .unwrap()
-        .execute(&mut universe, (), &mut transaction::no_outputs)
+        .execute(context.universe_mut(), (), &mut transaction::no_outputs)
         .unwrap();
 
-    match renderer.update(Layers::splat(universe.read_ticket()), None) {
+    match renderer.update(Layers::splat(context.universe().read_ticket()), None) {
         Err(RenderError::Read(HandleError::Gone(name)))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from update(): {res:?}"),
@@ -473,15 +475,14 @@ async fn fog(mut context: RenderTestContext, fog: FogOption) {
 }
 
 /// Does the renderer properly follow a change of character?
-async fn follow_character_change(context: RenderTestContext) {
-    let mut universe = Universe::new();
+async fn follow_character_change(mut context: RenderTestContext) {
     let mut character_of_a_color = |color: Rgb| -> Handle<Character> {
         let space = Space::builder(GridAab::ORIGIN_CUBE)
             .sky_color(color)
             .build();
-        let space = universe.insert_anonymous(space);
-        let character = Character::spawn_default(universe.read_ticket(), space);
-        universe.insert_anonymous(character)
+        let space = context.universe_mut().insert_anonymous(space);
+        let character = Character::spawn_default(context.universe().read_ticket(), space);
+        context.universe_mut().insert_anonymous(character)
     };
     let c1 = character_of_a_color(rgb_const!(1.0, 0.0, 0.0));
     let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
@@ -496,7 +497,7 @@ async fn follow_character_change(context: RenderTestContext) {
 
     // Draw the first character
     renderer
-        .update(Layers::splat(universe.read_ticket()), None)
+        .update(Layers::splat(context.universe().read_ticket()), None)
         .unwrap();
     let image1 = renderer.draw("").await.unwrap();
 
@@ -515,7 +516,7 @@ async fn follow_character_change(context: RenderTestContext) {
     // Switch characters and draw the second -- the resulting sky color should be from it
     character_cell.set(Some(c2));
     renderer
-        .update(Layers::splat(universe.read_ticket()), None)
+        .update(Layers::splat(context.universe().read_ticket()), None)
         .unwrap();
     let image2 = renderer.draw("").await.unwrap();
 
@@ -527,19 +528,18 @@ async fn follow_character_change(context: RenderTestContext) {
 }
 /// Does the renderer properly follow a change of graphics options?
 async fn follow_options_change(mut context: RenderTestContext) {
-    let mut universe = Universe::new();
     let bounds = GridAab::from_lower_upper([-1, 0, 0], [2, 1, 1]);
     let space = Space::builder(bounds)
         .sky_color(rgb_const!(0.5, 0.5, 0.5))
         .spawn(looking_at_one_cube_spawn(bounds))
-        .read_ticket(universe.read_ticket())
+        .read_ticket(context.universe().read_ticket())
         .build_and_mutate(|m| {
             m.set([0, 0, 0], block::from_color!(0.0, 1.0, 0.0, 1.0))?;
             m.set([1, 0, 0], block::from_color!(0.0, 0.0, 1.0, 0.5))?;
             Ok(())
         })
         .unwrap();
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     // Two sets of graphics options with various differences
     let mut options_1 = GraphicsOptions::UNALTERED_COLORS;
@@ -554,7 +554,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
     let cameras: StandardCameras = StandardCameras::new(
         options_cell.as_source(),
         listen::constant(COMMON_VIEWPORT),
-        listen::constant(universe.get_default_character()),
+        listen::constant(context.universe().get_default_character()),
         listen::constant(Arc::new(UiViewState::default())),
     );
 
@@ -580,7 +580,6 @@ async fn follow_options_change(mut context: RenderTestContext) {
 /// under uniform lighting conditions, so the output image is expected not to be perfectly constant.
 /// But it’s still a test case worth looking at. (And perhaps we should remove that fudge factor.)
 async fn furnace(mut context: RenderTestContext) {
-    let mut universe = Universe::new();
     let white_block = block::from_color!(Rgba::WHITE);
     let bounds = GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]);
     let mut space = Space::builder(bounds)
@@ -591,7 +590,7 @@ async fn furnace(mut context: RenderTestContext) {
             spawn.set_look_direction(vec3(1., -1., -1.));
             spawn
         })
-        .read_ticket(universe.read_ticket())
+        .read_ticket(context.universe().read_ticket())
         .build_and_mutate(|m| {
             // Make a pattern of blocks that has room for some reflections.
             m.set([-1, -1, 1], &white_block).unwrap();
@@ -601,7 +600,7 @@ async fn furnace(mut context: RenderTestContext) {
         })
         .unwrap();
     space.evaluate_light::<std::time::Instant>(0, drop);
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     // Unlike other test cases we are not using UNALTERED_COLORS, because the entire point of this
     // test is that none of the alterations should cause the block to not be colored identically
@@ -609,7 +608,8 @@ async fn furnace(mut context: RenderTestContext) {
     let mut options = GraphicsOptions::default();
     options.fov_y = ps64(45.0);
     options.bloom_intensity = zo32(0.0);
-    let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
 
     context
         .render_comparison_test(1, scene, Overlays::NONE)
@@ -617,12 +617,11 @@ async fn furnace(mut context: RenderTestContext) {
 }
 
 async fn info_text(mut context: RenderTestContext) {
-    let mut universe = Universe::new();
     let space = Space::builder(GridAab::ORIGIN_CUBE)
         // This used to also be a test of setting sky
         .sky_color(rgb_const!(1.0, 0.5, 0.0))
         .build();
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
     let overlays = Overlays {
         cursor: None,
         info_text: Some(
@@ -635,7 +634,7 @@ async fn info_text(mut context: RenderTestContext) {
     };
 
     context
-        .render_comparison_test(TEXT_MAX_DIFF, &universe, overlays)
+        .render_comparison_test(TEXT_MAX_DIFF, context.default_cameras(), overlays)
         .await;
 }
 
@@ -659,25 +658,24 @@ async fn icons(mut context: RenderTestContext) {
         widgets::{ToolbarButtonState, WidgetBlocks, WidgetTheme},
     };
 
-    let universe = &mut Universe::new();
     let mut install_txn = UniverseTransaction::default();
     Icons::new(&mut install_txn, yield_progress_for_testing())
         .await
-        .install(universe.read_ticket(), &mut install_txn)
+        .install(context.universe().read_ticket(), &mut install_txn)
         .unwrap();
     let ui_blocks_p = UiBlocks::new(&mut install_txn, yield_progress_for_testing())
         .await
-        .install(universe.read_ticket(), &mut install_txn)
+        .install(context.universe().read_ticket(), &mut install_txn)
         .unwrap();
     let widget_theme = WidgetTheme::new(
-        universe.read_ticket(),
+        context.universe().read_ticket(),
         &mut install_txn,
         yield_progress_for_testing(),
     )
     .await
     .unwrap();
     install_txn
-        .execute(universe, (), &mut transaction::no_outputs)
+        .execute(context.universe_mut(), (), &mut transaction::no_outputs)
         .unwrap();
 
     fn get_blocks<E: BlockModule + 'static>(
@@ -689,7 +687,7 @@ async fn icons(mut context: RenderTestContext) {
     }
 
     let icons = get_blocks(
-        universe,
+        context.universe(),
         [
             Icons::Activate,
             Icons::Delete,
@@ -700,7 +698,7 @@ async fn icons(mut context: RenderTestContext) {
     );
 
     let widget_blocks = get_blocks(
-        universe,
+        context.universe(),
         [
             WidgetBlocks::Crosshair,
             WidgetBlocks::ToolbarSlotFrame,
@@ -726,7 +724,7 @@ async fn icons(mut context: RenderTestContext) {
 
     let action_widgets = [UiBlocks::BackButtonLabel].map(|label_key| {
         block_from_widget(
-            universe.read_ticket(),
+            context.universe().read_ticket(),
             &vui::leaf_widget(widgets::ActionButton::new(
                 ui_blocks_p[label_key].clone(),
                 &widget_theme,
@@ -743,7 +741,7 @@ async fn icons(mut context: RenderTestContext) {
     ]
     .map(|(label_key, state)| {
         block_from_widget(
-            universe.read_ticket(),
+            context.universe().read_ticket(),
             &vui::leaf_widget(widgets::ToggleButton::new(
                 listen::constant(state),
                 |state| *state,
@@ -770,7 +768,7 @@ async fn icons(mut context: RenderTestContext) {
 
     // Fill space with blocks
     let mut space = Space::builder(bounds)
-        .read_ticket(universe.read_ticket())
+        .read_ticket(context.universe().read_ticket())
         .spawn_position(point3(
             FreeCoordinate::from(bounds.size().width) / 2.,
             FreeCoordinate::from(bounds.size().height) / 2.,
@@ -795,7 +793,7 @@ async fn icons(mut context: RenderTestContext) {
         f64::from(space.bounds().size().height) / f64::from(space.bounds().size().width);
 
     space.evaluate_light::<time::NoTime>(1, |_| {});
-    finish_universe_from_space(universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.lighting_display = LightingOption::Flat;
@@ -809,7 +807,7 @@ async fn icons(mut context: RenderTestContext) {
             StandardCameras::from_constant_for_test(
                 options,
                 Viewport::with_scale(1.0, [256, (256.0 * aspect_ratio) as u32]),
-                universe,
+                context.universe(),
             ),
             Overlays::NONE,
         )
@@ -823,18 +821,17 @@ async fn layers_all(context: RenderTestContext) {
 
 /// Combined impl for [`layers_all()`] and [`layers_hidden_ui()`]
 async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
-    let mut universe = Universe::new();
     let cube_space = one_cube_space();
-    finish_universe_from_space(&mut universe, cube_space);
+    finish_universe_from_space(context.universe_mut(), cube_space);
 
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.lighting_display = LightingOption::Flat;
     options.show_ui = show_ui;
-    let ui_space = ui_space(&mut universe);
+    let ui_space = ui_space(context.universe_mut());
     let cameras: StandardCameras = StandardCameras::new(
         listen::constant(Arc::new(options.clone())),
         listen::constant(COMMON_VIEWPORT),
-        listen::constant(universe.get_default_character()),
+        listen::constant(context.universe().get_default_character()),
         listen::constant(Arc::new(UiViewState {
             space: Some(ui_space),
             view_transform: ViewTransform::identity(),
@@ -862,11 +859,10 @@ async fn layers_hidden_ui(context: RenderTestContext) {
 /// Test rendering with missing pieces.
 /// No world, no UI, but info text.
 async fn layers_none_but_text(mut context: RenderTestContext) {
-    let universe = Universe::new();
     context
         .render_comparison_test(
             TEXT_MAX_DIFF,
-            &universe,
+            context.default_cameras(),
             Overlays {
                 cursor: None,
                 info_text: Some("hello world"),
@@ -877,8 +873,7 @@ async fn layers_none_but_text(mut context: RenderTestContext) {
 
 /// No world, but UI and info text.
 async fn layers_ui_only(mut context: RenderTestContext) {
-    let mut universe = Universe::new();
-    let ui_space = ui_space(&mut universe);
+    let ui_space = ui_space(context.universe_mut());
     let cameras: StandardCameras = StandardCameras::new(
         listen::constant(Arc::new(GraphicsOptions::UNALTERED_COLORS)),
         listen::constant(COMMON_VIEWPORT),
@@ -917,12 +912,11 @@ async fn light(mut context: RenderTestContext, option: LightingOption) {
 /// exercise robustness in the presence of errors that stop `update()` from
 /// completing.
 async fn no_update(mut context: RenderTestContext) {
-    let mut universe = Universe::new();
     let space = one_cube_space();
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     // Call draw() without update().
-    let mut renderer = context.renderer(&universe);
+    let mut renderer = context.renderer(context.universe());
     let mut image = renderer.draw("").await.unwrap();
 
     // Check the output, but ignore that it's potentially unfinished.
@@ -938,8 +932,7 @@ async fn no_update(mut context: RenderTestContext) {
 async fn sky(mut context: RenderTestContext, face: Face6) {
     // The face passed is the face of the sky we are *looking at*.
 
-    let mut universe = Universe::new();
-    let [block] = make_some_voxel_blocks(&mut universe);
+    let [block] = make_some_voxel_blocks(context.universe_mut());
 
     let [r, g, b] = [
         Rgb::UNIFORM_LUMINANCE_RED,
@@ -951,7 +944,7 @@ async fn sky(mut context: RenderTestContext, face: Face6) {
     let sky = space::Sky::Octants([Rgb::ZERO, b, g, g + b, r, r + b, r + g, r + g + b]);
 
     let space = Space::builder(GridAab::ORIGIN_CUBE)
-        .read_ticket(universe.read_ticket())
+        .read_ticket(context.universe().read_ticket())
         .sky(sky)
         .filled_with(block)
         .spawn({
@@ -971,12 +964,13 @@ async fn sky(mut context: RenderTestContext, face: Face6) {
             spawn
         })
         .build();
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     // Enable lighting so that we can see the "reflected" sky light.
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.lighting_display = LightingOption::Smooth;
-    let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
 
     context
         .render_comparison_test(4, scene, Overlays::NONE)
@@ -1014,10 +1008,13 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
             .unwrap();
     }
 
+    *context.universe_mut() = universe;
+
     // TODO: add more features (fog, lighting) as long as all renderers support them
     let options = GraphicsOptions::UNALTERED_COLORS;
 
-    let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
     context
         .render_comparison_test(
             Threshold::new([
@@ -1057,18 +1054,17 @@ async fn tone_map(
 
 /// Test rendering of transparent blocks.
 async fn transparent_one(mut context: RenderTestContext, transparency_option: &str) {
-    let mut universe = Universe::new();
     let mut space = one_cube_space();
     // For example, in the case of TransparencyOption::Surface,
     // this should be a 50% mix of [1, 0, 0] and [0.5, 0.5, 0.5], i.e.
     // [0.75, 0.25, 0.25], whose closest sRGB8 approximation is [225, 137, 137] = #E18989.
     space
-        .mutate(universe.read_ticket(), |m| {
+        .mutate(context.universe().read_ticket(), |m| {
             m.set([0, 0, 0], block::from_color!(1.0, 0.0, 0.0, 0.5))
         })
         .unwrap();
 
-    finish_universe_from_space(&mut universe, space);
+    finish_universe_from_space(context.universe_mut(), space);
 
     let mut options = GraphicsOptions::UNALTERED_COLORS;
     options.transparency = match transparency_option {
@@ -1077,7 +1073,8 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
         _ => unreachable!(),
     };
 
-    let scene = StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, &universe);
+    let scene =
+        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
     context
         .render_comparison_test(COLOR_ROUNDING_MAX_DIFF, scene, Overlays::NONE)
         .await;
@@ -1086,14 +1083,13 @@ async fn transparent_one(mut context: RenderTestContext, transparency_option: &s
 /// Renderer should not crash if given a zero-size viewport,
 /// either at initialization time or afterward.
 async fn viewport_zero(mut context: RenderTestContext) {
-    let mut universe = Universe::new();
-    finish_universe_from_space(&mut universe, one_cube_space());
+    finish_universe_from_space(context.universe_mut(), one_cube_space());
     let zero = Viewport::with_scale(1.00, [0, 0]);
     let viewport_cell = listen::Cell::new(zero);
     let cameras: StandardCameras = StandardCameras::new(
         listen::constant(Arc::new(GraphicsOptions::default())),
         viewport_cell.as_source(),
-        listen::constant(universe.get_default_character()),
+        listen::constant(context.universe().get_default_character()),
         listen::constant(Arc::new(UiViewState::default())),
     );
     let overlays = Overlays {
@@ -1106,7 +1102,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     // Initially zero viewport
     {
         renderer
-            .update(Layers::splat(universe.read_ticket()), None)
+            .update(Layers::splat(context.universe().read_ticket()), None)
             .unwrap();
         let zero_image = renderer
             .draw(overlays.info_text.as_ref().unwrap())
@@ -1124,7 +1120,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     {
         viewport_cell.set(zero);
         renderer
-            .update(Layers::splat(universe.read_ticket()), None)
+            .update(Layers::splat(context.universe().read_ticket()), None)
             .unwrap();
         let zero_image = renderer
             .draw(overlays.info_text.as_ref().unwrap())
@@ -1141,8 +1137,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
 /// Renderer should not require the viewport to be a multiple of a certain size.
 /// (The `wgpu` implementation has to do extra work to support this.)
 async fn viewport_prime(mut context: RenderTestContext) {
-    let mut universe = Universe::new();
-    finish_universe_from_space(&mut universe, one_cube_space());
+    finish_universe_from_space(context.universe_mut(), one_cube_space());
 
     context
         .render_comparison_test(
@@ -1150,7 +1145,7 @@ async fn viewport_prime(mut context: RenderTestContext) {
             StandardCameras::from_constant_for_test(
                 GraphicsOptions::UNALTERED_COLORS,
                 Viewport::with_scale(1.0, [101, 37]),
-                &universe,
+                context.universe(),
             ),
             Overlays::NONE,
         )

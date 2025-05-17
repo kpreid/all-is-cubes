@@ -13,14 +13,20 @@ use futures_util::stream;
 use futures_util::{FutureExt as _, StreamExt as _};
 use itertools::Itertools;
 
-use all_is_cubes::universe::{ReadTicket, Universe};
+use all_is_cubes::universe::Universe;
 use all_is_cubes::util::{ConciseDebug, Refmt as _};
-use all_is_cubes_render::{Flaws, HeadlessRenderer, Rendering, camera::Layers};
+use all_is_cubes_render::camera::{Layers, StandardCameras};
+use all_is_cubes_render::{Flaws, HeadlessRenderer, Rendering};
 
 use crate::{
     ComparisonOutcome, ComparisonRecord, ImageId, Overlays, RendererFactory, RendererId, Scene,
     SuiteId, TestCaseOutput, TestId, Threshold, results_json_path, write_report_file,
 };
+
+#[cfg(doc)]
+use all_is_cubes_render::camera::GraphicsOptions;
+
+// -------------------------------------------------------------------------------------------------
 
 type BoxedTestFn = Box<dyn Fn(RenderTestContext) -> BoxFuture<'static, ()> + Send + Sync>;
 
@@ -66,6 +72,8 @@ impl std::hash::Hash for UniverseFuture {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Implementation of a particular test case (unique [`TestId`] stored externally).
 struct TestCase {
     function: BoxedTestFn,
@@ -80,9 +88,18 @@ pub struct RenderTestContext {
     test_id: TestId,
     renderer_factory: Box<dyn RendererFactory>,
     comparison_log: Arc<Mutex<Vec<ComparisonRecord>>>,
-    universe: Option<Arc<Universe>>,
+    universe: TestUniverse,
     image_serial: u64,
 }
+
+#[derive(Debug)]
+#[expect(clippy::large_enum_variant)]
+pub(crate) enum TestUniverse {
+    Shared(Arc<Universe>),
+    Mutable(Universe),
+}
+
+// -------------------------------------------------------------------------------------------------
 
 impl RenderTestContext {
     pub fn id(&self) -> TestId {
@@ -94,13 +111,37 @@ impl RenderTestContext {
             .renderer_from_cameras(scene.into_cameras())
     }
 
-    /// Optional way to receive a pre-configured universe
-    /// whose construction time is not counted against the test case's time and which
-    /// may be shared between test cases.
+    /// Returns the [`Universe`] for this test case.
+    ///
+    /// The test case may have been configured with a shared universe,
+    /// whose construction time is not counted against the test case's time;
+    /// if it is not, then this universe is empty until modified by the test case.
     pub fn universe(&self) -> &Universe {
-        self.universe
-            .as_ref()
-            .expect("RenderTestContext not configured with universe input")
+        match self.universe {
+            TestUniverse::Shared(ref universe) => universe,
+            TestUniverse::Mutable(ref universe) => universe,
+        }
+    }
+
+    /// Returns mutable access to the test case's non-shared universe.
+    ///
+    /// It is valid to overwrite this universe with a different one.
+    ///
+    /// Panics if the test case was configured with a shared universe.
+    pub fn universe_mut(&mut self) -> &mut Universe {
+        match self.universe {
+            TestUniverse::Shared(_) => panic!("May not mutate a universe shared between tests"),
+            TestUniverse::Mutable(ref mut universe) => universe,
+        }
+    }
+
+    /// Construct [`StandardCameras`] using [`Universe::get_default_character()`].
+    /// and [`GraphicsOptions::UNALTERED_COLORS`].
+    ///
+    /// This is intended to be used with [`RenderTestContext::render_comparison_test()`]
+    /// when a more customized camera setup is not required.
+    pub fn default_cameras(&self) -> StandardCameras {
+        Scene::into_cameras(self.universe())
     }
 
     pub async fn render_comparison_test(
@@ -124,11 +165,7 @@ impl RenderTestContext {
     ) {
         renderer
             .update(
-                Layers::splat(
-                    self.universe
-                        .as_ref()
-                        .map_or_else(ReadTicket::new, |u| u.read_ticket()),
-                ),
+                Layers::splat(self.universe().read_ticket()),
                 overlays.cursor,
             )
             .expect("renderer update() failed");
@@ -192,6 +229,8 @@ impl RenderTestContext {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Command-line arguments for binaries using the renderer test harness.
 ///
 /// TODO: This should eventually match the [standard Rust test harness args](
@@ -251,6 +290,8 @@ enum Format {
 
 /// Return type of [`harness_main()`], to be returned from `main()`.
 pub type HarnessResult = ExitCode;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Given a function which generates the tests, run all tests or the subset requested.
 /// Returns success if all of the tests that were run passed.
@@ -375,8 +416,8 @@ where
                             renderer_factory: Box::new(factory_future.await),
                             comparison_log: comparison_log_tc,
                             universe: match universe_future {
-                                Some(uf) => Some(uf.future.await),
-                                None => None,
+                                Some(uf) => TestUniverse::Shared(uf.future.await),
+                                None => TestUniverse::Mutable(Universe::new()),
                             },
                             image_serial: 0,
                         };
