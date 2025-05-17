@@ -90,11 +90,14 @@ fn out_of_bounds_lighting_value() {
 fn step() {
     let mut universe = Universe::new();
     let color = Rgb::new(1.0, 0.0, 0.0);
-    let space = universe.insert_anonymous(
-        Space::builder(GridAab::from_lower_upper([0, 0, 0], [3, 1, 1]))
-            .sky_color(color)
-            .build(),
-    );
+    let space = universe
+        .insert(
+            "space".into(),
+            Space::builder(GridAab::from_lower_upper([0, 0, 0], [3, 1, 1]))
+                .sky_color(color)
+                .build(),
+        )
+        .unwrap();
     let sky_light = PackedLight::from(color);
 
     universe

@@ -395,7 +395,7 @@ mod tests {
             })
             .unwrap();
         let mut universe = Universe::new();
-        let space = universe.insert_anonymous(space);
+        let space = universe.insert("space".into(), space).unwrap();
         // TODO: We need a "step until idle" function, or for the UniverseStepInfo to convey how many blocks were updated / are waiting
         // TODO: Some tests will want to look at the partial results
         for _ in 0..257 {

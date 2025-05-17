@@ -116,13 +116,19 @@ fn listen_indirect_atom() {
 #[test]
 fn listen_indirect_double() {
     let mut universe = Universe::new();
-    let block_def_handle1 = universe.insert_anonymous(BlockDef::new(
-        universe.read_ticket(),
-        block::from_color!(Rgba::WHITE),
-    ));
+    let block_def_handle1 = universe
+        .insert(
+            "bd1".into(),
+            BlockDef::new(universe.read_ticket(), block::from_color!(Rgba::WHITE)),
+        )
+        .unwrap();
     let indirect1 = Block::from(block_def_handle1.clone());
-    let block_def_handle2 =
-        universe.insert_anonymous(BlockDef::new(universe.read_ticket(), indirect1.clone()));
+    let block_def_handle2 = universe
+        .insert(
+            "bd2".into(),
+            BlockDef::new(universe.read_ticket(), indirect1.clone()),
+        )
+        .unwrap();
     let indirect2 = Block::from(block_def_handle2.clone());
     let sink1 = Sink::new();
     let sink2 = Sink::new();
@@ -237,7 +243,9 @@ fn self_referential_evaluate() {
                 voxels: 0,
                 recursion: 0
             },
-            kind: block::ErrorKind::Handle(HandleError::InUse(Name::Anonym(0)))
+            kind: block::ErrorKind::Handle(HandleError::InUse(Name::Specific(
+                "self_referential".into()
+            )))
         })
     );
 }
@@ -253,7 +261,12 @@ fn self_referential_listen() {
 
 /// Helper for overflow_ tests
 fn self_referential_block(universe: &mut Universe) -> Block {
-    let block_def = universe.insert_anonymous(BlockDef::new(universe.read_ticket(), AIR));
+    let block_def = universe
+        .insert(
+            "self_referential".into(),
+            BlockDef::new(universe.read_ticket(), AIR),
+        )
+        .unwrap();
     let indirect = Block::from(block_def.clone());
     universe
         .execute_1(

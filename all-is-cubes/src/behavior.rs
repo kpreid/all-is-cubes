@@ -995,7 +995,7 @@ mod tests {
             foo: 1,
             then: Then::Step,
         });
-        let character = u.insert_anonymous(character);
+        let character = u.insert("character".into(), character).unwrap();
 
         u.step(false, time::DeadlineNt::Whenever);
         u.step(false, time::DeadlineNt::Whenever);
@@ -1025,7 +1025,7 @@ mod tests {
             foo: 1,
             then: Then::Drop,
         });
-        let character = u.insert_anonymous(character);
+        let character = u.insert("character".into(), character).unwrap();
 
         assert_eq!(
             character

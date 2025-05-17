@@ -474,10 +474,10 @@ fn listens_to_block_changes() {
         .build();
     let sink = Sink::new();
     space.listen(sink.listener());
-    let space = universe.insert_anonymous(space);
+    let space = universe.insert("space".into(), space).unwrap();
     assert_eq!(sink.drain(), vec![]);
 
-    // Now mutate the block def .
+    // Now mutate the block def.
     let new_block = block::from_color!(Rgba::BLACK);
     universe
         .execute_1(
@@ -527,7 +527,7 @@ fn indirect_becomes_evaluation_error() {
         .unwrap();
     let sink = Sink::new();
     space.listen(sink.listener());
-    let space = universe.insert_anonymous(space);
+    let space = universe.insert("space".into(), space).unwrap();
 
     // Make the block def refer to itself, guaranteeing an evaluation error
     universe
@@ -682,7 +682,7 @@ fn block_tick_action_does_not_run_paused() {
     space
         .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &vanisher))
         .unwrap();
-    let space = universe.insert_anonymous(space);
+    let space = universe.insert("space".into(), space).unwrap();
 
     // No effect when paused
     universe.step(true, time::DeadlineNt::Whenever);
@@ -715,7 +715,7 @@ fn block_tick_action_timing() {
     space
         .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block1))
         .unwrap();
-    let space = universe.insert_anonymous(space);
+    let space = universe.insert("space".into(), space).unwrap();
 
     // Setup done, now simulate.
     let mut blocks_found = Vec::new();
@@ -788,7 +788,7 @@ fn block_tick_action_conflict() {
             m.set(right, &modifies_nx_neighbor)
         })
         .unwrap();
-    let space = universe.insert_anonymous(space);
+    let space = universe.insert("space".into(), space).unwrap();
 
     {
         universe.step(false, time::DeadlineNt::Whenever);
@@ -863,7 +863,7 @@ fn block_tick_action_repeats() {
     space
         .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &ticker))
         .unwrap();
-    let space = universe.insert_anonymous(space);
+    let space = universe.insert("space".into(), space).unwrap();
 
     for t in 0..2 {
         universe.step(false, time::DeadlineNt::Whenever);
