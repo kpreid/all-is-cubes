@@ -14,7 +14,7 @@
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tc: vec2<f32>,
-};
+}
 
 @vertex
 fn rt_frame_copy_vertex(

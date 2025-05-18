@@ -14,7 +14,7 @@ struct ShaderSpaceCamera {
     fog_distance: f32,
     // pad out to multiple of 16 bytes
     padding1: f32,
-};
+}
 
 // Mirrors `struct WgpuBlockVertex` on the Rust side.
 struct WgpuBlockVertex {
@@ -22,19 +22,19 @@ struct WgpuBlockVertex {
     @location(1) position_in_cube_and_normal_and_resolution_packed: u32,
     @location(2) color_or_texture: vec4<f32>,
     @location(3) clamp_min_max: vec3<u32>,
-};
+}
 
 // Mirrors `struct WgpuInstanceData` on the Rust side.
 struct WgpuInstanceData {
     @location(6) translation: vec3<f32>,
     @location(7) debug_text: vec4<u32>,
-};
+}
 
 // Mirrors `struct WgpuLinesVertex` on the Rust side.
 struct WgpuLinesVertex {
     @location(0) position: vec3<f32>,
     @location(1) color: vec4<f32>,
-};
+}
 
 // This group is named camera_bind_group_layout in the code.
 @group(0) @binding(0) var<uniform> camera: ShaderSpaceCamera;
@@ -139,7 +139,7 @@ struct BlockFragmentInput {
 
     @interpolate(flat, either)
     @location(12) debug_text: vec4<u32>,
-};
+}
 
 @vertex
 fn block_vertex_main(
@@ -701,7 +701,7 @@ struct LinesFragmentInput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) color: vec4<f32>,
     @location(1) fog_mix: f32,
-};
+}
 
 @vertex
 fn lines_vertex(
@@ -728,7 +728,7 @@ fn lines_fragment(input: LinesFragmentInput) -> @location(0) vec4<f32> {
 struct SkyboxFragmentInput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) camera_ray_direction: vec3<f32>,
-};
+}
 
 fn fullscreen_vertex_position(vertex_index: u32) -> vec4<f32> {
     return vec4<f32>(

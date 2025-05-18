@@ -20,7 +20,7 @@ struct RerunCopyCamera {
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) tc: vec2<f32>,
-};
+}
 
 @vertex
 fn rerun_frame_copy_vertex(

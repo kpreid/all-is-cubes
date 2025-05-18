@@ -6,7 +6,7 @@ struct PostprocessUniforms {
     maximum_intensity: f32,
     bloom_intensity: f32,
     _padding: i32,
-};
+}
 
 
 // This group is named postprocess_bind_group_layout in the code.
@@ -21,7 +21,7 @@ struct PostprocessUniforms {
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tc: vec4<f32>,
-};
+}
 
 @vertex
 fn postprocess_vertex(
