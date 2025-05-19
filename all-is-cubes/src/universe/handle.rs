@@ -172,8 +172,14 @@ impl<T: 'static> Handle<T> {
         if let Some(id) = self.universe_id() {
             if !read_ticket.allows_access_to(id) {
                 // Invalid tickets can be a subtle bug due to `Space`'s retrying behavior.
-                // As a compromise, log them. TODO: Add a cfg or something to panic.
-                log::error!("invalid ticket {read_ticket:?} for reading {id:?}");
+                // As a compromise, log them.
+                // TODO: Make a way to mark the operation as expected to possibly fail
+                // (or get rid of the tool icon rendering cases where that happens), then
+                // add a cfg or something to make this assert (panic) instead.
+                log::error!(
+                    "invalid ticket {read_ticket:?} for reading {name} in {id:?}",
+                    name = self.name()
+                );
                 return Err(HandleError::InvalidTicket(self.name()));
             }
         }
