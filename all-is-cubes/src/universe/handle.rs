@@ -626,7 +626,7 @@ pub struct ReadTicket<'universe> {
     origin: &'static Location<'static>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 enum TicketAccess<'u> {
     // Temporary placeholder ability to access handles from all universes.
     Any,
@@ -701,6 +701,17 @@ impl<'a, 'b> PartialEq<ReadTicket<'b>> for ReadTicket<'a> {
     }
 }
 impl Eq for ReadTicket<'_> {}
+
+impl<'u> fmt::Debug for TicketAccess<'u> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Any => write!(f, "Any"),
+            // Don't format the entire universe, just identify it
+            Self::Universe(u) => f.debug_tuple("Universe").field(&u.universe_id()).finish(),
+            Self::Stub => write!(f, "Stub"),
+        }
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -1114,6 +1125,33 @@ mod tests {
         assert_eq!(
             same_universe_tickets[0], same_universe_tickets[1],
             "same universes"
+        );
+    }
+
+    #[test]
+    fn read_ticket_debug() {
+        let universe = Universe::new();
+        let ticket = universe.read_ticket();
+
+        // Fetch data that makes variable parts of the string to keep the test robust
+        let id = universe.id;
+        let origin = ticket.origin;
+
+        assert_eq!(
+            format!("{ticket:?}"),
+            format!(
+                "ReadTicket {{ access: Universe({id:?}), universe_id: Some({id:?}), origin: {origin:?} }}"
+            ),
+        );
+    }
+
+    #[test]
+    fn read_ticket_debug_stub() {
+        let ticket = ReadTicket::stub();
+        let origin = ticket.origin;
+        assert_eq!(
+            format!("{ticket:?}"),
+            format!("ReadTicket {{ access: Stub, universe_id: None, origin: {origin:?} }}"),
         );
     }
 }
