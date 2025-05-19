@@ -173,13 +173,12 @@ impl<T: 'static> Handle<T> {
             if !read_ticket.allows_access_to(id) {
                 // Invalid tickets can be a subtle bug due to `Space`'s retrying behavior.
                 // As a compromise, log them.
-                // TODO: Make a way to mark the operation as expected to possibly fail
-                // (or get rid of the tool icon rendering cases where that happens), then
-                // add a cfg or something to make this assert (panic) instead.
-                log::error!(
-                    "invalid ticket {read_ticket:?} for reading {name} in {id:?}",
-                    name = self.name()
-                );
+                if !read_ticket.expect_may_fail {
+                    log::error!(
+                        "invalid ticket {read_ticket:?} for reading {name} in {id:?}",
+                        name = self.name()
+                    );
+                }
                 return Err(HandleError::InvalidTicket(self.name()));
             }
         }
@@ -630,6 +629,9 @@ pub struct ReadTicket<'universe> {
 
     /// Where this ticket was created.
     origin: &'static Location<'static>,
+
+    /// If true, don't log failures.
+    expect_may_fail: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -655,6 +657,7 @@ impl<'universe> ReadTicket<'universe> {
             access: TicketAccess::Any,
             universe_id: None,
             origin: Location::caller(),
+            expect_may_fail: false,
         }
     }
 
@@ -664,6 +667,7 @@ impl<'universe> ReadTicket<'universe> {
             access: TicketAccess::Universe(universe),
             universe_id: Some(universe.universe_id()),
             origin: Location::caller(),
+            expect_may_fail: false,
         }
     }
 
@@ -676,6 +680,7 @@ impl<'universe> ReadTicket<'universe> {
             access: TicketAccess::Stub,
             universe_id: None,
             origin: Location::caller(),
+            expect_may_fail: false,
         }
     }
 
@@ -691,6 +696,19 @@ impl<'universe> ReadTicket<'universe> {
     /// such universe.
     pub fn universe_id(&self) -> Option<UniverseId> {
         self.universe_id
+    }
+
+    /// Indicate that sometimes using this ticket with the wrong universe is expected and should
+    /// not be treated as a sign of a bug.
+    //---
+    // TODO(read_ticket) TODO(inventory): Stop needing this. Its uses come up in relation to
+    // tool icons being given by either the game universe or UI universe, which we want to replace
+    // anyway.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn expect_may_fail(mut self) -> Self {
+        self.expect_may_fail = true;
+        self
     }
 }
 
@@ -1146,7 +1164,8 @@ mod tests {
         assert_eq!(
             format!("{ticket:?}"),
             format!(
-                "ReadTicket {{ access: Universe({id:?}), universe_id: Some({id:?}), origin: {origin:?} }}"
+                "ReadTicket {{ access: Universe({id:?}), universe_id: Some({id:?}), \
+                origin: {origin:?}, expect_may_fail: false }}"
             ),
         );
     }
@@ -1157,7 +1176,10 @@ mod tests {
         let origin = ticket.origin;
         assert_eq!(
             format!("{ticket:?}"),
-            format!("ReadTicket {{ access: Stub, universe_id: None, origin: {origin:?} }}"),
+            format!(
+                "ReadTicket {{ access: Stub, universe_id: None, \
+                origin: {origin:?}, expect_may_fail: false }}"
+            ),
         );
     }
 }

@@ -91,8 +91,8 @@ impl TooltipState {
                     // TODO: This logic is redundant with what `InventoryWatcher` does and should be replaced with it.
                     let icon = tool.icon(&hud_blocks.icons);
                     let new_text = match icon
-                        .evaluate(ui_read_ticket)
-                        .or_else(|_| icon.evaluate(world_read_ticket))
+                        .evaluate(ui_read_ticket.expect_may_fail())
+                        .or_else(|_| icon.evaluate(world_read_ticket.expect_may_fail()))
                         .ok()
                     {
                         Some(ev_block) => ev_block.attributes().display_name.clone(),
