@@ -71,21 +71,12 @@ impl TooltipState {
         self.age = Some(Duration::ZERO);
     }
 
-    /// Advances time and returns the string that should be newly written to the screen, if different than the previous call.
-    fn step(
+    fn synchronize(
         &mut self,
         world_read_ticket: ReadTicket<'_>,
+        ui_read_ticket: ReadTicket<'_>,
         hud_blocks: &HudBlocks,
-        tick: Tick,
-    ) -> &TooltipContents {
-        if let Some(ref mut age) = self.age {
-            *age += tick.delta_t();
-            if *age > Duration::from_secs(1) {
-                self.set_contents(TooltipContents::Blanked);
-                self.age = None;
-            }
-        }
-
+    ) {
         if self.dirty_inventory {
             self.dirty_inventory = false;
 
@@ -97,9 +88,11 @@ impl TooltipState {
                     .copied()
                     .unwrap_or(inv::Ix::MAX);
                 if let Some(tool) = character.inventory().get(selected_slot).cloned() {
-                    let new_text = match tool
-                        .icon(&hud_blocks.icons)
-                        .evaluate(world_read_ticket)
+                    // TODO: This logic is redundant with what `InventoryWatcher` does and should be replaced with it.
+                    let icon = tool.icon(&hud_blocks.icons);
+                    let new_text = match icon
+                        .evaluate(ui_read_ticket)
+                        .or_else(|_| icon.evaluate(world_read_ticket))
                         .ok()
                     {
                         Some(ev_block) => ev_block.attributes().display_name.clone(),
@@ -127,8 +120,16 @@ impl TooltipState {
                 }
             }
         }
+    }
 
-        &self.current_contents
+    fn step(&mut self, tick: Tick) {
+        if let Some(ref mut age) = self.age {
+            *age += tick.delta_t();
+            if *age > Duration::from_secs(1) {
+                self.set_contents(TooltipContents::Blanked);
+                self.age = None;
+            }
+        }
     }
 }
 
@@ -232,6 +233,17 @@ struct TooltipController {
 }
 
 impl WidgetController for TooltipController {
+    fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
+        match self.definition.state.try_lock().ok() {
+            Some(mut state) => state.synchronize(
+                world_read_ticket,
+                ui_read_ticket,
+                &self.definition.hud_blocks,
+            ),
+            None => {}
+        }
+    }
+
     fn step(
         &mut self,
         context: &vui::WidgetContext<'_>,
@@ -239,16 +251,16 @@ impl WidgetController for TooltipController {
         // None if no update is needed
         let new_contents: Option<TooltipContents> =
             self.definition.state.try_lock().ok().and_then(|mut state| {
-                let contents = state.step(
-                    context.read_ticket(),
-                    &self.definition.hud_blocks,
-                    context.tick(),
-                );
-                if *contents != self.currently_displayed {
+                let contents = &state.current_contents;
+                let contents = if *contents != self.currently_displayed {
                     Some(contents.clone())
                 } else {
                     None
-                }
+                };
+
+                state.step(context.tick());
+
+                contents
             });
 
         let txn = if let Some(new_contents) = new_contents {
@@ -305,29 +317,24 @@ mod tests {
 
         // Initial state: no update.
         let mut t = TooltipState::default();
-        assert_eq!(
-            t.step(universe.read_ticket(), hud_blocks, Tick::from_seconds(0.5)),
-            &TooltipContents::JustStartedExisting
-        );
+        t.step(Tick::from_seconds(0.5));
+        t.synchronize(universe.read_ticket(), universe.read_ticket(), hud_blocks);
+        assert_eq!(t.current_contents, TooltipContents::JustStartedExisting);
         assert_eq!(t.age, None);
 
         // Add a message.
         t.set_message("Hello world".into());
         assert_eq!(t.age, Some(Duration::ZERO));
+        t.step(Tick::from_seconds(0.5));
+        t.synchronize(universe.read_ticket(), universe.read_ticket(), hud_blocks);
         assert_eq!(
-            t.step(universe.read_ticket(), hud_blocks, Tick::from_seconds(0.5)),
-            &TooltipContents::Message(literal!("Hello world"))
+            t.current_contents,
+            TooltipContents::Message(literal!("Hello world"))
         );
 
         // Advance time until it should time out.
-        assert_eq!(
-            t.step(
-                universe.read_ticket(),
-                hud_blocks,
-                Tick::from_seconds(0.501)
-            ),
-            &TooltipContents::Blanked
-        );
+        t.step(Tick::from_seconds(0.501));
+        assert_eq!(t.current_contents, TooltipContents::Blanked);
         assert_eq!(t.age, None);
     }
 }

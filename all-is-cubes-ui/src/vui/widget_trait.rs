@@ -93,7 +93,21 @@ pub trait WidgetController: Debug + SendSyncIfStd + 'static {
         Ok(WidgetTransaction::default())
     }
 
-    /// Called every frame to update the state of the space to match the current state of
+    /// For widgets which are installed in a session's UI universe,
+    /// this is called every frame before [`Self::step()`] to allow the widget controller to fetch
+    /// information from the game universe via the provided [`ReadTicket`].
+    ///
+    /// If this is not overridden, it will do nothing.
+    ///
+    /// TODO: This is a kludge which should go away soon along with substantial refactoring of
+    /// the UI as a whole.
+    fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
+        _ = world_read_ticket;
+        _ = ui_read_ticket;
+    }
+
+    /// Called every frame (except as [`Then`] specifies otherwise)
+    /// to update the state of the space to match the current state of
     /// the widget's data sources or user interaction.
     ///
     /// If this is not overridden, it will do nothing and the controller will be dropped.
@@ -118,6 +132,10 @@ pub type StepSuccess = (WidgetTransaction, Then);
 pub type StepError = maybe_sync::BoxError;
 
 impl WidgetController for Box<dyn WidgetController> {
+    fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
+        (**self).synchronize(world_read_ticket, ui_read_ticket)
+    }
+
     fn step(&mut self, context: &WidgetContext<'_>) -> Result<StepSuccess, StepError> {
         (**self).step(context)
     }
@@ -148,9 +166,10 @@ impl WidgetBehavior {
     pub(crate) fn installation(
         widget: Positioned<Arc<dyn Widget>>,
         mut controller: Box<dyn WidgetController>,
+        read_ticket: ReadTicket<'_>,
     ) -> Result<SpaceTransaction, InstallVuiError> {
         let init_txn = match controller.initialize(&WidgetContext {
-            read_ticket: ReadTicket::new(), // TODO(read_ticket): need to plumb this in somehow
+            read_ticket,
             behavior_context: None,
             grant: &widget.position,
         }) {
@@ -189,7 +208,7 @@ impl Behavior<Space> for WidgetBehavior {
             .lock()
             .unwrap()
             .step(&WidgetContext {
-                read_ticket: ReadTicket::new(), // TODO(read_ticket): need to plumb this in somehow
+                read_ticket: context.read_ticket,
                 behavior_context: Some(context),
                 grant: &self.widget.position,
             })
@@ -210,7 +229,6 @@ impl Behavior<Space> for WidgetBehavior {
 pub struct WidgetContext<'a> {
     behavior_context: Option<&'a behavior::Context<'a, Space>>,
     /// [`ReadTicket`] for the universe the widget is UI for, not the one it is in.
-    // TODO(read_ticket): this is a kludge and we need a better story for UI data sources
     read_ticket: ReadTicket<'a>,
     grant: &'a LayoutGrant,
 }
@@ -234,7 +252,7 @@ impl<'a> WidgetContext<'a> {
         self.grant
     }
 
-    #[cfg_attr(not(feature = "session"), allow(dead_code))]
+    #[allow(dead_code)] // TODO(read_ticket): this may or may not end up being needed
     pub(crate) fn read_ticket(&self) -> ReadTicket<'a> {
         self.read_ticket
     }
@@ -317,6 +335,21 @@ impl From<InstallVuiError> for all_is_cubes::linking::InGenError {
     }
 }
 
+/// Calls [`WidgetController::synchronize()`] on every widget installed in the space.
+pub(crate) fn synchronize_widgets(
+    world_read_ticket: ReadTicket<'_>,
+    ui_read_ticket: ReadTicket<'_>,
+    space: &Space,
+) {
+    for item in space.behaviors().query::<WidgetBehavior>() {
+        item.behavior
+            .controller
+            .lock()
+            .unwrap()
+            .synchronize(world_read_ticket, ui_read_ticket);
+    }
+}
+
 /// Create a [`Space`] to put a widget in.
 #[cfg(test)]
 #[track_caller]
@@ -329,7 +362,8 @@ pub(crate) fn instantiate_widget<W: Widget + 'static>(
     use all_is_cubes::transaction::Transaction as _;
 
     let mut space = Space::builder(grant.bounds).build();
-    let txn = vui::install_widgets(grant, &vui::leaf_widget(widget)).expect("widget instantiation");
+    let txn = vui::install_widgets(grant, &vui::leaf_widget(widget), read_ticket)
+        .expect("widget instantiation");
     txn.execute(&mut space, read_ticket, &mut transaction::no_outputs)
         .expect("widget transaction");
     (txn.bounds_only_cubes(), space)

@@ -250,6 +250,7 @@ mod tests {
                     ),
                 },
                 &tree,
+                universe.read_ticket(),
             )
             .unwrap()
             .execute(

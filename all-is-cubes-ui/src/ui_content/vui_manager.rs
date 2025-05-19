@@ -374,6 +374,14 @@ impl Vui {
             // at.
             self.compute_view_state();
         }
+
+        if let Some(space_handle) = self.view().get().space.as_ref() {
+            if let Ok(space) = space_handle.read(self.universe.read_ticket()) {
+                vui::synchronize_widgets(world_read_ticket, self.universe.read_ticket(), &space);
+            } else {
+                log::error!("failed to synchronize widgets");
+            }
+        }
     }
 
     pub fn show_modal_message(&mut self, message: ArcStr) {

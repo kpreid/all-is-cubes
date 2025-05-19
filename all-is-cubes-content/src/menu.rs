@@ -63,7 +63,7 @@ pub async fn template_menu_space(
         })
         .build();
 
-    install_widgets(vui::LayoutGrant::new(bounds), &tree)?.execute(
+    install_widgets(vui::LayoutGrant::new(bounds), &tree, universe.read_ticket())?.execute(
         &mut space,
         universe.read_ticket(),
         &mut transaction::no_outputs,

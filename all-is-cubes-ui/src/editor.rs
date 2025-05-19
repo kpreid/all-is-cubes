@@ -128,7 +128,7 @@ fn inspect_primitive(read_ticket: ReadTicket<'_>, primitive: &block::Primitive) 
                 direction: Face6::PX,
                 children: vec![
                     vui::leaf_widget(vui::quote_and_snapshot_block(
-                        read_ticket,
+                        [read_ticket, ReadTicket::stub()],
                         &Block::from_primitive(primitive.clone()),
                     )),
                     vui::leaf_widget(widgets::Label::new(name)),
@@ -228,7 +228,7 @@ fn inspect_modifier(
                 direction: Face6::PX,
                 children: vec![
                     vui::leaf_widget(vui::quote_and_snapshot_block(
-                        read_ticket,
+                        [read_ticket, ReadTicket::stub()],
                         &block_up_to_this.with_modifier(block::Quote::new()),
                     )),
                     vui::leaf_widget(widgets::Label::new(name)),

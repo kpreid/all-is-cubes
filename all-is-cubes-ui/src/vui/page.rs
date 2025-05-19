@@ -297,7 +297,11 @@ impl PageInst {
         universe: &mut Universe,
     ) -> Result<Handle<Space>, InstallVuiError> {
         let space = universe.insert_anonymous(size.create_space());
-        let txn = install_widgets(LayoutGrant::new(size.space_bounds()), &self.page.tree)?;
+        let txn = install_widgets(
+            LayoutGrant::new(size.space_bounds()),
+            &self.page.tree,
+            universe.read_ticket(),
+        )?;
         universe
             .execute_1(&space, &txn)
             .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;

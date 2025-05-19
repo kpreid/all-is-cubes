@@ -4,12 +4,19 @@
 //! "derived information from a `listen::DynSource` that requires computation" and should become
 //! general code that handles the re-listening problem.
 
+use all_is_cubes::linking::BlockProvider;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
+use all_is_cubes::block::Block;
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::inv;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
 use all_is_cubes::universe::{Handle, HandleError, ReadTicket};
+
+use crate::vui;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Some game entity that has an inventory we are watching, or none (treated as empty inventory).
 ///
@@ -20,6 +27,8 @@ type Owner = Option<Handle<Character>>;
 /// Track the contents of an [`Inventory`] stored elsewhere, and make UI elements for it.
 #[derive(Debug)]
 pub(crate) struct InventoryWatcher {
+    icon_provider: BlockProvider<inv::Icons>,
+
     /// Source of what inventory we should be looking at.
     inventory_source: listen::DynSource<Owner>,
 
@@ -29,6 +38,9 @@ pub(crate) struct InventoryWatcher {
     /// Last inventory gotten from `inventory_owner`
     /// as of the last call to `update()`.
     inventory: inv::Inventory,
+
+    /// Snapshotted (safe to use in UI) icons for each slot in `inventory`.
+    snapshotted_icons: Vec<Block>,
 
     /// Last selected slots gotten from `inventory_owner`
     /// as of the last call to `update()`.
@@ -52,15 +64,20 @@ impl InventoryWatcher {
     /// `ui_universe` will be used to create anonymous resources used to depict the inventory.
     ///
     /// The presented inventory will be empty until the first [`update()`][Self::update].
-    pub fn new(inventory_source: listen::DynSource<Option<Handle<Character>>>) -> Self {
+    pub fn new(
+        inventory_source: listen::DynSource<Option<Handle<Character>>>,
+        icon_provider: BlockProvider<inv::Icons>,
+    ) -> Self {
         let dirty = listen::Flag::new(true);
 
         inventory_source.listen(dirty.listener());
 
         Self {
+            icon_provider,
             inventory_source,
             inventory_owner: None, // will be replaced
             inventory: inv::Inventory::new(0),
+            snapshotted_icons: Vec::new(),
             selected_slots: [inv::Ix::MAX; inv::TOOL_SELECTIONS],
             owner_gate: listen::Gate::default(),
             notifier: Arc::new(listen::Notifier::new()),
@@ -70,7 +87,11 @@ impl InventoryWatcher {
 
     /// Update this watcher's state from the inventory source, if any change has occurred.
     /// This should be called before making use of updated inventory information.
-    pub fn update(&mut self, read_ticket: ReadTicket<'_>) {
+    pub fn update(
+        &mut self,
+        inventory_read_ticket: ReadTicket<'_>,
+        icons_read_ticket: ReadTicket<'_>,
+    ) {
         if !self.dirty.get_and_clear() {
             return;
         }
@@ -101,7 +122,7 @@ impl InventoryWatcher {
         let character_guard;
         let (new_inventory, new_selections) = match &self.inventory_owner {
             Some(character_handle) => {
-                match character_handle.read(read_ticket) {
+                match character_handle.read(inventory_read_ticket) {
                     Ok(cg) => {
                         character_guard = cg;
                         if let Some(l) = listener_to_install {
@@ -151,6 +172,15 @@ impl InventoryWatcher {
         if *new_inventory != self.inventory {
             self.inventory = new_inventory.clone();
             self.notifier.notify(&WatcherChange::Inventory);
+
+            self.snapshotted_icons.clear();
+            self.snapshotted_icons
+                .extend(self.inventory.slots().iter().map(|stack| {
+                    vui::quote_and_snapshot_block(
+                        [icons_read_ticket, inventory_read_ticket],
+                        &stack.icon(&self.icon_provider),
+                    )
+                }));
         }
         if new_selections != self.selected_slots {
             self.selected_slots = new_selections;
@@ -168,6 +198,12 @@ impl InventoryWatcher {
     /// Returns the current contents of the watched inventory, as of the last [`Self::update()`].
     pub fn inventory(&self) -> &inv::Inventory {
         &self.inventory
+    }
+
+    /// Returns icons for the current contents of the watched inventory, as of the last
+    /// [`Self::update()`].
+    pub fn snapshotted_icons(&self) -> &[Block] {
+        &self.snapshotted_icons
     }
 
     /// Returns the current selected slots, as of the last [`Self::update()`].
@@ -207,6 +243,7 @@ pub enum WatcherChange {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::block;
     use all_is_cubes::character::CharacterTransaction;
     use all_is_cubes::inv;
     use all_is_cubes::space::Space;
@@ -229,8 +266,11 @@ mod tests {
                 space.clone(),
             ));
             let character_cell = listen::Cell::new(Some(character.clone()));
-            let mut watcher = InventoryWatcher::new(character_cell.as_source());
-            watcher.update(universe.read_ticket());
+            let mut watcher = InventoryWatcher::new(
+                character_cell.as_source(),
+                BlockProvider::new_sync(|_| block::AIR),
+            );
+            watcher.update(universe.read_ticket(), ReadTicket::stub());
 
             // Install listener
             let sink: listen::Sink<WatcherChange> = listen::Sink::new();
@@ -246,7 +286,8 @@ mod tests {
             }
         }
         pub fn update(&mut self) {
-            self.watcher.update(self.universe.read_ticket());
+            self.watcher
+                .update(self.universe.read_ticket(), ReadTicket::stub());
         }
     }
 

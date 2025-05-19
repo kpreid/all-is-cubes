@@ -53,8 +53,11 @@ impl Toolbar {
         cue_channel: CueNotifier,
     ) -> Arc<Self> {
         Arc::new(Self {
+            watcher: Arc::new(Mutex::new(InventoryWatcher::new(
+                character_source,
+                hud_blocks.icons.clone(),
+            ))),
             hud_blocks,
-            watcher: Arc::new(Mutex::new(InventoryWatcher::new(character_source))),
             cue_channel,
             slot_range,
             slot_info_text_template: text::Text::builder()
@@ -136,28 +139,30 @@ impl ToolbarController {
     /// but only the given inputs.
     fn write_items(
         &self,
-        slots: &[inv::Slot],
+        watcher: &InventoryWatcher,
     ) -> Result<WidgetTransaction, Box<dyn Error + Send + Sync>> {
         let mut txn = SpaceTransaction::default();
 
         // Note that `contents_iter` is infinite; when zipped with `slot_range` it is then
         // guaranteed to be the right length for our number of slots.
+        let slots = watcher.inventory().slots();
         let slot_range = self.definition.slot_range.clone();
         let contents_iter = slots[usize::from(slot_range.start).min(slots.len())..]
             .iter()
             .chain(iter::repeat(&inv::Slot::Empty));
+        let icons_iter = watcher.snapshotted_icons()
+            [usize::from(slot_range.start).min(slots.len())..]
+            .iter()
+            .chain(iter::repeat(&block::AIR));
 
-        for (slot_index, stack) in slot_range.zip(contents_iter) {
+        for ((slot_index, stack), icon_block) in slot_range.zip(contents_iter).zip(icons_iter) {
             let icon_cube = self.slot_position(slot_index);
             let info_cube = icon_cube + GridVector::new(-1, 0, 0);
 
             // Draw icon
-            // TODO(read_ticket): migrate UI data sources such as this to where they can get a proper ticket
-            let icon_block = vui::quote_and_snapshot_block(
-                ReadTicket::new(),
-                &stack.icon(&self.definition.hud_blocks.icons),
-            );
-            txn.merge_from(CubeTransaction::replacing(None, Some(icon_block)).at(icon_cube))?;
+            txn.merge_from(
+                CubeTransaction::replacing(None, Some(icon_block.clone())).at(icon_cube),
+            )?;
 
             // Draw stack count text
             txn.merge_from(
@@ -276,6 +281,11 @@ impl WidgetController for ToolbarController {
         Ok(txn)
     }
 
+    fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
+        let watcher = &mut *self.definition.watcher.lock().unwrap();
+        watcher.update(world_read_ticket, ui_read_ticket);
+    }
+
     fn step(
         &mut self,
         context: &vui::WidgetContext<'_>,
@@ -296,13 +306,12 @@ impl WidgetController for ToolbarController {
         }
 
         let watcher = &mut *self.definition.watcher.lock().unwrap();
-        watcher.update(ReadTicket::new()); // TODO(read_ticket): figure out what basis widgets have for fetching data
 
         // TODO: check watcher's notifs on whether we should update or not
         let should_update_inventory = true;
 
         let slots_txn = if should_update_inventory {
-            self.write_items(watcher.inventory().slots())?
+            self.write_items(watcher)?
         } else {
             WidgetTransaction::default()
         };

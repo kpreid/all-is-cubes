@@ -39,8 +39,9 @@ pub type WidgetTree = Arc<LayoutTree<Arc<dyn Widget>>>;
 pub fn install_widgets(
     grant: LayoutGrant,
     tree: &WidgetTree,
+    read_ticket: ReadTicket<'_>,
 ) -> Result<SpaceTransaction, InstallVuiError> {
-    tree.perform_layout(grant).unwrap(/* currently infallible */).installation()
+    tree.perform_layout(grant).unwrap(/* currently infallible */).installation(read_ticket)
 }
 
 /// Requested size and relative positioning of a widget or other thing occupying space,
@@ -447,6 +448,7 @@ impl LayoutTree<Arc<dyn Widget>> {
                 gravity,
             },
             self,
+            read_ticket,
         )?
         .execute(&mut space, read_ticket, &mut transaction::no_outputs)
         .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
@@ -458,14 +460,20 @@ impl LayoutTree<Arc<dyn Widget>> {
 impl LayoutTree<Positioned<Arc<dyn Widget>>> {
     /// Creates a transaction which will install all of the widgets in this tree.
     ///
+    /// The provided `read_ticket` should be for the universe the transaction will be executed in.
+    ///
     /// Returns an error if the widgets conflict with each other.
-    pub fn installation(&self) -> Result<SpaceTransaction, InstallVuiError> {
+    pub fn installation(
+        &self,
+        read_ticket: ReadTicket<'_>,
+    ) -> Result<SpaceTransaction, InstallVuiError> {
         let mut txn = SpaceTransaction::default();
         for positioned_widget @ Positioned { value, position } in self.leaves() {
             let widget = value.clone();
             let controller_installation = WidgetBehavior::installation(
                 positioned_widget.clone(),
                 widget.controller(position),
+                read_ticket,
             )?;
             validate_widget_transaction(value, &controller_installation, position)?;
             txn.merge_from(controller_installation)

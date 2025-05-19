@@ -4,6 +4,7 @@
 //!
 //! [`Space`]: all_is_cubes::space::Space
 
+use all_is_cubes::block::EvalBlockError;
 use all_is_cubes::{block, universe};
 
 #[doc(hidden)] // public for use by test-renderers only
@@ -29,14 +30,18 @@ pub mod widgets;
 /// TODO: This needs a clear module location.
 #[cfg_attr(not(feature = "session"), expect(dead_code))]
 pub(crate) fn quote_and_snapshot_block(
-    read_ticket: universe::ReadTicket<'_>,
+    read_tickets: [universe::ReadTicket<'_>; 2],
     source: &block::Block,
 ) -> block::Block {
-    let evaluated = source
-        .clone()
-        .with_modifier(block::Quote::default())
-        .evaluate(read_ticket)
-        .unwrap_or_else(|e| e.to_placeholder());
+    let quoted_block = source.clone().with_modifier(block::Quote::default());
+    let mut eval_result = quoted_block.evaluate(read_tickets[0]);
+    if eval_result
+        .as_ref()
+        .is_err_and(EvalBlockError::is_invalid_ticket)
+    {
+        eval_result = quoted_block.evaluate(read_tickets[1]);
+    }
+    let evaluated = eval_result.unwrap_or_else(|e| e.to_placeholder());
     let snapshotted = block::Block::from(block::Primitive::Raw {
         attributes: evaluated.attributes().clone(),
         voxels: evaluated.voxels().clone(),

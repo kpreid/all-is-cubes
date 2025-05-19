@@ -346,6 +346,11 @@ impl EvalBlockError {
         }
     }
 
+    #[doc(hidden)] // TODO(read_ticket): eventually stop needing this
+    pub fn is_invalid_ticket(&self) -> bool {
+        matches!(self.kind, ErrorKind::Handle(HandleError::InvalidTicket(..)))
+    }
+
     /// Returns whether this error relates to the timing or [`ReadTicket`] used to evaluate the
     /// block, rather than the current state of the block’s definition or the evaluation budget.
     ///

@@ -240,6 +240,7 @@ impl<'u> State<'u> {
         vui::install_widgets(
             vui::LayoutGrant::new(logo_location),
             &vui::leaf_widget(logo_text()),
+            self.universe.read_ticket(),
         )?
         .execute(
             &mut self.space,
