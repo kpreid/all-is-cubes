@@ -48,6 +48,7 @@ impl core::ops::Deref for HudInputs {
 }
 
 pub(super) fn new_hud_page(
+    read_ticket: ReadTicket<'_>,
     hud_inputs: &HudInputs,
     tooltip_state: Arc<Mutex<TooltipState>>,
 ) -> vui::Page {
@@ -68,7 +69,7 @@ pub(super) fn new_hud_page(
             direction: Face6::PY,
             children: vec![vui::leaf_widget(toolbar), vui::leaf_widget(tooltip)],
         }),
-        control_bar: control_bar(hud_inputs),
+        control_bar: control_bar(read_ticket, hud_inputs),
     });
     vui::Page {
         tree: hud_widget_tree,
@@ -79,13 +80,17 @@ pub(super) fn new_hud_page(
 
 /// Miscellaneous controls (pause, debug, etc., not gameplay controls) intended to be
 /// positioned in the top right corner.
-pub(crate) fn control_bar(hud_inputs: &HudInputs) -> WidgetTree {
+pub(crate) fn control_bar(read_ticket: ReadTicket<'_>, hud_inputs: &HudInputs) -> WidgetTree {
     let control_bar_widgets: WidgetTree = Arc::new(LayoutTree::Stack {
         direction: Face6::NX,
         children: vec![
             Arc::new(LayoutTree::Stack {
                 direction: Face6::NX,
-                children: graphics_options_widgets(hud_inputs, OptionsStyle::CompactRow),
+                children: graphics_options_widgets(
+                    read_ticket,
+                    hud_inputs,
+                    OptionsStyle::CompactRow,
+                ),
             }),
             vui::leaf_widget(open_page_button(
                 hud_inputs,

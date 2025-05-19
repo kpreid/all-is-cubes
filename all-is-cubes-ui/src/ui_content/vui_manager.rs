@@ -160,10 +160,11 @@ impl Vui {
             vui_control_channel: control_send,
             page_state: state.as_source(),
         };
-        let hud_page = super::hud::new_hud_page(&hud_inputs, tooltip_state.clone());
+        let hud_page =
+            super::hud::new_hud_page(universe.read_ticket(), &hud_inputs, tooltip_state.clone());
 
         let paused_page = pages::new_paused_page(&mut universe, &hud_inputs).unwrap();
-        let options_page = pages::new_options_widget_tree(&hud_inputs);
+        let options_page = pages::new_options_widget_tree(universe.read_ticket(), &hud_inputs);
         let about_page = pages::new_about_page(&mut universe, &hud_inputs).unwrap();
         let progress_page =
             pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, &notif_hub);

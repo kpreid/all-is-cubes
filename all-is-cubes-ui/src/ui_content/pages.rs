@@ -8,7 +8,7 @@ use all_is_cubes::block::Resolution::*;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen::Source as _;
 use all_is_cubes::math::Face6;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::universe::{ReadTicket, Universe};
 
 use crate::logo::logo_text;
 use crate::notification::NotificationContent;
@@ -127,12 +127,19 @@ pub(super) fn new_progress_page(
     vui::Page::new_modal_dialog_with_title_widget(theme, title_widget, None, contents)
 }
 
-pub(super) fn new_options_widget_tree(hud_inputs: &HudInputs) -> vui::Page {
+pub(super) fn new_options_widget_tree(
+    read_ticket: ReadTicket<'_>,
+    hud_inputs: &HudInputs,
+) -> vui::Page {
     let contents = Arc::new(LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![Arc::new(LayoutTree::Stack {
             direction: Face6::NY,
-            children: graphics_options_widgets(hud_inputs, OptionsStyle::LabeledColumn),
+            children: graphics_options_widgets(
+                read_ticket,
+                hud_inputs,
+                OptionsStyle::LabeledColumn,
+            ),
         })],
     });
     vui::Page::new_modal_dialog(

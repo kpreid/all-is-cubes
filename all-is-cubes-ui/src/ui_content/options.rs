@@ -20,6 +20,7 @@ pub(crate) enum OptionsStyle {
 }
 
 pub(crate) fn graphics_options_widgets(
+    read_ticket: ReadTicket<'_>,
     hud_inputs: &HudInputs,
     style: OptionsStyle,
 ) -> Vec<WidgetTree> {
@@ -99,6 +100,7 @@ pub(crate) fn graphics_options_widgets(
         // but it is currently convenient to have toggleability for testing.
         // Find a way to support this better.
         graphics_toggle_button(
+            read_ticket,
             hud_inputs,
             style,
             UiBlocks::AntialiasButtonLabel,
@@ -113,6 +115,7 @@ pub(crate) fn graphics_options_widgets(
             },
         ),
         graphics_toggle_button(
+            read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugInfoTextButtonLabel,
@@ -120,6 +123,7 @@ pub(crate) fn graphics_options_widgets(
             |g, v| g.debug_info_text = v,
         ),
         graphics_toggle_button(
+            read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugPixelPerformanceButtonLabel,
@@ -127,6 +131,7 @@ pub(crate) fn graphics_options_widgets(
             |g, v| g.debug_pixel_cost = v,
         ),
         graphics_toggle_button(
+            read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugBehaviorsButtonLabel,
@@ -134,6 +139,7 @@ pub(crate) fn graphics_options_widgets(
             |g, v| g.debug_behaviors = v,
         ),
         graphics_toggle_button(
+            read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugChunkBoxesButtonLabel,
@@ -141,6 +147,7 @@ pub(crate) fn graphics_options_widgets(
             |g, v| g.debug_chunk_boxes = v,
         ),
         graphics_toggle_button(
+            read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugCollisionBoxesButtonLabel,
@@ -148,6 +155,7 @@ pub(crate) fn graphics_options_widgets(
             |g, v| g.debug_collision_boxes = v,
         ),
         graphics_toggle_button(
+            read_ticket,
             hud_inputs,
             style,
             UiBlocks::DebugLightRaysButtonLabel,
@@ -160,6 +168,7 @@ pub(crate) fn graphics_options_widgets(
 
 /// Generate a button that toggles a boolean graphics option.
 fn graphics_toggle_button(
+    read_ticket: ReadTicket<'_>,
     hud_inputs: &HudInputs,
     style: OptionsStyle,
     icon_key: UiBlocks,
@@ -170,7 +179,7 @@ fn graphics_toggle_button(
     let text: Option<widgets::Label> = match style {
         OptionsStyle::CompactRow => None,
         OptionsStyle::LabeledColumn => Some(
-            icon.evaluate(ReadTicket::new()) // TODO(read_ticket): figure out how to pass one in, or get the label text elsewhere
+            icon.evaluate(read_ticket) // TODO(read_ticket): we should probably get the label text elsewhere and remove this need for a read ticket
                 .unwrap()
                 .attributes()
                 .display_name
