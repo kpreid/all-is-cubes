@@ -479,8 +479,10 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
                             }
                         }
                     }
-                    // TODO: print all states
-                    _ => (),
+                    #[cfg(feature = "save")]
+                    State::Deserializing { .. } => write!(f, ", not yet deserialized")?,
+                    State::Member { .. } => { /* normal condition, no message */ }
+                    State::Gone { .. } => write!(f, ", gone")?,
                 }
             }
             Err(e) => {
