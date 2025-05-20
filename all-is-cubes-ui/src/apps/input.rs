@@ -517,7 +517,7 @@ mod tests {
     use all_is_cubes::euclid::vec3;
     use all_is_cubes::space::Space;
     use all_is_cubes::time;
-    use all_is_cubes::universe::ReadTicket;
+    use all_is_cubes::universe::{Handle, ReadTicket};
 
     fn apply_input_helper(
         input: &mut InputProcessor,

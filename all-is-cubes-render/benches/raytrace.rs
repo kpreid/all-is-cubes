@@ -9,7 +9,7 @@ use all_is_cubes::character::Character;
 use all_is_cubes::content::testing::lighting_bench_space;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::listen;
-use all_is_cubes::universe::{Handle, Universe};
+use all_is_cubes::universe::{StrongHandle, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_render::camera::{
     GraphicsOptions, Layers, LightingOption, StandardCameras, TransparencyOption, UiViewState,
@@ -20,7 +20,7 @@ use all_is_cubes_render::raytracer::RtRenderer;
 /// Non-mutated test data shared between benches
 struct TestData {
     universe: Universe,
-    character: Handle<Character>,
+    character: StrongHandle<Character>,
 }
 impl TestData {
     #[tokio::main(flavor = "current_thread")]
@@ -34,8 +34,9 @@ impl TestData {
         .await
         .unwrap();
         let space = universe.insert_anonymous(space);
-        let character =
-            universe.insert_anonymous(Character::spawn_default(universe.read_ticket(), space));
+        let character = StrongHandle::from(
+            universe.insert_anonymous(Character::spawn_default(universe.read_ticket(), space)),
+        );
         Self {
             universe,
             character,

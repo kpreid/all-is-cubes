@@ -495,7 +495,13 @@ impl Universe {
     }
 
     /// Inserts a new object without giving it a specific name, and returns
-    /// a reference to it.
+    /// a handle to it.
+    ///
+    /// Anonymous members are subject to garbage collection on the next [`Universe::step()`];
+    /// the returned handle should be used or converted to a [`StrongHandle`] before then.
+    //---
+    // TODO: This should logically return `StrongHandle`, but that may be too disruptive.
+    // For now, we live with "do something with this handle before the next step".
     pub fn insert_anonymous<T>(&mut self, value: T) -> Handle<T>
     where
         T: UniverseMember,

@@ -12,7 +12,7 @@ use all_is_cubes::block::Block;
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::inv;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
-use all_is_cubes::universe::{Handle, HandleError, ReadTicket};
+use all_is_cubes::universe::{HandleError, ReadTicket, StrongHandle};
 
 use crate::vui;
 
@@ -22,7 +22,7 @@ use crate::vui;
 ///
 /// Currently, no other game object has an inventory, but eventually this will have
 /// to become an enum of possibilities.
-type Owner = Option<Handle<Character>>;
+type Owner = Option<StrongHandle<Character>>;
 
 /// Track the contents of an [`Inventory`] stored elsewhere, and make UI elements for it.
 #[derive(Debug)]
@@ -65,7 +65,7 @@ impl InventoryWatcher {
     ///
     /// The presented inventory will be empty until the first [`update()`][Self::update].
     pub fn new(
-        inventory_source: listen::DynSource<Option<Handle<Character>>>,
+        inventory_source: listen::DynSource<Owner>,
         icon_provider: BlockProvider<inv::Icons>,
     ) -> Self {
         let dirty = listen::Flag::new(true);
@@ -191,8 +191,12 @@ impl InventoryWatcher {
     /// Returns the current [`Character`] whose inventory is being tracked, as of the last
     /// [`Self::update()`].
     #[cfg(test)] // TODO: only used in tests at the moment
-    fn character(&self) -> Option<&Handle<Character>> {
-        self.inventory_owner.as_ref()
+    fn character(&self) -> Option<&all_is_cubes::universe::Handle<Character>> {
+        use all_is_cubes::universe::Handle;
+
+        self.inventory_owner
+            .as_ref()
+            .map(<StrongHandle<Character> as AsRef<Handle<Character>>>::as_ref)
     }
 
     /// Returns the current contents of the watched inventory, as of the last [`Self::update()`].
@@ -247,13 +251,13 @@ mod tests {
     use all_is_cubes::character::CharacterTransaction;
     use all_is_cubes::inv;
     use all_is_cubes::space::Space;
-    use all_is_cubes::universe::Universe;
+    use all_is_cubes::universe::{Handle, Universe};
 
     struct Tester {
         universe: Universe,
         space: Handle<Space>,
-        character: Handle<Character>,
-        character_cell: listen::Cell<Option<Handle<Character>>>,
+        character: StrongHandle<Character>,
+        character_cell: listen::Cell<Option<StrongHandle<Character>>>,
         watcher: InventoryWatcher,
         sink: listen::Sink<WatcherChange>,
     }
@@ -261,10 +265,10 @@ mod tests {
         pub fn new() -> Self {
             let mut universe = Universe::new();
             let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
-            let character = universe.insert_anonymous(Character::spawn_default(
+            let character = StrongHandle::new(universe.insert_anonymous(Character::spawn_default(
                 universe.read_ticket(),
                 space.clone(),
-            ));
+            )));
             let character_cell = listen::Cell::new(Some(character.clone()));
             let mut watcher = InventoryWatcher::new(
                 character_cell.as_source(),
@@ -299,7 +303,7 @@ mod tests {
         t.update();
         assert_eq!(t.sink.drain(), vec![]);
 
-        assert_eq!(t.watcher.character(), Some(&t.character));
+        assert_eq!(t.watcher.character().unwrap(), &t.character);
 
         // Make a change to the character and observe update
         t.universe
@@ -320,9 +324,8 @@ mod tests {
         let mut t = Tester::new();
 
         // Construct new character with different inventory.
-        let new_character = t.universe.insert_anonymous(Character::spawn_default(
-            t.universe.read_ticket(),
-            t.space.clone(),
+        let new_character = StrongHandle::new(t.universe.insert_anonymous(
+            Character::spawn_default(t.universe.read_ticket(), t.space.clone()),
         ));
         t.universe
             .execute_1(
@@ -334,9 +337,9 @@ mod tests {
             .unwrap();
 
         t.character_cell.set(Some(new_character.clone()));
-        assert_eq!(t.watcher.character(), Some(&t.character));
+        assert_eq!(t.watcher.character().unwrap(), &t.character);
         t.update();
-        assert_eq!(t.watcher.character(), Some(&new_character));
+        assert_eq!(t.watcher.character().unwrap(), &new_character);
         assert_eq!(t.sink.drain(), vec![WatcherChange::Inventory]);
     }
 }

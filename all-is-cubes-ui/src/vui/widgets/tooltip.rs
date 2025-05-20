@@ -10,7 +10,7 @@ use all_is_cubes::euclid::size3;
 use all_is_cubes::inv;
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
 use all_is_cubes::time::{Duration, Tick};
-use all_is_cubes::universe::{Handle, ReadTicket};
+use all_is_cubes::universe::{ReadTicket, StrongHandle};
 
 use crate::ui_content::hud::HudBlocks;
 use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
@@ -18,7 +18,7 @@ use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController, widg
 #[derive(Debug)]
 pub(crate) struct TooltipState {
     /// Character we're reading inventory state from
-    character: Option<Handle<Character>>,
+    character: Option<StrongHandle<Character>>,
     /// Listener gate to stop the listener if we change characters
     character_gate: Gate,
 
@@ -36,7 +36,7 @@ impl TooltipState {
     pub(crate) fn bind_to_character(
         world_read_ticket: ReadTicket<'_>,
         this_ref: &Arc<Mutex<Self>>,
-        character: Handle<Character>,
+        character: StrongHandle<Character>,
     ) {
         let (gate, listener) = FnListener::new(
             this_ref,
@@ -51,7 +51,8 @@ impl TooltipState {
         )
         .gate();
 
-        // TODO: Think about what state results if either of the locks/borrows fails
+        // TODO: Think about what state results if either of the locks/borrows fails;
+        // then stop using StrongHandle?
         character.read(world_read_ticket).unwrap().listen(listener);
         {
             let mut this = this_ref.lock().unwrap();

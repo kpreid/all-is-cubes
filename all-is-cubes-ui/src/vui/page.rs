@@ -10,7 +10,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{self, Space, SpacePhysics};
 use all_is_cubes::time;
-use all_is_cubes::universe::{Handle, ReadTicket, Universe};
+use all_is_cubes::universe::{Handle, ReadTicket, StrongHandle, Universe};
 use all_is_cubes_render::camera::{self, ViewTransform};
 
 use crate::vui::{
@@ -236,7 +236,7 @@ impl PageLayout {
 #[derive(Clone, Debug)]
 pub(crate) struct PageInst {
     page: Page,
-    space: Option<Handle<Space>>,
+    space: Option<StrongHandle<Space>>,
 }
 
 impl PageInst {
@@ -252,7 +252,7 @@ impl PageInst {
         if let Some(space) = self.space.as_ref() {
             // TODO: We will need to be comparing the entire `UiSize` if it gains other fields
             if space.read(universe.read_ticket()).unwrap().bounds() == size.space_bounds() {
-                return space.clone();
+                return space.to_weak();
             }
         }
 
@@ -278,7 +278,7 @@ impl PageInst {
         // TODO: Resize in-place instead, once `Space` supports that.
         match self.create_space(size, universe) {
             Ok(space) => {
-                self.space = Some(space.clone());
+                self.space = Some(StrongHandle::new(space.clone()));
                 space
             }
             Err(error) => {

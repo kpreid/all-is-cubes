@@ -17,7 +17,7 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
-use all_is_cubes::universe::{Handle, ReadTicket};
+use all_is_cubes::universe::{ReadTicket, StrongHandle};
 
 use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::{CueMessage, CueNotifier, hud::HudBlocks};
@@ -46,7 +46,7 @@ impl Toolbar {
     const TOOLBAR_STEP: GridCoordinate = 2;
 
     pub fn new(
-        character_source: listen::DynSource<Option<Handle<Character>>>,
+        character_source: listen::DynSource<Option<StrongHandle<Character>>>,
         // TODO: Take WidgetTheme instead of HudBlocks, or move this widget out of the widgets module.
         hud_blocks: Arc<HudBlocks>,
         slot_range: Range<u16>,

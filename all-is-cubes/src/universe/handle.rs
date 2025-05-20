@@ -609,6 +609,107 @@ impl core::error::Error for HandleError {}
 
 // -------------------------------------------------------------------------------------------------
 
+/// A [`Handle<T>`][Handle], except that it keeps the referent present in its [`Universe`]
+/// even when it would otherwise be removed by garbage collection.
+///
+/// Note that a named universe member can still be explicitly deleted,
+/// and a `StrongHandle` can be created from a defunct `Handle`,
+/// so there is still no guarantee that `read()` will always succeed.
+///
+/// A [`StrongHandle`] should never be stored within a [`Universe`], as this will defeat
+/// garbage collection. Accordingly, it does not implement [`VisitHandles`].
+#[derive(Debug)]
+pub struct StrongHandle<T: UniverseMember>(Handle<T>);
+
+impl<T: UniverseMember> StrongHandle<T> {
+    /// Creates a [`StrongHandle`] from the given [`Handle`], ensuring that its referent will
+    /// not be subject to garbage collection.
+    pub fn new(handle: Handle<T>) -> Self {
+        // This will need to become less trivial in the future when the GC is better.
+        Self(handle)
+    }
+
+    /// Clone a plain [`Handle`] out of this [`StrongHandle`].
+    pub fn to_weak(&self) -> Handle<T> {
+        self.0.clone()
+    }
+
+    /// Convert this [`StrongHandle`] to a plain [`Handle`].
+    pub fn into_weak(self) -> Handle<T> {
+        // TODO: eliminate clone (not trivial due to Drop behavior)
+        self.0.clone()
+    }
+}
+
+impl<T: UniverseMember> Drop for StrongHandle<T> {
+    fn drop(&mut self) {
+        // This will need to become less trivial in the future when the GC is better.
+    }
+}
+
+// TODO: consider removing this in favor of separate API and conversions,
+// or making `Handle` generic over a strength parameter.
+impl<T: UniverseMember> Deref for StrongHandle<T> {
+    type Target = Handle<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: UniverseMember> From<Handle<T>> for StrongHandle<T> {
+    fn from(handle: Handle<T>) -> Self {
+        StrongHandle::new(handle)
+    }
+}
+impl<T: UniverseMember> From<&Handle<T>> for StrongHandle<T> {
+    fn from(handle: &Handle<T>) -> Self {
+        StrongHandle::new(handle.clone())
+    }
+}
+impl<T: UniverseMember> From<StrongHandle<T>> for Handle<T> {
+    fn from(handle: StrongHandle<T>) -> Self {
+        handle.into_weak()
+    }
+}
+
+impl<T: UniverseMember> AsRef<Handle<T>> for StrongHandle<T> {
+    fn as_ref(&self) -> &Handle<T> {
+        &self.0
+    }
+}
+impl<T: UniverseMember> core::borrow::Borrow<Handle<T>> for StrongHandle<T> {
+    fn borrow(&self) -> &Handle<T> {
+        &self.0
+    }
+}
+
+impl<T: UniverseMember> Eq for StrongHandle<T> {}
+impl<T: UniverseMember> PartialEq for StrongHandle<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl<T: UniverseMember> PartialEq<Handle<T>> for StrongHandle<T> {
+    fn eq(&self, other: &Handle<T>) -> bool {
+        self.0 == *other
+    }
+}
+impl<T: UniverseMember> PartialEq<StrongHandle<T>> for Handle<T> {
+    fn eq(&self, other: &StrongHandle<T>) -> bool {
+        *self == other.0
+    }
+}
+
+impl<T: UniverseMember> Clone for StrongHandle<T> {
+    fn clone(&self) -> Self {
+        // TODO: when this becomes an actual refcount manipulation, don't forget to increment here
+        Self(self.0.clone())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Permission to call [`Handle::read()`] to access the handle’s referent.
 ///
 /// Functions which call [`Handle::read()`] need to run only when there is no possibility of a

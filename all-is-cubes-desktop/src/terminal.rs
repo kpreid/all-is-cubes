@@ -15,6 +15,7 @@ use all_is_cubes::arcstr::literal_substr;
 use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen;
 use all_is_cubes::math::Rgba;
+use all_is_cubes::universe::StrongHandle;
 use all_is_cubes_render::camera::{self, Camera, StandardCameras, Viewport};
 use all_is_cubes_render::raytracer::{
     self, Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer,
@@ -275,7 +276,11 @@ fn run(
                 terminal_options: dsession.renderer.options.clone(),
                 inventory: InventoryDisplay::new(
                     dsession.session.universe().read_ticket(),
-                    dsession.session.character().get(),
+                    dsession
+                        .session
+                        .character()
+                        .get()
+                        .map(StrongHandle::into_weak),
                 ),
             })),
             // TODO: Even if we don't have a frame, we might want to update the UI anyway.

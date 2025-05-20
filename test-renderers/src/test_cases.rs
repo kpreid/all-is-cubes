@@ -19,7 +19,9 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
-use all_is_cubes::universe::{Handle, HandleError, ReadTicket, Universe, UniverseTransaction};
+use all_is_cubes::universe::{
+    Handle, HandleError, ReadTicket, StrongHandle, Universe, UniverseTransaction,
+};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{UniverseTemplate, make_some_voxel_blocks, palette};
 use all_is_cubes_render::camera::{
@@ -476,13 +478,13 @@ async fn fog(mut context: RenderTestContext, fog: FogOption) {
 
 /// Does the renderer properly follow a change of character?
 async fn follow_character_change(mut context: RenderTestContext) {
-    let mut character_of_a_color = |color: Rgb| -> Handle<Character> {
+    let mut character_of_a_color = |color: Rgb| -> StrongHandle<Character> {
         let space = Space::builder(GridAab::ORIGIN_CUBE)
             .sky_color(color)
             .build();
         let space = context.universe_mut().insert_anonymous(space);
         let character = Character::spawn_default(context.universe().read_ticket(), space);
-        context.universe_mut().insert_anonymous(character)
+        StrongHandle::from(context.universe_mut().insert_anonymous(character))
     };
     let c1 = character_of_a_color(rgb_const!(1.0, 0.0, 0.0));
     let c2 = character_of_a_color(rgb_const!(0.0, 1.0, 0.0));
@@ -554,7 +556,12 @@ async fn follow_options_change(mut context: RenderTestContext) {
     let cameras: StandardCameras = StandardCameras::new(
         options_cell.as_source(),
         listen::constant(COMMON_VIEWPORT),
-        listen::constant(context.universe().get_default_character()),
+        listen::constant(
+            context
+                .universe()
+                .get_default_character()
+                .map(StrongHandle::from),
+        ),
         listen::constant(Arc::new(UiViewState::default())),
     );
 
@@ -831,7 +838,12 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     let cameras: StandardCameras = StandardCameras::new(
         listen::constant(Arc::new(options.clone())),
         listen::constant(COMMON_VIEWPORT),
-        listen::constant(context.universe().get_default_character()),
+        listen::constant(
+            context
+                .universe()
+                .get_default_character()
+                .map(StrongHandle::from),
+        ),
         listen::constant(Arc::new(UiViewState {
             space: Some(ui_space),
             view_transform: ViewTransform::identity(),
@@ -1089,7 +1101,12 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let cameras: StandardCameras = StandardCameras::new(
         listen::constant(Arc::new(GraphicsOptions::default())),
         viewport_cell.as_source(),
-        listen::constant(context.universe().get_default_character()),
+        listen::constant(
+            context
+                .universe()
+                .get_default_character()
+                .map(StrongHandle::from),
+        ),
         listen::constant(Arc::new(UiViewState::default())),
     );
     let overlays = Overlays {

@@ -22,7 +22,8 @@ use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{
-    self, Handle, ReadTicket, Universe, UniverseId, UniverseStepInfo, UniverseTransaction,
+    self, Handle, ReadTicket, StrongHandle, Universe, UniverseId, UniverseStepInfo,
+    UniverseTransaction,
 };
 use all_is_cubes::util::{
     ConciseDebug, Fmt, Refmt as _, ShowStatus, StatusText, YieldProgressBuilder,
@@ -110,7 +111,7 @@ struct Shuttle {
 
     /// Character we're designating as “the player character”.
     /// Always a member of `game_universe`.
-    game_character: listen::CellWithLocal<Option<Handle<Character>>>,
+    game_character: listen::CellWithLocal<Option<StrongHandle<Character>>>,
 
     ui: Option<Vui>,
 
@@ -206,7 +207,7 @@ impl<I: time::Instant> Session<I> {
     }
 
     /// Returns a source for the [`Character`] that should be shown to the user.
-    pub fn character(&self) -> listen::DynSource<Option<Handle<Character>>> {
+    pub fn character(&self) -> listen::DynSource<Option<StrongHandle<Character>>> {
         self.shuttle().game_character.as_source()
     }
 
@@ -219,7 +220,7 @@ impl<I: time::Instant> Session<I> {
 
     /// Set the character which this session is “looking through the eyes of”.
     /// It must be from the universe previously set with `set_universe()`.
-    pub fn set_character(&mut self, character: Option<Handle<Character>>) {
+    pub fn set_character(&mut self, character: Option<StrongHandle<Character>>) {
         let shuttle = self.shuttle_mut();
         if let Some(character) = &character {
             assert!(character.universe_id() == Some(shuttle.game_universe.universe_id()));
@@ -344,7 +345,11 @@ impl<I: time::Instant> Session<I> {
                 self.input_processor.apply_input(
                     InputTargets {
                         universe: Some(&mut shuttle.game_universe),
-                        character: shuttle.game_character.get().as_ref(),
+                        character: shuttle
+                            .game_character
+                            .get()
+                            .as_ref()
+                            .map(StrongHandle::as_ref),
                         paused: Some(&self.paused),
                         settings: Some(&shuttle.settings),
                         control_channel: Some(&self.control_channel_sender),
@@ -669,8 +674,11 @@ impl<I: time::Instant> Session<I> {
 impl Shuttle {
     fn set_universe(&mut self, universe: Universe) {
         self.game_universe = universe;
-        self.game_character
-            .set(self.game_universe.get_default_character());
+        self.game_character.set(
+            self.game_universe
+                .get_default_character()
+                .map(StrongHandle::new),
+        );
 
         self.sync_universe_and_character_derived();
         // TODO: Need to sync FrameClock's schedule with the universe in case it is different
@@ -710,7 +718,7 @@ impl Shuttle {
             if let Some(character_handle) = self.game_character.get() {
                 let transaction = Character::click(
                     self.game_universe.read_ticket(),
-                    character_handle.clone(),
+                    character_handle.to_weak(),
                     self.cursor_result.as_ref(),
                     button,
                 )?;
@@ -1360,8 +1368,9 @@ mod tests {
         let mut u = Universe::new();
         let space1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let space2 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let character =
-            u.insert_anonymous(Character::spawn_default(u.read_ticket(), space1.clone()));
+        let character = StrongHandle::from(
+            u.insert_anonymous(Character::spawn_default(u.read_ticket(), space1.clone())),
+        );
         let st = space::CubeTransaction::fluff(Fluff::Happened).at(Cube::ORIGIN);
 
         // Create session

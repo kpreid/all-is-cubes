@@ -5,7 +5,7 @@ use all_is_cubes::character::{Character, Cursor, cursor_raycast};
 use all_is_cubes::listen;
 use all_is_cubes::math::FreeCoordinate;
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{Handle, HandleError, ReadTicket, Universe};
+use all_is_cubes::universe::{Handle, HandleError, ReadTicket, StrongHandle, Universe};
 
 use crate::camera::{Camera, GraphicsOptions, NdcPoint2, ViewTransform, Viewport};
 
@@ -92,10 +92,10 @@ pub struct StandardCameras {
     graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
     graphics_options_dirty: listen::Flag,
 
-    character_source: listen::DynSource<Option<Handle<Character>>>,
+    character_source: listen::DynSource<Option<StrongHandle<Character>>>,
     /// Tracks whether the character was replaced (not whether its view changed).
     character_dirty: listen::Flag,
-    character: Option<Handle<Character>>,
+    character: Option<StrongHandle<Character>>,
     /// Cached and listenable version of character's space.
     /// TODO: This should be in a `Layers` along with `ui_state`...?
     world_space: listen::Cell<Option<Handle<Space>>>,
@@ -120,7 +120,7 @@ impl StandardCameras {
     pub fn new(
         graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
         viewport_source: listen::DynSource<Viewport>,
-        character_source: listen::DynSource<Option<Handle<Character>>>,
+        character_source: listen::DynSource<Option<StrongHandle<Character>>>,
         ui_source: listen::DynSource<Arc<UiViewState>>,
     ) -> Self {
         // TODO: Add a unit test that each of these listeners works as intended.
@@ -166,7 +166,7 @@ impl StandardCameras {
         let mut new_self = Self::new(
             listen::constant(Arc::new(graphics_options)),
             listen::constant(viewport),
-            listen::constant(universe.get_default_character()),
+            listen::constant(universe.get_default_character().map(StrongHandle::new)),
             listen::constant(Default::default()),
         );
         new_self.update(Layers {
@@ -295,7 +295,7 @@ impl StandardCameras {
 
     /// Returns the character's viewpoint to draw in the world layer.
     /// May be [`None`] if there is no current character.
-    pub fn character(&self) -> Option<&Handle<Character>> {
+    pub fn character(&self) -> Option<&StrongHandle<Character>> {
         self.character.as_ref()
     }
 
@@ -486,7 +486,7 @@ mod tests {
                 Character::spawn_default(universe.read_ticket(), space_handle.clone()),
             )
             .unwrap();
-        character_cell.set(Some(character));
+        character_cell.set(Some(StrongHandle::new(character)));
 
         // Now the world_source should be reporting the new space
         {

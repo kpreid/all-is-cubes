@@ -11,7 +11,9 @@ use all_is_cubes::listen::{self, Notifier};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction};
-use all_is_cubes::universe::{Handle, ReadTicket, Universe, UniverseStepInfo, UniverseTransaction};
+use all_is_cubes::universe::{
+    Handle, ReadTicket, StrongHandle, Universe, UniverseStepInfo, UniverseTransaction,
+};
 use all_is_cubes_render::camera::{FogOption, GraphicsOptions, UiViewState, Viewport};
 
 use crate::apps::{
@@ -33,7 +35,7 @@ pub(crate) struct UiTargets {
     pub(crate) mouselook_mode: listen::DynSource<bool>,
 
     /// Reports the `Character` whose inventory should be displayed.
-    pub(crate) character_source: listen::DynSource<Option<Handle<Character>>>,
+    pub(crate) character_source: listen::DynSource<Option<StrongHandle<Character>>>,
 
     pub(crate) paused: listen::DynSource<bool>,
 
