@@ -21,6 +21,47 @@ pub(in crate::universe) use crate::universe::members::{
     AnyTransaction, AnyTransactionConflict, AnyTransactionMismatch,
 };
 
+// -------------------------------------------------------------------------------------------------
+
+/// Check a transaction against a [`Handle`].
+/// This is a shared helper between [`TransactionInUniverse`] and [`Universe::execute_1()`].
+pub(in crate::universe) fn check_transaction_in_universe<O: UniverseMember + Transactional>(
+    _universe: &Universe,
+    target: &Handle<O>,
+    transaction: &<O as Transactional>::Transaction,
+) -> Result<TransactionInUniverseCheck<O>, <O::Transaction as Transaction>::Mismatch> {
+    let guard = target
+        .try_borrow_mut()
+        // TODO: return this error
+        .expect("Attempted to execute transaction with target already borrowed");
+    let check = transaction.check(&guard)?;
+    Ok(TransactionInUniverseCheck { guard, check })
+}
+
+/// Commit a transaction to a [`Handle`].
+/// This is a shared helper between [`TransactionInUniverse`] and [`Universe::execute_1()`].
+pub(in crate::universe) fn commit_transaction_in_universe<O>(
+    // TODO: eventually this will be needed
+    // universe: &mut Universe,
+    _target: &Handle<O>,
+    transaction: &<O as Transactional>::Transaction,
+    mut tu_check: TransactionInUniverseCheck<O>,
+) -> Result<(), CommitError>
+where
+    O: UniverseMember + Transactional,
+    for<'a> O::Transaction:
+        Transaction<Output = transaction::NoOutput, Context<'a> = ReadTicket<'a>>,
+{
+    transaction.commit(
+        &mut tu_check.guard,
+        ReadTicket::new(),
+        tu_check.check,
+        &mut transaction::no_outputs,
+    )
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Conversion from concrete transaction types to [`UniverseTransaction`].
 ///
 /// Most code should be able to call [`Transaction::bind`] rather than mentioning this
@@ -50,38 +91,28 @@ pub(in crate::universe) struct TransactionInUniverse<O: Transactional + 'static>
 
 impl<O> Transaction for TransactionInUniverse<O>
 where
-    O: Transactional + 'static,
-    for<'a> O::Transaction: Transaction<Context<'a> = ReadTicket<'a>>,
+    O: UniverseMember + Transactional + 'static,
+    for<'a> O::Transaction:
+        Transaction<Output = transaction::NoOutput, Context<'a> = ReadTicket<'a>>,
 {
     type Target = Universe;
     type Context<'a> = ();
     type CommitCheck = TransactionInUniverseCheck<O>;
-    type Output = <O::Transaction as Transaction>::Output;
+    type Output = transaction::NoOutput;
     type Mismatch = <O::Transaction as Transaction>::Mismatch;
 
-    fn check(&self, _universe: &Universe) -> Result<Self::CommitCheck, Self::Mismatch> {
-        let guard = self
-            .target
-            .try_borrow_mut()
-            // TODO: return this error
-            .expect("Attempted to execute transaction with target already borrowed");
-        let check = self.transaction.check(&guard)?;
-        Ok(TransactionInUniverseCheck { guard, check })
+    fn check(&self, universe: &Universe) -> Result<Self::CommitCheck, Self::Mismatch> {
+        check_transaction_in_universe(universe, &self.target, &self.transaction)
     }
 
     fn commit(
         &self,
-        universe: &mut Universe,
+        _universe: &mut Universe,
         (): Self::Context<'_>,
-        mut tu_check: Self::CommitCheck,
-        outputs: &mut dyn FnMut(Self::Output),
+        tu_check: Self::CommitCheck,
+        _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        self.transaction.commit(
-            &mut tu_check.guard,
-            universe.read_ticket(),
-            tu_check.check,
-            outputs,
-        )
+        commit_transaction_in_universe(&self.target, &self.transaction, tu_check)
     }
 }
 
