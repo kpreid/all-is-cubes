@@ -25,7 +25,6 @@ private = { ignore = true }
 yanked = "deny"
 unmaintained = "all"
 ignore = [
-    "RUSTSEC-2025-0014", # humantime is only used in tests
     "RUSTSEC-2024-0436", # paste is “done”, not relevantly unmaintained
 ]
 
@@ -39,7 +38,6 @@ allow-wildcard-paths = true
 
 skip = [
     { name = "core-foundation", version = "0.9.4" }, # old used by `winit`
-    { name = "unicode-width", version = "0.1" }, # old used by `codespan-reporting` via `wgpu`
 ]
 
 skip-tree = [

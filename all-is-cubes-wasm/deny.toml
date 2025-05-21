@@ -10,7 +10,7 @@ allow = [
     # "MPL-2.0", # does not occur currently
     "BSD-3-Clause",
     "BSL-1.0",
-    # "ISC", # does not occur currently
+    "ISC",
     "Unicode-3.0",
     "Zlib",
     "CC0-1.0",
