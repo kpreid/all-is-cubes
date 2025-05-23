@@ -37,7 +37,7 @@ pub(crate) fn quote_and_snapshot_block(
     let mut eval_result = quoted_block.evaluate(read_tickets[0].expect_may_fail());
     if eval_result
         .as_ref()
-        .is_err_and(EvalBlockError::is_invalid_ticket)
+        .is_err_and(EvalBlockError::is_wrong_universe)
     {
         eval_result = quoted_block.evaluate(read_tickets[1].expect_may_fail());
     }

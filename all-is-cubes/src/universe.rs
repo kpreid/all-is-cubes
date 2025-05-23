@@ -728,8 +728,11 @@ impl Universe {
         if handle.universe_id() == Some(self.id) {
             handle.try_modify_impl(function)
         } else {
-            // TODO: not the exactly correct error
-            Err(HandleError::InvalidTicket(handle.name()))
+            Err(HandleError::WrongUniverse {
+                name: handle.name(),
+                ticket_universe_id: Some(self.id),
+                handle_universe_id: handle.universe_id(),
+            })
         }
     }
 

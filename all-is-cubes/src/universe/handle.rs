@@ -170,16 +170,17 @@ impl<T: 'static> Handle<T> {
     #[inline(never)]
     pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<ReadGuard<'t, T>, HandleError> {
         if let Some(id) = self.universe_id() {
-            if !read_ticket.allows_access_to(id) {
+            let ok_to_access = read_ticket.check_access(id);
+            if let Err(e) = ok_to_access {
                 // Invalid tickets can be a subtle bug due to `Space`'s retrying behavior.
                 // As a compromise, log them.
                 if !read_ticket.expect_may_fail {
                     log::error!(
-                        "invalid ticket {read_ticket:?} for reading {name} in {id:?}",
+                        "invalid ticket {read_ticket:?} for reading {name} in {id:?}: {e}",
                         name = self.name()
                     );
                 }
-                return Err(HandleError::InvalidTicket(self.name()));
+                return Err(e.into_handle_error(self.name()));
             }
         }
         let inner = owning_guard::ReadGuardImpl::new(self.upgrade()?)
@@ -396,13 +397,16 @@ impl<T: 'static> Handle<T> {
                     kind: InsertErrorKind::Gone,
                 });
             }
-            Err(HandleError::InvalidTicket(name)) => {
+            Err(HandleError::WrongUniverse { name, .. }) => {
                 // The only way we can get an invalid ticket error is if the handle was concurrently
                 // inserted into a different universe.
                 return Err(InsertError {
                     name,
                     kind: InsertErrorKind::AlreadyInserted,
                 });
+            }
+            Err(HandleError::InvalidTicket { .. }) => {
+                unreachable!("tried to insert a Handle from deserialization without valid ticket")
             }
         }
 
@@ -583,7 +587,8 @@ impl<T> State<T> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[non_exhaustive]
 pub enum HandleError {
-    /// Referent was deleted from the universe, or its entire universe was dropped.
+    /// Referent was explicitly deleted (if named) or garbage-collected (if anonymous)
+    /// from the universe.
     #[displaydoc("object was deleted: {0}")]
     Gone(Name),
 
@@ -600,12 +605,45 @@ pub enum HandleError {
     #[displaydoc("object was referenced but not defined: {0}")]
     NotReady(Name),
 
-    /// The presented [`ReadTicket`] is for a different universe.
-    #[displaydoc("object is from a different universe than the given ReadTicket: {0}")]
-    InvalidTicket(Name),
+    /// The given [`ReadTicket`] is for a different universe,
+    /// or a mutation function was called on a [`Universe`] which does not contain the given handle.
+    #[displaydoc(
+        // TODO: avoid use of Debug formatting
+        "object {name} is from a different universe ({handle_universe_id:?}) \
+        than the given ReadTicket or universe ({handle_universe_id:?})"
+    )]
+    #[non_exhaustive]
+    WrongUniverse {
+        /// ID of the universe the ticket is for, or [`None`] in the case of [`ReadTicket::stub()`].
+        ticket_universe_id: Option<UniverseId>,
+        /// ID of the universe the handle belongs to, or [`None`] if the handle has not been
+        /// inserted into a universe.
+        handle_universe_id: Option<UniverseId>,
+        /// Name of the member which was being accessed.
+        name: Name,
+    },
+
+    /// The presented [`ReadTicket`] does not have sufficient access for the requested data.
+    #[displaydoc("given ReadTicket does not have sufficient access to {name}")]
+    InvalidTicket {
+        /// Name of the member which was being accessed.
+        name: Name,
+        /// Opaque description of the exact restriction.
+        error: ReadTicketError,
+    },
 }
 
-impl core::error::Error for HandleError {}
+impl core::error::Error for HandleError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            HandleError::Gone(..) => None,
+            HandleError::InUse(..) => None,
+            HandleError::NotReady(..) => None,
+            HandleError::WrongUniverse { .. } => None,
+            HandleError::InvalidTicket { name: _, error } => Some(error),
+        }
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -787,11 +825,24 @@ impl<'universe> ReadTicket<'universe> {
         }
     }
 
-    pub(crate) fn allows_access_to(&self, id: UniverseId) -> bool {
+    pub(crate) fn check_access(
+        &self,
+        handle_universe_id: UniverseId,
+    ) -> Result<(), TicketErrorKind> {
         match self.access {
-            TicketAccess::Any => true,
-            TicketAccess::Stub => false,
-            TicketAccess::Universe(universe) => universe.universe_id() == id,
+            TicketAccess::Any => Ok(()),
+            TicketAccess::Stub => Err(TicketErrorKind::Stub),
+            TicketAccess::Universe(universe) => {
+                let ticket_universe_id = universe.universe_id();
+                if ticket_universe_id == handle_universe_id {
+                    Ok(())
+                } else {
+                    Err(TicketErrorKind::WrongUniverse {
+                        ticket_universe_id,
+                        handle_universe_id,
+                    })
+                }
+            }
         }
     }
 
@@ -837,6 +888,61 @@ impl<'u> fmt::Debug for TicketAccess<'u> {
             Self::Universe(u) => f.debug_tuple("Universe").field(&u.universe_id()).finish(),
             Self::Stub => write!(f, "Stub"),
         }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Error when a [`ReadTicket`] does not have sufficient access.
+//---
+// Design note: This type exists solely to hide the variants of `TicketErrorKind` so that they are
+// not stable public API. There will be more of them eventually.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ReadTicketError(TicketErrorKind);
+
+/// Low-level errors that can result from attempting to use a [`ReadTicket`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
+#[allow(dead_code, reason = "used for Debug printing")]
+pub(crate) enum TicketErrorKind {
+    #[displaydoc("wrong universe {handle_universe_id:?} for {ticket_universe_id:?}")]
+    WrongUniverse {
+        /// ID of the universe the ticket is for, or [`None`] in the case of [`ReadTicket::stub()`].
+        ticket_universe_id: UniverseId,
+        /// ID of the universe the handle belongs to, or [`None`] if the handle has not been
+        /// inserted into a universe.
+        handle_universe_id: UniverseId,
+    },
+    #[displaydoc("ticket is a stub")]
+    Stub,
+}
+
+impl TicketErrorKind {
+    /// Convert to the corresponding high-level error,
+    /// or panic if the error “can’t happen”.
+    ///
+    /// Depending on the specific case, the resulting [`HandleError`]
+    pub(crate) fn into_handle_error(self, name: Name) -> HandleError {
+        match self {
+            TicketErrorKind::WrongUniverse {
+                ticket_universe_id,
+                handle_universe_id,
+            } => HandleError::WrongUniverse {
+                name,
+                ticket_universe_id: Some(ticket_universe_id),
+                handle_universe_id: Some(handle_universe_id),
+            },
+            TicketErrorKind::Stub => HandleError::InvalidTicket {
+                name,
+                error: ReadTicketError(self),
+            },
+        }
+    }
+}
+
+impl core::error::Error for ReadTicketError {}
+impl fmt::Display for ReadTicketError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
