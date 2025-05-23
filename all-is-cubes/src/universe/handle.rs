@@ -7,6 +7,7 @@ use core::marker::PhantomData;
 use core::mem;
 use core::ops::{Deref, DerefMut};
 use core::panic::Location;
+use core::sync::atomic;
 
 use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::universe::{
@@ -43,9 +44,32 @@ pub struct Handle<T> {
     /// Reference to the object. Weak because we don't want to create reference cycles;
     /// the assumption is that the overall game system will keep the [`Universe`] alive
     /// and that [`Universe`] will ensure no entry goes away while referenced.
+    ///
+    /// This cannot be stored in `inner` because the number of [`Weak`]s is used
+    /// to determine the number of [`Handle`]s, and `inner` is shared with [`RootHandle`].
+    /// It is also the most frequently accessed part of the handle, so avoiding an extra
+    /// indirection may be helpful.
     weak_ref: Weak<RwLock<UEntry<T>>>,
 
-    state: Arc<Mutex<State<T>>>,
+    /// The shared state of all clones of this handle and its corresponding [`RootHandle`].
+    /// These have a 1:1 relationship with `Entity`s except that a pending handle has no
+    /// `Entity` yet.
+    inner: Arc<Inner<T>>,
+}
+
+#[derive(Debug)]
+struct Inner<T> {
+    /// Shared mutable state defining the relationship of the handle to a universe.
+    state: Mutex<State<T>>,
+
+    /// Number of [`StrongHandle`]s that exist.
+    ///
+    /// TODO: This is not actually used for anything yet.
+    /// Eventuallly it will assist the garbage collector, when there is one.
+    strong_handle_count: atomic::AtomicUsize,
+    // TODO: Add `once_cell::{race,sync}::OnceCell` to store the `UniverseId` and permanent `Name`.
+    // This will reduce state lock contention and may serve a future in which `Handle`s can be
+    // always `Send + Sync`.
 }
 
 /// Strongly-referenced mutable state shared by all clones of a [`Handle`].
@@ -90,11 +114,24 @@ enum State<T> {
         /// ID of the universe this handle belongs to.
         universe_id: UniverseId,
     },
+
     /// State of [`Handle::new_gone()`].
+    /// Nearly equivalent to [`State::Member`] after its entity is despawned.
     Gone { name: Name },
 }
 
 impl<T: 'static> Handle<T> {
+    /// Private helper constructor for the common part.
+    fn new_from_state(weak_ref: Weak<RwLock<UEntry<T>>>, state: State<T>) -> Self {
+        Handle {
+            weak_ref,
+            inner: Arc::new(Inner {
+                state: Mutex::new(state),
+                strong_handle_count: atomic::AtomicUsize::new(0),
+            }),
+        }
+    }
+
     /// Constructs a new [`Handle`] that is not yet associated with any [`Universe`],
     /// and strongly references its value (until inserted into a universe).
     ///
@@ -108,13 +145,13 @@ impl<T: 'static> Handle<T> {
         let strong_ref = Arc::new(RwLock::new(UEntry {
             data: Some(initial_value),
         }));
-        Handle {
-            weak_ref: Arc::downgrade(&strong_ref),
-            state: Arc::new(Mutex::new(State::Pending {
+        Self::new_from_state(
+            Arc::downgrade(&strong_ref),
+            State::Pending {
                 name,
                 strong: strong_ref,
-            })),
-        }
+            },
+        )
     }
 
     /// Constructs a [`Handle`] that does not refer to a value, as if it used to but
@@ -126,10 +163,7 @@ impl<T: 'static> Handle<T> {
     /// This may be used in tests to exercise error handling.
     #[doc(hidden)] // TODO: decide if this is good API
     pub fn new_gone(name: Name) -> Handle<T> {
-        Handle {
-            weak_ref: Weak::new(),
-            state: Arc::new(Mutex::new(State::Gone { name })),
-        }
+        Self::new_from_state(Weak::new(), State::Gone { name })
     }
 
     /// Name by which the [`Universe`] knows this handle.
@@ -138,7 +172,7 @@ impl<T: 'static> Handle<T> {
     /// a [`Universe`].
     pub fn name(&self) -> Name {
         // This code is also duplicated as `RootHandle::name()`
-        match self.state.lock() {
+        match self.inner.state.lock() {
             Ok(state) => state.name(),
             Err(_) => Name::Pending,
         }
@@ -151,7 +185,7 @@ impl<T: 'static> Handle<T> {
     /// Returns [`None`] if this [`Handle`] is not yet associated with a universe, or if
     ///  if it was created by [`Self::new_gone()`].
     pub fn universe_id(&self) -> Option<UniverseId> {
-        match *self.state.lock().ok()? {
+        match *self.inner.state.lock().ok()? {
             State::Pending { .. } => None,
             #[cfg(feature = "save")]
             State::Deserializing { universe_id, .. } => Some(universe_id),
@@ -316,7 +350,7 @@ impl<T: 'static> Handle<T> {
     where
         T: VisitHandles,
     {
-        match self.state.lock() {
+        match self.inner.state.lock() {
             Ok(state_guard) => match &*state_guard {
                 State::Pending { .. } => {}
                 &State::Member {
@@ -419,7 +453,7 @@ impl<T: 'static> Handle<T> {
         universe: &mut Universe,
     ) -> Result<RootHandle<T>, InsertError> {
         let mut state_guard: MutexGuard<'_, State<T>> =
-            self.state.lock().expect("Handle::state lock error");
+            self.inner.state.lock().expect("Handle::state lock error");
 
         let (strong_ref, name) = match &*state_guard {
             State::Gone { name } => {
@@ -451,7 +485,7 @@ impl<T: 'static> Handle<T> {
 
         Ok(RootHandle {
             strong_ref,
-            state: self.state.clone(),
+            inner: self.inner.clone(),
         })
     }
 }
@@ -462,9 +496,9 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
 
         write!(f, "Handle({}", self.name())?;
 
-        // Note: self.state is never held for long operations, so it is safe
+        // Note: self.inner.state is never held for long operations, so it is safe
         // to block on locking it.
-        match self.state.lock() {
+        match self.inner.state.lock() {
             Ok(state_guard) => {
                 match &*state_guard {
                     State::Pending { strong, .. } => {
@@ -503,17 +537,16 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
 /// the same mutable cell.
 impl<T> PartialEq for Handle<T> {
     fn eq(&self, other: &Self) -> bool {
-        // Note: Comparing the state pointer causes `Handle::new_gone()` to produce distinct
+        // Note: Comparing the shared state pointer causes `Handle::new_gone()` to produce distinct
         // instances. This seems better to me than comparing them by name and type only.
-        Weak::ptr_eq(&self.weak_ref, &other.weak_ref) && Arc::ptr_eq(&self.state, &other.state)
+        Arc::ptr_eq(&self.inner, &other.inner)
     }
 }
 /// `Handle`s are compared by pointer equality.
 impl<T> Eq for Handle<T> {}
 impl<T> hash::Hash for Handle<T> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        Weak::as_ptr(&self.weak_ref).hash(state);
-        Arc::as_ptr(&self.state).hash(state);
+        Arc::as_ptr(&self.inner).hash(state);
     }
 }
 
@@ -522,7 +555,7 @@ impl<T> Clone for Handle<T> {
     fn clone(&self) -> Self {
         Handle {
             weak_ref: self.weak_ref.clone(),
-            state: self.state.clone(),
+            inner: self.inner.clone(),
         }
     }
 }
@@ -663,7 +696,16 @@ impl<T: UniverseMember> StrongHandle<T> {
     /// Creates a [`StrongHandle`] from the given [`Handle`], ensuring that its referent will
     /// not be subject to garbage collection.
     pub fn new(handle: Handle<T>) -> Self {
-        // This will need to become less trivial in the future when the GC is better.
+        // We don't worry about integer overflow here, because it's unlikely to happen and
+        // if it does, the result will at worst be an unintended `HandleError::Gone` or an
+        // unintended retention, neither of which is a soundness issue.
+        //
+        // TODO: Think about the optimal choice of atomic ordering
+        handle
+            .inner
+            .strong_handle_count
+            .fetch_add(1, atomic::Ordering::AcqRel);
+
         Self(handle)
     }
 
@@ -681,7 +723,10 @@ impl<T: UniverseMember> StrongHandle<T> {
 
 impl<T: UniverseMember> Drop for StrongHandle<T> {
     fn drop(&mut self) {
-        // This will need to become less trivial in the future when the GC is better.
+        self.0
+            .inner
+            .strong_handle_count
+            .fetch_sub(1, atomic::Ordering::Relaxed);
     }
 }
 
@@ -741,8 +786,7 @@ impl<T: UniverseMember> PartialEq<StrongHandle<T>> for Handle<T> {
 
 impl<T: UniverseMember> Clone for StrongHandle<T> {
     fn clone(&self) -> Self {
-        // TODO: when this becomes an actual refcount manipulation, don't forget to increment here
-        Self(self.0.clone())
+        Self::new(self.0.clone())
     }
 }
 
@@ -1034,7 +1078,7 @@ pub(super) struct UEntry<T> {
 #[derive(Debug)]
 pub(crate) struct RootHandle<T> {
     strong_ref: StrongEntryRef<T>,
-    state: Arc<Mutex<State<T>>>,
+    inner: Arc<Inner<T>>,
 }
 
 impl<T> RootHandle<T> {
@@ -1043,12 +1087,15 @@ impl<T> RootHandle<T> {
     pub(super) fn new_deserializing(universe_id: UniverseId, name: Name) -> Self {
         RootHandle {
             strong_ref: Arc::new(RwLock::new(UEntry { data: None })),
-            state: Arc::new(Mutex::new(State::Deserializing { name, universe_id })),
+            inner: Arc::new(Inner {
+                state: Mutex::new(State::Deserializing { name, universe_id }),
+                strong_handle_count: atomic::AtomicUsize::new(0),
+            }),
         }
     }
 
     pub(crate) fn name(&self) -> Name {
-        match self.state.lock() {
+        match self.inner.state.lock() {
             Ok(state) => state.name(),
             Err(_) => Name::Pending,
         }
@@ -1061,7 +1108,7 @@ impl<T> RootHandle<T> {
     pub(crate) fn downgrade(&self) -> Handle<T> {
         Handle {
             weak_ref: Arc::downgrade(&self.strong_ref),
-            state: Arc::clone(&self.state),
+            inner: Arc::clone(&self.inner),
         }
     }
 
@@ -1142,7 +1189,7 @@ impl<T: UniverseMember> ErasedHandle for Handle<T> {
         // TODO: Make this fail if the value hasn't actually been provided
 
         let mut state_guard: MutexGuard<'_, State<T>> =
-            self.state.lock().expect("Handle::state lock error");
+            self.inner.state.lock().expect("Handle::state lock error");
 
         match &*state_guard {
             #[cfg(feature = "save")]
