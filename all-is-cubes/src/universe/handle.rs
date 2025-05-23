@@ -52,8 +52,6 @@ pub struct Handle<T> {
     weak_ref: Weak<RwLock<UEntry<T>>>,
 
     /// The shared state of all clones of this handle and its corresponding [`RootHandle`].
-    /// These have a 1:1 relationship with `Entity`s except that a pending handle has no
-    /// `Entity` yet.
     inner: Arc<Inner<T>>,
 }
 
@@ -62,12 +60,18 @@ struct Inner<T> {
     /// Shared mutable state defining the relationship of the handle to a universe.
     state: Mutex<State<T>>,
 
+    /// The ID of the universe this handle belongs to, if any.
+    ///
+    /// This field is interior mutable and, when it is updated, is updated only while `state`
+    /// is locked (but this may change in the future).
+    universe_id: OnceUniverseId,
+
     /// Number of [`StrongHandle`]s that exist.
     ///
     /// TODO: This is not actually used for anything yet.
     /// Eventuallly it will assist the garbage collector, when there is one.
     strong_handle_count: atomic::AtomicUsize,
-    // TODO: Add `once_cell::{race,sync}::OnceCell` to store the `UniverseId` and permanent `Name`.
+    // TODO: Add `once_cell::{race,sync}::OnceCell` to store the permanent `Name`.
     // This will reduce state lock contention and may serve a future in which `Handle`s can be
     // always `Send + Sync`.
 }
@@ -79,6 +83,8 @@ enum State<T> {
     /// Not yet (or never will be) inserted into a [`Universe`].
     ///
     /// May transition to [`State::Member`].
+    ///
+    /// This state should always be accompanied by `Inner::universe_id` having no value.
     Pending {
         /// Name that will apply once the ref is in a [`Universe`].
         ///
@@ -99,10 +105,14 @@ enum State<T> {
     /// is a handle that is being deserialized.
     ///
     /// May transition to [`State::Member`] when the [`Universe`] is fully deserialized.
+    ///
+    /// This state should always be accompanied by `Inner::universe_id` having a value.
     #[cfg(feature = "save")]
-    Deserializing { name: Name, universe_id: UniverseId },
+    Deserializing { name: Name },
 
     /// In a [`Universe`] (or has been deleted from one).
+    ///
+    /// This state should always be accompanied by `Inner::universe_id` having a value.
     Member {
         /// Name of this member within the [`Universe`].
         ///
@@ -110,13 +120,11 @@ enum State<T> {
         /// * May be [`Name::Anonym`].
         /// * May not be [`Name::Pending`].
         name: Name,
-
-        /// ID of the universe this handle belongs to.
-        universe_id: UniverseId,
     },
 
     /// State of [`Handle::new_gone()`].
-    /// Nearly equivalent to [`State::Member`] after its entity is despawned.
+    ///
+    /// This state should always be accompanied by `Inner::universe_id` having no value.
     Gone { name: Name },
 }
 
@@ -126,6 +134,7 @@ impl<T: 'static> Handle<T> {
         Handle {
             weak_ref,
             inner: Arc::new(Inner {
+                universe_id: OnceUniverseId::new(),
                 state: Mutex::new(state),
                 strong_handle_count: atomic::AtomicUsize::new(0),
             }),
@@ -180,27 +189,22 @@ impl<T: 'static> Handle<T> {
 
     /// Returns the unique ID of the universe this handle belongs to.
     ///
-    /// This may be used to confirm that two [`Handle`]s belong to the same universe.
-    ///
     /// Returns [`None`] if this [`Handle`] is not yet associated with a universe, or if
-    ///  if it was created by [`Self::new_gone()`].
+    /// it was created by [`Self::new_gone()`].
+    ///
+    /// The ID cannot be replaced; once [`Some`] is seen, the result will be stable forever.
     pub fn universe_id(&self) -> Option<UniverseId> {
-        match *self.inner.state.lock().ok()? {
-            State::Pending { .. } => None,
-            #[cfg(feature = "save")]
-            State::Deserializing { universe_id, .. } => Some(universe_id),
-            State::Member { universe_id, .. } => Some(universe_id),
-            State::Gone { .. } => None,
-        }
+        self.inner.universe_id.get(atomic::Ordering::Relaxed)
     }
 
     /// Acquire temporary read access to the value, in the sense of
     /// [`std::sync::RwLock::try_read()`].
     ///
-    /// It is not possible to block on, or otherwise wait for, read access.
-    /// Callers are responsible for separately scheduling read and write access to avoid conflict.
+    /// The caller must supply a [`ReadTicket`] from the [`Universe`] the handle belongs to.
+    /// If the handle is pending (not yet inserted into a universe) then any ticket is acceptable.
     ///
-    /// Returns an error if the value is currently being written to, or does not exist.
+    /// Returns an error if the value does not exist, is currently being written to, or if the
+    /// ticket does not match.
     #[inline(never)]
     pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<ReadGuard<'t, T>, HandleError> {
         if let Some(id) = self.universe_id() {
@@ -350,21 +354,22 @@ impl<T: 'static> Handle<T> {
     where
         T: VisitHandles,
     {
+        if let Some(existing_id) = self.universe_id() {
+            if existing_id != future_universe_id {
+                return Err(InsertError {
+                    name: self.name().clone(),
+                    kind: InsertErrorKind::AlreadyInserted,
+                });
+            }
+        }
+
         match self.inner.state.lock() {
             Ok(state_guard) => match &*state_guard {
                 State::Pending { .. } => {}
-                &State::Member {
-                    ref name,
-                    universe_id,
-                    ..
-                } => {
+                State::Member { name, .. } => {
                     return Err(InsertError {
                         name: name.clone(),
-                        kind: if future_universe_id == universe_id {
-                            InsertErrorKind::AlreadyExists
-                        } else {
-                            InsertErrorKind::AlreadyInserted
-                        },
+                        kind: InsertErrorKind::AlreadyExists,
                     });
                 }
                 #[cfg(feature = "save")]
@@ -455,6 +460,14 @@ impl<T: 'static> Handle<T> {
         let mut state_guard: MutexGuard<'_, State<T>> =
             self.inner.state.lock().expect("Handle::state lock error");
 
+        self.inner
+            .universe_id
+            .set(universe.universe_id())
+            .map_err(|_| InsertError {
+                name: state_guard.name(),
+                kind: InsertErrorKind::AlreadyInserted,
+            })?;
+
         let (strong_ref, name) = match &*state_guard {
             State::Gone { name } => {
                 return Err(InsertError {
@@ -478,10 +491,7 @@ impl<T: 'static> Handle<T> {
             State::Pending { name, strong } => (strong.clone(), universe.allocate_name(name)?),
         };
 
-        *state_guard = State::Member {
-            name,
-            universe_id: universe.universe_id(),
-        };
+        *state_guard = State::Member { name };
 
         Ok(RootHandle {
             strong_ref,
@@ -1088,7 +1098,8 @@ impl<T> RootHandle<T> {
         RootHandle {
             strong_ref: Arc::new(RwLock::new(UEntry { data: None })),
             inner: Arc::new(Inner {
-                state: Mutex::new(State::Deserializing { name, universe_id }),
+                universe_id: universe_id.into(),
+                state: Mutex::new(State::Deserializing { name }),
                 strong_handle_count: atomic::AtomicUsize::new(0),
             }),
         }
@@ -1188,18 +1199,19 @@ impl<T: UniverseMember> ErasedHandle for Handle<T> {
     ) -> Result<(), HandleError> {
         // TODO: Make this fail if the value hasn't actually been provided
 
+        assert_eq!(
+            self.inner.universe_id.get(atomic::Ordering::Acquire),
+            Some(expected_universe_id)
+        );
+
         let mut state_guard: MutexGuard<'_, State<T>> =
             self.inner.state.lock().expect("Handle::state lock error");
 
         match &*state_guard {
             #[cfg(feature = "save")]
-            &State::Deserializing {
-                ref name,
-                universe_id,
-            } => {
-                assert_eq!(universe_id, expected_universe_id);
+            State::Deserializing { name } => {
                 let name = name.clone();
-                *state_guard = State::Member { name, universe_id }
+                *state_guard = State::Member { name }
             }
             _ => {}
         }
@@ -1228,6 +1240,8 @@ mod private {
 }
 #[cfg(feature = "save")]
 pub(crate) use private::ErasedHandleInternalToken;
+
+use super::id::OnceUniverseId;
 
 #[cfg(test)]
 mod tests {
