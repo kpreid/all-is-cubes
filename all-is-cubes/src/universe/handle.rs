@@ -57,7 +57,7 @@ pub struct Handle<T> {
 
 #[derive(Debug)]
 struct Inner<T> {
-    /// Shared mutable state defining the relationship of the handle to a universe.
+    /// Shared mutable state defining the current relationship of the handle to a universe.
     state: Mutex<State<T>>,
 
     /// The ID of the universe this handle belongs to, if any.
@@ -66,14 +66,22 @@ struct Inner<T> {
     /// is locked (but this may change in the future).
     universe_id: OnceUniverseId,
 
+    /// The permanent name of this handle in the universe.
+    ///
+    /// If and only if the handle is not yet inserted into a universe,
+    /// and it was constructed with [`Name::Pending`], then this has no value yet.
+    ///
+    /// It is never equal to [`Name::Pending`].
+    ///
+    /// This field is interior mutable and, when it is updated, is updated only while `state`
+    /// is locked (but this may change in the future).
+    permanent_name: OnceName,
+
     /// Number of [`StrongHandle`]s that exist.
     ///
     /// TODO: This is not actually used for anything yet.
     /// Eventuallly it will assist the garbage collector, when there is one.
     strong_handle_count: atomic::AtomicUsize,
-    // TODO: Add `once_cell::{race,sync}::OnceCell` to store the permanent `Name`.
-    // This will reduce state lock contention and may serve a future in which `Handle`s can be
-    // always `Send + Sync`.
 }
 
 /// Strongly-referenced mutable state shared by all clones of a [`Handle`].
@@ -85,14 +93,9 @@ enum State<T> {
     /// May transition to [`State::Member`].
     ///
     /// This state should always be accompanied by `Inner::universe_id` having no value.
+    /// `Inner::name` may or may not have a value yet; if it does not, that corresponds to
+    /// a not-yet-assigned [`Name::Anonym`].
     Pending {
-        /// Name that will apply once the ref is in a [`Universe`].
-        ///
-        /// * May be [`Name::Specific`].
-        /// * May be [`Name::Pending`] to assign a [`Name::Anonym`] later.
-        /// * May not be [`Name::Anonym`].
-        name: Name,
-
         /// Contains a strong reference to the same target as [`Handle::weak_ref`].
         /// This is used to allow constructing `Handle`s with targets *before* they are
         /// inserted into a [`Universe`], and thus inserting entire trees into the
@@ -108,33 +111,34 @@ enum State<T> {
     ///
     /// This state should always be accompanied by `Inner::universe_id` having a value.
     #[cfg(feature = "save")]
-    Deserializing { name: Name },
+    Deserializing {},
 
     /// In a [`Universe`] (or has been deleted from one).
     ///
-    /// This state should always be accompanied by `Inner::universe_id` having a value.
-    Member {
-        /// Name of this member within the [`Universe`].
-        ///
-        /// * May be [`Name::Specific`].
-        /// * May be [`Name::Anonym`].
-        /// * May not be [`Name::Pending`].
-        name: Name,
-    },
+    /// This state should always be accompanied by `Inner::universe_id` and `Inner::name`
+    /// having values set.
+    Member {},
 
     /// State of [`Handle::new_gone()`].
     ///
     /// This state should always be accompanied by `Inner::universe_id` having no value.
-    Gone { name: Name },
+    Gone {},
 }
 
 impl<T: 'static> Handle<T> {
     /// Private helper constructor for the common part.
-    fn new_from_state(weak_ref: Weak<RwLock<UEntry<T>>>, state: State<T>) -> Self {
+    #[track_caller]
+    fn new_from_state(weak_ref: Weak<RwLock<UEntry<T>>>, name: Name, state: State<T>) -> Self {
+        let permanent_name = match name {
+            Name::Pending => None,
+            name => Some(name),
+        };
+
         Handle {
             weak_ref,
             inner: Arc::new(Inner {
                 universe_id: OnceUniverseId::new(),
+                permanent_name: OnceName::from_optional_value(permanent_name),
                 state: Mutex::new(state),
                 strong_handle_count: atomic::AtomicUsize::new(0),
             }),
@@ -156,10 +160,8 @@ impl<T: 'static> Handle<T> {
         }));
         Self::new_from_state(
             Arc::downgrade(&strong_ref),
-            State::Pending {
-                name,
-                strong: strong_ref,
-            },
+            name,
+            State::Pending { strong: strong_ref },
         )
     }
 
@@ -172,7 +174,7 @@ impl<T: 'static> Handle<T> {
     /// This may be used in tests to exercise error handling.
     #[doc(hidden)] // TODO: decide if this is good API
     pub fn new_gone(name: Name) -> Handle<T> {
-        Self::new_from_state(Weak::new(), State::Gone { name })
+        Self::new_from_state(Weak::new(), name, State::Gone {})
     }
 
     /// Name by which the [`Universe`] knows this handle.
@@ -181,10 +183,11 @@ impl<T: 'static> Handle<T> {
     /// a [`Universe`].
     pub fn name(&self) -> Name {
         // This code is also duplicated as `RootHandle::name()`
-        match self.inner.state.lock() {
-            Ok(state) => state.name(),
-            Err(_) => Name::Pending,
-        }
+        self.inner
+            .permanent_name
+            .get()
+            .unwrap_or(&Name::Pending)
+            .clone()
     }
 
     /// Returns the unique ID of the universe this handle belongs to.
@@ -357,7 +360,7 @@ impl<T: 'static> Handle<T> {
         if let Some(existing_id) = self.universe_id() {
             if existing_id != future_universe_id {
                 return Err(InsertError {
-                    name: self.name().clone(),
+                    name: self.name(),
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
@@ -366,22 +369,22 @@ impl<T: 'static> Handle<T> {
         match self.inner.state.lock() {
             Ok(state_guard) => match &*state_guard {
                 State::Pending { .. } => {}
-                State::Member { name, .. } => {
+                State::Member { .. } => {
                     return Err(InsertError {
-                        name: name.clone(),
+                        name: self.name(),
                         kind: InsertErrorKind::AlreadyExists,
                     });
                 }
                 #[cfg(feature = "save")]
-                State::Deserializing { name, .. } => {
+                State::Deserializing { .. } => {
                     return Err(InsertError {
-                        name: name.clone(),
+                        name: self.name(),
                         kind: InsertErrorKind::Deserializing,
                     });
                 }
-                State::Gone { name, .. } => {
+                State::Gone { .. } => {
                     return Err(InsertError {
-                        name: name.clone(),
+                        name: self.name(),
                         kind: InsertErrorKind::Gone,
                     });
                 }
@@ -464,34 +467,35 @@ impl<T: 'static> Handle<T> {
             .universe_id
             .set(universe.universe_id())
             .map_err(|_| InsertError {
-                name: state_guard.name(),
+                name: self.name(),
                 kind: InsertErrorKind::AlreadyInserted,
             })?;
 
         let (strong_ref, name) = match &*state_guard {
-            State::Gone { name } => {
+            State::Gone {} => {
                 return Err(InsertError {
-                    name: name.clone(),
+                    name: self.name(),
                     kind: InsertErrorKind::Gone,
                 });
             }
-            State::Member { name, .. } => {
+            State::Member { .. } => {
                 return Err(InsertError {
-                    name: name.clone(),
+                    name: self.name(),
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
             #[cfg(feature = "save")]
-            State::Deserializing { name, .. } => {
+            State::Deserializing { .. } => {
                 return Err(InsertError {
-                    name: name.clone(),
+                    name: self.name(),
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
-            State::Pending { name, strong } => (strong.clone(), universe.allocate_name(name)?),
+            State::Pending { strong } => (strong.clone(), universe.allocate_name(&self.name())?),
         };
 
-        *state_guard = State::Member { name };
+        let _ = self.inner.permanent_name.set(name); // already-set error is ignored
+        *state_guard = State::Member {};
 
         Ok(RootHandle {
             strong_ref,
@@ -609,20 +613,6 @@ impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for Han
                 ),
             ))
         })
-    }
-}
-
-impl<T> State<T> {
-    /// Name by which the [`Universe`] knows the ref with this state.
-    /// This is public as [`Handle::name()`].
-    pub(crate) fn name(&self) -> Name {
-        match self {
-            State::Pending { name, .. } => name.clone(),
-            #[cfg(feature = "save")]
-            State::Deserializing { name, .. } => name.clone(),
-            State::Member { name, .. } => name.clone(),
-            State::Gone { name } => name.clone(),
-        }
     }
 }
 
@@ -1099,17 +1089,19 @@ impl<T> RootHandle<T> {
             strong_ref: Arc::new(RwLock::new(UEntry { data: None })),
             inner: Arc::new(Inner {
                 universe_id: universe_id.into(),
-                state: Mutex::new(State::Deserializing { name }),
+                permanent_name: OnceName::from_optional_value(Some(name)),
+                state: Mutex::new(State::Deserializing {}),
                 strong_handle_count: atomic::AtomicUsize::new(0),
             }),
         }
     }
 
     pub(crate) fn name(&self) -> Name {
-        match self.inner.state.lock() {
-            Ok(state) => state.name(),
-            Err(_) => Name::Pending,
-        }
+        self.inner
+            .permanent_name
+            .get()
+            .unwrap_or(&Name::Pending)
+            .clone()
     }
 
     /// Convert to `Handle`.
@@ -1209,10 +1201,7 @@ impl<T: UniverseMember> ErasedHandle for Handle<T> {
 
         match &*state_guard {
             #[cfg(feature = "save")]
-            State::Deserializing { name } => {
-                let name = name.clone();
-                *state_guard = State::Member { name }
-            }
+            State::Deserializing {} => *state_guard = State::Member {},
             _ => {}
         }
 
@@ -1242,6 +1231,7 @@ mod private {
 pub(crate) use private::ErasedHandleInternalToken;
 
 use super::id::OnceUniverseId;
+use super::name::OnceName;
 
 #[cfg(test)]
 mod tests {

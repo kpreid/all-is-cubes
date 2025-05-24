@@ -54,6 +54,7 @@ default = ["std"]
 std = [
     "all-is-cubes-base/std",
     "arcstr/std", # not required but nicer behavior
+    "once_cell/std", # used conditionally as more efficient than once_cell::race
     "nosy/sync",
     "yield-progress/sync",
 ]
