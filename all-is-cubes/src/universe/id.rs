@@ -2,6 +2,8 @@ use core::num::NonZeroU64;
 use core::sync::atomic;
 use core::sync::atomic::Ordering::{Acquire, Relaxed};
 
+use bevy_ecs::prelude as ecs;
+
 #[cfg(doc)]
 use crate::universe::{Handle, Universe};
 
@@ -12,7 +14,7 @@ use crate::universe::{Handle, Universe};
 /// Used to check whether [`Handle`]s belong to particular [`Universe`]s.
 //---
 // IDs are nonzero in order to help implement `OnceUniverseId`.
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, ecs::Resource)]
 pub struct UniverseId(NonZeroU64);
 
 impl UniverseId {

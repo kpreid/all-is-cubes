@@ -5,10 +5,10 @@
 //! inside it (the public-in-private trick).
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
-use alloc::string::ToString;
 use core::any::Any;
 use core::fmt;
+
+use bevy_ecs::prelude as ecs;
 
 use crate::block::BlockDef;
 use crate::character::Character;
@@ -16,14 +16,7 @@ use crate::sound::SoundDef;
 use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
-use crate::universe::{
-    ErasedHandle, Handle, InsertError, Name, RootHandle, Universe, UniverseIter, universe_txn as ut,
-};
-use crate::util::Refmt as _;
-
-/// A `BTreeMap` is used to ensure that the iteration order is deterministic across
-/// runs/versions.
-pub(crate) type Storage<T> = BTreeMap<Name, RootHandle<T>>;
+use crate::universe::{ErasedHandle, Handle, InsertError, Name, Universe, universe_txn as ut};
 
 /// Trait for every type which can be a named member of a universe.
 ///
@@ -33,54 +26,12 @@ pub(crate) type Storage<T> = BTreeMap<Name, RootHandle<T>>;
 /// public-in-private.
 #[doc(hidden)]
 #[expect(unnameable_types)]
-pub trait UniverseMember: Sized + 'static + fmt::Debug {
+// TODO(ecs): make Component not publicly a supertrait, once we figure out what components typed members actually have
+pub trait UniverseMember:
+    Sized + 'static + fmt::Debug + ecs::Component<Mutability = bevy_ecs::component::Mutable>
+{
     /// Generic constructor for [`AnyHandle`].
     fn into_any_handle(r: Handle<Self>) -> AnyHandle;
-}
-
-/// For each type `T` that can be a member of a [`Universe`], this trait is implemented,
-/// `impl UniverseTable<T> for Universe`, in order to provide the collection of members
-/// of that type.
-///
-/// This trait is not public and is used only within the implementation of [`Universe`];
-/// thus, the `Table` associated type does not need to be a public type.
-///
-/// TODO: Implement this on [`UniverseTables`] instead.
-pub(crate) trait UniverseTable<T> {
-    type Table;
-
-    fn table(&self) -> &Self::Table;
-
-    fn table_mut(&mut self) -> &mut Self::Table;
-}
-
-/// Trait implemented by [`Universe`] once for each type of object that can be stored in a
-/// [`Universe`], that permits lookups of that type.
-///
-/// This trait must be public(-in-private) so it can be a bound on public methods.
-/// It could be just public, but it's cleaner to not require importing it everywhere.
-#[doc(hidden)]
-#[expect(unnameable_types)]
-pub trait UniverseOps<T>
-where
-    T: UniverseMember,
-{
-    // Internal: Implementations of this are in the [`members`] module.
-
-    fn get(&self, name: &Name) -> Option<Handle<T>>;
-
-    fn iter_by_type(&self) -> UniverseIter<'_, T>;
-}
-
-// Helper functions to implement `UniverseOps` without putting everything
-// in the macro body.
-pub(super) fn ops_get<T>(this: &Universe, name: &Name) -> Option<Handle<T>>
-where
-    Universe: UniverseTable<T, Table = Storage<T>>,
-{
-    <Universe as UniverseTable<T>>::table(this)
-        .get(name)
-        .map(RootHandle::downgrade)
 }
 
 /// Generates impls for a specific Universe member type.
@@ -89,26 +40,6 @@ macro_rules! impl_universe_for_member {
         impl UniverseMember for $member_type {
             fn into_any_handle(handle: Handle<$member_type>) -> AnyHandle {
                 AnyHandle::$member_type(handle)
-            }
-        }
-
-        impl UniverseTable<$member_type> for Universe {
-            type Table = Storage<$member_type>;
-
-            fn table(&self) -> &Storage<$member_type> {
-                &self.tables.$table
-            }
-            fn table_mut(&mut self) -> &mut Storage<$member_type> {
-                &mut self.tables.$table
-            }
-        }
-
-        impl UniverseOps<$member_type> for Universe {
-            fn get(&self, name: &Name) -> Option<Handle<$member_type>> {
-                ops_get(self, name)
-            }
-            fn iter_by_type(&self) -> UniverseIter<'_, $member_type> {
-                UniverseIter(UniverseTable::<$member_type>::table(self).iter())
             }
         }
 
@@ -131,28 +62,6 @@ macro_rules! impl_universe_for_member {
 /// Generates data structures which cover all universe member types.
 macro_rules! member_enums_and_impls {
     ( $( ($member_type:ident, $table_name:ident), )* ) => {
-        /// Sub-structure of [`Universe`] that actually stores the members.
-        #[derive(Debug, Default)]
-        pub(super) struct UniverseTables {
-            $( pub(crate) $table_name: Storage<$member_type>, )*
-        }
-
-        impl UniverseTables {
-            /// Called by Universe as part of its `Debug`
-            pub(crate) fn fmt_members(&self, ds: &mut fmt::DebugStruct<'_, '_>) {
-                $( fmt_members_of_type::<$member_type>(&self.$table_name, ds); )*
-            }
-
-            pub(crate) fn get_any(&self, name: &Name) -> Option<Box<dyn ErasedHandle>> {
-                $(
-                    if let Some(root_handle) = self.$table_name.get(name) {
-                        return Some(Box::new(root_handle.downgrade()));
-                    }
-                )*
-                None
-            }
-        }
-
         impl Universe {
             /// Iterate over all members of this universe.
             ///
@@ -199,17 +108,47 @@ macro_rules! member_enums_and_impls {
             ) -> Result<(), InsertError> {
                 match self {
                     $( AnyHandle::$member_type(pending_handle) => {
-                        ut::any_handle_insert_and_upgrade_pending(universe, pending_handle)
+                        pending_handle.upgrade_pending(universe)
                     } )*
                 }
             }
 
+            /// For debugging — not guaranteed to be stable.
             #[doc(hidden)] // TODO: not great API, but used by all-is-cubes-port
             pub fn member_type_name(&self) -> &'static str {
                  match self {
                     $( AnyHandle::$member_type(_) => {
                         core::any::type_name::<$member_type>()
                     } )*
+                }
+            }
+
+            #[cfg(feature = "save")]
+            pub(crate) fn not_still_deserializing(
+                &self,
+                read_ticket: $crate::universe::ReadTicket<'_>,
+            ) -> bool {
+                match self {
+                    $( AnyHandle::$member_type(h) => {
+                        !matches!(h.read(read_ticket), Err($crate::universe::HandleError::NotReady(_)))
+                    } )*
+                }
+            }
+
+            /// For deleting members.
+            pub(in crate::universe) fn set_state_to_gone(
+                &self,
+            ) -> () {
+                match self {
+                    $( AnyHandle::$member_type(handle) => handle.set_state_to_gone(), )*
+                }
+            }
+
+            pub(in crate::universe) fn has_strong_handles(
+                &self,
+            ) -> bool {
+                match self {
+                    $( AnyHandle::$member_type(handle) => handle.has_strong_handles(), )*
                 }
             }
         }
@@ -387,12 +326,12 @@ macro_rules! member_enums_and_impls {
 // To add another type, it is also necessary to update:
 //    Universe::delete
 //    Universe::gc
-//    Universe::fix_deserialized_handles
 //    Universe::step (if the members do anything on step)
 //    struct PartialUniverse
 //    impl Serialize for PartialUniverse
 //    save::schema::MemberSer
 //    transaction::universe_txn::*
+// TODO(ecs): The above comment is stale.
 member_enums_and_impls!(
     (BlockDef, blocks),
     (Character, characters),
@@ -432,34 +371,12 @@ impl ErasedHandle for AnyHandle {
         r.universe_id()
     }
 
+    fn as_entity(&self) -> Option<ecs::Entity> {
+        let r: &dyn ErasedHandle = &**self;
+        r.as_entity()
+    }
+
     fn to_any_handle(&self) -> AnyHandle {
         self.clone()
-    }
-
-    #[cfg(feature = "save")]
-    fn fix_deserialized(
-        &self,
-        universe_id: super::UniverseId,
-        privacy_token: super::ErasedHandleInternalToken,
-    ) -> Result<(), super::HandleError> {
-        let r: &dyn ErasedHandle = &**self;
-        r.fix_deserialized(universe_id, privacy_token)
-    }
-}
-
-/// Helper for `UniverseTable::fmt_members`
-fn fmt_members_of_type<T>(table: &Storage<T>, ds: &mut fmt::DebugStruct<'_, '_>)
-where
-    Universe: UniverseTable<T, Table = Storage<T>>,
-{
-    for name in table.keys() {
-        // match root.strong_ref.try_borrow() {
-        //     Ok(entry) => ds.field(&name.to_string(), &entry.data),
-        //     Err(_) => ds.field(&name.to_string(), &"<in use>"),
-        // };
-        ds.field(
-            &name.to_string(),
-            &core::marker::PhantomData::<T>.refmt(&crate::util::TypeName),
-        );
     }
 }

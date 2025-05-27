@@ -8,8 +8,6 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::universe::ReadTicket;
-
 use super::schema;
 
 mod behavior {
@@ -980,7 +978,7 @@ mod space {
 
                     let space = Space::builder(bounds)
                         .physics(physics.into())
-                        .read_ticket(ReadTicket::new())
+                        // .read_ticket(todo!("TODO(ecs)"))
                         .palette_and_contents(blocks, contents, light)
                         .map_err(serde::de::Error::custom)?
                         .behaviors(behaviors.into_owned())
@@ -1258,7 +1256,7 @@ mod universe {
             }
 
             universe
-                .fix_deserialized_handles()
+                .validate_deserialized_members()
                 .map_err(serde::de::Error::custom)?;
 
             // Perform a paused step to let things do re-initialization,
@@ -1276,10 +1274,7 @@ mod universe {
         }
     }
 
-    impl<'de, T: 'static> Deserialize<'de> for Handle<T>
-    where
-        Universe: universe::UniverseTable<T, Table = universe::Storage<T>>,
-    {
+    impl<'de, T: universe::UniverseMember + 'static> Deserialize<'de> for Handle<T> {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             match HandleSer::deserialize(deserializer)? {
                 HandleSer::HandleV1 { name } => {
@@ -1326,7 +1321,10 @@ mod universe {
         }
     }
 
-    impl<T: Serialize + 'static> Serialize for schema::SerializeHandle<'_, T> {
+    impl<T> Serialize for schema::SerializeHandle<'_, T>
+    where
+        T: Serialize + universe::UniverseMember,
+    {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,

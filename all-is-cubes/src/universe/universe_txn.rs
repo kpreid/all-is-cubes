@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use core::any::Any;
 use core::fmt;
 
+use bevy_ecs::prelude as ecs;
 use hashbrown::HashMap as HbHashMap;
 
 use crate::behavior;
@@ -12,7 +13,7 @@ use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transacti
 use crate::universe::HandleError;
 use crate::universe::{
     AnyHandle, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadTicket, Universe,
-    UniverseId, UniverseMember, UniverseTable, WriteGuard,
+    UniverseId, UniverseMember,
 };
 
 // Reëxports for macro-generated types
@@ -26,36 +27,41 @@ pub(in crate::universe) use crate::universe::members::{
 /// Check a transaction against a [`Handle`].
 /// This is a shared helper between [`TransactionInUniverse`] and [`Universe::execute_1()`].
 pub(in crate::universe) fn check_transaction_in_universe<O: UniverseMember + Transactional>(
-    _universe: &Universe,
+    universe: &Universe,
     target: &Handle<O>,
     transaction: &<O as Transactional>::Transaction,
-) -> Result<TransactionInUniverseCheck<O>, <O::Transaction as Transaction>::Mismatch> {
-    let guard = target
-        .try_borrow_mut()
-        // TODO: return this error
-        .expect("Attempted to execute transaction with target already borrowed");
-    let check = transaction.check(&guard)?;
-    Ok(TransactionInUniverseCheck { guard, check })
+) -> Result<<O::Transaction as Transaction>::CommitCheck, <O::Transaction as Transaction>::Mismatch>
+{
+    let check = transaction.check(
+        &target
+            .read(universe.read_ticket())
+            .expect("Attempted to execute transaction with target already borrowed"),
+    )?;
+    Ok(check)
 }
 
 /// Commit a transaction to a [`Handle`].
 /// This is a shared helper between [`TransactionInUniverse`] and [`Universe::execute_1()`].
 pub(in crate::universe) fn commit_transaction_in_universe<O>(
-    // TODO: eventually this will be needed
-    // universe: &mut Universe,
-    _target: &Handle<O>,
+    universe: &mut Universe,
+    target: &Handle<O>,
     transaction: &<O as Transactional>::Transaction,
-    mut tu_check: TransactionInUniverseCheck<O>,
+    check: <O::Transaction as Transaction>::CommitCheck,
 ) -> Result<(), CommitError>
 where
     O: UniverseMember + Transactional,
     for<'a> O::Transaction:
         Transaction<Output = transaction::NoOutput, Context<'a> = ReadTicket<'a>>,
 {
+    let entity: ecs::Entity = target.as_entity().unwrap();
+    let (mut target_component, everything_but) = universe
+        .get_one_mut_and_ticket::<O>(entity)
+        .expect("component missing; universe state changed between check and commit");
+
     transaction.commit(
-        &mut tu_check.guard,
-        ReadTicket::new(),
-        tu_check.check,
+        &mut *target_component,
+        everything_but,
+        check,
         &mut transaction::no_outputs,
     )
 }
@@ -97,7 +103,7 @@ where
 {
     type Target = Universe;
     type Context<'a> = ();
-    type CommitCheck = TransactionInUniverseCheck<O>;
+    type CommitCheck = <O::Transaction as Transaction>::CommitCheck;
     type Output = transaction::NoOutput;
     type Mismatch = <O::Transaction as Transaction>::Mismatch;
 
@@ -107,22 +113,13 @@ where
 
     fn commit(
         &self,
-        _universe: &mut Universe,
+        universe: &mut Universe,
         (): Self::Context<'_>,
         tu_check: Self::CommitCheck,
         _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        commit_transaction_in_universe(&self.target, &self.transaction, tu_check)
+        commit_transaction_in_universe(universe, &self.target, &self.transaction, tu_check)
     }
-}
-
-/// Private to keep the mutable access private.
-pub(in crate::universe) struct TransactionInUniverseCheck<O>
-where
-    O: Transactional + 'static,
-{
-    guard: WriteGuard<O>,
-    check: <O::Transaction as Transaction>::CommitCheck,
 }
 
 impl<O> Merge for TransactionInUniverse<O>
@@ -814,24 +811,6 @@ impl MemberTxn {
             Noop | Insert(_) | Delete => None,
         }
     }
-}
-
-/// Generic helper function called by macro-generated
-/// [`AnyHandle::insert_and_upgrade_pending()`]
-pub(in crate::universe) fn any_handle_insert_and_upgrade_pending<T>(
-    universe: &mut Universe,
-    pending_handle: &Handle<T>,
-) -> Result<(), InsertError>
-where
-    T: 'static,
-    Universe: UniverseTable<T, Table = super::Storage<T>>,
-{
-    let new_root_handle = pending_handle.upgrade_pending(universe)?;
-
-    UniverseTable::<T>::table_mut(universe).insert(pending_handle.name(), new_root_handle);
-    universe.wants_gc = true;
-
-    Ok(())
 }
 
 impl Merge for MemberTxn {

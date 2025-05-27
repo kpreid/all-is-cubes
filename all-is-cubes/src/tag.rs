@@ -70,7 +70,7 @@ impl universe::VisitHandles for Is {
 #[doc = include_str!("save/serde-warning.md")]
 #[expect(clippy::exhaustive_structs)]
 #[expect(clippy::module_name_repetitions, reason = "TODO: reconsider")]
-#[derive(Debug)]
+#[derive(Debug, bevy_ecs::component::Component)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct TagDef;
 

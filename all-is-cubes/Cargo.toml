@@ -86,8 +86,14 @@ rerun = [
 ]
 # Adds automatic parallelism to some algorithms.
 # If disabled, `std::thread` is never used.
-# If enabled, threads may be created and the active `rayon` thread pool may be used.
-auto-threads = ["std", "dep:rayon"]
+# If enabled, threads may be created and the global `rayon` thread pool may be used.
+auto-threads = [
+    "std",
+    "dep:rayon",
+    "bevy_ecs/multi_threaded",
+    "bevy_ecs/std", # shouldn't be necessary
+    "bevy_ecs/async_executor", # shouldn't be necessary
+]
 
 [dependencies]
 all-is-cubes-base = { workspace = true }
@@ -95,6 +101,7 @@ arbitrary = { workspace = true, optional = true }
 arcstr = { version = "1.2.0", default-features = false, features = ["serde", "substr"] }
 arrayvec = { workspace = true }
 base64 = { workspace = true, optional = true, features = ["std"] } # used in serialization
+bevy_ecs = { workspace = true }
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }

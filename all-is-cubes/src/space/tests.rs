@@ -506,6 +506,7 @@ fn listens_to_block_changes() {
 }
 
 #[test]
+#[ignore = "TODO(ecs): this test can't provoke an error how it used to, due to new feedback-loop behavior instead of error; add notification upon handles becoming Gone and test using that"]
 fn indirect_becomes_evaluation_error() {
     let block_name = Name::from("block");
 
