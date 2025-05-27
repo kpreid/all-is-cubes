@@ -53,9 +53,10 @@ pub async fn export_to_path(
 }
 
 /// Selection of the data to be exported.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ExportSet {
     pub(crate) contents: HandleSet,
+    multiple: bool,
 }
 
 impl ExportSet {
@@ -64,29 +65,30 @@ impl ExportSet {
         Self::default()
     }
 
+    fn new(handle_set: HandleSet) -> Self {
+        Self {
+            multiple: handle_set.len() > 1,
+            contents: handle_set,
+        }
+    }
+
     /// Construct an [`ExportSet`] specifying exporting all members of the universe
     /// (insofar as that is possible).
     ///
     /// Any members added between the call to this function and the export operation will
     /// not be included; removals may cause errors.
     pub fn all_of_universe(universe: &Universe) -> Self {
-        Self {
-            contents: HandleSet::all_of(universe),
-        }
+        Self::new(HandleSet::all_of(universe))
     }
 
     /// Construct an [`ExportSet`] specifying exporting only the given [`BlockDef`]s.
     pub fn from_block_defs(block_defs: Vec<Handle<BlockDef>>) -> Self {
-        Self {
-            contents: HandleSet::from_set(block_defs),
-        }
+        Self::new(block_defs.into_iter().collect())
     }
 
     /// Construct an [`ExportSet`] specifying exporting only the given [`Space`]s.
     pub fn from_spaces(spaces: Vec<Handle<Space>>) -> Self {
-        Self {
-            contents: HandleSet::from_set(spaces),
-        }
+        Self::new(spaces.into_iter().collect())
     }
 
     /// Calculate the file path to use supposing that we want to export one member to one file
@@ -95,6 +97,10 @@ impl ExportSet {
     /// This has a suffix added for uniqueness (after the name but preserving the existing
     /// extension), based on the item's [`Handle::name()`], if the [`ExportSet`] contains more
     /// than one item. If it contains only one item, then `base_path` is returned unchanged.
+    ///
+    /// TODO: This is incompatible with the "extract" approach to handling what to export.
+    /// Fix that by separately tracking whether the set *started* with multiple items
+    /// that need suffixing.
     #[cfg(feature = "stl")] // stl is the only exporter that does multi-file
     pub(crate) fn member_export_path(
         &self,
@@ -102,12 +108,12 @@ impl ExportSet {
         member: &dyn universe::ErasedHandle,
     ) -> PathBuf {
         let mut path: PathBuf = base_path.to_owned();
-        if self.contents.count() > 1 {
+        if self.multiple {
             let mut new_file_name: std::ffi::OsString =
                 base_path.file_stem().expect("file name missing").to_owned();
             new_file_name.push("-");
             match member.name() {
-                // TODO: validate member name as filename fragment
+                // TODO: sanitize member name as a probably-legal filename fragment
                 universe::Name::Specific(s) => new_file_name.push(&*s),
                 universe::Name::Anonym(n) => new_file_name.push(n.to_string()),
                 universe::Name::Pending => todo!(),
@@ -119,25 +125,29 @@ impl ExportSet {
         }
         path
     }
+
+    /// Helper for exporters to reject [`ExportSet`] members they don’t support at all.
+    /// Returns an error if this export set is not now empty.
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "convenient given how it is used"
+    )]
+    pub(crate) fn reject_unsupported(&self, format: Format) -> Result<(), ExportError> {
+        if let Some(handle) = self.contents.iter().next() {
+            Err(ExportError::MemberTypeNotRepresentable {
+                format,
+                name: handle.name(),
+                member_type_name: handle.member_type_name(),
+            })
+        } else {
+            Ok(())
+        }
+    }
 }
 
-/// Helper for exporters to reject [`ExportSet`] members they don’t support at all.
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "convenient given how it is used"
-)]
-pub(crate) fn reject_unsupported_members<T: 'static>(
-    format: Format,
-    handles: Vec<Handle<T>>,
-) -> Result<(), ExportError> {
-    if let Some(handle) = handles.first() {
-        Err(ExportError::MemberTypeNotRepresentable {
-            format,
-            name: handle.name(),
-            member_type_name: core::any::type_name::<T>(),
-        })
-    } else {
-        Ok(())
+impl Default for ExportSet {
+    fn default() -> Self {
+        Self::new(HandleSet::default())
     }
 }
 

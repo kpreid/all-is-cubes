@@ -7,7 +7,6 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::ToString;
-use alloc::vec::Vec;
 use core::any::Any;
 use core::fmt;
 
@@ -18,8 +17,7 @@ use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
-    ErasedHandle, Handle, HandleSet, InsertError, Name, RootHandle, Universe, UniverseIter,
-    universe_txn as ut,
+    ErasedHandle, Handle, InsertError, Name, RootHandle, Universe, UniverseIter, universe_txn as ut,
 };
 use crate::util::Refmt as _;
 
@@ -74,22 +72,6 @@ where
     fn iter_by_type(&self) -> UniverseIter<'_, T>;
 }
 
-/// Trait implemented by [`HandleSet`] once for each type of object that can be
-/// stored in a [`Universe`], that permits lookups of that type.
-///
-/// This trait must be public(-in-private) so it can be a bound on public methods.
-/// It could be just public, but it's cleaner to not require importing it everywhere.
-#[doc(hidden)]
-#[expect(unnameable_types)]
-pub trait HandleSetOps<T>
-where
-    T: UniverseMember,
-{
-    fn from_set(members: impl IntoIterator<Item = Handle<T>>) -> Self
-    where
-        Self: Sized;
-}
-
 // Helper functions to implement `UniverseOps` without putting everything
 // in the macro body.
 pub(super) fn ops_get<T>(this: &Universe, name: &Name) -> Option<Handle<T>>
@@ -121,32 +103,12 @@ macro_rules! impl_universe_for_member {
             }
         }
 
-        impl UniverseTable<$member_type> for HandleSet {
-            type Table = Vec<Handle<$member_type>>;
-
-            fn table(&self) -> &Self::Table {
-                &self.$table
-            }
-            fn table_mut(&mut self) -> &mut Self::Table {
-                &mut self.$table
-            }
-        }
-
         impl UniverseOps<$member_type> for Universe {
             fn get(&self, name: &Name) -> Option<Handle<$member_type>> {
                 ops_get(self, name)
             }
             fn iter_by_type(&self) -> UniverseIter<'_, $member_type> {
                 UniverseIter(UniverseTable::<$member_type>::table(self).iter())
-            }
-        }
-
-        impl HandleSetOps<$member_type> for HandleSet {
-            fn from_set(members: impl IntoIterator<Item = Handle<$member_type>>) -> Self {
-                // TODO: enforce exactly one universe id
-                let mut new_self = Self::default();
-                UniverseTable::<$member_type>::table_mut(&mut new_self).extend(members);
-                new_self
             }
         }
 
@@ -191,6 +153,19 @@ macro_rules! member_enums_and_impls {
             }
         }
 
+        impl Universe {
+            /// Iterate over all members of this universe.
+            ///
+            /// The iteration order is currently not guaranteed.
+            pub fn iter(&self) -> impl Iterator<Item = AnyHandle> {
+                core::iter::empty()
+                $(
+                    .chain(self.iter_by_type::<$member_type>()
+                        .map(|(_name, handle)| AnyHandle::$member_type(handle)))
+                )*
+            }
+        }
+
         /// Holds any one of the concrete [`Handle<T>`](Handle) types that can be in a [`Universe`].
         ///
         /// See also [`ErasedHandle`], which is implemented by `Handle`s rather than owning one.
@@ -225,6 +200,15 @@ macro_rules! member_enums_and_impls {
                 match self {
                     $( AnyHandle::$member_type(pending_handle) => {
                         ut::any_handle_insert_and_upgrade_pending(universe, pending_handle)
+                    } )*
+                }
+            }
+
+            #[doc(hidden)] // TODO: not great API, but used by all-is-cubes-port
+            pub fn member_type_name(&self) -> &'static str {
+                 match self {
+                    $( AnyHandle::$member_type(_) => {
+                        core::any::type_name::<$member_type>()
                     } )*
                 }
             }

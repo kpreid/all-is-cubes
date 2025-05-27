@@ -108,23 +108,10 @@ async fn dot_vox_data_to_universe(
 async fn export_to_dot_vox_data(
     p: YieldProgress,
     read_ticket: ReadTicket<'_>,
-    source: ExportSet,
+    mut source: ExportSet,
 ) -> Result<dot_vox::DotVoxData, ExportError> {
-    let ExportSet {
-        contents:
-            universe::HandleSet {
-                blocks: block_defs,
-                sounds,
-                spaces: to_export,
-                characters: _,
-                tags,
-            },
-    } = source;
-
-    // TODO: I forget; is there a reason we just ignore instead of erroring on characters?
-    crate::reject_unsupported_members(Format::DotVox, block_defs)?;
-    crate::reject_unsupported_members(Format::DotVox, sounds)?;
-    crate::reject_unsupported_members(Format::DotVox, tags)?;
+    let to_export = source.contents.extract_type::<Space>();
+    source.reject_unsupported(Format::DotVox)?;
 
     let mut palette: Vec<dot_vox::Color> = Vec::new();
     let mut models: Vec<dot_vox::Model> = Vec::with_capacity(to_export.len());

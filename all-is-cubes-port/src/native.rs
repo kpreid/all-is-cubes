@@ -42,12 +42,11 @@ pub(crate) async fn export_native_json(
 ) -> Result<(), ExportError> {
     // TODO: Spin off a blocking thread to perform this export
 
-    let ExportSet { contents } = source;
     serde_json::to_writer(
         destination,
         &universe::PartialUniverse {
             read_ticket,
-            handles: contents,
+            handles: source.contents,
         },
     )
     .map_err(|error| {

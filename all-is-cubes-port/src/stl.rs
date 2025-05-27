@@ -20,24 +20,16 @@ use all_is_cubes_render::camera::GraphicsOptions;
 pub(crate) async fn export_stl(
     progress: YieldProgress,
     read_ticket: universe::ReadTicket<'_>,
-    source: crate::ExportSet,
+    mut source: crate::ExportSet,
     destination: std::path::PathBuf,
 ) -> Result<(), crate::ExportError> {
-    // TODO: this should be doing reject_unsupported_members but that is incompatible with member_export_path() -- fix somehow
-    let crate::ExportSet {
-        contents:
-            universe::HandleSet {
-                blocks: ref block_defs,
-                sounds: _,
-                ref spaces,
-                characters: _,
-                tags: _,
-            },
-    } = source;
+    let spaces = source.contents.extract_type::<Space>();
+    let block_defs = source.contents.extract_type::<block::BlockDef>();
+    source.reject_unsupported(crate::Format::Stl)?;
 
     for space in spaces {
         stl_io::write_stl(
-            &mut fs::File::create(source.member_export_path(&destination, space))?,
+            &mut fs::File::create(source.member_export_path(&destination, &space))?,
             space_to_stl_triangles(&*space.read(read_ticket)?).into_iter(),
         )?;
     }
@@ -51,7 +43,7 @@ pub(crate) async fn export_stl(
                 error,
             })?;
         stl_io::write_stl(
-            &mut fs::File::create(source.member_export_path(&destination, block_def))?,
+            &mut fs::File::create(source.member_export_path(&destination, &block_def))?,
             block_to_stl_triangles(&ev).into_iter(),
         )?;
     }

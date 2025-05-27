@@ -17,7 +17,7 @@ pub use gltf_json as json;
 use gltf_json::Index;
 use gltf_json::validation::Checked::Valid;
 
-use all_is_cubes::universe::{HandleSet, ReadTicket};
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{BlockMesh, MeshOptions, MeshTypes, SpaceMesh, block_meshes_for_space};
 use all_is_cubes_render::Flaws;
@@ -358,23 +358,14 @@ impl GltfWriter {
 pub(crate) async fn export_gltf(
     progress: YieldProgress,
     read_ticket: ReadTicket<'_>,
-    source: ExportSet,
+    mut source: ExportSet,
     destination: PathBuf,
 ) -> Result<(), ExportError> {
-    let ExportSet {
-        contents:
-            HandleSet {
-                blocks: block_defs,
-                sounds,
-                spaces,
-                characters,
-                tags,
-            },
-    } = source;
-
-    crate::reject_unsupported_members(Format::Gltf, characters)?;
-    crate::reject_unsupported_members(Format::Gltf, sounds)?;
-    crate::reject_unsupported_members(Format::Gltf, tags)?;
+    let block_defs = source
+        .contents
+        .extract_type::<all_is_cubes::block::BlockDef>();
+    let spaces = source.contents.extract_type::<all_is_cubes::space::Space>();
+    source.reject_unsupported(Format::Gltf)?;
 
     let [block_def_progress, space_progress] = progress.split(0.5); // TODO: ratio
 
