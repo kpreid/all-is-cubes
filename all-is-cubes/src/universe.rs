@@ -1,17 +1,4 @@
 //! [`Universe`], the top-level game-world container.
-//!
-//! ## Thread-safety
-//!
-//! [`Universe`], [`Handle`], and their contents implement [`Send`] and [`Sync`],
-//! such that it is possible to access a universe from multiple threads.
-//! However, they do not (currently) provide any ability to wait to obtain a lock,
-//! because there is not yet a policy about how one would avoid the possibility of
-//! deadlock. Instead, you may only _attempt_ to acquire a lock, receiving an error if it
-//! is already held. (TODO: Improve this.)
-//!
-//! For the time being, if you wish to use a [`Universe`] from multiple threads, you must
-//! bring your own synchronization mechanisms to ensure that readers and writers do not
-//! run at the same time.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -64,8 +51,6 @@ mod tests;
 /// A collection of named objects which can refer to each other via [`Handle`],
 /// and which are simulated at the same time steps.
 ///
-/// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
-///
 /// A `Universe` consists of:
 ///
 /// * _members_ of various types, which may be identified using [`Name`]s or [`Handle`]s.
@@ -78,8 +63,6 @@ mod tests;
 /// especially when being passed through `async` blocks.
 ///
 #[doc = include_str!("save/serde-warning.md")]
-///
-/// [avoiding deadlock]: crate::universe#thread-safety
 pub struct Universe {
     /// Storage of the actual members.
     tables: UniverseTables,

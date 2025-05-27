@@ -25,21 +25,20 @@ use crate::block::Block;
 /// parameterized with this somewhat less hairy.
 type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
 
-/// A pointer to a member of a [`Universe`] of type `T`.
+/// Identifies a member of a [`Universe`] of type `T`.
+///
+/// Handles can also be in a ªpending” state in which they directly own the value
+/// until they are inserted into the universe.
 ///
 /// Most handles should be owned by other members of the same universe.
-/// A handle from outside the universe is not guaranteed to remain valid
-/// (in which case trying to use the `Handle` to read or write the object will return an error)
-/// except as long as the member is still referenced from within the universe.
+/// A handle kept outside the universe is not guaranteed to remain valid
+/// except as long as the member is still referenced from within the universe;
+/// use [`StrongHandle`] when necessary.
 ///
 /// See also [`ErasedHandle`] and [`AnyHandle`] when it is necessary to be generic over member
 /// types.
 ///
-/// **Thread-safety caveat:** See the documentation on [avoiding deadlock].
-///
 #[doc = include_str!("../save/serde-warning.md")]
-///
-/// [avoiding deadlock]: crate::universe#thread-safety
 pub struct Handle<T> {
     /// Reference to the object. Weak because we don't want to create reference cycles;
     /// the assumption is that the overall game system will keep the [`Universe`] alive
@@ -626,6 +625,10 @@ pub enum HandleError {
     Gone(Name),
 
     /// Referent is currently incompatibly borrowed (read/write or write/write conflict).
+    ///
+    /// This can only happen inside of transactions or when working with a handle which is not
+    /// yet inserted into a universe. Outside of those cases, borrow checking of the universe
+    /// as a whole prevents it.
     #[displaydoc("object is currently in use: {0}")]
     InUse(Name),
 
