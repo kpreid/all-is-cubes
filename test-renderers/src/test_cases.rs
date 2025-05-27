@@ -1020,7 +1020,7 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
             .unwrap();
     }
 
-    *context.universe_mut() = universe;
+    *context.universe_mut() = *universe;
 
     // TODO: add more features (fog, lighting) as long as all renderers support them
     let options = GraphicsOptions::UNALTERED_COLORS;

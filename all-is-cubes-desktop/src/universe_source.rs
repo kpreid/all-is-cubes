@@ -36,7 +36,7 @@ impl UniverseSource {
         precompute_light: bool,
         notif_rx: oneshot::Receiver<Notification>,
         replace_universe_callback: Arc<dyn Fn(&UniverseTemplate) + Send + Sync>,
-    ) -> Result<Universe, anyhow::Error> {
+    ) -> Result<Box<Universe>, anyhow::Error> {
         let start_time = Instant::now();
 
         // TODO: figure out a cleaner way to wrangle this rx hookup
@@ -71,7 +71,7 @@ impl UniverseSource {
         let mut universe = match self.clone() {
             // TODO: awkward kludge for hooking up the menu's universe-selection buttons. Instead, `TemplateParameters` should have an extension mechanism by which we can pass the hook function.
             UniverseSource::Template(UniverseTemplate::Menu, _parameters) => {
-                let mut universe = Universe::new();
+                let mut universe = Box::new(Universe::new());
                 // let mut txn = UniverseTransaction::default();
 
                 let space = all_is_cubes_content::template_menu_space(

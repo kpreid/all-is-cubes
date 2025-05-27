@@ -152,7 +152,7 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
 
                 match loader_task.await.unwrap() {
                     Ok(universe) => {
-                        ctx.set_universe(universe);
+                        ctx.set_universe(*universe);
                     }
                     Err(e) => {
                         ctx.show_modal_message(arcstr::format!(

@@ -17,7 +17,7 @@ pub(crate) fn import_native_json(
     progress: YieldProgress,
     bytes: &[u8],
     file: &dyn Fileish,
-) -> Result<Universe, ImportError> {
+) -> Result<Box<Universe>, ImportError> {
     let reader = ReadProgressAdapter::new(progress, bytes);
     serde_json::from_reader(reader).map_err(|error| ImportError {
         source_path: file.display_full_path(),

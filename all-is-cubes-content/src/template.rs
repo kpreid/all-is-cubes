@@ -144,8 +144,8 @@ impl UniverseTemplate {
         self,
         p: YieldProgress,
         params: TemplateParameters,
-    ) -> Result<Universe, GenError> {
-        let mut universe = Universe::new();
+    ) -> Result<Box<Universe>, GenError> {
+        let mut universe = Box::new(Universe::new());
 
         // TODO: Later we want a "module loading" system that can lazily bring in content.
         // For now, unconditionally add all these blocks.
@@ -294,7 +294,7 @@ impl WhenceUniverse for TemplateAndParameters {
     fn load(
         &self,
         progress: YieldProgress,
-    ) -> futures_core::future::BoxFuture<'static, Result<Universe, Box<dyn Error + Send + Sync>>>
+    ) -> futures_core::future::BoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>>
     {
         let ingredients = self.clone();
         Box::pin(async move {

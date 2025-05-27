@@ -15,14 +15,14 @@ use crate::file;
 pub async fn load_universe_from_file(
     progress: YieldProgress,
     file: Arc<dyn file::Fileish>,
-) -> Result<Universe, ImportError> {
+) -> Result<Box<Universe>, ImportError> {
     // TODO: use extension, if any, for format detection
     let bytes = file.read().map_err(|error| ImportError {
         source_path: file.display_full_path(),
         detail: ImportErrorKind::Read { path: None, error },
     })?;
 
-    let (mut universe, format): (Universe, Format) = if bytes.starts_with(b"{") {
+    let (mut universe, format): (Box<Universe>, Format) = if bytes.starts_with(b"{") {
         // Assume it's JSON. Furthermore, assume it's ours.
         // TODO: better handling of foreign JSON?
         cfg_if::cfg_if! {
@@ -97,7 +97,7 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
     fn load(
         &self,
         progress: YieldProgress,
-    ) -> BoxFuture<'static, Result<Universe, Box<dyn std::error::Error + Send + Sync>>> {
+    ) -> BoxFuture<'static, Result<Box<Universe>, Box<dyn std::error::Error + Send + Sync>>> {
         let file = self.file.clone();
         Box::pin(async move { Ok(load_universe_from_file(progress, file).await?) })
     }

@@ -74,6 +74,9 @@ mod tests;
 /// * A [`WhenceUniverse`] defining where its data is persisted, if anywhere.
 /// * A [`UniverseId`] unique within this process.
 ///
+/// `Universe` is a quite large data structure, so it may be desirable to keep it in a [`Box`],
+/// especially when being passed through `async` blocks.
+///
 #[doc = include_str!("save/serde-warning.md")]
 ///
 /// [avoiding deadlock]: crate::universe#thread-safety

@@ -320,7 +320,7 @@ impl WebSession {
                                 )
                                 .await
                                 .unwrap();
-                                this.set_universe(universe);
+                                this.set_universe(*universe);
                             }
                             Err(e) => {
                                 // TODO: present error to UI

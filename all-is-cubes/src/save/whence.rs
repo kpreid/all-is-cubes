@@ -44,7 +44,7 @@ pub trait WhenceUniverse: fmt::Debug + Send + Sync + Any + 'static {
     fn load(
         &self,
         progress: YieldProgress,
-    ) -> MaybeLocalBoxFuture<'static, Result<Universe, Box<dyn Error + Send + Sync>>>;
+    ) -> MaybeLocalBoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>>;
 
     /// Write the current state of the given universe into the storage denoted by `self`.
     ///
@@ -83,7 +83,7 @@ impl WhenceUniverse for () {
     fn load(
         &self,
         _: YieldProgress,
-    ) -> MaybeLocalBoxFuture<'static, Result<Universe, Box<dyn Error + Send + Sync>>> {
+    ) -> MaybeLocalBoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>> {
         Box::pin(core::future::ready(Err(
             "this universe cannot be reloaded because it has no source".into(),
         )))

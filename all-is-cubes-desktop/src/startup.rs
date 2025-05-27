@@ -89,7 +89,8 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
     }
 
     dsession.session.set_main_task(async move |mut ctx| {
-        let universe_result: Result<Universe, anyhow::Error> = match universe_task_future.await {
+        let universe_result: Result<Box<Universe>, anyhow::Error> = match universe_task_future.await
+        {
             // nested Results because one is template failure and the other is tokio JoinHandle failure
             Ok(Ok(u)) => Ok(u),
             Ok(Err(e)) => {
@@ -104,7 +105,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         logging
             .finish(&mut startup_universe)
             .unwrap_or_else(|e| report_error_and_exit(&ctx, e));
-        ctx.set_universe(startup_universe);
+        ctx.set_universe(*startup_universe);
         _ = universe_ready_signal.send(Ok(()));
 
         #[cfg(feature = "record")]
@@ -161,7 +162,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             );
             // TODO: should attach_to_session() for progress reporting but we can't have the `&mut Session` for it; it should be generalized better
             // TODO: error reporting
-            ctx.set_universe(task.future.await.unwrap().unwrap());
+            ctx.set_universe(*task.future.await.unwrap().unwrap());
             log::trace!("Startup task completed new universe");
         }
 
@@ -243,7 +244,7 @@ pub struct InnerMainParams {
 /// delivered via [`InnerMainParams`].
 #[derive(Debug)]
 pub struct UniverseTask {
-    future: tokio::task::JoinHandle<Result<Universe, anyhow::Error>>,
+    future: tokio::task::JoinHandle<Result<Box<Universe>, anyhow::Error>>,
     progress_notification_handoff_tx:
         Option<tokio::sync::oneshot::Sender<notification::Notification>>,
     replace_universe_command_rx:

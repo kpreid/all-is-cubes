@@ -171,7 +171,7 @@ async fn start_game_with_dom(
         )
         .await
         .expect("universe template error");
-    root.set_universe(universe);
+    root.set_universe(*universe);
 
     // Explicitly keep the game loop alive.
     Box::leak(Box::new(root));

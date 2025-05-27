@@ -24,7 +24,7 @@ use crate::{ExportError, ExportSet, Format};
 pub(crate) async fn load_dot_vox(
     p: YieldProgress,
     bytes: &[u8],
-) -> Result<Universe, DotVoxConversionError> {
+) -> Result<Box<Universe>, DotVoxConversionError> {
     dot_vox_data_to_universe(
         p,
         &dot_vox::load_bytes(bytes).map_err(DotVoxConversionError::Parse)?,
@@ -48,7 +48,7 @@ pub(crate) async fn export_dot_vox(
 async fn dot_vox_data_to_universe(
     p: YieldProgress,
     data: &dot_vox::DotVoxData,
-) -> Result<Universe, DotVoxConversionError> {
+) -> Result<Box<Universe>, DotVoxConversionError> {
     let dot_vox::DotVoxData {
         version,
         models,
@@ -71,7 +71,7 @@ async fn dot_vox_data_to_universe(
     let palette = dot_vox_palette_to_blocks(palette);
     let p = p.finish_and_cut(0.3).await;
 
-    let mut universe = Universe::new();
+    let mut universe = Box::new(Universe::new());
 
     let models_progress = p.split_evenly(models.len());
     for ((i, model), model_progress) in models.iter().enumerate().zip(models_progress) {
@@ -389,7 +389,7 @@ mod tests {
     #[cfg(all(feature = "export", feature = "import"))]
     async fn roundtrip(
         export_universe: &Universe,
-    ) -> Result<Universe, Either<ExportError, DotVoxConversionError>> {
+    ) -> Result<Box<Universe>, Either<ExportError, DotVoxConversionError>> {
         // TODO: also roundtrip through bytes, for maximum rigor
         let data = export_to_dot_vox_data(
             yield_progress_for_testing(),
