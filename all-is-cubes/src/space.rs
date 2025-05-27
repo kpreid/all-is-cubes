@@ -56,6 +56,8 @@ pub use physics::*;
 mod sky;
 pub use sky::*;
 
+pub(crate) mod step;
+
 mod space_txn;
 pub use space_txn::*;
 
@@ -68,6 +70,8 @@ mod tests;
 /// data structure.
 ///
 #[doc = include_str!("save/serde-warning.md")]
+#[derive(bevy_ecs::component::Component)]
+#[require(step::SpacePaletteNextValue)]
 pub struct Space {
     palette: Palette,
 
@@ -480,6 +484,8 @@ impl Space {
     ///
     /// * `tick` is how much time is to pass in the simulation.
     /// * `deadline` is when to stop computing flexible things such as light transport.
+    ///
+    /// TODO(ecs): Replace this with systems. It is partially replaced already
     pub(crate) fn step<I: time::Instant>(
         &mut self,
         read_ticket: ReadTicket<'_>,
@@ -487,11 +493,6 @@ impl Space {
         tick: time::Tick,
         deadline: time::Deadline<I>,
     ) -> (SpaceStepInfo, UniverseTransaction) {
-        // Process changed block definitions.
-        let evaluations = self
-            .palette
-            .step::<I>(read_ticket, &mut self.change_notifier.buffer());
-
         // Process cubes_wanting_ticks.
         let start_cube_ticks = I::now();
         let cube_ticks = if !tick.paused() {
@@ -529,7 +530,7 @@ impl Space {
         (
             SpaceStepInfo {
                 spaces: 1,
-                evaluations,
+                evaluations: TimeStats::default(), // TODO(ecs): re-hookup our time stats
                 cube_ticks,
                 cube_time: cube_ticks_to_space_behaviors
                     .saturating_duration_since(start_cube_ticks),

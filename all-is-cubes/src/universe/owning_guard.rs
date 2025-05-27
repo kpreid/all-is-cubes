@@ -1,4 +1,4 @@
-//! `unsafe` code to manage access to universe members.
+//! `unsafe` code to manage access to pending universe members.
 //!
 //! This is a narrowly restricted “self-referential struct” implementation; specifically, it is
 //! an “owner and borrower” pair of the sort which `yoke` and `self_cell` support.
@@ -20,45 +20,33 @@
 //!
 //! Further discussion of this code:
 //! <https://users.rust-lang.org/t/unsafe-code-review-semi-owning-weak-rwlock-t-guard/95706>
+//!
+//! TODO(ecs): Revisit whether we really need this, after the ECS migration.
 
 use alloc::sync::Arc;
 
-use super::handle::UEntry;
-use crate::util::maybe_sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
+use crate::util::maybe_sync::{RwLock, RwLockReadGuard, TryLockError};
 
 #[cfg(doc)]
 use super::Handle;
 
 // -------------------------------------------------------------------------------------------------
 
-type Lock<T> = RwLock<UEntry<T>>;
+type Lock<T> = RwLock<T>;
 type Strong<T> = Arc<Lock<T>>;
 
 // There are two near-identical implementations for read-only and exclusive access.
 // For readability, they are presented in parallel; both structs then both impls, etc.
 //
 // The “impl” in the name refers to that these are not public API; they are solely concerned with
-// maintaining their unsafe self-reference, and they dereference to `UEntry<T>` instead of `T`.
+// maintaining their unsafe self-reference.
 
 /// Owning wrapper around [`RwLockReadGuard`] for [`Handle`].
 pub(super) struct ReadGuardImpl<T: 'static> {
     // SAFETY: `guard` must be dropped before `strong`,
     // which is accomplished by declaring it first.
     /// Lock guard that points into `strong`.
-    guard: MaybeDangling<RwLockReadGuard<'static, UEntry<T>>>,
-
-    /// [`Arc`] that keeps the data pointer alive as long as `guard` is in use.
-    /// This field is never read, only dropped to decrement the reference count appropriately.
-    #[expect(dead_code, reason = "used for drop effect")]
-    strong: Strong<T>,
-}
-
-/// Owning wrapper around [`RwLockWriteGuard`] for [`Handle`].
-pub(super) struct WriteGuardImpl<T: 'static> {
-    // SAFETY: `guard` must be dropped before `strong`,
-    // which is accomplished by declaring it first.
-    /// Lock guard that points into `strong`.
-    guard: MaybeDangling<RwLockWriteGuard<'static, UEntry<T>>>,
+    guard: MaybeDangling<RwLockReadGuard<'static, T>>,
 
     /// [`Arc`] that keeps the data pointer alive as long as `guard` is in use.
     /// This field is never read, only dropped to decrement the reference count appropriately.
@@ -84,41 +72,11 @@ impl<T: 'static> ReadGuardImpl<T> {
     }
 }
 
-impl<T: 'static> WriteGuardImpl<T> {
-    pub(super) fn new(strong: Strong<T>) -> Result<Self, LockError> {
-        let ptr: *const Lock<T> = Arc::as_ptr(&strong);
-
-        // SAFETY:
-        // * `ptr` will remain valid until we drop `strong`
-        // * we will not drop `strong` until after we drop `reference`
-        // * we will not let `reference` escape to be copied and potentially outlive `strong`
-        // * we will store the owner of the `reference` in `MaybeDangling` (see below)
-        //   to avoid asserting its validity too long.
-        let reference: &'static Lock<T> = unsafe { &*ptr };
-
-        let guard = MaybeDangling::new(reference.try_write()?);
-
-        Ok(WriteGuardImpl { guard, strong })
-    }
-}
-
 impl<T: 'static> core::ops::Deref for ReadGuardImpl<T> {
-    type Target = UEntry<T>;
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
         &self.guard
-    }
-}
-impl<T: 'static> core::ops::Deref for WriteGuardImpl<T> {
-    type Target = UEntry<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.guard
-    }
-}
-impl<T: 'static> core::ops::DerefMut for WriteGuardImpl<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.guard
     }
 }
 

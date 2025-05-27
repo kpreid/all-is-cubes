@@ -16,7 +16,7 @@ use crate::universe;
 // -------------------------------------------------------------------------------------------------
 
 /// A sound effect or grain.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, bevy_ecs::component::Component)]
 #[expect(clippy::module_name_repetitions)]
 #[non_exhaustive]
 pub struct SoundDef {

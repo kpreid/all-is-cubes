@@ -54,6 +54,7 @@ const JUMP_SPEED: FreeCoordinate = 8.0;
 ///   (controlling velocity, holding tools).
 ///
 #[doc = include_str!("save/serde-warning.md")]
+#[derive(bevy_ecs::component::Component)]
 pub struct Character {
     /// Position, collision, and look direction.
     pub body: Body,

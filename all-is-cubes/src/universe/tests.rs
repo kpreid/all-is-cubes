@@ -68,8 +68,8 @@ fn universe_debug_elements() {
             behaviors: BehaviorSet({}), \
             session_step_time: 0, \
             spaces_with_work: 0, \
-            [anonymous #0]: all_is_cubes::block::block_def::BlockDef, \
             'foo': all_is_cubes::space::Space, \
+            [anonymous #0]: all_is_cubes::block::block_def::BlockDef, \
             .. \
         }"
     );
@@ -81,8 +81,8 @@ fn universe_debug_elements() {
                 behaviors: BehaviorSet({}),
                 session_step_time: 0,
                 spaces_with_work: 0,
-                [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
                 'foo': all_is_cubes::space::Space,
+                [anonymous #0]: all_is_cubes::block::block_def::BlockDef,
                 ..
             }\
         "}
@@ -258,8 +258,10 @@ fn insert_pending_becomes_anonym_direct() {
     u.insert(Name::Pending, BlockDef::new(u.read_ticket(), AIR))
         .unwrap();
     assert_eq!(
-        u.tables.blocks.keys().collect::<Vec<_>>(),
-        vec![&Name::Anonym(0)]
+        u.iter_by_type::<BlockDef>()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>(),
+        vec![Name::Anonym(0)]
     );
 }
 
@@ -273,8 +275,10 @@ fn insert_pending_becomes_anonym_via_txn() {
     .execute(&mut u, (), &mut drop)
     .unwrap();
     assert_eq!(
-        u.tables.blocks.keys().collect::<Vec<_>>(),
-        vec![&Name::Anonym(0)]
+        u.iter_by_type::<BlockDef>()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>(),
+        vec![Name::Anonym(0)]
     );
 }
 

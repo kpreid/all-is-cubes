@@ -8,10 +8,9 @@ use itertools::Itertools as _;
 use crate::block::{self, AIR, AIR_EVALUATED, Block, BlockChange, EvaluatedBlock};
 use crate::listen::{self, IntoDynListener as _, Listener as _};
 use crate::math::{self, OpacityCategory};
+use crate::space::step::SpacePaletteNextValue;
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
-use crate::time::Instant;
 use crate::universe::ReadTicket;
-use crate::util::TimeStats;
 use crate::util::maybe_sync::Mutex;
 
 #[cfg(doc)]
@@ -252,44 +251,58 @@ impl Palette {
         }
     }
 
-    /// Reevaluate changed blocks.
-    pub(crate) fn step<I: Instant>(
-        &mut self,
+    /// First half of palette updates based on block change notifications.
+    pub(crate) fn prepare_update(
+        &self,
         read_ticket: ReadTicket<'_>,
-        change_buffer: &mut ChangeBuffer<'_>,
-    ) -> TimeStats {
-        let mut last_start_time = I::now();
-        let mut evaluations = TimeStats::default();
+        output: &mut SpacePaletteNextValue,
+    ) {
+        //let mut last_start_time = I::now();
+        //let evaluations = TimeStats::default();
         {
             let mut try_eval_again = hashbrown::HashSet::new();
             let mut todo = self.todo.lock().unwrap();
             for block_index in todo.blocks.drain() {
-                change_buffer.push(SpaceChange::BlockEvaluation(block_index));
-                let data: &mut SpaceBlockData = &mut self.entries[usize::from(block_index)];
+                let data: &SpaceBlockData = &self.entries[usize::from(block_index)];
 
                 // TODO: We may want to have a higher-level error handling by pausing the Space
                 // and giving the user choices like reverting to save, editing to fix, or
                 // continuing with a partly broken world. Right now, we just continue with the
                 // placeholder, which may have cascading effects despite the placeholder's
                 // design to be innocuous.
-                data.evaluated = data.block.evaluate(read_ticket).unwrap_or_else(|e| {
-                    // Trigger retrying evaluation at next step.
-                    try_eval_again.insert(block_index);
+                output.0.insert(
+                    block_index,
+                    data.block.evaluate(read_ticket).unwrap_or_else(|e| {
+                        // Trigger retrying evaluation at next step.
+                        try_eval_again.insert(block_index);
 
-                    e.to_placeholder()
-                });
+                        e.to_placeholder()
+                    }),
+                );
 
                 // TODO: Process side effects on individual cubes such as reevaluating the
                 // lighting influenced by the block.
 
-                evaluations.record_consecutive_interval(&mut last_start_time, I::now());
+                //evaluations.record_consecutive_interval(&mut last_start_time, I::now());
             }
             if !try_eval_again.is_empty() {
                 todo.blocks = try_eval_again;
             }
         }
 
-        evaluations
+        // TODO(ecs): restore these TimeStats and send them somewhere they can be read out and reported
+        //_ = evaluations;
+    }
+    /// Second half of palette updates based on block change notifications.
+    pub(crate) fn apply_update(
+        &mut self,
+        updates: &mut SpacePaletteNextValue,
+        change_buffer: &mut ChangeBuffer<'_>,
+    ) {
+        for (block_index, evaluation) in updates.0.drain() {
+            self.entries[usize::from(block_index)].evaluated = evaluation;
+            change_buffer.push(SpaceChange::BlockEvaluation(block_index));
+        }
     }
 
     /// Check that this palette is self-consistent and has `count`s that accurately count the

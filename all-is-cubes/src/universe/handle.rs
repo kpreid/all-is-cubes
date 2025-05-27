@@ -1,18 +1,22 @@
 #![expect(clippy::elidable_lifetime_names, reason = "names for clarity")]
 
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
+use core::any::Any;
+use core::any::type_name;
 use core::fmt;
 use core::hash;
-use core::marker::PhantomData;
 use core::mem;
-use core::ops::{Deref, DerefMut};
+use core::ops::Deref;
 use core::panic::Location;
 use core::sync::atomic;
 
+use bevy_ecs::prelude as ecs;
+use bevy_ecs::world::unsafe_world_cell::UnsafeWorldCell;
+
 use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::universe::{
-    AnyHandle, InsertError, InsertErrorKind, Name, Universe, UniverseId, UniverseMember,
-    VisitHandles, owning_guard,
+    AnyHandle, InsertError, InsertErrorKind, Membership, Name, Universe, UniverseId,
+    UniverseMember, VisitHandles, id::OnceUniverseId, name::OnceName, owning_guard,
 };
 use crate::util::maybe_sync::{Mutex, MutexGuard, RwLock};
 
@@ -20,10 +24,6 @@ use crate::util::maybe_sync::{Mutex, MutexGuard, RwLock};
 use crate::block::Block;
 
 // -------------------------------------------------------------------------------------------------
-
-/// Type of a strong reference to an entry in a [`Universe`]. Defined to make types
-/// parameterized with this somewhat less hairy.
-type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
 
 /// Identifies a member of a [`Universe`] of type `T`.
 ///
@@ -37,24 +37,14 @@ type StrongEntryRef<T> = Arc<RwLock<UEntry<T>>>;
 ///
 /// See also [`ErasedHandle`] and [`AnyHandle`] when it is necessary to be generic over member
 /// types.
-///
 #[doc = include_str!("../save/serde-warning.md")]
 pub struct Handle<T> {
-    /// Reference to the object. Weak because we don't want to create reference cycles;
-    /// the assumption is that the overall game system will keep the [`Universe`] alive
-    /// and that [`Universe`] will ensure no entry goes away while referenced.
-    ///
-    /// This cannot be stored in `inner` because the number of [`Weak`]s is used
-    /// to determine the number of [`Handle`]s, and `inner` is shared with [`RootHandle`].
-    /// It is also the most frequently accessed part of the handle, so avoiding an extra
-    /// indirection may be helpful.
-    weak_ref: Weak<RwLock<UEntry<T>>>,
-
-    /// The shared state of all clones of this handle and its corresponding [`RootHandle`].
+    /// The shared state of all clones of this handle.
+    /// These have a 1:1 relationship with `Entity`s except that a pending handle has no
+    /// `Entity` yet.
     inner: Arc<Inner<T>>,
 }
 
-#[derive(Debug)]
 struct Inner<T> {
     /// Shared mutable state defining the current relationship of the handle to a universe.
     state: Mutex<State<T>>,
@@ -77,9 +67,6 @@ struct Inner<T> {
     permanent_name: OnceName,
 
     /// Number of [`StrongHandle`]s that exist.
-    ///
-    /// TODO: This is not actually used for anything yet.
-    /// Eventuallly it will assist the garbage collector, when there is one.
     strong_handle_count: atomic::AtomicUsize,
 }
 
@@ -89,34 +76,41 @@ struct Inner<T> {
 enum State<T> {
     /// Not yet (or never will be) inserted into a [`Universe`].
     ///
+    /// This state owns the `T` value.
+    ///
     /// May transition to [`State::Member`].
     ///
     /// This state should always be accompanied by `Inner::universe_id` having no value.
     /// `Inner::name` may or may not have a value yet; if it does not, that corresponds to
     /// a not-yet-assigned [`Name::Anonym`].
     Pending {
-        /// Contains a strong reference to the same target as [`Handle::weak_ref`].
+        /// Owns the value.
+        ///
         /// This is used to allow constructing `Handle`s with targets *before* they are
         /// inserted into a [`Universe`], and thus inserting entire trees into the
         /// Universe. Upon that insertion, these strong references are dropped by
         /// changing the state.
-        strong: StrongEntryRef<T>,
+        ///
+        /// We use a `RwLock` here because we need to support `read()` and `try_modify()`
+        /// operations even before the handle is inserted.
+        /// TODO(ecs): See if this can be changed once the ECS migration is complete.
+        value_arc: Arc<RwLock<T>>,
     },
 
-    /// Halfway inserted into a [`Universe`], and may not yet have a value, because it
+    /// Halfway inserted into a [`Universe`], and has no value yet, because it
     /// is a handle that is being deserialized.
     ///
     /// May transition to [`State::Member`] when the [`Universe`] is fully deserialized.
     ///
     /// This state should always be accompanied by `Inner::universe_id` having a value.
     #[cfg(feature = "save")]
-    Deserializing {},
+    Deserializing { entity: ecs::Entity },
 
     /// In a [`Universe`] (or has been deleted from one).
     ///
     /// This state should always be accompanied by `Inner::universe_id` and `Inner::name`
     /// having values set.
-    Member {},
+    Member { entity: ecs::Entity },
 
     /// State of [`Handle::new_gone()`].
     ///
@@ -127,14 +121,13 @@ enum State<T> {
 impl<T: 'static> Handle<T> {
     /// Private helper constructor for the common part.
     #[track_caller]
-    fn new_from_state(weak_ref: Weak<RwLock<UEntry<T>>>, name: Name, state: State<T>) -> Self {
+    fn new_from_state(name: Name, state: State<T>) -> Self {
         let permanent_name = match name {
             Name::Pending => None,
             name => Some(name),
         };
 
         Handle {
-            weak_ref,
             inner: Arc::new(Inner {
                 universe_id: OnceUniverseId::new(),
                 permanent_name: OnceName::from_optional_value(permanent_name),
@@ -153,14 +146,13 @@ impl<T: 'static> Handle<T> {
     ///
     /// Note that specifying a [`Name::Anonym`] will create a `Handle` which cannot actually
     /// be inserted into another [`Universe`], even if the specified number is free.
+    /// This is permitted but not recommended.
     pub fn new_pending(name: Name, initial_value: T) -> Self {
-        let strong_ref = Arc::new(RwLock::new(UEntry {
-            data: Some(initial_value),
-        }));
         Self::new_from_state(
-            Arc::downgrade(&strong_ref),
             name,
-            State::Pending { strong: strong_ref },
+            State::Pending {
+                value_arc: Arc::new(RwLock::new(initial_value)),
+            },
         )
     }
 
@@ -173,7 +165,62 @@ impl<T: 'static> Handle<T> {
     /// This may be used in tests to exercise error handling.
     #[doc(hidden)] // TODO: decide if this is good API
     pub fn new_gone(name: Name) -> Handle<T> {
-        Self::new_from_state(Weak::new(), name, State::Gone {})
+        Self::new_from_state(name, State::Gone {})
+    }
+
+    /// Constructs a [`Handle`] that has an associated entity but not yet a value.
+    ///
+    /// The caller is responsible for validating the [`Name`] is not duplicate or invalid.
+    #[cfg(feature = "save")]
+    pub(in crate::universe) fn new_deserializing(name: Name, universe: &mut Universe) -> Handle<T>
+    where
+        T: UniverseMember,
+    {
+        let universe_id = universe.universe_id();
+
+        // Create entity so we have an entity ID.
+        let mut entity_mut = universe.world.spawn(());
+        // Create handle for it.
+        let handle = Self::new_from_state(
+            name.clone(),
+            State::Deserializing {
+                entity: entity_mut.id(),
+            },
+        );
+        handle.inner.universe_id.set(universe_id).unwrap();
+        // Point back to the handle.
+        entity_mut.insert(Membership {
+            name,
+            handle: T::into_any_handle(handle.clone()),
+        });
+        // We may have created a new archetype.
+        universe.update_archetypes();
+
+        handle
+    }
+
+    /// Add the missing value of a member being deserialized.
+    #[cfg(feature = "save")]
+    pub(crate) fn insert_deserialized_value(&self, universe: &mut Universe, value: T)
+    where
+        T: UniverseMember,
+    {
+        let mut state_guard: MutexGuard<'_, State<T>> =
+            self.inner.state.lock().expect("Handle::state lock error");
+
+        let State::Deserializing { entity } = *state_guard else {
+            panic!("incorrect state {:?}", *state_guard);
+        };
+
+        universe
+            .world
+            .get_entity_mut(entity)
+            .expect("handle's entity missing")
+            .insert(value);
+        // We may have created a new archetype.
+        universe.update_archetypes();
+
+        *state_guard = State::Member { entity };
     }
 
     /// Name by which the [`Universe`] knows this handle.
@@ -189,6 +236,14 @@ impl<T: 'static> Handle<T> {
             .clone()
     }
 
+    #[doc(hidden)] // hidden because we have not yet decided to make our use of ECS, let alone bevy_ecs, public
+    pub fn as_entity(&self) -> Option<ecs::Entity> {
+        match *self.inner.state.lock().expect("Handle::state lock error") {
+            State::Member { entity, .. } => Some(entity),
+            _ => None,
+        }
+    }
+
     /// Returns the unique ID of the universe this handle belongs to.
     ///
     /// Returns [`None`] if this [`Handle`] is not yet associated with a universe, or if
@@ -201,6 +256,7 @@ impl<T: 'static> Handle<T> {
 
     /// Acquire temporary read access to the value, in the sense of
     /// [`std::sync::RwLock::try_read()`].
+    // TODO(ecs): revise explanation now that this isn't always a RwLock, just on principle
     ///
     /// The caller must supply a [`ReadTicket`] from the [`Universe`] the handle belongs to.
     /// If the handle is pending (not yet inserted into a universe) then any ticket is acceptable.
@@ -208,30 +264,64 @@ impl<T: 'static> Handle<T> {
     /// Returns an error if the value does not exist, is currently being written to, or if the
     /// ticket does not match.
     #[inline(never)]
-    pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<ReadGuard<'t, T>, HandleError> {
-        if let Some(id) = self.universe_id() {
-            let ok_to_access = read_ticket.check_access(id);
-            if let Err(e) = ok_to_access {
-                // Invalid tickets can be a subtle bug due to `Space`'s retrying behavior.
-                // As a compromise, log them.
-                if !read_ticket.expect_may_fail {
-                    log::error!(
-                        "invalid ticket {read_ticket:?} for reading {name} in {id:?}: {e}",
-                        name = self.name()
-                    );
+    pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<ReadGuard<'t, T>, HandleError>
+    where
+        T: UniverseMember,
+    {
+        /// Contains what we copied out of `self.inner.state` before dropping the state lock guard.
+        /// This intermediate structure is not strictly necessary for lock ordering,
+        /// but it makes things a little more clearly OK and slightly shortens the duration
+        /// the state mutex is locked.
+        enum Access<T> {
+            Pending(Arc<RwLock<T>>),
+            Entity(ecs::Entity),
+        }
+
+        // Use the state mutex to figure out how to obtain access.
+        let access: Access<T> = match &*self.inner.state.lock().expect("Handle::state lock error") {
+            State::Pending { value_arc } => Access::Pending(value_arc.clone()),
+            #[cfg(feature = "save")]
+            State::Deserializing { entity: _ } => return Err(HandleError::NotReady(self.name())),
+            &State::Member { entity } => {
+                let handle_universe_id = self.inner.universe_id.get(atomic::Ordering::Relaxed);
+                debug_assert!(handle_universe_id.is_some());
+                let ticket_universe_id = read_ticket.universe_id();
+                if ticket_universe_id != handle_universe_id {
+                    let name = self.name();
+                    // Invalid tickets can be a subtle bug due to `Space`'s retrying behavior.
+                    // As a compromise, log them.
+                    if !read_ticket.expect_may_fail {
+                        log::error!(
+                            "invalid ticket {read_ticket:?} for reading {name} \
+                            in {handle_universe_id:?}",
+                        );
+                    }
+                    return Err(HandleError::WrongUniverse {
+                        ticket_universe_id,
+                        handle_universe_id,
+                        name,
+                    });
                 }
-                return Err(e.into_handle_error(self.name()));
+
+                Access::Entity(entity)
+            }
+            State::Gone {} => return Err(HandleError::Gone(self.name())),
+        };
+
+        // Actually obtain access.
+        match access {
+            Access::Pending(value_arc) => {
+                let inner = owning_guard::ReadGuardImpl::new(value_arc)
+                    .map_err(|_| HandleError::InUse(self.name()))?;
+                Ok(ReadGuard(ReadGuardKind::Pending(inner)))
+            }
+            Access::Entity(entity) => {
+                let component = read_ticket
+                    .get::<T>(entity)
+                    .map_err(|e| e.into_handle_error(self.name()))?;
+                Ok(ReadGuard(ReadGuardKind::World(component)))
             }
         }
-        let inner = owning_guard::ReadGuardImpl::new(self.upgrade()?)
-            .map_err(|_| HandleError::InUse(self.name()))?;
-        if inner.data.is_none() {
-            return Err(HandleError::NotReady(self.name()));
-        }
-        Ok(ReadGuard {
-            guard: inner,
-            _phantom: PhantomData,
-        })
     }
 
     /// Apply the given function to the `T` inside.
@@ -252,57 +342,24 @@ impl<T: 'static> Handle<T> {
     where
         F: FnOnce(&mut T) -> Out,
     {
-        self.try_modify_impl(function)
-    }
-
-    /// Apply the given function to the `T` inside.
-    ///
-    /// This is the implementation shared between [`Handle::try_modify_pending()`]
-    /// and [`Universe::try_modify()`].
-    /// See their documentation for correct usage information.
-    /// They are split in this way because of planned changes such that they will
-    /// no longer share an implementation.
-    pub(in crate::universe) fn try_modify_impl<F, Out>(
-        &self,
-        function: F,
-    ) -> Result<Out, HandleError>
-    where
-        F: FnOnce(&mut T) -> Out,
-    {
-        let strong: Arc<RwLock<UEntry<T>>> = self.upgrade()?;
-        let mut guard = strong
+        let value_arc: Arc<RwLock<T>> =
+            match &*self.inner.state.lock().expect("Handle::state lock error") {
+                State::Pending { value_arc, .. } => value_arc.clone(),
+                #[cfg(feature = "save")]
+                State::Deserializing { .. } => {
+                    // TODO: not really the right error variant (but this should be unreachable)
+                    return Err(HandleError::InUse(self.name()));
+                }
+                State::Member { .. } => {
+                    // TODO(ecs): give this a dedicated error
+                    return Err(HandleError::Gone(self.name()));
+                }
+                State::Gone {} => return Err(HandleError::Gone(self.name())),
+            };
+        let mut guard = value_arc
             .try_write()
             .map_err(|_| HandleError::InUse(self.name()))?;
-        let data: &mut T = guard
-            .data
-            .as_mut()
-            .ok_or_else(|| HandleError::NotReady(self.name()))?;
-        Ok(function(data))
-    }
-
-    #[cfg(feature = "save")]
-    pub(crate) fn insert_value_from_deserialization(&self, new_data: T) -> Result<(), HandleError> {
-        let strong: Arc<RwLock<UEntry<T>>> = self.upgrade()?;
-        let mut guard = strong
-            .try_write()
-            .map_err(|_| HandleError::InUse(self.name()))?;
-        assert!(guard.data.is_none()); // TODO: should this be an error return?
-        guard.data = Some(new_data);
-        Ok(())
-    }
-
-    /// Gain mutable access but don't use it immediately.
-    ///
-    /// This function is not exposed publicly, but only used in transactions to allow
-    /// the check-then-commit pattern; use [`Handle::try_modify`] instead for other
-    /// purposes.
-    pub(crate) fn try_borrow_mut(&self) -> Result<WriteGuard<T>, HandleError> {
-        let inner = owning_guard::WriteGuardImpl::new(self.upgrade()?)
-            .map_err(|_| HandleError::InUse(self.name()))?;
-        if inner.data.is_none() {
-            return Err(HandleError::NotReady(self.name()));
-        }
-        Ok(WriteGuard(inner))
+        Ok(function(&mut *guard))
     }
 
     /// Execute the given transaction on the `T` inside.
@@ -331,16 +388,10 @@ impl<T: 'static> Handle<T> {
         let outcome: Result<
             Result<(), ExecuteError<<T as Transactional>::Transaction>>,
             HandleError,
-        > = self.try_modify_impl(|data| {
+        > = self.try_modify_pending(|data| {
             transaction.execute(data, read_ticket, &mut transaction::no_outputs)
         });
         outcome.map_err(ExecuteError::Handle)?
-    }
-
-    fn upgrade(&self) -> Result<StrongEntryRef<T>, HandleError> {
-        self.weak_ref
-            .upgrade()
-            .ok_or_else(|| HandleError::Gone(self.name()))
     }
 
     /// Returns whether this [`Handle`] does not yet belong to a universe and can start.
@@ -354,7 +405,7 @@ impl<T: 'static> Handle<T> {
         future_universe_id: UniverseId,
     ) -> Result<(), InsertError>
     where
-        T: VisitHandles,
+        T: VisitHandles + UniverseMember,
     {
         if let Some(existing_id) = self.universe_id() {
             if existing_id != future_universe_id {
@@ -439,15 +490,13 @@ impl<T: 'static> Handle<T> {
                 });
             }
             Err(HandleError::WrongUniverse { name, .. }) => {
-                // The only way we can get an invalid ticket error is if the handle was concurrently
-                // inserted into a different universe.
                 return Err(InsertError {
                     name,
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
-            Err(HandleError::InvalidTicket { .. }) => {
-                unreachable!("tried to insert a Handle from deserialization without valid ticket")
+            Err(e @ HandleError::InvalidTicket { .. }) => {
+                unreachable!("invalid ticket while deserializing: {e:?}")
             }
         }
 
@@ -458,7 +507,10 @@ impl<T: 'static> Handle<T> {
     pub(in crate::universe) fn upgrade_pending(
         &self,
         universe: &mut Universe,
-    ) -> Result<RootHandle<T>, InsertError> {
+    ) -> Result<(), InsertError>
+    where
+        T: UniverseMember,
+    {
         let mut state_guard: MutexGuard<'_, State<T>> =
             self.inner.state.lock().expect("Handle::state lock error");
 
@@ -470,36 +522,78 @@ impl<T: 'static> Handle<T> {
                 kind: InsertErrorKind::AlreadyInserted,
             })?;
 
-        let (strong_ref, name) = match &*state_guard {
-            State::Gone {} => {
+        let pending_name = self
+            .inner
+            .permanent_name
+            .get()
+            .unwrap_or(&Name::Pending)
+            .clone();
+
+        let placeholder_state = State::Gone {};
+
+        let value: T = match mem::replace(&mut *state_guard, placeholder_state) {
+            state @ State::Gone { .. } => {
+                *state_guard = state;
                 return Err(InsertError {
-                    name: self.name(),
+                    name: pending_name,
                     kind: InsertErrorKind::Gone,
                 });
             }
-            State::Member { .. } => {
+            state @ State::Member { .. } => {
+                *state_guard = state;
                 return Err(InsertError {
-                    name: self.name(),
+                    name: pending_name.clone(),
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
             #[cfg(feature = "save")]
-            State::Deserializing { .. } => {
+            state @ State::Deserializing { .. } => {
+                *state_guard = state;
                 return Err(InsertError {
-                    name: self.name(),
+                    name: pending_name.clone(),
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
-            State::Pending { strong } => (strong.clone(), universe.allocate_name(&self.name())?),
+            State::Pending { value_arc } => Arc::try_unwrap(value_arc)
+                .expect("TODO(ecs): handle error from handle being inserted while also modified")
+                .into_inner()
+                .expect("TODO(ecs): handle poisoning (return error?)"),
         };
 
-        let _ = self.inner.permanent_name.set(name); // already-set error is ignored
-        *state_guard = State::Member {};
+        let new_name = universe.allocate_name(&pending_name)?;
+        let _ = self.inner.permanent_name.set(new_name.clone()); // already-set error is ignored
+        let entity = universe
+            .world
+            .spawn((
+                Membership {
+                    name: new_name,
+                    handle: T::into_any_handle(self.clone()),
+                },
+                value,
+            ))
+            .id();
+        // We may have created a new archetype.
+        universe.update_archetypes();
 
-        Ok(RootHandle {
-            strong_ref,
-            inner: self.inner.clone(),
-        })
+        // Inserting new members is a good time to check if there are old ones to remove.
+        universe.wants_gc = true;
+
+        *state_guard = State::Member { entity };
+
+        Ok(())
+    }
+
+    /// For deleting members.
+    pub(in crate::universe) fn set_state_to_gone(&self) {
+        let state = &mut *self.inner.state.lock().expect("Handle::state lock error");
+        *state = State::Gone {};
+    }
+
+    pub(in crate::universe) fn has_strong_handles(&self) -> bool {
+        self.inner
+            .strong_handle_count
+            .load(atomic::Ordering::Acquire)
+            > 0
     }
 }
 
@@ -514,19 +608,16 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
         match self.inner.state.lock() {
             Ok(state_guard) => {
                 match &*state_guard {
-                    State::Pending { strong, .. } => {
+                    State::Pending { value_arc, .. } => {
                         write!(f, " in no universe")?;
-                        if self.weak_ref.strong_count() <= 1 {
+                        if Arc::strong_count(value_arc) <= 1 {
                             // Write the contents, but only if there are no other handles and thus
-                            // we cannot possibly cause an infinite recursion of formatting.
+                            // we cannot possibly cause an infinite recursion of formatting
                             // TODO: maybe only do it if we are in alternate/prettyprint format.
                             write!(f, " = ")?;
-                            match strong.try_read() {
-                                Ok(uentry_guard) => match &uentry_guard.deref().data {
-                                    Some(data) => fmt::Debug::fmt(&data, f)?,
-                                    None => write!(f, "<data not yet set>")?,
-                                },
-                                Err(e) => write!(f, "<entry lock error: {e}>")?,
+                            match value_arc.try_read() {
+                                Ok(guard) => fmt::Debug::fmt(&*guard, f)?,
+                                Err(e) => write!(f, "<data lock error: {e}>")?,
                             }
                         }
                     }
@@ -546,8 +637,8 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
     }
 }
 
-/// `Handle`s are compared by pointer equality: they are equal only if they refer to
-/// the same mutable cell.
+/// `Handle`s are compared by "pointer" identity: they are equal only if they refer to
+/// the same mutable cell, one way or another.
 impl<T> PartialEq for Handle<T> {
     fn eq(&self, other: &Self) -> bool {
         // Note: Comparing the shared state pointer causes `Handle::new_gone()` to produce distinct
@@ -567,7 +658,6 @@ impl<T> Clone for Handle<T> {
     /// Cloning a [`Handle`] clones the handle only, not its referent.
     fn clone(&self) -> Self {
         Handle {
-            weak_ref: self.weak_ref.clone(),
             inner: self.inner.clone(),
         }
     }
@@ -806,9 +896,6 @@ impl<T: UniverseMember> Clone for StrongHandle<T> {
 /// * Call [`Universe::read_ticket()`].
 /// * If the operation will not actually read using any handles (e.g. calling [`Block::evaluate()`]
 ///   on a [`Block`] that contains no handles), use [`ReadTicket::stub()`].
-///
-/// Currently, this is only an advisory mechanism — having the correct read ticket is not necessary
-/// for access — but it may become mandatory in the future.
 #[derive(Clone, Copy, Debug)]
 pub struct ReadTicket<'universe> {
     access: TicketAccess<'universe>,
@@ -824,35 +911,30 @@ pub struct ReadTicket<'universe> {
 
 #[derive(Clone, Copy)]
 enum TicketAccess<'u> {
-    // Temporary placeholder ability to access handles from all universes.
-    Any,
-    Universe(&'u Universe),
+    World(&'u ecs::World),
+    BlockDataSources(QueryBlockDataSources<'u, 'u>),
+    EverythingBut(UnsafeWorldCell<'u>, ecs::Entity),
     Stub,
 }
 
-impl<'universe> ReadTicket<'universe> {
-    /// Create an unrestricted [`ReadTicket`].
-    ///
-    /// Whenever possible, use [`Universe::read_ticket()`] instead.
-    /// This will probably stop being available in a future version.
-    //---
-    // TODO(read_ticket): eliminate all uses of this
-    #[allow(clippy::new_without_default)]
-    #[doc(hidden)]
-    #[track_caller]
-    pub const fn new() -> Self {
-        Self {
-            access: TicketAccess::Any,
-            universe_id: None,
-            origin: Location::caller(),
-            expect_may_fail: false,
-        }
-    }
+#[derive(Clone, Copy, Debug, bevy_ecs::system::SystemParam)]
+pub(crate) struct QueryBlockDataSources<'w, 's> {
+    universe_id: UniverseId,
+    query: ecs::Query<
+        'w,
+        's,
+        ecs::AnyOf<(
+            &'static crate::block::BlockDef,
+            &'static crate::space::Space,
+        )>,
+    >,
+}
 
+impl<'universe> ReadTicket<'universe> {
     #[track_caller]
     pub(crate) fn from_universe(universe: &'universe Universe) -> Self {
         Self {
-            access: TicketAccess::Universe(universe),
+            access: TicketAccess::World(&universe.world),
             universe_id: Some(universe.universe_id()),
             origin: Location::caller(),
             expect_may_fail: false,
@@ -872,24 +954,97 @@ impl<'universe> ReadTicket<'universe> {
         }
     }
 
-    pub(crate) fn check_access(
+    #[track_caller]
+    pub(crate) fn from_block_data_sources(
+        data_sources: QueryBlockDataSources<'universe, 'universe>,
+    ) -> Self {
+        ReadTicket {
+            access: TicketAccess::BlockDataSources(data_sources),
+            universe_id: Some(data_sources.universe_id),
+            origin: Location::caller(),
+            expect_may_fail: false,
+        }
+    }
+
+    /// Create a [`ReadTicket`] allowing access to every entity in the world except the specified one.
+    ///
+    /// # Safety
+    ///
+    /// There must be no concurrent access to any entity other than `entity`,
+    /// until the lifetime `'u` expires.
+    #[track_caller]
+    pub(in crate::universe) unsafe fn everything_but<'u>(
+        universe_id: UniverseId,
+        world: UnsafeWorldCell<'u>,
+        entity: ecs::Entity,
+    ) -> ReadTicket<'u> {
+        ReadTicket {
+            access: TicketAccess::EverythingBut(world, entity),
+            universe_id: Some(universe_id),
+            origin: Location::caller(),
+            expect_may_fail: false,
+        }
+    }
+
+    /// Get a component.
+    /// Returns None if any of:
+    ///
+    /// * entity does not exist
+    /// * entity does not have a `T` component
+    /// * this ticket does not allow access to that component
+    pub(crate) fn get<T: ecs::Component>(
         &self,
-        handle_universe_id: UniverseId,
-    ) -> Result<(), TicketErrorKind> {
+        entity: ecs::Entity,
+    ) -> Result<&'universe T, TicketErrorKind> {
         match self.access {
-            TicketAccess::Any => Ok(()),
-            TicketAccess::Stub => Err(TicketErrorKind::Stub),
-            TicketAccess::Universe(universe) => {
-                let ticket_universe_id = universe.universe_id();
-                if ticket_universe_id == handle_universe_id {
-                    Ok(())
+            TicketAccess::World(world) => world.get(entity).ok_or_else(|| {
+                if world.get_entity(entity).is_ok() {
+                    TicketErrorKind::MissingComponent {
+                        type_name: type_name::<T>(),
+                    }
                 } else {
-                    Err(TicketErrorKind::WrongUniverse {
-                        ticket_universe_id,
-                        handle_universe_id,
+                    TicketErrorKind::MissingEntity
+                }
+            }),
+            TicketAccess::BlockDataSources(query) => {
+                let (block_component, space_component) =
+                    query.query.get_inner(entity).map_err(|error| {
+                        use bevy_ecs::query::QueryEntityError as E;
+                        match error {
+                            E::QueryDoesNotMatch(..) => TicketErrorKind::ComponentNotAllowed {
+                                type_name: type_name::<T>(),
+                            },
+                            E::EntityDoesNotExist(_) => TicketErrorKind::MissingEntity,
+                            E::AliasedMutability(_) => {
+                                unreachable!("not a query for mutable access")
+                            }
+                        }
+                    })?;
+                block_component
+                    .and_then(|r| <dyn Any>::downcast_ref(r))
+                    .or_else(|| space_component.and_then(|r| <dyn Any>::downcast_ref(r)))
+                    .ok_or_else(|| TicketErrorKind::MissingComponent {
+                        type_name: type_name::<T>(),
+                    })
+            }
+            TicketAccess::EverythingBut(world, prohibited_entity) => {
+                if entity == prohibited_entity {
+                    Err(TicketErrorKind::BeingMutated)
+                } else {
+                    let entity_ref = world
+                        .get_entity(entity)
+                        .map_err(|_| TicketErrorKind::MissingEntity)?;
+                    // SAFETY:
+                    // If [`ReadTicket::everything_but()`]'s safety conditions were met,
+                    // this access will not alias.
+                    unsafe { entity_ref.get::<T>() }.ok_or_else(|| {
+                        TicketErrorKind::MissingComponent {
+                            type_name: type_name::<T>(),
+                        }
                     })
                 }
             }
+            TicketAccess::Stub => Err(TicketErrorKind::Stub),
         }
     }
 
@@ -930,9 +1085,9 @@ impl Eq for ReadTicket<'_> {}
 impl<'u> fmt::Debug for TicketAccess<'u> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Any => write!(f, "Any"),
-            // Don't format the entire universe, just identify it
-            Self::Universe(u) => f.debug_tuple("Universe").field(&u.universe_id()).finish(),
+            Self::World(_) => f.debug_tuple("World").finish_non_exhaustive(),
+            Self::BlockDataSources(_) => f.debug_tuple("BlockDataSources").finish_non_exhaustive(),
+            Self::EverythingBut(_, entity) => f.debug_tuple("EverythingBut").field(entity).finish(),
             Self::Stub => write!(f, "Stub"),
         }
     }
@@ -941,24 +1096,36 @@ impl<'u> fmt::Debug for TicketAccess<'u> {
 // -------------------------------------------------------------------------------------------------
 
 /// Error when a [`ReadTicket`] does not have sufficient access.
+///
+/// It is also possible for this error to occur when the [`Universe`] has entered an invalid state,
+/// in which case it indicates a bug in All is Cubes.
 //---
 // Design note: This type exists solely to hide the variants of `TicketErrorKind` so that they are
-// not stable public API. There will be more of them eventually.
+// not stable public API. We could also consider adding the entity ID, though.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ReadTicketError(TicketErrorKind);
 
-/// Low-level errors that can result from attempting to use a [`ReadTicket`].
+/// Low-level errors that can result from attempting to use a [`ReadTicket`] to fetch a component.
+///
+/// This enum is sort of an internal version of [`HandleError`]; it differs in that it does not
+/// contain the [`Name`] of the handle (nor the entity ID), since that is easier to obtain at higher
+/// levels.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
 #[allow(dead_code, reason = "used for Debug printing")]
 pub(crate) enum TicketErrorKind {
-    #[displaydoc("wrong universe {handle_universe_id:?} for {ticket_universe_id:?}")]
-    WrongUniverse {
-        /// ID of the universe the ticket is for, or [`None`] in the case of [`ReadTicket::stub()`].
-        ticket_universe_id: UniverseId,
-        /// ID of the universe the handle belongs to, or [`None`] if the handle has not been
-        /// inserted into a universe.
-        handle_universe_id: UniverseId,
-    },
+    /// The entity requested does not exist in the world.
+    #[displaydoc("handle’s entity is missing")]
+    MissingEntity,
+    /// The component requested does not exist in the world.
+    #[displaydoc("component {type_name} is missing")]
+    MissingComponent { type_name: &'static str },
+    /// The component may or may not exist, but this ticket does not allow access to it.
+    #[displaydoc("component {type_name} is not accessible using this ticket")]
+    ComponentNotAllowed { type_name: &'static str },
+    /// The ticket does not allow access to the entity because the entity is being mutated.
+    #[displaydoc("this entity is being mutated")]
+    BeingMutated,
+    /// The ticket does not allow access to this universe or any other.
     #[displaydoc("ticket is a stub")]
     Stub,
 }
@@ -970,18 +1137,14 @@ impl TicketErrorKind {
     /// Depending on the specific case, the resulting [`HandleError`]
     pub(crate) fn into_handle_error(self, name: Name) -> HandleError {
         match self {
-            TicketErrorKind::WrongUniverse {
-                ticket_universe_id,
-                handle_universe_id,
-            } => HandleError::WrongUniverse {
-                name,
-                ticket_universe_id: Some(ticket_universe_id),
-                handle_universe_id: Some(handle_universe_id),
-            },
-            TicketErrorKind::Stub => HandleError::InvalidTicket {
+            TicketErrorKind::MissingEntity => HandleError::Gone(name),
+            TicketErrorKind::MissingComponent { type_name: _ } => panic!("{self:?}"), // TODO: improve
+            TicketErrorKind::ComponentNotAllowed { type_name: _ } => HandleError::InvalidTicket {
                 name,
                 error: ReadTicketError(self),
             },
+            TicketErrorKind::BeingMutated => HandleError::InUse(name),
+            TicketErrorKind::Stub => unreachable!("universe ID should already have been checked"),
         }
     }
 }
@@ -999,11 +1162,12 @@ impl fmt::Display for ReadTicketError {
 ///
 /// You can create this by calling [`Handle::read()`], and must drop it before the next time
 /// the handle's referent is mutated.
-pub struct ReadGuard<'ticket, T: 'static> {
-    guard: owning_guard::ReadGuardImpl<T>,
-    // The `'ticket` lifetime exists to enforce that `ReadGuard`s are used only as long as the
-    // corresponding `ReadTicket`. This will become mandatory in the future.
-    _phantom: PhantomData<&'ticket ReadTicket<'ticket>>,
+pub struct ReadGuard<'ticket, T: 'static>(ReadGuardKind<'ticket, T>);
+enum ReadGuardKind<'ticket, T: 'static> {
+    /// Lock guard for a standalone `RwLock`.
+    Pending(owning_guard::ReadGuardImpl<T>),
+    /// Borrowed from an [`ecs::World`].
+    World(&'ticket T),
 }
 
 impl<T: fmt::Debug> fmt::Debug for ReadGuard<'_, T> {
@@ -1014,10 +1178,10 @@ impl<T: fmt::Debug> fmt::Debug for ReadGuard<'_, T> {
 impl<T> Deref for ReadGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &T {
-        self.guard
-            .data
-            .as_ref()
-            .expect("can't happen: universe::ReadGuard lost its data")
+        match self.0 {
+            ReadGuardKind::Pending(ref guard) => guard,
+            ReadGuardKind::World(reference) => reference,
+        }
     }
 }
 impl<T> AsRef<T> for ReadGuard<'_, T> {
@@ -1031,145 +1195,22 @@ impl<T> core::borrow::Borrow<T> for ReadGuard<'_, T> {
     }
 }
 
-/// Parallel to [`ReadGuard`], but for mutable access.
-//
-/// This type is not exposed publicly, but only used in transactions to allow
-/// the check-then-commit pattern; use [`Handle::try_modify()`] instead for other
-/// purposes.
-pub(crate) struct WriteGuard<T: 'static>(owning_guard::WriteGuardImpl<T>);
-impl<T: 'static> Deref for WriteGuard<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        self.0
-            .data
-            .as_ref()
-            .expect("can't happen: universe::WriteGuard lost its data")
-    }
-}
-
-impl<T: fmt::Debug> fmt::Debug for WriteGuard<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "WriteGuard({:?})", **self)
-    }
-}
-impl<T: 'static> DerefMut for WriteGuard<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        self.0
-            .data
-            .as_mut()
-            .expect("can't happen: universe::WriteGuard lost its data")
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// The actual mutable data of a universe member, that can be accessed via [`Handle`].
-#[derive(Debug)]
-pub(super) struct UEntry<T> {
-    /// Actual value of type `T`.
-    ///
-    /// If [`None`], then the universe is being deserialized and the data for this member
-    /// is not yet available.
-    data: Option<T>,
-}
-
-/// The unique reference to an entry in a [`Universe`] from that `Universe`.
-/// Normal usage is via [`Handle`] instead.
-/// Construct this using [`Handle::upgrade_pending()`].
-///
-/// This is essentially a strong-reference version of [`Handle`] (which is weak).
-#[derive(Debug)]
-pub(crate) struct RootHandle<T> {
-    strong_ref: StrongEntryRef<T>,
-    inner: Arc<Inner<T>>,
-}
-
-impl<T> RootHandle<T> {
-    /// Construct a root with no value for mid-deserialization states.
-    #[cfg(feature = "save")]
-    pub(super) fn new_deserializing(universe_id: UniverseId, name: Name) -> Self {
-        RootHandle {
-            strong_ref: Arc::new(RwLock::new(UEntry { data: None })),
-            inner: Arc::new(Inner {
-                universe_id: universe_id.into(),
-                permanent_name: OnceName::from_optional_value(Some(name)),
-                state: Mutex::new(State::Deserializing {}),
-                strong_handle_count: atomic::AtomicUsize::new(0),
-            }),
-        }
-    }
-
-    pub(crate) fn name(&self) -> Name {
-        self.inner
-            .permanent_name
-            .get()
-            .unwrap_or(&Name::Pending)
-            .clone()
-    }
-
-    /// Convert to `Handle`.
-    ///
-    /// TODO: As we add graph analysis features, this will need additional arguments
-    /// like where the ref is being held, and it will probably need to be renamed.
-    pub(crate) fn downgrade(&self) -> Handle<T> {
-        Handle {
-            weak_ref: Arc::downgrade(&self.strong_ref),
-            inner: Arc::clone(&self.inner),
-        }
-    }
-
-    /// Returns the number of weak references to this entry, which is greater than
-    /// or equal to the number of [`Handle`]s to it.
-    pub(crate) fn weak_ref_count(&self) -> usize {
-        Arc::weak_count(&self.strong_ref)
-    }
-
-    /// Apply the given function to the `&mut T` inside.
-    ///
-    /// This implementation is used in the implementation of universe stepping; normal mutations
-    /// should use transactions or, if necessary, [`Handle::try_modify()`] instead.
-    pub fn try_modify<F, Out>(&self, function: F) -> Result<Out, HandleError>
-    where
-        F: FnOnce(&mut T) -> Out,
-    {
-        let mut guard = self
-            .strong_ref
-            .try_write()
-            .map_err(|_| HandleError::InUse(self.name()))?;
-        let data: &mut T = guard
-            .data
-            .as_mut()
-            .ok_or_else(|| HandleError::NotReady(self.name()))?;
-        Ok(function(data))
-    }
-}
-
 // -------------------------------------------------------------------------------------------------
 
 /// Object-safe trait implemented for [`Handle`], to allow code to operate on `Handle<T>`
 /// regardless of `T`.
-pub trait ErasedHandle: core::any::Any + fmt::Debug {
+pub trait ErasedHandle: Any + fmt::Debug {
     /// Same as [`Handle::name()`].
     fn name(&self) -> Name;
 
     /// Same as [`Handle::universe_id()`].
     fn universe_id(&self) -> Option<UniverseId>;
 
+    #[doc(hidden)] // hidden because we have not yet decided to make our use of ECS, let alone bevy_ecs, public
+    fn as_entity(&self) -> Option<ecs::Entity>;
+
     /// Clone this into an owned `Handle<T>` wrapped in the [`AnyHandle`] enum.
     fn to_any_handle(&self) -> AnyHandle;
-
-    /// If this [`Handle`] is the result of deserialization, fix its state to actually
-    /// point to the other member rather than only having the name.
-    ///
-    /// This method is hidden and cannot actually be called from outside the crate;
-    /// it is part of the trait so that it is possible to call this through [`VisitHandles`].
-    #[doc(hidden)]
-    #[cfg(feature = "save")]
-    fn fix_deserialized(
-        &self,
-        expected_universe_id: UniverseId,
-        privacy_token: ErasedHandleInternalToken,
-    ) -> Result<(), HandleError>;
 }
 
 impl<T: UniverseMember> ErasedHandle for Handle<T> {
@@ -1185,30 +1226,8 @@ impl<T: UniverseMember> ErasedHandle for Handle<T> {
         <T as UniverseMember>::into_any_handle(self.clone())
     }
 
-    #[doc(hidden)]
-    #[cfg(feature = "save")]
-    fn fix_deserialized(
-        &self,
-        expected_universe_id: UniverseId,
-        _privacy_token: ErasedHandleInternalToken,
-    ) -> Result<(), HandleError> {
-        // TODO: Make this fail if the value hasn't actually been provided
-
-        assert_eq!(
-            self.inner.universe_id.get(atomic::Ordering::Acquire),
-            Some(expected_universe_id)
-        );
-
-        let mut state_guard: MutexGuard<'_, State<T>> =
-            self.inner.state.lock().expect("Handle::state lock error");
-
-        match &*state_guard {
-            #[cfg(feature = "save")]
-            State::Deserializing {} => *state_guard = State::Member {},
-            _ => {}
-        }
-
-        Ok(())
+    fn as_entity(&self) -> Option<ecs::Entity> {
+        Handle::as_entity(self)
     }
 }
 
@@ -1221,20 +1240,6 @@ impl alloc::borrow::ToOwned for dyn ErasedHandle {
 }
 
 // -------------------------------------------------------------------------------------------------
-
-#[cfg(feature = "save")]
-mod private {
-    /// Private type making it impossible to call [`ErasedHandle::connect_deserialized`] outside
-    /// the crate.
-    #[derive(Debug)]
-    #[expect(unnameable_types)]
-    pub struct ErasedHandleInternalToken;
-}
-#[cfg(feature = "save")]
-pub(crate) use private::ErasedHandleInternalToken;
-
-use super::id::OnceUniverseId;
-use super::name::OnceName;
 
 #[cfg(test)]
 mod tests {
@@ -1300,17 +1305,6 @@ mod tests {
     }
 
     #[test]
-    fn handle_try_borrow_mut_in_use() {
-        let mut u = Universe::new();
-        let r = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let _borrow_1 = r.read(u.read_ticket()).unwrap();
-        assert_eq!(
-            r.try_borrow_mut().unwrap_err(),
-            HandleError::InUse(Name::Anonym(0))
-        );
-    }
-
-    #[test]
     fn new_gone_properties() {
         let name = Name::from("foo");
         let r: Handle<Space> = Handle::new_gone(name.clone());
@@ -1321,7 +1315,7 @@ mod tests {
             HandleError::Gone(name.clone())
         );
         assert_eq!(
-            r.try_borrow_mut().unwrap_err(),
+            r.try_modify_pending(|_| {}).unwrap_err(),
             HandleError::Gone(name.clone())
         );
     }
@@ -1397,9 +1391,6 @@ mod tests {
         let stubs: [ReadTicket<'_>; 2] = std::array::from_fn(|_| ReadTicket::stub());
         assert_eq!(stubs[0], stubs[1], "identical stub()");
 
-        let unrestricteds: [ReadTicket<'_>; 2] = std::array::from_fn(|_| ReadTicket::new());
-        assert_eq!(unrestricteds[0], unrestricteds[1], "identical new()");
-
         let different_universe_tickets: [ReadTicket<'_>; 2] =
             std::array::from_fn(|i| universes[i].read_ticket());
         assert_ne!(
@@ -1427,7 +1418,7 @@ mod tests {
         assert_eq!(
             format!("{ticket:?}"),
             format!(
-                "ReadTicket {{ access: Universe({id:?}), universe_id: Some({id:?}), \
+                "ReadTicket {{ access: World(..), universe_id: Some({id:?}), \
                 origin: {origin:?}, expect_may_fail: false }}"
             ),
         );

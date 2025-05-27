@@ -1,6 +1,8 @@
 use alloc::sync::Arc;
 use core::{fmt, mem, ops};
 
+use bevy_ecs::prelude as ecs;
+
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
 use crate::listen::{self, Gate, IntoDynListener as _, Listener, Notifier};
 use crate::transaction::{self, Equal, Transaction};
@@ -21,6 +23,8 @@ use crate::universe::Universe;
 /// Note that this cache only updates when the owning [`Universe`] is being stepped, or when
 /// a direct mutation to this [`BlockDef`] is performed, not when the contained [`Block`]
 /// sends a change notification.
+#[derive(bevy_ecs::component::Component)]
+#[require(BlockDefNextValue)]
 pub struct BlockDef {
     state: BlockDefState,
 
@@ -33,7 +37,8 @@ pub struct BlockDef {
 }
 
 /// Subset of [`BlockDef`] that is constructed anew when its block is replaced.
-struct BlockDefState {
+// TODO(ecs): make this private once the system fn types are no longer exposed
+pub(crate) struct BlockDefState {
     /// The current value.
     block: Block,
 
@@ -134,10 +139,6 @@ impl BlockDef {
                 .map_err(EvalBlockError::into_internal_error_for_block_def)
         }
     }
-
-    pub(crate) fn step(&mut self, read_ticket: ReadTicket<'_>) -> BlockDefStepInfo {
-        self.state.step(read_ticket, &self.notifier)
-    }
 }
 
 impl BlockDefState {
@@ -164,55 +165,6 @@ impl BlockDefState {
             cache_dirty,
             block_listen_gate,
         }
-    }
-
-    fn step(
-        &mut self,
-        read_ticket: ReadTicket<'_>,
-        notifier: &Notifier<BlockChange>,
-    ) -> BlockDefStepInfo {
-        let mut info = BlockDefStepInfo::default();
-
-        if !self.listeners_ok {
-            info.attempted = 1;
-            // If there was an evaluation error, then we may also be missing listeners.
-            // Start over.
-            *self = BlockDefState::new(self.block.clone(), read_ticket);
-            notifier.notify(&BlockChange::new());
-            info.updated = 1;
-        } else if self.cache_dirty.get_and_clear() {
-            // We have a cached value, but it is stale.
-
-            info.attempted = 1;
-
-            let new_cache = self
-                .block
-                .evaluate2(&block::EvalFilter {
-                    read_ticket,
-                    skip_eval: false,
-                    listener: None, // we already have a listener installed
-                    budget: Default::default(),
-                })
-                .map(MinEval::from);
-
-            // Write the new cache data *unless* it is a transient error.
-            if !matches!(new_cache, Err(ref e) if e.is_transient()) {
-                let old_cache = mem::replace(&mut self.cache, new_cache);
-
-                // In case the definition changed in the way which turned out not to affect the
-                // evaluation, compare old and new before notifying.
-                if old_cache != self.cache {
-                    notifier.notify(&BlockChange::new());
-                    info.updated = 1;
-                }
-            }
-        }
-
-        if info.attempted > 0 && matches!(self.cache, Err(ref e) if e.is_transient()) {
-            info.was_in_use = 1;
-        }
-
-        info
     }
 }
 
@@ -443,15 +395,6 @@ pub(crate) struct BlockDefStepInfo {
     was_in_use: usize,
 }
 
-impl BlockDefStepInfo {
-    #[cfg(feature = "auto-threads")]
-    pub(crate) const IN_USE: Self = Self {
-        attempted: 1,
-        updated: 0,
-        was_in_use: 1,
-    };
-}
-
 impl ops::Add for BlockDefStepInfo {
     type Output = Self;
     #[inline]
@@ -484,6 +427,101 @@ impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {
         )
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// When updating block definitions, this temporarily stores the value that should be written
+/// into the `BlockDef` component.
+///
+#[derive(bevy_ecs::component::Component, Default)]
+// TODO(ecs): make this private once the system fn types are no longer exposed
+pub(crate) enum BlockDefNextValue {
+    #[default]
+    None,
+    NewEvaluation(Result<MinEval, EvalBlockError>),
+    /// Used when the prior attempt to add listeners failed.
+    NewState(BlockDefState),
+}
+
+/// ECS system function that looks for `BlockDef`s needing reevaluation, then writes the new
+/// evaluations into `BlockDefNextValue`.
+pub(crate) fn update_phase_1(
+    mut info: ecs::InMut<'_, BlockDefStepInfo>,
+    mut defs: ecs::Query<'_, '_, (&BlockDef, &mut BlockDefNextValue)>,
+    data_sources: crate::universe::QueryBlockDataSources<'_, '_>,
+) {
+    // TODO(ecs): parallel iter
+    for (def, mut next) in defs.iter_mut() {
+        debug_assert!(
+            matches!(*next, BlockDefNextValue::None),
+            "BlockDefNextValue should have been cleared",
+        );
+
+        let read_ticket = ReadTicket::from_block_data_sources(data_sources);
+
+        if !def.state.listeners_ok {
+            info.attempted += 1;
+            // If there was an evaluation error, then we may also be missing listeners.
+            // Start over.
+            *next = BlockDefNextValue::NewState(BlockDefState::new(
+                def.state.block.clone(),
+                read_ticket,
+            ));
+            info.updated += 1;
+        } else if def.state.cache_dirty.get_and_clear() {
+            // We have a cached value, but it is stale.
+
+            info.attempted += 1;
+
+            let new_cache = def
+                .state
+                .block
+                .evaluate2(&block::EvalFilter {
+                    read_ticket,
+                    skip_eval: false,
+                    listener: None, // we already have a listener installed
+                    budget: Default::default(),
+                })
+                .map(MinEval::from);
+
+            // Write the new cache data *unless* it is a transient error.
+            if !matches!(new_cache, Err(ref e) if e.is_transient()) {
+                if new_cache != def.state.cache {
+                    *next = BlockDefNextValue::NewEvaluation(new_cache);
+                    info.updated += 1;
+                }
+            }
+        }
+
+        if info.attempted > 0 && matches!(def.state.cache, Err(ref e) if e.is_transient()) {
+            info.was_in_use += 1;
+        }
+    }
+}
+
+/// ECS system function that moves new evaluations from `BlockDefNextValue` to `BlockDef`.
+///
+/// This system being separate resolves the borrow conflict between different `BlockDef`s reading
+/// each other (possibly circularly) and writing themselves.
+pub(crate) fn update_phase_2(
+    mut defs: ecs::Query<'_, '_, (&mut BlockDef, &mut BlockDefNextValue)>,
+) {
+    // TODO: run this only on entities that need it, somehow
+    defs.par_iter_mut()
+        .for_each(|(mut def, mut next)| match mem::take(&mut *next) {
+            BlockDefNextValue::NewEvaluation(result) => {
+                def.state.cache = result;
+                def.notifier.notify(&BlockChange::new());
+            }
+            BlockDefNextValue::NewState(result) => {
+                def.state = result;
+                def.notifier.notify(&BlockChange::new());
+            }
+            BlockDefNextValue::None => {}
+        });
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

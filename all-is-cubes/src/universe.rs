@@ -1,19 +1,20 @@
 //! [`Universe`], the top-level game-world container.
 
-use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::any::Any;
 use core::{fmt, mem};
 
+use bevy_ecs::entity::Entity;
+use bevy_ecs::prelude as ecs;
 use manyfmt::Fmt;
 
 use crate::behavior::BehaviorSetStepInfo;
-use crate::block::BlockDefStepInfo;
+use crate::block::{self, BlockDefStepInfo};
 use crate::character::{Character, CharacterStepInfo};
 use crate::save::WhenceUniverse;
-use crate::space::SpaceStepInfo;
+use crate::space::{self, Space, SpaceStepInfo};
 use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::util::{ConciseDebug, Refmt as _, ShowStatus, StatusText};
 use crate::{behavior, time};
@@ -26,6 +27,11 @@ use crate::rerun_glue as rg;
 mod members;
 pub use members::AnyHandle;
 pub(crate) use members::*;
+
+mod ecs_details;
+use ecs_details::{Membership, NameMap};
+
+mod gc;
 
 mod universe_txn;
 pub use universe_txn::*;
@@ -59,13 +65,15 @@ mod tests;
 /// * A [`WhenceUniverse`] defining where its data is persisted, if anywhere.
 /// * A [`UniverseId`] unique within this process.
 ///
-/// `Universe` is a quite large data structure, so it may be desirable to keep it in a [`Box`],
-/// especially when being passed through `async` blocks.
+/// `Universe` is a quite large data structure, so it may be desirable to keep it in a
+/// [`Box`][alloc::boxed::Box], especially when being passed through `async` blocks.
 ///
 #[doc = include_str!("save/serde-warning.md")]
 pub struct Universe {
-    /// Storage of the actual members.
-    tables: UniverseTables,
+    world: bevy_ecs::world::World,
+
+    /// Stuff derived from `world` that we want to construct once.
+    regs: WorldRegistrations,
 
     id: UniverseId,
 
@@ -111,12 +119,50 @@ pub struct Universe {
     rerun_destination: crate::rerun_glue::Destination,
 }
 
+struct WorldRegistrations {
+    all_members_query: ecs::QueryState<(Entity, &'static Membership)>,
+}
+
 impl Universe {
     /// Constructs an empty [`Universe`].
     pub fn new() -> Self {
+        let id = UniverseId::new();
+
+        let mut world = bevy_ecs::world::World::new();
+
+        {
+            // "Panics: The ComputeTaskPool is not initialized. If using this from a query that is
+            // being initialized and run from the ECS scheduler, this should never panic."
+            // — <https://docs.rs/bevy_ecs/0.16.0/bevy_ecs/query/struct.QueryState.html#method.par_iter>
+            // We are not properly using the scheduler yet, so create and run a dummy schedule to
+            // trigger the initialization.
+            {
+                let mut schedule = ecs::Schedule::default();
+                schedule.add_systems(|q: ecs::Query<'_, '_, Entity>| {
+                    q.par_iter().for_each(|_| {});
+                });
+                schedule.run(&mut world);
+            }
+
+            world.init_resource::<NameMap>();
+            world.register_component::<Membership>();
+            // TODO(ecs): it would be nice to register all member components to ensure our queries
+            // are up to date up-front; right now we are kludgily doing update_archetypes()
+            // manually.
+
+            world.insert_resource(id);
+        }
+
+        gc::add_gc(&mut world);
+
+        let regs = WorldRegistrations {
+            all_members_query: world.query::<(Entity, &Membership)>(),
+        };
+
         Universe {
-            tables: UniverseTables::default(),
-            id: UniverseId::new(),
+            world,
+            regs,
+            id,
             next_anonym: 0,
             wants_gc: false,
             whence: Arc::new(()),
@@ -134,21 +180,14 @@ impl Universe {
     /// regardless of its type, or [`None`] if there is none.
     ///
     /// This is a dynamically-typed version of [`Universe::get()`].
-    //
-    // TODO: Find a useful way to implement this which does not require
-    // boxing. Perhaps `RootHandle` should implement `ErasedHandle`? That would
-    // change what `Handle: Any` means, though. Perhaps `RootHandle` should own
-    // a prepared `Handle` that it can return a reference to.
-    pub fn get_any(&self, name: &Name) -> Option<Box<dyn ErasedHandle>> {
-        self.tables.get_any(name)
+    pub fn get_any(&self, name: &Name) -> Option<&AnyHandle> {
+        self.world.resource::<NameMap>().map.get(name)
     }
 
     /// Returns the character named `"character"`.
     /// This is currently assumed to be the “player character” for this universe.
     ///
-    /// TODO: this is a temporary shortcut to be replaced with something with more nuance
-    /// (e.g. we might have temporary characters for editing purposes, which are 'current'
-    /// but not 'primary').
+    /// TODO: this is a temporary shortcut to be replaced with something with more nuance.
     pub fn get_default_character(&self) -> Option<Handle<Character>> {
         self.get(&"character".into())
     }
@@ -189,7 +228,8 @@ impl Universe {
     {
         let check = check_transaction_in_universe(self, handle, transaction)
             .map_err(ExecuteError::Check)?;
-        commit_transaction_in_universe(handle, transaction, check).map_err(ExecuteError::Commit)
+        commit_transaction_in_universe(self, handle, transaction, check)
+            .map_err(ExecuteError::Commit)
     }
 
     /// Advance time for all members.
@@ -237,53 +277,93 @@ impl Universe {
             log::info!("Transaction failure: {e}");
         }
 
-        // Compute how to divide time among spaces, based on the previous srep
-        let budget_per_space: Option<time::Duration> = deadline
-            .remaining_since(start_time)
-            .map(|dur| dur / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1));
-        self.spaces_with_work = 0;
+        self.sync_space_blocks();
 
-        let mut transactions = Vec::new();
+        // Bundle all our relevant state so we can pass it to systems.
+        struct StepInput<I> {
+            tick: time::Tick,
+            deadline: time::Deadline<I>,
+            /// How to divide light calculation time among spaces, based on the previous step
+            budget_per_space: Option<time::Duration>,
+            info: UniverseStepInfo,
+            transactions: Vec<UniverseTransaction>,
+            spaces_with_work: usize,
+        }
+        let mut si = StepInput {
+            tick,
+            deadline,
+            budget_per_space: deadline
+                .remaining_since(start_time)
+                .map(|dur| dur / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1)),
+            info,
+            transactions: Vec::new(),
+            spaces_with_work: 0,
+        };
 
-        for space_root in self.tables.spaces.values() {
-            let (space_info, transaction) = space_root
-                .try_modify(|space| {
-                    space.step(
-                        self.read_ticket(),
-                        // TODO: avoid needing downgrade() unless the ref is actually used?
-                        Some(&space_root.downgrade()),
-                        tick,
-                        match budget_per_space {
-                            Some(budget) => deadline.min(time::Deadline::At(I::now() + budget)),
-                            None => deadline,
-                        },
-                    )
-                })
-                .expect("space borrowed during universe.step()");
-            transactions.push(transaction);
+        {
+            // TODO(ecs): convert Space::step() to a series of systems
+            // (this will require stopping using get_one_mut_and_ticket, which is currently
+            // used to allow Space block changes to evaluate blocks).
+            let spaces: Vec<Handle<Space>> = self
+                .iter_by_type::<Space>()
+                .map(|(_, handle)| handle)
+                .collect();
+            for space_handle in spaces {
+                let (mut space, everything_but) = self
+                    .get_one_mut_and_ticket::<Space>(space_handle.as_entity().unwrap())
+                    .unwrap();
 
-            if space_info.light.queue_count > 0 {
-                self.spaces_with_work += 1;
+                let (space_info, transaction) = space.step(
+                    everything_but,
+                    Some(&space_handle),
+                    si.tick,
+                    match si.budget_per_space {
+                        Some(budget) => si.deadline.min(time::Deadline::At(I::now() + budget)),
+                        None => si.deadline,
+                    },
+                );
+
+                si.transactions.push(transaction);
+
+                if space_info.light.queue_count > 0 {
+                    si.info.active_members += 1;
+                }
+                if space_info.light.queue_count > 0 {
+                    si.spaces_with_work += 1;
+                }
+                si.info.space_step += space_info;
+                si.info.total_members += 1;
             }
-            info.space_step += space_info;
-            info.total_members += 1;
         }
-        info.active_members += self.spaces_with_work;
+        self.sync_space_blocks();
 
-        for character_root in self.tables.characters.values() {
-            let (transaction, character_info, _body_info) = character_root
-                .try_modify(|ch| {
-                    // TODO: avoid needing downgrade() unless the ref is actually used?
-                    ch.step(self.read_ticket(), Some(&character_root.downgrade()), tick)
-                })
-                .expect("character borrowed during universe.step()");
-            transactions.push(transaction);
-            info.character_step += character_info;
-            info.total_members += 1;
-        }
+        // TODO(ecs): pre-register this system
+        self.world
+            .run_system_cached_with(
+                |mut si: ecs::InMut<'_, StepInput<I>>,
+                 data_sources: QueryBlockDataSources<'_, '_>,
+                 characters: ecs::Query<'_, '_, (&Membership, &mut Character)>| {
+                    // TODO(ecs): convert this to run in parallel
+                    for (membership, mut ch) in characters {
+                        let (transaction, character_info, _body_info) = ch.step(
+                            // TODO(ecs): using QueryBlockDataSources as an approximation of what is actually needed here
+                            ReadTicket::from_block_data_sources(data_sources),
+                            membership.handle.downcast_ref(),
+                            si.tick,
+                        );
+                        si.transactions.push(transaction);
+                        si.info.character_step += character_info;
+                        si.info.total_members += 1;
+                    }
+                },
+                &mut si,
+            )
+            .unwrap();
+
+        self.spaces_with_work = si.spaces_with_work;
 
         // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
-        for t in transactions {
+        for t in si.transactions {
             if let Err(e) = t.execute(self, (), &mut transaction::no_outputs) {
                 // TODO: Need to report these failures back to the source
                 // ... and perhaps in the UniverseStepInfo
@@ -291,50 +371,28 @@ impl Universe {
             }
         }
 
-        info.computation_time = I::now().saturating_duration_since(start_time);
-        info
+        self.sync_space_blocks();
+
+        si.info.computation_time = I::now().saturating_duration_since(start_time);
+        si.info
     }
 
-    fn sync_block_defs(&self) -> BlockDefStepInfo {
-        // TODO: Implement waking and only step the BlockDefs which know they need it.
-        // This will allow more reliable updates in the presence of interdependencies.
+    fn sync_space_blocks(&mut self) {
+        self.world
+            .run_system_cached(space::step::update_palette_phase_1)
+            .unwrap();
+        self.world
+            .run_system_cached(space::step::update_palette_phase_2)
+            .unwrap();
+    }
 
-        // If we are allowed to use threads, update in parallel.
-        // This may fail with borrow conflicts if BlockDefs depend on other BlockDefs;
-        // therefore we unconditionally do a synchronous update afterward.
-        #[cfg(feature = "auto-threads")]
-        let mut info: BlockDefStepInfo = {
-            use rayon::prelude::{IntoParallelRefIterator as _, ParallelIterator as _};
-
-            self.tables
-                .blocks
-                .par_iter()
-                .map(|(_, block_def_root)| {
-                    match block_def_root.try_modify(|block_def| block_def.step(self.read_ticket()))
-                    {
-                        Ok(info) => info,
-                        // An in-use error might be due to our own parallel borrows!
-                        // Therefore, treat it as if it were an evaluation in-use instead.
-                        Err(HandleError::InUse(_)) => BlockDefStepInfo::IN_USE,
-                        Err(e) => panic!(
-                            "BlockDef ref broken during universe.step():\n{}",
-                            crate::util::ErrorChain(&e)
-                        ),
-                    }
-                })
-                .reduce(BlockDefStepInfo::default, |a, b| a + b)
-        };
-        #[cfg(not(feature = "auto-threads"))]
+    fn sync_block_defs(&mut self) -> BlockDefStepInfo {
         let mut info = BlockDefStepInfo::default();
-
-        // TODO: In the event of dependencies between BlockDefs, this may miss some updates and
-        // defer them to the next step; solve iteratively once we can do that cheaply with waking
-        for block_def_root in self.tables.blocks.values() {
-            info += block_def_root
-                .try_modify(|block_def| block_def.step(self.read_ticket()))
-                .expect("BlockDef borrow error during universe.step()");
-        }
-
+        // TODO(ecs): register these systems
+        self.world
+            .run_system_cached_with(block::update_phase_1, &mut info)
+            .unwrap();
+        self.world.run_system_cached(block::update_phase_2).unwrap();
         info
     }
 
@@ -360,16 +418,19 @@ impl Universe {
             .expect("shouldn't happen: insert_anonymous failed")
     }
 
-    /// Translates a name for an object of type `T` into a [`Handle`] for it, which
-    /// allows borrowing the actual object.
+    /// Translates a name for an object of type `T` into a [`Handle`] for it.
     ///
-    /// Returns [`None`] if no object exists for the name.
+    /// Returns [`None`] if no object exists for the name or if its type is not `T`.
     pub fn get<T>(&self, name: &Name) -> Option<Handle<T>>
     where
-        Self: UniverseOps<T>,
         T: UniverseMember,
     {
-        UniverseOps::get(self, name)
+        self.world
+            .resource::<NameMap>()
+            .map
+            .get(name)
+            .and_then(AnyHandle::downcast_ref)
+            .cloned()
     }
 
     /// Inserts a new object with a specific name.
@@ -391,9 +452,8 @@ impl Universe {
         name: Name,
     ) -> Result<Handle<T>, InsertError>
     where
-        Self: UniverseTable<T, Table = Storage<T>>,
+        T: UniverseMember,
     {
-        let id = self.id;
         match name {
             Name::Pending => {
                 return Err(InsertError {
@@ -403,14 +463,10 @@ impl Universe {
             }
             Name::Specific(_) | Name::Anonym(_) => {}
         }
-        match <Universe as UniverseTable<T>>::table_mut(self).entry(name.clone()) {
-            alloc::collections::btree_map::Entry::Occupied(oe) => Ok(oe.get().downgrade()),
-            alloc::collections::btree_map::Entry::Vacant(ve) => {
-                let root_handle = RootHandle::new_deserializing(id, name);
-                let returned_handle = root_handle.downgrade();
-                ve.insert(root_handle);
-                Ok(returned_handle)
-            }
+        if let Some(handle) = self.get(&name) {
+            Ok(handle)
+        } else {
+            Ok(Handle::new_deserializing(name, self))
         }
     }
 
@@ -419,12 +475,10 @@ impl Universe {
     #[cfg(feature = "save")]
     pub(crate) fn insert_deserialized<T>(&mut self, name: Name, value: T) -> Result<(), InsertError>
     where
-        Self: UniverseTable<T, Table = Storage<T>>,
-        T: 'static,
+        T: UniverseMember,
     {
         self.get_or_insert_deserializing(name)?
-            .insert_value_from_deserialization(value)
-            .unwrap(); // TODO: can error actually happen here?
+            .insert_deserialized_value(self, value);
         Ok(())
     }
 
@@ -454,12 +508,19 @@ impl Universe {
     ///         .collect::<Vec<_>>(),
     /// );
     /// ```
-    pub fn iter_by_type<T>(&self) -> UniverseIter<'_, T>
+    pub fn iter_by_type<T>(&self) -> impl Iterator<Item = (Name, Handle<T>)>
     where
-        Self: UniverseOps<T>,
         T: UniverseMember,
     {
-        UniverseOps::iter_by_type(self)
+        self.regs
+            .all_members_query
+            .iter_manual(&self.world)
+            .filter_map(|(_entity, membership)| {
+                Some((
+                    membership.name.clone(),
+                    membership.handle.downcast_ref::<T>()?.clone(),
+                ))
+            })
     }
 
     /// Convert a possibly-[pending](Name::Pending) [`Name`] into a name that may be an
@@ -505,51 +566,44 @@ impl Universe {
 
     /// Delete a member.
     ///
-    /// (Use [`UniverseTransaction::delete()`] as the public interface to this.)
+    /// (Use [`UniverseTransaction::delete()`] as the public, checked interface to this.)
     ///
     /// Returns whether the entry actually existed.
     pub(crate) fn delete(&mut self, name: &Name) -> bool {
-        let UniverseTables {
-            blocks,
-            characters,
-            sounds,
-            spaces,
-            tags,
-        } = &mut self.tables;
-
-        blocks.remove(name).is_some()
-            || characters.remove(name).is_some()
-            || sounds.remove(name).is_some()
-            || spaces.remove(name).is_some()
-            || tags.remove(name).is_some()
+        let Some(handle) = self.get_any(name) else {
+            return false;
+        };
+        let entity = handle.as_entity().unwrap();
+        handle.set_state_to_gone();
+        let success = self.world.despawn(entity);
+        assert!(success);
+        true
     }
 
-    /// Delete all anonymous members which have no handles to them.
+    /// Perform garbage collection: delete all anonymous members which have no handles to them.
     ///
     /// This may happen at any time during operations of the universe; calling this method
     /// merely ensures that it happens now and not earlier.
     pub fn gc(&mut self) {
-        let UniverseTables {
-            blocks,
-            characters,
-            sounds,
-            spaces,
-            tags,
-        } = &mut self.tables;
+        self.world.run_schedule(gc::Gc);
+    }
 
-        // TODO: We need a real GC algorithm. For now, let's perform non-cyclic collection by
-        // checking reference counts. If an entry has no weak references to its `Arc`, then
-        // we know that it has no `Handle`s.
-        //
-        // Besides not collecting cycles, this algorithm also has the flaw that it keeps
-        // members around if there are `Handle`s to them outside of the Universe, whereas the
-        // preferred behavior, for consistency of the game logic, would be that they
-        // go away at a time that is deterministic with respect to the simulation.
-        gc_members(blocks);
-        gc_members(characters);
-        gc_members(sounds);
-        gc_members(spaces);
-        gc_members(tags);
+    /// Validate
+    #[cfg(feature = "save")]
+    pub(crate) fn validate_deserialized_members(&self) -> Result<(), DeserializeHandlesError> {
+        let read_ticket = self.read_ticket();
+        self.regs
+            .all_members_query
+            .iter_manual(&self.world)
+            .try_for_each(|(_entity, membership)| {
+                if membership.handle.not_still_deserializing(read_ticket) {
+                    Ok(())
+                } else {
+                    Err(DeserializeHandlesError {
+                        to: membership.handle.name(),
+                    })
+                }
+            })
     }
 
     /// Apply the given function to the referent of the given handle.
@@ -575,8 +629,12 @@ impl Universe {
     where
         F: FnOnce(&mut T) -> Out,
     {
-        if handle.universe_id() == Some(self.id) {
-            handle.try_modify_impl(function)
+        let handle_universe_id = handle.universe_id();
+        if handle_universe_id == Some(self.id) {
+            let Some(mut component_guard) = self.world.get_mut(handle.as_entity().unwrap()) else {
+                return Err(HandleError::Gone(handle.name()));
+            };
+            Ok(function(&mut *component_guard))
         } else {
             Err(HandleError::WrongUniverse {
                 name: handle.name(),
@@ -586,53 +644,35 @@ impl Universe {
         }
     }
 
-    /// Traverse all members and find [`Handle`]s that were deserialized in disconnected form.
-    /// Each one needs to have its state adjusted and checked that it actually exists.
-    #[cfg(feature = "save")]
-    pub(crate) fn fix_deserialized_handles(&mut self) -> Result<(), DeserializeHandlesError> {
-        let visitor = &mut |maybe_broken_handle: &dyn ErasedHandle| {
-            let _result = maybe_broken_handle.fix_deserialized(self.id, ErasedHandleInternalToken);
-            // TODO: propagate errors usefully
-        };
+    /// Get mutable access to one component of one entity, and read-only access to all other
+    /// entities.
+    #[allow(clippy::elidable_lifetime_names)]
+    pub(in crate::universe) fn get_one_mut_and_ticket<'u, C>(
+        &'u mut self,
+        entity: Entity,
+    ) -> Option<(ecs::Mut<'u, C>, ReadTicket<'u>)>
+    where
+        C: ecs::Component<Mutability = bevy_ecs::component::Mutable>,
+    {
+        let universe_id = self.universe_id();
+        let unsafe_world = self.world.as_unsafe_world_cell();
+        let entity_mut = unsafe_world.get_entity(entity).ok()?;
 
-        let UniverseTables {
-            blocks,
-            characters,
-            sounds,
-            spaces,
-            tags,
-        } = &self.tables;
+        // SAFETY: `entity_mut` and the `everything_but()` ticket are disjoint.
+        Some(unsafe {
+            (
+                entity_mut.get_mut::<C>()?,
+                ReadTicket::everything_but(universe_id, unsafe_world, entity),
+            )
+        })
+    }
 
-        fix_handles_in_members(visitor, blocks)?;
-        fix_handles_in_members(visitor, characters)?;
-        fix_handles_in_members(visitor, sounds)?;
-        fix_handles_in_members(visitor, spaces)?;
-        fix_handles_in_members(visitor, tags)?;
-
-        fn fix_handles_in_members<T: VisitHandles + 'static>(
-            visitor: &mut dyn HandleVisitor,
-            storage: &Storage<T>,
-        ) -> Result<(), DeserializeHandlesError> {
-            for root in storage.values() {
-                // Besides allowing us to visit the handles, this read() has the side effect
-                // of discovering any missing referents, because they will have been
-                // inserted but not given a value.
-                //
-                // TODO: Gather information from other members to learn which member
-                // contained the bad handle.
-                let member_value =
-                    root.downgrade()
-                        .read(ReadTicket::new())
-                        .map_err(|e| match e {
-                            HandleError::NotReady(name) => DeserializeHandlesError { to: name },
-                            _ => unreachable!(),
-                        })?;
-                member_value.visit_handles(visitor);
-            }
-            Ok(())
-        }
-
-        Ok(())
+    /// Update stored queries to account for new archetypes.
+    ///
+    /// TODO(ecs): Is it possible and needful to avoid doing this if no changes were made?
+    fn update_archetypes(&mut self) {
+        let WorldRegistrations { all_members_query } = &mut self.regs;
+        all_members_query.update_archetypes(&self.world);
     }
 
     /// Activate logging this universe's time to a Rerun stream.
@@ -670,7 +710,8 @@ impl Universe {
 impl fmt::Debug for Universe {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
-            tables,
+            world,
+            regs: _,
             id: _,
             next_anonym: _,
             wants_gc: _,
@@ -697,26 +738,46 @@ impl fmt::Debug for Universe {
         ds.field("behaviors", &behaviors);
         ds.field("session_step_time", &session_step_time);
         ds.field("spaces_with_work", &spaces_with_work);
-        tables.fmt_members(&mut ds);
+
+        if false {
+            // A more “raw” dump of the ECS world which doesn't depend for correctness on
+            // all_members_query having been updated, and can see non-"member" entities.
+            // TODO(ecs): Decide whether to keep or discard this.
+            let raw_entities: Vec<(Option<Name>, Vec<&str>)> = world
+                .iter_entities()
+                .map(|er| {
+                    let components = er
+                        .archetype()
+                        .components()
+                        .map(|cid| world.components().get_info(cid).unwrap().name())
+                        .collect();
+                    let name = er.get::<Membership>().map(|m| m.name.clone());
+                    (name, components)
+                })
+                .collect();
+            ds.field("raw_entities", &raw_entities);
+        }
+
+        // Print members, sorted by name.
+        let members: BTreeMap<&Name, &'static str> = self
+            .regs
+            .all_members_query
+            .iter_manual(&self.world)
+            .map(|(_entity, membership)| (&membership.name, membership.handle.member_type_name()))
+            .collect();
+        for (member_name, type_name) in members {
+            ds.field(
+                &format!("{member_name}"),
+                &type_name.refmt(&manyfmt::formats::Unquote),
+            );
+        }
+
         ds.finish_non_exhaustive()
     }
 }
 
 impl behavior::Host for Universe {
     type Attachment = (); // TODO: store a `BTreeSet<Name>` or something to define a scope
-}
-
-/// Iterator type for [`Universe::iter_by_type`].
-#[derive(Clone, Debug)]
-#[expect(clippy::module_name_repetitions)] // TODO: consider renaming to Iter
-pub struct UniverseIter<'u, T>(alloc::collections::btree_map::Iter<'u, Name, RootHandle<T>>);
-impl<T> Iterator for UniverseIter<'_, T> {
-    type Item = (Name, Handle<T>);
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0
-            .next()
-            .map(|(name, root)| (name.clone(), root.downgrade()))
-    }
 }
 
 impl Default for Universe {
@@ -858,19 +919,6 @@ impl Fmt<StatusText> for UniverseStepInfo {
         }
         write!(fmt, "Universe behaviors: {}", behaviors.refmt(fopt))?;
         Ok(())
-    }
-}
-
-/// Helper for [`Universe::gc()`].
-fn gc_members<T>(table: &mut Storage<T>) {
-    let mut dead: Vec<Name> = Vec::new();
-    for (name, root) in table.iter() {
-        if !name.is_gc_root() && root.weak_ref_count() == 0 {
-            dead.push(name.clone());
-        }
-    }
-    for name in dead {
-        table.remove(&name);
     }
 }
 
