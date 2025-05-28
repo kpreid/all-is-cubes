@@ -1,6 +1,8 @@
 #![allow(missing_docs)]
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use all_is_cubes::math::{Cube, Face7, GridAab};
 use all_is_cubes::raycast::{AaRay, Raycaster};

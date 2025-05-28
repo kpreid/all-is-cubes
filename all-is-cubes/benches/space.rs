@@ -1,10 +1,9 @@
 #![allow(missing_docs)]
 
+use std::hint::black_box;
 use std::sync::Arc;
 
-use criterion::{
-    BatchSize, BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main,
-};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 
 use all_is_cubes::block;
 use all_is_cubes::camera::GraphicsOptions;
