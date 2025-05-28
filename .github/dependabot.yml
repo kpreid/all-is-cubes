@@ -6,26 +6,6 @@ updates:
       interval: "weekly"
       time: "17:00"
       timezone: "America/Los_Angeles"
-  - package-ecosystem: "cargo"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      time: "17:00"
-      timezone: "America/Los_Angeles"
-    # Note: We would *like* the versioning strategy "increase-if-necessary",
-    # but Dependabot does not currently support that. As a workaround, to
-    # decrease noise, we configure to ignore patch releases below.
-    versioning-strategy: "auto"
-    ignore:
-      - dependency-name: "*"
-        # Ignore patch updates because we prefer to just `cargo update` which
-        # does not make the error of increasing version *requirements* to require
-        # the patch. See comments above on versioning-strategy.
-        update-types: ["version-update:semver-patch"]
-      
-      # Skip deps we only use for tooling and not on external data
-      - dependency-name: "cargo_metadata"
-      - dependency-name: "toml_edit"
-      # Skip glam because we only use it explicitly syncing with Rerun version
-      # (we can't use their reexport because it wouldn't enable the mint feature)
-      - dependency-name: "glam"
+  # We now use Renovate instead of Dependabot for Cargo dependencies, because it handles
+  # distinguishing breaking and non-breaking changes better.
+  # - package-ecosystem: "cargo"
