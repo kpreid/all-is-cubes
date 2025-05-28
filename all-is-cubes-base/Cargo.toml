@@ -18,6 +18,7 @@ bench = false
 std = []
 # Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = [
+    "std", # TODO: remove this when <https://github.com/rust-fuzz/arbitrary/issues/208> is fixed
     "dep:arbitrary",
     "euclid/arbitrary",
     "ordered-float/arbitrary"
