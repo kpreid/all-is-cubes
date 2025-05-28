@@ -19,6 +19,10 @@ fn main() {
     let rays = generate_light_ray_pattern();
     let chart = generate_light_propagation_chart(&rays);
     write_light_propagation_chart(chart);
+
+    // TODO(ecs) TODO(no_std): horrible kludge: pretend the 'std' feature is always enabled,
+    // because disabling it is not currently functional.
+    println!("cargo::rustc-cfg=feature=\"std\"");
 }
 
 const RAY_DIRECTION_STEP: isize = 5;
