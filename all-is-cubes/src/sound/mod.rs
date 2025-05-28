@@ -4,7 +4,7 @@
 
 use core::fmt;
 
-/// Acts as polyfill for float methods used in synthesis such as sin()
+/// Acts as polyfill for float methods used in synthesis such as `sin()`
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
