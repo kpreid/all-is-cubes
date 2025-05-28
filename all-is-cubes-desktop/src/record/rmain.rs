@@ -87,7 +87,9 @@ impl behavior::Behavior<Character> for AutoRotate {
         context: &behavior::Context<'_, Character>,
     ) -> (UniverseTransaction, behavior::Then) {
         let mut new_self = *self;
-        new_self.angle += new_self.rate * context.tick.delta_t().as_secs_f64();
+        new_self.angle =
+            NotNan::new(new_self.angle + new_self.rate * context.tick.delta_t().as_secs_f64())
+                .unwrap();
 
         let body_txn = BodyTransaction::default().with_look_direction(
             euclid::Rotation3D::<f64, Cube, Cube>::around_y(euclid::Angle::degrees(

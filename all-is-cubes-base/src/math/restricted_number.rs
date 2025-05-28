@@ -433,13 +433,13 @@ impl<T: FloatCore + PartialOrd> Ord for ZeroOne<T> {
     }
 }
 
-impl<T: FloatCore> hash::Hash for PositiveSign<T> {
+impl<T: ordered_float::PrimitiveFloat> hash::Hash for PositiveSign<T> {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.into_nn().hash(state)
     }
 }
-impl<T: FloatCore> hash::Hash for ZeroOne<T> {
+impl<T: ordered_float::PrimitiveFloat> hash::Hash for ZeroOne<T> {
     #[inline]
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.into_nn().hash(state)

@@ -148,13 +148,6 @@ user-id = 988
 user-login = "kornelski"
 user-name = "Kornel"
 
-[[publisher.is-terminal]]
-version = "0.4.15"
-when = "2025-01-22"
-user-id = 6825
-user-login = "sunfishcode"
-user-name = "Dan Gohman"
-
 [[publisher.is_terminal_polyfill]]
 version = "1.70.1"
 when = "2024-07-25"
@@ -2376,6 +2369,12 @@ criteria = "safe-to-deploy"
 delta = "0.1.5 -> 0.1.6"
 notes = "Only a minor clippy adjustment."
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
+
+[[audits.isrg.audits.criterion]]
+who = "Tim Geoghegan <timg@divviup.org>"
+criteria = "safe-to-run"
+delta = "0.5.1 -> 0.6.0"
+notes = "No new unsafe code and nothing suspicious in build scripts."
 
 [[audits.isrg.audits.num-iter]]
 who = "David Cook <dcook@divviup.org>"

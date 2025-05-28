@@ -117,7 +117,7 @@ nosy = { git = "https://github.com/kpreid/nosy/", rev = "24a4d626a9dc6e1d4fb55fc
 num-traits = { version = "0.2.19", default-features = false }
 # once_cell::race is used in no_std builds only, for lazy initialization
 once_cell = { version = "1.21.3", default-features = false }
-ordered-float = { version = "4.2.0", default-features = false }
+ordered-float = { version = "5.0.0", default-features = false }
 paste = {version = "1.0.15", default-features = false }
 petgraph = { version = "0.8.1", default-features = false, features = ["graphmap"] }
 png-decoder = { version = "0.1.1", default-features = false } # used by all-is-cubes for no_std-compatible reading pngs
