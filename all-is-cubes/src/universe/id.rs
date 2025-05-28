@@ -25,7 +25,7 @@ impl UniverseId {
             reason = "depends on pointer width and atomic support"
         )]
 
-        static UNIVERSE_ID_COUNTER: AtomicUpTo64 = atomic::AtomicU64::new(1);
+        static UNIVERSE_ID_COUNTER: AtomicUpTo64 = AtomicUpTo64::new(1);
 
         let id = from_atomic_value(
             UNIVERSE_ID_COUNTER
@@ -55,7 +55,10 @@ impl OnceUniverseId {
     ///
     /// On failure, returns the already-stored ID.
     pub fn set(&self, new_id: UniverseId) -> Result<(), UniverseId> {
-        match self.0.compare_exchange(0, new_id.0.get(), Acquire, Relaxed) {
+        match self
+            .0
+            .compare_exchange(0, to_atomic_value(new_id.0), Acquire, Relaxed)
+        {
             Ok(_) => Ok(()),
             Err(existing) => Err(UniverseId(from_atomic_value(existing).unwrap())),
         }
@@ -68,8 +71,8 @@ impl OnceUniverseId {
 }
 
 impl From<UniverseId> for OnceUniverseId {
-    fn from(value: UniverseId) -> Self {
-        Self(AtomicUpTo64::new(value.0.get()))
+    fn from(id: UniverseId) -> Self {
+        Self(AtomicUpTo64::new(to_atomic_value(id.0)))
     }
 }
 
@@ -81,23 +84,36 @@ cfg_if::cfg_if! {
     // by counting one at a time. If not, compromise on a smaller counter.
     if #[cfg(target_has_atomic = "64")] {
         type AtomicUpTo64 = atomic::AtomicU64;
+        type NonAtomicUpTo64 = u64;
         fn from_atomic_value(value: u64) -> Option<NonZeroU64> {
             NonZeroU64::new(value)
         }
     } else if #[cfg(target_has_atomic = "32")] {
         type AtomicUpTo64 = atomic::AtomicU32;
-        fn from_atomic_value(value: uu32) -> Option<NonZeroU64> {
+        type NonAtomicUpTo64 = u32;
+        fn from_atomic_value(value: u32) -> Option<NonZeroU64> {
             NonZeroU64::new(u64::from(value))
         }
     } else {
         // If this doesn't work we'll give up.
         type AtomicUpTo64 = atomic::AtomicUsize;
+        type NonAtomicUpTo64 = usize;
         fn from_atomic_value(value: usize) -> Option<NonZeroU64> {
             NonZeroU64::new(u64::try_from(value).expect(
                 "You have >64-bit usize and you overflowed u64? Impressive."
             ))
         }
     }
+}
+
+#[allow(
+    trivial_numeric_casts,
+    clippy::cast_possible_truncation,
+    reason = "platform dependent"
+)]
+fn to_atomic_value(value: NonZeroU64) -> NonAtomicUpTo64 {
+    // This should never overflow because we'll overflow UNIVERSE_ID_COUNTER first.
+    value.get() as NonAtomicUpTo64
 }
 
 // -------------------------------------------------------------------------------------------------
