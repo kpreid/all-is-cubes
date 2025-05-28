@@ -10,27 +10,23 @@
   "semanticCommits": "disabled",
   "packageRules": [
     {
-      "description": "Group Cargo-semver-compatible updates of the 0.* kind",
       "matchManagers": [
         "cargo"
       ],
-      "matchUpdateTypes": [
-        "patch"
+      "matchJsonata": [
+        "isBreaking != true"
       ],
-      "matchCurrentVersion": "<1.0.0",
-      "groupName": "compatible"
+      "groupName": "compatible",
+      "rangeStrategy": "update-lockfile"
     },
     {
-      "description": "Group Cargo-semver-compatible updates of the >=1.0 kind",
       "matchManagers": [
         "cargo"
       ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
+      "matchJsonata": [
+        "isBreaking = true"
       ],
-      "matchCurrentVersion": ">=1.0.0",
-      "groupName": "compatible"
+      "rangeStrategy": "replace"
     },
     {
       "description": "Skip glam because we only use it explicitly syncing with Rerun version. (We can't use their reexport because it wouldn't enable the mint feature.)",
