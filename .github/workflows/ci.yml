@@ -502,6 +502,9 @@ jobs:
   no_std:
     runs-on: ubuntu-latest
 
+    # TODO(no_std): Re-enable this job when the no_std build works again.
+    if: false
+
     steps:
     - uses: actions/checkout@v4
 

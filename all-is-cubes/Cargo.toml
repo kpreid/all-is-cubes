@@ -52,11 +52,12 @@ required-features = ["rerun"]
 default = ["std"]
 # Adds std-dependent functionality such as thread safety.
 std = [
-    "all-is-cubes-base/std",
+    # TODO(no_std): make these dep features conditional on our std feature again when possible
+    # "all-is-cubes-base/std",
     "arcstr/std", # not required but nicer behavior
-    "once_cell/std", # used conditionally as more efficient than once_cell::race
-    "nosy/sync",
-    "yield-progress/sync",
+    # "once_cell/std", # used conditionally as more efficient than once_cell::race
+    # "nosy/sync",
+    # "yield-progress/sync",
 ]
 # Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = [
@@ -96,7 +97,7 @@ auto-threads = [
 ]
 
 [dependencies]
-all-is-cubes-base = { workspace = true }
+all-is-cubes-base = { workspace = true, features = ["std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
 arbitrary = { workspace = true, optional = true }
 arcstr = { version = "1.2.0", default-features = false, features = ["serde", "substr"] }
 arrayvec = { workspace = true }
@@ -121,9 +122,9 @@ log = { workspace = true }
 macro_rules_attribute = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
-nosy = { workspace = true, features = ["async"] }
+nosy = { workspace = true, features = ["async", "sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
 num-traits = { workspace = true }
-once_cell = { workspace = true, features = ["alloc", "race"] }
+once_cell = { workspace = true, features = ["alloc", "race", "std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
 ordered-float = { workspace = true }
 paste = { workspace = true }
 png-decoder = { workspace = true }
@@ -139,7 +140,7 @@ re_types = { workspace = true, optional = true }
 # alloc feature needed for #[serde(flatten)] — https://github.com/serde-rs/serde/issues/1935
 serde = { workspace = true, optional = true, features = ["alloc", "derive", "rc"] }
 unicode-segmentation = { workspace = true }
-yield-progress = { workspace = true }
+yield-progress = { workspace = true, features = ["sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
 
 [build-dependencies]
 all-is-cubes-base = { workspace = true }
