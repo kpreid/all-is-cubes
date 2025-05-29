@@ -146,9 +146,7 @@ impl Universe {
 
             world.init_resource::<NameMap>();
             world.register_component::<Membership>();
-            // TODO(ecs): it would be nice to register all member components to ensure our queries
-            // are up to date up-front; right now we are kludgily doing update_archetypes()
-            // manually.
+            Self::register_all_member_components(&mut world);
 
             world.insert_resource(id);
         }

@@ -1,9 +1,14 @@
 #[cfg(test)]
 use alloc::vec::Vec;
 
+use bevy_ecs::prelude as ecs;
+use bevy_ecs::ptr::Ptr;
+
 #[cfg(doc)]
 use crate::universe::Universe;
 use crate::universe::{self, ErasedHandle, Handle};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Allows finding all of the [`Handle`]s inside a data structure.
 ///
@@ -77,4 +82,48 @@ pub(crate) fn list_handles<T: VisitHandles + 'static>(target: &T) -> Vec<super::
     let mut names: Vec<super::Name> = Vec::new();
     target.visit_handles(&mut |r: &dyn ErasedHandle| names.push(r.name().clone()));
     names
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Registry of [`ecs::Component`] types that implement [`VisitHandles`].
+/// Allows obtaining `&dyn VisitHandles` from each one.
+///
+/// Used by the garbage collector.
+/// If components containing handles are not registered, they will not keep their referents alive.
+//---
+// Note: If we find ourselves wanting this for more traits, or with less unsafe code,
+// try <https://docs.rs/bevy-trait-query/>.
+#[derive(Default, ecs::Resource)]
+pub(in crate::universe) struct VisitableComponents(
+    hashbrown::HashMap<bevy_ecs::component::ComponentId, unsafe fn(Ptr<'_>) -> &dyn VisitHandles>,
+);
+
+impl VisitableComponents {
+    pub(in crate::universe) fn register<C: ecs::Component + VisitHandles>(world: &mut ecs::World) {
+        let component_id = world.register_component::<C>();
+        world.get_resource_or_init::<Self>().0.insert(
+            component_id,
+            |ptr: Ptr<'_>| -> &dyn VisitHandles {
+                // SAFETY: This function will only be called with pointers to `C`.
+                unsafe { ptr.deref::<C>() }
+            },
+        );
+    }
+
+    pub(in crate::universe) fn visit_handles_in_entity<'w>(
+        &self,
+        entity: bevy_ecs::world::EntityRefExcept<'w, impl ecs::Bundle>,
+    ) -> impl Iterator<Item = &'w dyn VisitHandles> {
+        // TODO: should this accept a visitor instead as its name suggest,
+        // or is this version with less code near the unsafe{} preferable?
+        self.0
+            .iter()
+            .filter_map(move |(&component_id, &downcaster)| {
+                entity
+                    .get_by_id(component_id)
+                    // SAFETY: the component id ensures the component is of the correct type
+                    .map(|ptr| unsafe { downcaster(ptr) })
+            })
+    }
 }

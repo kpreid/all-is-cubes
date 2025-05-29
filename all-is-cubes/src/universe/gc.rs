@@ -2,7 +2,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use bevy_ecs::prelude as ecs;
 
-use crate::universe::{ErasedHandle, Membership, VisitHandles};
+use crate::universe::{ErasedHandle, Membership, VisitableComponents};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -38,11 +38,16 @@ pub(in crate::universe) fn add_gc(world: &mut ecs::World) {
 /// See [`Universe::gc()`].
 fn gc_system(
     world: &ecs::World,
-    gc_query: ecs::Query<'_, '_, (ecs::Entity, &Membership, &GcState)>,
+    // Used for the initial scan for roots and final scan for garbage.
+    scan_query: ecs::Query<'_, '_, (ecs::Entity, &Membership, &GcState)>,
+    // Used for finding handles.
+    walk_query: ecs::Query<'_, '_, bevy_ecs::world::EntityRefExcept<'_, ()>>,
+    // Used for marking the referents of found handles.
+    gc_state_query: ecs::Query<'_, '_, &GcState>,
     mut commands: ecs::Commands<'_, '_>,
-) {
+) -> ecs::Result {
     // Mark all GC roots (named members) and unmark all non-roots (anonymous members).
-    let mut to_visit: bevy_ecs::entity::EntityHashSet = gc_query
+    let mut to_visit: bevy_ecs::entity::EntityHashSet = scan_query
         .iter()
         .filter_map(|(entity, membership, state)| {
             let is_gc_root = membership.name.is_gc_root() || membership.handle.has_strong_handles();
@@ -65,13 +70,16 @@ fn gc_system(
             log::trace!("visiting refs in {entity}");
         }
 
-        for component in all_visitable_components(&world.get_entity(entity).unwrap()) {
+        for component in world
+            .resource::<VisitableComponents>()
+            .visit_handles_in_entity(walk_query.get(entity)?)
+        {
             component.visit_handles(&mut |handle: &dyn ErasedHandle| {
                 let Some(referenced_entity) = handle.as_entity() else {
                     // This happens if the handle is in state Gone already.
                     return;
                 };
-                let (_, _, r_state) = gc_query.get(referenced_entity).unwrap();
+                let r_state = gc_state_query.get(referenced_entity).unwrap();
                 if !r_state.marked.swap(true, Ordering::Relaxed) {
                     to_visit.insert(referenced_entity);
                 }
@@ -80,7 +88,7 @@ fn gc_system(
     }
 
     // Delete unmarked member-entities.
-    for (entity, membership, state) in gc_query.iter() {
+    for (entity, membership, state) in scan_query.iter() {
         if !state.marked.load(Ordering::Relaxed) {
             if GC_DEBUG_LOG {
                 log::trace!("despawning {entity}");
@@ -89,20 +97,6 @@ fn gc_system(
             commands.entity(entity).despawn()
         }
     }
-}
 
-fn all_visitable_components<'w>(
-    entity: &ecs::EntityRef<'w>,
-) -> impl Iterator<Item = &'w dyn VisitHandles> {
-    fn coerce(arg: &impl VisitHandles) -> &dyn VisitHandles {
-        arg
-    }
-    [
-        // TODO(ecs): generate this list by macro so it is more likely to be complete
-        entity.get::<crate::block::BlockDef>().map(coerce),
-        entity.get::<crate::space::Space>().map(coerce),
-        entity.get::<crate::character::Character>().map(coerce),
-    ]
-    .into_iter()
-    .flatten()
+    Ok(())
 }

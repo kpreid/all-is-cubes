@@ -16,7 +16,9 @@ use crate::sound::SoundDef;
 use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
-use crate::universe::{ErasedHandle, Handle, InsertError, Name, Universe, universe_txn as ut};
+use crate::universe::{
+    ErasedHandle, Handle, InsertError, Name, Universe, VisitableComponents, universe_txn as ut,
+};
 
 /// Trait for every type which can be a named member of a universe.
 ///
@@ -71,6 +73,13 @@ macro_rules! member_enums_and_impls {
                 $(
                     .chain(self.iter_by_type::<$member_type>()
                         .map(|(_name, handle)| AnyHandle::$member_type(handle)))
+                )*
+            }
+
+            pub(in crate::universe) fn register_all_member_components(world: &mut ecs::World) {
+                $(
+                    // This also registers the components themselves as a side benefit.
+                    VisitableComponents::register::<$member_type>(world);
                 )*
             }
         }
