@@ -283,6 +283,30 @@ impl CurrentTick {
 
 // -------------------------------------------------------------------------------------------------
 
+/// [`ScheduleLabel`]s relating to time passing in a [`Universe`].
+pub(crate) mod schedule {
+    use bevy_ecs::schedule::ScheduleLabel;
+
+    /// Schedule label for systems executed immediately before [`Step`].
+    ///
+    /// Use this schedule to collect information about the current state
+    /// and synchronize with any edits that happened outside of stepping.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ScheduleLabel)]
+    pub struct BeforeStep;
+
+    /// Most simulation logic goes here.
+    ///
+    /// If time is paused, this is not called, but [`BeforeStep`] and [`AfterStep`] still are.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ScheduleLabel)]
+    pub struct Step;
+
+    /// Executed immediately after [`Step`].
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ScheduleLabel)]
+    pub struct AfterStep;
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;

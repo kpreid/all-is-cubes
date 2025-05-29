@@ -270,6 +270,8 @@ impl Universe {
 
         // --- End of setup; now advance time for our contents. ---
 
+        self.world.run_schedule(time::schedule::BeforeStep);
+
         // Update block def caches. This must be done before spaces so that spaces can see the
         // latest updates.
         self.sync_block_defs();
@@ -373,18 +375,27 @@ impl Universe {
             )
             .unwrap();
 
-        self.spaces_with_work = si.spaces_with_work;
+        if !tick.paused() {
+            self.world.run_schedule(time::schedule::Step);
+        }
 
-        // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
-        for t in si.transactions {
-            if let Err(e) = t.execute(self, (), &mut transaction::no_outputs) {
-                // TODO: Need to report these failures back to the source
-                // ... and perhaps in the UniverseStepInfo
-                log::info!("Transaction failure: {e}");
+        // Finalize `StepInput`'s stuff
+        {
+            self.spaces_with_work = si.spaces_with_work;
+
+            // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
+            for t in si.transactions {
+                if let Err(e) = t.execute(self, (), &mut transaction::no_outputs) {
+                    // TODO: Need to report these failures back to the source
+                    // ... and perhaps in the UniverseStepInfo
+                    log::info!("Transaction failure: {e}");
+                }
             }
         }
 
         self.sync_space_blocks();
+
+        self.world.run_schedule(time::schedule::AfterStep);
 
         // Post-step cleanup
         self.world.resource_mut::<time::CurrentTick>().0 = None;
