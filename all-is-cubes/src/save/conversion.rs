@@ -1216,6 +1216,7 @@ mod universe {
 
     impl Serialize for Universe {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            // TODO: Serialize resources such as `Clock`, possibly by giving them unique Handles.
             PartialUniverse {
                 handles: HandleSet::all_of(self),
                 read_ticket: self.read_ticket(),

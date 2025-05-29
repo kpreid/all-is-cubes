@@ -70,7 +70,8 @@ mod tests;
 ///
 #[doc = include_str!("save/serde-warning.md")]
 pub struct Universe {
-    world: bevy_ecs::world::World,
+    /// ECS storage for most of the data of the universe.
+    world: ecs::World,
 
     /// Stuff derived from `world` that we want to construct once.
     regs: WorldRegistrations,
@@ -91,11 +92,6 @@ pub struct Universe {
     ///
     /// For universes created by [`Universe::new()`], this is equal to `Arc::new(())`.
     pub whence: Arc<dyn WhenceUniverse>,
-
-    /// State and schedule of in-game time passing.
-    //
-    // TODO: this is not serialized, and fixing that will require refactoring.
-    clock: time::Clock,
 
     behaviors: behavior::BehaviorSet<Universe>,
 
@@ -130,12 +126,14 @@ impl Universe {
 
         let mut world = bevy_ecs::world::World::new();
 
+        // Configure the World state.
         {
             // "Panics: The ComputeTaskPool is not initialized. If using this from a query that is
             // being initialized and run from the ECS scheduler, this should never panic."
             // — <https://docs.rs/bevy_ecs/0.16.0/bevy_ecs/query/struct.QueryState.html#method.par_iter>
             // We are not properly using the scheduler yet, so create and run a dummy schedule to
             // trigger the initialization.
+            // TODO(ecs): Remove this when it is definitely no longer necessary.
             {
                 let mut schedule = ecs::Schedule::default();
                 schedule.add_systems(|q: ecs::Query<'_, '_, Entity>| {
@@ -144,14 +142,23 @@ impl Universe {
                 schedule.run(&mut world);
             }
 
+            // Register various components and resources which are *not* visible state of the
+            // universe, but have data derived from others or are used temporarily.
             world.init_resource::<NameMap>();
+            world.init_resource::<time::CurrentTick>();
             world.register_component::<Membership>();
             Self::register_all_member_components(&mut world);
 
+            // Register things that are user-visible state of the universe.
+            // When new such resources are added, also mention them in the documentation when
+            // they aren’t just implementation details.
+            // TODO: allow configuring nondefault clock schedules
+            world.insert_resource(time::Clock::new(time::TickSchedule::per_second(60), 0));
             world.insert_resource(id);
-        }
 
-        gc::add_gc(&mut world);
+            // Add systems.
+            gc::add_gc(&mut world);
+        }
 
         let regs = WorldRegistrations {
             all_members_query: world.query::<(Entity, &Membership)>(),
@@ -164,8 +171,6 @@ impl Universe {
             next_anonym: 0,
             wants_gc: false,
             whence: Arc::new(()),
-            // TODO: allow nondefault schedules
-            clock: time::Clock::new(time::TickSchedule::per_second(60), 0),
             behaviors: behavior::BehaviorSet::new(),
             session_step_time: 0,
             spaces_with_work: 0,
@@ -241,7 +246,8 @@ impl Universe {
         let mut info = UniverseStepInfo::default();
         let start_time = I::now();
 
-        let tick = self.clock.advance(paused);
+        let tick = self.world.resource_mut::<time::Clock>().advance(paused);
+        self.world.resource_mut::<time::CurrentTick>().0 = Some(tick);
 
         self.log_rerun_time();
 
@@ -279,7 +285,6 @@ impl Universe {
 
         // Bundle all our relevant state so we can pass it to systems.
         struct StepInput<I> {
-            tick: time::Tick,
             deadline: time::Deadline<I>,
             /// How to divide light calculation time among spaces, based on the previous step
             budget_per_space: Option<time::Duration>,
@@ -288,7 +293,6 @@ impl Universe {
             spaces_with_work: usize,
         }
         let mut si = StepInput {
-            tick,
             deadline,
             budget_per_space: deadline
                 .remaining_since(start_time)
@@ -314,7 +318,7 @@ impl Universe {
                 let (space_info, transaction) = space.step(
                     everything_but,
                     Some(&space_handle),
-                    si.tick,
+                    tick,
                     match si.budget_per_space {
                         Some(budget) => si.deadline.min(time::Deadline::At(I::now() + budget)),
                         None => si.deadline,
@@ -335,19 +339,22 @@ impl Universe {
         }
         self.sync_space_blocks();
 
-        // TODO(ecs): pre-register this system
+        // TODO(ecs): pre-register this system after getting rid of the inputs
         self.world
             .run_system_cached_with(
                 |mut si: ecs::InMut<'_, StepInput<I>>,
+                 current_tick: ecs::Res<'_, time::CurrentTick>,
                  data_sources: QueryBlockDataSources<'_, '_>,
                  characters: ecs::Query<'_, '_, (&Membership, &mut Character)>| {
+                    #[expect(clippy::shadow_unrelated, reason = "mid-refactoring")]
+                    let tick = current_tick.get().unwrap();
                     // TODO(ecs): convert this to run in parallel
                     for (membership, mut ch) in characters {
                         let (transaction, character_info, _body_info) = ch.step(
                             // TODO(ecs): using QueryBlockDataSources as an approximation of what is actually needed here
                             ReadTicket::from_block_data_sources(data_sources),
                             membership.handle.downcast_ref(),
-                            si.tick,
+                            tick,
                         );
                         si.transactions.push(transaction);
                         si.info.character_step += character_info;
@@ -370,6 +377,9 @@ impl Universe {
         }
 
         self.sync_space_blocks();
+
+        // Post-step cleanup
+        self.world.resource_mut::<time::CurrentTick>().0 = None;
 
         si.info.computation_time = I::now().saturating_duration_since(start_time);
         si.info
@@ -397,7 +407,7 @@ impl Universe {
     /// Returns the [`time::Clock`] that is used to advance time when [`step()`](Self::step)
     /// is called.
     pub fn clock(&self) -> time::Clock {
-        self.clock
+        *self.world.resource()
     }
 
     /// Inserts a new object without giving it a specific name, and returns
@@ -714,7 +724,6 @@ impl fmt::Debug for Universe {
             next_anonym: _,
             wants_gc: _,
             whence,
-            clock,
             behaviors,
             session_step_time,
             spaces_with_work,
@@ -732,7 +741,7 @@ impl fmt::Debug for Universe {
         {
             ds.field("whence", &whence);
         }
-        ds.field("clock", &clock);
+        ds.field("clock", &self.clock());
         ds.field("behaviors", &behaviors);
         ds.field("session_step_time", &session_step_time);
         ds.field("spaces_with_work", &spaces_with_work);

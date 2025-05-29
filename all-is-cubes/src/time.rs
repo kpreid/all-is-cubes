@@ -3,8 +3,12 @@
 use core::fmt;
 use core::num::NonZeroU16;
 
+use bevy_ecs::prelude as ecs;
+
 #[cfg(doc)]
 use crate::universe::Universe;
+
+// -------------------------------------------------------------------------------------------------
 
 #[doc(inline)]
 pub use all_is_cubes_base::time::*;
@@ -93,6 +97,8 @@ impl Tick {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Specifies which [`Tick`]s a repeating event occurs on.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -127,6 +133,8 @@ impl Schedule {
         Some(self.period)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Defines how time passes in a [`Universe`].
 ///
@@ -179,6 +187,8 @@ impl fmt::Debug for TickSchedule {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Defines the passage of time in a [`Universe`].
 ///
 /// See [`TickSchedule`] for details on what is possible and why.
@@ -186,7 +196,7 @@ impl fmt::Debug for TickSchedule {
 /// ---
 ///
 /// TODO: Should `paused` be part of the clock's state?
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, ecs::Resource)]
 pub struct Clock {
     schedule: TickSchedule,
 
@@ -254,6 +264,24 @@ impl fmt::Debug for Clock {
         write!(f, "Clock({phase}/{divisor} of {base_duration:?})")
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Resource which contains a `Tick` when, and only when, the [`Universe`] is being stepped.
+//---
+#[derive(Clone, Copy, Default, ecs::Resource)]
+pub(crate) struct CurrentTick(pub Option<Tick>);
+
+impl CurrentTick {
+    pub(crate) fn get(
+        self,
+    ) -> Result<Tick, alloc::boxed::Box<dyn core::error::Error + Send + Sync>> {
+        self.0
+            .ok_or_else(|| "attempted to get current Tick when there is no step in progress".into())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
