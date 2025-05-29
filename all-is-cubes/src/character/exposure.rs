@@ -26,6 +26,7 @@ const TARGET_LUMINANCE: f32 = 0.9;
 const ADJUSTMENT_STRENGTH: f32 = 0.5;
 const EXPOSURE_CHANGE_RATE: f32 = 2.0;
 
+#[derive(Clone)]
 pub(crate) struct State {
     /// Incrementally updated samples of neighboring light levels, used for
     /// determining exposure / eye adaptation.
@@ -140,6 +141,7 @@ fn compute_target_exposure(luminance: f32) -> f32 {
 mod tests {
     use super::*;
     use crate::character::Character;
+    use crate::character::eye::CharacterEye;
     use crate::math::{GridAab, Rgb};
     use crate::time;
     use crate::universe::Universe;
@@ -196,7 +198,10 @@ mod tests {
         // Let exposure sampling reach steady state
         for i in 0..100 {
             {
-                let exposure = &character.read(universe.read_ticket()).unwrap().exposure;
+                let exposure = &character
+                    .query::<CharacterEye>(universe.read_ticket())
+                    .unwrap()
+                    .exposure;
                 eprintln!(
                     "{i:3} {exp_log} {exp}",
                     exp_log = exposure.exposure_log,
@@ -208,7 +213,10 @@ mod tests {
 
         // Done running; examine results.
 
-        let exposure = &character.read(universe.read_ticket()).unwrap().exposure;
+        let exposure = &character
+            .query::<CharacterEye>(universe.read_ticket())
+            .unwrap()
+            .exposure;
 
         // Luminance sampling should match the scene we set up.
         eprintln!("{:?}", exposure.luminance_samples);

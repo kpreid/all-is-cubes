@@ -237,26 +237,23 @@ impl StandardCameras {
         }
 
         if let Some(character_handle) = &self.character {
-            match character_handle.read(read_tickets.world) {
-                Ok(character) => {
-                    let view_transform = character.view();
+            match Character::view(character_handle, read_tickets.world) {
+                Ok((space_handle, view_transform, exposure)) => {
                     if view_transform != self.cameras.world.view_transform() {
                         anything_changed = true;
-                        self.cameras.world.set_view_transform(character.view());
+                        self.cameras.world.set_view_transform(view_transform);
                     }
 
                     // TODO: listen::Cell should make this easier and cheaper
-                    if Option::as_ref(&self.world_space.get()) != Some(&character.space) {
+                    if Option::as_ref(&self.world_space.get()) != Some(space_handle) {
                         anything_changed = true;
 
-                        self.world_space.set(Some(character.space.clone()));
+                        self.world_space.set(Some(space_handle.clone()));
                     }
 
                     // Update camera exposure from character.
                     let old_actual_exposure = self.cameras.world.exposure();
-                    self.cameras
-                        .world
-                        .set_measured_exposure(character.exposure());
+                    self.cameras.world.set_measured_exposure(exposure);
                     anything_changed |= self.cameras.world.exposure() != old_actual_exposure;
                 }
                 Err(_) => {

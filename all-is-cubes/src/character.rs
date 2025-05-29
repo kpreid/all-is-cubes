@@ -20,25 +20,33 @@ use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
 use crate::listen;
 use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, notnan};
 use crate::physics;
-use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact, Velocity};
+use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 #[cfg(feature = "save")]
 use crate::save::schema;
 use crate::space::{CubeTransaction, Space};
 use crate::time::Tick;
 use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
+use crate::universe::HandleError;
 use crate::universe::{Handle, HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText};
+
+// -------------------------------------------------------------------------------------------------
 
 mod cursor;
 pub use cursor::*;
 
 mod exposure;
 
+mod eye;
+pub(crate) use eye::add_eye_systems;
+
 mod spawn;
 pub use spawn::*;
 
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 // Control characteristics.
 const WALKING_SPEED: FreeCoordinate = 4.0;
@@ -55,6 +63,7 @@ const JUMP_SPEED: FreeCoordinate = 8.0;
 ///
 #[doc = include_str!("save/serde-warning.md")]
 #[derive(bevy_ecs::component::Component)]
+#[require(eye::CharacterEye)]
 pub struct Character {
     /// Position, collision, and look direction.
     pub body: Body,
@@ -67,13 +76,6 @@ pub struct Character {
     /// towards.
     velocity_input: FreeVector,
 
-    /// Offset to be added to `body.position` to produce the drawn eye position.
-    /// Used to produce camera shifting effects when the body is stopped by an obstacle
-    /// or otherwise moves suddenly.
-    eye_displacement_pos: Vector3D<FreeCoordinate, Cube>,
-    /// Velocity of the `eye_displacement_pos` point (relative to body).
-    eye_displacement_vel: Vector3D<FreeCoordinate, Velocity>,
-
     // TODO: Does this belong here? Or in the Space?
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu
     pub colliding_cubes: HbHashSet<Contact>,
@@ -81,8 +83,6 @@ pub struct Character {
     /// Last body step from [`Character::step`], for debugging.
     #[doc(hidden)] // pub to be used by fuzz_physics
     pub last_step_info: Option<BodyStepInfo>,
-
-    exposure: exposure::State,
 
     // TODO: Figure out what access is needed and add accessors
     inventory: Inventory,
@@ -107,11 +107,8 @@ impl fmt::Debug for Character {
             body,
             space: _,
             velocity_input,
-            eye_displacement_pos: _,
-            eye_displacement_vel: _,
             colliding_cubes,
             last_step_info: _,
-            exposure,
             inventory,
             selected_slots,
             notifier: _,
@@ -123,7 +120,6 @@ impl fmt::Debug for Character {
             .field("body", &body)
             .field("velocity_input", &velocity_input.refmt(&ConciseDebug))
             .field("colliding_cubes", &colliding_cubes)
-            .field("exposure", &exposure.exposure())
             .field("inventory", &inventory)
             .field("selected_slots", selected_slots)
             .field("behaviors", &behaviors)
@@ -214,11 +210,8 @@ impl Character {
             },
             space,
             velocity_input: Vector3D::zero(),
-            eye_displacement_pos: Vector3D::zero(),
-            eye_displacement_vel: Vector3D::zero(),
             colliding_cubes: HbHashSet::new(),
             last_step_info: None,
-            exposure: exposure::State::default(),
             inventory: Inventory::from_slots(inventory),
             selected_slots,
             notifier: listen::Notifier::new(),
@@ -240,12 +233,26 @@ impl Character {
     /// coordinate system.
     ///
     /// See the documentation for [`ViewTransform`] for the interpretation of this transform.
-    pub fn view(&self) -> ViewTransform {
-        ViewTransform {
-            // Remember, this is an eye *to* world transform.
-            rotation: self.body.look_rotation(),
-            translation: (self.body.position().to_vector() + self.eye_displacement_pos).cast_unit(),
-        }
+    ///
+    /// In addition to the transform it also returns the [`Space`] to be viewed and the
+    /// automatic exposure value.
+    ///
+    /// TODO: This return value should really be a struct, but we are somewhat in the middle of
+    /// refactoring how [`Character`] is built and this particular tuple is an interim measure.
+    //---
+    // TODO(ecs): this needs a better signature. figure out how to do that without exposing `CharacterEye` publicly unless we want to do that on purpose.
+    // TODO: documentation needs updating, and return value should be a struct
+    pub fn view<'t>(
+        handle: &Handle<Self>,
+        read_ticket: ReadTicket<'t>,
+    ) -> Result<(&'t Handle<Space>, ViewTransform, f32), HandleError> {
+        let character = handle.query::<Character>(read_ticket)?;
+        let space = &character.space;
+        let eye = handle.query::<eye::CharacterEye>(read_ticket)?; // TODO(ecs): need to distinguish "missing component"
+        let transform = eye
+            .view_transform
+            .unwrap_or_else(|| eye::compute_view_transform(&character.body, FreeVector::zero()));
+        Ok((space, transform, eye.exposure()))
     }
 
     /// Returns the character's current inventory.
@@ -325,8 +332,6 @@ impl Character {
             .map(|c| NotNan::new(c).unwrap_or(notnan!(0.0)));
 
         self.last_step_info = if let Ok(space) = self.space.read(read_ticket) {
-            self.exposure.step(&space, self.view(), dt);
-
             let colliding_cubes = &mut self.colliding_cubes;
             colliding_cubes.clear();
             let info = self.body.step_with_rerun(
@@ -340,10 +345,11 @@ impl Character {
                 &self.rerun_destination,
             );
 
-            if let Some(push_out_displacement) = info.push_out {
-                // Smooth out camera effect of push-outs
-                self.eye_displacement_pos -= push_out_displacement;
-            }
+            // TODO(ecs): report push_out in a way that `CharacterEye` can receive it
+            // if let Some(push_out_displacement) = info.push_out {
+            //     // Smooth out camera effect of push-outs
+            //     self.eye_displacement_pos -= push_out_displacement;
+            // }
 
             if let Some(fluff_txn) = info.impact_fluff().and_then(|fluff| {
                 Some(CubeTransaction::fluff(fluff).at(Cube::containing(self.body.position())?))
@@ -406,24 +412,6 @@ impl Character {
             behavior::BehaviorSetStepInfo::default()
         };
 
-        // Apply accelerations on the body inversely to the eye displacement.
-        // This causes the eye position to be flung past the actual body position
-        // if it is stopped, producing a bit of flavor to landing from a jump and
-        // other such events.
-        // TODO: Try applying velocity_input to this positively, "leaning forward".
-        // First, update velocity.
-        let body_delta_v_this_frame = self.body.velocity() - initial_body_velocity;
-        self.eye_displacement_vel -= body_delta_v_this_frame.cast_unit() * 0.04;
-        // Return-to-center force — linear near zero and increasing quadratically
-        self.eye_displacement_vel -= self.eye_displacement_pos.cast_unit()
-            * (self.eye_displacement_pos.length() + 1.0)
-            * 1e21_f64.powf(dt);
-        // Damping.
-        self.eye_displacement_vel *= 1e-9_f64.powf(dt);
-        // Finally, apply velocity to position.
-        self.eye_displacement_pos += self.eye_displacement_vel.cast_unit() * dt;
-        // TODO: Clamp eye_displacement_pos to be within the body AAB.
-
         (
             result_transaction,
             CharacterStepInfo {
@@ -432,12 +420,6 @@ impl Character {
             },
             self.last_step_info,
         )
-    }
-
-    /// Returns the character's current automatic-exposure calculation based on the light
-    /// around it.
-    pub fn exposure(&self) -> f32 {
-        self.exposure.exposure()
     }
 
     /// Maximum range for normal keyboard input should be -1 to 1
@@ -512,11 +494,8 @@ impl VisitHandles for Character {
             body: _,
             space,
             velocity_input: _,
-            eye_displacement_pos: _,
-            eye_displacement_vel: _,
             colliding_cubes: _,
             last_step_info: _,
-            exposure: _,
             inventory,
             selected_slots: _,
             notifier: _,
@@ -568,12 +547,9 @@ impl serde::Serialize for Character {
             #[cfg(feature = "rerun")]
                 rerun_destination: _,
 
-            // Not persisted - decorative simulation
-            eye_displacement_pos: _,
-            eye_displacement_vel: _,
+            // Not persisted - recomputed info
             colliding_cubes: _,
             last_step_info: _,
-            exposure: _,
         } = self;
         schema::CharacterSer::CharacterV1 {
             space: space.clone(),
@@ -612,12 +588,9 @@ impl<'de> serde::Deserialize<'de> for Character {
                 #[cfg(feature = "rerun")]
                 rerun_destination: Default::default(),
 
-                // Not persisted - decorative simulation
-                eye_displacement_pos: Vector3D::zero(),
-                eye_displacement_vel: Vector3D::zero(),
+                // Not persisted - recomputed info
                 colliding_cubes: HbHashSet::new(),
                 last_step_info: None,
-                exposure: exposure::State::default(),
             }),
         }
     }

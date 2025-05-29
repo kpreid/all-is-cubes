@@ -158,6 +158,7 @@ impl Universe {
 
             // Add systems.
             gc::add_gc(&mut world);
+            crate::character::add_eye_systems(&mut world);
 
             // Finally, insist on no ambiguous scheduling.
             world.resource_mut::<ecs::Schedules>().configure_schedules(
