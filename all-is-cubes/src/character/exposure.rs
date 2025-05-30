@@ -141,7 +141,7 @@ mod tests {
     use super::*;
     use crate::character::Character;
     use crate::math::{GridAab, Rgb};
-    use crate::time::Tick;
+    use crate::time;
     use crate::universe::Universe;
     use euclid::point3;
 
@@ -166,6 +166,7 @@ mod tests {
     fn e2e() {
         // Put a character in a uniformly lit box.
         let mut universe = Universe::new();
+        universe.set_clock(time::Clock::new(time::TickSchedule::per_second(10), 0));
         let luminance = 3.;
         let light = Rgb::new(luminance, luminance, luminance);
 
@@ -185,34 +186,42 @@ mod tests {
             //     .fill_uniform(space.bounds().shrink(FaceMap::splat(1)), AIR)
             //     .unwrap();
 
-            space.evaluate_light::<crate::time::NoTime>(0, |_| {});
+            space.evaluate_light::<time::NoTime>(0, |_| {});
             space
         });
         let mut character = Character::spawn_default(universe.read_ticket(), space);
         character.body.set_position(point3(5., 5., 5.));
+        let character = universe.insert("character".into(), character).unwrap();
 
         // Let exposure sampling reach steady state
         for i in 0..100 {
-            eprintln!(
-                "{i:3} {exp_log} {exp}",
-                exp_log = character.exposure.exposure_log,
-                exp = character.exposure.exposure(),
-            );
-            let _ = character.step(universe.read_ticket(), None, Tick::from_seconds(1.0 / 10.0));
+            {
+                let exposure = &character.read(universe.read_ticket()).unwrap().exposure;
+                eprintln!(
+                    "{i:3} {exp_log} {exp}",
+                    exp_log = exposure.exposure_log,
+                    exp = exposure.exposure(),
+                );
+            }
+            universe.step(false, time::DeadlineNt::Whenever);
         }
 
+        // Done running; examine results.
+
+        let exposure = &character.read(universe.read_ticket()).unwrap().exposure;
+
         // Luminance sampling should match the scene we set up.
-        eprintln!("{:?}", character.exposure.luminance_samples);
-        assert_eq!(character.exposure.luminance_average(), luminance);
+        eprintln!("{:?}", exposure.luminance_samples);
+        assert_eq!(exposure.luminance_average(), luminance);
 
         // Exposure produced by the stateful process should closely approach the value from
         // compute_target_exposure.
         let expected = compute_target_exposure(luminance);
-        let expected_actual_ratio_difference = character.exposure() / expected - 1.0;
+        let expected_actual_ratio_difference = exposure.exposure() / expected - 1.0;
         assert!(
             expected_actual_ratio_difference.abs() < 0.001,
             "actual {actual} != expected {expected} (ratio {expected_actual_ratio_difference})",
-            actual = character.exposure()
+            actual = exposure.exposure()
         );
     }
 }

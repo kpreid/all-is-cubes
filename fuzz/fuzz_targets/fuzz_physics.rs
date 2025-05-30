@@ -5,8 +5,8 @@ use all_is_cubes::character::Character;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::{self, FreeCoordinate, NotNan};
 use all_is_cubes::space::Space;
-use all_is_cubes::time::Tick;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::time;
+use all_is_cubes::universe::{StrongHandle, Universe};
 
 use libfuzzer_sys::fuzz_target;
 
@@ -32,20 +32,34 @@ fuzz_target!(|input: (
     //     velocity.refmt(&ConciseDebug)
     // );
 
+    // TODO(ecs): When `Character` and `Body` have been disentangled, make this work solely on
+    // `Body`.
+
     let mut universe = Universe::new();
     let space_handle = universe.insert_anonymous(space);
     let mut character = Character::spawn_default(universe.read_ticket(), space_handle);
     character.body.set_position(position);
     character.body.add_velocity(velocity);
+    let character = StrongHandle::from(universe.insert_anonymous(character));
+
     for i in 0..5000 {
-        if !interesting_bounds_aab.contains(character.body.position()) {
+        if !interesting_bounds_aab.contains(
+            character
+                .read(universe.read_ticket())
+                .unwrap()
+                .body
+                .position(),
+        ) {
             // Flying out of bounds is not interesting.
             return;
         }
 
         // dbg!((i, character.body.position));
-        let (_txn, _char_info, body_info) =
-            character.step(universe.read_ticket(), None, Tick::arbitrary());
+        universe.step(false, time::DeadlineNt::Whenever);
+        let body_info = character
+            .read(universe.read_ticket())
+            .unwrap()
+            .last_step_info;
         // dbg!(info);
 
         // Check for no push out, but not on the first step, which might have been due to initial

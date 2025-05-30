@@ -79,7 +79,8 @@ pub struct Character {
     pub colliding_cubes: HbHashSet<Contact>,
 
     /// Last body step from [`Character::step`], for debugging.
-    pub(crate) last_step_info: Option<BodyStepInfo>,
+    #[doc(hidden)] // pub to be used by fuzz_physics
+    pub last_step_info: Option<BodyStepInfo>,
 
     exposure: exposure::State,
 
@@ -282,10 +283,8 @@ impl Character {
         }
     }
 
-    /// Advances time.
-    ///
-    /// Normally, this is called from [`Universe::step`][crate::universe::Universe::step].
-    pub fn step(
+    // TODO(ecs): replace all of this with systems
+    pub(crate) fn step(
         &mut self,
         read_ticket: ReadTicket<'_>,
         self_handle: Option<&Handle<Character>>,

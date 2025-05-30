@@ -10,7 +10,7 @@ use crate::math::{Face6, GridAab, Rgb};
 use crate::physics::BodyTransaction;
 use crate::raycast::Ray;
 use crate::space::Space;
-use crate::time::Tick;
+use crate::time;
 use crate::transaction::{self, Transaction as _, TransactionTester};
 use crate::universe::Universe;
 
@@ -219,26 +219,31 @@ fn no_superjumping() {
             .body
             .collision_box_rel()
             .face_coordinate(Face6::NY)
-            + 1.1,
+            + 1.001,
         0.,
     ));
-    let _ = character.step(universe.read_ticket(), None, Tick::from_seconds(1.0)); // initial settling
+    let character = universe.insert("character".into(), character).unwrap();
+    universe.step(false, time::DeadlineNt::Whenever); // initial settling
 
-    assert!(
-        character.is_on_ground(),
-        "should be on ground; current position = {:?}",
-        character.body.position()
-    );
-    assert_eq!(character.body.velocity().y, 0.0);
+    universe
+        .try_modify(&character, |character| {
+            assert!(
+                character.is_on_ground(),
+                "should be on ground; current position = {:?}",
+                character.body.position()
+            );
+            assert_eq!(character.body.velocity().y, 0.0);
 
-    character.jump_if_able();
-    assert!(!character.is_on_ground());
-    let velocity = character.body.velocity();
-    assert!(velocity.y > 0.0);
+            character.jump_if_able();
+            assert!(!character.is_on_ground());
+            let velocity = character.body.velocity();
+            assert!(velocity.y > 0.0);
 
-    // Second jump without ticking should do nothing
-    character.jump_if_able();
-    assert_eq!(character.body.velocity(), velocity);
+            // Second jump without ticking should do nothing
+            character.jump_if_able();
+            assert_eq!(character.body.velocity(), velocity);
+        })
+        .unwrap();
 }
 
 #[test]

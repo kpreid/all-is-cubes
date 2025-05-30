@@ -60,6 +60,12 @@
 - `all-is-cubes-ui` library:
     - `apps::Session::settings()` replaces `graphics_options_mut()`.
 
+### Removed
+
+- `all-is-cubes` library:
+    - The public functions `Character::step()` and `Space::step()` no longer exist.
+      In general, to make time pass, create a `Universe` and `step()` it instead.
+
 ## 0.9.0 (2025-01-01)
 
 ### Added
