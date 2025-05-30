@@ -410,6 +410,13 @@ impl Universe {
         *self.world.resource()
     }
 
+    /// Replaces the universe's [`time::Clock`], used by [`step()`](Self::step).
+    ///
+    /// Use this to control how many steps there are per second, or reset time to a specific value.
+    pub fn set_clock(&mut self, clock: time::Clock) {
+        self.world.insert_resource(clock);
+    }
+
     /// Inserts a new object without giving it a specific name, and returns
     /// a handle to it.
     ///

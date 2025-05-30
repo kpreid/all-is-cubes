@@ -377,6 +377,23 @@ fn step_time() {
 }
 
 #[test]
+fn set_clock() {
+    let mut u = Universe::new();
+    let default_schedule = time::TickSchedule::per_second(60);
+
+    assert_eq!(u.clock(), time::Clock::new(default_schedule, 0));
+    u.step(false, time::DeadlineNt::Whenever);
+    assert_eq!(u.clock(), time::Clock::new(default_schedule, 1));
+
+    let new_schedule = time::TickSchedule::per_second(30);
+    u.set_clock(time::Clock::new(new_schedule, 7));
+    assert_eq!(u.clock(), time::Clock::new(new_schedule, 7));
+
+    u.step(false, time::DeadlineNt::Whenever);
+    assert_eq!(u.clock(), time::Clock::new(new_schedule, 8));
+}
+
+#[test]
 fn universe_behavior() {
     #[derive(Clone, Debug, PartialEq)]
     struct UTestBehavior {}
