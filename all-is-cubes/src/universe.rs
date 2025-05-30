@@ -158,6 +158,14 @@ impl Universe {
 
             // Add systems.
             gc::add_gc(&mut world);
+
+            // Finally, insist on no ambiguous scheduling.
+            world.resource_mut::<ecs::Schedules>().configure_schedules(
+                bevy_ecs::schedule::ScheduleBuildSettings {
+                    ambiguity_detection: bevy_ecs::schedule::LogLevel::Error,
+                    ..Default::default()
+                },
+            );
         }
 
         let regs = WorldRegistrations {
