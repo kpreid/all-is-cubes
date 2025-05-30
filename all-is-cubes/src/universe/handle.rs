@@ -324,6 +324,53 @@ impl<T: 'static> Handle<T> {
         }
     }
 
+    /// Like [`Self::read()`], but allows selecting an arbitrary component.
+    /// In the future, this will need to be the only way, and `read()` will be a facade, or something.
+    pub(crate) fn query<'t, C: ecs::Component>(
+        &self,
+        read_ticket: ReadTicket<'t>,
+    ) -> Result<&'t C, HandleError>
+    where
+        T: UniverseMember,
+    {
+        // TODO(ecs): Deduplicate this setup code with read()
+        let entity: ecs::Entity = match &*self.inner.state.lock().expect("Handle::state lock error")
+        {
+            State::Pending { .. } => panic!("cannot use query() on pending handles"), // TODO: proper error
+            #[cfg(feature = "save")]
+            State::Deserializing { entity: _ } => return Err(HandleError::NotReady(self.name())),
+            &State::Member { entity } => {
+                let handle_universe_id = self.inner.universe_id.get(atomic::Ordering::Relaxed);
+                debug_assert!(handle_universe_id.is_some());
+                let ticket_universe_id = read_ticket.universe_id();
+                if ticket_universe_id != handle_universe_id {
+                    let name = self.name();
+                    // Invalid tickets can be a subtle bug due to `Space`'s retrying behavior.
+                    // As a compromise, log them.
+                    if !read_ticket.expect_may_fail {
+                        log::error!(
+                            "invalid ticket {read_ticket:?} for reading {name} \
+                            in {handle_universe_id:?}",
+                        );
+                    }
+                    return Err(HandleError::WrongUniverse {
+                        ticket_universe_id,
+                        handle_universe_id,
+                        name,
+                    });
+                }
+
+                entity
+            }
+            State::Gone {} => return Err(HandleError::Gone(self.name())),
+        };
+
+        let component = read_ticket
+            .get::<C>(entity)
+            .map_err(|e| e.into_handle_error(self.name()))?;
+        Ok(component)
+    }
+
     /// Apply the given function to the `T` inside.
     ///
     /// This handle must not have been inserted into a [`Universe`] yet.
