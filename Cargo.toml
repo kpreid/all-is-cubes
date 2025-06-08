@@ -81,7 +81,7 @@ bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.22.0", default-features = false, features = ["derive", "must_cast"] }
 cfg-if = { version = "1.0.0", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
-clap = { version = "4.2.4", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
+clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 # Note: async_tokio feature is not needed globally but is enabled to avoid compiling two versions
 # when benching/testing specific packages
 criterion = { version = "0.6.0", features = ["async_tokio", "cargo_bench_support", "html_reports"] }
@@ -140,7 +140,7 @@ scopeguard = { version = "1.2.0", default-features = false }
 send_wrapper = { version = "0.6.0", default-features = false, features = ["futures"] }
 serde = { version = "1.0.204", default-features = false, features = ["derive"] }
 # TODO: currently all crates that use serde_json also need std, but that should change
-serde_json = { version = "1.0.79", default-features = false, features = ["std"] }
+serde_json = { version = "1.0.100", default-features = false, features = ["std"] }
 simplelog = { version = "0.12.0", default-features = false, features = ["local-offset"] }
 snapbox = "0.6.10" # keep in sync with `trycmd`
 strum = { version = "0.26.3", default-features = false, features = ["derive"] }
