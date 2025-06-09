@@ -76,11 +76,11 @@ pub struct Character {
     /// towards.
     velocity_input: FreeVector,
 
-    // TODO: Does this belong here? Or in the Space?
     #[doc(hidden)] // pub to be used by all-is-cubes-gpu
     pub colliding_cubes: HbHashSet<Contact>,
 
-    /// Last body step from [`Character::step`], for debugging.
+    /// Last body step, for debugging.
+    // TODO(ecs): this is not fundamental so it should be a separate component, probably?
     #[doc(hidden)] // pub to be used by fuzz_physics
     pub last_step_info: Option<BodyStepInfo>,
 
@@ -96,6 +96,7 @@ pub struct Character {
     // TODO: not crate access: we need something like the listen() method for Notifier
     pub(crate) behaviors: BehaviorSet<Character>,
 
+    // TODO(ecs): this should be a separate component so it is least intrusive
     #[cfg(feature = "rerun")]
     rerun_destination: crate::rerun_glue::Destination,
 }
@@ -460,7 +461,7 @@ impl Character {
         tb.inventory.use_tool(read_ticket, cursor, this, slot_index)
     }
 
-    /// Make the character jump, if they are on ground to jump from as of the last [`step()`](Self::step).
+    /// Make the character jump, if they are on ground to jump from as of the last step.
     ///
     /// TODO: this code's location is driven by `colliding_cubes` being here, which is probably wrong.
     /// If nothing else, the jump height probably belongs elsewhere.
@@ -596,12 +597,11 @@ impl<'de> serde::Deserialize<'de> for Character {
     }
 }
 
-/// Performance data returned by [`Character::step()`].
+/// Performance data returned by stepping a character.
 ///
 /// Use `Debug` or [`StatusText`] formatting to examine this.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-#[expect(clippy::module_name_repetitions)] // TODO: rename to StepInfo?
-pub struct CharacterStepInfo {
+pub(crate) struct CharacterStepInfo {
     /// Number of characters whose updates were aggregated into this value.
     count: usize,
 
