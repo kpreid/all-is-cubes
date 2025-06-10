@@ -21,7 +21,9 @@ use hashbrown::HashMap as HbHashMap;
 use crate::block::{Block, BlockDef};
 use crate::space::{SetCubeError, SpaceTransaction};
 use crate::transaction::ExecuteError;
-use crate::universe::{Handle, InsertError, Name, ReadTicket, Universe, UniverseTransaction};
+use crate::universe::{
+    self, Handle, InsertError, Name, ReadTicket, Universe, UniverseTransaction, VisitHandles,
+};
 use crate::util::YieldProgress;
 use crate::util::maybe_sync;
 
@@ -281,6 +283,18 @@ impl<'provider, E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> IntoIterator
         self.iter()
     }
 }
+
+impl<E: Eq + Hash + VisitHandles, V: VisitHandles> VisitHandles for Provider<E, V> {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self { map } = self;
+        for (key, value) in map {
+            key.visit_handles(visitor);
+            value.visit_handles(visitor);
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Iterator returned by [`Provider::iter()`].
 #[expect(missing_debug_implementations)]

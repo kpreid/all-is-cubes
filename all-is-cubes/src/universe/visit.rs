@@ -45,6 +45,17 @@ impl<T: universe::UniverseMember> VisitHandles for Handle<T> {
     }
 }
 
+impl<T: ?Sized + VisitHandles> VisitHandles for alloc::boxed::Box<T> {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        T::visit_handles(&**self, visitor);
+    }
+}
+impl<T: ?Sized + VisitHandles> VisitHandles for alloc::sync::Arc<T> {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        T::visit_handles(&**self, visitor);
+    }
+}
+
 impl<T: VisitHandles> VisitHandles for Option<T> {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         if let Some(element) = self {

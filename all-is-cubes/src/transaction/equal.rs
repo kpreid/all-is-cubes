@@ -2,6 +2,7 @@ use core::fmt;
 use core::hash::Hash;
 
 use crate::transaction::Merge;
+use crate::universe;
 
 /// A component of a transaction which either optionally compares a value or optionally sets a
 /// value, but in either case, fails to merge with another transaction unless the value is equal.
@@ -66,6 +67,13 @@ impl<T: PartialEq> Merge for Equal<T> {
 impl<T> Default for Equal<T> {
     fn default() -> Self {
         Self(None)
+    }
+}
+
+impl<T: universe::VisitHandles> universe::VisitHandles for Equal<T> {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self(value) = self;
+        value.visit_handles(visitor);
     }
 }
 

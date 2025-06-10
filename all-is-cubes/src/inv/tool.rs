@@ -639,6 +639,14 @@ impl<T: ?Sized> hash::Hash for EphemeralOpaque<T> {
     }
 }
 
+impl<T: ?Sized> VisitHandles for EphemeralOpaque<T> {
+    fn visit_handles(&self, _: &mut dyn HandleVisitor) {
+        // Being opaque, an `EphemeralOpaque` doesn’t count as containing any handles.
+        // In the future, we might replace it with something that *does* constitute a handle
+        // to a special “external connection” entity, and if we do that, this will change.
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 #[mutants::skip]
 impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for EphemeralOpaque<T> {

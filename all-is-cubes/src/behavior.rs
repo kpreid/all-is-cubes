@@ -416,6 +416,17 @@ impl<H: Host> PartialEq for BehaviorSetEntry<H> {
     }
 }
 
+impl<H: Host> VisitHandles for BehaviorSetEntry<H> {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        let Self {
+            attachment: _,
+            behavior,
+            waker: _,
+        } = self;
+        behavior.visit_handles(visitor);
+    }
+}
+
 type WokenSet = Mutex<BTreeSet<Key>>;
 
 /// Handle to wake up a [`Behavior`].
@@ -763,6 +774,17 @@ impl<H: Host> Clone for Replace<H> {
             old: self.old.clone(),
             new: self.new.clone(),
         }
+    }
+}
+
+impl<H: Host> VisitHandles for BehaviorSetTransaction<H> {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        let Self { replace, insert } = self;
+        for Replace { old, new } in replace.values() {
+            new.visit_handles(visitor);
+            old.visit_handles(visitor);
+        }
+        insert.visit_handles(visitor);
     }
 }
 

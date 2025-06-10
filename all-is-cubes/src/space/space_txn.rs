@@ -17,7 +17,7 @@ use crate::space::{self, ActivatableRegion, GridAab, Mutation, SetCubeError, Spa
 use crate::transaction::{
     CommitError, Equal, ExecuteError, Merge, NoOutput, Transaction, Transactional, no_outputs,
 };
-use crate::universe::ReadTicket;
+use crate::universe::{self, ReadTicket};
 use crate::util::{ConciseDebug, Refmt as _};
 
 #[cfg(doc)]
@@ -390,6 +390,16 @@ impl fmt::Debug for SpaceTransaction {
     }
 }
 
+impl universe::VisitHandles for SpaceTransaction {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self { cubes, behaviors } = self;
+        for cube_txn in cubes.values() {
+            cube_txn.visit_handles(visitor);
+        }
+        behaviors.visit_handles(visitor);
+    }
+}
+
 /// Transaction precondition error type for a [`SpaceTransaction`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -637,6 +647,22 @@ impl Merge for CubeTransaction {
         *activate_behavior |= other.activate_behavior;
 
         fluff.extend(other.fluff);
+    }
+}
+
+impl universe::VisitHandles for CubeTransaction {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            old,
+            new,
+            conserved: _,
+            activate_behavior: _,
+            fluff,
+        } = self;
+
+        old.visit_handles(visitor);
+        new.visit_handles(visitor);
+        fluff.visit_handles(visitor);
     }
 }
 

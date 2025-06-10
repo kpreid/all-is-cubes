@@ -6,7 +6,7 @@ use euclid::{Vector3D, vec3};
 
 use crate::block::{self, Block, Resolution};
 use crate::math::{Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation};
-use crate::space;
+use crate::{space, universe};
 
 // Bits in [`BoxPart`] and indexes of [`BoxStyle::parts`].
 const LOWER: u8 = 1;
@@ -440,6 +440,13 @@ impl ops::IndexMut<BoxPart> for BoxStyle {
     fn index_mut(&mut self, index: BoxPart) -> &mut Self::Output {
         &mut Arc::make_mut(&mut self.parts)[usize::from(index.0.x)][usize::from(index.0.y)]
             [usize::from(index.0.z)]
+    }
+}
+
+impl universe::VisitHandles for BoxStyle {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self { parts } = self;
+        parts.visit_handles(visitor);
     }
 }
 

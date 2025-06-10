@@ -10,6 +10,7 @@ use crate::op::Operation;
 use crate::sound::SoundDef;
 #[cfg(doc)]
 use crate::space::{Space, SpaceFluff};
+use crate::universe;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -109,6 +110,18 @@ impl Fluff {
                 let amplitude = (velocity * 0.01).clamp(0.0, 1.0);
                 Some((&THUMP, amplitude))
             }
+        }
+    }
+}
+
+impl universe::VisitHandles for Fluff {
+    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
+        match self {
+            Fluff::Beep => {}
+            Fluff::Happened => {}
+            Fluff::BlockFault(_) => {}
+            Fluff::PlaceBlockGeneric => {}
+            Fluff::BlockImpact { velocity: _ } => {}
         }
     }
 }
