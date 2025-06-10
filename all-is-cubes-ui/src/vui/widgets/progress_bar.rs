@@ -7,9 +7,9 @@ use alloc::sync::Arc;
 use num_traits::float::FloatCore as _;
 
 use all_is_cubes::block::{self, AIR, Block, Composite, CompositeOperator};
-use all_is_cubes::listen;
 use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, Rgb, ZeroOne};
 use all_is_cubes::space::SpaceTransaction;
+use all_is_cubes::{listen, universe};
 
 use crate::vui;
 use crate::vui::widgets::{BoxStyle, WidgetTheme};
@@ -74,6 +74,19 @@ impl vui::Widget for ProgressBar {
             position: position.bounds,
             last_drawn_state: None,
         })
+    }
+}
+
+impl universe::VisitHandles for ProgressBar {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            empty_style,
+            filled_style,
+            direction: _,
+            source: _,
+        } = self;
+        empty_style.visit_handles(visitor);
+        filled_style.visit_handles(visitor);
     }
 }
 
@@ -197,6 +210,18 @@ impl vui::WidgetController for ProgressBarController {
         let txn = self.paint_txn(&new_state);
         self.last_drawn_state = Some(new_state);
         Ok((txn, vui::Then::Step))
+    }
+}
+
+impl universe::VisitHandles for ProgressBarController {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            definition,
+            todo: _,
+            position: _,
+            last_drawn_state: _,
+        } = self;
+        definition.visit_handles(visitor);
     }
 }
 

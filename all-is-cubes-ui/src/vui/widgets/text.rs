@@ -1,4 +1,4 @@
-use all_is_cubes::listen;
+use all_is_cubes::{listen, universe};
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
@@ -176,6 +176,18 @@ impl From<ArcStr> for Label {
     }
 }
 
+impl universe::VisitHandles for Label {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            text,
+            font,
+            positioning: _,
+        } = self;
+        text.visit_handles(visitor);
+        font.visit_handles(visitor);
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Widget which draws [`Text`](BlockText) that can change, to be used for textual content,
@@ -228,6 +240,18 @@ impl Widget for TextBox {
     }
 }
 
+impl universe::VisitHandles for TextBox {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            text_source: _,
+            font,
+            positioning: _,
+            minimum_size: _,
+        } = self;
+        font.visit_handles(visitor);
+    }
+}
+
 /// [`WidgetController`] for [`TextBox`].
 #[derive(Debug)]
 struct TextBoxController {
@@ -270,6 +294,17 @@ impl WidgetController for TextBoxController {
             // TODO: use waking
             vui::Then::Step,
         ))
+    }
+}
+
+impl universe::VisitHandles for TextBoxController {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            definition,
+            todo: _,
+            grant: _,
+        } = self;
+        definition.visit_handles(visitor);
     }
 }
 

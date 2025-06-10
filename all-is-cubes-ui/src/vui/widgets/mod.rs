@@ -6,6 +6,7 @@ use alloc::sync::Arc;
 use all_is_cubes::block::Block;
 use all_is_cubes::euclid::size3;
 use all_is_cubes::space::SpaceTransaction;
+use all_is_cubes::universe;
 
 use crate::vui;
 
@@ -63,6 +64,13 @@ impl vui::WidgetController for OneshotController {
     }
 
     // TODO: Arrange somehow for this controller to be deleted since it doesn't need to be step()ped
+}
+
+impl universe::VisitHandles for OneshotController {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self(txn) = self;
+        txn.visit_handles(visitor);
+    }
 }
 
 /// A block may act as a 1×1×1 non-interactive widget.

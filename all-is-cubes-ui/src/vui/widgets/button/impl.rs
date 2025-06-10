@@ -8,10 +8,10 @@ use core::sync::atomic::{AtomicU8, Ordering::Relaxed};
 
 use all_is_cubes::behavior::BehaviorSetTransaction;
 use all_is_cubes::inv::EphemeralOpaque;
-use all_is_cubes::linking;
 use all_is_cubes::listen;
 use all_is_cubes::space::{self, SpaceBehaviorAttachment, SpaceTransaction};
 use all_is_cubes::transaction::Merge;
+use all_is_cubes::{linking, universe};
 
 use crate::vui;
 
@@ -107,6 +107,14 @@ impl CommonController {
                 pressed: counter > 1,
             },
         }
+    }
+}
+
+impl universe::VisitHandles for CommonController {
+    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
+        let Self {
+            recently_pressed: _,
+        } = self;
     }
 }
 
@@ -215,5 +223,31 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> ToggleButtonController<D> {
     fn draw_txn(&self, common: ButtonVisualState) -> vui::WidgetTransaction {
         let value = (self.definition.projection)(&self.definition.data_source.get());
         self.txns[ToggleButtonVisualState { common, value }].clone()
+    }
+}
+
+impl universe::VisitHandles for ActionButtonController {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            common,
+            definition,
+            txns,
+        } = self;
+        common.visit_handles(visitor);
+        definition.visit_handles(visitor);
+        txns.visit_handles(visitor);
+    }
+}
+impl<D: Clone + Send + Sync> universe::VisitHandles for ToggleButtonController<D> {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            common,
+            definition,
+            txns,
+            todo: _,
+        } = self;
+        common.visit_handles(visitor);
+        definition.visit_handles(visitor);
+        txns.visit_handles(visitor);
     }
 }

@@ -1,5 +1,6 @@
 //! Public API types and functions for button widgets.
 
+use all_is_cubes::universe;
 use alloc::sync::Arc;
 use core::fmt;
 use core::hash::Hash;
@@ -35,6 +36,14 @@ impl<St: Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St> {
     fn new(shape: &linking::Provider<St, Block>, label: ButtonLabel) -> Self {
         let shape = shape.map(|_, base_multiblock| BoxStyle::from_nine_and_thin(base_multiblock));
         Self { shape, label }
+    }
+}
+
+impl<St: Eq + Hash + universe::VisitHandles> universe::VisitHandles for ButtonCommon<St> {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self { shape, label } = self;
+        shape.visit_handles(visitor);
+        label.visit_handles(visitor);
     }
 }
 
@@ -75,6 +84,14 @@ impl From<ArcStr> for ButtonLabel {
             icon: None,
             text: Some(vui::widgets::Label::new(string)),
         }
+    }
+}
+
+impl universe::VisitHandles for ButtonLabel {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self { icon, text } = self;
+        icon.visit_handles(visitor);
+        text.visit_handles(visitor);
     }
 }
 
@@ -166,6 +183,26 @@ impl<D> vui::Layoutable for ToggleButton<D> {
     }
 }
 
+impl universe::VisitHandles for ActionButton {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self { common, action } = self;
+        common.visit_handles(visitor);
+        action.visit_handles(visitor);
+    }
+}
+impl<D> universe::VisitHandles for ToggleButton<D> {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            common,
+            action,
+            data_source: _,
+            projection: _,
+        } = self;
+        common.visit_handles(visitor);
+        action.visit_handles(visitor);
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Possible visual states of a button.
@@ -189,6 +226,10 @@ impl fmt::Display for ButtonVisualState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.pressed { "pressed" } else { "idle" }.fmt(f)
     }
+}
+
+impl universe::VisitHandles for ButtonVisualState {
+    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {}
 }
 
 /// Possible visual states of a [`ToggleButton`].
@@ -227,4 +268,8 @@ impl ToggleButtonVisualState {
             common: ButtonVisualState { pressed: false },
         }
     }
+}
+
+impl universe::VisitHandles for ToggleButtonVisualState {
+    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {}
 }

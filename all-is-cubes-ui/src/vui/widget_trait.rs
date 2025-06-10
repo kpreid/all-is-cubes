@@ -82,7 +82,7 @@ pub trait Widget: Layoutable + Debug + SendSyncIfStd {
 /// their assigned regions of space and therefore will not experience transaction conflicts.
 ///
 /// [`OneshotController`]: crate::vui::widgets::OneshotController
-pub trait WidgetController: Debug + SendSyncIfStd + 'static {
+pub trait WidgetController: Debug + VisitHandles + SendSyncIfStd + 'static {
     /// Write the initial state of the widget to the space.
     /// This is called at most once.
     fn initialize(
@@ -196,8 +196,14 @@ impl WidgetBehavior {
 }
 
 impl VisitHandles for WidgetBehavior {
-    fn visit_handles(&self, _: &mut dyn HandleVisitor) {
-        // TODO: Do we need to visit the widget controllers?
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        let Self {
+            widget: _,
+            controller,
+        } = self;
+        // Not visiting the widget because it is not used for actual behavior
+        // (no handles it may contain will be used *by* this WidgetBehavior).
+        controller.lock().unwrap().visit_handles(visitor);
     }
 }
 

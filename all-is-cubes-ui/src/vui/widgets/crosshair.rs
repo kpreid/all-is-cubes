@@ -3,8 +3,8 @@ use alloc::sync::Arc;
 
 use all_is_cubes::block::{AIR, Block};
 use all_is_cubes::euclid::size3;
-use all_is_cubes::listen;
 use all_is_cubes::space::SpaceTransaction;
+use all_is_cubes::{listen, universe};
 
 use crate::vui;
 
@@ -72,5 +72,25 @@ impl vui::WidgetController for CrosshairController {
         };
 
         Ok((txn, vui::Then::Step))
+    }
+}
+
+impl universe::VisitHandles for CrosshairController {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            definition,
+            todo: _,
+        } = self;
+        definition.visit_handles(visitor);
+    }
+}
+
+impl universe::VisitHandles for Crosshair {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
+        let Self {
+            icon,
+            mouselook_mode: _,
+        } = self;
+        icon.visit_handles(visitor);
     }
 }

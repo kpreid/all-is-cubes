@@ -5,7 +5,6 @@ use core::iter;
 use core::ops::Range;
 use std::sync::Mutex;
 
-use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, Block, Resolution, text};
 use all_is_cubes::character::Character;
 use all_is_cubes::content::palette;
@@ -18,6 +17,7 @@ use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::time::Duration;
 use all_is_cubes::transaction::Merge as _;
 use all_is_cubes::universe::{ReadTicket, StrongHandle};
+use all_is_cubes::{arcstr, universe};
 
 use crate::inv_watch::InventoryWatcher;
 use crate::ui_content::{CueMessage, CueNotifier, hud::HudBlocks};
@@ -326,6 +326,17 @@ impl WidgetController for ToolbarController {
 
         // TODO: Use Then::Sleep and a waker
         Ok((slots_txn.merge(pointers_txn).unwrap(), vui::Then::Step))
+    }
+}
+
+impl universe::VisitHandles for ToolbarController {
+    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
+        let Self {
+            definition: _,
+            todo_more: _,
+            first_slot_position: _,
+        } = self;
+        // arguably we should visit the definition but traversing HudBlocks is almost certainly redundant
     }
 }
 

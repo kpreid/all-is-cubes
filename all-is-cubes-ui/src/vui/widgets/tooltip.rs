@@ -7,10 +7,10 @@ use all_is_cubes::block::{self, Block, text};
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::content::palette;
 use all_is_cubes::euclid::size3;
-use all_is_cubes::inv;
 use all_is_cubes::listen::{FnListener, Gate, Listen, Listener};
 use all_is_cubes::time::{Duration, Tick};
 use all_is_cubes::universe::{ReadTicket, StrongHandle};
+use all_is_cubes::{inv, universe};
 
 use crate::ui_content::hud::HudBlocks;
 use crate::vui::{self, LayoutRequest, Layoutable, Widget, WidgetController, widgets};
@@ -290,6 +290,16 @@ impl WidgetController for TooltipController {
             vui::WidgetTransaction::default()
         };
         Ok((txn, vui::Then::Step))
+    }
+}
+
+impl universe::VisitHandles for TooltipController {
+    fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
+        let Self {
+            definition: _,
+            currently_displayed: _,
+        } = self;
+        // TODO: replace the StrongHandle with visiting?
     }
 }
 
