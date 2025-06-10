@@ -236,11 +236,30 @@ impl<T: 'static> Handle<T> {
             .clone()
     }
 
+    /// Obtains the [`ecs::Entity`] for this handle.
+    ///
+    /// May fail if the handle is not ready or belongs to a different universe.
     #[doc(hidden)] // hidden because we have not yet decided to make our use of ECS, let alone bevy_ecs, public
-    pub fn as_entity(&self) -> Option<ecs::Entity> {
+    pub fn as_entity(&self, expected_universe: UniverseId) -> Result<ecs::Entity, HandleError> {
+        let handle_universe_id = self.universe_id();
+        if handle_universe_id != Some(expected_universe) {
+            return Err(HandleError::WrongUniverse {
+                name: self.name(),
+                ticket_universe_id: Some(expected_universe),
+                handle_universe_id: self.universe_id(),
+            });
+        }
+
         match *self.inner.state.lock().expect("Handle::state lock error") {
-            State::Member { entity, .. } => Some(entity),
-            _ => None,
+            State::Member { entity, .. } => Ok(entity),
+            #[cfg(feature = "save")]
+            State::Deserializing { .. } => Err(HandleError::NotReady(self.name())),
+            State::Pending { .. } => Err(HandleError::WrongUniverse {
+                ticket_universe_id: Some(expected_universe),
+                handle_universe_id,
+                name: self.name(),
+            }),
+            State::Gone {} => Err(HandleError::Gone(self.name())),
         }
     }
 
@@ -1254,7 +1273,7 @@ pub trait ErasedHandle: Any + fmt::Debug {
     fn universe_id(&self) -> Option<UniverseId>;
 
     #[doc(hidden)] // hidden because we have not yet decided to make our use of ECS, let alone bevy_ecs, public
-    fn as_entity(&self) -> Option<ecs::Entity>;
+    fn as_entity(&self, expected_universe: UniverseId) -> Result<ecs::Entity, HandleError>;
 
     /// Clone this into an owned `Handle<T>` wrapped in the [`AnyHandle`] enum.
     fn to_any_handle(&self) -> AnyHandle;
@@ -1273,8 +1292,8 @@ impl<T: UniverseMember> ErasedHandle for Handle<T> {
         <T as UniverseMember>::into_any_handle(self.clone())
     }
 
-    fn as_entity(&self) -> Option<ecs::Entity> {
-        Handle::as_entity(self)
+    fn as_entity(&self, expected_universe: UniverseId) -> Result<ecs::Entity, HandleError> {
+        Handle::as_entity(self, expected_universe)
     }
 }
 

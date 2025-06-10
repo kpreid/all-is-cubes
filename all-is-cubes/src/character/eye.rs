@@ -12,6 +12,7 @@ use crate::math::{Cube, FreeCoordinate, FreeVector};
 use crate::physics::Velocity;
 use crate::space::Space;
 use crate::time;
+use crate::universe::UniverseId;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -109,6 +110,7 @@ fn step_eye_position(
 }
 
 fn step_exposure(
+    universe_id: UniverseId,
     tick: ecs::Res<'_, time::CurrentTick>,
     characters: ecs::Query<'_, '_, (&Character, &mut CharacterEye)>,
     spaces: ecs::Query<'_, '_, &Space>,
@@ -122,7 +124,7 @@ fn step_exposure(
 
     for (character, mut eye) in characters {
         let eye = &mut *eye;
-        let Some(space_entity) = character.space.as_entity() else {
+        let Ok(space_entity) = character.space.as_entity(universe_id) else {
             continue;
         };
         let Some(view_transform) = eye.view_transform else {

@@ -53,7 +53,7 @@ where
     for<'a> O::Transaction:
         Transaction<Output = transaction::NoOutput, Context<'a> = ReadTicket<'a>>,
 {
-    let entity: ecs::Entity = target.as_entity().unwrap();
+    let entity: ecs::Entity = target.as_entity(universe.universe_id()).unwrap();
     let (mut target_component, everything_but) = universe
         .get_one_mut_and_ticket::<O>(entity)
         .expect("component missing; universe state changed between check and commit");

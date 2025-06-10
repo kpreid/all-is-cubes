@@ -2,7 +2,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use bevy_ecs::prelude as ecs;
 
-use crate::universe::{ErasedHandle, Membership, VisitableComponents};
+use crate::universe::{ErasedHandle, Membership, UniverseId, VisitableComponents};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -37,6 +37,7 @@ pub(in crate::universe) fn add_gc(world: &mut ecs::World) {
 /// ECS system function that performs mark-and-sweep garbage collection on universe members.
 /// See [`Universe::gc()`].
 fn gc_system(
+    universe_id: UniverseId,
     world: &ecs::World,
     // Used for the initial scan for roots and final scan for garbage.
     scan_query: ecs::Query<'_, '_, (ecs::Entity, &Membership, &GcState)>,
@@ -75,8 +76,9 @@ fn gc_system(
             .visit_handles_in_entity(walk_query.get(entity)?)
         {
             component.visit_handles(&mut |handle: &dyn ErasedHandle| {
-                let Some(referenced_entity) = handle.as_entity() else {
-                    // This happens if the handle is in state Gone already.
+                let Ok(referenced_entity) = handle.as_entity(universe_id) else {
+                    // This happens if the handle is in state Gone already, or if it (incorrectly)
+                    // belongs to a different universe.
                     return;
                 };
                 let r_state = gc_state_query.get(referenced_entity).unwrap();

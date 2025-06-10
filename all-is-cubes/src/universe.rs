@@ -323,7 +323,7 @@ impl Universe {
                 .collect();
             for space_handle in spaces {
                 let (mut space, everything_but) = self
-                    .get_one_mut_and_ticket::<Space>(space_handle.as_entity().unwrap())
+                    .get_one_mut_and_ticket::<Space>(space_handle.as_entity(self.id).unwrap())
                     .unwrap();
 
                 let (space_info, transaction) = space.step(
@@ -608,7 +608,7 @@ impl Universe {
         let Some(handle) = self.get_any(name) else {
             return false;
         };
-        let entity = handle.as_entity().unwrap();
+        let entity = handle.as_entity(self.id).unwrap();
         handle.set_state_to_gone();
         let success = self.world.despawn(entity);
         assert!(success);
@@ -664,19 +664,11 @@ impl Universe {
     where
         F: FnOnce(&mut T) -> Out,
     {
-        let handle_universe_id = handle.universe_id();
-        if handle_universe_id == Some(self.id) {
-            let Some(mut component_guard) = self.world.get_mut(handle.as_entity().unwrap()) else {
-                return Err(HandleError::Gone(handle.name()));
-            };
-            Ok(function(&mut *component_guard))
-        } else {
-            Err(HandleError::WrongUniverse {
-                name: handle.name(),
-                ticket_universe_id: Some(self.id),
-                handle_universe_id: handle.universe_id(),
-            })
-        }
+        let entity = handle.as_entity(self.id)?;
+        let Some(mut component_guard) = self.world.get_mut(entity) else {
+            return Err(HandleError::Gone(handle.name()));
+        };
+        Ok(function(&mut *component_guard))
     }
 
     /// Get mutable access to one component of one entity, and read-only access to all other

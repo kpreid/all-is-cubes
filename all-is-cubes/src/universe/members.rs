@@ -380,9 +380,12 @@ impl ErasedHandle for AnyHandle {
         r.universe_id()
     }
 
-    fn as_entity(&self) -> Option<ecs::Entity> {
+    fn as_entity(
+        &self,
+        expected_universe: super::UniverseId,
+    ) -> Result<ecs::Entity, crate::universe::handle::HandleError> {
         let r: &dyn ErasedHandle = &**self;
-        r.as_entity()
+        r.as_entity(expected_universe)
     }
 
     fn to_any_handle(&self) -> AnyHandle {
