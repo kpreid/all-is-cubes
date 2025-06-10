@@ -27,7 +27,10 @@ pub fn inspect_block_at_cursor(
     let contents = Arc::new(vui::LayoutTree::Stack {
         direction: Face6::NY,
         children: vec![
-            vui::leaf_widget(hit.block.clone().with_modifier(block::Quote::new())),
+            vui::leaf_widget(vui::quote_and_snapshot_block(
+                [read_ticket, ReadTicket::stub()],
+                &hit.block,
+            )),
             Arc::new(vui::LayoutTree::Stack {
                 direction: Face6::PX,
                 children: vec![
