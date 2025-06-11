@@ -432,6 +432,9 @@ pub(crate) async fn export_gltf(
             let mesh_index = writer.add_mesh(&name, &mesh);
             let mesh_node = writer.root.push(gltf_json::Node {
                 mesh: mesh_index,
+                // SpaceMesh translates everything so the lower bounds of the requested region
+                // are at [0, 0, 0], so we must undo that.
+                translation: Some(space.bounds().lower_bounds().to_f32().into()),
                 ..empty_node(Some(name.to_string()))
             });
 

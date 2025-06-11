@@ -160,7 +160,12 @@
   "nodes": [
     {
       "mesh": 0,
-      "name": "'x'"
+      "name": "'x'",
+      "translation": [
+        10.0,
+        -5.0,
+        0.0
+      ]
     }
   ],
   "scenes": [

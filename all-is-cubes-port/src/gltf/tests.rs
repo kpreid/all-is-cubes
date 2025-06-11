@@ -132,7 +132,8 @@ async fn export_space() {
     universe
         .insert(
             "x".into(),
-            Space::builder(GridAab::ORIGIN_CUBE)
+            // nonzero lower bounds to validate the positioning.
+            Space::builder(GridAab::from_lower_size([10, -5, 0], [1, 1, 1]))
                 .read_ticket(universe.read_ticket())
                 .filled_with(block)
                 .build(),
