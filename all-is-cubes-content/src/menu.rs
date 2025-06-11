@@ -89,7 +89,7 @@ fn template_menu_widget_tree(
     let logo_text_space_handle = Handle::new_pending(Name::Pending, logo_text_space);
     let logo_widget = widgets::Voxels::new(
         logo_text_bounds,
-        logo_text_space_handle.clone(),
+        logo_text_space_handle.clone().into(),
         Resolution::R8,
         [],
     );

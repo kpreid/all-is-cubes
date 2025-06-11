@@ -540,7 +540,7 @@ fn place_one_exhibit<I: Instant>(
                 },
                 vui::leaf_widget(Arc::new(widgets::Voxels::new(
                     bounds_for_info_voxels,
-                    universe.insert_anonymous(exhibit_info_space),
+                    universe.insert_anonymous(exhibit_info_space).into(),
                     info_resolution,
                     [block::Block::builder()
                         .display_name(literal!("Exhibit Name"))

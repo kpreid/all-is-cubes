@@ -352,7 +352,7 @@ pub(crate) mod parts {
         )?;
         Ok(Arc::new(widgets::Voxels::new(
             space.bounds(),
-            universe.insert_anonymous(space),
+            universe.insert_anonymous(space).into(),
             resolution,
             [],
         )))

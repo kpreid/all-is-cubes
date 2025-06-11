@@ -6,7 +6,7 @@ use all_is_cubes::block::{self, Block, Primitive, Resolution};
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::math::{GridAab, GridMatrix, GridPoint, GridSizeCoord, GridVector};
 use all_is_cubes::space::{Space, SpaceTransaction};
-use all_is_cubes::universe::Handle;
+use all_is_cubes::universe::StrongHandle;
 
 use crate::vui::{self, Layoutable as _};
 
@@ -16,7 +16,9 @@ use crate::vui::{self, Layoutable as _};
 /// TODO: add a click response feature
 #[derive(Clone, Debug)]
 pub struct Voxels {
-    space: Handle<Space>,
+    // TODO(ecs): temporary kludge to fix bugs. This should not be a StrongHandle; instead,
+    // widgets should be subject to VisitHandles, but there’s an upcoming big VUI refactor first.
+    space: StrongHandle<Space>,
     region: GridAab,
     scale: Resolution,
     modifiers: Vec<block::Modifier>,
@@ -30,7 +32,7 @@ impl Voxels {
     /// `region` may be displayed in that case.
     pub fn new(
         region: GridAab,
-        space: Handle<Space>,
+        space: StrongHandle<Space>,
         scale: Resolution,
         modifiers: impl IntoIterator<Item = block::Modifier>,
     ) -> Self {
@@ -99,7 +101,7 @@ impl vui::Widget for Voxels {
                     .transform_cube(cube)
                     .lower_bounds(),
                 resolution: self.scale,
-                space: self.space.clone(),
+                space: self.space.clone().into(),
             });
             block.modifiers_mut().clone_from(&self.modifiers);
             txn.at(cube).overwrite(block);
@@ -127,7 +129,9 @@ mod tests {
             grant,
             Voxels::new(
                 voxel_space_bounds,
-                universe.insert_anonymous(Space::builder(voxel_space_bounds).build()),
+                StrongHandle::from(
+                    universe.insert_anonymous(Space::builder(voxel_space_bounds).build()),
+                ),
                 R8,
                 [],
             ),
