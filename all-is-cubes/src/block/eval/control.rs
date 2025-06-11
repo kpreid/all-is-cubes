@@ -372,6 +372,8 @@ impl EvalBlockError {
             // make use of this either way. Revisit when we have a better story about failing to
             // install listeners.
             ErrorKind::Handle(HandleError::NotReady(..)) => false,
+
+            ErrorKind::Handle(ref e @ HandleError::NotPending { .. }) => unreachable!("{e}"),
         }
     }
 

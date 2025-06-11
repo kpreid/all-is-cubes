@@ -984,6 +984,7 @@ mod tests {
     use crate::space::SpaceTransaction;
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict, TransactionTester};
+    use crate::universe::GoneReason;
     use crate::universe::{self, HandleError};
     use alloc::sync::Arc;
     use indoc::indoc;
@@ -1292,12 +1293,18 @@ mod tests {
             .execute_on_pending(ReadTicket::stub(), &SpaceTransaction::default())
             .unwrap_err();
 
-        assert_eq!(e, ExecuteError::Handle(HandleError::Gone("foo".into())));
+        assert_eq!(
+            e,
+            ExecuteError::Handle(HandleError::Gone {
+                name: "foo".into(),
+                reason: GoneReason::CreatedGone {}
+            })
+        );
     }
 
-    // This is not specifically desirable, but more work will be needed to avoid it
+    // This panic is not specifically desirable, but more work will be needed to avoid it.
     #[test]
-    #[should_panic = "Attempted to execute transaction with target already borrowed: Gone(Specific(\"foo\"))"]
+    #[should_panic = "Attempted to execute transaction with target already borrowed: Gone { name: Specific(\"foo\"), reason: CreatedGone }"]
     fn handle_error_from_universe_txn() {
         let mut u = Universe::new();
         let txn = SpaceTransaction::default().bind(Handle::<Space>::new_gone("foo".into()));

@@ -153,7 +153,7 @@ impl InventoryWatcher {
                         }
                         empty_inventory
                     }
-                    Err(HandleError::Gone(_)) => {
+                    Err(HandleError::Gone { .. }) => {
                         // No inventory exists any more, so nothing to do.
                         empty_inventory
                     }

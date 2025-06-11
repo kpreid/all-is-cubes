@@ -417,7 +417,7 @@ async fn error_character_gone(mut context: RenderTestContext) {
     // Updating may fail, or it may succeed because there were no change notifications.
     match renderer.update(Layers::splat(context.universe().read_ticket()), None) {
         Ok(()) => {}
-        Err(RenderError::Read(HandleError::Gone(name)))
+        Err(RenderError::Read(HandleError::Gone { name, .. }))
             if name == "character".into() || name == "space".into() => {}
         Err(e) => panic!("unexpected other error from update(): {e:?}"),
     }
@@ -425,7 +425,7 @@ async fn error_character_gone(mut context: RenderTestContext) {
     // TODO: We temporarily also allow failure. Stop that.
     match renderer.draw("").await {
         Ok(_) => {}
-        Err(RenderError::Read(HandleError::Gone(name)))
+        Err(RenderError::Read(HandleError::Gone { name, .. }))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from draw(): {res:?}"),
     }
@@ -450,7 +450,7 @@ async fn error_character_unavailable(mut context: RenderTestContext) {
         .unwrap();
 
     match renderer.update(Layers::splat(context.universe().read_ticket()), None) {
-        Err(RenderError::Read(HandleError::Gone(name)))
+        Err(RenderError::Read(HandleError::Gone { name, .. }))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from update(): {res:?}"),
     }
@@ -458,7 +458,7 @@ async fn error_character_unavailable(mut context: RenderTestContext) {
     // TODO: We temporarily also allow failure. Stop that.
     match renderer.draw("").await {
         Ok(_image) => {}
-        Err(RenderError::Read(HandleError::Gone(name)))
+        Err(RenderError::Read(HandleError::Gone { name, .. }))
             if name == "character".into() || name == "space".into() => {}
         res => panic!("unexpected result from draw(): {res:?}"),
     }

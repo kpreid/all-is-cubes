@@ -95,7 +95,9 @@ fn gc_system(
             if GC_DEBUG_LOG {
                 log::trace!("despawning {entity}");
             }
-            membership.handle.set_state_to_gone();
+            membership
+                .handle
+                .set_state_to_gone(crate::universe::GoneReason::Gc {});
             commands.entity(entity).despawn()
         }
     }

@@ -20,9 +20,9 @@ use crate::space::{
     CubeTransaction, LightPhysics, PackedLight, SetCubeError, Space, SpaceChange, SpaceFluff,
     SpacePhysics,
 };
-use crate::time;
 use crate::transaction::{self, Transaction as _};
 use crate::universe::{Handle, HandleError, Name, ReadTicket, Universe};
+use crate::{time, universe};
 
 // TODO: test consistency between the index and get_* methods
 // TODO: test fill() equivalence and error handling
@@ -96,7 +96,10 @@ fn set_success_despite_eval_error_gone() {
                 voxels: 0,
                 recursion: 0
             },
-            kind: block::ErrorKind::Handle(HandleError::Gone("bs".into()))
+            kind: block::ErrorKind::Handle(HandleError::Gone {
+                name: "bs".into(),
+                reason: universe::GoneReason::CreatedGone {}
+            })
         }
         .to_placeholder()
     );

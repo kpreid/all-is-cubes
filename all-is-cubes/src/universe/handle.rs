@@ -112,10 +112,8 @@ enum State<T> {
     /// having values set.
     Member { entity: ecs::Entity },
 
-    /// State of [`Handle::new_gone()`].
-    ///
-    /// This state should always be accompanied by `Inner::universe_id` having no value.
-    Gone {},
+    /// Deleted or never existed.
+    Gone { reason: GoneReason },
 }
 
 impl<T: 'static> Handle<T> {
@@ -165,7 +163,12 @@ impl<T: 'static> Handle<T> {
     /// This may be used in tests to exercise error handling.
     #[doc(hidden)] // TODO: decide if this is good API
     pub fn new_gone(name: Name) -> Handle<T> {
-        Self::new_from_state(name, State::Gone {})
+        Self::new_from_state(
+            name,
+            State::Gone {
+                reason: GoneReason::CreatedGone {},
+            },
+        )
     }
 
     /// Constructs a [`Handle`] that has an associated entity but not yet a value.
@@ -238,28 +241,37 @@ impl<T: 'static> Handle<T> {
 
     /// Obtains the [`ecs::Entity`] for this handle.
     ///
-    /// May fail if the handle is not ready or belongs to a different universe.
+    /// May fail if the handle is not ready, belongs to a different universe, or was deleted.
     #[doc(hidden)] // hidden because we have not yet decided to make our use of ECS, let alone bevy_ecs, public
     pub fn as_entity(&self, expected_universe: UniverseId) -> Result<ecs::Entity, HandleError> {
         let handle_universe_id = self.universe_id();
-        if handle_universe_id != Some(expected_universe) {
-            return Err(HandleError::WrongUniverse {
+        let is_expected_universe = handle_universe_id == Some(expected_universe);
+
+        match (
+            is_expected_universe,
+            &*self.inner.state.lock().expect("Handle::state lock error"),
+        ) {
+            (true, &State::Member { entity, .. }) => Ok(entity),
+
+            // Ignore universe mismatch so that Handle::new_gone() takes this branch.
+            (_, &State::Gone { reason }) => Err(HandleError::Gone {
+                name: self.name(),
+                reason,
+            }),
+
+            (false, State::Member { .. }) => Err(HandleError::WrongUniverse {
                 name: self.name(),
                 ticket_universe_id: Some(expected_universe),
                 handle_universe_id: self.universe_id(),
-            });
-        }
-
-        match *self.inner.state.lock().expect("Handle::state lock error") {
-            State::Member { entity, .. } => Ok(entity),
+            }),
             #[cfg(feature = "save")]
-            State::Deserializing { .. } => Err(HandleError::NotReady(self.name())),
-            State::Pending { .. } => Err(HandleError::WrongUniverse {
+            (_, State::Deserializing { .. }) => Err(HandleError::NotReady(self.name())),
+            // TODO: WrongUniverse isn't the clearest error for this
+            (_, State::Pending { .. }) => Err(HandleError::WrongUniverse {
                 ticket_universe_id: Some(expected_universe),
                 handle_universe_id,
                 name: self.name(),
             }),
-            State::Gone {} => Err(HandleError::Gone(self.name())),
         }
     }
 
@@ -297,11 +309,11 @@ impl<T: 'static> Handle<T> {
         }
 
         // Use the state mutex to figure out how to obtain access.
-        let access: Access<T> = match &*self.inner.state.lock().expect("Handle::state lock error") {
-            State::Pending { value_arc } => Access::Pending(value_arc.clone()),
+        let access: Access<T> = match *self.inner.state.lock().expect("Handle::state lock error") {
+            State::Pending { ref value_arc } => Access::Pending(value_arc.clone()),
             #[cfg(feature = "save")]
             State::Deserializing { entity: _ } => return Err(HandleError::NotReady(self.name())),
-            &State::Member { entity } => {
+            State::Member { entity } => {
                 let handle_universe_id = self.inner.universe_id.get(atomic::Ordering::Relaxed);
                 debug_assert!(handle_universe_id.is_some());
                 let ticket_universe_id = read_ticket.universe_id();
@@ -324,7 +336,12 @@ impl<T: 'static> Handle<T> {
 
                 Access::Entity(entity)
             }
-            State::Gone {} => return Err(HandleError::Gone(self.name())),
+            State::Gone { reason } => {
+                return Err(HandleError::Gone {
+                    name: self.name(),
+                    reason,
+                });
+            }
         };
 
         // Actually obtain access.
@@ -353,12 +370,12 @@ impl<T: 'static> Handle<T> {
         T: UniverseMember,
     {
         // TODO(ecs): Deduplicate this setup code with read()
-        let entity: ecs::Entity = match &*self.inner.state.lock().expect("Handle::state lock error")
+        let entity: ecs::Entity = match *self.inner.state.lock().expect("Handle::state lock error")
         {
             State::Pending { .. } => panic!("cannot use query() on pending handles"), // TODO: proper error
             #[cfg(feature = "save")]
             State::Deserializing { entity: _ } => return Err(HandleError::NotReady(self.name())),
-            &State::Member { entity } => {
+            State::Member { entity } => {
                 let handle_universe_id = self.inner.universe_id.get(atomic::Ordering::Relaxed);
                 debug_assert!(handle_universe_id.is_some());
                 let ticket_universe_id = read_ticket.universe_id();
@@ -381,7 +398,12 @@ impl<T: 'static> Handle<T> {
 
                 entity
             }
-            State::Gone {} => return Err(HandleError::Gone(self.name())),
+            State::Gone { reason } => {
+                return Err(HandleError::Gone {
+                    name: self.name(),
+                    reason,
+                });
+            }
         };
 
         let component = read_ticket
@@ -409,18 +431,22 @@ impl<T: 'static> Handle<T> {
         F: FnOnce(&mut T) -> Out,
     {
         let value_arc: Arc<RwLock<T>> =
-            match &*self.inner.state.lock().expect("Handle::state lock error") {
-                State::Pending { value_arc, .. } => value_arc.clone(),
+            match *self.inner.state.lock().expect("Handle::state lock error") {
+                State::Pending { ref value_arc, .. } => value_arc.clone(),
                 #[cfg(feature = "save")]
                 State::Deserializing { .. } => {
                     // TODO: not really the right error variant (but this should be unreachable)
                     return Err(HandleError::InUse(self.name()));
                 }
                 State::Member { .. } => {
-                    // TODO(ecs): give this a dedicated error
-                    return Err(HandleError::Gone(self.name()));
+                    return Err(HandleError::NotPending { name: self.name() });
                 }
-                State::Gone {} => return Err(HandleError::Gone(self.name())),
+                State::Gone { reason } => {
+                    return Err(HandleError::Gone {
+                        name: self.name(),
+                        reason,
+                    });
+                }
             };
         let mut guard = value_arc
             .try_write()
@@ -549,7 +575,10 @@ impl<T: 'static> Handle<T> {
             Err(HandleError::NotReady(_)) => {
                 unreachable!("tried to insert a Handle from deserialization via transaction")
             }
-            Err(HandleError::Gone(name)) => {
+            Err(HandleError::Gone {
+                name,
+                reason: GoneReason::CreatedGone {},
+            }) => {
                 return Err(InsertError {
                     name,
                     kind: InsertErrorKind::Gone,
@@ -561,8 +590,12 @@ impl<T: 'static> Handle<T> {
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
-            Err(e @ HandleError::InvalidTicket { .. }) => {
-                unreachable!("invalid ticket while deserializing: {e:?}")
+            Err(
+                e @ (HandleError::InvalidTicket { .. }
+                | HandleError::NotPending { .. }
+                | HandleError::Gone { .. }),
+            ) => {
+                unreachable!("unexpected handle error while deserializing: {e:?}")
             }
         }
 
@@ -595,7 +628,10 @@ impl<T: 'static> Handle<T> {
             .unwrap_or(&Name::Pending)
             .clone();
 
-        let placeholder_state = State::Gone {};
+        // This state should never be observed.
+        let placeholder_state = State::Gone {
+            reason: GoneReason::Placeholder {},
+        };
 
         let value: T = match mem::replace(&mut *state_guard, placeholder_state) {
             state @ State::Gone { .. } => {
@@ -650,9 +686,9 @@ impl<T: 'static> Handle<T> {
     }
 
     /// For deleting members.
-    pub(in crate::universe) fn set_state_to_gone(&self) {
+    pub(in crate::universe) fn set_state_to_gone(&self, reason: GoneReason) {
         let state = &mut *self.inner.state.lock().expect("Handle::state lock error");
-        *state = State::Gone {};
+        *state = State::Gone { reason };
     }
 
     pub(in crate::universe) fn has_strong_handles(&self) -> bool {
@@ -777,8 +813,14 @@ impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for Han
 pub enum HandleError {
     /// Referent was explicitly deleted (if named) or garbage-collected (if anonymous)
     /// from the universe.
-    #[displaydoc("object was deleted: {0}")]
-    Gone(Name),
+    #[displaydoc("object {name} was deleted")] // TODO: print reason
+    #[non_exhaustive]
+    Gone {
+        /// Name of the member which was being accessed.
+        name: Name,
+        /// Further details for diagnosing why the member may be unexpectedly gone.
+        reason: GoneReason,
+    },
 
     /// Referent is currently incompatibly borrowed (read/write or write/write conflict).
     ///
@@ -823,18 +865,48 @@ pub enum HandleError {
         /// Opaque description of the exact restriction.
         error: ReadTicketError,
     },
+
+    /// The handle is not pending and cannot be used with [`Handle::try_modify_pending()`].
+    #[displaydoc("handle {name} is not pending and cannot be accessed with try_modify_pending()")]
+    NotPending {
+        /// Name of the member which was being accessed.
+        name: Name,
+    },
 }
 
 impl core::error::Error for HandleError {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
-            HandleError::Gone(..) => None,
+            HandleError::Gone { .. } => None,
             HandleError::InUse(..) => None,
             HandleError::NotReady(..) => None,
             HandleError::WrongUniverse { .. } => None,
             HandleError::InvalidTicket { name: _, error } => Some(error),
+            HandleError::NotPending { .. } => None,
         }
     }
+}
+
+/// Details of [`HandleError::Gone`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum GoneReason {
+    /// The handle was created using [`Handle::new_gone()`] and never had a value.
+    #[non_exhaustive]
+    CreatedGone {},
+
+    /// Was [deleted explicitly][crate::universe::UniverseTransaction::delete] from the universe.
+    #[non_exhaustive]
+    Deleted {},
+
+    /// Was deleted by garbage collection.
+    #[non_exhaustive]
+    Gc {},
+
+    /// Placeholder value during handle mutation which should never be observed.
+    #[doc(hidden)]
+    #[non_exhaustive]
+    Placeholder {},
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1203,7 +1275,12 @@ impl TicketErrorKind {
     /// Depending on the specific case, the resulting [`HandleError`]
     pub(crate) fn into_handle_error(self, name: Name) -> HandleError {
         match self {
-            TicketErrorKind::MissingEntity => HandleError::Gone(name),
+            TicketErrorKind::MissingEntity => HandleError::Gone {
+                name,
+                // TODO(ecs): we don't know that this is the true reason.
+                // Should this be panicking instead?
+                reason: GoneReason::Deleted {},
+            },
             TicketErrorKind::MissingComponent { type_name: _ } => panic!("{self:?}"), // TODO: improve
             TicketErrorKind::ComponentNotAllowed { type_name: _ } => HandleError::InvalidTicket {
                 name,
@@ -1373,16 +1450,29 @@ mod tests {
     #[test]
     fn new_gone_properties() {
         let name = Name::from("foo");
-        let r: Handle<Space> = Handle::new_gone(name.clone());
-        assert_eq!(r.name(), name);
-        assert_eq!(r.universe_id(), None);
+        let handle: Handle<Space> = Handle::new_gone(name.clone());
+        assert_eq!(handle.name(), name);
+        assert_eq!(handle.universe_id(), None);
         assert_eq!(
-            r.read(ReadTicket::stub()).unwrap_err(),
-            HandleError::Gone(name.clone())
+            handle.read(ReadTicket::stub()).unwrap_err(),
+            HandleError::Gone {
+                name: name.clone(),
+                reason: GoneReason::CreatedGone {}
+            }
         );
         assert_eq!(
-            r.try_modify_pending(|_| {}).unwrap_err(),
-            HandleError::Gone(name.clone())
+            handle.try_modify_pending(|_| {}),
+            Err(HandleError::Gone {
+                name: name.clone(),
+                reason: GoneReason::CreatedGone {}
+            }),
+        );
+        assert_eq!(
+            handle.as_entity(UniverseId::new()),
+            Err(HandleError::Gone {
+                name: name.clone(),
+                reason: GoneReason::CreatedGone {}
+            }),
         );
     }
 
@@ -1405,12 +1495,20 @@ mod tests {
             "object is currently in use: 'foo'"
         );
         assert_eq!(
-            HandleError::Gone("foo".into()).to_string(),
-            "object was deleted: 'foo'"
+            HandleError::Gone {
+                name: "foo".into(),
+                reason: GoneReason::Deleted {}
+            }
+            .to_string(),
+            "object 'foo' was deleted"
         );
         assert_eq!(
-            HandleError::Gone(Name::Anonym(123)).to_string(),
-            "object was deleted: [anonymous #123]"
+            HandleError::Gone {
+                name: Name::Anonym(123),
+                reason: GoneReason::Deleted {}
+            }
+            .to_string(),
+            "object [anonymous #123] was deleted"
         );
     }
 

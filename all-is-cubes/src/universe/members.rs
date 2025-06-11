@@ -147,9 +147,10 @@ macro_rules! member_enums_and_impls {
             /// For deleting members.
             pub(in crate::universe) fn set_state_to_gone(
                 &self,
+                reason: $crate::universe::GoneReason,
             ) -> () {
                 match self {
-                    $( AnyHandle::$member_type(handle) => handle.set_state_to_gone(), )*
+                    $( AnyHandle::$member_type(handle) => handle.set_state_to_gone(reason), )*
                 }
             }
 

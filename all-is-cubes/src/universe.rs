@@ -609,7 +609,7 @@ impl Universe {
             return false;
         };
         let entity = handle.as_entity(self.id).unwrap();
-        handle.set_state_to_gone();
+        handle.set_state_to_gone(GoneReason::Deleted {});
         let success = self.world.despawn(entity);
         assert!(success);
         true
@@ -666,7 +666,9 @@ impl Universe {
     {
         let entity = handle.as_entity(self.id)?;
         let Some(mut component_guard) = self.world.get_mut(entity) else {
-            return Err(HandleError::Gone(handle.name()));
+            // This should never happen even with concurrent access, because as_entity() checks
+            // all cases that would lead to the entity being absent.
+            panic!("{handle:?}.as_entity() succeeded but entity {entity:?} is missing");
         };
         Ok(function(&mut *component_guard))
     }

@@ -17,8 +17,8 @@ use crate::space::Space;
 use crate::time;
 use crate::transaction::{self, Transaction};
 use crate::universe::{
-    self, Handle, HandleError, InsertError, InsertErrorKind, Name, ReadTicket, Universe,
-    UniverseTransaction, list_handles,
+    self, GoneReason, Handle, HandleError, InsertError, InsertErrorKind, Name, ReadTicket,
+    Universe, UniverseTransaction, list_handles,
 };
 use crate::util::{assert_conditional_send_sync, yield_progress_for_testing};
 
@@ -303,7 +303,10 @@ fn delete_success() {
         handle_1
             .read(u.read_ticket(),)
             .expect_err("should be no longer reachable by ref"),
-        HandleError::Gone(name.clone()),
+        HandleError::Gone {
+            name: name.clone(),
+            reason: GoneReason::Deleted {}
+        },
     );
 
     // Now insert a new thing under the same name, and it should not be considered the same.
@@ -319,7 +322,10 @@ fn delete_success() {
         handle_1
             .read(u.read_ticket(),)
             .expect_err("should not be resurrected"),
-        HandleError::Gone(name),
+        HandleError::Gone {
+            name: name.clone(),
+            reason: GoneReason::Deleted {}
+        },
     );
     let _ = handle_2.read(u.read_ticket()).unwrap();
 }
