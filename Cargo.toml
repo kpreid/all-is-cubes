@@ -113,7 +113,7 @@ manyfmt = { version = "0.1.0", default-features = false }
 mutants = { version = "0.0.3", default-features = false }
 noise = { version = "0.9.0", default-features = false }
 # TODO: switch back to crates.io release when available
-nosy = { git = "https://github.com/kpreid/nosy/", rev = "24a4d626a9dc6e1d4fb55fc6fc1c3edb042b3f70", default-features = false }
+nosy = { git = "https://github.com/kpreid/nosy/", rev = "2c9fb0fe4c5df0480e6bc6af57962210e8a5a016", default-features = false }
 num-traits = { version = "0.2.19", default-features = false }
 # once_cell::race is used in no_std builds only, for lazy initialization
 once_cell = { version = "1.21.3", default-features = false }
