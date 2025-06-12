@@ -89,7 +89,7 @@ image = { workspace = true, optional = true, features = ["png"] }
 rectangle-pack = { workspace = true, optional = true, features = ["std"] }
 
 [dev-dependencies]
-all-is-cubes-render = { workspace = true, features = ["raytracer"] }
+all-is-cubes-render = { workspace = true, features = ["raytracer", "std"] }
 snapbox = { workspace = true, features = ["path"] }
 either = { workspace = true }
 pretty_assertions = { workspace = true }
