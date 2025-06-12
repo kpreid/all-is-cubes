@@ -1377,12 +1377,12 @@ mod tests {
         let mut session = Session::<std::time::Instant>::builder().build().await;
         session.set_universe(u);
         session.set_character(Some(character.clone()));
-        let sink = listen::Sink::<Fluff>::new();
-        session.listen_fluff(sink.listener());
+        let log = listen::Log::<Fluff>::new();
+        session.listen_fluff(log.listener());
 
         // Try some fluff with the initial state (we haven't even stepped the session)
         session.universe_mut().execute_1(&space1, &st).unwrap();
-        assert_eq!(sink.drain(), vec![Fluff::Happened]);
+        assert_eq!(log.drain(), vec![Fluff::Happened]);
 
         // Change spaces
         session
@@ -1396,9 +1396,9 @@ mod tests {
 
         // Check we're now listening to the new space only
         session.universe_mut().execute_1(&space1, &st).unwrap();
-        assert_eq!(sink.drain(), vec![]);
+        assert_eq!(log.drain(), vec![]);
         session.universe_mut().execute_1(&space2, &st).unwrap();
-        assert_eq!(sink.drain(), vec![Fluff::Happened]);
+        assert_eq!(log.drain(), vec![Fluff::Happened]);
     }
 
     #[tokio::test]

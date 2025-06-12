@@ -5,7 +5,7 @@ use euclid::{Vector3D, point3};
 use crate::block::{self, AIR};
 use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn, cursor_raycast};
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
-use crate::listen::{Listen as _, Sink};
+use crate::listen::{Listen as _, Log};
 use crate::math::{Face6, GridAab, Rgb};
 use crate::physics::BodyTransaction;
 use crate::raycast::Ray;
@@ -83,8 +83,8 @@ fn inventory_transaction() {
     let space = Space::empty_positive(1, 1, 1);
     let space_handle = universe.insert_anonymous(space);
     let character = Character::spawn_default(universe.read_ticket(), space_handle.clone());
-    let sink = Sink::new();
-    character.listen(sink.listener());
+    let log = Log::new();
+    character.listen(log.listener());
     let character_handle = universe.insert_anonymous(character);
 
     let item = Tool::InfiniteBlocks(AIR);
@@ -97,7 +97,7 @@ fn inventory_transaction() {
 
     // Check notification
     assert_eq!(
-        sink.drain(),
+        log.drain(),
         vec![CharacterChange::Inventory(InventoryChange {
             slots: Arc::new([0])
         })],
@@ -306,17 +306,17 @@ fn selected_slot_notification() {
     let mut universe = Universe::new();
     let space_handle = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
     let mut character = Character::spawn_default(universe.read_ticket(), space_handle);
-    let sink = Sink::new();
-    character.listen(sink.listener());
+    let log = Log::new();
+    character.listen(log.listener());
 
     character.set_selected_slot(0, 2);
 
-    assert_eq!(sink.drain(), vec![CharacterChange::Selections]);
+    assert_eq!(log.drain(), vec![CharacterChange::Selections]);
 
     // no change
     character.set_selected_slot(0, 2);
 
-    assert_eq!(sink.drain(), vec![]);
+    assert_eq!(log.drain(), vec![]);
 }
 
 // TODO: more tests

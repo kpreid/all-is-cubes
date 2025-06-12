@@ -13,7 +13,7 @@ use indoc::indoc;
 use crate::block::{self, AIR, Block, BlockDef, BlockDefTransaction, Resolution::*, TickAction};
 use crate::content::make_some_blocks;
 use crate::fluff::{self, Fluff};
-use crate::listen::{Listen as _, Sink};
+use crate::listen::{Listen as _, Log};
 use crate::math::{Cube, Face6, GridAab, GridCoordinate, GridPoint, Rgba, Vol};
 use crate::op::Operation;
 use crate::space::{
@@ -189,8 +189,8 @@ fn set_updates_evaluated_on_added_block() {
 fn set_updates_evaluated_and_notifies_on_replaced_block() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(1, 1, 1);
-    let sink = Sink::new();
-    space.listen(sink.listener());
+    let log = Log::new();
+    space.listen(log.listener());
 
     let cube = Cube::ORIGIN;
     space
@@ -206,7 +206,7 @@ fn set_updates_evaluated_and_notifies_on_replaced_block() {
     );
     // Confirm expected notifications
     assert_eq!(
-        sink.drain(),
+        log.drain(),
         vec![
             SpaceChange::BlockIndex(0),
             SpaceChange::CubeLight { cube },
@@ -299,15 +299,15 @@ fn removed_blocks_are_forgotten() {
 fn change_listener_simple() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    let sink = Sink::new();
-    space.listen(sink.listener());
+    let log = Log::new();
+    space.listen(log.listener());
 
     assert_eq!(
         Ok(true),
         space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
     );
     assert_eq!(
-        sink.drain(),
+        log.drain(),
         vec![
             SpaceChange::BlockIndex(1),
             SpaceChange::CubeLight {
@@ -326,21 +326,21 @@ fn change_listener_simple() {
         Ok(false),
         space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
     );
-    assert_eq!(sink.drain(), vec![]);
+    assert_eq!(log.drain(), vec![]);
 }
 
 #[test]
 fn fluff_listener() {
     let mut space = Space::empty_positive(1, 1, 1);
     let txn = CubeTransaction::fluff(Fluff::Happened).at(Cube::ORIGIN);
-    let sink = Sink::new();
-    space.fluff().listen(sink.listener());
+    let log = Log::new();
+    space.fluff().listen(log.listener());
 
     txn.execute(&mut space, ReadTicket::stub(), &mut transaction::no_outputs)
         .unwrap();
 
     assert_eq!(
-        sink.drain(),
+        log.drain(),
         vec![SpaceFluff {
             position: Cube::ORIGIN,
             fluff: Fluff::Happened,
@@ -425,14 +425,14 @@ fn fill_uniform_entire_space() {
     let [block] = make_some_blocks();
     let bounds = GridAab::from_lower_size([0, 3, 0], [25 * 16, 16, 2]);
     let mut space = Space::empty(bounds);
-    let sink = Sink::new();
-    space.listen(sink.listener());
+    let log = Log::new();
+    space.listen(log.listener());
 
     space.mutate(ReadTicket::stub(), |m| {
         m.fill_uniform(bounds, &block).unwrap()
     });
 
-    assert_eq!(sink.drain(), vec![SpaceChange::EveryBlock]);
+    assert_eq!(log.drain(), vec![SpaceChange::EveryBlock]);
 
     space.consistency_check();
     for cube in bounds.interior_iter() {
@@ -475,10 +475,10 @@ fn listens_to_block_changes() {
         .read_ticket(universe.read_ticket())
         .filled_with(indirect)
         .build();
-    let sink = Sink::new();
-    space.listen(sink.listener());
+    let log = Log::new();
+    space.listen(log.listener());
     let space = universe.insert("space".into(), space).unwrap();
-    assert_eq!(sink.drain(), vec![]);
+    assert_eq!(log.drain(), vec![]);
 
     // Now mutate the block def.
     let new_block = block::from_color!(Rgba::BLACK);
@@ -494,11 +494,11 @@ fn listens_to_block_changes() {
 
     // This does not result in an outgoing notification, because we don't want
     // computations like reevaluation to happen during the notification process.
-    assert_eq!(sink.drain(), vec![]);
+    assert_eq!(log.drain(), vec![]);
     // Instead, it only happens the next time the space is stepped.
     universe.step(false, time::DeadlineNt::Whenever);
     // Now we should see a notification and the evaluated block data having changed.
-    assert_eq!(sink.drain(), vec![SpaceChange::BlockEvaluation(0)]);
+    assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
         space
             .read(universe.read_ticket())
@@ -529,8 +529,8 @@ fn indirect_becomes_evaluation_error() {
     space
         .mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block))
         .unwrap();
-    let sink = Sink::new();
-    space.listen(sink.listener());
+    let log = Log::new();
+    space.listen(log.listener());
     let space = universe.insert("space".into(), space).unwrap();
 
     // Make the block def refer to itself, guaranteeing an evaluation error
@@ -545,7 +545,7 @@ fn indirect_becomes_evaluation_error() {
     universe.step(false, time::DeadlineNt::Whenever);
 
     // Now we should see a notification and the evaluated block data having changed.
-    assert_eq!(sink.drain(), vec![SpaceChange::BlockEvaluation(0)]);
+    assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
         space
             .read(universe.read_ticket())
@@ -659,17 +659,17 @@ fn set_physics_light_rays() {
 #[test]
 fn set_physics_notification() {
     let mut space = Space::empty_positive(1, 1, 1);
-    let sink = Sink::new();
-    space.listen(sink.listener());
+    let log = Log::new();
+    space.listen(log.listener());
 
     space.set_physics(space.physics.clone());
-    assert_eq!(sink.drain(), vec![]);
+    assert_eq!(log.drain(), vec![]);
 
     space.set_physics(SpacePhysics {
         gravity: Vector3D::zero(),
         ..SpacePhysics::default()
     });
-    assert_eq!(sink.drain(), vec![SpaceChange::Physics]);
+    assert_eq!(log.drain(), vec![SpaceChange::Physics]);
 }
 
 #[test]
@@ -779,9 +779,9 @@ fn block_tick_action_conflict() {
     connect(&mut modifies_nx_neighbor, &output2, Face6::NX);
 
     // Create test setup.
-    let fluff_sink = Sink::new();
+    let fluff_log = Log::new();
     let mut space = Space::empty_positive(3, 1, 1);
-    space.fluff().listen(fluff_sink.listener());
+    space.fluff().listen(fluff_log.listener());
     // These two blocks will both try to mutate [1, 0, 0], with different results.
     let left = Cube::new(0, 0, 0);
     let middle = Cube::new(1, 0, 0);
@@ -806,7 +806,7 @@ fn block_tick_action_conflict() {
             );
         }
         assert_eq!(
-            fluff_sink.drain(),
+            fluff_log.drain(),
             vec![
                 SpaceFluff {
                     position: left,
@@ -832,7 +832,7 @@ fn block_tick_action_conflict() {
     universe.step(false, time::DeadlineNt::Whenever);
 
     {
-        assert_eq!(fluff_sink.drain(), vec![]);
+        assert_eq!(fluff_log.drain(), vec![]);
 
         let space = space.read(universe.read_ticket()).unwrap();
         assert_eq!(

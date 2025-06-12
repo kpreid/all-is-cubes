@@ -4,7 +4,7 @@ use pretty_assertions::assert_eq;
 
 use super::{LightUpdatesInfo, PackedLight, Priority, data::LightStatus};
 use crate::block::{self, AIR, Block};
-use crate::listen::{Listen as _, Listener, Sink};
+use crate::listen::{Listen as _, Listener, Log};
 use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgba, rgb_const};
 use crate::space::{CubeTransaction, GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
 use crate::time;
@@ -155,8 +155,8 @@ fn evaluate_light() {
 #[test]
 fn set_cube_opaque_notification() {
     let mut space = Space::empty_positive(1, 1, 1);
-    let sink: Sink<SpaceChange> = Sink::new();
-    space.listen(sink.listener().filter(|change| match change {
+    let log: Log<SpaceChange> = Log::new();
+    space.listen(log.listener().filter(|change| match change {
         SpaceChange::CubeLight { cube: _ } => Some(change.clone()),
         _ => None,
     }));
@@ -171,7 +171,7 @@ fn set_cube_opaque_notification() {
 
     assert_eq!(space.get_lighting([0, 0, 0]), PackedLight::OPAQUE);
     assert_eq!(
-        sink.drain(),
+        log.drain(),
         vec![SpaceChange::CubeLight {
             cube: Cube::new(0, 0, 0)
         }]

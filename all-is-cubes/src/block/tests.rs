@@ -8,7 +8,7 @@ use crate::block::{
     Resolution::*,
 };
 use crate::content::make_some_blocks;
-use crate::listen::{self, NullListener, Sink};
+use crate::listen::{self, Log, NullListener};
 use crate::math::{GridRotation, Rgba};
 use crate::space::{Space, SpaceTransaction};
 use crate::time::DeadlineNt;
@@ -80,10 +80,10 @@ fn block_debug_with_modifiers() {
 fn listen_atom() {
     let universe = Universe::new();
     let block = block::from_color!(Rgba::WHITE);
-    let sink = Sink::new();
+    let log = Log::new();
 
-    listen(&universe, &block, sink.listener()).unwrap();
-    assert_eq!(sink.drain(), vec![]);
+    listen(&universe, &block, log.listener()).unwrap();
+    assert_eq!(log.drain(), vec![]);
     // No notifications are possible, so nothing more to test.
 }
 
@@ -95,9 +95,9 @@ fn listen_indirect_atom() {
         block::from_color!(Rgba::WHITE),
     ));
     let indirect = Block::from(block_def_handle.clone());
-    let sink = Sink::new();
-    listen(&universe, &indirect, sink.listener()).unwrap();
-    assert_eq!(sink.drain(), vec![]);
+    let log = Log::new();
+    listen(&universe, &indirect, log.listener()).unwrap();
+    assert_eq!(log.drain(), vec![]);
 
     // Now mutate it and we should see a notification.
     universe
@@ -106,7 +106,7 @@ fn listen_indirect_atom() {
             &BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
         )
         .unwrap();
-    assert_eq!(sink.drain().len(), 1);
+    assert_eq!(log.drain().len(), 1);
 }
 
 /// Testing double indirection not because it's a case we expect to use routinely,
@@ -130,12 +130,12 @@ fn listen_indirect_double() {
         )
         .unwrap();
     let indirect2 = Block::from(block_def_handle2.clone());
-    let sink1 = Sink::new();
-    let sink2 = Sink::new();
-    listen(&universe, &indirect1, sink1.listener()).unwrap();
-    listen(&universe, &indirect2, sink2.listener()).unwrap();
-    assert_eq!(sink1.drain(), vec![]);
-    assert_eq!(sink2.drain(), vec![]);
+    let log1 = Log::new();
+    let log2 = Log::new();
+    listen(&universe, &indirect1, log1.listener()).unwrap();
+    listen(&universe, &indirect2, log2.listener()).unwrap();
+    assert_eq!(log1.drain(), vec![]);
+    assert_eq!(log2.drain(), vec![]);
 
     // Mutate the first BlockDef and we should see a notification for it alone.
     universe
@@ -144,11 +144,11 @@ fn listen_indirect_double() {
             &BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
         )
         .unwrap();
-    assert_eq!([sink1.drain().len(), sink2.drain().len()], [1, 0]);
+    assert_eq!([log1.drain().len(), log2.drain().len()], [1, 0]);
 
     // Step and get the other notification.
     universe.step(false, DeadlineNt::Whenever);
-    assert_eq!([sink1.drain().len(), sink2.drain().len()], [0, 1]);
+    assert_eq!([log1.drain().len(), log2.drain().len()], [0, 1]);
 
     // Remove block_def_handle1 from the contents of block_def_handle2...
     universe
@@ -157,7 +157,7 @@ fn listen_indirect_double() {
             &BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
         )
         .unwrap();
-    assert_eq!(sink2.drain().len(), 1);
+    assert_eq!(log2.drain().len(), 1);
     // ...and then block_def_handle1's changes should NOT be forwarded.
     universe
         .execute_1(
@@ -165,7 +165,7 @@ fn listen_indirect_double() {
             &BlockDefTransaction::overwrite(block::from_color!(Rgba::WHITE)),
         )
         .unwrap();
-    assert_eq!(sink2.drain(), vec![]);
+    assert_eq!(log2.drain(), vec![]);
 }
 
 /// Test that changes to a `Space` propagate to block listeners.
@@ -177,9 +177,9 @@ fn listen_recur() {
     let block = Block::builder()
         .voxels_handle(R1, space_handle.clone())
         .build();
-    let sink = Sink::new();
-    listen(&universe, &block, sink.listener()).unwrap();
-    assert_eq!(sink.drain(), vec![]);
+    let log = Log::new();
+    listen(&universe, &block, log.listener()).unwrap();
+    assert_eq!(log.drain(), vec![]);
 
     // Now mutate the space and we should see a notification.
     universe
@@ -188,7 +188,7 @@ fn listen_recur() {
             &SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)),
         )
         .unwrap();
-    assert_eq!(sink.drain().len(), 1);
+    assert_eq!(log.drain().len(), 1);
 
     // TODO: Also test that we don't propagate lighting changes
 
@@ -199,7 +199,7 @@ fn listen_recur() {
             &SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)),
         )
         .unwrap();
-    assert_eq!(sink.drain(), vec![]);
+    assert_eq!(log.drain(), vec![]);
 }
 
 #[test]
@@ -310,15 +310,15 @@ mod txn {
         let mut universe = Universe::new();
         let block_def_handle = universe.insert_anonymous(BlockDef::new(universe.read_ticket(), b1));
         let indirect = Block::from(block_def_handle.clone());
-        let sink = Sink::new();
-        listen(&universe, &indirect, sink.listener()).unwrap();
-        assert_eq!(sink.drain(), vec![]);
+        let log = Log::new();
+        listen(&universe, &indirect, log.listener()).unwrap();
+        assert_eq!(log.drain(), vec![]);
 
         // Now mutate it and we should see a notification.
         universe
             .execute_1(&block_def_handle, &BlockDefTransaction::overwrite(b2))
             .unwrap();
-        assert_eq!(sink.drain().len(), 1);
+        assert_eq!(log.drain().len(), 1);
     }
 
     #[test]

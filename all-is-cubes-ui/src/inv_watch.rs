@@ -259,7 +259,7 @@ mod tests {
         character: StrongHandle<Character>,
         character_cell: listen::Cell<Option<StrongHandle<Character>>>,
         watcher: InventoryWatcher,
-        sink: listen::Sink<WatcherChange>,
+        log: listen::Log<WatcherChange>,
     }
     impl Tester {
         pub fn new() -> Self {
@@ -277,8 +277,8 @@ mod tests {
             watcher.update(universe.read_ticket(), ReadTicket::stub());
 
             // Install listener
-            let sink: listen::Sink<WatcherChange> = listen::Sink::new();
-            watcher.listen(sink.listener());
+            let log: listen::Log<WatcherChange> = listen::Log::new();
+            watcher.listen(log.listener());
 
             Self {
                 universe,
@@ -286,7 +286,7 @@ mod tests {
                 character,
                 character_cell,
                 watcher,
-                sink,
+                log,
             }
         }
         pub fn update(&mut self) {
@@ -299,9 +299,9 @@ mod tests {
     fn basic_and_changed_slot_in_character() {
         let mut t = Tester::new();
         // Run redundant update -- should see no effect
-        assert_eq!(t.sink.drain(), vec![]);
+        assert_eq!(t.log.drain(), vec![]);
         t.update();
-        assert_eq!(t.sink.drain(), vec![]);
+        assert_eq!(t.log.drain(), vec![]);
 
         assert_eq!(t.watcher.character().unwrap(), &t.character);
 
@@ -314,9 +314,9 @@ mod tests {
                 ])),
             )
             .unwrap();
-        assert_eq!(t.sink.drain(), vec![WatcherChange::NeedsUpdate]);
+        assert_eq!(t.log.drain(), vec![WatcherChange::NeedsUpdate]);
         t.update();
-        assert_eq!(t.sink.drain(), vec![WatcherChange::Inventory]);
+        assert_eq!(t.log.drain(), vec![WatcherChange::Inventory]);
     }
 
     #[test]
@@ -340,6 +340,6 @@ mod tests {
         assert_eq!(t.watcher.character().unwrap(), &t.character);
         t.update();
         assert_eq!(t.watcher.character().unwrap(), &new_character);
-        assert_eq!(t.sink.drain(), vec![WatcherChange::Inventory]);
+        assert_eq!(t.log.drain(), vec![WatcherChange::Inventory]);
     }
 }

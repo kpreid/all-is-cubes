@@ -4,8 +4,8 @@
 //! Caution: if the `"std"` feature is disabled, they will change in non-additive ways.
 
 pub use ::nosy::{
-    Buffer, Constant, Flag, Gate, GateListener, IntoDynListener, Listen, Listener, NullListener,
-    Sink, Source, Store, StoreLock, future::WakeFlag,
+    Buffer, Constant, Flag, Gate, GateListener, IntoDynListener, Listen, Listener, Log,
+    NullListener, Source, Store, StoreLock, future::WakeFlag,
 };
 
 #[cfg(feature = "std")]

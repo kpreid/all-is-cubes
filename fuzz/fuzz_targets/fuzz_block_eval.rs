@@ -16,8 +16,8 @@ fn check_block(block: Block) {
 
     let rotationally_symmetric = block.rotationally_symmetric();
 
-    let sink = all_is_cubes::listen::Sink::new();
-    match block.evaluate_and_listen(ReadTicket::stub(), sink.listener()) {
+    let log = all_is_cubes::listen::Log::new();
+    match block.evaluate_and_listen(ReadTicket::stub(), log.listener()) {
         Ok(evaluated) => {
             evaluated.consistency_check();
 
