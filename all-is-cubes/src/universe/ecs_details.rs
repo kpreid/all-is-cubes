@@ -3,7 +3,7 @@ use alloc::collections::BTreeMap;
 use bevy_ecs::prelude as ecs;
 use bevy_ecs::system::SystemParam;
 
-use crate::universe::{AnyHandle, Name, UniverseId};
+use crate::universe::{AnyHandle, Name, ReadTicket, UniverseId};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -89,3 +89,33 @@ unsafe impl SystemParam for UniverseId {
 }
 // SAFETY: We delegate to `Res` and it is read-only too.
 unsafe impl bevy_ecs::system::ReadOnlySystemParam for UniverseId {}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Get mutable access to one component of one entity, and read-only access to all other
+/// entities.
+///
+/// Returns [`None`] if there is no such entity or component.
+///
+/// Panics if the world is not configured as a [`Universe`]’s world.
+#[allow(clippy::elidable_lifetime_names)]
+pub(crate) fn get_one_mut_and_ticket<'w, C>(
+    world: &'w mut ecs::World,
+    entity: ecs::Entity,
+) -> Option<(ecs::Mut<'w, C>, ReadTicket<'w>)>
+where
+    C: ecs::Component<Mutability = bevy_ecs::component::Mutable>,
+{
+    let universe_id: UniverseId = *world.resource::<UniverseId>();
+    let unsafe_world = world.as_unsafe_world_cell();
+    let unsafe_entity_mut = unsafe_world.get_entity(entity).ok()?;
+
+    // SAFETY: `unsafe_entity_mut` and the `everything_but()` ticket are disjoint parts of the
+    // world.
+    Some(unsafe {
+        (
+            unsafe_entity_mut.get_mut::<C>()?,
+            ReadTicket::everything_but(universe_id, unsafe_world, entity),
+        )
+    })
+}

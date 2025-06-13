@@ -493,14 +493,7 @@ impl Space {
         tick: time::Tick,
         deadline: time::Deadline<I>,
     ) -> (SpaceStepInfo, UniverseTransaction) {
-        // Process cubes_wanting_ticks.
-        let start_cube_ticks = I::now();
-        let cube_ticks = if !tick.paused() {
-            self.execute_tick_actions(read_ticket, tick)
-        } else {
-            0
-        };
-        let cube_ticks_to_space_behaviors = I::now();
+        let start_space_behaviors = I::now();
 
         // this should be an if-let-chain
         let (transaction, behavior_step_info) =
@@ -531,12 +524,11 @@ impl Space {
             SpaceStepInfo {
                 spaces: 1,
                 evaluations: TimeStats::default(), // TODO(ecs): re-hookup our time stats
-                cube_ticks,
-                cube_time: cube_ticks_to_space_behaviors
-                    .saturating_duration_since(start_cube_ticks),
+                cube_ticks: 0,                     // TODO(ecs): re-hookup
+                cube_time: Duration::ZERO,         // TODO(ecs): re-hookup
                 behaviors: behavior_step_info,
                 behaviors_time: space_behaviors_to_lighting
-                    .saturating_duration_since(cube_ticks_to_space_behaviors),
+                    .saturating_duration_since(start_space_behaviors),
                 light,
             },
             transaction,

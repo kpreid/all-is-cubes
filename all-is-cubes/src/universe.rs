@@ -30,6 +30,8 @@ pub(crate) use members::*;
 
 mod ecs_details;
 use ecs_details::{Membership, NameMap};
+// TODO(ecs): try to eliminate uses of get_one_mut_and_ticket in favor of normal queries
+pub(crate) use ecs_details::get_one_mut_and_ticket;
 
 mod gc;
 
@@ -321,6 +323,17 @@ impl Universe {
                 .iter_by_type::<Space>()
                 .map(|(_, handle)| handle)
                 .collect();
+
+            if !paused {
+                self.world
+                    .run_system_cached_with(
+                        space::step::execute_tick_actions_system,
+                        spaces.clone(),
+                    )
+                    .unwrap()
+                    .unwrap();
+            }
+
             for space_handle in spaces {
                 let (mut space, everything_but) = self
                     .get_one_mut_and_ticket::<Space>(space_handle.as_entity(self.id).unwrap())
@@ -678,22 +691,13 @@ impl Universe {
     #[allow(clippy::elidable_lifetime_names)]
     pub(in crate::universe) fn get_one_mut_and_ticket<'u, C>(
         &'u mut self,
+        // TODO(ecs): review whether this parameter should be a Handle
         entity: Entity,
     ) -> Option<(ecs::Mut<'u, C>, ReadTicket<'u>)>
     where
         C: ecs::Component<Mutability = bevy_ecs::component::Mutable>,
     {
-        let universe_id = self.universe_id();
-        let unsafe_world = self.world.as_unsafe_world_cell();
-        let entity_mut = unsafe_world.get_entity(entity).ok()?;
-
-        // SAFETY: `entity_mut` and the `everything_but()` ticket are disjoint.
-        Some(unsafe {
-            (
-                entity_mut.get_mut::<C>()?,
-                ReadTicket::everything_but(universe_id, unsafe_world, entity),
-            )
-        })
+        get_one_mut_and_ticket(&mut self.world, entity)
     }
 
     /// Update stored queries to account for new archetypes.
