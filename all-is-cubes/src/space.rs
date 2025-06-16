@@ -486,14 +486,14 @@ impl Space {
     /// * `deadline` is when to stop computing flexible things such as light transport.
     ///
     /// TODO(ecs): Replace this with systems. It is partially replaced already
-    pub(crate) fn step<I: time::Instant>(
+    pub(crate) fn step(
         &mut self,
         read_ticket: ReadTicket<'_>,
         self_handle: Option<&Handle<Space>>,
         tick: time::Tick,
-        deadline: time::Deadline<I>,
+        deadline: time::Deadline,
     ) -> (SpaceStepInfo, UniverseTransaction) {
-        let start_space_behaviors = I::now();
+        let start_space_behaviors = time::Instant::now();
 
         // this should be an if-let-chain
         let (transaction, behavior_step_info) =
@@ -509,11 +509,11 @@ impl Space {
                 Default::default()
             };
 
-        let space_behaviors_to_lighting = I::now();
+        let space_behaviors_to_lighting = time::Instant::now();
 
         let light = {
             let (light_storage, uc, mut change_buffer) = self.borrow_light_update_context();
-            light_storage.update_lighting_from_queue::<I>(
+            light_storage.update_lighting_from_queue(
                 uc,
                 &mut change_buffer,
                 deadline.remaining_since(space_behaviors_to_lighting),
@@ -703,7 +703,7 @@ impl Space {
     /// `epsilon` specifies a threshold at which to stop doing updates.
     /// Zero means to run to full completion; one is the smallest unit of light level
     /// difference; and so on.
-    pub fn evaluate_light<I: time::Instant>(
+    pub fn evaluate_light(
         &mut self,
         epsilon: u8,
         mut progress_callback: impl FnMut(LightUpdatesInfo),
@@ -713,7 +713,7 @@ impl Space {
 
         let mut total = 0;
         loop {
-            let info = light.update_lighting_from_queue::<I>(
+            let info = light.update_lighting_from_queue(
                 uc,
                 &mut change_buffer,
                 Some(Duration::from_secs_f32(0.25)),
@@ -797,12 +797,9 @@ impl Space {
     }
 
     #[doc(hidden)] // kludge used by session for tool usage
-    pub fn evaluate_light_for_time<I: time::Instant>(
-        &mut self,
-        budget: Duration,
-    ) -> LightUpdatesInfo {
+    pub fn evaluate_light_for_time(&mut self, budget: Duration) -> LightUpdatesInfo {
         let (light, uc, mut change_buffer) = self.borrow_light_update_context();
-        light.update_lighting_from_queue::<I>(uc, &mut change_buffer, Some(budget))
+        light.update_lighting_from_queue(uc, &mut change_buffer, Some(budget))
     }
 
     /// Compute the new lighting value for a cube.

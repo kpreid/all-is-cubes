@@ -12,7 +12,7 @@ use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
-use all_is_cubes::time::{self, Duration, Instant as _};
+use all_is_cubes::time::{self, Duration};
 use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes::util::{ConciseDebug, Fmt, Refmt, StatusText, TimeStats};
 use all_is_cubes_render::{Flaws, camera::Camera};
@@ -83,9 +83,9 @@ where
     last_mesh_options: Option<MeshOptions>,
 
     /// Most recent time at which we reset to no data.
-    zero_time: M::Instant,
+    zero_time: time::Instant,
     /// Earliest time prior to `zero_time` at which we finished everything in the queues.
-    complete_time: Option<M::Instant>,
+    complete_time: Option<time::Instant>,
 
     #[cfg(feature = "rerun")]
     rerun_destination: all_is_cubes::rerun_glue::Destination,
@@ -117,7 +117,7 @@ where
             install_listener: true,
             startup_chunks_only: interactive,
             last_mesh_options: None,
-            zero_time: M::Instant::now(),
+            zero_time: time::Instant::now(),
             complete_time: None,
             #[cfg(feature = "rerun")]
             rerun_destination: Default::default(),
@@ -212,7 +212,7 @@ where
         &mut self,
         read_ticket: ReadTicket<'_>,
         camera: &Camera,
-        deadline: time::Deadline<M::Instant>,
+        deadline: time::Deadline,
         render_data_updater: F,
     ) -> CsmUpdateInfo
     where
@@ -250,7 +250,7 @@ where
         &mut self,
         read_ticket: ReadTicket<'_>,
         camera: &Camera,
-        deadline: time::Deadline<M::Instant>,
+        deadline: time::Deadline,
         render_data_updater: &F,
     ) -> (CsmUpdateInfo, bool)
     where
@@ -267,7 +267,7 @@ where
             instance_generation_time: TimeStats,
         }
 
-        let update_start_time = M::Instant::now();
+        let update_start_time = time::Instant::now();
 
         let graphics_options = camera.options();
         let view_point = camera.view_position();
@@ -284,7 +284,7 @@ where
             // TODO: report error
             return (
                 CsmUpdateInfo {
-                    prep_time: M::Instant::now().saturating_duration_since(update_start_time),
+                    prep_time: time::Instant::now().saturating_duration_since(update_start_time),
                     ..CsmUpdateInfo::default()
                 },
                 false,
@@ -314,14 +314,14 @@ where
             // We don't need to clear self.chunks because they will automatically be considered
             // stale by the new block versioning value.
 
-            self.zero_time = M::Instant::now();
+            self.zero_time = time::Instant::now();
             self.complete_time = None;
         }
 
         self.chunk_chart
             .resize_if_needed(camera.view_distance().into_inner());
 
-        let prep_to_update_meshes_time = M::Instant::now();
+        let prep_to_update_meshes_time = time::Instant::now();
 
         let block_updates = self.block_meshes.update(
             &mut todo.blocks,
@@ -339,7 +339,7 @@ where
         // We are now done with todo preparation, and block mesh updates,
         // and can start updating chunk meshes.
 
-        let block_update_to_chunk_scan_time = M::Instant::now();
+        let block_update_to_chunk_scan_time = time::Instant::now();
 
         // Drop out-of-range chunks from todo.chunks and self.chunks.
         // We do this before allocating new ones to keep maximum memory usage lower.
@@ -369,7 +369,7 @@ where
                 // Stop processing chunks as soon as we hit the deadline.
                 // (This means we'll still overrun the deadline by one chunk's time, but that's
                 // the best we can do.)
-                let still_have_time = deadline > M::Instant::now();
+                let still_have_time = deadline > time::Instant::now();
                 if !still_have_time {
                     did_not_finish = true;
                 }
@@ -429,18 +429,18 @@ where
 
         // Update some chunk geometry.
         let chunk_updater = |mut state: ChunkUpdateState<M, CHUNK_SIZE>| {
-            let compute_start = M::Instant::now();
+            let compute_start = time::Instant::now();
             let actually_changed_mesh = state.chunk_mesh.recompute(
                 &mut state.chunk_todo,
                 space,
                 mesh_options,
                 &self.block_meshes,
             );
-            let compute_end_update_start = M::Instant::now();
+            let compute_end_update_start = time::Instant::now();
             if actually_changed_mesh {
                 render_data_updater(state.chunk_mesh.borrow_for_update(false));
             }
-            let update_end = M::Instant::now();
+            let update_end = time::Instant::now();
 
             let compute_time = compute_end_update_start.saturating_duration_since(compute_start);
             let update_time = update_end.saturating_duration_since(compute_end_update_start);
@@ -499,13 +499,13 @@ where
             self.startup_chunks_only = false;
         }
 
-        let chunk_scan_end_time = M::Instant::now();
+        let chunk_scan_end_time = time::Instant::now();
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
         let depth_sort_end_time = if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
             if chunk.depth_sort_for_view(view_point.cast::<<M::Vertex as Vertex>::Coordinate>()) {
                 render_data_updater(chunk.borrow_for_update(true));
-                Some(M::Instant::now())
+                Some(time::Instant::now())
             } else {
                 None
             }

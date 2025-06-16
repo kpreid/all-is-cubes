@@ -58,7 +58,7 @@ const NO_WORLD_SKY: Sky = Sky::Uniform(palette::NO_WORLD_TO_SHOW.to_rgb());
 ///
 /// Can be given a new [`Space`] or have none.
 #[derive(Debug)]
-pub(crate) struct SpaceRenderer<I: time::Instant> {
+pub(crate) struct SpaceRenderer {
     space_label: String,
     instance_buffer_label: String,
 
@@ -92,7 +92,7 @@ pub(crate) struct SpaceRenderer<I: time::Instant> {
     /// Mesh generator and updater.
     ///
     /// If [`None`], then we currently have no [`Space`].
-    csm: Option<ChunkedSpaceMesh<WgpuMt<I>, CHUNK_SIZE>>,
+    csm: Option<ChunkedSpaceMesh<WgpuMt, CHUNK_SIZE>>,
 
     /// The `interactive` parameter passed to `ChunkedSpaceMesh` construction.
     interactive: bool,
@@ -117,7 +117,7 @@ pub(super) struct ChunkBuffers {
     index_format: wgpu::IndexFormat,
 }
 
-impl<I: time::Instant> SpaceRenderer<I> {
+impl SpaceRenderer {
     /// Constructs a new [`SpaceRenderer`] with no space to render yet.
     pub fn new(
         space_label: String,
@@ -296,7 +296,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn update(
         &mut self,
-        deadline: time::Deadline<I>,
+        deadline: time::Deadline,
         read_ticket: ReadTicket<'_>,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -304,7 +304,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         camera: &Camera,
         mut bwp: BeltWritingParts<'_>,
     ) -> Result<SpaceUpdateInfo, RenderError> {
-        let start_time = I::now();
+        let start_time = time::Instant::now();
 
         let todo = &mut self.todo.lock();
 
@@ -322,7 +322,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         }
 
         // Update light texture.
-        let start_light_update = I::now();
+        let start_light_update = time::Instant::now();
         let mut light_update_count = 0;
         {
             // Check the size.
@@ -347,7 +347,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
                 .light_texture
                 .ensure_visible_is_mapped(queue, space, camera);
         }
-        let end_light_update = I::now();
+        let end_light_update = time::Instant::now();
 
         // Update chunks.
         let csm_info = {
@@ -414,7 +414,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         // Flush all texture updates to GPU.
         // This must happen after `csm.update()` so that the newly
         // generated meshes have the texels they expect.
-        let (block_texture_views, texture_info) = self.block_texture.flush::<I>(device, queue);
+        let (block_texture_views, texture_info) = self.block_texture.flush(device, queue);
 
         // Update space bind group if needed.
         self.space_bind_group.get_or_insert(
@@ -437,7 +437,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             },
         );
 
-        let end_time = I::now();
+        let end_time = time::Instant::now();
 
         let info = SpaceUpdateInfo {
             total_time: end_time.saturating_duration_since(start_time),
@@ -465,7 +465,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         camera: &Camera,
         draw_sky: bool, // TODO: consider specifying this at update time to decide whether to calc
     ) -> SpaceDrawInfo {
-        let start_time = I::now();
+        let start_time = time::Instant::now();
         let mut flaws = Flaws::empty();
 
         // Check if we actually have a space to render.
@@ -613,7 +613,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
         } else {
             &pipelines.opaque_render_pipeline
         };
-        let start_opaque_chunk_draw_time = I::now();
+        let start_opaque_chunk_draw_time = time::Instant::now();
         let mut chunk_meshes_drawn = 0;
         let mut chunks_with_instances_drawn = 0;
         let mut blocks_drawn = 0;
@@ -658,7 +658,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
 
         // Render opaque block instances, which we just gathered from the chunks.
         // (Currently, we don't ever try to instance transparent meshes, to avoid sorting issues.)
-        let start_opaque_instance_draw_time = I::now();
+        let start_opaque_instance_draw_time = time::Instant::now();
         for (block_index, cubes) in block_instances.iter() {
             // Set buffers for the mesh
             let Some(dynamic::InstanceMesh {
@@ -718,7 +718,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             .unwrap_or_else(PoisonError::into_inner) = Some(block_instances);
 
         // Transparent geometry after opaque geometry, in back-to-front order
-        let start_draw_transparent_time = I::now();
+        let start_draw_transparent_time = time::Instant::now();
         if camera.options().transparency.will_output_alpha() {
             render_pass.set_pipeline(if camera.options().debug_pixel_cost {
                 &pipelines.transparent_overdraw_render_pipeline
@@ -755,7 +755,7 @@ impl<I: time::Instant> SpaceRenderer<I> {
             }
         }
 
-        let end_time = I::now();
+        let end_time = time::Instant::now();
 
         SpaceDrawInfo {
             draw_init_time: start_opaque_chunk_draw_time.saturating_duration_since(start_time),
@@ -1024,9 +1024,9 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
     clippy::needless_pass_by_value,
     reason = "https://github.com/rust-lang/rust-clippy/issues/12525"
 )]
-fn update_chunk_buffers<I: time::Instant>(
+fn update_chunk_buffers(
     mut bwp: BeltWritingParts<'_>,
-    update: RenderDataUpdate<'_, WgpuMt<I>>,
+    update: RenderDataUpdate<'_, WgpuMt>,
     space_label: &str,
 ) {
     if update.mesh.is_empty() {

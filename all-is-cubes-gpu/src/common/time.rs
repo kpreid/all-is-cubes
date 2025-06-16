@@ -1,4 +1,3 @@
-use core::ops;
 use core::time::Duration;
 
 use all_is_cubes_render::camera::Layers;
@@ -50,32 +49,3 @@ impl FrameBudget {
 /// so long that adding a reasonable number of it to an [`Instant`] will overflow.
 /// TODO: Replace all this with the newer `Deadline` concept?
 const VERY_LONG: Duration = Duration::from_secs(86400 * 7);
-
-/// Wrapper to implement [`all_is_cubes::time::Instant`] for [`web_time::Instant`].
-///
-/// Note: This code exists in multiple locations because duplicating it is easier than
-/// arranging for a shared dependency.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct AdaptedInstant(web_time::Instant);
-
-impl all_is_cubes::time::Instant for AdaptedInstant {
-    fn now() -> Self {
-        Self(web_time::Instant::now())
-    }
-
-    fn saturating_duration_since(self, other: Self) -> Duration {
-        web_time::Instant::saturating_duration_since(&self.0, other.0)
-    }
-}
-impl ops::Add<Duration> for AdaptedInstant {
-    type Output = Self;
-    fn add(self, rhs: Duration) -> Self::Output {
-        Self(self.0 + rhs)
-    }
-}
-impl ops::Sub<Duration> for AdaptedInstant {
-    type Output = Self;
-    fn sub(self, rhs: Duration) -> Self::Output {
-        Self(ops::Sub::sub(self.0, rhs))
-    }
-}

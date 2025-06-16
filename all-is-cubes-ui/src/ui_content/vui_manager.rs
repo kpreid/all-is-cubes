@@ -306,7 +306,7 @@ impl Vui {
     pub fn step(
         &mut self,
         tick: time::Tick,
-        deadline: time::Deadline<impl time::Instant>,
+        deadline: time::Deadline,
         world_read_ticket: ReadTicket<'_>,
     ) -> UniverseStepInfo {
         self.step_pre_sync(world_read_ticket);

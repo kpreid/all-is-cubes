@@ -496,7 +496,7 @@ fn listens_to_block_changes() {
     // computations like reevaluation to happen during the notification process.
     assert_eq!(log.drain(), vec![]);
     // Instead, it only happens the next time the space is stepped.
-    universe.step(false, time::DeadlineNt::Whenever);
+    universe.step(false, time::Deadline::Whenever);
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
@@ -542,7 +542,7 @@ fn indirect_becomes_evaluation_error() {
         .unwrap();
 
     // Step the space to let it notice.
-    universe.step(false, time::DeadlineNt::Whenever);
+    universe.step(false, time::Deadline::Whenever);
 
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
@@ -689,14 +689,14 @@ fn block_tick_action_does_not_run_paused() {
     let space = universe.insert("space".into(), space).unwrap();
 
     // No effect when paused
-    universe.step(true, time::DeadlineNt::Whenever);
+    universe.step(true, time::Deadline::Whenever);
     assert_eq!(
         space.read(universe.read_ticket()).unwrap()[[0, 0, 0]],
         vanisher
     );
 
     // Operation applied when unpaused
-    universe.step(false, time::DeadlineNt::Whenever);
+    universe.step(false, time::Deadline::Whenever);
     assert_eq!(space.read(universe.read_ticket()).unwrap()[[0, 0, 0]], AIR);
 }
 
@@ -738,7 +738,7 @@ fn block_tick_action_timing() {
             });
         }
 
-        universe.step(false, time::DeadlineNt::Whenever);
+        universe.step(false, time::Deadline::Whenever);
     }
 
     // Check sequence of changes
@@ -795,7 +795,7 @@ fn block_tick_action_conflict() {
     let space = universe.insert("space".into(), space).unwrap();
 
     {
-        universe.step(false, time::DeadlineNt::Whenever);
+        universe.step(false, time::Deadline::Whenever);
 
         {
             let space = space.read(universe.read_ticket()).unwrap();
@@ -829,7 +829,7 @@ fn block_tick_action_conflict() {
         )
         .unwrap();
 
-    universe.step(false, time::DeadlineNt::Whenever);
+    universe.step(false, time::Deadline::Whenever);
 
     {
         assert_eq!(fluff_log.drain(), vec![]);
@@ -870,7 +870,7 @@ fn block_tick_action_repeats() {
     let space = universe.insert("space".into(), space).unwrap();
 
     for t in 0..2 {
-        universe.step(false, time::DeadlineNt::Whenever);
+        universe.step(false, time::Deadline::Whenever);
         assert_eq!(
             space.read(universe.read_ticket()).unwrap()[[0, 1, 0]]
                 .modifiers()

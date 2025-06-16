@@ -39,7 +39,7 @@ pub use universe_source::UniverseSource;
 /// Our concrete session type.
 ///
 /// Usually wrapped in a [`DesktopSession`].
-pub type Session = all_is_cubes_ui::apps::Session<std::time::Instant>;
+pub type Session = all_is_cubes_ui::apps::Session;
 
 /// Choose a window size (in terms of viewport size) when the user did not request one.
 ///

@@ -6,6 +6,7 @@ use rand::prelude::IndexedRandom as _;
 use rand::seq::IteratorRandom as _;
 use rand::{Rng, SeedableRng};
 
+use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, AIR, Block, Resolution::*, text};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::{BoxPart, BoxStyle, palette};
@@ -16,11 +17,11 @@ use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
     GridVector, Vol,
 };
+use all_is_cubes::op;
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{arcstr, op, time};
 
 use crate::alg::four_walls;
 use crate::dungeon::{
@@ -739,7 +740,7 @@ pub(crate) async fn demo_dungeon(
     space.set_physics(physics);
     light_progress.progress(0.01).await;
     // Make a rough lighting pass so that we don't have completely black rooms on start.
-    space.evaluate_light::<time::NoTime>(254, |_i| {
+    space.evaluate_light(254, |_i| {
         // TODO: report progress
         // light_progress.progress(i.max_queue_priority as f32 / 255.0)
     });

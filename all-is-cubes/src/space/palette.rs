@@ -257,7 +257,7 @@ impl Palette {
         read_ticket: ReadTicket<'_>,
         output: &mut SpacePaletteNextValue,
     ) {
-        //let mut last_start_time = I::now();
+        //let mut last_start_time = time::Instant::now();
         //let evaluations = TimeStats::default();
         {
             let mut try_eval_again = hashbrown::HashSet::new();
@@ -283,7 +283,7 @@ impl Palette {
                 // TODO: Process side effects on individual cubes such as reevaluating the
                 // lighting influenced by the block.
 
-                //evaluations.record_consecutive_interval(&mut last_start_time, I::now());
+                //evaluations.record_consecutive_interval(&mut last_start_time, time::Instant::now());
             }
             if !try_eval_again.is_empty() {
                 todo.blocks = try_eval_again;

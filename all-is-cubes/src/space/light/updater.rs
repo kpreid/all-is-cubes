@@ -26,7 +26,7 @@ use crate::space::{
     BlockIndex, BlockSky, ChangeBuffer, GridAab, LightPhysics, LightStatus, PackedLight,
     PackedLightScalar, Sky, SpaceChange, SpacePhysics,
 };
-use crate::time::{Duration, Instant};
+use crate::time;
 use crate::util::StatusText;
 
 /// Storage and update queue for a [`Space`]'s light.
@@ -175,18 +175,18 @@ impl LightStorage {
     }
 
     /// Do some lighting updates.
-    pub(in crate::space) fn update_lighting_from_queue<I: Instant>(
+    pub(in crate::space) fn update_lighting_from_queue(
         &mut self,
         uc: UpdateCtx<'_>,
         change_buffer: &mut ChangeBuffer<'_>,
-        budget: Option<Duration>,
+        budget: Option<time::Duration>,
     ) -> LightUpdatesInfo {
         let mut light_update_count: usize = 0;
         self.last_light_updates.clear();
         let mut max_difference: PackedLightScalar = 0;
 
         if self.physics != LightPhysics::None && !budget.is_some_and(|d| d.is_zero()) {
-            let t0 = I::now();
+            let t0 = time::Instant::now();
             let mut cost = 0;
             // We convert the time budget to an arbitrary cost value in order to avoid
             // the overhead of frequently making syscalls to check the clock.
@@ -267,7 +267,7 @@ impl LightStorage {
                 }
             }
 
-            let t1 = I::now();
+            let t1 = time::Instant::now();
             let cost_scale = t1.saturating_duration_since(t0).as_secs_f32() / cost as f32;
             if cost_scale.is_finite() {
                 // TODO(time-budget): don't let this grow or shrink too fast due to outliers

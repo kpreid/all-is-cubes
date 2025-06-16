@@ -613,11 +613,7 @@ mod tests {
 
         // But when paused, the UI enters the pause menu and, as a consequence, cancels mouselook.
         paused.set(true);
-        ui.step(
-            Tick::arbitrary(),
-            time::DeadlineNt::Asap,
-            ReadTicket::stub(),
-        );
+        ui.step(Tick::arbitrary(), time::Deadline::Asap, ReadTicket::stub());
         input.apply_input(
             InputTargets {
                 ui: Some(&ui),

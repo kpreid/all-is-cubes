@@ -1,14 +1,12 @@
 //! Hooks up [`all_is_cubes_mesh`] to [`re_sdk`].
 
-use std::time::Instant;
-
 use itertools::Itertools as _;
 
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{Cube, Face6, GridCoordinate};
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space};
-use all_is_cubes::time::DeadlineStd;
+use all_is_cubes::time::Deadline;
 use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_render::camera::Camera;
@@ -24,9 +22,6 @@ impl mesh::MeshTypes for Mt {
 }
 impl mesh::dynamic::DynamicMeshTypes for Mt {
     type RenderData = Option<DroppingMesh>;
-
-    type Instant = Instant;
-
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = 300;
 }
 
@@ -108,7 +103,7 @@ impl RerunMesher {
     pub(crate) fn update(&mut self, read_ticket: ReadTicket<'_>, camera: &Camera) {
         let _info = self
             .csm
-            .update(read_ticket, camera, DeadlineStd::Whenever, |u| {
+            .update(read_ticket, camera, Deadline::Whenever, |u| {
                 assert!(!u.indices_only);
 
                 let singleton_translation = u.mesh_id.singleton_translation(CHUNK_SIZE);

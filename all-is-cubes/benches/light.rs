@@ -4,7 +4,6 @@ use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 
 use all_is_cubes::content::testing::lighting_bench_space;
 use all_is_cubes::euclid::size3;
-use all_is_cubes::time;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::yield_progress_for_testing;
 
@@ -34,7 +33,7 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
                     if fast {
                         space.fast_evaluate_light();
                     } else {
-                        space.evaluate_light::<time::NoTime>(1, |_| {});
+                        space.evaluate_light(1, |_| {});
                     }
                 },
                 BatchSize::LargeInput,

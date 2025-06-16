@@ -212,7 +212,7 @@ fn dynamic_benches(c: &mut Criterion) {
                 let info = csm.update(
                     ReadTicket::stub(),
                     &camera,
-                    time::DeadlineNt::Whenever,
+                    time::Deadline::Whenever,
                     |_| {},
                 );
                 assert_eq!(info.flaws, Flaws::empty()); // should not be unfinished

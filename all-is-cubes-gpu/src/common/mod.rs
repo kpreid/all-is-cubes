@@ -13,7 +13,6 @@ mod msw;
 pub(crate) use msw::Msw;
 pub(crate) mod reloadable;
 mod time;
-pub(crate) use time::AdaptedInstant;
 pub use time::FrameBudget;
 
 #[doc(hidden)] // Exported only for use by fuzz_octree

@@ -2,7 +2,6 @@
 
 use alloc::string::String;
 use alloc::sync::Arc;
-use core::marker::PhantomData;
 
 use wgpu::TextureViewDescriptor;
 
@@ -56,21 +55,18 @@ mod vertex;
 
 /// [`DynamicMeshTypes`] implementation for this wgpu glue library.
 #[derive(Debug)]
-struct WgpuMt<I> {
-    _phantom: PhantomData<I>,
+struct WgpuMt {
     _not_instantiable: std::convert::Infallible,
 }
 
-impl<I: 'static> all_is_cubes_mesh::MeshTypes for WgpuMt<I> {
+impl all_is_cubes_mesh::MeshTypes for WgpuMt {
     type Vertex = vertex::WgpuBlockVertex;
     type Alloc = AtlasAllocator;
     type Tile = block_texture::AtlasTile;
 }
 
-impl<I: time::Instant> all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt<I> {
+impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for WgpuMt {
     type RenderData = Option<Msw<space::ChunkBuffers>>;
-
-    type Instant = I;
 
     // TODO(instancing): tune this value
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = 400;
@@ -83,7 +79,7 @@ pub fn device_descriptor(
     label: &str,
     available_limits: wgpu::Limits,
 ) -> wgpu::DeviceDescriptor<'_> {
-    EverythingRenderer::<time::NoTime>::device_descriptor(label, available_limits)
+    EverythingRenderer::device_descriptor(label, available_limits)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -93,18 +89,18 @@ pub fn device_descriptor(
 ///
 /// If you wish to render to an image rather than a surface, use [`headless`] instead.
 #[derive(Debug)]
-pub struct SurfaceRenderer<I: time::Instant> {
+pub struct SurfaceRenderer {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
     queue: wgpu::Queue,
 
-    everything: EverythingRenderer<I>,
+    everything: EverythingRenderer,
 
     /// True if we need to reconfigure the surface.
     viewport_dirty: listen::Flag,
 }
 
-impl<I: time::Instant> SurfaceRenderer<I> {
+impl SurfaceRenderer {
     /// Constructs a renderer owning and operating on `surface`.
     ///
     /// This will create a dedicated [`wgpu::Device`] using the provided [`wgpu::Adapter`],
@@ -115,15 +111,14 @@ impl<I: time::Instant> SurfaceRenderer<I> {
         adapter: wgpu::Adapter,
         executor: Arc<dyn Executor>,
     ) -> Result<Self, wgpu::RequestDeviceError> {
-        let request_device_future =
-            adapter.request_device(&EverythingRenderer::<I>::device_descriptor(
-                "SurfaceRenderer::device",
-                adapter.limits(),
-            ));
+        let request_device_future = adapter.request_device(&EverythingRenderer::device_descriptor(
+            "SurfaceRenderer::device",
+            adapter.limits(),
+        ));
         let (device, queue) = request_device_future.await?;
 
         let viewport_source = cameras.viewport_source();
-        let everything = EverythingRenderer::<I>::new(
+        let everything = EverythingRenderer::new(
             executor,
             device.clone(),
             &queue,
@@ -186,7 +181,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
 
         // If the GPU is busy, `get_current_texture()` blocks until a previous texture
         // is no longer in use (except on wasm, in which case submit() seems to take the time).
-        let before_get = I::now();
+        let before_get = time::Instant::now();
         let output = match self.surface.get_current_texture() {
             Ok(t) => t,
             Err(e @ wgpu::SurfaceError::Timeout) => {
@@ -219,7 +214,7 @@ impl<I: time::Instant> SurfaceRenderer<I> {
                 );
             }
         };
-        let after_get = I::now();
+        let after_get = time::Instant::now();
 
         let draw_info = self.everything.draw_frame_linear(&self.queue);
 

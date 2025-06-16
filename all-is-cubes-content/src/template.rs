@@ -18,10 +18,9 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
-use all_is_cubes::transaction::Transaction as _;
+use all_is_cubes::transaction::{self, Transaction as _};
 use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
-use all_is_cubes::{time, transaction};
 
 use crate::fractal::menger_sponge_from_size;
 use crate::{LandscapeBlocks, wavy_landscape};
@@ -140,7 +139,7 @@ impl UniverseTemplate {
     }
 
     /// Create a new [`Universe`] based on this template's specifications.
-    pub async fn build<I: time::Instant>(
+    pub async fn build(
         self,
         p: YieldProgress,
         params: TemplateParameters,
@@ -176,7 +175,7 @@ impl UniverseTemplate {
                 Fail => Some(Err(InGenError::Other(
                     "the Fail template always fails to generate".into(),
                 ))),
-                DemoCity => Some(demo_city::<I>(&mut universe, p.take().unwrap(), params).await),
+                DemoCity => Some(demo_city(&mut universe, p.take().unwrap(), params).await),
                 Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), params).await),
                 Islands => Some(islands(&mut universe, p.take().unwrap(), params).await),
                 Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
@@ -301,7 +300,7 @@ impl WhenceUniverse for TemplateAndParameters {
             ingredients
                 .template
                 // TODO: don't use placeholder time
-                .build::<time::NoTime>(progress, ingredients.parameters)
+                .build(progress, ingredients.parameters)
                 .await
                 .map_err(From::from)
         })
@@ -514,15 +513,16 @@ async fn arbitrary_space(
 mod tests {
     use super::*;
     use all_is_cubes::block;
+    use all_is_cubes::time;
     use all_is_cubes::util::yield_progress_for_testing;
     use futures_core::future::BoxFuture;
 
     #[expect(clippy::let_underscore_future)]
     fn _test_build_future_is_send() {
-        let _: BoxFuture<'_, _> = Box::pin(UniverseTemplate::Atrium.build::<std::time::Instant>(
-            yield_progress_for_testing(),
-            TemplateParameters::default(),
-        ));
+        let _: BoxFuture<'_, _> = Box::pin(
+            UniverseTemplate::Atrium
+                .build(yield_progress_for_testing(), TemplateParameters::default()),
+        );
     }
 
     /// Test one template.
@@ -545,7 +545,7 @@ mod tests {
 
         let result = template
             .clone()
-            .build::<std::time::Instant>(yield_progress_for_testing(), params)
+            .build(yield_progress_for_testing(), params)
             .await;
 
         if matches!(template, UniverseTemplate::Fail) {
@@ -561,7 +561,7 @@ mod tests {
                     .read(u.read_ticket())
                     .unwrap();
             }
-            u.step(false, time::DeadlineNt::Asap);
+            u.step(false, time::Deadline::Asap);
 
             check_block_spaces(&u);
         }
@@ -578,7 +578,7 @@ mod tests {
                 "too-big result: {:?}",
                 template
                     .clone()
-                    .build::<std::time::Instant>(
+                    .build(
                         yield_progress_for_testing(),
                         TemplateParameters {
                             seed: Some(0),

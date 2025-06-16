@@ -17,7 +17,6 @@ use all_is_cubes::math::{
     GridVector, Rgb, Rgba, Vol, ps32, ps64, rgb_const, rgba_const, zo32,
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
-use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
 use all_is_cubes::universe::{
     Handle, HandleError, ReadTicket, StrongHandle, Universe, UniverseTransaction,
@@ -606,7 +605,7 @@ async fn furnace(mut context: RenderTestContext) {
             Ok(())
         })
         .unwrap();
-    space.evaluate_light::<std::time::Instant>(0, drop);
+    space.evaluate_light(0, drop);
     finish_universe_from_space(context.universe_mut(), space);
 
     // Unlike other test cases we are not using UNALTERED_COLORS, because the entire point of this
@@ -799,7 +798,7 @@ async fn icons(mut context: RenderTestContext) {
     let aspect_ratio =
         f64::from(space.bounds().size().height) / f64::from(space.bounds().size().width);
 
-    space.evaluate_light::<time::NoTime>(1, |_| {});
+    space.evaluate_light(1, |_| {});
     finish_universe_from_space(context.universe_mut(), space);
 
     let mut options = GraphicsOptions::UNALTERED_COLORS;
@@ -992,7 +991,7 @@ async fn sky(mut context: RenderTestContext, face: Face6) {
 async fn template(mut context: RenderTestContext, template_name: &'static str) {
     let template = UniverseTemplate::from_str(template_name).unwrap();
     let mut universe = template
-        .build::<std::time::Instant>(
+        .build(
             yield_progress_for_testing(),
             all_is_cubes_content::TemplateParameters {
                 seed: Some(0),
@@ -1015,7 +1014,7 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
             .clone();
         universe
             .try_modify(&space_handle, |space| {
-                space.evaluate_light::<time::NoTime>(1, |_| {});
+                space.evaluate_light(1, |_| {});
             })
             .unwrap();
     }
@@ -1320,7 +1319,7 @@ async fn fog_test_universe() -> Arc<Universe> {
         .unwrap();
 
     space.fast_evaluate_light();
-    space.evaluate_light::<time::NoTime>(1, |_| {});
+    space.evaluate_light(1, |_| {});
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
@@ -1358,7 +1357,7 @@ async fn light_test_universe() -> Arc<Universe> {
         .unwrap();
 
     space.fast_evaluate_light();
-    space.evaluate_light::<time::NoTime>(1, |_| {});
+    space.evaluate_light(1, |_| {});
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
@@ -1463,7 +1462,7 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
         .unwrap();
 
     space.fast_evaluate_light();
-    space.evaluate_light::<time::NoTime>(1, |_| {});
+    space.evaluate_light(1, |_| {});
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);

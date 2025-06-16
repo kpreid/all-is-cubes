@@ -223,7 +223,7 @@ fn no_superjumping() {
         0.,
     ));
     let character = universe.insert("character".into(), character).unwrap();
-    universe.step(false, time::DeadlineNt::Whenever); // initial settling
+    universe.step(false, time::Deadline::Whenever); // initial settling
 
     universe
         .try_modify(&character, |character| {

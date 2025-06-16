@@ -11,7 +11,7 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::math::GridCoordinate;
 use all_is_cubes::space::BlockIndex;
-use all_is_cubes::time::{self, Instant};
+use all_is_cubes::time;
 use all_is_cubes::util::{ConciseDebug, Refmt as _};
 
 #[cfg(doc)]
@@ -100,11 +100,11 @@ impl<M: DynamicMeshTypes> MeshJobQueue<M> {
             return;
         }
 
-        let t0 = M::Instant::now();
+        let t0 = time::Instant::now();
         match kind {
             JobInputData::Block { block } => {
                 let mesh = BlockMesh::new(&block, &self.texture_allocator, &mesh_options);
-                let compute_time = M::Instant::now().saturating_duration_since(t0);
+                let compute_time = time::Instant::now().saturating_duration_since(t0);
 
                 counter_ticket.set_state(state::State::Completed);
 
@@ -263,11 +263,11 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
     // completed or the deadline is hit, but only if we're actually using threads.
     pub(crate) fn run_until(
         &self,
-        deadline: time::Deadline<M::Instant>,
+        deadline: time::Deadline,
         #[cfg_attr(target_family = "wasm", expect(unused))] blocks: bool,
         mut when_completed: impl FnMut(),
     ) -> (Duration, Duration) {
-        let start_running_time = M::Instant::now();
+        let start_running_time = time::Instant::now();
         let mut current_time = start_running_time;
 
         while deadline > current_time {
@@ -275,7 +275,7 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
                 break;
             };
             job.now_or_never().expect("job should not suspend");
-            current_time = M::Instant::now();
+            current_time = time::Instant::now();
         }
         let end_running_start_waiting_time = current_time;
 
@@ -308,7 +308,7 @@ impl<M: DynamicMeshTypes> QueueOwner<M> {
             counters.wait_for_finish_or_timeout(remaining);
             when_completed();
 
-            current_time = M::Instant::now();
+            current_time = time::Instant::now();
         }
         let end_waiting_time = current_time;
 

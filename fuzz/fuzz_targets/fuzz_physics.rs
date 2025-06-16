@@ -55,7 +55,7 @@ fuzz_target!(|input: (
         }
 
         // dbg!((i, character.body.position));
-        universe.step(false, time::DeadlineNt::Whenever);
+        universe.step(false, time::Deadline::Whenever);
         let body_info = character
             .read(universe.read_ticket())
             .unwrap()

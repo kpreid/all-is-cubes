@@ -28,7 +28,7 @@ fuzz_target!(|input: FuzzUniverseTemplate| {
         // TODO: give arbitrary "user" inputs to the character and other universe manipulations
         universe.step(
             false,
-            time::DeadlineStd::At(Instant::now() + Duration::from_millis(1)),
+            time::Deadline::At(Instant::now() + Duration::from_millis(1)),
         );
     }
 });

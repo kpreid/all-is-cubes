@@ -158,7 +158,7 @@ async fn start_game_with_dom(
     static_dom.append_to_loading_log("\nConstructing universe...");
     app_progress.finish().await;
     let universe = template
-        .build::<crate::AdaptedInstant>(
+        .build(
             universe_progress,
             all_is_cubes_content::TemplateParameters {
                 seed: Some(seed.unwrap_or_else(|| {

@@ -43,7 +43,7 @@ pub(super) type InfoTextTexture = DrawableTexture<Gray8, u8>;
 /// scene and UI, but not the surface it's drawn on.
 ///
 /// This may be used in tests or headless rendering.
-pub(super) struct EverythingRenderer<I: time::Instant> {
+pub(super) struct EverythingRenderer {
     executor: Arc<dyn Executor>,
 
     device: wgpu::Device,
@@ -63,7 +63,7 @@ pub(super) struct EverythingRenderer<I: time::Instant> {
     /// Pipelines and layouts for rendering Space content
     pipelines: Pipelines,
 
-    space_renderers: Layers<SpaceRenderer<I>>,
+    space_renderers: Layers<SpaceRenderer>,
 
     /// Raytracer for raytracing mode. If not in use, is not updated.
     rt: RaytraceToTexture,
@@ -84,7 +84,7 @@ pub(super) struct EverythingRenderer<I: time::Instant> {
     rerun_image: rerun_image::RerunImageExport,
 }
 
-impl<I: time::Instant> fmt::Debug for EverythingRenderer<I> {
+impl fmt::Debug for EverythingRenderer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // not at all clear how much is useful to print...
         let Self {
@@ -118,7 +118,7 @@ impl<I: time::Instant> fmt::Debug for EverythingRenderer<I> {
     }
 }
 
-impl<I: time::Instant> EverythingRenderer<I> {
+impl EverythingRenderer {
     /// A device descriptor suitable for the expectations of [`EverythingRenderer`].
     pub fn device_descriptor(
         label: &str,
@@ -258,7 +258,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         cursor_result: Option<&Cursor>,
         frame_budget: &FrameBudget,
     ) -> Result<UpdateInfo, RenderError> {
-        let start_frame_time = I::now();
+        let start_frame_time = time::Instant::now();
 
         // This updates camera matrices and graphics options which we are going to consult
         // or copy to the GPU.
@@ -345,7 +345,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             encoder: &mut encoder,
         };
 
-        let update_prep_to_space_update_time = I::now();
+        let update_prep_to_space_update_time = time::Instant::now();
 
         let world_deadline =
             time::Deadline::At(update_prep_to_space_update_time + frame_budget.update_meshes.world);
@@ -378,7 +378,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             }
         };
 
-        let space_update_to_lines_time = I::now();
+        let space_update_to_lines_time = time::Instant::now();
 
         // Prepare cursor and debug lines.
         {
@@ -434,7 +434,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             self.lines_vertex_count = v.len() as u32;
         };
 
-        let lines_to_submit_time = I::now();
+        let lines_to_submit_time = time::Instant::now();
 
         // Do raytracing
         if should_raytrace(&self.cameras) {
@@ -450,7 +450,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         self.staging_belt.finish();
         queue.submit(std::iter::once(encoder.finish()));
 
-        let finish_update_time = I::now();
+        let finish_update_time = time::Instant::now();
         Ok(UpdateInfo {
             flaws: self.fb.flaws() | space_infos.world.flaws() | space_infos.ui.flaws(),
             total_time: finish_update_time.saturating_duration_since(start_frame_time),
@@ -479,7 +479,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
     /// Render the current scene content to the linear scene texture,
     /// in linear color values without tone mapping.
     pub(crate) fn draw_frame_linear(&mut self, queue: &wgpu::Queue) -> DrawInfo {
-        let start_draw_time = I::now();
+        let start_draw_time = time::Instant::now();
 
         // We need multiple encoders to avoid borrow conflicts between render pass and StagingBelt.
         let mut pass_encoder =
@@ -555,7 +555,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
 
                 (info, false)
             };
-        let world_to_lines_time = I::now();
+        let world_to_lines_time = time::Instant::now();
 
         // Draw debug lines
         if self.lines_vertex_count > 0 {
@@ -592,7 +592,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             ..Default::default()
         });
 
-        let lines_to_ui_time = I::now();
+        let lines_to_ui_time = time::Instant::now();
         let ui_draw_info = if !is_raytracing {
             self.space_renderers.ui.draw(
                 bwp.reborrow(),
@@ -605,7 +605,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
             SpaceDrawInfo::default()
         };
         drop(ui_render_pass);
-        let ui_to_postprocess_time = I::now();
+        let ui_to_postprocess_time = time::Instant::now();
 
         // Write the postprocess camera data.
         bwp.write_buffer(
@@ -643,7 +643,7 @@ impl<I: time::Instant> EverythingRenderer<I> {
         queue.submit([belt_encoder.finish(), pass_encoder.finish()]);
         self.staging_belt.recall();
 
-        let end_time = I::now();
+        let end_time = time::Instant::now();
         DrawInfo {
             times: Layers {
                 world: world_to_lines_time.saturating_duration_since(start_draw_time),

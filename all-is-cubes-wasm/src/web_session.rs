@@ -27,10 +27,10 @@ use crate::web_glue::{
     add_event_listener, get_mandatory_element, replace_children_with_one_text_node,
 };
 
-pub(crate) type Session = all_is_cubes_ui::apps::Session<crate::AdaptedInstant>;
+pub(crate) type Session = all_is_cubes_ui::apps::Session;
 
 pub(crate) enum WebRenderer {
-    Wgpu(in_wgpu::SurfaceRenderer<crate::AdaptedInstant>),
+    Wgpu(in_wgpu::SurfaceRenderer),
 }
 
 /// The interior-mutable state of an All is Cubes session in a web page, owning a

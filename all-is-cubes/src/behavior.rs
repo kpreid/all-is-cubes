@@ -1019,8 +1019,8 @@ mod tests {
         });
         let character = u.insert("character".into(), character).unwrap();
 
-        u.step(false, time::DeadlineNt::Whenever);
-        u.step(false, time::DeadlineNt::Whenever);
+        u.step(false, time::Deadline::Whenever);
+        u.step(false, time::Deadline::Whenever);
 
         let character = character.read(u.read_ticket()).unwrap();
         assert_eq!(
@@ -1058,7 +1058,7 @@ mod tests {
                 .count(),
             1
         );
-        u.step(false, time::DeadlineNt::Whenever);
+        u.step(false, time::Deadline::Whenever);
         assert_eq!(
             character
                 .read(u.read_ticket())
@@ -1142,16 +1142,16 @@ mod tests {
         assert_eq!(mpsc::TryRecvError::Empty, rx.try_recv().unwrap_err());
 
         // First step
-        u.step(false, time::DeadlineNt::Whenever);
+        u.step(false, time::Deadline::Whenever);
         let waker: BehaviorWaker = rx.try_recv().unwrap();
 
         // Second step — should *not* step the behavior because it didn't wake.
-        u.step(false, time::DeadlineNt::Whenever);
+        u.step(false, time::Deadline::Whenever);
         assert_eq!(mpsc::TryRecvError::Empty, rx.try_recv().unwrap_err());
 
         // Wake and step again
         waker.wake();
-        u.step(false, time::DeadlineNt::Whenever);
+        u.step(false, time::Deadline::Whenever);
         rx.try_recv().unwrap();
     }
 

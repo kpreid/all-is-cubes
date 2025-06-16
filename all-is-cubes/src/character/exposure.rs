@@ -188,7 +188,7 @@ mod tests {
             //     .fill_uniform(space.bounds().shrink(FaceMap::splat(1)), AIR)
             //     .unwrap();
 
-            space.evaluate_light::<time::NoTime>(0, |_| {});
+            space.evaluate_light(0, |_| {});
             space
         });
         let mut character = Character::spawn_default(universe.read_ticket(), space);
@@ -208,7 +208,7 @@ mod tests {
                     exp = exposure.exposure(),
                 );
             }
-            universe.step(false, time::DeadlineNt::Whenever);
+            universe.step(false, time::Deadline::Whenever);
         }
 
         // Done running; examine results.

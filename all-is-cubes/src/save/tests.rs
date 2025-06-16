@@ -664,7 +664,7 @@ fn space_success() {
         })
         .unwrap();
 
-    space.evaluate_light::<time::NoTime>(0, |_| {});
+    space.evaluate_light(0, |_| {});
 
     const NL: [u8; 4] = [0, 0, 0, 1];
     const IN: [u8; 4] = [0, 0, 0, 2];
@@ -842,7 +842,7 @@ fn space_light_queue_remembered() {
 
     // Then, when stepped, they are updated
     let space2 = universe2.insert("space2".into(), space2).unwrap();
-    universe2.step(false, time::DeadlineNt::Whenever);
+    universe2.step(false, time::Deadline::Whenever);
     let space2 = space2.read(universe2.read_ticket()).unwrap();
     assert_eq!(
         [0, 1, 2].map(|x| space2.get_lighting([x, 0, 0]).status()),

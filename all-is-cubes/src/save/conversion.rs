@@ -1263,7 +1263,7 @@ mod universe {
             // Perform a paused step to let things do re-initialization,
             // such as `Space` block evaluation, without actually causing any in-game time
             // to pass.
-            universe.step(true, time::DeadlineNt::Asap);
+            universe.step(true, time::Deadline::Asap);
 
             Ok(universe)
         }

@@ -18,7 +18,6 @@ use wgpu::util::DeviceExt as _;
 use all_is_cubes::euclid::{Rotation3D, point3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{Face6, FreeVector, GridSize, GridVector, Rgba, ps64};
-use all_is_cubes::time;
 use all_is_cubes_mesh::{BlockVertex, Coloring};
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 
@@ -43,12 +42,10 @@ where
     T: bytemuck::Pod,
 {
     let (device, queue) = adapter
-        .request_device(
-            &in_wgpu::EverythingRenderer::<time::NoTime>::device_descriptor(
-                device_label,
-                adapter.limits(),
-            ),
-        )
+        .request_device(&in_wgpu::EverythingRenderer::device_descriptor(
+            device_label,
+            adapter.limits(),
+        ))
         .await
         .unwrap();
     #[cfg_attr(target_family = "wasm", expect(clippy::arc_with_non_send_sync))]
@@ -136,7 +133,7 @@ where
     // Placeholder space data for the bind group
     let texture_allocator =
         in_wgpu::block_texture::AtlasAllocator::new("shader test space", &device.limits());
-    let (texture_view, _) = texture_allocator.flush::<time::NoTime>(&device, &queue);
+    let (texture_view, _) = texture_allocator.flush(&device, &queue);
     let space_bind_group = in_wgpu::space::create_space_bind_group(
         "shader test space",
         &device,

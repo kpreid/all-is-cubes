@@ -9,7 +9,6 @@ use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, FreeVector, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgba,
 };
 use all_is_cubes::space::{self, Space, SpacePhysics};
-use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, ReadTicket, StrongHandle, Universe};
 use all_is_cubes_render::camera::{self, ViewTransform};
 
@@ -310,7 +309,7 @@ impl PageInst {
         universe
             .try_modify(&space, |space| {
                 space.fast_evaluate_light();
-                space.evaluate_light::<time::NoTime>(10, |_| {});
+                space.evaluate_light(10, |_| {});
             })
             .unwrap();
 

@@ -10,6 +10,8 @@ use core::time::Duration;
 use futures_core::future::BoxFuture as SyncBoxFuture;
 use manyfmt::Refmt as _;
 
+// -------------------------------------------------------------------------------------------------
+
 mod custom_format;
 pub use custom_format::*;
 
@@ -18,6 +20,8 @@ mod multi_failure;
 #[doc(hidden)] // experimental, may become a library
 #[cfg(any(feature = "std", test))]
 pub use multi_failure::MultiFailure;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Interface to start concurrent tasks.
 ///
@@ -199,10 +203,10 @@ impl TimeStats {
     /// Returns the duration that was recorded.
     #[doc(hidden)] // for now, not making writing conveniences public
     #[inline]
-    pub fn record_consecutive_interval<I: crate::time::Instant>(
+    pub fn record_consecutive_interval(
         &mut self,
-        last_marked_instant: &mut I,
-        now: I,
+        last_marked_instant: &mut crate::time::Instant,
+        now: crate::time::Instant,
     ) -> Duration {
         let previous = *last_marked_instant;
         *last_marked_instant = now;

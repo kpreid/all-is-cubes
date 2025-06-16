@@ -101,7 +101,7 @@ impl UniverseSource {
                 });
                 template
                     .clone()
-                    .build::<Instant>(
+                    .build(
                         yield_progress,
                         TemplateParameters {
                             seed: Some(seed),
@@ -143,7 +143,7 @@ impl UniverseSource {
 
 fn evaluate_light_with_progress(space: &mut Space) {
     let light_progress = logging::new_progress_bar(100).with_prefix("Lighting");
-    space.evaluate_light::<Instant>(1, lighting_progress_adapter(&light_progress));
+    space.evaluate_light(1, lighting_progress_adapter(&light_progress));
     light_progress.finish();
 }
 

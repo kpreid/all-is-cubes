@@ -9,7 +9,7 @@ use futures_channel::oneshot::Canceled;
 use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
 use all_is_cubes::math::Cube;
 use all_is_cubes::space::{BlockIndex, Space};
-use all_is_cubes::time::{self, Instant};
+use all_is_cubes::time;
 use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
 #[cfg(doc)]
@@ -73,7 +73,7 @@ where
         todo: &mut hashbrown::HashSet<BlockIndex>,
         space: &Space,
         mesh_options: &MeshOptions,
-        deadline: time::Deadline<M::Instant>,
+        deadline: time::Deadline,
         render_data_updater: &F,
     ) -> VbmUpdateInfo
     where
@@ -93,7 +93,7 @@ where
                 unfinished: 0,
             };
         }
-        let start_time = M::Instant::now();
+        let start_time = time::Instant::now();
 
         // Bump version number.
         self.last_version_counter = match self.last_version_counter.get().checked_add(1) {
@@ -208,7 +208,7 @@ where
                             || current_mesh_entry.version == BlockMeshVersion::NotReady
                         {
                             // TODO: reuse old render data
-                            let start_callback_time = M::Instant::now();
+                            let start_callback_time = time::Instant::now();
                             *current_mesh_entry = VersionedBlockMesh::new(
                                 block_index,
                                 new_evaluated_block,
@@ -217,7 +217,7 @@ where
                                 render_data_updater,
                             );
                             callback_stats += TimeStats::one(
-                                M::Instant::now().saturating_duration_since(start_callback_time),
+                                time::Instant::now().saturating_duration_since(start_callback_time),
                             );
                         } else {
                             // The new mesh is identical to the old one (which might happen because
@@ -257,7 +257,7 @@ where
             .map(|(i, _)| i as BlockIndex)
             .collect();
 
-        let end_time = M::Instant::now();
+        let end_time = time::Instant::now();
 
         VbmUpdateInfo {
             total_time: end_time.saturating_duration_since(start_time),

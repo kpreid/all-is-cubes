@@ -13,7 +13,7 @@ use all_is_cubes::util::Executor;
 use all_is_cubes_render::camera::{Layers, StandardCameras, Viewport};
 use all_is_cubes_render::{Flaws, HeadlessRenderer, RenderError, Rendering};
 
-use crate::common::{AdaptedInstant, FrameBudget};
+use crate::common::FrameBudget;
 use crate::in_wgpu::{self, init};
 
 /// Builder for configuring a [headless](HeadlessRenderer) [`Renderer`].
@@ -35,12 +35,10 @@ impl Builder {
         adapter: wgpu::Adapter,
     ) -> Result<Self, wgpu::RequestDeviceError> {
         let (device, queue) = adapter
-            .request_device(
-                &in_wgpu::EverythingRenderer::<AdaptedInstant>::device_descriptor(
-                    label,
-                    adapter.limits(),
-                ),
-            )
+            .request_device(&in_wgpu::EverythingRenderer::device_descriptor(
+                label,
+                adapter.limits(),
+            ))
             .await?;
         Ok(Self {
             device,
@@ -108,7 +106,7 @@ struct RendererImpl {
     queue: wgpu::Queue,
 
     color_texture: wgpu::Texture,
-    everything: super::EverythingRenderer<AdaptedInstant>,
+    everything: super::EverythingRenderer,
 
     viewport_source: listen::DynSource<Viewport>,
     viewport_dirty: listen::Flag,

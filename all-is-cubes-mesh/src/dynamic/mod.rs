@@ -48,9 +48,6 @@ pub trait DynamicMeshTypes: MeshTypes {
     // with `Option`?
     type RenderData: Default + Send + Sync + fmt::Debug;
 
-    /// Source of time measurement for scheduling and profiling.
-    type Instant: all_is_cubes::time::Instant;
-
     // We'd like to have
     // /// Cube side-length at which to group blocks into chunks (single meshes).
     // const CHUNK_SIZE: GridCoordinate;

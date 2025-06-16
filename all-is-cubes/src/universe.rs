@@ -249,13 +249,9 @@ impl Universe {
     /// Advance time for all members.
     ///
     /// * `deadline` is when to stop computing flexible things such as light transport.
-    pub fn step<I: time::Instant>(
-        &mut self,
-        paused: bool,
-        deadline: time::Deadline<I>,
-    ) -> UniverseStepInfo {
+    pub fn step(&mut self, paused: bool, deadline: time::Deadline) -> UniverseStepInfo {
         let mut info = UniverseStepInfo::default();
-        let start_time = I::now();
+        let start_time = time::Instant::now();
 
         let tick = self.world.resource_mut::<time::Clock>().advance(paused);
         self.world.resource_mut::<time::CurrentTick>().0 = Some(tick);
@@ -297,8 +293,8 @@ impl Universe {
         self.sync_space_blocks();
 
         // Bundle all our relevant state so we can pass it to systems.
-        struct StepInput<I> {
-            deadline: time::Deadline<I>,
+        struct StepInput {
+            deadline: time::Deadline,
             /// How to divide light calculation time among spaces, based on the previous step
             budget_per_space: Option<time::Duration>,
             info: UniverseStepInfo,
@@ -344,7 +340,9 @@ impl Universe {
                     Some(&space_handle),
                     tick,
                     match si.budget_per_space {
-                        Some(budget) => si.deadline.min(time::Deadline::At(I::now() + budget)),
+                        Some(budget) => si
+                            .deadline
+                            .min(time::Deadline::At(time::Instant::now() + budget)),
                         None => si.deadline,
                     },
                 );
@@ -366,7 +364,7 @@ impl Universe {
         // TODO(ecs): pre-register this system after getting rid of the inputs
         self.world
             .run_system_cached_with(
-                |mut si: ecs::InMut<'_, StepInput<I>>,
+                |mut si: ecs::InMut<'_, StepInput>,
                  current_tick: ecs::Res<'_, time::CurrentTick>,
                  data_sources: QueryBlockDataSources<'_, '_>,
                  characters: ecs::Query<'_, '_, (&Membership, &mut Character)>| {
@@ -414,7 +412,7 @@ impl Universe {
         // Post-step cleanup
         self.world.resource_mut::<time::CurrentTick>().0 = None;
 
-        si.info.computation_time = I::now().saturating_duration_since(start_time);
+        si.info.computation_time = time::Instant::now().saturating_duration_since(start_time);
         si.info
     }
 

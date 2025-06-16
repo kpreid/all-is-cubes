@@ -15,7 +15,9 @@ keywords = ["all-is-cubes"] # but we'll at least label it as being part of the f
 bench = false
 
 [features]
-std = []
+std = [
+    "bevy_platform/std",
+]
 # Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = [
     "std", # TODO: remove this when <https://github.com/rust-fuzz/arbitrary/issues/208> is fixed
@@ -31,6 +33,7 @@ serde = [
 
 [dependencies]
 arbitrary = { workspace = true, optional = true }
+bevy_platform = { workspace = true, features = ["alloc", "web"] }
 bytemuck = { workspace = true, features = ["derive"] }
 cfg-if = { workspace = true }
 displaydoc = { workspace = true }

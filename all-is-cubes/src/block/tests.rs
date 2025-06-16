@@ -11,7 +11,7 @@ use crate::content::make_some_blocks;
 use crate::listen::{self, Log, NullListener};
 use crate::math::{GridRotation, Rgba};
 use crate::space::{Space, SpaceTransaction};
-use crate::time::DeadlineNt;
+use crate::time;
 use crate::universe::{HandleError, Name, Universe};
 
 /// Just install a listener and discard the [`EvaluatedBlock`].
@@ -147,7 +147,7 @@ fn listen_indirect_double() {
     assert_eq!([log1.drain().len(), log2.drain().len()], [1, 0]);
 
     // Step and get the other notification.
-    universe.step(false, DeadlineNt::Whenever);
+    universe.step(false, time::Deadline::Whenever);
     assert_eq!([log1.drain().len(), log2.drain().len()], [0, 1]);
 
     // Remove block_def_handle1 from the contents of block_def_handle2...

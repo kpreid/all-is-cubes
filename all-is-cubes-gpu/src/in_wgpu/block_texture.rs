@@ -183,12 +183,12 @@ impl AtlasAllocator {
     ///
     /// Returns `wgpu::TextureView`s for the textures, which will remain unchanged until the next
     /// time `flush()` is called.
-    pub(crate) fn flush<I: time::Instant>(
+    pub(crate) fn flush(
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) -> (BlockTextureViews, BlockTextureInfo) {
-        let start_time = I::now();
+        let start_time = time::Instant::now();
         let (views0, info0) = AllocatorBacking::flush(&self.reflectance_backing, device, queue);
         let (views1, info1) =
             AllocatorBacking::flush(&self.reflectance_and_emission_backing, device, queue);
@@ -200,7 +200,7 @@ impl AtlasAllocator {
                 g1_emission: views1.emission.unwrap(),
             },
             BlockTextureInfo {
-                flush_time: I::now().saturating_duration_since(start_time),
+                flush_time: time::Instant::now().saturating_duration_since(start_time),
                 ..info0 + info1
             },
         )

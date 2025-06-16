@@ -37,12 +37,12 @@ use exhibit::{Context, Exhibit, Placement};
 mod exhibits;
 use exhibits::DEMO_CITY_EXHIBITS;
 
-pub(crate) async fn demo_city<I: Instant>(
+pub(crate) async fn demo_city(
     universe: &mut Universe,
     mut progress: YieldProgress,
     params: TemplateParameters,
 ) -> Result<Space, InGenError> {
-    let start_city_time = I::now();
+    let start_city_time = Instant::now();
 
     use LandscapeBlocks::*;
 
@@ -95,7 +95,7 @@ pub(crate) async fn demo_city<I: Instant>(
     })?;
     progress.progress(0.4).await;
 
-    let blank_city_time = I::now();
+    let blank_city_time = Instant::now();
     log::trace!(
         "Blank city took {:.3} s",
         blank_city_time
@@ -134,7 +134,7 @@ pub(crate) async fn demo_city<I: Instant>(
     }
 
     // TODO: Integrate logging and YieldProgress
-    let landscape_time = I::now();
+    let landscape_time = Instant::now();
     log::trace!(
         "Landscape took {:.3} s",
         landscape_time
@@ -146,7 +146,7 @@ pub(crate) async fn demo_city<I: Instant>(
     state.place_logo()?;
 
     // Exhibits
-    place_exhibits_in_city::<I>(
+    place_exhibits_in_city(
         exhibits_progress,
         state.universe,
         &widget_theme,
@@ -393,7 +393,7 @@ impl<'u> State<'u> {
     }
 }
 
-async fn place_exhibits_in_city<I: Instant>(
+async fn place_exhibits_in_city(
     progress: YieldProgress,
     universe: &mut Universe,
     widget_theme: &widgets::WidgetTheme,
@@ -427,9 +427,9 @@ async fn place_exhibits_in_city<I: Instant>(
         };
 
         // Execute the exhibit factory function.
-        let start_exhibit_time = I::now();
+        let start_exhibit_time = Instant::now();
         let result = (exhibit.factory)(ctx);
-        let gen_duration = I::now().saturating_duration_since(start_exhibit_time);
+        let gen_duration = Instant::now().saturating_duration_since(start_exhibit_time);
 
         exhibit_progress.finish().await;
         generated_exhibits.push((
@@ -452,7 +452,7 @@ async fn place_exhibits_in_city<I: Instant>(
 
         // This function is separate in order to reduce the complexity of the async part of
         // the code, which makes the compiler's job easier and avoids generating large futures.
-        place_one_exhibit::<I>(universe, &demo_blocks, planner, space, exhibit, result)?;
+        place_one_exhibit(universe, &demo_blocks, planner, space, exhibit, result)?;
 
         placement_progress.finish().await;
     }
@@ -460,7 +460,7 @@ async fn place_exhibits_in_city<I: Instant>(
     Ok(())
 }
 
-fn place_one_exhibit<I: Instant>(
+fn place_one_exhibit(
     universe: &mut Universe,
     demo_blocks: &BlockProvider<DemoBlocks>,
     planner: &mut CityPlanner,
@@ -486,7 +486,7 @@ fn place_one_exhibit<I: Instant>(
         }
     };
 
-    let start_placement_time = I::now();
+    let start_placement_time = Instant::now();
 
     // Amount by which the exhibit's own size is expanded to form walls and empty space
     // for displaying it and allowing players to move around it.
@@ -680,7 +680,7 @@ fn place_one_exhibit<I: Instant>(
     })?;
 
     // Log build time
-    let placement_time = I::now().saturating_duration_since(start_placement_time);
+    let placement_time = Instant::now().saturating_duration_since(start_placement_time);
     log::trace!(
         "{:?} took {:.3} s",
         exhibit.name,

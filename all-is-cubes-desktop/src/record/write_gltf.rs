@@ -32,8 +32,6 @@ impl MeshTypes for RecordGltfMt {
 impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for RecordGltfMt {
     type RenderData = MeshIndexCell;
 
-    type Instant = std::time::Instant;
-
     // TODO(instancing): Tune this value (or make it configurable).
     const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = 300;
 }
@@ -85,7 +83,7 @@ impl MeshRecorder {
         self.csm.update(
             read_ticket,
             &self.cameras.cameras().world,
-            time::DeadlineStd::Whenever,
+            time::Deadline::Whenever,
             |u| {
                 if u.indices_only {
                     // We don't do depth sorting.

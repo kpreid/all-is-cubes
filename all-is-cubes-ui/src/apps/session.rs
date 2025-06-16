@@ -2,7 +2,6 @@ use alloc::boxed::Box;
 use alloc::string::ToString as _;
 use alloc::sync::{Arc, Weak};
 use core::fmt;
-use core::marker::PhantomData;
 use core::mem;
 use core::pin::Pin;
 use core::task::{Context, Poll, Waker};
@@ -46,13 +45,10 @@ const SHUTTLE_PANIC_MSG: &str = "Shuttle not returned to Session; \
 ///
 /// Once we have multiplayer / client-server support, this will become the client-side
 /// structure.
-///
-/// `I` controls the time source used for frame pacing and performance logging.
-/// TODO: This will probably become some general “scheduler” trait.
-pub struct Session<I> {
+pub struct Session {
     /// Determines the timing of simulation and drawing. The caller must arrange
     /// to advance time in the clock.
-    pub frame_clock: FrameClock<I>,
+    pub frame_clock: FrameClock,
 
     /// Handles (some) user input. The caller must provide input events/state to this.
     /// [`Session`] will handle applying it to the game state.
@@ -133,7 +129,7 @@ struct Shuttle {
     quit_fn: Option<QuitFn>,
 }
 
-impl<I: fmt::Debug> fmt::Debug for Session<I> {
+impl fmt::Debug for Session {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             frame_clock,
@@ -191,9 +187,9 @@ impl<I: fmt::Debug> fmt::Debug for Session<I> {
     }
 }
 
-impl<I: time::Instant> Session<I> {
+impl Session {
     /// Returns a [`SessionBuilder`] with which to construct a new [`Session`].
-    pub fn builder() -> SessionBuilder<I> {
+    pub fn builder() -> SessionBuilder {
         SessionBuilder::default()
     }
 
@@ -332,7 +328,7 @@ impl<I: time::Instant> Session<I> {
 
         let mut step_result = None;
         // TODO: Catch-up implementation should probably live in FrameClock.
-        for _ in 0..FrameClock::<I>::CATCH_UP_STEPS {
+        for _ in 0..FrameClock::CATCH_UP_STEPS {
             if self.frame_clock.should_step() {
                 let shuttle = self.shuttle.as_mut().expect(SHUTTLE_PANIC_MSG);
                 let u_clock = shuttle.game_universe.clock();
@@ -365,7 +361,7 @@ impl<I: time::Instant> Session<I> {
                 // (That policy should probably live in `frame_clock`.)
                 // TODO(time-budget): give UI a time that reflects how much time it needs, rather
                 // than arbitrarily partitioning the delta_t
-                let step_start_time = I::now();
+                let step_start_time = time::Instant::now();
                 let dt = game_tick.delta_t();
                 let deadlines = Layers {
                     world: time::Deadline::At(step_start_time + dt / 2),
@@ -593,7 +589,7 @@ impl<I: time::Instant> Session<I> {
     pub fn click(&mut self, button: usize) {
         // TODO: This function has no tests.
 
-        let result = self.shuttle_mut().click_impl::<I>(button);
+        let result = self.shuttle_mut().click_impl(button);
 
         // Now, do all the _reporting_ of the tool's success or failure.
         // (The architectural reason this isn't inside of the use_tool() itself is so that
@@ -633,13 +629,13 @@ impl<I: time::Instant> Session<I> {
     /// The returned future will produce a [`QuitCancelled`] value if quitting was unsuccessful for
     /// any reason. If it is successful, the future never resolves. It is not necessary to poll
     /// the future if the result value is not wanted.
-    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static + use<I> {
+    pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static + use<> {
         self.shuttle().quit()
     }
 
     /// Returns textual information intended to be overlaid as a HUD on top of the rendered scene
     /// containing diagnostic information about rendering and stepping.
-    pub fn info_text<T: Fmt<StatusText>>(&self, render: T) -> InfoText<'_, I, T> {
+    pub fn info_text<T: Fmt<StatusText>>(&self, render: T) -> InfoText<'_, T> {
         let fopt = StatusText {
             show: self
                 .shuttle()
@@ -664,7 +660,7 @@ impl<I: time::Instant> Session<I> {
     }
 
     #[doc(hidden)] // TODO: Decide whether we want FpsCounter in our public API
-    pub fn draw_fps_counter(&self) -> &FpsCounter<I> {
+    pub fn draw_fps_counter(&self) -> &FpsCounter {
         self.frame_clock.draw_fps_counter()
     }
 }
@@ -703,7 +699,7 @@ impl Shuttle {
 
     /// Implementation of click interpretation logic, called by [`Self::click`].
     /// TODO: This function needs tests.
-    fn click_impl<I: time::Instant>(&mut self, button: usize) -> Result<(), ToolError> {
+    fn click_impl(&mut self, button: usize) -> Result<(), ToolError> {
         let cursor_space = self.cursor_result.as_ref().map(|c| c.space());
         // TODO: A better condition for this would be "is one of the spaces in the UI universe"
         if let Some(ui) = self
@@ -731,7 +727,7 @@ impl Shuttle {
                 if let Some(space_handle) = self.cursor_result.as_ref().map(Cursor::space) {
                     // TODO: make this a kind of SpaceTransaction, eliminating this try_modify.
                     let _ = self.game_universe.try_modify(space_handle, |space| {
-                        space.evaluate_light_for_time::<I>(Duration::from_millis(1));
+                        space.evaluate_light_for_time(Duration::from_millis(1));
                     });
                 }
 
@@ -803,7 +799,7 @@ impl Shuttle {
 #[derive(Clone)]
 #[must_use]
 #[expect(missing_debug_implementations)]
-pub struct SessionBuilder<I> {
+pub struct SessionBuilder {
     viewport_for_ui: Option<listen::DynSource<Viewport>>,
 
     fullscreen_state: listen::DynSource<FullscreenState>,
@@ -812,11 +808,9 @@ pub struct SessionBuilder<I> {
     settings: Option<Settings>,
 
     quit: Option<QuitFn>,
-
-    _instant: PhantomData<I>,
 }
 
-impl<I> Default for SessionBuilder<I> {
+impl Default for SessionBuilder {
     fn default() -> Self {
         Self {
             viewport_for_ui: None,
@@ -824,25 +818,23 @@ impl<I> Default for SessionBuilder<I> {
             set_fullscreen: None,
             settings: None,
             quit: None,
-            _instant: PhantomData,
         }
     }
 }
 
-impl<I: time::Instant> SessionBuilder<I> {
+impl SessionBuilder {
     /// Create the [`Session`] with configuration from this builder.
     ///
     /// This is an async function for the sake of cancellation and optional cooperative
     /// multitasking, while constructing the initial state. It may safely be blocked on
     /// from a synchronous context.
-    pub async fn build(self) -> Session<I> {
+    pub async fn build(self) -> Session {
         let Self {
             viewport_for_ui,
             fullscreen_state,
             set_fullscreen,
             settings,
             quit: quit_fn,
-            _instant: _,
         } = self;
 
         let settings = settings.unwrap_or_else(|| Settings::new(Default::default()));
@@ -1064,13 +1056,13 @@ impl PartialEq for SessionUniverseInfo {
 
 /// Displayable data returned by [`Session::info_text()`].
 #[derive(Copy, Clone, Debug)]
-pub struct InfoText<'a, I, T> {
-    session: &'a Session<I>,
+pub struct InfoText<'a, T> {
+    session: &'a Session,
     render: T,
     fopt: StatusText,
 }
 
-impl<I: time::Instant, T: Fmt<StatusText>> fmt::Display for InfoText<'_, I, T> {
+impl<T: Fmt<StatusText>> fmt::Display for InfoText<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fopt = self.fopt;
         let mut empty = true;
@@ -1349,7 +1341,7 @@ mod tests {
     use core::sync::atomic::{AtomicUsize, Ordering};
     use futures_channel::oneshot;
 
-    fn advance_time<T: time::Instant>(session: &mut Session<T>) {
+    fn advance_time(session: &mut Session) {
         session
             .frame_clock
             .advance_by(session.universe().clock().schedule().delta_t());
@@ -1359,7 +1351,7 @@ mod tests {
 
     #[test]
     fn is_send_sync() {
-        assert_send_sync::<Session<std::time::Instant>>();
+        assert_send_sync::<Session>();
     }
 
     #[tokio::test]
@@ -1374,7 +1366,7 @@ mod tests {
         let st = space::CubeTransaction::fluff(Fluff::Happened).at(Cube::ORIGIN);
 
         // Create session
-        let mut session = Session::<std::time::Instant>::builder().build().await;
+        let mut session = Session::builder().build().await;
         session.set_universe(u);
         session.set_character(Some(character.clone()));
         let log = listen::Log::<Fluff>::new();
@@ -1406,7 +1398,7 @@ mod tests {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
         let noticed_step = Arc::new(AtomicUsize::new(0));
-        let mut session = Session::<time::NoTime>::builder().build().await;
+        let mut session = Session::builder().build().await;
         session
             .universe_mut()
             .insert(old_marker.clone(), Space::empty_positive(1, 1, 1))
@@ -1475,7 +1467,7 @@ mod tests {
 
     #[tokio::test]
     async fn input_is_processed_even_without_character() {
-        let mut session = Session::<time::NoTime>::builder()
+        let mut session = Session::builder()
             .ui(listen::constant(Viewport::ARBITRARY))
             .build()
             .await;

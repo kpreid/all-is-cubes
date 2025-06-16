@@ -103,6 +103,7 @@ name = "all-is-cubes-base"
 version = "0.9.0"
 dependencies = [
  "arbitrary",
+ "bevy_platform",
  "bytemuck",
  "cfg-if",
  "displaydoc",
@@ -1013,11 +1014,13 @@ dependencies = [
  "cfg-if",
  "critical-section",
  "foldhash",
+ "getrandom 0.2.15",
  "hashbrown 0.15.2",
  "portable-atomic",
  "portable-atomic-util",
  "serde",
  "spin",
+ "web-time",
 ]
 
 [[package]]
@@ -2494,8 +2497,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
+ "wasm-bindgen",
 ]
 
 [[package]]

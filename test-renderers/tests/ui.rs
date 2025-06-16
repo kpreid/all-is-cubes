@@ -10,7 +10,6 @@ use all_is_cubes::arcstr::literal;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
 use all_is_cubes::math::Face6;
-use all_is_cubes::time::NoTime;
 use all_is_cubes::transaction::Transaction as _;
 use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
@@ -170,10 +169,10 @@ async fn widget_progress_bar(mut context: RenderTestContext) {
 
 // --- Test helpers -------------------------------------------------------------------------------
 
-async fn create_session() -> Session<NoTime> {
+async fn create_session() -> Session {
     let viewport = listen::constant(Viewport::with_scale(1.0, [256, 192]));
     let start_time = Instant::now();
-    let session: Session<NoTime> = Session::builder().ui(viewport).build().await;
+    let session: Session = Session::builder().ui(viewport).build().await;
     log::trace!(
         "created session in {}",
         start_time.elapsed().refmt(&ConciseDebug)
@@ -196,7 +195,7 @@ fn widget_theme(context: &RenderTestContext) -> widgets::WidgetTheme {
     widgets::WidgetTheme::from_provider(BlockProvider::using(context.universe()).unwrap())
 }
 
-fn advance_time(session: &mut Session<NoTime>) {
+fn advance_time(session: &mut Session) {
     session
         .frame_clock
         .advance_by(session.universe().clock().schedule().delta_t());
@@ -204,7 +203,7 @@ fn advance_time(session: &mut Session<NoTime>) {
     assert_ne!(step, None);
 }
 
-fn render_session(session: &Session<NoTime>) -> Rendering {
+fn render_session(session: &Session) -> Rendering {
     let start_time = Instant::now();
     let rendering = render_orthographic(
         session.read_tickets().ui,

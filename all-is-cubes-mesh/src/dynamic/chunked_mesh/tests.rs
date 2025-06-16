@@ -177,7 +177,7 @@ impl<const MBM: usize> CsmTester<MBM> {
         self.csm.update(
             self.universe.read_ticket(),
             &self.camera,
-            time::DeadlineNt::Whenever,
+            time::Deadline::Whenever,
             |u| updater_cell.lock().unwrap()(u),
         )
     }
@@ -340,7 +340,7 @@ fn did_not_finish_detection() {
         let info = tester.csm.update(
             tester.universe.read_ticket(),
             &tester.camera,
-            time::DeadlineNt::Asap,
+            time::Deadline::Asap,
             |_| {},
         );
 
