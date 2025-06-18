@@ -59,7 +59,7 @@ impl ops::Sub<Duration> for Deadline {
     fn sub(self, rhs: Duration) -> Self::Output {
         match self {
             Deadline::Asap => Deadline::Asap,
-            #[expect(
+            #[allow(
                 clippy::unchecked_duration_subtraction,
                 reason = "TODO: can we do better?"
             )]
@@ -114,7 +114,6 @@ mod tests {
 
     #[test]
     fn deadline_ordering() {
-        use std::time::Instant;
         let i = Instant::now();
         let mut deadlines = [
             Deadline::At(i + Duration::from_secs(1)),
