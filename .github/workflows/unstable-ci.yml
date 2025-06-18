@@ -37,10 +37,6 @@ env:
   CARGO_INCREMENTAL: 0
   # This will cause a test to fail if it has a dependence on a system/user config file.
   AIC_DO_NOT_USE_CONFIG_FILES_IN_TESTS: 1
-  # Test with new wasm abi.
-  # TODO: Remove this flag when the wasm-c-abi transition completes.
-  # See <https://blog.rust-lang.org/2025/04/04/c-abi-changes-for-wasm32-unknown-unknown.html>
-  RUSTFLAGS: -Zwasm-c-abi=spec
 
 jobs:
   build:

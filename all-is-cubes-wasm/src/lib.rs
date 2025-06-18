@@ -6,6 +6,7 @@
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![allow(
+    renamed_and_removed_lints, // wasm_c_abi lint only exists in Rust 1.88
     wasm_c_abi,
     reason = "tested and confirmed not affected by ABI transition"
 )]
