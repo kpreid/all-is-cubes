@@ -108,6 +108,32 @@ jobs:
 
     - run: df -h .
 
+    # Load cache before doing any Rust builds
+    - uses: Swatinem/rust-cache@v2.7.8
+      with:
+        # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
+        prefix-key: "v1-rust-${{ matrix.os }}-${{ matrix.toolchain }}-${{ matrix.depversions }}"
+        # Override the default job-id-based key explicitly so that our dependent jobs can
+        # reuse this cache.
+        shared-key: "build"
+        workspaces: |
+          ./
+          all-is-cubes-wasm/
+
+    - run: df -h .
+
+    - name: Install tools
+      # Note: we do this before setting the toolchain so that we still use stable for these tools.
+      # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
+      # about caching the builds of them.
+      # cargo-mutants and cargo-about are not used in this step but it will be cached for later use.
+      run: |
+        cargo install --locked wasm-pack@0.13.1 cargo-about@0.6.1
+        # Not locked so that we can have a newer `syn` than is in the lockfile
+        cargo install cargo-mutants@24.9.0
+
+    - run: df -h .
+
     - name: Set Rust toolchain
       # The rust-toolchain.toml file specifies the targets and components we need,
       # but we may want to override the toolchain.
@@ -133,20 +159,6 @@ jobs:
 
     - run: df -h .
 
-    # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.7.8
-      with:
-        # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
-        prefix-key: "v1-rust-${{ matrix.os }}-${{ matrix.toolchain }}-${{ matrix.depversions }}"
-        # Override the default job-id-based key explicitly so that our dependent jobs can
-        # reuse this cache.
-        shared-key: "build"
-        workspaces: |
-          ./
-          all-is-cubes-wasm/
-
-    - run: df -h .
-
     # break this out as a separate non-silenced build step
     - name: Compile xtask
       run: cargo build --package xtask
@@ -155,18 +167,6 @@ jobs:
       run: |
         cargo xtask update "${{ matrix.depversions }}"
         cargo tree --all-features
-
-    - run: df -h .
-
-    - name: Install tools
-      # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
-      # about caching the builds of them.
-      # cargo-mutants and cargo-about are not used in this step but it will be cached for later use.
-      run: |
-        cargo install --locked wasm-pack@0.13.1 cargo-about@0.6.1
-        # Not locked so that we can have a newer `syn` than is in the lockfile
-        cargo install cargo-mutants@24.9.0
-
 
     - run: df -h .
 
@@ -291,23 +291,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set Rust toolchain
-      # The rust-toolchain.toml file specifies the targets and components we need,
-      # but we may want to override the toolchain.
-      if: ${{ matrix.toolchain != 'stable' }}
-      run: perl -pi -e "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
-    
-    - name: Install Rust toolchain
-      run: rustup show active-toolchain || rustup toolchain install
-    
-    - name: Install native libraries
-      if: ${{ runner.os == 'Linux' }}
-      run: |
-          sudo apt update
-          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
-
-    - run: df -h .
-
     - uses: Swatinem/rust-cache@v2.7.8
       with:
         # We cannot reuse the cache from the `build` job, because `RUSTFLAGS=-Dwarnings`
@@ -323,6 +306,23 @@ jobs:
     - name: Install tools
       run: |
         cargo install --locked wasm-pack@0.13.1
+
+    - run: df -h .
+
+    - name: Set Rust toolchain
+      # The rust-toolchain.toml file specifies the targets and components we need,
+      # but we may want to override the toolchain.
+      if: ${{ matrix.toolchain != 'stable' }}
+      run: perl -pi -e "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
+    
+    - name: Install Rust toolchain
+      run: rustup show active-toolchain || rustup toolchain install
+    
+    - name: Install native libraries
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+          sudo apt update
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
 
     - run: df -h .
 

@@ -70,6 +70,22 @@ jobs:
       with:
         ref: unstable-rust
 
+    # Load cache before doing any Rust builds
+    - uses: Swatinem/rust-cache@v2.7.8
+      with:
+        # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
+        prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
+        workspaces: |
+          ./
+          all-is-cubes-wasm/
+
+    - name: Install tools
+      # Note: we do this before setting the toolchain so that we still use stable for these tools.
+      # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
+      # about caching the builds of them.
+      run: |
+        cargo install --locked wasm-pack@0.13.1 cargo-about@0.6.1
+
     - name: Set Rust toolchain
       # The rust-toolchain.toml file specifies the targets and components we need,
       # but we may want to override the toolchain.
@@ -89,15 +105,6 @@ jobs:
       # libasound2-dev: needed for audio via `kira`
       # libudev-dev: needed for gamepad input via `gilrs`
 
-    # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.7.8
-      with:
-        # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
-        prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
-        workspaces: |
-          ./
-          all-is-cubes-wasm/
-
     # break this out as a separate non-silenced build step
     - name: Compile xtask
       run: cargo build --package xtask
@@ -106,12 +113,6 @@ jobs:
       run: |
         cargo xtask update "${{ matrix.depversions }}"
         cargo tree --all-features
-
-    - name: Install tools
-      # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
-      # about caching the builds of them.
-      run: |
-        cargo install --locked wasm-pack@0.13.1 cargo-about@0.6.1
 
     - name: Compile basic tests
       # compile is broken out so we have visibility into compile vs. run times
