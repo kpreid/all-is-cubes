@@ -29,7 +29,7 @@ fn gltf_round_trip_test(args: &[&str]) {
         }
         Err(e) => {
             // Keep the file output alive so it can be examined.
-            let _ = temp_dir.into_path();
+            let _ = temp_dir.keep();
 
             panic!(
                 "glTF import failed.\nFiles: {p}\nError: {e}\n",
