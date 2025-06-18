@@ -111,7 +111,7 @@ jobs:
       # Note: Swatinem/rust-cache will cache these installed binaries, so we don't have to worry
       # about caching the builds of them.
       run: |
-        cargo install --locked wasm-pack@0.13.0 cargo-about@0.6.1
+        cargo install --locked wasm-pack@0.13.1 cargo-about@0.6.1
 
     - name: Compile basic tests
       # compile is broken out so we have visibility into compile vs. run times
