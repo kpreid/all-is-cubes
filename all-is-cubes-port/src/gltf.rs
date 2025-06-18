@@ -17,11 +17,16 @@ pub use gltf_json as json;
 use gltf_json::Index;
 use gltf_json::validation::Checked::Valid;
 
-use all_is_cubes::universe::ReadTicket;
+use all_is_cubes::block;
+use all_is_cubes::universe::{Name, ReadTicket};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{BlockMesh, MeshOptions, MeshTypes, SpaceMesh, block_meshes_for_space};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform};
+
+use crate::{ExportError, ExportSet, Format};
+
+// -------------------------------------------------------------------------------------------------
 
 mod buffer;
 pub use buffer::GltfDataDestination;
@@ -37,9 +42,10 @@ pub use texture::{GltfAtlasPoint, GltfTextureAllocator, GltfTexturePlane, GltfTi
 mod vertex;
 pub use vertex::GltfVertex;
 
-use crate::{ExportError, ExportSet, Format};
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 /// [`MeshTypes`] implementation for glTF output.
 #[derive(Debug)]
@@ -355,69 +361,41 @@ impl GltfWriter {
     }
 }
 
-pub(crate) async fn export_gltf(
+// The funny return type is to work with [`crate::export_to_path`].
+pub(crate) fn export_gltf(
     progress: YieldProgress,
     read_ticket: ReadTicket<'_>,
     mut source: ExportSet,
     destination: PathBuf,
-) -> Result<(), ExportError> {
-    let block_defs = source
-        .contents
-        .extract_type::<all_is_cubes::block::BlockDef>();
+) -> Result<impl Future<Output = Result<(), ExportError>> + Send + 'static, ExportError> {
+    let block_defs = source.contents.extract_type::<block::BlockDef>();
     let spaces = source.contents.extract_type::<all_is_cubes::space::Space>();
     source.reject_unsupported(Format::Gltf)?;
-
-    let [block_def_progress, space_progress] = progress.split(0.5); // TODO: ratio
 
     let mut writer = GltfWriter::new(GltfDataDestination::new(Some(destination.clone()), 2000));
     let mesh_options = MeshOptions::new(&GraphicsOptions::default());
 
-    for (mut p, block_def_handle) in block_def_progress
-        .split_evenly(block_defs.len())
-        .zip(block_defs)
-    {
-        let name = block_def_handle.name();
-        p.set_label(&name);
-        p.progress(0.01).await;
-        {
-            // constrained scope so we don't hold the read guard over an await
+    // Fetch data from `source` synchronously.
+    let block_evaluations: Vec<(Name, block::EvaluatedBlock)> = block_defs
+        .into_iter()
+        .map(|block_def_handle| -> Result<_, ExportError> {
             let block_def = block_def_handle.read(read_ticket)?;
-            let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
-                &block_def
+            let name = block_def_handle.name();
+            let evaluation =
+                block_def
                     .evaluate(read_ticket)
                     .map_err(|eve| ExportError::NotRepresentable {
                         format: Format::Gltf,
                         name: Some(name.clone()),
                         reason: format!("block evaluation failed: {eve}"),
-                    })?,
-                &writer.texture_allocator(),
-                &mesh_options,
-            ));
-
-            let mesh_index = writer.add_mesh(&name, &mesh);
-            // TODO: if the mesh is empty/None, should we include the node anyway or not?
-            let mesh_node = writer.root.push(gltf_json::Node {
-                mesh: mesh_index,
-                ..empty_node(Some(name.to_string()))
-            });
-
-            writer.root.scenes.push(json::Scene {
-                name: Some(format!("{name} block display scene")),
-                nodes: vec![mesh_node],
-                extensions: None,
-                extras: Default::default(),
-            });
-        }
-
-        p.finish().await;
-    }
-
-    for (mut p, space_handle) in space_progress.split_evenly(spaces.len()).zip(spaces) {
-        let name = space_handle.name();
-        p.set_label(&name);
-        p.progress(0.01).await;
-        {
-            // constrained scope so we don't hold the read guard over an await
+                    })?;
+            Ok((name, evaluation))
+        })
+        .collect::<Result<_, ExportError>>()?;
+    let space_meshes: Vec<(Name, SpaceMesh<GltfMt>, [f32; 3])> = spaces
+        .into_iter()
+        .map(|space_handle| -> Result<_, ExportError> {
+            let name = space_handle.name();
             let space = space_handle.read(read_ticket)?;
             let block_meshes = block_meshes_for_space::<GltfMt>(
                 &space,
@@ -426,39 +404,86 @@ pub(crate) async fn export_gltf(
             );
             let mesh: SpaceMesh<GltfMt> =
                 SpaceMesh::new(&space, space.bounds(), &mesh_options, &block_meshes[..]);
+            let translation: [f32; 3] = space.bounds().lower_bounds().to_f32().into();
 
-            // TODO: everything after here is duplicated vs. the blockdef code above
+            Ok((name, mesh, translation))
+        })
+        .collect::<Result<_, ExportError>>()?;
 
-            let mesh_index = writer.add_mesh(&name, &mesh);
-            let mesh_node = writer.root.push(gltf_json::Node {
-                mesh: mesh_index,
-                // SpaceMesh translates everything so the lower bounds of the requested region
-                // are at [0, 0, 0], so we must undo that.
-                translation: Some(space.bounds().lower_bounds().to_f32().into()),
-                ..empty_node(Some(name.to_string()))
-            });
+    Ok(async move {
+        let [block_def_progress, space_progress] = progress.split(0.5); // TODO: ratio
 
-            writer.root.scenes.push(json::Scene {
-                name: Some(format!("{name} space scene")),
-                nodes: vec![mesh_node],
-                extensions: None,
-                extras: Default::default(),
-            });
+        // TODO: deduplicate these two extremely similar loops
+
+        for (mut p, (name, evaluation)) in block_def_progress
+            .split_evenly(block_evaluations.len())
+            .zip(block_evaluations)
+        {
+            p.set_label(&name);
+            p.progress(0.01).await;
+            {
+                let mesh = SpaceMesh::<GltfMt>::from(&BlockMesh::new(
+                    &evaluation,
+                    &writer.texture_allocator(),
+                    &mesh_options,
+                ));
+
+                let mesh_index = writer.add_mesh(&name, &mesh);
+                // TODO: if the mesh is empty/None, should we include the node anyway or not?
+                let mesh_node = writer.root.push(gltf_json::Node {
+                    mesh: mesh_index,
+                    ..empty_node(Some(name.to_string()))
+                });
+
+                writer.root.scenes.push(json::Scene {
+                    name: Some(format!("{name} block display scene")),
+                    nodes: vec![mesh_node],
+                    extensions: None,
+                    extras: Default::default(),
+                });
+            }
+
+            p.finish().await;
         }
 
-        p.finish().await;
-    }
+        for (mut p, (name, mesh, translation)) in space_progress
+            .split_evenly(space_meshes.len())
+            .zip(space_meshes)
+        {
+            p.set_label(&name);
+            p.progress(0.01).await;
+            {
+                let mesh_index = writer.add_mesh(&name, &mesh);
+                let mesh_node = writer.root.push(gltf_json::Node {
+                    mesh: mesh_index,
+                    // SpaceMesh translates everything so the lower bounds of the requested region
+                    // are at [0, 0, 0], so we must undo that.
+                    translation: Some(translation),
+                    ..empty_node(Some(name.to_string()))
+                });
 
-    {
-        let file = fs::File::create(destination)?;
-        writer
-            .into_root(Duration::from_secs(1))?
-            .to_writer_pretty(&file) // TODO: non-pretty option
-            .map_err(|_| -> ExportError { todo!("serialization error conversion") })?;
-        file.sync_all()?;
-    }
+                writer.root.scenes.push(json::Scene {
+                    name: Some(format!("{name} space scene")),
+                    nodes: vec![mesh_node],
+                    extensions: None,
+                    extras: Default::default(),
+                });
+            }
 
-    Ok(())
+            p.finish().await;
+        }
+
+        {
+            let file = fs::File::create(destination)?;
+            writer
+                .into_root(Duration::from_secs(1))?
+                .to_writer_pretty(&file) // TODO: non-pretty option
+                .map_err(|_| -> ExportError { todo!("serialization error conversion") })?;
+            file.sync_all()?;
+        }
+
+        Ok(())
+    })
 }
 
 /// Construct gltf camera entity.

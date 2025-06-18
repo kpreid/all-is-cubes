@@ -33,6 +33,9 @@ In order to resolve various design problems interfering with development, the `a
     - `impl IntoIterator for math::FaceMap`
     - `math::PositiveSign::INFINITY`
 
+- `all-is-cubes-port` library:
+    - `export_to_path()` no longer accesses the `Universe` while its future is running, but instead only when initially called. This allows the latter portion of the export operation to run concurrently with other uses of the `Universe`.
+
 - `all-is-cubes-render` library:
     - `camera::GraphicsOptions::maximum_intensity` may be used to specify the maximum brightness of the output device and thus properly apply tone mapping to HDR output. It may also be used to choose to restrict output to SDR.
     - `raytracer::Accumulate` is implemented for tuples of up to 2 elements.

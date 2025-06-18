@@ -32,18 +32,6 @@ pub(crate) async fn load_dot_vox(
     .await
 }
 
-#[cfg(feature = "export")]
-pub(crate) async fn export_dot_vox(
-    p: YieldProgress,
-    read_ticket: ReadTicket<'_>,
-    source: ExportSet,
-    mut destination: impl std::io::Write,
-) -> Result<(), ExportError> {
-    let data: dot_vox::DotVoxData = export_to_dot_vox_data(p, read_ticket, source).await?;
-    data.write_vox(&mut destination)?;
-    Ok(())
-}
-
 #[cfg(feature = "import")]
 async fn dot_vox_data_to_universe(
     p: YieldProgress,
@@ -98,14 +86,16 @@ async fn dot_vox_data_to_universe(
     Ok(universe)
 }
 
-/// Create [`DotVoxData`] from a collection of [`Space`]s.
+/// Read the given [`ExportSet`] to produce in-memory [`DotVoxData`].
+///
+/// Use [`DotVoxData::write_vox()`] to produce the actual bytes from this.
 ///
 /// TODO: also support exporting [`BlockDef`]s.
 ///
 /// TODO: report export flaws (space too big, too many blocks)
 ///
 #[cfg(feature = "export")]
-async fn export_to_dot_vox_data(
+pub(crate) async fn export_to_dot_vox_data(
     p: YieldProgress,
     read_ticket: ReadTicket<'_>,
     mut source: ExportSet,

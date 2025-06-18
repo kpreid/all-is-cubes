@@ -1,5 +1,6 @@
 //! Export to the STL 3D model file format.
 
+use std::collections::HashMap;
 use std::fs;
 
 use itertools::Itertools as _;
@@ -17,21 +18,25 @@ use all_is_cubes_mesh::{
 };
 use all_is_cubes_render::camera::GraphicsOptions;
 
-pub(crate) async fn export_stl(
+// The funny return type is to work with [`crate::export_to_path`].
+pub(crate) fn export_stl(
     progress: YieldProgress,
     read_ticket: universe::ReadTicket<'_>,
     mut source: crate::ExportSet,
-    destination: std::path::PathBuf,
-) -> Result<(), crate::ExportError> {
+    destination: &std::path::Path,
+) -> Result<impl Future<Output = Result<(), crate::ExportError>> + Send + 'static, crate::ExportError>
+{
     let spaces = source.contents.extract_type::<Space>();
     let block_defs = source.contents.extract_type::<block::BlockDef>();
     source.reject_unsupported(crate::Format::Stl)?;
 
+    let mut items: HashMap<std::path::PathBuf, Vec<Triangle>> = HashMap::new();
+
     for space in spaces {
-        stl_io::write_stl(
-            &mut fs::File::create(source.member_export_path(&destination, &space))?,
-            space_to_stl_triangles(&*space.read(read_ticket)?).into_iter(),
-        )?;
+        items.insert(
+            source.member_export_path(destination, &space),
+            space_to_stl_triangles(&*space.read(read_ticket)?),
+        );
     }
 
     for block_def in block_defs {
@@ -42,16 +47,21 @@ pub(crate) async fn export_stl(
                 name: block_def.name(),
                 error,
             })?;
-        stl_io::write_stl(
-            &mut fs::File::create(source.member_export_path(&destination, &block_def))?,
-            block_to_stl_triangles(&ev).into_iter(),
-        )?;
+        items.insert(
+            source.member_export_path(destination, &block_def),
+            block_to_stl_triangles(&ev),
+        );
     }
 
-    // TODO: progress at individual parts
-    progress.finish().await;
+    Ok(async move {
+        #[allow(clippy::shadow_unrelated)]
+        for (progress, (path, triangles)) in progress.split_evenly(items.len()).zip(items) {
+            stl_io::write_stl(&mut fs::File::create(path)?, triangles.into_iter())?;
+            progress.finish().await;
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 pub(crate) fn space_to_stl_triangles(space: &Space) -> Vec<Triangle> {

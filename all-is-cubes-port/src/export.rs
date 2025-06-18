@@ -1,54 +1,105 @@
+use core::future::ready;
 #[allow(unused_imports)]
 use std::path::{Path, PathBuf};
 #[allow(unused_imports)]
 use std::{fs, io};
 
+use futures_core::future::BoxFuture;
+
 use all_is_cubes::block::{self, BlockDef};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{self, Handle, HandleError, HandleSet, Universe};
+use all_is_cubes::universe::{self, Handle, HandleError, HandleSet, ReadTicket, Universe};
 use all_is_cubes::util::YieldProgress;
 
 use crate::Format;
+#[allow(unused_imports)]
+use crate::util::spawn_blocking;
 
-/// Export data specified by an [`ExportSet`] to a file on disk.
+/// Export data specified by an [`ExportSet`] to a file or files on disk.
 ///
 /// If the format requires multiple files, then they will be named with hyphenated suffixes
 /// before the extension; i.e. "foo.gltf" becomes "foo-bar.gltf".
 ///
 /// TODO: Generalize this or add a parallel function for non-filesystem destinations.
-pub async fn export_to_path(
+///
+/// # Execution
+///
+/// Note that this function returns a future, but the future does not borrow the [`ReadTicket`].
+/// The order of events is:
+///
+/// 1. `export_to_path()` is called.
+/// 2. The data specified by `source` is copied using `read_ticket` and `source`.
+/// 3. `export_to_path()` returns a future.
+/// 4. The file writing operations are performed asynchronously.
+/// 5. The returned future completes.
+///
+/// This allows exports to have the minimum possible interruption to further use of the universe.
+///
+/// Cancelling (dropping) the future may or may not cause an incomplete set of files to be written.
+//---
+// TODO: further refine this to "borrowing future" and "non-borrowing future" for cooperative MT
+// on the copying part too.
+pub fn export_to_path(
     progress: YieldProgress,
-    read_ticket: universe::ReadTicket<'_>,
+    read_ticket: ReadTicket<'_>,
     format: Format,
     source: ExportSet,
     destination: PathBuf,
-) -> Result<(), ExportError> {
-    match format {
-        #[cfg(feature = "native")]
-        Format::AicJson => {
-            let mut writer = io::BufWriter::new(fs::File::create(destination)?);
-            crate::native::export_native_json(progress, read_ticket, source, &mut writer).await
-        }
-        #[cfg(feature = "dot-vox")]
-        Format::DotVox => {
-            // TODO: async file IO?
-            crate::mv::export_dot_vox(
+) -> impl Future<Output = Result<(), ExportError>> + use<> {
+    // helper function to allow both eager and lazy errors
+    fn inner(
+        progress: YieldProgress,
+        read_ticket: ReadTicket<'_>,
+        format: Format,
+        source: ExportSet,
+        destination: PathBuf,
+    ) -> Result<BoxFuture<'static, Result<(), ExportError>>, ExportError> {
+        Ok(match format {
+            #[cfg(feature = "native")]
+            Format::AicJson => {
+                // TODO: the file IO should be done in a separate thread
+                let mut writer = io::BufWriter::new(fs::File::create(destination)?);
+                crate::native::export_native_json(read_ticket, source, &mut writer)?;
+                Box::pin(ready(Ok(())))
+            }
+            #[cfg(feature = "dot-vox")]
+            Format::DotVox => {
+                // TODO: expose this async part too, in an *optional* way
+                // because callers may want to complete synchronously
+                let dot_vox_data = pollster::block_on(crate::mv::export_to_dot_vox_data(
+                    progress,
+                    read_ticket,
+                    source,
+                ))?;
+                Box::pin(spawn_blocking(move || {
+                    dot_vox_data.write_vox(&mut fs::File::create(destination)?)?;
+                    Ok(())
+                }))
+            }
+            #[cfg(feature = "gltf")]
+            Format::Gltf => Box::pin(crate::gltf::export_gltf(
                 progress,
                 read_ticket,
                 source,
-                fs::File::create(destination)?,
-            )
-            .await
-        }
-        #[cfg(feature = "gltf")]
-        Format::Gltf => crate::gltf::export_gltf(progress, read_ticket, source, destination).await,
-        #[cfg(feature = "stl")]
-        Format::Stl => crate::stl::export_stl(progress, read_ticket, source, destination).await,
+                destination,
+            )?),
+            #[cfg(feature = "stl")]
+            Format::Stl => Box::pin(crate::stl::export_stl(
+                progress,
+                read_ticket,
+                source,
+                &destination,
+            )?),
+            #[allow(unreachable_patterns)]
+            // TODO: distinguish between disabled and unsupported
+            // (not currently necessary because we have no import-only formats)
+            _ => Box::pin(ready(Err(ExportError::FormatDisabled { format }))),
+        })
+    }
 
-        #[allow(unreachable_patterns)]
-        // TODO: distinguish between disabled and unsupported
-        // (not currently necessary because we have no import-only formats)
-        _ => Err(ExportError::FormatDisabled { format }),
+    match inner(progress, read_ticket, format, source, destination) {
+        Ok(future) => future,
+        Err(error) => Box::pin(ready(Err(error))),
     }
 }
 

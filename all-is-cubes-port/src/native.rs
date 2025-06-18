@@ -34,14 +34,11 @@ pub(crate) fn import_native_json(
 
 /// The `destination` should be buffered for efficiency.
 #[cfg(feature = "export")]
-pub(crate) async fn export_native_json(
-    progress: YieldProgress,
+pub(crate) fn export_native_json(
     read_ticket: universe::ReadTicket<'_>,
     source: ExportSet,
     destination: &mut (dyn io::Write + Send),
 ) -> Result<(), ExportError> {
-    // TODO: Spin off a blocking thread to perform this export
-
     serde_json::to_writer(
         destination,
         &universe::PartialUniverse {
@@ -52,9 +49,7 @@ pub(crate) async fn export_native_json(
     .map_err(|error| {
         // TODO: report non-IO errors distinctly
         ExportError::Write(io::Error::other(error))
-    })?;
-    progress.finish().await;
-    Ok(())
+    })
 }
 
 #[cfg(feature = "import")]

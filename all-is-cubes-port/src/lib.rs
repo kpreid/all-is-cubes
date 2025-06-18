@@ -20,6 +20,8 @@ use std::fmt;
 #[cfg(doc)]
 use all_is_cubes::space::Space;
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(feature = "export")]
 mod export;
 #[cfg(feature = "export")]
@@ -31,6 +33,7 @@ mod import;
 pub use import::*;
 
 pub mod file;
+mod util;
 
 // Formats
 #[cfg(all(feature = "export", feature = "gltf"))]
@@ -44,6 +47,8 @@ mod stl;
 
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 /// File formats that All is Cubes data can be exported to or imported from.
 ///

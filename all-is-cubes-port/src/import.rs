@@ -130,13 +130,8 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
                 #[cfg(feature = "native")]
                 Format::AicJson => {
                     let mut buf = Vec::new();
-                    crate::native::export_native_json(
-                        progress,
-                        universe.read_ticket(),
-                        source,
-                        &mut buf,
-                    )
-                    .await?;
+                    crate::native::export_native_json(universe.read_ticket(), source, &mut buf)?;
+                    progress.finish().await;
                     file.write(&buf)?;
                     Ok(())
                 }
