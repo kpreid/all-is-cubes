@@ -242,28 +242,30 @@ impl Recorder {
                 // TODO: This should probably be done at the *end* of any specified recording
                 // period, the last frame, not the first frame.
                 if let Some(export_set) = export_set.take() {
-                    // TODO: Stop using block_on(), and instead be able to ask the main loop to
-                    // suspend stepping until we're done with this operation that is both async
-                    // and reading the universe. Doing this will require, in order to borrow the
-                    // universe, something like temporarily stuffing it into an `Arc`.
-                    executor
-                        .tokio()
-                        .block_on(all_is_cubes_port::export_to_path(
-                            // TODO: hook up a progress bar
-                            crate::glue::tokio_yield_progress().build(),
-                            read_ticket,
-                            export_format,
-                            export_set,
-                            options.output_path.clone(),
-                        ))
-                        .expect("failed to perform export operation");
+                    let export_task = all_is_cubes_port::export_to_path(
+                        // TODO: hook up a progress bar
+                        crate::glue::tokio_yield_progress().build(),
+                        read_ticket,
+                        export_format,
+                        export_set,
+                        options.output_path.clone(),
+                    );
+
+                    let status_notifier = status_notifier.clone();
+                    executor.tokio().spawn(async move {
+                        // TODO: need a proper error reporting path so this doesn't just turn into a dropped channel
+                        export_task
+                            .await
+                            .expect("failed to perform export operation");
+
+                        status_notifier.notify(&Status {
+                            frame_number: this_frame_number,
+                            flaws: Flaws::empty(), // TODO: should have a concept of export flaws
+                        });
+                    });
                 } else {
                     // Ignore other frames
                 }
-                status_notifier.notify(&Status {
-                    frame_number: this_frame_number,
-                    flaws: Flaws::empty(), // TODO: should have a concept of export flaws
-                });
             }
 
             RecorderInner::Shutdown => unreachable!(),
