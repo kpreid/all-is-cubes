@@ -206,11 +206,20 @@ impl GltfWriter {
     /// written to a JSON file.
     pub fn into_root(mut self, frame_pace: Duration) -> io::Result<gltf_json::Root> {
         if !self.texture_allocator.is_empty() {
-            let _block_texture_index =
+            let (block_texture_index, _mapping) =
                 texture::insert_block_texture_atlas(&mut self.root, &self.texture_allocator)?;
 
-            // TODO: Rewrite meshes to have texture coordinates and materials to designate
-            // the texture. Otherwise it's useless.
+            for material in self.root.materials.iter_mut() {
+                material.pbr_metallic_roughness.base_color_texture =
+                    Some(gltf_json::texture::Info {
+                        index: block_texture_index,
+                        tex_coord: 0,
+                        extensions: Default::default(),
+                        extras: Default::default(),
+                    });
+            }
+
+            todo!("must rewrite meshes' texture coordinates");
         }
 
         let mut scene_nodes: Vec<Index<gltf_json::Node>> = Vec::new();

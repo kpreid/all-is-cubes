@@ -57,6 +57,7 @@ impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
 
                 // Encode the plane ID in the color field as a value that is unambiguously
                 // not a real color, because the blue and alpha components are negative.
+                let plane_id: u64 = plane_id.0;
                 let base_color = [
                     Lef32::from(f32::from_bits(plane_id as u32)),
                     Lef32::from(f32::from_bits((plane_id >> 32) as u32)),

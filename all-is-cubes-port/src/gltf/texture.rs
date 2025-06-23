@@ -1,5 +1,6 @@
 //! [`GltfTextureAllocator`], produces glTF-compatible textures for blocks.
 
+use std::collections::HashMap;
 use std::io;
 
 use gltf_json::validation::Checked::Valid;
@@ -10,6 +11,10 @@ use all_is_cubes::math::{Axis, GridAab, GridRotation, Vol};
 use all_is_cubes_mesh::texture::{self, TilePoint};
 
 use super::GltfDataDestination;
+
+// -------------------------------------------------------------------------------------------------
+
+type AtlasMapping = HashMap<PlaneId, Point2D<u32, texture::TexelUnit>>;
 
 /// [`texture::Allocator`] implementation for glTF exports.
 ///
@@ -46,8 +51,8 @@ impl GltfTextureAllocator {
         self.gatherer.is_empty()
     }
 
-    pub(crate) fn write_png_atlas(&self) -> Result<gltf_json::Buffer, io::Error> {
-        let image: image::RgbaImage = self.gatherer.build_atlas();
+    pub(crate) fn write_png_atlas(&self) -> Result<(gltf_json::Buffer, AtlasMapping), io::Error> {
+        let (image, mapping): (image::RgbaImage, AtlasMapping) = self.gatherer.build_atlas();
         let buffer = self
             .destination
             .write(String::from("texture"), "texture", "png", |w| {
@@ -59,7 +64,7 @@ impl GltfTextureAllocator {
                 w.write_all(tmp.into_inner().as_slice())?;
                 Ok(())
             })?;
-        Ok(buffer)
+        Ok((buffer, mapping))
     }
 }
 
@@ -158,12 +163,16 @@ impl texture::Tile for GltfTile {
 ///
 /// You should not generally need to refer to this type.
 #[derive(Clone, Debug, PartialEq)]
-#[expect(clippy::derive_partial_eq_without_eq)]
 pub struct GltfTexturePlane {
-    plane_id: u64,
+    plane_id: PlaneId,
     bounds: GridAab,
     rotation: GridRotation,
 }
+
+/// Identifier of a particular [`texture::Plane`] allocated by [`GltfTextureAllocator`] and
+/// packed into a 2D texture coordinate space.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub(crate) struct PlaneId(pub(in crate::gltf) u64);
 
 impl texture::Plane for GltfTexturePlane {
     type Point = GltfAtlasPoint;
@@ -185,7 +194,7 @@ impl texture::Plane for GltfTexturePlane {
         let point_within = rot_tc - rot_bounds.lower_bounds().to_f32().cast_unit();
         debug_assert!(
             point_within.z >= 0.0 && point_within.z <= 1.0,
-            "{tc_in_tile:?} -> {point_within:?}"
+            "rotation did not properly flatten to zero Z: {tc_in_tile:?} -> {point_within:?}"
         );
         let point_within = point_within.to_2d().to_point();
 
@@ -204,7 +213,7 @@ impl texture::Plane for GltfTexturePlane {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GltfAtlasPoint {
     /// Unique ID of the plane.
-    pub(crate) plane_id: u64,
+    pub(crate) plane_id: PlaneId,
     /// Point within the plane, still with 1 unit = 1 texel coordinates.
     pub(crate) point_within: Point2D<f32, texture::TexelUnit>,
 }
@@ -213,8 +222,8 @@ pub struct GltfAtlasPoint {
 pub(super) fn insert_block_texture_atlas(
     root: &mut gltf_json::Root,
     allocator: &GltfTextureAllocator,
-) -> Result<gltf_json::Index<gltf_json::Texture>, io::Error> {
-    let block_texture_buffer = allocator.write_png_atlas()?;
+) -> Result<(gltf_json::Index<gltf_json::Texture>, AtlasMapping), io::Error> {
+    let (block_texture_buffer, atlas_mapping) = allocator.write_png_atlas()?;
     let block_texture_len = block_texture_buffer.byte_length;
     let block_texture_buffer = root.push(block_texture_buffer);
     let block_texture_buffer_view = root.push(gltf_json::buffer::View {
@@ -251,11 +260,11 @@ pub(super) fn insert_block_texture_atlas(
         extensions: None,
         extras: Default::default(),
     });
-    Ok(block_texture)
+    Ok((block_texture, atlas_mapping))
 }
 
 mod internal {
-    use all_is_cubes::euclid::Point3D;
+    use all_is_cubes::euclid::{Point3D, point2};
     use all_is_cubes::math::Cube;
 
     use super::*;
@@ -275,14 +284,15 @@ mod internal {
             self.0.lock().expect("mutex in atlas gatherer").is_empty()
         }
 
-        pub fn insert(&self, entry: AtlasEntry) -> u64 {
+        /// Inserts a new atlas entry corresponding to a plane and returns its ID.
+        pub fn insert(&self, entry: AtlasEntry) -> PlaneId {
             let mut data = self.0.lock().expect("mutex in atlas gatherer");
-            let plane_id = u64::try_from(data.len()).unwrap();
+            let plane_id = PlaneId(u64::try_from(data.len()).unwrap());
             data.push(entry);
             plane_id
         }
 
-        pub(crate) fn build_atlas(&self) -> image::RgbaImage {
+        pub(crate) fn build_atlas(&self) -> (image::RgbaImage, AtlasMapping) {
             use rectangle_pack as rp;
 
             let entries: Vec<AtlasEntry> =
@@ -290,7 +300,7 @@ mod internal {
             // TODO: exit early if vec is empty
 
             // TODO: add anti-bleed borders to atlas
-            let mut rects_to_place: rp::GroupedRectsToPlace<usize, ()> =
+            let mut rects_to_place: rp::GroupedRectsToPlace<PlaneId, ()> =
                 rp::GroupedRectsToPlace::new();
             for (
                 i,
@@ -300,7 +310,7 @@ mod internal {
                     sliced_bounds,
                     rotation,
                 },
-            ) in entries.iter().enumerate()
+            ) in (0..).zip(entries.iter())
             {
                 let size = sliced_bounds
                     .transform(rotation.into())
@@ -311,14 +321,14 @@ mod internal {
                     "failed to rotate slice {sliced_bounds:?} into the XY plane with {rotation:?}: {size:?}"
                 );
                 rects_to_place.push_rect(
-                    i,
+                    PlaneId(i),
                     None,
                     rp::RectToInsert::new(size.width, size.height, size.depth),
                 );
             }
 
             let mut texture_size = 1;
-            let placements = loop {
+            let placements: rp::RectanglePackOk<PlaneId, ()> = loop {
                 // "Bins" correspond to multiple textures. We will use one bin,
                 // because our goal is to fit everything into one texture rather than
                 // requiring multiple meshes.
@@ -342,8 +352,8 @@ mod internal {
 
             let mut atlas_image = image::RgbaImage::new(texture_size, texture_size);
 
-            for (&index, &((), slice_location_in_atlas)) in placements.packed_locations() {
-                let entry = &entries[index];
+            for (&plane_id, &((), slice_location_in_atlas)) in placements.packed_locations() {
+                let entry = &entries[plane_id.0 as usize];
 
                 let rotated_slice_bounds = entry.rotated_slice_bounds();
                 let rotated_size = rotated_slice_bounds.size();
@@ -395,7 +405,18 @@ mod internal {
                 }
             }
 
-            atlas_image
+            let mappings = placements
+                .packed_locations()
+                .iter()
+                .map(|(&index, &((), slice_location_in_atlas))| {
+                    (
+                        index,
+                        point2(slice_location_in_atlas.x(), slice_location_in_atlas.y()),
+                    )
+                })
+                .collect();
+
+            (atlas_image, mappings)
         }
     }
 
