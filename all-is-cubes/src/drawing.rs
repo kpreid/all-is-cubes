@@ -714,7 +714,7 @@ mod tests {
 
     /// TODO: We no longer have an easy way to trigger a set() failure
     #[test]
-    #[cfg(any())]
+    #[cfg(false)]
     fn draw_set_failure() {
         let name = Name::from("foo");
         let dead_block = Block::builder()
