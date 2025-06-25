@@ -179,7 +179,7 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
         resolution: Resolution,
         space: Space,
     ) -> Builder<'u, Voxels, UniverseTransaction> {
-        let space_handle = Handle::new_pending(Name::Pending, space);
+        let (space_handle, transaction) = UniverseTransaction::insert(Name::Pending, space);
 
         let Self {
             read_ticket,
@@ -192,7 +192,7 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
             read_ticket,
             attributes,
             primitive_builder: Voxels {
-                space: space_handle.clone(),
+                space: space_handle,
                 resolution,
                 offset: GridPoint::origin(),
             },
@@ -200,7 +200,7 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
             // TODO: This might not be the right thing in more general transaction usage.
             // For now, it's OK that we discard the transaction because it can only ever be
             // inserting a `Space` we are not going to use any more.
-            transaction: UniverseTransaction::insert(space_handle),
+            transaction,
         }
     }
 
@@ -280,18 +280,18 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
                 space = shrunk;
             }
 
-            let space_handle = Handle::new_pending(Name::Pending, space);
+            let (space_handle, transaction) = UniverseTransaction::insert(Name::Pending, space);
 
             Ok(Builder {
                 read_ticket,
                 attributes,
                 primitive_builder: Voxels {
-                    space: space_handle.clone(),
+                    space: space_handle,
                     resolution,
                     offset: GridPoint::origin(),
                 },
                 modifiers,
-                transaction: UniverseTransaction::insert(space_handle),
+                transaction,
             })
         }
 

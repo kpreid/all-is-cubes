@@ -142,8 +142,7 @@ impl<E: BlockModule> Provider<E, Block> {
             block: &Block,
         ) -> Result<Block, InsertError> {
             let block_def_handle =
-                Handle::new_pending(name, BlockDef::new(read_ticket, block.clone()));
-            txn.insert_mut(block_def_handle.clone())?;
+                txn.insert_mut(name, BlockDef::new(read_ticket, block.clone()))?;
             let indirect_block = Block::from(block_def_handle);
             Ok(indirect_block)
         }

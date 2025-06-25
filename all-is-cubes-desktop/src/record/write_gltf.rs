@@ -8,10 +8,9 @@ use std::sync::{Arc, Mutex, mpsc};
 use anyhow::Context;
 
 use all_is_cubes::listen;
-use all_is_cubes::math::{GridAab, GridVector};
-use all_is_cubes::space::Space;
+use all_is_cubes::math::GridVector;
 use all_is_cubes::time;
-use all_is_cubes::universe::{self, ReadTicket};
+use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::MeshTypes;
 use all_is_cubes_mesh::dynamic::{ChunkedSpaceMesh, MeshId};
@@ -39,7 +38,8 @@ impl all_is_cubes_mesh::dynamic::DynamicMeshTypes for RecordGltfMt {
 #[derive(Debug)]
 pub(super) struct MeshRecorder {
     cameras: camera::StandardCameras,
-    csm: ChunkedSpaceMesh<RecordGltfMt, 32>,
+    /// None if our input includes no space to record.
+    csm: Option<ChunkedSpaceMesh<RecordGltfMt, 32>>,
     scene_sender: mpsc::SyncSender<MeshRecordMsg>,
 }
 
@@ -52,16 +52,10 @@ impl MeshRecorder {
         MeshRecorder {
             // TODO: We need to tell the ChunkedSpaceMesh to have an infinite view distance
             // (or at least as much data as we care about).
-            csm: ChunkedSpaceMesh::new(
-                cameras.world_space().get().unwrap_or_else(|| {
-                    universe::Handle::new_pending(
-                        universe::Name::from("empty-space-placeholder"),
-                        Space::builder(GridAab::ORIGIN_EMPTY).build(),
-                    )
-                }),
-                tex,
-                false,
-            ),
+            csm: cameras
+                .world_space()
+                .get()
+                .map(|s| ChunkedSpaceMesh::new(s, tex, false)),
             scene_sender,
             cameras,
         }
@@ -80,24 +74,26 @@ impl MeshRecorder {
         // The `BTreeMap` will do that for us.
         let meshes_to_record: Mutex<BTreeMap<MeshId, MeshRecordMsg>> = Mutex::new(BTreeMap::new());
 
-        self.csm.update(
-            read_ticket,
-            &self.cameras.cameras().world,
-            time::Deadline::Whenever,
-            |u| {
-                if u.indices_only {
-                    // We don't do depth sorting.
-                    return;
-                }
-                // We could probably get away with reusing the cells but this is safer.
-                let new_cell = MeshIndexCell::default();
-                meshes_to_record.lock().unwrap().insert(
-                    u.mesh_id,
-                    MeshRecordMsg::AddMesh(u.mesh_id, u.mesh.clone(), Arc::clone(&new_cell)),
-                );
-                *u.render_data = new_cell;
-            },
-        );
+        if let Some(ref mut csm) = self.csm {
+            csm.update(
+                read_ticket,
+                &self.cameras.cameras().world,
+                time::Deadline::Whenever,
+                |u| {
+                    if u.indices_only {
+                        // We don't do depth sorting.
+                        return;
+                    }
+                    // We could probably get away with reusing the cells but this is safer.
+                    let new_cell = MeshIndexCell::default();
+                    meshes_to_record.lock().unwrap().insert(
+                        u.mesh_id,
+                        MeshRecordMsg::AddMesh(u.mesh_id, u.mesh.clone(), Arc::clone(&new_cell)),
+                    );
+                    *u.render_data = new_cell;
+                },
+            );
+        }
 
         // Deliver meshes in sorted order.
         for msg in meshes_to_record.into_inner().unwrap().into_values() {
@@ -106,23 +102,24 @@ impl MeshRecorder {
         }
 
         let mut instances: Vec<(MeshIndexCell, GridVector)> = Vec::new();
-        for c in self.csm.iter_chunks() {
-            let csm = &self.csm;
-            instances.extend(
-                c.block_instances()
-                    .flat_map(move |(block_index, positions)| {
-                        positions.filter_map(move |position| {
-                            Some((
-                                csm.block_instance_mesh(block_index)?.render_data.clone(),
-                                position.lower_bounds().to_vector(),
-                            ))
-                        })
-                    }),
-            );
-            instances.push((
-                c.render_data.clone(),
-                c.position().bounds().lower_bounds().to_vector(),
-            ))
+        if let Some(ref csm) = self.csm {
+            for c in csm.iter_chunks() {
+                instances.extend(
+                    c.block_instances()
+                        .flat_map(move |(block_index, positions)| {
+                            positions.filter_map(move |position| {
+                                Some((
+                                    csm.block_instance_mesh(block_index)?.render_data.clone(),
+                                    position.lower_bounds().to_vector(),
+                                ))
+                            })
+                        }),
+                );
+                instances.push((
+                    c.render_data.clone(),
+                    c.position().bounds().lower_bounds().to_vector(),
+                ))
+            }
         }
 
         self.scene_sender

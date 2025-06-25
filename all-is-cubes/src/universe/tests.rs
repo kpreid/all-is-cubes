@@ -197,12 +197,10 @@ fn insert_duplicate_name_via_txn() {
     let mut u = Universe::new();
     u.insert("test_thing".into(), BlockDef::new(u.read_ticket(), AIR))
         .unwrap();
-    let error = UniverseTransaction::insert(Handle::new_pending(
-        "test_thing".into(),
-        Space::empty_positive(1, 1, 1),
-    ))
-    .execute(&mut u, (), &mut transaction::no_outputs)
-    .unwrap_err();
+    let (_, txn) = UniverseTransaction::insert("test_thing".into(), Space::empty_positive(1, 1, 1));
+    let error = txn
+        .execute(&mut u, (), &mut transaction::no_outputs)
+        .unwrap_err();
 
     assert_eq!(
         error,
@@ -231,12 +229,10 @@ fn insert_anonym_prohibited_direct() {
 
 #[test]
 fn insert_anonym_prohibited_via_txn() {
-    let error = UniverseTransaction::insert(Handle::new_pending(
-        Name::Anonym(0),
-        Space::empty_positive(1, 1, 1),
-    ))
-    .execute(&mut Universe::new(), (), &mut drop)
-    .unwrap_err();
+    let (_, txn) = UniverseTransaction::insert(Name::Anonym(0), Space::empty_positive(1, 1, 1));
+    let error = txn
+        .execute(&mut Universe::new(), (), &mut drop)
+        .unwrap_err();
 
     assert_eq!(
         error,
@@ -268,12 +264,8 @@ fn insert_pending_becomes_anonym_direct() {
 #[test]
 fn insert_pending_becomes_anonym_via_txn() {
     let mut u = Universe::new();
-    UniverseTransaction::insert(Handle::new_pending(
-        Name::Pending,
-        BlockDef::new(u.read_ticket(), AIR),
-    ))
-    .execute(&mut u, (), &mut drop)
-    .unwrap();
+    let (_, txn) = UniverseTransaction::insert(Name::Pending, BlockDef::new(u.read_ticket(), AIR));
+    txn.execute(&mut u, (), &mut drop).unwrap();
     assert_eq!(
         u.iter_by_type::<BlockDef>()
             .map(|(name, _)| name)
@@ -408,13 +400,9 @@ fn universe_behavior() {
             &self,
             _context: &behavior::Context<'_, Universe>,
         ) -> (UniverseTransaction, behavior::Then) {
-            (
-                UniverseTransaction::insert(Handle::new_pending(
-                    "foo".into(),
-                    BlockDef::new(ReadTicket::stub(), AIR),
-                )),
-                behavior::Then::Drop,
-            )
+            let (_, txn) =
+                UniverseTransaction::insert("foo".into(), BlockDef::new(ReadTicket::stub(), AIR));
+            (txn, behavior::Then::Drop)
         }
         fn persistence(&self) -> Option<behavior::Persistence> {
             None
@@ -510,7 +498,10 @@ fn visit_handles_block_def_indirect() {
 
 #[test]
 fn visit_handles_block_tick_action() {
-    let b1 = Handle::new_pending("foo".into(), BlockDef::new(ReadTicket::stub(), AIR));
+    let mut u = Universe::new();
+    let b1 = u
+        .insert("foo".into(), BlockDef::new(ReadTicket::stub(), AIR))
+        .unwrap();
     let b2 = Block::builder()
         .color(Rgba::WHITE)
         .tick_action(Some(TickAction::from(Operation::Become(Block::from(b1)))))

@@ -190,7 +190,6 @@ fn slow_mesh_benches(c: &mut Criterion) {
 #[cfg(feature = "dynamic")]
 fn dynamic_benches(c: &mut Criterion) {
     use all_is_cubes::time;
-    use all_is_cubes::universe::{Handle, Name};
     use all_is_cubes_mesh::dynamic;
     use all_is_cubes_render::Flaws;
     use all_is_cubes_render::camera::{Camera, Viewport};
@@ -200,8 +199,8 @@ fn dynamic_benches(c: &mut Criterion) {
     let camera = Camera::new(graphics_options, Viewport::with_scale(1.0, [100, 100]));
 
     g.bench_function("initial-update", |b| {
-        let space_handle =
-            Handle::new_pending(Name::Pending, half_space(&block::from_color!(Rgba::WHITE)));
+        let mut universe = Universe::new();
+        let space_handle = universe.insert_anonymous(half_space(&block::from_color!(Rgba::WHITE)));
         b.iter_batched_ref(
             || {
                 let csm: dynamic::ChunkedSpaceMesh<Mt, 16> =

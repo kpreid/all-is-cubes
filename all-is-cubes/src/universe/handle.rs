@@ -145,7 +145,11 @@ impl<T: 'static> Handle<T> {
     /// Note that specifying a [`Name::Anonym`] will create a `Handle` which cannot actually
     /// be inserted into another [`Universe`], even if the specified number is free.
     /// This is permitted but not recommended.
-    pub fn new_pending(name: Name, initial_value: T) -> Self {
+    //---
+    // TODO(ecs): We need to get rid of this in favor of values/members always being stored in
+    // `Universe` or `UniverseTransaction`, so that handles can be simply `Sync` and so that
+    // members can be made of multiple components.
+    pub(crate) fn new_pending(name: Name, initial_value: T) -> Self {
         Self::new_from_state(
             name,
             State::Pending {
@@ -780,6 +784,8 @@ impl<T: UniverseMember> core::borrow::Borrow<dyn ErasedHandle> for Handle<T> {
 impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for Handle<T> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         Ok(if u.arbitrary()? {
+            // TODO(ecs): We’re trying to get rid of new_pending() and stop letting handles
+            // strongly own anything, but we’ll need some kind of replacement for this.
             Handle::new_pending(Name::arbitrary(u)?, T::arbitrary(u)?)
         } else {
             Handle::new_gone(Name::arbitrary(u)?)
@@ -1414,10 +1420,13 @@ mod tests {
 
     #[test]
     fn handle_debug_pending() {
-        let handle = Handle::new_pending(
-            "foo".into(),
-            BlockDef::new(ReadTicket::stub(), block::from_color!(Rgba::WHITE)),
-        );
+        let mut txn = UniverseTransaction::default();
+        let handle = txn
+            .insert_mut(
+                "foo".into(),
+                BlockDef::new(ReadTicket::stub(), block::from_color!(Rgba::WHITE)),
+            )
+            .unwrap();
         assert_eq!(
             format!("{handle:?}"),
             "Handle('foo' in no universe = BlockDef { \
@@ -1512,13 +1521,15 @@ mod tests {
         );
     }
 
-    /// Handles are compared by pointer (each `Handle::new_pending()` is a new identity),
+    /// Handles are compared by [`ecs::Entity`] or pointer (each pending handle is a new identity),
     /// not by name or member-value.
     #[test]
     fn handle_equality_is_pointer_equality() {
-        let handle_a_1 = Handle::new_pending("space".into(), Space::empty_positive(1, 1, 1));
+        let (handle_a_1, insert_a) =
+            UniverseTransaction::insert("space".into(), Space::empty_positive(1, 1, 1));
         let handle_a_2 = handle_a_1.clone();
-        let handle_b_1 = Handle::new_pending("space".into(), Space::empty_positive(1, 1, 1));
+        let (handle_b_1, insert_b) =
+            UniverseTransaction::insert("space".into(), Space::empty_positive(1, 1, 1));
 
         assert_eq!(handle_a_1, handle_a_1, "reflexive eq");
         assert_eq!(handle_a_1, handle_a_2, "clones are equal");
@@ -1528,9 +1539,9 @@ mod tests {
         // consecutively, because they have the same name and would conflict.
         let mut universe = Universe::new();
         for txn in [
-            UniverseTransaction::insert(handle_a_1.clone()),
+            insert_a,
             UniverseTransaction::delete(handle_a_1.clone()),
-            UniverseTransaction::insert(handle_b_1.clone()),
+            insert_b,
             UniverseTransaction::delete(handle_b_1.clone()),
         ] {
             txn.execute(&mut universe, (), &mut transaction::no_outputs)

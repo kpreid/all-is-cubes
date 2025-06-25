@@ -390,22 +390,11 @@ impl UniverseTransaction {
     /// the handle's name.
     ///
     /// Note that this transaction can only ever succeed once.
-    pub fn insert<T: UniverseMember>(handle: Handle<T>) -> Self {
-        // TODO: fail right away if the ref is already in a universe or if it is Anonym?
-        match handle.name() {
-            Name::Specific(_) | Name::Anonym(_) => Self::from_member_txn(
-                handle.name(),
-                MemberTxn::Insert(UniverseMember::into_any_handle(handle)),
-            ),
-            Name::Pending => Self {
-                members: HbHashMap::new(),
-                anonymous_insertions: vec![MemberTxn::Insert(UniverseMember::into_any_handle(
-                    handle,
-                ))],
-                universe_id: Equal(None),
-                behaviors: Default::default(),
-            },
-        }
+    pub fn insert<T: UniverseMember>(name: Name, value: T) -> (Handle<T>, Self) {
+        let mut txn = Self::default();
+        // can't fail because the transaction has no conflicting names
+        let handle = txn.insert_mut(name, value).unwrap();
+        (handle, txn)
     }
 
     /// Adds an insertion of a universe member to the transaction.
@@ -418,9 +407,13 @@ impl UniverseTransaction {
     ///
     /// TODO: Give this a better name by renaming `insert()`.
     /// TODO: Is `InsertError` actually desirable, or legacy from before transactions?
-    pub fn insert_mut<T: UniverseMember>(&mut self, handle: Handle<T>) -> Result<(), InsertError> {
-        let name = handle.name();
-        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle));
+    pub fn insert_mut<T: UniverseMember>(
+        &mut self,
+        name: Name,
+        value: T,
+    ) -> Result<Handle<T>, InsertError> {
+        let handle = Handle::new_pending(name.clone(), value);
+        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle.clone()));
 
         // TODO: fail right away if the ref is already in a universe or if it is Anonym?
         match name {
@@ -435,13 +428,13 @@ impl UniverseTransaction {
                     }
                     hashbrown::hash_map::Entry::Vacant(ve) => {
                         ve.insert(insertion);
-                        Ok(())
+                        Ok(handle)
                     }
                 }
             }
             Name::Pending => {
                 self.anonymous_insertions.push(insertion);
-                Ok(())
+                Ok(handle)
             }
         }
     }
@@ -1154,16 +1147,15 @@ mod tests {
     }
 
     #[test]
-    fn insert_affects_clones() {
+    fn insert_affects_handles() {
         let mut u = Universe::new();
-        let pending_1 = Handle::new_pending("foo".into(), Space::empty_positive(1, 1, 1));
-        let pending_2 = pending_1.clone();
+        let (pending, txn) =
+            UniverseTransaction::insert("foo".into(), Space::empty_positive(1, 1, 1));
+        assert_eq!(pending.universe_id(), None);
 
-        UniverseTransaction::insert(pending_2)
-            .execute(&mut u, (), &mut drop)
-            .unwrap();
+        txn.execute(&mut u, (), &mut drop).unwrap();
 
-        assert_eq!(pending_1.universe_id(), Some(u.universe_id()));
+        assert_eq!(pending.universe_id(), Some(u.universe_id()));
         // TODO: Also verify that pending_1 is not still in the pending state
     }
 
@@ -1174,11 +1166,13 @@ mod tests {
         let mut u = Universe::new();
 
         // TODO: Cleaner public API for new anonymous?
-        let foo = Handle::new_pending(Name::Pending, Space::empty_positive(1, 1, 1));
-        let bar = Handle::new_pending(Name::Pending, Space::empty_positive(2, 2, 2));
+        let (foo, foo_txn) =
+            UniverseTransaction::insert(Name::Pending, Space::empty_positive(1, 1, 1));
+        let (bar, bar_txn) =
+            UniverseTransaction::insert(Name::Pending, Space::empty_positive(2, 2, 2));
 
-        UniverseTransaction::insert(foo.clone())
-            .merge(UniverseTransaction::insert(bar.clone()))
+        foo_txn
+            .merge(bar_txn)
             .expect("merge should allow 2 pending")
             .execute(&mut u, (), &mut drop)
             .expect("execute");
@@ -1190,15 +1184,6 @@ mod tests {
     }
 
     #[test]
-    fn insert_anonymous_equivalence() {
-        let mut txn = UniverseTransaction::default();
-        let handle = txn.insert_anonymous(Space::empty_positive(1, 1, 1));
-
-        assert_eq!(handle.name(), Name::Pending);
-        assert_eq!(txn, UniverseTransaction::insert(handle));
-    }
-
-    #[test]
     #[ignore = "TODO: figure out how to get this to work w/ insert transactions"]
     fn systematic() {
         TransactionTester::new()
@@ -1206,10 +1191,7 @@ mod tests {
             .transaction(UniverseTransaction::default(), |_, _| Ok(()))
             // TODO: this is going to fail because insert transactions aren't reusable
             .transaction(
-                UniverseTransaction::insert(Handle::new_pending(
-                    "foo".into(),
-                    Space::empty_positive(1, 1, 1),
-                )),
+                UniverseTransaction::insert("foo".into(), Space::empty_positive(1, 1, 1)).1,
                 |_, _| Ok(()),
             )
             .target(Universe::new)
@@ -1247,12 +1229,11 @@ mod tests {
     fn insert_named_already_in_different_universe() {
         let mut u1 = Universe::new();
         let mut u2 = Universe::new();
-        let handle = u1
-            .insert("foo".into(), Space::empty_positive(1, 1, 1))
-            .unwrap();
-        let txn = UniverseTransaction::insert(handle);
+        let (_, txn) = UniverseTransaction::insert("foo".into(), Space::empty_positive(1, 1, 1));
 
+        txn.execute(&mut u1, (), &mut drop).unwrap();
         let e = txn.execute(&mut u2, (), &mut drop).unwrap_err();
+
         assert_eq!(
             dbg!(e),
             ExecuteError::Check(UniverseMismatch::Member(transaction::MapMismatch {
@@ -1267,10 +1248,10 @@ mod tests {
 
     #[test]
     fn insert_anonymous_already_in_different_universe() {
-        let handle = Handle::new_pending(Name::Pending, Space::empty_positive(1, 1, 1));
         let mut u1 = Universe::new();
         let mut u2 = Universe::new();
-        let txn = UniverseTransaction::insert(handle);
+        let mut txn = UniverseTransaction::default();
+        txn.insert_anonymous(Space::empty_positive(1, 1, 1));
 
         txn.execute(&mut u1, (), &mut drop).unwrap();
         let e = txn.execute(&mut u2, (), &mut drop).unwrap_err();

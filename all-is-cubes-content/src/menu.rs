@@ -13,7 +13,7 @@ use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{Face6, GridAab};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
-use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Name, ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::logo::logo_text;
 use all_is_cubes_ui::vui::{self, Align, LayoutTree, Layoutable as _, install_widgets, widgets};
@@ -86,7 +86,7 @@ fn template_menu_widget_tree(
         Vector3D::new(Align::Center, Align::Center, Align::Low),
     )?;
     let logo_text_bounds = logo_text_space.bounds();
-    let logo_text_space_handle = Handle::new_pending(Name::Pending, logo_text_space);
+    let (logo_text_space_handle, txn) = UniverseTransaction::insert(Name::Pending, logo_text_space);
     let logo_widget = widgets::Voxels::new(
         logo_text_bounds,
         logo_text_space_handle.clone().into(),
@@ -111,5 +111,5 @@ fn template_menu_widget_tree(
                 direction: Face6::NY,
                 children: vertical_widgets,
             }));
-    Ok((tree, UniverseTransaction::insert(logo_text_space_handle)))
+    Ok((tree, txn))
 }

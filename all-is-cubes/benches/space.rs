@@ -13,7 +13,7 @@ use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, GridSize};
 use all_is_cubes::raytracer::UpdatingSpaceRaytracer;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{self, Transaction as _};
-use all_is_cubes::universe::{Handle, Name, ReadTicket};
+use all_is_cubes::universe::{Handle, ReadTicket, Universe};
 
 fn space_bulk_mutation(c: &mut Criterion) {
     let mut group = c.benchmark_group("bulk");
@@ -58,8 +58,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
                 let [block] = make_some_blocks();
 
                 b.iter_batched_ref(
-                    || -> (Handle<Space>, Listeners) {
-                        let space = Handle::new_pending(Name::Pending, Space::empty(bigger_bounds));
+                    || -> (Universe, Handle<Space>, Listeners) {
+                        let mut universe = Universe::new();
+                        let space = universe.insert_anonymous(Space::empty(bigger_bounds));
                         // Multiple nontrivial things that will receive notifications:
                         // 1. Raytracers
                         let rts = std::array::from_fn(|_| {
@@ -80,11 +81,11 @@ fn space_bulk_mutation(c: &mut Criterion) {
                                 }),
                             )
                         });
-                        (space, (rts, blocks))
+                        (universe, space, (rts, blocks))
                     },
-                    |(space_handle, _listening_things)| {
-                        space_handle
-                            .try_modify_pending(|space| {
+                    |(universe, space_handle, _listening_things)| {
+                        universe
+                            .try_modify(space_handle, |space| {
                                 space
                                     .mutate(ReadTicket::stub(), |m| {
                                         m.fill(bounds, |_| Some(&block))

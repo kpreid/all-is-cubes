@@ -60,6 +60,7 @@ In order to resolve various design problems interfering with development, the `a
 
     - `math::Rgb::clamp()` now takes a parameter for the upper bound.
 
+    - `universe::UniverseTransaction::{insert, insert_mut}` now take a name and value rather than a `Handle`.
     - `universe::WhenceUniverse::load()` now returns `Box<Universe>` instead of `Universe`.
 
     - Renamed `block::Move::to_paired()` to `into_paired()`.
@@ -84,6 +85,8 @@ In order to resolve various design problems interfering with development, the `a
 - `all-is-cubes` library:
     - The public functions `Character::step()` and `Space::step()` no longer exist.
       In general, to make time pass, create a `Universe` and `step()` it instead.
+    - `universe::Handle::new_pending()` has been replaced by `UniverseTransaction::insert()`.
+      Handles are now always associated with some container, either `Universe` or `UniverseTransaction`, except for those in the “gone” defunct state.
 
 ## 0.9.0 (2025-01-01)
 

@@ -11,7 +11,7 @@ use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
 use all_is_cubes::math::Face6;
 use all_is_cubes::transaction::Transaction as _;
-use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe, UniverseTransaction};
+use all_is_cubes::universe::{ReadTicket, Universe, UniverseTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 use all_is_cubes::{space, transaction};
 use all_is_cubes_render::Rendering;
@@ -222,8 +222,8 @@ fn render_widget(
     gravity: vui::Gravity,
 ) -> Rendering {
     let start_time = Instant::now();
-    let space_handle = Handle::new_pending(
-        Name::Pending,
+    let mut txn = UniverseTransaction::default();
+    let space_handle = txn.insert_anonymous(
         widget
             .to_space(
                 context.universe().read_ticket(),
