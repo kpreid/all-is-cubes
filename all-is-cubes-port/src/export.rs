@@ -107,6 +107,10 @@ pub fn export_to_path(
 #[derive(Clone, Debug)]
 pub struct ExportSet {
     pub(crate) contents: HandleSet,
+    #[cfg_attr(
+        not(feature = "stl"),
+        allow(dead_code, reason = "stl is the only exporter that does multi-file")
+    )]
     multiple: bool,
 }
 
