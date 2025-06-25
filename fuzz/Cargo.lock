@@ -27,7 +27,7 @@ dependencies = [
  "futures-core",
  "hashbrown",
  "indoc",
- "itertools 0.13.0",
+ "itertools",
  "libm",
  "log",
  "macro_rules_attribute",
@@ -96,7 +96,7 @@ dependencies = [
  "gloo-timers",
  "half",
  "hashbrown",
- "itertools 0.13.0",
+ "itertools",
  "log",
  "num-traits",
  "pollster",
@@ -125,7 +125,7 @@ dependencies = [
  "futures-util",
  "hashbrown",
  "indoc",
- "itertools 0.13.0",
+ "itertools",
  "log",
  "mutants",
  "num-traits",
@@ -529,7 +529,7 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b2b9102b00a5237a5c503c211623652aa22d05de2c6eb227eed331186463d62"
 dependencies = [
- "itertools 0.14.0",
+ "itertools",
  "proc-macro2",
  "quote",
  "syn 2.0.103",
@@ -736,15 +736,6 @@ name = "indoc"
 version = "2.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4c7245a08504955605670dbf141fceab975f15ca21570696aebe9d2e71576bd"
-
-[[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"
