@@ -67,7 +67,7 @@ jobs:
         ref: unstable-rust
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.7.8
+    - uses: Swatinem/rust-cache@v2.8.0
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
@@ -144,7 +144,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: Swatinem/rust-cache@v2.7.8
+    - uses: Swatinem/rust-cache@v2.8.0
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-ubuntu-locked"
