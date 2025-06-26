@@ -8,16 +8,18 @@ use all_is_cubes::block::{self, Block};
 use all_is_cubes::math::GridRotation;
 use all_is_cubes::universe::{self, ReadTicket, VisitHandles as _};
 
-fuzz_target!(|block: Block| check_block(block));
+fuzz_target!(
+    |input: all_is_cubes::universe::ArbitraryWithUniverse<Block>| {
+        let read_ticket = input.universe.read_ticket();
+        check_block(read_ticket, &input.contents);
+    }
+);
 
-fn check_block(block: Block) {
-    // TODO: The `Block` will have pending `Handle`s (not inserted in a Universe).
-    // Put them in a universe once that is possible.
-
+fn check_block(read_ticket: ReadTicket<'_>, block: &Block) {
     let rotationally_symmetric = block.rotationally_symmetric();
 
     let log = all_is_cubes::listen::Log::new();
-    match block.evaluate_and_listen(ReadTicket::stub(), log.listener()) {
+    match block.evaluate_and_listen(read_ticket, log.listener()) {
         Ok(evaluated) => {
             evaluated.consistency_check();
 

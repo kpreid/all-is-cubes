@@ -41,6 +41,8 @@ pub use universe_txn::*;
 mod handle;
 pub use handle::*;
 
+pub(crate) mod tl;
+
 mod id;
 #[expect(clippy::module_name_repetitions)] // TODO: consider renaming to Id
 pub use id::UniverseId;

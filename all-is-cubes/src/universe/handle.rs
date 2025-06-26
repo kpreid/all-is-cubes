@@ -780,38 +780,138 @@ impl<T: UniverseMember> core::borrow::Borrow<dyn ErasedHandle> for Handle<T> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(feature = "arbitrary")]
-impl<'a, T: arbitrary::Arbitrary<'a> + 'static> arbitrary::Arbitrary<'a> for Handle<T> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(if u.arbitrary()? {
-            // TODO(ecs): We’re trying to get rid of new_pending() and stop letting handles
-            // strongly own anything, but we’ll need some kind of replacement for this.
-            Handle::new_pending(Name::arbitrary(u)?, T::arbitrary(u)?)
-        } else {
-            Handle::new_gone(Name::arbitrary(u)?)
-        })
+pub use arbitrary_handle::ArbitraryWithUniverse;
+
+#[cfg(feature = "arbitrary")]
+mod arbitrary_handle {
+    use super::{Handle, Name};
+    use crate::universe::{StrongHandle, Universe, UniverseMember, tl};
+    use alloc::vec::Vec;
+    use arbitrary::size_hint;
+
+    /// May be used with [`arbitrary::Arbitrary`], to construct a [`Universe`] and
+    /// things that contain [`Handle`]s to that universe.
+    ///
+    /// This `struct` is only available with `feature = "arbitrary"`.
+    #[derive(Debug)]
+    #[allow(clippy::exhaustive_structs)]
+    pub struct ArbitraryWithUniverse<T> {
+        #[allow(missing_docs)]
+        pub universe: Universe,
+        #[allow(missing_docs)]
+        pub contents: T,
     }
 
-    fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        Self::try_size_hint(depth).unwrap_or_default()
+    impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for ArbitraryWithUniverse<T> {
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            let scope = tl::Scope::install(tl::Context {
+                purpose: tl::Purpose::Arbitrary,
+                universe: Universe::new(),
+            });
+            let contents = T::arbitrary(u)?;
+            let universe = scope.take(tl::Purpose::Arbitrary).universe;
+            Ok(Self { universe, contents })
+        }
+
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            Self::try_size_hint(depth).unwrap_or_default()
+        }
+        fn try_size_hint(
+            depth: usize,
+        ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+            T::try_size_hint(depth)
+        }
     }
-    fn try_size_hint(
-        depth: usize,
-    ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
-        arbitrary::size_hint::try_recursion_guard(depth, |depth| {
-            Ok(arbitrary::size_hint::and(
-                bool::size_hint(depth),
-                arbitrary::size_hint::or(
-                    Name::try_size_hint(depth)?,
-                    arbitrary::size_hint::and(
+
+    impl<'a, T: arbitrary::Arbitrary<'a> + UniverseMember + 'static> arbitrary::Arbitrary<'a>
+        for Handle<T>
+    {
+        /// Do not call this! It will panic under most circumstances.
+        /// Because [`Handle`]s belong to a [`Universe`], they must be constructed together.
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            Ok(match u.int_in_range(0..=2)? {
+                0 => Handle::new_gone(Name::arbitrary(u)?),
+                1 => {
+                    let name = Name::arbitrary(u)?;
+                    let value = T::arbitrary(u)?;
+
+                    tl::get_from_context(tl::Purpose::Arbitrary, |context| {
+                        context
+                            .universe
+                            .insert(name.clone(), value)
+                            .unwrap_or_else(|_| {
+                                // TODO: insert anonymous if picking an arbitrary name failed;
+                                // right now we can't recover ownership of the value!
+                                Handle::new_gone(name)
+                            })
+                    })
+                    .unwrap_or_else(no_context)
+                }
+                _ => tl::get_from_context(tl::Purpose::Arbitrary, |context| {
+                    // must collect to get an ExactSizeIterator
+                    let handles: Vec<Handle<T>> = context
+                        .universe
+                        .iter_by_type::<T>()
+                        .map(|(_name, handle)| handle)
+                        .collect();
+                    u.choose_iter(handles.into_iter())
+                })
+                .unwrap_or_else(no_context)?,
+            })
+        }
+
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            Self::try_size_hint(depth).unwrap_or_default()
+        }
+        fn try_size_hint(
+            depth: usize,
+        ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+            size_hint::try_recursion_guard(depth, |depth| {
+                Ok(size_hint::and(
+                    (1, Some(1)), // choice of type of handle,
+                    size_hint::or_all(&[
+                        // 0 => Gone
                         Name::try_size_hint(depth)?,
-                        T::try_size_hint(depth)?,
-                    ),
-                ),
-            ))
-        })
+                        // 1 => Create new handle
+                        size_hint::and(Name::try_size_hint(depth)?, T::try_size_hint(depth)?),
+                        // 2 => Choose old handle
+                        (0, Some(size_of::<usize>())),
+                    ]),
+                ))
+            })
+        }
+    }
+
+    impl<'a, T: UniverseMember + 'static> arbitrary::Arbitrary<'a> for StrongHandle<T>
+    where
+        Handle<T>: arbitrary::Arbitrary<'a>,
+    {
+        fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+            Handle::<T>::arbitrary(u).map(StrongHandle::from)
+        }
+
+        fn size_hint(depth: usize) -> (usize, Option<usize>) {
+            Self::try_size_hint(depth).unwrap_or_default()
+        }
+        fn try_size_hint(
+            depth: usize,
+        ) -> Result<(usize, Option<usize>), arbitrary::MaxRecursionReached> {
+            Handle::<T>::try_size_hint(depth)
+        }
+    }
+
+    fn no_context<T>() -> T {
+        panic!(
+            "impl Arbitrary for Handle must be called in context of \
+             constructing an arbitrary universe"
+        )
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Errors resulting from attempting to read or write the referent of a [`Handle`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]

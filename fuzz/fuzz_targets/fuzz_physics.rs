@@ -6,16 +6,22 @@ use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::{self, FreeCoordinate, NotNan};
 use all_is_cubes::space::Space;
 use all_is_cubes::time;
-use all_is_cubes::universe::{StrongHandle, Universe};
+use all_is_cubes::universe::{ArbitraryWithUniverse, StrongHandle, Universe};
 
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|input: (
     [NotNan<FreeCoordinate>; 3],
     [NotNan<FreeCoordinate>; 3],
-    Space
+    ArbitraryWithUniverse<Space>,
 )| {
-    let (position, velocity, space) = input;
+    let (
+        position,
+        velocity,
+        ArbitraryWithUniverse {
+            contents: space, ..
+        },
+    ) = input;
 
     let interesting_bounds_aab = space.bounds().to_free().expand(10.0);
 

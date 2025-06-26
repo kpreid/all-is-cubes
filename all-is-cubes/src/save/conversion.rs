@@ -1147,9 +1147,8 @@ mod universe {
     use crate::save::schema::MemberEntrySer;
     use crate::time;
     use crate::universe::{
-        self, AnyHandle, Handle, HandleSet, Name, PartialUniverse, ReadGuard, Universe,
+        self, AnyHandle, Handle, HandleSet, Name, PartialUniverse, ReadGuard, Universe, tl,
     };
-    use core::cell::RefCell;
     use schema::{HandleSer, MemberDe, NameSer};
 
     impl From<&BlockDef> for schema::MemberSer<'_> {
@@ -1228,11 +1227,12 @@ mod universe {
     impl<'de> Deserialize<'de> for Universe {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             let (data, mut universe) = {
-                let scope = ContextScope::install(DeContext {
+                let scope = tl::Scope::install(tl::Context {
+                    purpose: tl::Purpose::Deserialization,
                     universe: Universe::new(),
                 });
                 let data = schema::UniverseDe::deserialize(deserializer)?;
-                let universe = scope.take().universe;
+                let universe = scope.take(tl::Purpose::Deserialization).universe;
                 (data, universe)
             };
 
@@ -1279,20 +1279,18 @@ mod universe {
         fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
             match HandleSer::deserialize(deserializer)? {
                 HandleSer::HandleV1 { name } => {
-                    HANDLE_DESERIALIZATION_CONTEXT.with(|context_cell| -> Result<Self, D::Error> {
-                        match Option::as_mut(&mut context_cell.borrow_mut()) {
-                            Some(context) => context
-                                .universe
-                                .get_or_insert_deserializing(name)
-                                .map_err(serde::de::Error::custom),
-                            None => {
-                                // If there is no `Universe` context, use a “gone” handle.
-                                // I am unsure whether this has any practical application, but it
-                                // is at least useful in deserialization tests.
-                                Ok(Handle::new_gone(name))
-                            }
+                    match tl::get_from_context(tl::Purpose::Deserialization, {
+                        let name = name.clone();
+                        |context| context.universe.get_or_insert_deserializing(name)
+                    }) {
+                        Some(result) => result.map_err(serde::de::Error::custom),
+                        None => {
+                            // If there is no `Universe` context, use a “gone” handle.
+                            // I am unsure whether this has any practical application, but it
+                            // is at least useful in deserialization tests.
+                            Ok(Handle::new_gone(name))
                         }
-                    })
+                    }
                 }
             }
         }
@@ -1339,60 +1337,6 @@ mod universe {
             })?;
             let value: &T = &read_guard;
             value.serialize(serializer)
-        }
-    }
-
-    std::thread_local! {
-        /// Thread-local state used to communicate from [`Universe`] deserialization to
-        /// [`Handle`] deserialization so that the [`Handle`]`] points to a member of that
-        /// [`Universe`].
-        ///
-        /// If [`None`], no [`Universe`] deserialization is currently occurring.
-        ///
-        /// TODO: Find an alternative not dependent on external state. Perhaps
-        /// serde::DeserializeSeed will do, or if necessary we can modify Handle to support
-        /// modification after construction.
-        static HANDLE_DESERIALIZATION_CONTEXT: RefCell<Option<DeContext>> = const {
-            RefCell::new(None)
-        };
-    }
-
-    struct DeContext {
-        universe: Universe,
-    }
-
-    struct ContextScope;
-
-    impl ContextScope {
-        fn install(new_context: DeContext) -> Self {
-            HANDLE_DESERIALIZATION_CONTEXT.with_borrow_mut(|tl| {
-                assert!(tl.is_none(), "cannot nest Universe deserialization");
-                *tl = Some(new_context);
-            });
-            Self
-        }
-
-        /// Uninstall and retrieve the context. Panics if none present.
-        fn take(self) -> DeContext {
-            let context = HANDLE_DESERIALIZATION_CONTEXT.with_borrow_mut(|tl| {
-                tl.take()
-                    .expect("something went wrong with HANDLE_DESERIALIZATION_CONTEXT")
-            });
-            core::mem::forget(self); // don't run Drop
-            context
-        }
-    }
-
-    impl Drop for ContextScope {
-        fn drop(&mut self) {
-            HANDLE_DESERIALIZATION_CONTEXT.with(|handle_context| {
-                let mut handle_context = handle_context.borrow_mut();
-                assert!(
-                    handle_context.is_some(),
-                    "something went wrong with HANDLE_DESERIALIZATION_CONTEXT"
-                );
-                *handle_context = None;
-            });
         }
     }
 }

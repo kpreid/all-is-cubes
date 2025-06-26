@@ -226,6 +226,7 @@ impl Character {
     /// Constructs a [`Character`] within/looking at the given `space`
     /// with the initial state specified by [`Space::spawn`].
     pub fn spawn_default(read_ticket: ReadTicket<'_>, space: Handle<Space>) -> Self {
+        // TODO: don’t panic.
         Self::spawn(space.read(read_ticket).unwrap().spawn(), space)
     }
 
