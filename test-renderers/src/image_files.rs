@@ -164,20 +164,7 @@ pub(crate) fn load_and_copy_expected_image(
             // This makes it canonical and contain only the information we actually compared.
             image.save(&snapshot_file_path).unwrap();
 
-            // Convert to what `rendiff` wants.
-            let width = image.width() as usize;
-            let height = image.height() as usize;
-            let image = imgref::ImgVec::new(
-                image
-                    .into_vec()
-                    .chunks(4)
-                    .map(|pixel| <[u8; 4]>::try_from(pixel).unwrap())
-                    .collect(),
-                width,
-                height,
-            );
-
-            Ok((image, snapshot_file_path))
+            Ok((image_to_imgref(image), snapshot_file_path))
         }
         Err(image::ImageError::IoError(e)) if e.kind() == io::ErrorKind::NotFound => {
             Err(NotFound(expected_file_path))
@@ -187,6 +174,15 @@ pub(crate) fn load_and_copy_expected_image(
             p = expected_file_path.display()
         ),
     }
+}
+
+fn image_to_imgref(image: image::ImageBuffer<image::Rgba<u8>, Vec<u8>>) -> imgref::ImgVec<[u8; 4]> {
+    let width = usize::try_from(image.width()).unwrap();
+    let height = usize::try_from(image.height()).unwrap();
+    let data: Vec<u8> = image.into_vec();
+    let (pixels, remainder) = data.as_chunks::<4>();
+    debug_assert!(remainder.is_empty());
+    imgref::ImgVec::new(pixels.to_vec(), width, height)
 }
 
 pub(crate) struct NotFound(pub PathBuf);
