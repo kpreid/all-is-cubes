@@ -99,8 +99,6 @@ pub fn cursor_raycast(
 }
 /// Data collected by [`cursor_raycast`] about the blocks struck by the ray; intended to be
 /// sufficient for various player interactions with blocks.
-///
-/// TODO: Should carry information about both the struck and preceding cubes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cursor {
     /// The space the selected cube is in.
