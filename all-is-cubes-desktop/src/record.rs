@@ -212,7 +212,7 @@ impl Recorder {
                 let mut renderer = RtRenderer::new(
                     rec.cameras.clone_unupdated(),
                     Box::new(|v| v),
-                    listen::constant(Arc::new(())),
+                    listen::constant(Default::default()),
                 );
                 renderer
                     .update(

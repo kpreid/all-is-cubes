@@ -24,6 +24,10 @@ use crate::{Flaws, RenderError, Rendering};
 #[cfg(any(doc, feature = "std"))]
 use crate::HeadlessRenderer;
 
+// -------------------------------------------------------------------------------------------------
+
+type CustomOptionsValues<D> = Layers<Arc<<D as RtBlockData>::Options>>;
+
 /// Builds upon [`UpdatingSpaceRaytracer`] to make a complete [`HeadlessRenderer`],
 /// following the scene and camera information in a [`StandardCameras`].
 pub struct RtRenderer<D: RtBlockData = ()> {
@@ -38,9 +42,9 @@ pub struct RtRenderer<D: RtBlockData = ()> {
     // TODO: this oughta be just provided by `StandardCameras`
     ui_graphics_options: listen::DynSource<Arc<GraphicsOptions>>,
 
-    custom_options: listen::DynSource<Arc<D::Options>>,
+    custom_options: listen::DynSource<CustomOptionsValues<D>>,
     /// Borrowable copy of the value in `custom_options`.
-    custom_options_cache: Arc<D::Options>,
+    custom_options_cache: CustomOptionsValues<D>,
 
     /// Whether there was a [`Cursor`] to be drawn.
     /// Raytracing doesn't yet support cursors but we need to report that.
@@ -59,7 +63,7 @@ where
     pub fn new(
         cameras: StandardCameras,
         size_policy: Box<dyn Fn(Viewport) -> Viewport + Send + Sync>,
-        custom_options: listen::DynSource<Arc<D::Options>>,
+        custom_options: listen::DynSource<CustomOptionsValues<D>>,
     ) -> Self {
         RtRenderer {
             rts: Layers::<Option<_>>::default(),
@@ -104,7 +108,7 @@ where
             cached_rt: &mut Option<UpdatingSpaceRaytracer<D>>,
             optional_space: Option<&Handle<Space>>,
             graphics_options_source: listen::DynSource<Arc<GraphicsOptions>>,
-            custom_options_source: &listen::DynSource<Arc<D::Options>>,
+            custom_options_source_factory: impl FnOnce() -> listen::DynSource<Arc<D::Options>>,
             anything_changed: &mut bool,
         ) -> Result<(), RenderError>
         where
@@ -122,7 +126,7 @@ where
                     *rt = Some(UpdatingSpaceRaytracer::new(
                         space.clone(),
                         graphics_options_source,
-                        custom_options_source.clone(),
+                        custom_options_source_factory(),
                     ));
                 }
                 // Space is None, so drop raytracer if any
@@ -139,7 +143,13 @@ where
             &mut self.rts.world,
             Option::as_ref(&self.cameras.world_space().get()),
             self.cameras.graphics_options_source(),
-            &self.custom_options,
+            || {
+                Arc::new(
+                    self.custom_options
+                        .clone()
+                        .map(|layers| layers.world.clone()),
+                )
+            },
             &mut anything_changed,
         )?;
         sync_space(
@@ -147,7 +157,7 @@ where
             &mut self.rts.ui,
             self.cameras.ui_space(),
             self.ui_graphics_options.clone(),
-            &self.custom_options,
+            || Arc::new(self.custom_options.clone().map(|layers| layers.ui.clone())),
             &mut anything_changed,
         )?;
 
@@ -194,8 +204,8 @@ where
                 output,
                 viewport,
                 [
-                    encoder(P::paint(Rgba::BLACK, scene.options)),
-                    encoder(P::paint(Rgba::WHITE, scene.options)),
+                    encoder(P::paint(Rgba::BLACK, scene.options_refs().ui)),
+                    encoder(P::paint(Rgba::WHITE, scene.options_refs().ui)),
                 ],
                 &info_text,
             );
@@ -217,19 +227,13 @@ where
         cameras.world.set_viewport(viewport);
         cameras.ui.set_viewport(viewport);
 
-        let options =
-            RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
-                self.cameras.graphics_options(),
-                &*self.custom_options_cache,
-            );
-
         RtScene {
             rts: self
                 .rts
                 .as_refs()
                 .map(|opt_urt| opt_urt.as_ref().map(|urt| urt.get())),
             cameras,
-            options,
+            custom_options: &self.custom_options_cache,
         }
     }
 
@@ -349,7 +353,8 @@ pub struct RtScene<'a, P: Accumulate> {
     rts: Layers<Option<&'a SpaceRaytracer<P::BlockData>>>,
     /// Cameras *with* `size_policy` applied.
     cameras: Layers<Camera>,
-    options: RtOptionsRef<'a, <P::BlockData as RtBlockData>::Options>,
+    /// Custom options for `P`, per layer.
+    custom_options: &'a CustomOptionsValues<P::BlockData>,
 }
 
 impl<P: Accumulate> fmt::Debug for RtScene<'_, P>
@@ -360,12 +365,12 @@ where
         let Self {
             rts,
             cameras,
-            options,
+            custom_options,
         } = self;
         f.debug_struct("RtScene")
             .field("rts", rts)
             .field("cameras", cameras)
-            .field("options", options)
+            .field("custom_options", custom_options)
             .finish()
     }
 }
@@ -375,12 +380,26 @@ impl<P: Accumulate> Clone for RtScene<'_, P> {
         Self {
             rts: self.rts,
             cameras: self.cameras.clone(),
-            options: self.options,
+            custom_options: self.custom_options,
         }
     }
 }
 
 impl<P: Accumulate> RtScene<'_, P> {
+    /// Constructs [`RtOptionsRef`] referring to the options stored in `self`.
+    fn options_refs(&self) -> Layers<RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>> {
+        Layers {
+            world: RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
+                self.cameras.world.options(),
+                &*self.custom_options.world,
+            ),
+            ui: RtOptionsRef::_new_but_please_do_not_construct_this_if_you_are_not_all_is_cubes_itself(
+                self.cameras.ui.options(),
+                &*self.custom_options.ui,
+            ),
+        }
+    }
+
     /// Given the `patch` which is the bounding box of a single image pixel in normalized device
     /// coordinates (range -1 to 1), produce the [`Accumulate`]d value of that pixel in this scene.
     ///
@@ -401,7 +420,7 @@ impl<P: Accumulate> RtScene<'_, P> {
             return trace_patch_in_one_space(world, &self.cameras.world, patch, true);
         }
         (
-            P::paint(palette::NO_WORLD_TO_SHOW, self.options),
+            P::paint(palette::NO_WORLD_TO_SHOW, self.options_refs().world),
             RaytraceInfo::default(),
         )
     }
@@ -709,9 +728,15 @@ mod tests {
         );
 
         // Change the options after the renderer is created.
-        let custom_options = listen::Cell::new(Arc::new("before"));
+        let custom_options = listen::Cell::new(Layers {
+            world: Arc::new("world before"),
+            ui: Arc::new("ui before"),
+        });
         let mut renderer = RtRenderer::new(cameras, Box::new(identity), custom_options.as_source());
-        custom_options.set(Arc::new("after"));
+        custom_options.set(Layers {
+            world: Arc::new("world after"),
+            ui: Arc::new("ui after"),
+        });
 
         // See what options value is used.
         let mut result = [CatchCustomOptions::default()];
@@ -729,7 +754,7 @@ mod tests {
         assert_eq!(
             result,
             [CatchCustomOptions {
-                custom_options: "after"
+                custom_options: "world after"
             }]
         )
     }

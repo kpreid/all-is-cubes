@@ -109,7 +109,7 @@ pub fn create_terminal_session(
             .send(RtRenderer::new(
                 cameras.clone_unupdated(),
                 Box::new(|v| v),
-                listen::constant(Arc::new(())),
+                listen::constant(Default::default()),
             ))
             .unwrap();
     }

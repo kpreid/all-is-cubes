@@ -54,7 +54,7 @@ impl TestData {
                 listen::constant(Arc::new(UiViewState::default())),
             ),
             Box::new(core::convert::identity),
-            listen::constant(Arc::new(())),
+            listen::constant(Default::default()),
         );
         renderer
             .update(Layers::splat(self.universe.read_ticket()), None)

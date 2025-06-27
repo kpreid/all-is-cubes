@@ -38,11 +38,11 @@ pub mod builder;
 pub use builder::Builder;
 
 mod light;
+#[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
+pub use light::LightUpdateCubeInfo;
 #[cfg(feature = "rerun")]
 #[doc(hidden)] // unstable
 pub use light::chart as light_chart;
-#[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
-pub use light::LightUpdateCubeInfo;
 pub(crate) use light::{LightStatus, LightUpdateRequest};
 use light::{LightStorage, LightUpdateQueue, PackedLightScalar};
 pub use light::{LightUpdatesInfo, PackedLight};
