@@ -143,7 +143,7 @@ fn space_mesh_benches(c: &mut Criterion) {
                 let mut buffer = SpaceMesh::default();
                 checker_ing.do_compute(&mut buffer);
                 // Sanity check that we're actually rendering as much as we expect.
-                assert_eq!(buffer.vertices().len(), 6 * 4 * (16 * 16 * 16) / 2);
+                assert_eq!(buffer.vertices().0.len(), 6 * 4 * (16 * 16 * 16) / 2);
                 buffer
             },
             |buffer: &mut SpaceMesh<Mt>| {

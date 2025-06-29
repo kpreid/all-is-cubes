@@ -75,9 +75,9 @@ pub struct BlockMesh<M: MeshTypes> {
 /// The texture associated with the contained vertices' texture coordinates is recorded
 /// in the [`BlockMesh`] only.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct BlockFaceMesh<V> {
+pub(super) struct BlockFaceMesh<V: Vertex> {
     /// Vertices, as used by the indices vectors.
-    pub(super) vertices: Vec<V>,
+    pub(super) vertices: (Vec<V>, Vec<V::SecondaryData>),
 
     /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
     /// in counterclockwise order, for vertices whose coloring is fully opaque (or
@@ -293,7 +293,7 @@ impl<M: MeshTypes> Default for BlockMesh<M> {
 
 impl<M> PartialEq for BlockMesh<M>
 where
-    M: MeshTypes<Vertex: PartialEq, Tile: PartialEq>,
+    M: MeshTypes<Vertex: PartialEq + Vertex<SecondaryData: PartialEq>, Tile: PartialEq>,
 {
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -344,9 +344,9 @@ impl<M: MeshTypes> Clone for BlockMesh<M> {
     }
 }
 
-impl<V> BlockFaceMesh<V> {
+impl<V: Vertex> BlockFaceMesh<V> {
     pub const EMPTY: Self = Self {
-        vertices: Vec::new(),
+        vertices: (Vec::new(), Vec::new()),
         indices_opaque: IndexVec::new(),
         indices_transparent: IndexVec::new(),
         fully_opaque: false,
@@ -355,13 +355,14 @@ impl<V> BlockFaceMesh<V> {
 
     pub fn clear(&mut self) {
         let Self {
-            vertices,
+            vertices: (v0, v1),
             indices_opaque,
             indices_transparent,
             fully_opaque,
             bounding_box,
         } = self;
-        vertices.clear();
+        v0.clear();
+        v1.clear();
         indices_opaque.clear();
         indices_transparent.clear();
         *fully_opaque = false;
@@ -369,7 +370,7 @@ impl<V> BlockFaceMesh<V> {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.vertices.is_empty()
+        self.vertices.0.is_empty()
     }
 
     /// Bounding box of this mesh’s vertices.
@@ -385,8 +386,10 @@ impl<V: Vertex> BlockFaceMesh<V> {
     fn consistency_check(&self) {
         // TODO: check vertex/index consistency like SpaceMesh does
 
+        assert_eq!(self.vertices.0.len(), self.vertices.1.len());
+
         let mut bounding_box: Option<Aab> = None;
-        for vertex in self.vertices.iter() {
+        for vertex in self.vertices.0.iter() {
             let position = vertex
                 .position()
                 .map(|coord| num_traits::ToPrimitive::to_f64(&coord).unwrap());
@@ -403,7 +406,7 @@ impl<V: Vertex> BlockFaceMesh<V> {
     }
 }
 
-impl<V> Default for BlockFaceMesh<V> {
+impl<V: Vertex> Default for BlockFaceMesh<V> {
     fn default() -> Self {
         Self::EMPTY
     }

@@ -27,7 +27,7 @@ use crate::{MeshTypes, VPos};
 /// The type parameter `M` allows generating meshes suitable for the target graphics API by
 /// providing a suitable implementation of [`MeshTypes`].
 pub struct SpaceMesh<M: MeshTypes> {
-    vertices: Vec<M::Vertex>,
+    vertices: (Vec<M::Vertex>, Vec<<M::Vertex as Vertex>::SecondaryData>),
     indices: IndexVec,
 
     meta: MeshMeta<M>,
@@ -56,11 +56,14 @@ impl<M: MeshTypes> SpaceMesh<M> {
         this
     }
 
-    /// The vertices of the mesh, in an arbitrary order. Use [`indices()`](`Self::indices`)
-    /// and the [`MeshMeta`] range methods to determine how to use them.
+    /// The data of the vertices of the mesh, in an arbitrary order in two “columns”.
+    /// It is up to the [`Vertex`] type to decide what data appears in each column.
+    ///
+    /// Use [`indices()`](`Self::indices`) and the [`MeshMeta`] range methods to determine how to
+    /// use them.
     #[inline]
-    pub fn vertices(&self) -> &[M::Vertex] {
-        &self.vertices
+    pub fn vertices(&self) -> (&[M::Vertex], &[<M::Vertex as Vertex>::SecondaryData]) {
+        (&self.vertices.0, &self.vertices.1)
     }
 
     /// The indices of the mesh. Each consecutive three numbers denote a triangle
@@ -107,6 +110,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
 
     #[allow(dead_code, reason = "used conditionally")]
     fn consistency_check(&self) {
+        assert_eq!(self.vertices.0.len(), self.vertices.1.len());
         assert_eq!(self.opaque_range().start, 0);
         let len_transparent = self.transparent_range(DepthOrdering::Any).len();
         for &rot in &GridRotation::ALL {
@@ -120,11 +124,11 @@ impl<M: MeshTypes> SpaceMesh<M> {
         assert_eq!(self.opaque_range().end % 3, 0);
         assert_eq!(self.indices().len() % 3, 0);
         for index in self.indices().iter_u32() {
-            assert!(index < self.vertices.len() as u32);
+            assert!(index < self.vertices.0.len() as u32);
         }
 
         let mut bounding_box: Option<Aab> = None;
-        for vertex in self.vertices() {
+        for vertex in &self.vertices.0 {
             let position = vertex
                 .position()
                 .map(|coord| num_traits::ToPrimitive::to_f64(&coord).unwrap());
@@ -144,7 +148,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// [`SpaceMesh`] value and all its owned objects.
     pub fn total_byte_size(&self) -> usize {
         let SpaceMesh {
-            vertices,
+            vertices: (v0, v1),
             indices,
             meta:
                 MeshMeta {
@@ -158,7 +162,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
         } = self;
 
         size_of::<Self>()
-            + vertices.capacity() * size_of::<M::Vertex>()
+            + v0.capacity() * size_of::<M::Vertex>()
+            + v1.capacity() * size_of::<<M::Vertex as Vertex>::SecondaryData>()
             + indices.capacity_bytes()
             + block_indices_used.capacity() / 8
             + textures_used.capacity() * size_of::<M::Tile>()
@@ -230,11 +235,20 @@ impl<M: MeshTypes> SpaceMesh<M> {
     ) where
         P: GetBlockMesh<'p, M>,
     {
-        // use the buffer but not the existing data
-        self.vertices.clear();
-        self.indices.clear();
-        self.meta.clear();
-        self.block_indices_used.clear();
+        // Clear storage so allocations are reused but nothing else is
+        {
+            let Self {
+                vertices: (v0, v1),
+                indices,
+                meta,
+                block_indices_used,
+            } = self;
+            v0.clear();
+            v1.clear();
+            indices.clear();
+            meta.clear();
+            block_indices_used.clear();
+        }
 
         // Use temporary buffer for positioning the transparent indices
         // TODO: Consider reuse
@@ -359,7 +373,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 .iter()
                 .map(|&indices| QuadWithMid {
                     indices,
-                    midpoint: Self::midpoint(&self.vertices, indices),
+                    midpoint: Self::midpoint(&self.vertices.0, indices),
                 })
                 .collect();
 
@@ -429,13 +443,13 @@ impl<M: MeshTypes> SpaceMesh<M> {
         }
 
         // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
-        let vertices = &self.vertices; // borrow for closure
+        let positions = &self.vertices.0; // borrow for closure
         match &mut self.indices {
             IndexVec::U16(vec) => {
                 bytemuck::cast_slice_mut::<u16, [u16; 6]>(&mut vec[range]).sort_unstable_by_key(
                     |indices| {
                         -OrderedFloat(
-                            (view_position - Self::midpoint(vertices, *indices)).square_length(),
+                            (view_position - Self::midpoint(positions, *indices)).square_length(),
                         )
                     },
                 );
@@ -444,7 +458,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 bytemuck::cast_slice_mut::<u32, [u32; 6]>(&mut vec[range]).sort_unstable_by_key(
                     |indices| {
                         -OrderedFloat(
-                            (view_position - Self::midpoint(vertices, *indices)).square_length(),
+                            (view_position - Self::midpoint(positions, *indices)).square_length(),
                         )
                     },
                 );
@@ -531,10 +545,11 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 /// * `neighbor_is_fully_opaque` is called to determine whether this block's faces are
 ///   obscured. It is a function so that lookups can be skipped if their answer would
 ///   make no difference.
+#[allow(clippy::too_many_arguments)]
 fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     block_mesh: &BlockMesh<M>,
     translation: Cube,
-    vertices: &mut Vec<M::Vertex>,
+    vertices: &mut (Vec<M::Vertex>, Vec<<M::Vertex as Vertex>::SecondaryData>),
     opaque_indices: &mut IndexVec,
     transparent_indices: &mut IndexVec,
     bounding_box: &mut Option<Aab>,
@@ -560,12 +575,13 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         }
 
         // Copy vertices, offset to the block position
-        let index_offset_usize = vertices.len();
+        let index_offset_usize = vertices.0.len();
         let index_offset: u32 = index_offset_usize
             .try_into()
             .expect("vertex index overflow");
-        vertices.extend(face_mesh.vertices.iter());
-        for vertex in &mut vertices[index_offset_usize..] {
+        vertices.0.extend(face_mesh.vertices.0.iter());
+        vertices.1.extend(face_mesh.vertices.1.iter());
+        for vertex in &mut vertices.0[index_offset_usize..] {
             vertex.instantiate_vertex(inst);
         }
         opaque_indices.extend(
@@ -600,7 +616,7 @@ impl<M: MeshTypes> Default for SpaceMesh<M> {
     #[inline]
     fn default() -> Self {
         Self {
-            vertices: Vec::new(),
+            vertices: Default::default(),
             indices: IndexVec::new(),
             meta: MeshMeta::default(),
             block_indices_used: BitVec::new(),
@@ -618,12 +634,15 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
         let mut block_indices_used = BitVec::new();
         block_indices_used.push(true);
 
+        let vertex_count = block_mesh
+            .all_face_meshes()
+            .map(|(_, fm)| fm.vertices.0.len())
+            .sum();
+
         let mut space_mesh = Self {
-            vertices: Vec::with_capacity(
-                block_mesh
-                    .all_face_meshes()
-                    .map(|(_, fm)| fm.vertices.len())
-                    .sum(),
+            vertices: (
+                Vec::with_capacity(vertex_count),
+                Vec::with_capacity(vertex_count),
             ),
             indices: IndexVec::with_capacity(
                 block_mesh
@@ -1053,7 +1072,7 @@ mod tests {
     fn default_is_empty() {
         let mesh = TestMesh::default();
         assert!(mesh.is_empty());
-        assert_eq!(mesh.vertices(), &[]);
+        assert_eq!(mesh.vertices(), (&[][..], &[][..]));
         assert_eq!(mesh.indices(), IndexSlice::U16(&[]));
         assert_eq!(mesh.count_indices(), 0);
         assert_eq!(dbg!(mesh.total_byte_size()), size_of::<TestMesh>());
@@ -1068,7 +1087,7 @@ mod tests {
 
         assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
 
-        let expected_data_size = size_of_val::<[BlockVertex<TexPoint>]>(mesh.vertices())
+        let expected_data_size = size_of_val::<[BlockVertex<TexPoint>]>(mesh.vertices().0)
             + mesh.indices().as_bytes().len();
 
         let actual_size = dbg!(mesh.total_byte_size());

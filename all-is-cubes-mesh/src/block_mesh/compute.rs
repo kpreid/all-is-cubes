@@ -208,7 +208,7 @@ fn push_box<M: MeshTypes>(
             & (depth == 0)
             & (lower_bounds == point2(0, 0))
             & (upper_bounds == Point2D::splat(resolution.into()));
-        face_mesh.vertices.reserve_exact(4);
+        reserve_vertices(&mut face_mesh.vertices, 4);
 
         let plane: <M::Tile as texture::Tile>::Plane;
         push_quad(
@@ -254,7 +254,7 @@ fn push_full_box<M: MeshTypes>(
     let fully_opaque = opacity_category == OpacityCategory::Opaque;
     for (face, face_mesh) in output.face_vertices.iter_mut() {
         if opacity_category != OpacityCategory::Invisible {
-            face_mesh.vertices.reserve_exact(4);
+            reserve_vertices(&mut face_mesh.vertices, 4);
             push_quad(
                 &mut face_mesh.vertices,
                 if fully_opaque {
@@ -543,4 +543,9 @@ fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOption
     let mut evoxel = *voxels.get(cube).unwrap_or(&Evoxel::AIR);
     evoxel.color = options.transparency.limit_alpha(evoxel.color);
     evoxel
+}
+
+fn reserve_vertices<T, U>((v0, v1): &mut (Vec<T>, Vec<U>), n: usize) {
+    v0.reserve_exact(n);
+    v1.reserve_exact(n);
 }

@@ -103,6 +103,7 @@ impl WgpuBlockVertex {
 
 impl Vertex for WgpuBlockVertex {
     const WANTS_DEPTH_SORTING: bool = true;
+    type SecondaryData = (); // TODO: take advantage of secondary data
     /// TODO: no reason this should be f32 other than scaling to fractional integers.
     /// The depth sorting system should be made more flexible here.
     type Coordinate = f32;
@@ -112,7 +113,7 @@ impl Vertex for WgpuBlockVertex {
     type TexPoint = TexPoint;
 
     #[inline]
-    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> Self {
+    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> (Self, ()) {
         let position_in_cube_fixed: Point3D<u32, CubeFix128> = vertex
             .position
             .map(|coord| (coord * 128.) as u32)
@@ -130,31 +131,37 @@ impl Vertex for WgpuBlockVertex {
                 // Clamp out-of-range alpha values so they fit into the
                 // VertexColorOrTexture protocol (not less than zero).
                 color_attribute[3] = color_attribute[3].clamp(0., 1.);
-                Self {
-                    cube_packed,
-                    position_in_cube_and_normal_and_resolution_packed:
-                        position_in_cube_and_normal_packed,
-                    color_or_texture: color_attribute,
-                    clamp_min_max: [0, 0, 0],
-                }
+                (
+                    Self {
+                        cube_packed,
+                        position_in_cube_and_normal_and_resolution_packed:
+                            position_in_cube_and_normal_packed,
+                        color_or_texture: color_attribute,
+                        clamp_min_max: [0, 0, 0],
+                    },
+                    (),
+                )
             }
             Coloring::Texture {
                 pos: TexPoint { tc, atlas_id },
                 clamp_min,
                 clamp_max,
                 resolution,
-            } => Self {
-                cube_packed,
-                position_in_cube_and_normal_and_resolution_packed:
-                    position_in_cube_and_normal_packed | (u32::from(resolution.log2()) << 28),
-                color_or_texture: [
-                    tc.x.into(),
-                    tc.y.into(),
-                    tc.z.into(),
-                    -1.0 - f32::from(atlas_id),
-                ],
-                clamp_min_max: clamp_min.tc.zip(clamp_max.tc, FixTexCoord::pack).into(),
-            },
+            } => (
+                Self {
+                    cube_packed,
+                    position_in_cube_and_normal_and_resolution_packed:
+                        position_in_cube_and_normal_packed | (u32::from(resolution.log2()) << 28),
+                    color_or_texture: [
+                        tc.x.into(),
+                        tc.y.into(),
+                        tc.z.into(),
+                        -1.0 - f32::from(atlas_id),
+                    ],
+                    clamp_min_max: clamp_min.tc.zip(clamp_max.tc, FixTexCoord::pack).into(),
+                },
+                (),
+            ),
         }
     }
 
@@ -347,7 +354,8 @@ mod tests {
             position: Point3D::new(0.25, 0.0, 1.0),
             face: Face6::PX,
             coloring: Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
-        });
+        })
+        .0;
         vertex.instantiate_vertex(WgpuBlockVertex::instantiate_block(Cube::new(100, 50, 7)));
         assert_eq!(Vertex::position(&vertex), Point3D::new(100.25, 50.0, 8.0));
     }

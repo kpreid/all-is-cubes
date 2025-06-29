@@ -277,7 +277,7 @@ fn graphics_options_change() {
     tester.camera.set_options(options.clone());
 
     let mut vertices = None;
-    tester.update(|u| vertices = Some(u.mesh.vertices().len()));
+    tester.update(|u| vertices = Some(u.mesh.vertices().0.len()));
     assert_eq!(vertices, Some(24));
 
     // Change options so that the mesh should disappear
@@ -285,7 +285,7 @@ fn graphics_options_change() {
     tester.camera.set_options(options);
 
     vertices = None;
-    tester.update(|u| vertices = Some(u.mesh.vertices().len()));
+    tester.update(|u| vertices = Some(u.mesh.vertices().0.len()));
     assert_eq!(vertices, Some(0));
 }
 

@@ -108,13 +108,14 @@ fn excludes_hidden_faces_of_blocks() {
         Vec::<&BlockVertex<TexPoint>>::new(),
         space_mesh
             .vertices()
+            .0
             .iter()
             .filter(|vertex| (vertex.position - Point3D::new(1., 1., 1.)).square_length() < 0.99)
             .collect::<Vec<&BlockVertex<TexPoint>>>(),
         "found an interior point"
     );
     assert_eq!(
-        space_mesh.vertices().len(),
+        space_mesh.vertices().0.len(),
         4 /* vertices per face */
         * 4 /* block faces per exterior side of space */
         * 6, /* sides of space */
@@ -198,7 +199,7 @@ fn animated_atom_uses_texture() {
 
     assert_eq!(allocator.count_allocated(), 1);
     assert_eq!(
-        mesh.vertices()[0].coloring,
+        mesh.vertices().0[0].coloring,
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
             clamp_min: point3(0.5, 0.5, 0.5),
@@ -230,7 +231,7 @@ fn animated_voxels_uses_texture() {
 
     assert_eq!(allocator.count_allocated(), 1);
     assert_eq!(
-        mesh.vertices()[0].coloring,
+        mesh.vertices().0[0].coloring,
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
             clamp_min: point3(0.5, 0.5, 0.5),
@@ -259,7 +260,7 @@ fn emissive_atom_uses_texture() {
 
     assert_eq!(allocator.count_allocated(), 1);
     assert_eq!(
-        mesh.vertices()[0].coloring,
+        mesh.vertices().0[0].coloring,
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
             clamp_min: point3(0.5, 0.5, 0.5),
@@ -288,7 +289,7 @@ fn emissive_only_atom() {
     assert!(!space_mesh.is_empty());
     assert_eq!(allocator.count_allocated(), 1);
     assert_eq!(
-        space_mesh.vertices()[0].coloring,
+        space_mesh.vertices().0[0].coloring,
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
             clamp_min: point3(0.5, 0.5, 0.5),
@@ -361,10 +362,10 @@ fn space_mesh_equals_block_mesh() {
 
     // Compare the contents of the space mesh and block mesh.
     assert_eq!(
-        space_rendered.vertices().to_vec(),
+        space_rendered.vertices().0.to_vec(),
         block_meshes[0]
             .all_face_meshes()
-            .flat_map(|(_, face_mesh)| face_mesh.vertices.clone().into_iter())
+            .flat_map(|(_, face_mesh)| face_mesh.vertices.0.clone().into_iter())
             .collect::<Vec<_>>()
     );
     assert_eq!(tex.count_allocated(), 1); // for striped faces
@@ -419,7 +420,7 @@ fn shrunken_box_has_no_extras() {
 
     assert_eq!(tex.count_allocated(), 1);
     assert_eq!(
-        space_rendered.vertices().iter().map(|&v| v.remove_clamps()).collect::<Vec<_>>(),
+        space_rendered.vertices().0.iter().map(|&v| v.remove_clamps()).collect::<Vec<_>>(),
         vec![
             v_t([0.250, 0.250, 0.250], NX, resolution, [2.5, 2.0, 2.0]),
             v_t([0.250, 0.250, 0.750], NX, resolution, [2.5, 2.0, 6.0]),
@@ -487,7 +488,7 @@ fn shrunken_box_uniform_color() {
 
     assert_eq!(tex.count_allocated(), 0, "should have no texture");
     assert_eq!(
-        space_rendered.vertices().to_vec(),
+        space_rendered.vertices().0.to_vec(),
         vec![
             v_c([0.250, 0.250, 0.250], NX, [0.0, 1.0, 0.5, 1.0]),
             v_c([0.250, 0.250, 0.750], NX, [0.0, 1.0, 0.5, 1.0]),
@@ -677,7 +678,7 @@ fn transparency_split() {
 
     let (_, _, space_rendered) = mesh_blocks_and_space(&space);
     // 2 cubes...
-    assert_eq!(space_rendered.vertices().len(), 6 * 4 * 2);
+    assert_eq!(space_rendered.vertices().0.len(), 6 * 4 * 2);
     // ...one of which is opaque...
     assert_eq!(space_rendered.opaque_range().len(), 6 * 6);
     // ...and one of which is transparent
@@ -732,7 +733,7 @@ fn handling_allocation_failure() {
 
     // Check the color of the produced mesh. (Easier to do with SpaceMesh.)
     let allowed_colors = [atom1.color(), atom2.color(), block_derived_color];
-    for vertex in space_mesh.vertices() {
+    for vertex in space_mesh.vertices().0 {
         match vertex.coloring {
             Coloring::Solid(c) if allowed_colors.contains(&c) => { /* OK */ }
             Coloring::Solid(c) => {
@@ -748,7 +749,7 @@ fn space_mesh_empty() {
     let t = SpaceMesh::<TextureMt>::default();
     assert!(t.is_empty());
     assert_eq!(t.flaws(), Flaws::empty());
-    assert_eq!(t.vertices(), &[]);
+    assert_eq!(t.vertices(), (&[][..], &[][..]));
     assert_eq!(t.indices(), IndexSlice::U16(&[]));
 }
 
@@ -802,7 +803,7 @@ fn texture_clamp_coordinate_ordering() {
     let [block] = make_some_voxel_blocks(&mut universe);
     let mesh = test_block_mesh(&universe, block);
     for (face, face_mesh) in mesh.all_face_meshes() {
-        for vertex in face_mesh.vertices.iter() {
+        for vertex in face_mesh.vertices.0.iter() {
             let mut had_any_textured = false;
             match vertex.coloring {
                 Coloring::Solid(_) => {}
@@ -862,11 +863,11 @@ fn texture_coordinates_for_volumetric() {
     for (face, face_mesh) in mesh.all_face_meshes() {
         eprintln!("Checking {face:?}...");
         if face == Face7::Within {
-            assert_eq!(face_mesh.vertices.len(), 0);
+            assert_eq!(face_mesh.vertices.0.len(), 0);
         } else {
-            assert_eq!(face_mesh.vertices.len(), 4);
+            assert_eq!(face_mesh.vertices.0.len(), 4);
         }
-        for (i, vertex) in face_mesh.vertices.iter().enumerate() {
+        for (i, vertex) in face_mesh.vertices.0.iter().enumerate() {
             let Coloring::Texture {
                 pos,
                 clamp_min,

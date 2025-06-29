@@ -30,7 +30,7 @@ where
         return None;
     }
 
-    let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(mesh.vertices());
+    let vertex_bytes = bytemuck::must_cast_slice::<GltfVertex, u8>(mesh.vertices().0);
     let index_type = match mesh.indices() {
         IndexSlice::U16(_) => gltf_json::accessor::ComponentType::U16,
         IndexSlice::U32(_) => gltf_json::accessor::ComponentType::U32,
@@ -93,7 +93,7 @@ where
                 format!("{name} position"),
                 vertex_buffer_view,
                 offset_of!(GltfVertex, position),
-                mesh.vertices().iter().map(|v| v.position.map(f32::from)),
+                mesh.vertices().0.iter().map(|v| v.position.map(f32::from)),
             )),
         ),
         (
@@ -102,7 +102,10 @@ where
                 format!("{name} base color"),
                 vertex_buffer_view,
                 offset_of!(GltfVertex, base_color),
-                mesh.vertices().iter().map(|v| v.base_color.map(f32::from)),
+                mesh.vertices()
+                    .0
+                    .iter()
+                    .map(|v| v.base_color.map(f32::from)),
             )),
         ),
         (
@@ -112,6 +115,7 @@ where
                 vertex_buffer_view,
                 offset_of!(GltfVertex, base_color_tc),
                 mesh.vertices()
+                    .0
                     .iter()
                     .map(|v| v.base_color_tc.map(f32::from)),
             )),

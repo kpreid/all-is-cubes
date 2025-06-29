@@ -1032,8 +1032,8 @@ fn update_chunk_buffers(
         return;
     }
 
-    let new_vertices_data: &[u8] =
-        bytemuck::must_cast_slice::<WgpuBlockVertex, u8>(update.mesh.vertices());
+    let new_vertices: (&[WgpuBlockVertex], &[()]) = update.mesh.vertices();
+    let new_vertices_data: &[u8] = bytemuck::must_cast_slice::<WgpuBlockVertex, u8>(new_vertices.0);
     let new_indices: IndexSlice<'_> = update.mesh.indices();
 
     let mesh_id = &update.mesh_id;

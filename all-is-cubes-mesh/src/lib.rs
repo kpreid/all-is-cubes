@@ -121,8 +121,10 @@ impl MeshOptions {
 /// around separately.
 pub trait MeshTypes: 'static {
     /// Mesh vertex type.
-    type Vertex: Vertex<TexPoint = <Self::Alloc as texture::Allocator>::Point>
-        + fmt::Debug
+    type Vertex: Vertex<
+            TexPoint = <Self::Alloc as texture::Allocator>::Point,
+            SecondaryData: fmt::Debug + PartialEq + Send + Sync + 'static,
+        > + fmt::Debug
         + PartialEq
         + Send
         + Sync

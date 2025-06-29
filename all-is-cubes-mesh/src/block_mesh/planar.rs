@@ -234,10 +234,13 @@ impl<T> Clone for QuadColoring<'_, T> {
 /// Compute vertices for a quad and push them into the supplied vectors.
 ///
 /// `depth`, `low_corner`, and `high_corner` are in units of 1 texel.
+///
+/// The caller should call [`Vec::reserve()`] so as to reserve space for at least the 4 vertices
+/// pushed.
 #[inline]
 #[expect(clippy::too_many_arguments)] // TODO: Figure out how to simplify
 pub(super) fn push_quad<V, Tex>(
-    vertices: &mut Vec<V>,
+    vertices: &mut (Vec<V>, Vec<V::SecondaryData>),
     indices: &mut IndexVec,
     transform: &QuadTransform,
     depth: FreeCoordinate,
@@ -250,7 +253,7 @@ pub(super) fn push_quad<V, Tex>(
     V: crate::Vertex<TexPoint = Tex::Point>,
     Tex: texture::Plane,
 {
-    let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
+    let index_origin: u32 = vertices.0.len().try_into().expect("vertex index overflow");
     let half_texel = 0.5;
     let face = transform.face;
 
@@ -279,20 +282,23 @@ pub(super) fn push_quad<V, Tex>(
     match coloring {
         QuadColoring::Solid(color) => {
             // Performance note: not using array::map() because, by benchmark, that's slower.
-            vertices.extend(position_iter.map(|voxel_grid_point| -> V {
-                let position = transform.transform_position(voxel_grid_point);
+            push_quad_from_iter(
+                vertices,
+                position_iter.map(|voxel_grid_point| {
+                    let position = transform.transform_position(voxel_grid_point);
 
-                *bounding_box = Some(match *bounding_box {
-                    None => Aab::from_lower_upper(position, position),
-                    Some(aab) => aab.union_point(position),
-                });
+                    *bounding_box = Some(match *bounding_box {
+                        None => Aab::from_lower_upper(position, position),
+                        Some(aab) => aab.union_point(position),
+                    });
 
-                V::from_block_vertex(BlockVertex {
-                    position,
-                    face,
-                    coloring: Coloring::Solid(color),
-                })
-            }));
+                    V::from_block_vertex(BlockVertex {
+                        position,
+                        face,
+                        coloring: Coloring::Solid(color),
+                    })
+                }),
+            );
         }
         QuadColoring::Texture(plane) => {
             let (clamp_min, clamp_max) = transform_clamp_box(
@@ -310,31 +316,34 @@ pub(super) fn push_quad<V, Tex>(
                 ),
             );
 
-            vertices.extend(position_iter.map(|voxel_grid_point| {
-                let position = transform.transform_position(voxel_grid_point);
+            push_quad_from_iter(
+                vertices,
+                position_iter.map(|voxel_grid_point| {
+                    let position = transform.transform_position(voxel_grid_point);
 
-                *bounding_box = Some(match *bounding_box {
-                    None => Aab::from_lower_upper(position, position),
-                    Some(aab) => aab.union_point(position),
-                });
+                    *bounding_box = Some(match *bounding_box {
+                        None => Aab::from_lower_upper(position, position),
+                        Some(aab) => aab.union_point(position),
+                    });
 
-                V::from_block_vertex(BlockVertex {
-                    position,
-                    face,
-                    coloring: Coloring::Texture {
-                        pos: plane.grid_to_texcoord(
-                            transform.transform_texture_point(
-                                (voxel_grid_point + vec3(0., 0., 0.5))
-                                    .map(|s| s as TextureCoordinate)
-                                    .cast_unit(),
+                    V::from_block_vertex(BlockVertex {
+                        position,
+                        face,
+                        coloring: Coloring::Texture {
+                            pos: plane.grid_to_texcoord(
+                                transform.transform_texture_point(
+                                    (voxel_grid_point + vec3(0., 0., 0.5))
+                                        .map(|s| s as TextureCoordinate)
+                                        .cast_unit(),
+                                ),
                             ),
-                        ),
-                        clamp_min,
-                        clamp_max,
-                        resolution: transform.resolution,
-                    },
-                })
-            }));
+                            clamp_min,
+                            clamp_max,
+                            resolution: transform.resolution,
+                        },
+                    })
+                }),
+            );
         }
         QuadColoring::Volume { plane, far_depth } => {
             let (clamp_min, clamp_max) = transform_clamp_box(
@@ -355,31 +364,44 @@ pub(super) fn push_quad<V, Tex>(
             );
 
             // TODO: deduplicate this code
-            vertices.extend(position_iter.map(|voxel_grid_point| {
-                let position = transform.transform_position(voxel_grid_point);
+            push_quad_from_iter(
+                vertices,
+                position_iter.map(|voxel_grid_point| {
+                    let position = transform.transform_position(voxel_grid_point);
 
-                *bounding_box = Some(match *bounding_box {
-                    None => Aab::from_lower_upper(position, position),
-                    Some(aab) => aab.union_point(position),
-                });
+                    *bounding_box = Some(match *bounding_box {
+                        None => Aab::from_lower_upper(position, position),
+                        Some(aab) => aab.union_point(position),
+                    });
 
-                V::from_block_vertex(BlockVertex {
-                    position,
-                    face,
-                    coloring: Coloring::Texture {
-                        pos: plane.grid_to_texcoord(transform.transform_texture_point(
-                            voxel_grid_point.map(|s| s as TextureCoordinate).cast_unit(),
-                        )),
-                        clamp_min,
-                        clamp_max,
-                        resolution: transform.resolution,
-                    },
-                })
-            }));
+                    V::from_block_vertex(BlockVertex {
+                        position,
+                        face,
+                        coloring: Coloring::Texture {
+                            pos: plane.grid_to_texcoord(transform.transform_texture_point(
+                                voxel_grid_point.map(|s| s as TextureCoordinate).cast_unit(),
+                            )),
+                            clamp_min,
+                            clamp_max,
+                            resolution: transform.resolution,
+                        },
+                    })
+                }),
+            );
         }
     }
 
     indices.extend(QUAD_INDICES.iter().map(|&i| index_origin + i));
+}
+
+fn push_quad_from_iter<V: crate::Vertex>(
+    output: &mut (Vec<V>, Vec<V::SecondaryData>),
+    input: impl Iterator<Item = (V, V::SecondaryData)>,
+) {
+    for (v0, v1) in input {
+        output.0.push(v0);
+        output.1.push(v1);
+    }
 }
 
 fn transform_clamp_box<Tex: texture::Plane>(

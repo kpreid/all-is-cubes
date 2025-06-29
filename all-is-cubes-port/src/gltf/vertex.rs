@@ -31,6 +31,7 @@ pub struct GltfVertex {
 
 impl Vertex for GltfVertex {
     const WANTS_DEPTH_SORTING: bool = false;
+    type SecondaryData = ();
     type Coordinate = f32;
     type BlockInst = Vector3D<f32, Cube>;
     type TexPoint = GltfAtlasPoint;
@@ -50,16 +51,19 @@ impl Vertex for GltfVertex {
         Point3D::<Lef32, _>::from(self.position).map(f32::from)
     }
 
-    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> Self {
+    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> (Self, Self::SecondaryData) {
         let position = Lef32::from_vec3(vertex.position.to_f32().to_vector());
         match vertex.coloring {
             Coloring::Solid(color) => {
-                Self {
-                    position,
-                    base_color: <[f32; 4]>::from(color.clamp()).map(Lef32::from),
-                    // TODO: We need to ensure that the texture, if present, has white allocated here.
-                    base_color_tc: [Lef32::ZERO; 2],
-                }
+                (
+                    Self {
+                        position,
+                        base_color: <[f32; 4]>::from(color.clamp()).map(Lef32::from),
+                        // TODO: We need to ensure that the texture, if present, has white allocated here.
+                        base_color_tc: [Lef32::ZERO; 2],
+                    },
+                    (),
+                )
             }
             Coloring::Texture {
                 pos: tc,
@@ -84,11 +88,14 @@ impl Vertex for GltfVertex {
                     Lef32::from(-1.0),
                 ];
 
-                Self {
-                    position,
-                    base_color,
-                    base_color_tc: Into::<[f32; 2]>::into(point_within).map(Lef32::from),
-                }
+                (
+                    Self {
+                        position,
+                        base_color,
+                        base_color_tc: Into::<[f32; 2]>::into(point_within).map(Lef32::from),
+                    },
+                    (),
+                )
             }
         }
     }

@@ -157,17 +157,20 @@ where
                 position: point3(0., 0., 0.),
                 face: Face6::PZ,
                 coloring: Coloring::Solid(Rgba::WHITE),
-            }),
+            })
+            .0,
             WgpuBlockVertex::from_block_vertex(BlockVertex {
                 position: point3(1., 0., 0.),
                 face: Face6::PZ,
                 coloring: Coloring::Solid(Rgba::WHITE),
-            }),
+            })
+            .0,
             WgpuBlockVertex::from_block_vertex(BlockVertex {
                 position: point3(0., 1., 0.),
                 face: Face6::PZ,
                 coloring: Coloring::Solid(Rgba::WHITE),
-            }),
+            })
+            .0,
         ]),
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
     });

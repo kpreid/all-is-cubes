@@ -145,6 +145,20 @@ pub trait Vertex: Copy + Sized + 'static {
     /// [`MeshOptions`]: crate::MeshOptions
     const WANTS_DEPTH_SORTING: bool;
 
+    /// Additional data making up this vertex.
+    ///
+    /// This data will be stored in a second vector.
+    /// If none is necessary, use [`()`] for this type.
+    ///
+    /// The data needed to implement [`Vertex::position()`] and [`Vertex::instantiate_vertex()`]
+    /// *must* be stored in `Self`,
+    /// but other data not affecting the position can be placed in `SecondaryData`.
+    ///
+    /// This may be useful for improving memory locality during rasterization by
+    /// storing positions more densely and avoiding loading non-position data
+    /// for culled vertices..
+    type SecondaryData: Copy + Sized + 'static;
+
     /// Number type for the vertex position coordinates.
     type Coordinate: num_traits::float::FloatCore;
 
@@ -159,7 +173,7 @@ pub trait Vertex: Copy + Sized + 'static {
     ///
     /// In use, the [`BlockVertex`]es are constructed by the [`BlockMesh`] algorithm and
     /// then immediately passed to this function (never stored).
-    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> Self;
+    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> (Self, Self::SecondaryData);
 
     /// Prepare the information needed by [`Self::instantiate_vertex()`] for one block.
     /// Currently, this constitutes the location of that block, and hence this function
@@ -181,12 +195,13 @@ pub trait Vertex: Copy + Sized + 'static {
 /// Trivial implementation of [`Vertex`] for testing purposes. Discards lighting.
 impl<T: Copy + 'static> Vertex for BlockVertex<T> {
     const WANTS_DEPTH_SORTING: bool = true;
+    type SecondaryData = ();
     type Coordinate = FreeCoordinate;
     type TexPoint = T;
     type BlockInst = FreeVector;
 
-    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> Self {
-        vertex
+    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> (Self, ()) {
+        (vertex, ())
     }
 
     fn position(&self) -> FreePoint {

@@ -29,8 +29,10 @@ const CHUNK_SIZE: GridCoordinate = 32;
 
 /// Vertex type for mesh generation.
 ///
-/// [`all_is_cubes_mesh`] doesn't currently support multi-buffer / struct-of-arrays output,
+/// [`all_is_cubes_mesh`] doesn't currently support full struct-of-arrays output,
 /// so we have to make this and then split it apart.
+///
+/// TODO: Use the `SecondaryData` field to do *some* splitting
 #[derive(Copy, Clone, Debug, PartialEq)]
 struct Vertex {
     position: rg::components::Position3D,
@@ -40,18 +42,24 @@ struct Vertex {
 
 impl mesh::Vertex for Vertex {
     const WANTS_DEPTH_SORTING: bool = false;
+    type SecondaryData = ();
     type Coordinate = f32;
     type TexPoint = NoTexture;
     type BlockInst = Vector3D<f32, Cube>;
 
-    fn from_block_vertex(v: all_is_cubes_mesh::BlockVertex<Self::TexPoint>) -> Self {
-        Self {
-            position: v.position.to_f32().to_array().into(),
-            color: match v.coloring {
-                mesh::Coloring::Solid(color) => color.to_srgb8().into(),
+    fn from_block_vertex(
+        v: all_is_cubes_mesh::BlockVertex<Self::TexPoint>,
+    ) -> (Self, Self::SecondaryData) {
+        (
+            Self {
+                position: v.position.to_f32().to_array().into(),
+                color: match v.coloring {
+                    mesh::Coloring::Solid(color) => color.to_srgb8().into(),
+                },
+                face: v.face,
             },
-            face: v.face,
-        }
+            (),
+        )
     }
 
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
@@ -158,11 +166,11 @@ impl RerunMesher {
 }
 
 fn convert_to_rerun_mesh(input: &mesh::SpaceMesh<Mt>, output: &mut rg::archetypes::Mesh3D) {
-    *output = rg::archetypes::Mesh3D::new(input.vertices().iter().map(|v| v.position))
-        .with_vertex_colors(input.vertices().iter().map(|v| v.color))
+    let vertices: &[Vertex] = input.vertices().0;
+    *output = rg::archetypes::Mesh3D::new(vertices.iter().map(|v| v.position))
+        .with_vertex_colors(vertices.iter().map(|v| v.color))
         .with_vertex_normals(
-            input
-                .vertices()
+            vertices
                 .iter()
                 .map(|v| rg::convert_vec(v.face.normal_vector::<f32, ()>())),
         )

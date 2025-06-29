@@ -89,7 +89,7 @@ fn mesh_options_for_stl() -> mesh::MeshOptions {
 }
 
 fn space_mesh_to_triangles(mesh: &mesh::SpaceMesh<StlMt>) -> Vec<Triangle> {
-    let vertices = mesh.vertices();
+    let vertices = mesh.vertices().0;
     mesh.indices()
         .iter_u32()
         .tuples()
