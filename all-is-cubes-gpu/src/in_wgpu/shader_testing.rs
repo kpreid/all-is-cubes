@@ -18,7 +18,7 @@ use wgpu::util::DeviceExt as _;
 use all_is_cubes::euclid::{Rotation3D, point3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{Face6, FreeVector, GridSize, GridVector, Rgba, ps64};
-use all_is_cubes_mesh::{BlockVertex, Coloring};
+use all_is_cubes_mesh::{BlockVertex, Coloring, Vertex};
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 
 use crate::in_wgpu::shaders::Shaders;
@@ -153,17 +153,17 @@ where
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
         contents: bytemuck::bytes_of(&[
-            WgpuBlockVertex::from(BlockVertex {
+            WgpuBlockVertex::from_block_vertex(BlockVertex {
                 position: point3(0., 0., 0.),
                 face: Face6::PZ,
                 coloring: Coloring::Solid(Rgba::WHITE),
             }),
-            WgpuBlockVertex::from(BlockVertex {
+            WgpuBlockVertex::from_block_vertex(BlockVertex {
                 position: point3(1., 0., 0.),
                 face: Face6::PZ,
                 coloring: Coloring::Solid(Rgba::WHITE),
             }),
-            WgpuBlockVertex::from(BlockVertex {
+            WgpuBlockVertex::from_block_vertex(BlockVertex {
                 position: point3(0., 1., 0.),
                 face: Face6::PZ,
                 coloring: Coloring::Solid(Rgba::WHITE),

@@ -133,7 +133,7 @@ where
 ///    to become the [`SpaceMesh`]’s vertices, and [`Vertex::instantiate_vertex()`] is
 ///    called on each copy to position it at the particular block's location.
 /// 3. You obtain the vertices from the [`SpaceMesh`] to draw or export them.
-pub trait Vertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static {
+pub trait Vertex: Copy + Sized + 'static {
     /// Whether [`SpaceMesh`]es should provide pre-sorted vertex index slices to allow
     /// back-to-front drawing order based on viewing ranges.
     ///
@@ -154,6 +154,12 @@ pub trait Vertex: From<BlockVertex<Self::TexPoint>> + Copy + Sized + 'static {
     /// Type of the data carried from [`Self::instantiate_block()`] to
     /// [`Self::instantiate_vertex()`].
     type BlockInst: Copy;
+
+    /// Constructs this vertex type from [`BlockVertex`].
+    ///
+    /// In use, the [`BlockVertex`]es are constructed by the [`BlockMesh`] algorithm and
+    /// then immediately passed to this function (never stored).
+    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> Self;
 
     /// Prepare the information needed by [`Self::instantiate_vertex()`] for one block.
     /// Currently, this constitutes the location of that block, and hence this function
@@ -178,6 +184,10 @@ impl<T: Copy + 'static> Vertex for BlockVertex<T> {
     type Coordinate = FreeCoordinate;
     type TexPoint = T;
     type BlockInst = FreeVector;
+
+    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> Self {
+        vertex
+    }
 
     fn position(&self) -> FreePoint {
         self.position

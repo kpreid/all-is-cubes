@@ -236,7 +236,7 @@ impl<T> Clone for QuadColoring<'_, T> {
 /// `depth`, `low_corner`, and `high_corner` are in units of 1 texel.
 #[inline]
 #[expect(clippy::too_many_arguments)] // TODO: Figure out how to simplify
-pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
+pub(super) fn push_quad<V, Tex>(
     vertices: &mut Vec<V>,
     indices: &mut IndexVec,
     transform: &QuadTransform,
@@ -246,7 +246,10 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
     coloring: QuadColoring<'_, Tex>,
     viz: &mut Viz,
     bounding_box: &mut Option<Aab>,
-) {
+) where
+    V: crate::Vertex<TexPoint = Tex::Point>,
+    Tex: texture::Plane,
+{
     let index_origin: u32 = vertices.len().try_into().expect("vertex index overflow");
     let half_texel = 0.5;
     let face = transform.face;
@@ -284,7 +287,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                     Some(aab) => aab.union_point(position),
                 });
 
-                V::from(BlockVertex {
+                V::from_block_vertex(BlockVertex {
                     position,
                     face,
                     coloring: Coloring::Solid(color),
@@ -315,7 +318,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                     Some(aab) => aab.union_point(position),
                 });
 
-                V::from(BlockVertex {
+                V::from_block_vertex(BlockVertex {
                     position,
                     face,
                     coloring: Coloring::Texture {
@@ -360,7 +363,7 @@ pub(super) fn push_quad<V: From<BlockVertex<Tex::Point>>, Tex: texture::Plane>(
                     Some(aab) => aab.union_point(position),
                 });
 
-                V::from(BlockVertex {
+                V::from_block_vertex(BlockVertex {
                     position,
                     face,
                     coloring: Coloring::Texture {

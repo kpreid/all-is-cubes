@@ -101,9 +101,18 @@ impl WgpuBlockVertex {
     };
 }
 
-impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
+impl Vertex for WgpuBlockVertex {
+    const WANTS_DEPTH_SORTING: bool = true;
+    /// TODO: no reason this should be f32 other than scaling to fractional integers.
+    /// The depth sorting system should be made more flexible here.
+    type Coordinate = f32;
+
+    /// Packed cube coordinates
+    type BlockInst = u32;
+    type TexPoint = TexPoint;
+
     #[inline]
-    fn from(vertex: BlockVertex<TexPoint>) -> Self {
+    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> Self {
         let position_in_cube_fixed: Point3D<u32, CubeFix128> = vertex
             .position
             .map(|coord| (coord * 128.) as u32)
@@ -148,17 +157,6 @@ impl From<BlockVertex<TexPoint>> for WgpuBlockVertex {
             },
         }
     }
-}
-
-impl Vertex for WgpuBlockVertex {
-    const WANTS_DEPTH_SORTING: bool = true;
-    /// TODO: no reason this should be f32 other than scaling to fractional integers.
-    /// The depth sorting system should be made more flexible here.
-    type Coordinate = f32;
-
-    /// Packed cube coordinates
-    type BlockInst = u32;
-    type TexPoint = TexPoint;
 
     #[inline]
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
@@ -345,7 +343,7 @@ mod tests {
     /// and because it is a useful test of the outgoing coordinate processing logic too.
     #[test]
     fn block_vertex_position() {
-        let mut vertex = WgpuBlockVertex::from(BlockVertex {
+        let mut vertex = WgpuBlockVertex::from_block_vertex(BlockVertex {
             position: Point3D::new(0.25, 0.0, 1.0),
             face: Face6::PX,
             coloring: Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),

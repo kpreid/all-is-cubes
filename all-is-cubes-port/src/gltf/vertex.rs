@@ -29,9 +29,28 @@ pub struct GltfVertex {
     pub(crate) base_color_tc: [Lef32; 2],
 }
 
-impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
+impl Vertex for GltfVertex {
+    const WANTS_DEPTH_SORTING: bool = false;
+    type Coordinate = f32;
+    type BlockInst = Vector3D<f32, Cube>;
+    type TexPoint = GltfAtlasPoint;
+
     #[inline]
-    fn from(vertex: BlockVertex<GltfAtlasPoint>) -> Self {
+    fn instantiate_block(cube: Cube) -> Self::BlockInst {
+        cube.lower_bounds().to_vector().map(|s| s as f32)
+    }
+
+    #[inline]
+    fn instantiate_vertex(&mut self, cube: Self::BlockInst) {
+        self.position = Lef32::from_vec3(self.position().to_vector() + cube);
+    }
+
+    #[inline]
+    fn position(&self) -> Point3D<Self::Coordinate, Cube> {
+        Point3D::<Lef32, _>::from(self.position).map(f32::from)
+    }
+
+    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> Self {
         let position = Lef32::from_vec3(vertex.position.to_f32().to_vector());
         match vertex.coloring {
             Coloring::Solid(color) => {
@@ -72,27 +91,5 @@ impl From<BlockVertex<GltfAtlasPoint>> for GltfVertex {
                 }
             }
         }
-    }
-}
-
-impl Vertex for GltfVertex {
-    const WANTS_DEPTH_SORTING: bool = false;
-    type Coordinate = f32;
-    type BlockInst = Vector3D<f32, Cube>;
-    type TexPoint = GltfAtlasPoint;
-
-    #[inline]
-    fn instantiate_block(cube: Cube) -> Self::BlockInst {
-        cube.lower_bounds().to_vector().map(|s| s as f32)
-    }
-
-    #[inline]
-    fn instantiate_vertex(&mut self, cube: Self::BlockInst) {
-        self.position = Lef32::from_vec3(self.position().to_vector() + cube);
-    }
-
-    #[inline]
-    fn position(&self) -> Point3D<Self::Coordinate, Cube> {
-        Point3D::<Lef32, _>::from(self.position).map(f32::from)
     }
 }

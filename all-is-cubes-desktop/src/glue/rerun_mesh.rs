@@ -38,8 +38,13 @@ struct Vertex {
     face: Face6,
 }
 
-impl From<mesh::BlockVertex<NoTexture>> for Vertex {
-    fn from(v: mesh::BlockVertex<NoTexture>) -> Self {
+impl mesh::Vertex for Vertex {
+    const WANTS_DEPTH_SORTING: bool = false;
+    type Coordinate = f32;
+    type TexPoint = NoTexture;
+    type BlockInst = Vector3D<f32, Cube>;
+
+    fn from_block_vertex(v: all_is_cubes_mesh::BlockVertex<Self::TexPoint>) -> Self {
         Self {
             position: v.position.to_f32().to_array().into(),
             color: match v.coloring {
@@ -48,16 +53,6 @@ impl From<mesh::BlockVertex<NoTexture>> for Vertex {
             face: v.face,
         }
     }
-}
-
-impl mesh::Vertex for Vertex {
-    const WANTS_DEPTH_SORTING: bool = false;
-
-    type Coordinate = f32;
-
-    type TexPoint = NoTexture;
-
-    type BlockInst = Vector3D<f32, Cube>;
 
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
         cube.lower_bounds().to_f32().to_vector()
