@@ -60,7 +60,7 @@ struct WgpuMt {
 }
 
 impl all_is_cubes_mesh::MeshTypes for WgpuMt {
-    type Vertex = vertex::WgpuBlockVertex;
+    type Vertex = vertex::BPosition;
     type Alloc = AtlasAllocator;
     type Tile = block_texture::AtlasTile;
 }

@@ -8,9 +8,7 @@ use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
 use crate::in_wgpu::frame_texture::FramebufferTextures;
 use crate::in_wgpu::shaders::Shaders;
-use crate::in_wgpu::vertex::WgpuBlockVertex;
-use crate::in_wgpu::vertex::WgpuInstanceData;
-use crate::in_wgpu::vertex::WgpuLinesVertex;
+use crate::in_wgpu::vertex;
 
 /// Resources needed for rendering that aren't actually specific to any content and so
 /// don't need to be modified under normal circumstances.
@@ -207,7 +205,11 @@ impl Pipelines {
             unclipped_depth: false,
             conservative: false,
         };
-        let vertex_buffers = &[WgpuBlockVertex::LAYOUT, WgpuInstanceData::LAYOUT];
+        let block_vertex_buffers = &[
+            vertex::BPosition::LAYOUT,
+            vertex::BColor::LAYOUT,
+            vertex::WgpuInstanceData::LAYOUT,
+        ];
 
         let multisample = fb.linear_scene_multisample_state();
         #[cfg(feature = "rerun")]
@@ -217,7 +219,7 @@ impl Pipelines {
             module: shaders.blocks_and_lines.get(),
             entry_point: Some("block_vertex_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: vertex_buffers,
+            buffers: block_vertex_buffers,
         };
 
         let depth_state_for_opaque = wgpu::DepthStencilState {
@@ -434,7 +436,7 @@ impl Pipelines {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: Some("lines_vertex"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    buffers: &[WgpuLinesVertex::LAYOUT],
+                    buffers: &[vertex::WgpuLinesVertex::LAYOUT],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),
@@ -746,4 +748,12 @@ impl Pipelines {
             );
         }
     }
+}
+
+/// Not used as run-time data but used to mark code locations that use the buffer slots
+/// matching `vertex_state_for_blocks` as defined above in [`Pipelines`].
+pub(crate) enum BlockBufferSlot {
+    Position = 0,
+    Color = 1,
+    Instance = 2,
 }

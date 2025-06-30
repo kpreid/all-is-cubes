@@ -33,19 +33,17 @@ use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 use all_is_cubes_render::camera::Camera;
 use all_is_cubes_render::{Flaws, RenderError};
 
-use crate::in_wgpu::block_texture::BlockTextureViews;
-use crate::in_wgpu::glue::{MapVec, buffer_size_of, to_wgpu_index_format};
-use crate::in_wgpu::light_texture::LightChunk;
-use crate::in_wgpu::pipelines::Pipelines;
-use crate::in_wgpu::skybox;
-use crate::in_wgpu::vertex::{WgpuInstanceData, WgpuLinesVertex};
-use crate::in_wgpu::{LightTexture, WgpuMt};
-use crate::in_wgpu::{
-    block_texture::AtlasAllocator,
-    camera::ShaderSpaceCamera,
-    glue::{BeltWritingParts, ResizingBuffer, to_wgpu_index_range},
-    vertex::WgpuBlockVertex,
+use crate::in_wgpu::block_texture::{AtlasAllocator, BlockTextureViews};
+use crate::in_wgpu::camera::ShaderSpaceCamera;
+use crate::in_wgpu::glue::{
+    BeltWritingParts, MapVec, ResizingBuffer, buffer_size_of, to_wgpu_index_format,
+    to_wgpu_index_range,
 };
+use crate::in_wgpu::light_texture::LightChunk;
+use crate::in_wgpu::pipelines::{BlockBufferSlot, Pipelines};
+use crate::in_wgpu::skybox;
+use crate::in_wgpu::vertex::{self, WgpuInstanceData, WgpuLinesVertex};
+use crate::in_wgpu::{LightTexture, WgpuMt};
 use crate::{DebugLineVertex, Memo, Msw, SpaceDrawInfo, SpaceUpdateInfo};
 
 // temporarily public for a lighting kludge
@@ -110,10 +108,25 @@ pub(crate) struct SpaceRenderer {
     rerun_destination: all_is_cubes::rerun_glue::Destination,
 }
 
+/// GPU resources for each chunk of the space.
+/// This is used as the [`dynamic::DynamicMeshTypes::RenderData`] type.
 #[derive(Debug, Default)]
 pub(super) struct ChunkBuffers {
+    /// Vertex data, formatted as two arrays possibly with padding between.
     vertex_buf: ResizingBuffer,
+    /// Address within `vertex_buf` of [`vertex::BPosition`] data.
+    vertices_pos_addr: wgpu::BufferAddress,
+    /// Address within `vertex_buf` of [`vertex::BColor`] data.
+    vertices_color_addr: wgpu::BufferAddress,
+
+    /// Index data (may be either u16 or u32 according to `index_format`).
+    ///
+    /// This cannot be the same buffer as `vertex_buf` because the wgpu WebGL backend does not
+    /// permit mixing vertex and index data in the same buffer.
+    /// We could do that conditionally, but I don’t think that’s currently worth the complexity.
     index_buf: ResizingBuffer,
+
+    /// Format of `index_buf`.
     index_format: wgpu::IndexFormat,
 }
 
@@ -513,7 +526,7 @@ impl SpaceRenderer {
             flaws |= Flaws::UNFINISHED;
         }
         if let Some(buffer) = self.instance_buffer.get() {
-            render_pass.set_vertex_buffer(1, buffer.slice(..));
+            render_pass.set_vertex_buffer(BlockBufferSlot::Instance as u32, buffer.slice(..));
         } else {
             // If there's no buffer then there must also be no instances; no action needed.
         }
@@ -999,13 +1012,14 @@ pub(in crate::in_wgpu) fn create_space_bind_group(
 }
 
 fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuffers) {
+    let vertex_buffer: &'a wgpu::Buffer = buffers.vertex_buf.get().expect("missing vertex buffer");
     render_pass.set_vertex_buffer(
-        0,
-        buffers
-            .vertex_buf
-            .get()
-            .expect("missing vertex buffer")
-            .slice(..),
+        BlockBufferSlot::Position as u32,
+        vertex_buffer.slice(buffers.vertices_pos_addr..),
+    );
+    render_pass.set_vertex_buffer(
+        BlockBufferSlot::Color as u32,
+        vertex_buffer.slice(buffers.vertices_color_addr..),
     );
     render_pass.set_index_buffer(
         buffers
@@ -1032,27 +1046,35 @@ fn update_chunk_buffers(
         return;
     }
 
-    let new_vertices: (&[WgpuBlockVertex], &[()]) = update.mesh.vertices();
-    let new_vertices_data: &[u8] = bytemuck::must_cast_slice::<WgpuBlockVertex, u8>(new_vertices.0);
+    let new_vertices: (&[vertex::BPosition], &[vertex::BColor]) = update.mesh.vertices();
+    let position_data: &[u8] = bytemuck::must_cast_slice::<vertex::BPosition, u8>(new_vertices.0);
+    let color_data: &[u8] = bytemuck::must_cast_slice::<vertex::BColor, u8>(new_vertices.1);
     let new_indices: IndexSlice<'_> = update.mesh.indices();
-
     let mesh_id = &update.mesh_id;
-    let buffers = update
+
+    let ChunkBuffers {
+        vertex_buf,
+        vertices_pos_addr,
+        vertices_color_addr,
+        index_buf,
+        index_format,
+    } = &mut **update
         .render_data
         .get_or_insert_with(|| Msw::new(ChunkBuffers::default()));
-    buffers.vertex_buf.write_with_resizing(
+
+    [*vertices_pos_addr, *vertices_color_addr] = vertex_buf.write_with_resizing(
         bwp.reborrow(),
         &|| format!("{space_label} vertex {mesh_id:?}"),
         wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        [new_vertices_data],
+        [position_data, color_data],
     );
-    buffers.index_buf.write_with_resizing(
+    index_buf.write_with_resizing(
         bwp.reborrow(),
         &|| format!("{space_label} index {mesh_id:?}"),
         wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
         [new_indices.as_bytes()],
     );
-    buffers.index_format = to_wgpu_index_format(new_indices);
+    *index_format = to_wgpu_index_format(new_indices);
 }
 
 /// One or more particles derived from [`Fluff`] or similar.

@@ -40,7 +40,7 @@ pub(crate) enum CubeFix128 {}
 /// [blocks]: all_is_cubes::block::Block
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
-pub(crate) struct WgpuBlockVertex {
+pub(crate) struct BPosition {
     /// Chunk-relative position of the cube containing the triangle this vertex belongs to,
     /// packed into a u32 as `x | (y << 8) | (z << 16)`. The uppermost 8 bits are not used.
     ///
@@ -67,7 +67,11 @@ pub(crate) struct WgpuBlockVertex {
     /// * Bits 28..32 indicate the logarithm of the resolution of the texture data.
     ///   (There is an unused high bit here.)
     position_in_cube_and_normal_and_resolution_packed: u32,
+}
 
+#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub(crate) struct BColor {
     /// Packed format:
     /// * If `[3]` is in the range 0.0 to 1.0, then the attribute is a linear RGBA color.
     /// * If `[3]` is negative, then the first three components are 3D texture coordinates,
@@ -87,13 +91,23 @@ pub(crate) struct WgpuBlockVertex {
     clamp_min_max: [u32; 3],
 }
 
-impl WgpuBlockVertex {
+impl BPosition {
     pub const LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
         array_stride: size_of::<Self>() as wgpu::BufferAddress,
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &wgpu::vertex_attr_array![
             0 => Uint32, // cube_packed
             1 => Uint32, // position_in_cube_and_normal_and_resolution_packed
+            // location numbers must not clash with WgpuInstanceData
+        ],
+    };
+}
+
+impl BColor {
+    pub const LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
+        array_stride: size_of::<Self>() as wgpu::BufferAddress,
+        step_mode: wgpu::VertexStepMode::Vertex,
+        attributes: &wgpu::vertex_attr_array![
             2 => Float32x4, // color_or_texture
             3 => Uint32x3, // clamp_min_max
             // location numbers must not clash with WgpuInstanceData
@@ -101,9 +115,9 @@ impl WgpuBlockVertex {
     };
 }
 
-impl Vertex for WgpuBlockVertex {
+impl Vertex for BPosition {
     const WANTS_DEPTH_SORTING: bool = true;
-    type SecondaryData = (); // TODO: take advantage of secondary data
+    type SecondaryData = BColor;
     /// TODO: no reason this should be f32 other than scaling to fractional integers.
     /// The depth sorting system should be made more flexible here.
     type Coordinate = f32;
@@ -113,7 +127,7 @@ impl Vertex for WgpuBlockVertex {
     type TexPoint = TexPoint;
 
     #[inline]
-    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> (Self, ()) {
+    fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> (BPosition, BColor) {
         let position_in_cube_fixed: Point3D<u32, CubeFix128> = vertex
             .position
             .map(|coord| (coord * 128.) as u32)
@@ -132,14 +146,15 @@ impl Vertex for WgpuBlockVertex {
                 // VertexColorOrTexture protocol (not less than zero).
                 color_attribute[3] = color_attribute[3].clamp(0., 1.);
                 (
-                    Self {
+                    BPosition {
                         cube_packed,
                         position_in_cube_and_normal_and_resolution_packed:
                             position_in_cube_and_normal_packed,
+                    },
+                    BColor {
                         color_or_texture: color_attribute,
                         clamp_min_max: [0, 0, 0],
                     },
-                    (),
                 )
             }
             Coloring::Texture {
@@ -148,10 +163,12 @@ impl Vertex for WgpuBlockVertex {
                 clamp_max,
                 resolution,
             } => (
-                Self {
+                BPosition {
                     cube_packed,
                     position_in_cube_and_normal_and_resolution_packed:
                         position_in_cube_and_normal_packed | (u32::from(resolution.log2()) << 28),
+                },
+                BColor {
                     color_or_texture: [
                         tc.x.into(),
                         tc.y.into(),
@@ -160,7 +177,6 @@ impl Vertex for WgpuBlockVertex {
                     ],
                     clamp_min_max: clamp_min.tc.zip(clamp_max.tc, FixTexCoord::pack).into(),
                 },
-                (),
             ),
         }
     }
@@ -341,7 +357,8 @@ mod tests {
     /// the struct is designed to have a fixed layout communicating to the shader anyway.
     #[test]
     fn vertex_size() {
-        assert_eq!(size_of::<WgpuBlockVertex>(), 36);
+        assert_eq!(size_of::<BPosition>(), 8);
+        assert_eq!(size_of::<BColor>(), 28);
         assert_eq!(size_of::<WgpuLinesVertex>(), 28);
     }
 
@@ -350,13 +367,13 @@ mod tests {
     /// and because it is a useful test of the outgoing coordinate processing logic too.
     #[test]
     fn block_vertex_position() {
-        let mut vertex = WgpuBlockVertex::from_block_vertex(BlockVertex {
+        let mut vertex = BPosition::from_block_vertex(BlockVertex {
             position: Point3D::new(0.25, 0.0, 1.0),
             face: Face6::PX,
             coloring: Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
         })
         .0;
-        vertex.instantiate_vertex(WgpuBlockVertex::instantiate_block(Cube::new(100, 50, 7)));
+        vertex.instantiate_vertex(BPosition::instantiate_block(Cube::new(100, 50, 7)));
         assert_eq!(Vertex::position(&vertex), Point3D::new(100.25, 50.0, 8.0));
     }
 

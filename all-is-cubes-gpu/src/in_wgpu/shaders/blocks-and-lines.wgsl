@@ -16,7 +16,8 @@ struct ShaderSpaceCamera {
     padding1: f32,
 }
 
-// Mirrors `struct WgpuBlockVertex` on the Rust side.
+// Mirrors `struct BPosition` + `struct BColor` on the Rust side.
+// This is a vertex attribute struct, so its layout does not need to match exactly.
 struct WgpuBlockVertex {
     @location(0) cube_packed: u32,
     @location(1) position_in_cube_and_normal_and_resolution_packed: u32,

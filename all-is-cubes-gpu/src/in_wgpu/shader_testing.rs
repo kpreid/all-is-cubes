@@ -18,9 +18,10 @@ use wgpu::util::DeviceExt as _;
 use all_is_cubes::euclid::{Rotation3D, point3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{Face6, FreeVector, GridSize, GridVector, Rgba, ps64};
-use all_is_cubes_mesh::{BlockVertex, Coloring, Vertex};
+use all_is_cubes_mesh::{BlockVertex, Coloring, Vertex as _};
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 
+use crate::in_wgpu::pipelines::BlockBufferSlot;
 use crate::in_wgpu::shaders::Shaders;
 use crate::in_wgpu::{
     self, FramebufferTextures,
@@ -28,7 +29,7 @@ use crate::in_wgpu::{
     frame_texture::{FbtConfig, FbtFeatures},
     init::get_texels_from_gpu,
     space::SpaceCameraBuffer,
-    vertex::{WgpuBlockVertex, WgpuInstanceData},
+    vertex,
 };
 
 // TODO: T is bad abstraction since it silently has to be f16
@@ -97,7 +98,11 @@ where
             module: &shader,
             entry_point: Some("block_vertex_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[WgpuBlockVertex::LAYOUT, WgpuInstanceData::LAYOUT],
+            buffers: &[
+                vertex::BPosition::LAYOUT,
+                vertex::BColor::LAYOUT,
+                vertex::WgpuInstanceData::LAYOUT,
+            ],
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
@@ -149,35 +154,39 @@ where
     );
 
     // This buffer contains one triangle, that will be full-screen once the camera looks
-    // at it. Remember that block vertices must actually stick to the 0-1 range.
-    let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    // at it. Remember that block vertices must actually stick to the 0-1 range;
+    // we're only using them because it would be harder not to.
+    let vertices = [
+        vertex::BPosition::from_block_vertex(BlockVertex {
+            position: point3(0., 0., 0.),
+            face: Face6::PZ,
+            coloring: Coloring::Solid(Rgba::WHITE),
+        }),
+        vertex::BPosition::from_block_vertex(BlockVertex {
+            position: point3(1., 0., 0.),
+            face: Face6::PZ,
+            coloring: Coloring::Solid(Rgba::WHITE),
+        }),
+        vertex::BPosition::from_block_vertex(BlockVertex {
+            position: point3(0., 1., 0.),
+            face: Face6::PZ,
+            coloring: Coloring::Solid(Rgba::WHITE),
+        }),
+    ];
+    let vertex_position_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
-        contents: bytemuck::bytes_of(&[
-            WgpuBlockVertex::from_block_vertex(BlockVertex {
-                position: point3(0., 0., 0.),
-                face: Face6::PZ,
-                coloring: Coloring::Solid(Rgba::WHITE),
-            })
-            .0,
-            WgpuBlockVertex::from_block_vertex(BlockVertex {
-                position: point3(1., 0., 0.),
-                face: Face6::PZ,
-                coloring: Coloring::Solid(Rgba::WHITE),
-            })
-            .0,
-            WgpuBlockVertex::from_block_vertex(BlockVertex {
-                position: point3(0., 1., 0.),
-                face: Face6::PZ,
-                coloring: Coloring::Solid(Rgba::WHITE),
-            })
-            .0,
-        ]),
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        contents: bytemuck::bytes_of(&vertices.map(|v| v.0)),
+    });
+    let vertex_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: None,
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        contents: bytemuck::bytes_of(&vertices.map(|v| v.1)),
     });
 
     let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
-        contents: bytemuck::bytes_of(&[WgpuInstanceData::new(GridVector::zero(), &"")]),
+        contents: bytemuck::bytes_of(&[vertex::WgpuInstanceData::new(GridVector::zero(), &"")]),
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
     });
 
@@ -222,8 +231,12 @@ where
 
         render_pass.set_pipeline(&test_pipeline);
 
-        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-        render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+        render_pass.set_vertex_buffer(
+            BlockBufferSlot::Position as u32,
+            vertex_position_buffer.slice(..),
+        );
+        render_pass.set_vertex_buffer(BlockBufferSlot::Color as u32, vertex_color_buffer.slice(..));
+        render_pass.set_vertex_buffer(BlockBufferSlot::Instance as u32, instance_buffer.slice(..));
         render_pass.draw(0..3, 0..1);
     }
     queue.submit(std::iter::once(encoder.finish()));
