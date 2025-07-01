@@ -6,11 +6,12 @@ use all_is_cubes::block::{self, AIR, Block, Resolution::R16};
 use all_is_cubes::content::make_some_voxel_blocks;
 use all_is_cubes::math::{GridAab, Rgba};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::{ReadTicket, Universe};
+use all_is_cubes::universe::Universe;
 use all_is_cubes_render::camera::GraphicsOptions;
 
+use all_is_cubes_mesh as mesh;
 use all_is_cubes_mesh::testing::{Allocator, TextureMt as Mt};
-use all_is_cubes_mesh::{BlockMesh, BlockMeshes, MeshOptions, SpaceMesh, block_meshes_for_space};
+use all_is_cubes_mesh::{BlockMesh, BlockMeshes, MeshOptions, SpaceMesh};
 
 criterion_main!(benches);
 fn benches() {
@@ -189,14 +190,18 @@ fn slow_mesh_benches(c: &mut Criterion) {
 
 #[cfg(feature = "dynamic")]
 fn dynamic_benches(c: &mut Criterion) {
+    use all_is_cubes::chunking::ChunkPos;
+    use all_is_cubes::euclid::{self, vec3};
+    use all_is_cubes::math::{Cube, FreePoint};
     use all_is_cubes::time;
+    use all_is_cubes::universe::Handle;
     use all_is_cubes_mesh::dynamic;
     use all_is_cubes_render::Flaws;
-    use all_is_cubes_render::camera::{Camera, Viewport};
+    use all_is_cubes_render::camera::{Camera, ViewTransform, Viewport};
 
     let mut g = c.benchmark_group("dynamic");
     let graphics_options = GraphicsOptions::default();
-    let camera = Camera::new(graphics_options, Viewport::with_scale(1.0, [100, 100]));
+    let default_camera = Camera::new(graphics_options, Viewport::with_scale(1.0, [100, 100]));
 
     g.bench_function("initial-update", |b| {
         let mut universe = Universe::new();
@@ -209,8 +214,8 @@ fn dynamic_benches(c: &mut Criterion) {
             },
             |csm| {
                 let info = csm.update(
-                    ReadTicket::stub(),
-                    &camera,
+                    universe.read_ticket(),
+                    &default_camera,
                     time::Deadline::Whenever,
                     |_| {},
                 );
@@ -220,6 +225,153 @@ fn dynamic_benches(c: &mut Criterion) {
         );
     });
 
+    // Depth sorting performance benches, designed to detect the difference between
+    // split and single-struct vertices.
+    {
+        /// A vertex type that, unlike `BlockVertex`, has less data,
+        /// so we can measure the performance impact of reducing the amount of data depth
+        /// sorting applies to.
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        struct PositionOnlyVertex {
+            position: FreePoint,
+        }
+        impl mesh::Vertex for PositionOnlyVertex {
+            // These choices match `BlockVertex`.
+            const WANTS_DEPTH_SORTING: bool = true;
+            type SecondaryData = mesh::Coloring<mesh::texture::NoTexture>;
+            type Coordinate = f64;
+            type TexPoint = mesh::texture::NoTexture;
+            type BlockInst = Cube;
+
+            fn from_block_vertex(
+                vertex: mesh::BlockVertex<Self::TexPoint>,
+            ) -> (Self, Self::SecondaryData) {
+                (
+                    Self {
+                        position: vertex.position,
+                    },
+                    vertex.coloring,
+                )
+            }
+
+            fn instantiate_block(cube: Cube) -> Self::BlockInst {
+                cube
+            }
+
+            fn instantiate_vertex(&mut self, block: Self::BlockInst) {
+                self.position += block.lower_bounds().to_f64().to_vector();
+            }
+
+            fn position(&self) -> FreePoint {
+                self.position
+            }
+        }
+        struct PovMt;
+        impl mesh::MeshTypes for PovMt {
+            type Vertex = PositionOnlyVertex;
+            type Alloc = mesh::texture::NoTextures;
+            type Tile = mesh::texture::NoTexture;
+        }
+        impl dynamic::DynamicMeshTypes for PovMt {
+            type RenderData = ();
+            const MAXIMUM_MERGED_BLOCK_MESH_SIZE: usize = usize::MAX;
+        }
+
+        struct State<'a, Mt: dynamic::DynamicMeshTypes> {
+            universe: &'a Universe,
+            csm: dynamic::ChunkedSpaceMesh<Mt, 16>,
+            camera: Camera,
+            pos_step: f64,
+        }
+
+        impl<'a, Mt: dynamic::DynamicMeshTypes<Alloc: Send + Sync, Tile: Send + Sync>> State<'a, Mt> {
+            fn new(
+                universe: &'a Universe,
+                space_handle: Handle<Space>,
+                camera: Camera,
+                allocator: Mt::Alloc,
+            ) -> Self {
+                let mut csm: dynamic::ChunkedSpaceMesh<Mt, 16> =
+                    dynamic::ChunkedSpaceMesh::new(space_handle, allocator, true);
+                csm.update(
+                    universe.read_ticket(),
+                    &camera,
+                    time::Deadline::Whenever,
+                    |_| {},
+                );
+                assert_eq!(
+                    3612672,
+                    csm.chunk(ChunkPos::new(0, 0, 0))
+                        .unwrap()
+                        .mesh()
+                        .indices()
+                        .len(),
+                    "mesh is not of the expected complexity"
+                );
+
+                State {
+                    csm,
+                    universe,
+                    camera,
+                    pos_step: 0.5,
+                }
+            }
+
+            // Inner loop of both benchmarks
+            fn inner(&mut self) {
+                self.pos_step = (self.pos_step + 1.).rem_euclid(16.);
+                self.camera.set_view_transform(ViewTransform {
+                    rotation: euclid::Rotation3D::around_y(euclid::Angle::frac_pi_2()),
+                    // This position must be within the chunk or depth sorting won't happen.
+                    translation: vec3(self.pos_step, 0.5, 0.5),
+                });
+
+                let info = self.csm.update(
+                    self.universe.read_ticket(),
+                    &self.camera,
+                    time::Deadline::Whenever,
+                    |_| {},
+                );
+                assert!(info.depth_sort_time.is_some());
+            }
+        }
+
+        let mut universe = Universe::new();
+        // transparent block so we cause depth sorting
+        let space_handle = universe.insert_anonymous(half_space(&block::from_color!(Rgba::new(
+            0.0, 1.0, 0.0, 0.5
+        ))));
+
+        g.bench_function("depth-sort-whole", |b| {
+            b.iter_batched_ref(
+                || {
+                    State::<Mt>::new(
+                        &universe,
+                        space_handle.clone(),
+                        default_camera.clone(),
+                        Allocator::new(),
+                    )
+                },
+                State::inner,
+                BatchSize::LargeInput,
+            );
+        });
+
+        g.bench_function("depth-sort-split", |b| {
+            b.iter_batched_ref(
+                || {
+                    State::<PovMt>::new(
+                        &universe,
+                        space_handle.clone(),
+                        default_camera.clone(),
+                        mesh::texture::NoTextures,
+                    )
+                },
+                State::inner,
+                BatchSize::LargeInput,
+            );
+        });
+    }
     // TODO: Add a test for updates past the initial one
 }
 
@@ -275,7 +427,7 @@ struct SpaceMeshIngredients {
 
 impl SpaceMeshIngredients {
     fn new(options: MeshOptions, space: Space) -> Self {
-        let block_meshes = block_meshes_for_space(&space, &Allocator::new(), &options);
+        let block_meshes = mesh::block_meshes_for_space(&space, &Allocator::new(), &options);
 
         SpaceMeshIngredients {
             space,

@@ -631,7 +631,8 @@ pub struct CsmUpdateInfo {
     pub chunk_instance_generation_times: TimeStats,
     /// Time spent on `chunk_mesh_updater` callbacks this frame.
     pub chunk_mesh_callback_times: TimeStats,
-    depth_sort_time: Option<Duration>,
+    #[doc(hidden)]
+    pub depth_sort_time: Option<Duration>,
     /// Time spent on building block meshes this frame.
     block_updates: dynamic::blocks::VbmUpdateInfo,
 
