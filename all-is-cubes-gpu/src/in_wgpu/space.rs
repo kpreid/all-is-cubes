@@ -1034,7 +1034,6 @@ fn update_chunk_buffers(
 
     let new_vertices_data: &[u8] =
         bytemuck::must_cast_slice::<WgpuBlockVertex, u8>(update.mesh.vertices());
-    // TODO: assert INDEX_FORMAT matches this type
     let new_indices: IndexSlice<'_> = update.mesh.indices();
 
     let mesh_id = &update.mesh_id;
@@ -1043,19 +1042,15 @@ fn update_chunk_buffers(
         .get_or_insert_with(|| Msw::new(ChunkBuffers::default()));
     buffers.vertex_buf.write_with_resizing(
         bwp.reborrow(),
-        &wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{space_label} vertex {mesh_id:?}")),
-            contents: new_vertices_data,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-        },
+        &|| format!("{space_label} vertex {mesh_id:?}"),
+        wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        [new_vertices_data],
     );
     buffers.index_buf.write_with_resizing(
         bwp.reborrow(),
-        &wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{space_label} index {mesh_id:?}")),
-            contents: new_indices.as_bytes(),
-            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
-        },
+        &|| format!("{space_label} index {mesh_id:?}"),
+        wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+        [new_indices.as_bytes()],
     );
     buffers.index_format = to_wgpu_index_format(new_indices);
 }

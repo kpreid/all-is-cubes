@@ -1,10 +1,11 @@
 //! Miscellaneous conversion functions and trait impls for [`wgpu`].
 
+use alloc::alloc::Layout;
+use alloc::string::String;
 use core::marker::PhantomData;
 use core::ops::Range;
 
 use bytemuck::Pod;
-use wgpu::util::DeviceExt as _;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size3D};
 use all_is_cubes::math::{GridSize, Rgba};
@@ -157,22 +158,43 @@ impl ResizingBuffer {
         self.buffer.as_ref()
     }
 
-    /// Write new data, reallocating if needed.
+    /// Write one or more blocks of new data, reallocating if needed to fit all of them.
     ///
-    /// Note that the fields of the `BufferInitDescriptor` other than `contents` are ignored
-    /// if the existing buffer is used. TODO: Provide a means of lazy loading the label.
-    pub(crate) fn write_with_resizing(
+    /// * `label` and `usage` are ignored when not reallocating.
+    /// * There may be padding between the provided slices to meet alignment requirements.
+    /// * `contents[0]` is always positioned at address 0.
+    pub(crate) fn write_with_resizing<const N: usize>(
         &mut self,
-        bwp: BeltWritingParts<'_>,
-        descriptor: &wgpu::util::BufferInitDescriptor<'_>,
-    ) {
-        let new_size: u64 = descriptor.contents.len().try_into().unwrap();
+        mut bwp: BeltWritingParts<'_>,
+        label: &dyn Fn() -> String,
+        usage: wgpu::BufferUsages,
+        contents: [&[u8]; N],
+    ) -> [wgpu::BufferAddress; N] {
+        // Compute the size and offsets that fit all the given slices.
+        // Note we are using Layout as a handy utility here, not to define any *Rust* memory layout.
+        // Technically this is restrictive for 32-bit usize, but we're probably doomed then anyway
+        // if the amount of data to load doesn't fit in CPU memory.
+        let mut addresses = [0; N];
+        let mut layout = Layout::new::<()>();
+        for (i, slice) in contents.into_iter().enumerate() {
+            let (next_layout, addr) = layout
+                .extend(Layout::from_size_align(slice.len(), wgpu::MAP_ALIGNMENT as usize).unwrap())
+                .unwrap();
+            layout = next_layout;
+            addresses[i] = u64::try_from(addr).unwrap();
+        }
+        let new_size: u64 = layout.size().try_into().unwrap();
+
         if let Some(buffer) = self.buffer.as_ref().filter(|b| b.size() >= new_size) {
-            if let Some(new_size) = wgpu::BufferSize::new(new_size) {
-                bwp.write_buffer(buffer, 0, new_size)
-                    .copy_from_slice(descriptor.contents);
-            } else {
-                // zero bytes to write
+            // Buffer is already big enough to fit the data.
+            for (address, data) in addresses.into_iter().zip(contents) {
+                if let Some(data_size) = wgpu::BufferSize::new(u64::try_from(data.len()).unwrap()) {
+                    bwp.reborrow()
+                        .write_buffer(buffer, address, data_size)
+                        .copy_from_slice(data);
+                } else {
+                    // zero bytes to write
+                }
             }
         } else {
             // Explicitly destroy the old buffer, because we know it will not be used any more
@@ -187,8 +209,25 @@ impl ResizingBuffer {
                 }
             }
 
-            self.buffer = Some(bwp.device.create_buffer_init(descriptor));
+            let buffer = bwp.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some(&label()),
+                size: new_size,
+                usage,
+                mapped_at_creation: true,
+            });
+            if buffer.size() > 0 {
+                // We could do multiple get_mapped_range() but that would not be particularly useful
+                // since there is no sparseness to them.
+                let mut mapped = buffer.get_mapped_range_mut(..);
+                for (address, data) in addresses.into_iter().zip(contents) {
+                    mapped[address as usize..][..data.len()].copy_from_slice(data);
+                }
+            }
+            buffer.unmap();
+            self.buffer = Some(buffer);
         }
+
+        addresses
     }
 
     pub(crate) fn map_without_resizing<'belt>(

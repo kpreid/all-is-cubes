@@ -425,11 +425,9 @@ impl EverythingRenderer {
 
             self.lines_buffer.write_with_resizing(
                 bwp.reborrow(),
-                &wgpu::util::BufferInitDescriptor {
-                    label: Some("EverythingRenderer::lines_buffer"),
-                    contents: bytemuck::must_cast_slice::<WgpuLinesVertex, u8>(&v),
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                },
+                &|| "EverythingRenderer::lines_buffer".into(),
+                wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                [bytemuck::must_cast_slice::<WgpuLinesVertex, u8>(&v)],
             );
             self.lines_vertex_count = v.len() as u32;
         };
