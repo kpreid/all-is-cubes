@@ -37,6 +37,17 @@ pub(crate) struct RaytraceToTexture {
     inner: Arc<Mutex<Inner>>,
     rt_frame_copy_bind_group:
         Memo<(crate::Id<wgpu::TextureView>, crate::Id<wgpu::TextureView>), wgpu::BindGroup>,
+
+    /// * `true`: Allow frames to be “torn” (allow camera and scene data to change midway),
+    ///   but update pixels in an order intended to be helpful.
+    /// * `false`: Produce wholly consistent frames only.
+    ///
+    /// TODO: In incremental mode we should skip `PixelPicker` but don’t.
+    incremental: bool,
+
+    /// Whether it is allowed for an `update()` to actually change camera and the scene data.
+    /// This only has an effect when `self.incremental` is false.
+    may_start_next_frame: bool,
 }
 
 /// State for the possibly-asynchronous tracing job.
@@ -91,6 +102,8 @@ impl RaytraceToTexture {
         Self {
             rt_frame_copy_bind_group: Memo::new(),
             inner,
+            incremental: false, // TODO: allow configuration of this.
+            may_start_next_frame: true,
         }
     }
 
@@ -100,10 +113,12 @@ impl RaytraceToTexture {
         read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
-        self.inner
-            .lock()
-            .unwrap()
-            .update_inputs(read_tickets, cursor)
+        if self.incremental || self.may_start_next_frame {
+            self.may_start_next_frame = false;
+            let inner = &mut *self.inner.lock().unwrap();
+            inner.update_inputs(read_tickets, cursor)?;
+        }
+        Ok(())
     }
 
     /// Trace a frame's worth of rays (which may be less than the scene) and update the texture.
@@ -146,8 +161,12 @@ impl RaytraceToTexture {
         );
 
         inner.do_some_tracing();
-        inner.color_render_target.upload(queue);
-        inner.depth_render_target.upload(queue);
+        // Copy to GPU texture if we are in incremental mode or the frame is finished.
+        if self.incremental || inner.dirty_pixels == 0 {
+            inner.color_render_target.upload(queue);
+            inner.depth_render_target.upload(queue);
+            self.may_start_next_frame = true;
+        }
     }
 
     /// Draw a copy of the raytraced scene (as of the last [`Self::prepare_frame()`]).
@@ -311,6 +330,8 @@ fn background_tracing_task(weak_inner: Weak<Mutex<Inner>>) {
     }
 }
 
+/// Sorts pixels into an update order that produces more quickly useful results for interactive
+/// viewing than a linear top-to-bottom sweep would.
 #[derive(Clone, Debug)]
 struct PixelPicker {
     viewport: Viewport,
