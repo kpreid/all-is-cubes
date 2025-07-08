@@ -5,6 +5,7 @@ use alloc::sync::Arc;
 use alloc::boxed::Box;
 #[cfg(feature = "auto-threads")]
 use alloc::sync::Weak;
+#[cfg(feature = "auto-threads")]
 use alloc::vec::Vec;
 use std::sync::Mutex;
 
@@ -29,6 +30,8 @@ use crate::in_wgpu::frame_texture::DrawableTexture;
 use crate::in_wgpu::pipelines::Pipelines;
 use crate::{Identified, Memo};
 
+// -------------------------------------------------------------------------------------------------
+
 // TODO: this type definition makes more sense in `draw_to_texture.rs` once we are not partly using embedded_graphics
 type Point = all_is_cubes::euclid::Point2D<u32, ImagePixel>;
 
@@ -38,15 +41,8 @@ pub(crate) struct RaytraceToTexture {
     rt_frame_copy_bind_group:
         Memo<(crate::Id<wgpu::TextureView>, crate::Id<wgpu::TextureView>), wgpu::BindGroup>,
 
-    /// * `true`: Allow frames to be “torn” (allow camera and scene data to change midway),
-    ///   but update pixels in an order intended to be helpful.
-    /// * `false`: Produce wholly consistent frames only.
-    ///
-    /// TODO: In incremental mode we should skip `PixelPicker` but don’t.
-    incremental: bool,
-
     /// Whether it is allowed for an `update()` to actually change camera and the scene data.
-    /// This only has an effect when `self.incremental` is false.
+    /// This only has an effect when `update_strategy` is `Consistent`.
     may_start_next_frame: bool,
 }
 
@@ -54,27 +50,61 @@ pub(crate) struct RaytraceToTexture {
 #[derive(Debug)]
 struct Inner {
     rtr: RtRenderer,
-    render_viewport: Viewport,
-    pixel_picker: PixelPicker,
+    update_strategy: UpdateStrategy,
     dirty_pixels: usize,
     rays_per_frame: usize,
     color_render_target: DrawableTexture<[f16; 4], [f16; 4]>,
     depth_render_target: DrawableTexture<f32, f32>,
 }
 
+/// Schedule with which a [`RaytraceToTexture`] re-traces its pixels.
+///
+/// Also always knows the rendering (reduced resolution) viewport.
+#[derive(Debug)]
+enum UpdateStrategy {
+    /// Allow frames to be “torn” (allow camera and scene data to change midway through rendering),
+    /// to provide lower average latency. The central area of the image will be traced more often.
+    Incremental(PixelPicker),
+
+    /// Don't update anything; produce wholly consistent frames only.
+    /// This does less work than waiting for the same frames to appear in incremental mode,
+    /// but has higher latency.
+    Consistent {
+        render_viewport: Viewport,
+        /// Index of the next pixel to render.
+        next: usize,
+    },
+}
+
+// -------------------------------------------------------------------------------------------------
+
 impl RaytraceToTexture {
     pub fn new(cameras: StandardCameras) -> Self {
         let initial_viewport = Viewport::with_scale(1.0, vec2(1, 1));
+
+        // TODO: allow choice of incremental mode.
+        let update_strategy = if true {
+            UpdateStrategy::Incremental(PixelPicker::new(initial_viewport))
+        } else {
+            UpdateStrategy::Consistent {
+                render_viewport: initial_viewport,
+                next: 0,
+            }
+        };
+
         let inner = Arc::new(Mutex::new(Inner {
-            render_viewport: initial_viewport,
+            rays_per_frame: 5000
+                * match cameras.graphics_options().lighting_display {
+                    all_is_cubes_render::camera::LightingOption::Bounce => 1,
+                    _ => 10,
+                },
             rtr: RtRenderer::new(
                 cameras,
                 Box::new(raytracer_size_policy),
                 listen::constant(Default::default()),
             ),
-            pixel_picker: PixelPicker::new(initial_viewport),
-            dirty_pixels: initial_viewport.pixel_count().unwrap(),
-            rays_per_frame: 50000,
+            dirty_pixels: update_strategy.cycle_length(),
+            update_strategy,
             color_render_target: DrawableTexture::new(wgpu::TextureFormat::Rgba16Float),
             // Not using a depth texture format because float depth textures cannot be copied to.
             depth_render_target: DrawableTexture::new(wgpu::TextureFormat::R32Float),
@@ -102,7 +132,6 @@ impl RaytraceToTexture {
         Self {
             rt_frame_copy_bind_group: Memo::new(),
             inner,
-            incremental: false, // TODO: allow configuration of this.
             may_start_next_frame: true,
         }
     }
@@ -113,9 +142,9 @@ impl RaytraceToTexture {
         read_tickets: Layers<ReadTicket<'_>>,
         cursor: Option<&Cursor>,
     ) -> Result<(), RenderError> {
-        if self.incremental || self.may_start_next_frame {
+        let inner = &mut *self.inner.lock().unwrap();
+        if inner.update_strategy.incremental() || self.may_start_next_frame {
             self.may_start_next_frame = false;
-            let inner = &mut *self.inner.lock().unwrap();
             inner.update_inputs(read_tickets, cursor)?;
         }
         Ok(())
@@ -162,7 +191,7 @@ impl RaytraceToTexture {
 
         inner.do_some_tracing();
         // Copy to GPU texture if we are in incremental mode or the frame is finished.
-        if self.incremental || inner.dirty_pixels == 0 {
+        if inner.update_strategy.incremental() || inner.dirty_pixels == 0 {
             inner.color_render_target.upload(queue);
             inner.depth_render_target.upload(queue);
             self.may_start_next_frame = true;
@@ -200,11 +229,10 @@ impl Inner {
     }
 
     fn set_viewport(&mut self, device: &wgpu::Device, render_viewport: Viewport) {
-        if self.render_viewport == render_viewport {
+        if self.update_strategy.render_viewport() == render_viewport {
             // don't reset/dirty anything
             return;
         }
-        self.render_viewport = render_viewport;
         self.color_render_target.resize(
             device,
             Some("RaytraceToTexture::color_render_target"),
@@ -215,12 +243,12 @@ impl Inner {
             Some("RaytraceToTexture::depth_render_target"),
             render_viewport.framebuffer_size,
         );
-        self.pixel_picker.resize(render_viewport);
+        self.update_strategy.resize(render_viewport);
         self.dirty();
     }
 
     fn dirty(&mut self) {
-        self.dirty_pixels = self.pixel_picker.cycle_length;
+        self.dirty_pixels = self.update_strategy.cycle_length();
     }
 
     fn do_some_tracing(&mut self) {
@@ -232,7 +260,7 @@ impl Inner {
             return;
         }
 
-        let render_viewport = self.render_viewport;
+        let render_viewport = self.update_strategy.render_viewport();
         let scene = self.rtr.scene::<(ColorBuf, DepthBuf)>();
         let camera = &scene.cameras().world;
 
@@ -249,14 +277,10 @@ impl Inner {
             .pre_translate(vec3(0., 0., depth_bias))
             .pre_scale(0., 0., depth_scale);
 
-        #[allow(clippy::needless_collect, reason = "needed with rayon and not without")]
-        let this_frame_pixels: Vec<Point> =
-            (&mut self.pixel_picker).take(self.rays_per_frame).collect();
-
-        self.dirty_pixels = self.dirty_pixels.saturating_sub(this_frame_pixels.len());
-
         let start_time = Instant::now();
-        let trace = |point: Point| -> Trace {
+
+        // Function to trace one ray, independent of strategy.
+        let trace_one = |point: Point| -> Trace {
             let x = point.x as usize;
             let y = point.y as usize;
             let ((color_buf, depth_buf), _info) = scene.trace_patch(Box2D {
@@ -288,10 +312,62 @@ impl Inner {
             (point, color, projected_depth as f32)
         };
 
-        #[cfg(feature = "auto-threads")]
-        let traces: Vec<Trace> = this_frame_pixels.into_par_iter().map(trace).collect();
-        #[cfg(not(feature = "auto-threads"))]
-        let traces: Vec<Trace> = this_frame_pixels.into_iter().map(trace).collect();
+        // Function to write the trace results to storage.
+        let color_target = self.color_render_target.draw_target();
+        let depth_target = self.depth_render_target.draw_target();
+        let mut store_one = |(point, color, depth): Trace| {
+            color_target.set_pixel(point, color);
+            depth_target.set_pixel(point, depth);
+        };
+
+        match self.update_strategy {
+            UpdateStrategy::Incremental(ref mut pixel_picker) => {
+                cfg_if::cfg_if! {
+                    if #[cfg(feature = "auto-threads")] {
+                        let this_frame_pixels: Vec<Point> =
+                            pixel_picker.take(self.rays_per_frame).collect();
+                        // Note: I tried making these steps execute in parallel using a channel
+                        // instead of a `Vec`, and it was slower.
+                        let traces: Vec<Trace> =
+                            this_frame_pixels.into_par_iter().map(trace_one).collect();
+                        for trace in traces {
+                            store_one(trace);
+                        }
+                    } else {
+                        for pixel in pixel_picker.take(self.rays_per_frame) {
+                            store_one(trace_one(pixel));
+                        }
+                    }
+                }
+            }
+            UpdateStrategy::Consistent {
+                render_viewport: _,
+                ref mut next,
+            } => {
+                let pixel_iter = (0..self.rays_per_frame)
+                    .map(|i| point_from_pixel_index(render_viewport, i + *next));
+                cfg_if::cfg_if! {
+                    if #[cfg(feature = "auto-threads")] {
+                        let this_frame_pixels: Vec<Point> =
+                            pixel_iter.take(self.rays_per_frame).collect();
+                        let traces: Vec<Trace> =
+                            this_frame_pixels.into_par_iter().map(trace_one).collect();
+                        for trace in traces {
+                            store_one(trace);
+                        }
+                    } else {
+                        for pixel in pixel_iter {
+                            store_one(trace_one(pixel));
+                        }
+                    }
+                }
+
+                *next += self.rays_per_frame;
+            }
+        }
+
+        // Every strategy updates exactly this many pixels.
+        self.dirty_pixels = self.dirty_pixels.saturating_sub(self.rays_per_frame);
 
         let tracing_duration = Instant::now().duration_since(start_time);
 
@@ -304,13 +380,6 @@ impl Inner {
                 self.rays_per_frame = (self.rays_per_frame + 5000)
                     .min(area_usize(render_viewport.framebuffer_size).unwrap());
             }
-        }
-
-        let color_target = self.color_render_target.draw_target();
-        let depth_target = self.depth_render_target.draw_target();
-        for (point, color, depth) in traces {
-            color_target.set_pixel(point, color);
-            depth_target.set_pixel(point, depth);
         }
     }
 }
@@ -329,6 +398,55 @@ fn background_tracing_task(weak_inner: Weak<Mutex<Inner>>) {
         std::thread::yield_now();
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+impl UpdateStrategy {
+    fn render_viewport(&self) -> Viewport {
+        match *self {
+            UpdateStrategy::Incremental(ref pixel_picker) => pixel_picker.viewport,
+            UpdateStrategy::Consistent {
+                render_viewport,
+                next: _,
+            } => render_viewport,
+        }
+    }
+
+    /// After at least this many pixels have been traced according to this strategy,
+    /// the entire image has been covered.
+    fn cycle_length(&self) -> usize {
+        match self {
+            UpdateStrategy::Incremental(picker) => picker.cycle_length,
+            UpdateStrategy::Consistent {
+                render_viewport,
+                next: _,
+            } => render_viewport.pixel_count().unwrap_or(usize::MAX),
+        }
+    }
+
+    fn incremental(&self) -> bool {
+        match self {
+            UpdateStrategy::Incremental(_) => true,
+            UpdateStrategy::Consistent { .. } => false,
+        }
+    }
+
+    fn resize(&mut self, new_render_viewport: Viewport) {
+        match self {
+            UpdateStrategy::Incremental(pixel_picker) => {
+                pixel_picker.resize(new_render_viewport);
+            }
+            UpdateStrategy::Consistent {
+                render_viewport,
+                next: _,
+            } => {
+                *render_viewport = new_render_viewport;
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Sorts pixels into an update order that produces more quickly useful results for interactive
 /// viewing than a linear top-to-bottom sweep would.
@@ -399,16 +517,24 @@ impl Iterator for PixelPicker {
     type Item = Point;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // `as usize` is safe because we would have failed earlier if it doesn't fit in usize.
-        let size = self.viewport.framebuffer_size.map(|s| s as usize);
         let linear_index = self.iter.next().unwrap();
         let index = self.sorted_pixels[linear_index];
-        Some(Point::new(
-            index.rem_euclid(size.width) as u32,
-            index.div_euclid(size.width).rem_euclid(size.height) as u32,
-        ))
+        Some(point_from_pixel_index(self.viewport, index))
     }
 }
+
+/// Convert an index in the viewport to a pixel position. If out of range, wraps around.
+#[inline(always)]
+fn point_from_pixel_index(viewport: Viewport, index: usize) -> Point {
+    // `as usize` is valid because we would have failed earlier if it doesn't fit in usize.
+    let size = viewport.framebuffer_size.map(|s| s as usize);
+    Point::new(
+        index.rem_euclid(size.width) as u32,
+        index.div_euclid(size.width).rem_euclid(size.height) as u32,
+    )
+}
+
+// -------------------------------------------------------------------------------------------------
 
 fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
     // use 2x2 nominal pixels
@@ -418,6 +544,8 @@ fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
         .cast_unit();
     viewport
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
