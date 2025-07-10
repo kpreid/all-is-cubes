@@ -19,6 +19,10 @@ pub(crate) enum Query {
     EndWorldRenderPass,
     BeginUiRenderPass,
     EndUiRenderPass,
+    BeginReprojectRenderPass,
+    EndReprojectRenderPass,
+    BeginGapFill,
+    EndGapFill,
     BeginBloom,
     EndBloom,
     BeginPostprocess,
@@ -39,6 +43,7 @@ impl Query {
 #[derive(Debug)]
 pub(crate) struct TimestampInterpretation {
     pub bloom_present: bool,
+    pub reprojecting: bool,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -182,6 +187,8 @@ impl Queries {
 pub(crate) struct GpuTimes {
     world_render_pass: Duration,
     ui_render_pass: Duration,
+    rt_reproject: Option<Duration>,
+    rt_gap_fill: Option<Duration>,
     bloom: Option<Duration>,
     postprocess: Duration,
 }
@@ -191,6 +198,8 @@ impl all_is_cubes::util::Fmt<StatusText> for GpuTimes {
         let Self {
             world_render_pass,
             ui_render_pass,
+            rt_reproject,
+            rt_gap_fill,
             bloom,
             postprocess,
         } = self;
@@ -200,6 +209,12 @@ impl all_is_cubes::util::Fmt<StatusText> for GpuTimes {
             world_render_pass.refmt(fopt),
             ui_render_pass.refmt(fopt),
         )?;
+        if let Some(rt_reproject) = rt_reproject {
+            write!(fmt, "reproject {}, ", rt_reproject.refmt(fopt))?;
+        }
+        if let Some(rt_gap_fill) = rt_gap_fill {
+            write!(fmt, "gap fill {}, ", rt_gap_fill.refmt(fopt))?;
+        }
         if let Some(bloom) = bloom {
             write!(fmt, "bloom {}, ", bloom.refmt(fopt))?;
         }
@@ -226,6 +241,15 @@ impl GpuTimes {
         Self {
             world_render_pass: fetch(Query::BeginWorldRenderPass, Query::EndWorldRenderPass),
             ui_render_pass: fetch(Query::BeginUiRenderPass, Query::EndUiRenderPass),
+            rt_reproject: interpretation.reprojecting.then(|| {
+                fetch(
+                    Query::BeginReprojectRenderPass,
+                    Query::EndReprojectRenderPass,
+                )
+            }),
+            rt_gap_fill: interpretation
+                .reprojecting
+                .then(|| fetch(Query::BeginGapFill, Query::EndGapFill)),
             bloom: interpretation.bloom_present.then(|| fetch(Query::BeginBloom, Query::EndBloom)),
             postprocess: fetch(Query::BeginPostprocess, Query::EndPostprocess),
         }

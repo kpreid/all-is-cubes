@@ -5,7 +5,6 @@
 struct ReprojectionUniforms {
     reprojection_matrix: mat4x4<f32>,
     inverse_projection: mat4x4<f32>,
-    // TODO: was going to be used but is not, currently
     output_pixel_scale: vec2<f32>,
     _padding: vec2<f32>,
 }

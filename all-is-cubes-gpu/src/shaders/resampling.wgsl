@@ -40,15 +40,10 @@ fn full_image_vertex(
     return VertexOutput(position, texcoord, in_instance_index);
 }
 
-// --- Fragment shader for bloom -------------------------------------------------------------------
-//
-// This bloom strategy is the “Dual filter” described in
-// _Bandwidth-Efficient Rendering_ by Marius Bjørge at SIGGRAPH 2015
-// https://community.arm.com/cfs-file/__key/communityserver-blogs-components-weblogfiles/00-00-00-20-66/siggraph2015_2D00_mmg_2D00_marius_2D00_notes.pdf
-// (The choice of this algorithm was simply because it looked easy to implement for good
-// results, not for any specific benefit.)
+// --- General fragment shading helpers ------------------------------------------------------------
 
-// Fetch from input image (scene texture or previous downsampling stage).
+// Fetch from input image (scene texture or previous downsampling stage),
+// with an offset in units of output fragments.
 fn input_pixel(in: VertexOutput, offset: vec2<f32>) -> vec4<f32> {
     let derivatives = vec2<f32>(dpdx(in.texcoord.x), dpdy(in.texcoord.y));
 
@@ -61,6 +56,14 @@ fn input_pixel(in: VertexOutput, offset: vec2<f32>) -> vec4<f32> {
         0.0
     );
 }
+
+// --- Fragment shader for bloom -------------------------------------------------------------------
+//
+// This bloom strategy is the “Dual filter” described in
+// _Bandwidth-Efficient Rendering_ by Marius Bjørge at SIGGRAPH 2015
+// https://community.arm.com/cfs-file/__key/communityserver-blogs-components-weblogfiles/00-00-00-20-66/siggraph2015_2D00_mmg_2D00_marius_2D00_notes.pdf
+// (The choice of this algorithm was simply because it looked easy to implement for good
+// results, not for any specific benefit.)
 
 @fragment
 fn bloom_downsample(in: VertexOutput) -> @location(0) vec4<f32> {
@@ -89,4 +92,63 @@ fn bloom_upsample(in: VertexOutput) -> @location(0) vec4<f32> {
         + input_pixel(in, vec2<f32>(1.0, 0.0))
         + higher_weight * textureSampleLevel(higher_stage_input, input_sampler, in.texcoord, 0.0)
     ) / (12.0 + higher_weight);
+}
+
+// --- Gap filler for raytracer reprojection -------------------------------------------------------
+
+fn gf_valid(input: vec4f) -> bool {
+    // To signal “not filled” pixels, the reprojection stage will use an alpha value of -1.0
+    // in the clear color.
+    return input.a > -0.5;
+}
+
+fn gf_add_to_accum(accum: ptr<function, vec4f>, weight: f32, input: vec4f) {
+    if gf_valid(input) {
+        // use alpha channel as weight
+        *accum += vec4f(input.rgb * weight, weight);
+    }
+}
+
+@fragment
+fn gap_fill_downsample(in: VertexOutput) -> @location(0) vec4<f32> {
+    let center_sample = input_pixel(in, vec2<f32>(0.0, 0.0));
+    if gf_valid(center_sample) {
+        return center_sample;
+    }
+
+    // Offset by 0.5 because the whole pixels in the input are at double the resolution of this render.
+    var accum = vec4f(0.0);
+    gf_add_to_accum(&accum, 1.0, input_pixel(in, vec2<f32>(0.0, 0.0)));
+    gf_add_to_accum(&accum, 1.0, input_pixel(in, vec2<f32>(0.5, 0.0)));
+    gf_add_to_accum(&accum, 1.0, input_pixel(in, vec2<f32>(-0.5, 0.0)));
+    gf_add_to_accum(&accum, 1.0, input_pixel(in, vec2<f32>(0.0, 0.5)));
+    gf_add_to_accum(&accum, 1.0, input_pixel(in, vec2<f32>(0.0, -0.5)));
+    if accum.a > 0.5 {
+        return accum / accum.a;
+    } else {
+        // No valid samples; mark the input as invalid.
+        return vec4f(0.0, 0.0, 0.0, -1.0);
+    }
+}
+
+@fragment
+fn gap_fill_upsample(in: VertexOutput) -> @location(0) vec4<f32> {
+    let high_center_sample = textureSampleLevel(higher_stage_input, input_sampler, in.texcoord, 0.0);
+    if gf_valid(high_center_sample) {
+        return high_center_sample;
+    }
+
+    // Offset by 2.0 because the whole pixels in the input are at half the resolution of this render.
+    var accum = vec4f(0.0);
+    gf_add_to_accum(&accum, 2.0, input_pixel(in, vec2<f32>(0.0, 0.0)));
+    gf_add_to_accum(&accum, 1.0, input_pixel(in, vec2<f32>(2.0, 0.0)));
+    gf_add_to_accum(&accum, 1.0, input_pixel(in, vec2<f32>(-2.0, 0.0)));
+    gf_add_to_accum(&accum, 1.0, input_pixel(in, vec2<f32>(0.0, 2.0)));
+    gf_add_to_accum(&accum, 1.0, input_pixel(in, vec2<f32>(0.0, -2.0)));
+    if accum.a > 0.5 {
+        return accum / accum.a;
+    } else {
+        // No valid samples; mark the input as invalid.
+        return vec4f(0.0, 0.0, 0.0, -1.0);
+    }
 }

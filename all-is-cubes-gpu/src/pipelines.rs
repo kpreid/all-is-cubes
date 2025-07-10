@@ -611,7 +611,7 @@ impl Pipelines {
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
-                multisample,
+                multisample: wgpu::MultisampleState::default(),
                 multiview_mask: None,
                 cache,
             });

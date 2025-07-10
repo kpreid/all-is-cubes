@@ -230,7 +230,7 @@ impl EverythingRenderer {
                 ),
                 ui: SpaceRenderer::new("ui".into(), &device, &pipelines, block_texture, true),
             },
-            rt: RaytraceToTexture::new(&device, cameras.clone_unupdated()),
+            rt: RaytraceToTexture::new(&device, &shaders, cameras.clone_unupdated()),
 
             lines_buffer: ResizingBuffer::default(),
             lines_vertex_count: 0,
@@ -463,6 +463,7 @@ impl EverythingRenderer {
                 queue,
                 &self.pipelines,
                 &self.cameras.cameras().world,
+                self.queries.as_ref(),
             );
         }
 
@@ -674,7 +675,10 @@ impl EverythingRenderer {
 
         let gpu_times = if let Some(queries) = &mut self.queries {
             queries.resolve_and_fetch(&self.device, &mut pass_encoder);
-            queries.latest(crate::queries::TimestampInterpretation { bloom_present })
+            queries.latest(crate::queries::TimestampInterpretation {
+                bloom_present,
+                reprojecting: self.rt.is_reprojecting(),
+            })
         } else {
             None
         };

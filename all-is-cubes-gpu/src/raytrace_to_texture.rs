@@ -21,13 +21,19 @@ use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
 use all_is_cubes::math::{OpacityCategory, VectorOps as _};
 use all_is_cubes::universe::ReadTicket;
-use all_is_cubes_render::camera::{Camera, ImagePixel, Layers, StandardCameras, Viewport};
+use all_is_cubes_render::camera::{
+    Camera, ImagePixel, ImageSize, Layers, StandardCameras, Viewport,
+};
 use all_is_cubes_render::raytracer::{self, RtRenderer};
 use all_is_cubes_render::{Flaws, RenderError};
 
-use crate::common::{Identified, Memo};
 use crate::frame_texture::DrawableTexture;
+use crate::glue::size2d_to_extent;
+use crate::mip_ping;
 use crate::pipelines::Pipelines;
+use crate::queries::{Queries, Query};
+use crate::shaders::Shaders;
+use crate::{Identified, Memo};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -38,8 +44,15 @@ type Point = all_is_cubes::euclid::Point2D<u32, ImagePixel>;
 pub(crate) struct RaytraceToTexture {
     inner: Arc<Mutex<Inner>>,
     reprojection_uniform_buffer: wgpu::Buffer,
-    rt_bind_group:
+    draw_direct_bind_group:
         Memo<(crate::Id<wgpu::TextureView>, crate::Id<wgpu::TextureView>), wgpu::BindGroup>,
+    draw_reprojected_bind_group: Memo<
+        (
+            crate::Id<mip_ping::Texture<1>>,
+            crate::Id<wgpu::TextureView>,
+        ),
+        wgpu::BindGroup,
+    >,
 
     /// Whether it is allowed for an `update()` to actually change camera and the scene data.
     /// This only has an effect when `update_strategy` is `Consistent`.
@@ -55,6 +68,21 @@ pub(crate) struct RaytraceToTexture {
     /// Camera that was used for the frame currently stored in `Inner::color_render_target`.
     camera_used: Camera,
 
+    /// Used to initialize `gap_fill_texture`.
+    /// [`None`] if reprojection is not in use.
+    gap_fill_pipelines: Option<Arc<mip_ping::Pipelines>>,
+
+    /// Used to produce an image which has no black gaps between the reprojected points.
+    /// [`None`] if reprojection is not in use or the viewport hasn't been set yet.
+    gap_fill_texture: Option<Identified<mip_ping::Texture<1>>>,
+
+    /// Textures used as the output of the reprojection stage, before gap filling is applied.
+    ///
+    /// TODO: Get rid of these and use the first stage of the `gap_fill_texture` as these render
+    /// targets instead.
+    post_reprojection_color_and_depth_textures:
+        Memo<ImageSize, (Identified<wgpu::TextureView>, Identified<wgpu::TextureView>)>,
+
     #[cfg(feature = "auto-threads")]
     background_thread: Option<std::thread::JoinHandle<()>>,
 }
@@ -66,6 +94,8 @@ struct Inner {
     update_strategy: UpdateStrategy,
     dirty_pixels: usize,
     rays_per_frame: usize,
+
+    // Textures the CPU side writes to.
     color_render_target: DrawableTexture<[f16; 4], [f16; 4]>,
     depth_render_target: DrawableTexture<f32, f32>,
 }
@@ -99,7 +129,7 @@ enum UpdateStrategy {
 // -------------------------------------------------------------------------------------------------
 
 impl RaytraceToTexture {
-    pub fn new(device: &wgpu::Device, cameras: StandardCameras) -> Self {
+    pub fn new(device: &wgpu::Device, shaders: &Shaders, cameras: StandardCameras) -> Self {
         let initial_viewport = Viewport::with_scale(1.0, vec2(1, 1));
         let camera_used = cameras.cameras().world.clone();
 
@@ -113,6 +143,30 @@ impl RaytraceToTexture {
                 want_reprojection: true,
             }
         };
+
+        let gap_fill_pipelines = update_strategy.want_reprojection().then(|| {
+            let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("RaytraceToTexture gap_fill sampler"),
+                // TODO: evaluate which address mode produces the best appearance
+                address_mode_u: wgpu::AddressMode::MirrorRepeat,
+                address_mode_v: wgpu::AddressMode::MirrorRepeat,
+                address_mode_w: wgpu::AddressMode::MirrorRepeat,
+                mag_filter: wgpu::FilterMode::Nearest,
+                min_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+                ..Default::default()
+            });
+            mip_ping::Pipelines::new(
+                device,
+                "RaytraceToTexture gap_fill".into(),
+                [wgpu::TextureFormat::Rgba16Float],
+                shaders.resampling.get(),
+                "full_image_vertex",
+                "gap_fill_downsample",
+                "gap_fill_upsample",
+                sampler,
+            )
+        });
 
         let inner = Arc::new(Mutex::new(Inner {
             rays_per_frame: 5000
@@ -158,7 +212,8 @@ impl RaytraceToTexture {
         };
 
         Self {
-            rt_bind_group: Memo::new(),
+            draw_direct_bind_group: Memo::new(),
+            draw_reprojected_bind_group: Memo::new(),
             reprojection_uniform_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("RaytraceToTexture::reprojection_uniform_buffer"),
                 size: size_of::<ReprojectionUniforms>().try_into().unwrap(),
@@ -169,6 +224,9 @@ impl RaytraceToTexture {
             may_start_next_frame: true,
             should_reproject: None,
             camera_used,
+            gap_fill_pipelines,
+            gap_fill_texture: None,
+            post_reprojection_color_and_depth_textures: Memo::new(),
 
             #[cfg(feature = "auto-threads")]
             background_thread,
@@ -189,14 +247,56 @@ impl RaytraceToTexture {
         Ok(())
     }
 
-    /// Trace a frame's worth of rays (which may be less than the scene) and update the texture.
+    /// Trace a frame's worth of rays (which may be less than the scene) and update the texture
+    /// so that we are ready to [`Self::draw()`] into a render pass.
     pub fn prepare_frame(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         pipelines: &Pipelines,
         camera: &Camera,
+        queries: Option<&Queries>,
     ) {
+        // First, do steps we can do without taking the `Inner` lock.
+
+        let render_viewport = raytracer_size_policy(camera.viewport());
+
+        let (post_reprojection_color, post_reprojection_depth) = self
+            .post_reprojection_color_and_depth_textures
+            .get_or_insert(render_viewport.framebuffer_size, || {
+                let color_texture = device
+                    .create_texture(&wgpu::TextureDescriptor {
+                        label: Some("post_reprojection_color"),
+                        size: size2d_to_extent(render_viewport.framebuffer_size),
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                            | wgpu::TextureUsages::TEXTURE_BINDING,
+                        view_formats: &[],
+                    })
+                    .create_view(&Default::default());
+                let depth_texture = device
+                    .create_texture(&wgpu::TextureDescriptor {
+                        label: Some("post_reprojection_depth"),
+                        size: size2d_to_extent(render_viewport.framebuffer_size),
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: wgpu::TextureFormat::Depth32Float,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                            | wgpu::TextureUsages::TEXTURE_BINDING,
+                        view_formats: &[],
+                    })
+                    .create_view(&Default::default());
+                (
+                    Identified::new(color_texture),
+                    Identified::new(depth_texture),
+                )
+            });
+
+        // Take the lock.
         let start_time = Instant::now();
         let inner = &mut *self.inner.lock().unwrap(); // not handling poisoning, just fail
         let got_lock_time = Instant::now();
@@ -205,14 +305,42 @@ impl RaytraceToTexture {
             got_lock_time.saturating_duration_since(start_time).refmt(&ConciseDebug)
         );
 
-        let adjusted_viewport = raytracer_size_policy(camera.viewport());
-        inner.set_viewport(device, adjusted_viewport);
+        // Resize textures if needed.
+        if inner.update_strategy.render_viewport() != render_viewport {
+            inner.color_render_target.resize(
+                device,
+                Some("RaytraceToTexture::color_render_target"),
+                render_viewport.framebuffer_size,
+            );
+            inner.depth_render_target.resize(
+                device,
+                Some("RaytraceToTexture::depth_render_target"),
+                render_viewport.framebuffer_size,
+            );
+            inner.update_strategy.resize(render_viewport);
+
+            if inner.update_strategy.want_reprojection() {
+                self.gap_fill_texture = Some(Identified::new(mip_ping::Texture::new(
+                    device,
+                    self.gap_fill_pipelines.as_deref().unwrap(),
+                    size2d_to_extent(render_viewport.framebuffer_size),
+                    [&**post_reprojection_color],
+                    12,
+                    1,
+                    Query::BeginGapFill,
+                    Query::EndGapFill,
+                )));
+            }
+
+            inner.dirty();
+        }
 
         // Update bind group if needed
         let color_view: &Identified<wgpu::TextureView> = inner.color_render_target.view().unwrap();
         let depth_view: &Identified<wgpu::TextureView> = inner.depth_render_target.view().unwrap();
-        self.rt_bind_group
-            .get_or_insert((color_view.global_id(), depth_view.global_id()), || {
+        let draw_direct_bind_group = self.draw_direct_bind_group.get_or_insert(
+            (color_view.global_id(), depth_view.global_id()),
+            || {
                 device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("rt to scene copy"),
                     layout: &pipelines.rt_frame_copy_layout,
@@ -235,7 +363,46 @@ impl RaytraceToTexture {
                         },
                     ],
                 })
-            });
+            },
+        );
+
+        // not used here but needs to be initialized
+        if let Some(gap_fill_texture) = self.gap_fill_texture.as_ref() {
+            self.draw_reprojected_bind_group.get_or_insert(
+                (
+                    gap_fill_texture.global_id(),
+                    post_reprojection_depth.global_id(),
+                ),
+                || {
+                    device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("rt to scene copy"),
+                        layout: &pipelines.rt_frame_copy_layout,
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(
+                                    &gap_fill_texture.output_texture_views[0],
+                                ),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::TextureView(
+                                    post_reprojection_depth,
+                                ),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 2,
+                                resource: wgpu::BindingResource::Sampler(&pipelines.linear_sampler),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 3,
+                                resource: self.reprojection_uniform_buffer.as_entire_binding(),
+                            },
+                        ],
+                    })
+                },
+            );
+        }
 
         // If we don’t currently have a background tracing thread (either because it is not enabled
         // or because it died), do some tracing right now while we have the lock held.
@@ -296,29 +463,19 @@ impl RaytraceToTexture {
                         .framebuffer_size
                         .to_f32()
                         .to_vector()
-                        .component_div(adjusted_viewport.framebuffer_size.to_f32().to_vector())
+                        .component_div(render_viewport.framebuffer_size.to_f32().to_vector())
                         .into(),
                     _padding: Default::default(),
                 }),
             );
-            self.should_reproject = Some(inner.update_strategy.render_viewport());
-        }
-    }
+            // TODO: with gap_fill this field may be obsolete
+            self.should_reproject = Some(render_viewport);
 
-    /// Draw a copy of the raytraced scene (as of the last [`Self::prepare_frame()`]).
-    pub(crate) fn draw(
-        &self,
-        pipelines: &Pipelines,
-        render_pass: &mut wgpu::RenderPass<'_>,
-    ) -> Flaws {
-        let Some(rt_bind_group) = self.rt_bind_group.get() else {
-            return Flaws::UNFINISHED;
-        };
+            // TODO: accept external encoder
+            let mut encoder =
+                device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
 
-        render_pass.set_bind_group(0, rt_bind_group, &[]);
-
-        if let Some(render_viewport) = self.should_reproject {
-            // Draw with reprojection.
+            // Perform reprojecting draw
             //
             // Note that our reprojection is “forward” rather than “backward”: rather than
             // reprojecting the current frame back to the image position in a previous frame,
@@ -328,20 +485,83 @@ impl RaytraceToTexture {
             // (triangle) for every single old pixel.
             //
             // TODO: Improve performance and quality by drawing single points instead of
-            // triangles, then filling in the gaps using
-            // <https://en.wikipedia.org/wiki/Jump_flooding_algorithm> or some other algorithm
-            // to fill the gaps between points.
-            let size = render_viewport.framebuffer_size;
-            let vertex_count = size.width.saturating_mul(size.height).saturating_mul(3);
-            render_pass.set_pipeline(&pipelines.rt_reproject_pipeline);
-            render_pass.draw(0..vertex_count, 0..1);
-        } else {
-            // Draw a straightforward upscaling with no reprojection.
-            render_pass.set_pipeline(&pipelines.rt_frame_copy_pipeline);
-            render_pass.draw(0..3, 0..1);
+            // triangles, then figuring out some way to have gap filling reject distant pixels
+            // in favor of nearby ones.
+            {
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("rt reprojection"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: post_reprojection_color,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(REPROJECTION_CLEAR_COLOR),
+                            store: wgpu::StoreOp::Store,
+                        },
+                        depth_slice: None,
+                        resolve_target: None,
+                    })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: post_reprojection_depth,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    }),
+                    timestamp_writes: queries.map(|queries| wgpu::RenderPassTimestampWrites {
+                        query_set: &queries.query_set,
+                        beginning_of_pass_write_index: Some(
+                            Query::BeginReprojectRenderPass.index(),
+                        ),
+                        end_of_pass_write_index: Some(Query::EndReprojectRenderPass.index()),
+                    }),
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                render_pass.set_bind_group(0, &*draw_direct_bind_group, &[]);
+                let vertex_count = render_viewport
+                    .framebuffer_size
+                    .width
+                    .saturating_mul(render_viewport.framebuffer_size.height)
+                    .saturating_mul(3);
+                render_pass.set_pipeline(&pipelines.rt_reproject_pipeline);
+                render_pass.draw(0..vertex_count, 0..1);
+            }
+
+            // Run gap-filling operation on output of draw
+            self.gap_fill_texture.as_ref().unwrap().run(&mut encoder, queries);
+
+            queue.submit([encoder.finish()]);
         }
+    }
+
+    /// Draw a copy of the raytraced scene (as of the last [`Self::prepare_frame()`]).
+    ///
+    /// The commands encoded on `prior_encoder` must be executed _before_ `render_pass`.
+    pub(crate) fn draw(
+        &self,
+        pipelines: &Pipelines,
+        render_pass: &mut wgpu::RenderPass<'_>,
+    ) -> Flaws {
+        let Some(rt_bind_group) = (if self.should_reproject.is_some() {
+            self.draw_reprojected_bind_group.get()
+        } else {
+            self.draw_direct_bind_group.get()
+        }) else {
+            return Flaws::UNFINISHED;
+        };
+
+        render_pass.set_bind_group(0, rt_bind_group, &[]);
+
+        // Draw a straightforward upscaling with no reprojection.
+        // TODO: If we previously reprojected, grab the gap-fill output
+        render_pass.set_pipeline(&pipelines.rt_frame_copy_pipeline);
+        render_pass.draw(0..3, 0..1);
 
         Flaws::empty()
+    }
+
+    pub(crate) fn is_reprojecting(&self) -> bool {
+        self.should_reproject.is_some()
     }
 }
 
@@ -355,25 +575,6 @@ impl Inner {
             self.dirty();
         }
         Ok(())
-    }
-
-    fn set_viewport(&mut self, device: &wgpu::Device, render_viewport: Viewport) {
-        if self.update_strategy.render_viewport() == render_viewport {
-            // don't reset/dirty anything
-            return;
-        }
-        self.color_render_target.resize(
-            device,
-            Some("RaytraceToTexture::color_render_target"),
-            render_viewport.framebuffer_size,
-        );
-        self.depth_render_target.resize(
-            device,
-            Some("RaytraceToTexture::depth_render_target"),
-            render_viewport.framebuffer_size,
-        );
-        self.update_strategy.resize(render_viewport);
-        self.dirty();
     }
 
     fn dirty(&mut self) {
@@ -545,6 +746,15 @@ impl Inner {
         // );
     }
 }
+
+const REPROJECTION_CLEAR_COLOR: wgpu::Color = wgpu::Color {
+    // We clear the reprojection output texture to this special value with a negative
+    // alpha component, and the gap filler looks for it to find gaps to fill.
+    r: 0.0,
+    g: 0.0,
+    b: 0.0,
+    a: -1.0,
+};
 
 // -------------------------------------------------------------------------------------------------
 
