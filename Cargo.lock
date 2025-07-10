@@ -163,6 +163,7 @@ dependencies = [
  "all-is-cubes-render",
  "all-is-cubes-ui",
  "anyhow",
+ "async_fn_traits",
  "cfg-if",
  "clap",
  "directories-next",

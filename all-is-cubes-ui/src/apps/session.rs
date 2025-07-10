@@ -11,7 +11,7 @@ use flume::TryRecvError;
 use futures_core::future::BoxFuture;
 use sync_wrapper::SyncWrapper;
 
-use all_is_cubes::arcstr::{self, ArcStr};
+use all_is_cubes::arcstr::{self, ArcStr, literal};
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
@@ -25,7 +25,7 @@ use all_is_cubes::universe::{
     UniverseTransaction,
 };
 use all_is_cubes::util::{
-    ConciseDebug, Fmt, Refmt as _, ShowStatus, StatusText, YieldProgressBuilder,
+    ConciseDebug, Fmt, Refmt as _, ShowStatus, StatusText, YieldProgress, YieldProgressBuilder,
 };
 use all_is_cubes_render::camera::{
     GraphicsOptions, Layers, StandardCameras, UiViewState, Viewport,
@@ -34,6 +34,7 @@ use all_is_cubes_render::camera::{
 use crate::apps::{FpsCounter, FrameClock, InputProcessor, InputTargets, Settings};
 use crate::ui_content::Vui;
 use crate::ui_content::notification::{self, Notification};
+use crate::vui::widgets::ProgressBarState;
 
 const LOG_FIRST_FRAMES: bool = false;
 
@@ -1223,6 +1224,60 @@ impl MainTaskContext {
         self.with_mut(|shuttle| {
             shuttle.set_universe(universe);
         })
+    }
+
+    /// Run the given async task which will obtain a new [`Universe`] and replace the current one.
+    /// Display a progress notification during this period.
+    ///
+    /// If possible, the produced future should do its work on a background thread
+    /// to minimize impact on the session execution.
+    ///
+    /// Panics if called while the main task is suspended.
+    //---
+    // TODO: Additional UI features:
+    // * Optional confirmation with preview after loading and before actually replacing
+    // * Optional fade to black transition
+    // Also add a test for this
+    pub async fn set_universe_async<F>(&mut self, f: F)
+    where
+        F: async_fn_traits::AsyncFnOnce1<
+                YieldProgress,
+                // TODO: we need to choose some standard "rich error to report to the user" format
+                Output = Result<Box<Universe>, ArcStr>,
+                OutputFuture: Send + 'static,
+            > + Send
+            + 'static,
+    {
+        let notification = self
+            .show_notification(notification::NotificationContent::Progress {
+                title: literal!("Loading..."),
+                progress: ProgressBarState::new(0.0),
+                part: literal!(""),
+            })
+            .ok();
+
+        let progress = YieldProgressBuilder::new()
+            .progress_using(move |info| {
+                if let Some(notification) = &notification {
+                    notification.set_content(notification::NotificationContent::Progress {
+                        title: literal!("Loading..."),
+                        progress: ProgressBarState::new(info.fraction().into()),
+                        part: info.label_str().into(),
+                    });
+                }
+            })
+            .build();
+
+        match f(progress).await {
+            Ok(universe) => {
+                self.set_universe(*universe);
+            }
+            Err(error_message) => {
+                self.show_modal_message(error_message);
+            }
+        }
+
+        // TODO: Force the notification to go away even if somebody cloned our YieldProgress
     }
 
     /// Allows reading or changing the settings of this session.

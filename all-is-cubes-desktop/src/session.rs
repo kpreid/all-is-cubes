@@ -4,10 +4,8 @@ use std::time::{Duration, Instant};
 
 use all_is_cubes::arcstr;
 use all_is_cubes::listen;
-#[cfg(doc)]
-use all_is_cubes::universe::Universe;
-use all_is_cubes::universe::UniverseStepInfo;
-use all_is_cubes::util::ErrorChain;
+use all_is_cubes::universe::{Universe, UniverseStepInfo};
+use all_is_cubes::util::{ErrorChain, YieldProgress};
 use all_is_cubes_render::camera::{StandardCameras, Viewport};
 use all_is_cubes_ui::apps::{ExitMainTask, MainTaskContext};
 
@@ -151,43 +149,33 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     /// in a manner appropriate for e.g. the user dropping a file on the window.
     ///
     /// See [`all_is_cubes_port::load_universe_from_file`] for supported formats.
-    ///
-    /// TODO: Instead of specifying exactly “replace universe”, we should have a
-    /// general application concept of “open a provided file” which matches the
-    /// command-line behavior as much as is reasonable, and also maybe supports
-    /// e.g. importing resources *into* an existing universe.
+    //---
+    // TODO: Instead of specifying exactly “replace universe”, we should have a
+    // general application concept of “open a provided file” which matches the
+    // command-line behavior as much as is reasonable, and also maybe supports
+    // e.g. importing resources *into* an existing universe.
+    //
+    // TODO: Also make a way to do this that isn't replacing the main task,
+    // or that defines a way for the existing main task to coordinate or for the user to
+    // accept/reject.
     pub fn replace_universe_with_file(&mut self, path: PathBuf) {
-        // TODO: ideally this would be a cancelled-on-drop task
-        let loader_task = self
-            .executor
-            .tokio()
-            .spawn(all_is_cubes_port::load_universe_from_file(
-                crate::glue::tokio_yield_progress().build(),
-                Arc::new(path.clone()),
-            ));
-
-        // TODO: Also make a way to do this that isn't replacing the main task,
-        // or that defines a way for the existing main task to coordinate.
-        self.session
-            .set_main_task(async move |mut ctx: MainTaskContext| {
-                // TODO: Offer confirmation before replacing the current universe.
-                // TODO: Then open a progress-bar UI page while we load.
-
-                match loader_task.await.unwrap() {
-                    Ok(universe) => {
-                        ctx.set_universe(*universe);
-                    }
-                    Err(e) => {
-                        ctx.show_modal_message(arcstr::format!(
-                            "Failed to load file '{path}':\n{e}",
+        let executor = self.executor.clone();
+        self.session.set_main_task(async move |mut ctx| {
+            load_new_universe_async(&mut ctx, executor, async move |progress| {
+                all_is_cubes_port::load_universe_from_file(progress, Arc::new(path.clone()))
+                    .await
+                    .map_err(|error| {
+                        arcstr::format!(
+                            "Failed to load file '{path}':\n{error}",
                             path = path.display(),
-                            e = ErrorChain(&e),
-                        ));
-                    }
-                }
-
-                ExitMainTask
+                            error = ErrorChain(&error),
+                        )
+                    })
             })
+            .await;
+
+            ExitMainTask
+        })
     }
 
     /// Set the “fixed” window title — the portion of the title not determined by the universe,
@@ -252,6 +240,8 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Defines the clock for time passing in the simulation managed by a [`DesktopSession`].
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
@@ -261,4 +251,43 @@ pub enum ClockSource {
     /// Every time [`DesktopSession::advance_time_and_maybe_step`] is called, advance time
     /// by the specified amount.
     Fixed(Duration),
+}
+
+// -------------------------------------------------------------------------------------------------
+
+#[expect(dead_code, reason = "TODO: hook this up to a user-issued command")]
+async fn reload_universe(ctx: &mut MainTaskContext, executor: Arc<crate::Executor>) {
+    let whence = ctx.with_universe(|universe| universe.whence.clone());
+    load_new_universe_async(ctx, executor, async move |progress| {
+        whence.load(progress).await.map_err(|error| {
+            arcstr::format!(
+                "Failed to reload universe:\n{error}",
+                error = ErrorChain(&*error),
+            )
+        })
+    })
+    .await
+}
+
+// TODO: except for being tokio-specific, this belongs in `Session` itself.
+pub(crate) async fn load_new_universe_async(
+    ctx: &mut MainTaskContext,
+    executor: Arc<crate::Executor>,
+    loader: impl async_fn_traits::AsyncFnOnce1<
+        YieldProgress,
+        Output = Result<Box<Universe>, arcstr::ArcStr>,
+        OutputFuture: Send + 'static,
+    > + Send
+    + 'static,
+) {
+    ctx.set_universe_async(async move |progress| {
+        // TODO: ideally this would be a cancelled-on-drop task
+        // TODO: hook up proper tokio yield (this will require <https://github.com/kpreid/yield-progress/issues/36>)
+        let loader_task = executor.tokio().spawn(loader(progress));
+
+        loader_task
+            .await
+            .expect("tokio runtime unexpectedly failed")
+    })
+    .await
 }
