@@ -158,7 +158,7 @@ unicode-width = { version = "0.2", default-features = false }
 # explicitly enabling "std" needed for <https://github.com/rustwasm/wasm-bindgen/issues/4303>
 wasm-bindgen-futures = { version = "0.4.50", default-features = false, features = ["std"] }
 web-time = { version = "1.1.0", default-features = false }
-wgpu = { version = "25.0.0", default-features = false, features = ["wgsl"] }
+wgpu = { version = "26.0.0", default-features = false, features = ["wgsl"] }
 yield-progress = { version = "0.1.6", default-features = false }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.
