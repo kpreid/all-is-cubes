@@ -120,6 +120,7 @@ impl PostprocessResources {
                 label: Some("add_info_text_and_postprocess() pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: output,
+                    depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,

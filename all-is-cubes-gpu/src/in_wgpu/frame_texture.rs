@@ -304,6 +304,7 @@ impl FramebufferTextures {
     ) -> wgpu::RenderPassColorAttachment<'_> {
         wgpu::RenderPassColorAttachment {
             view: &self.linear_scene_view,
+            depth_slice: None,
             resolve_target: self.linear_scene_resolved_view.as_deref(),
             ops: wgpu::Operations {
                 load: color_load_op,

@@ -309,6 +309,7 @@ impl BloomResources {
                 label: Some(label),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: color_texture_view,
+                    depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),

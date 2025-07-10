@@ -188,6 +188,7 @@ impl RerunImageExport {
                     color_attachments: &[
                         Some(wgpu::RenderPassColorAttachment {
                             view: srgb_color_texture_view,
+                            depth_slice: None,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::GREEN), // will not be seen
@@ -196,6 +197,7 @@ impl RerunImageExport {
                         }),
                         Some(wgpu::RenderPassColorAttachment {
                             view: linear_depth_texture_view,
+                            depth_slice: None,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::GREEN), // will not be seen
