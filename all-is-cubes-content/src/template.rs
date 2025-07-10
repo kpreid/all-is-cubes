@@ -299,7 +299,6 @@ impl WhenceUniverse for TemplateAndParameters {
         Box::pin(async move {
             ingredients
                 .template
-                // TODO: don't use placeholder time
                 .build(progress, ingredients.parameters)
                 .await
                 .map_err(From::from)
