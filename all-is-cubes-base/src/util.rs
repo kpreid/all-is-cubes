@@ -28,9 +28,12 @@ pub use multi_failure::MultiFailure;
 /// In the typical case, applications making use of All is Cubes libraries provide an implementation
 /// of this trait to functions which can make use of it.
 ///
-/// Executors should generally implement `Clone`.
+/// Executors are typically passed as [`Arc<dyn Executor>`][Arc].
+/// Dropping the `Executor` should not cancel tasks started by it; the `Executor` implementation
+/// is a “handle to” the actual executor mechanism.
 pub trait Executor: fmt::Debug + Send + Sync {
-    /// Create a set of tasks which runds the provided `future`, if possible.
+    /// Create a set of tasks which run the futures created by calling `task_factory` several times,
+    /// if possible.
     ///
     /// The given `task_factory` is called some number of times appropriate to the available
     /// parallelism. If only single-threaded asynchronous execution is supported, it will be called
@@ -40,6 +43,9 @@ pub trait Executor: fmt::Debug + Send + Sync {
     /// The future **must periodically yield** by calling [`Executor::yield_now()`].
     /// Otherwise, it may prevent other tasks, even “foreground” ones, from progressing.
     /// This requirement is for the benefit of single-threaded [`Executor`]s.
+    ///
+    /// The tasks are responsible for terminating on their own when they are no longer needed,
+    /// such as by a channel receiver being closed.
     fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>);
 
     /// Grants an opportunity for other tasks to execute instead of the current one.
