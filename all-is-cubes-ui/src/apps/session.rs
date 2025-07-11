@@ -128,6 +128,8 @@ struct Shuttle {
     session_event_notifier: Arc<listen::Notifier<Event>>,
 
     quit_fn: Option<QuitFn>,
+
+    custom_commands: listen::CellWithLocal<Arc<[crate::ui_content::Command]>>,
 }
 
 impl fmt::Debug for Session {
@@ -162,6 +164,7 @@ impl fmt::Debug for Session {
             quit_fn,
             fluff_notifier,
             session_event_notifier,
+            custom_commands,
         } = &**shuttle;
 
         f.debug_struct("Session")
@@ -181,6 +184,7 @@ impl fmt::Debug for Session {
                 "quit_fn",
                 &quit_fn.as_ref().map(|_cant_print_a_function| ()),
             )
+            .field("custom_commands", &custom_commands)
             .field("cursor_result", &cursor_result)
             .field("last_step_info", &last_step_info)
             .field("tick_counter_for_logging", &tick_counter_for_logging)
@@ -845,6 +849,7 @@ impl SessionBuilder {
         let input_processor = InputProcessor::new();
         let paused = listen::Cell::new(false);
         let (control_send, control_recv) = flume::bounded(100);
+        let custom_commands = listen::CellWithLocal::new([].into());
 
         let space_watch_state = Layers {
             world: SpaceWatchState::empty(),
@@ -867,6 +872,7 @@ impl SessionBuilder {
                             fullscreen_mode: fullscreen_state,
                             set_fullscreen,
                             quit: quit_fn.clone(),
+                            custom_commands: custom_commands.as_source(),
                         })
                         .await,
                     ),
@@ -886,6 +892,7 @@ impl SessionBuilder {
                 fluff_notifier: Arc::new(listen::Notifier::new()),
                 control_channel_sender: control_send.clone(),
                 quit_fn,
+                custom_commands,
             })),
             input_processor,
             main_task: None,
@@ -1300,6 +1307,28 @@ impl MainTaskContext {
     /// the future if the result value is not wanted.
     pub fn quit(&self) -> impl Future<Output = QuitResult> + Send + 'static + use<> {
         self.with_ref(|shuttle| shuttle.quit())
+    }
+
+    /// Add a custom command button, which will be displayed in the pause menu.
+    ///
+    /// Future versions may allow such commands to be bound to keys or displayed elsewhere.
+    ///
+    /// Panics if called while the main task is suspended.
+    //---
+    // TODO: make it so that this returns a handle, or rather a "command was invoked" channel
+    // in lieu of an arbitrary function, that deletes the command if dropped.
+    pub fn add_custom_command(&mut self, command: crate::ui_content::Command) {
+        self.with_mut(|shuttle| {
+            shuttle.custom_commands.set(
+                shuttle
+                    .custom_commands
+                    .get()
+                    .iter()
+                    .cloned()
+                    .chain([command])
+                    .collect(),
+            )
+        });
     }
 
     /// Display a dialog box with a message. The user can exit the dialog box to return

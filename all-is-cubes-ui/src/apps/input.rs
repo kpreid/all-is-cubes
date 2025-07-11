@@ -593,6 +593,7 @@ mod tests {
             fullscreen_mode: listen::constant(None),
             set_fullscreen: None,
             quit: None,
+            custom_commands: listen::constant(Default::default()),
         })
         .await;
 

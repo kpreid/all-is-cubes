@@ -47,6 +47,22 @@ pub(super) fn new_paused_page(
         )),
         vui::leaf_widget(pause_toggle_button(hud_inputs, OptionsStyle::LabeledColumn)),
     ];
+
+    // TODO: need to make this update on change (by invalidating the page)
+    for command in hud_inputs.custom_commands.get().iter() {
+        let command_fn = command.command.clone();
+        children.push(vui::leaf_widget(widgets::ActionButton::new(
+            command.label.clone(),
+            &hud_inputs.hud_blocks.widget_theme,
+            move || match command_fn() {
+                Ok(()) => {}
+                Err(_) => {
+                    // TODO: display message indicating failure
+                }
+            },
+        )));
+    }
+
     if let Some(quit_fn) = hud_inputs.quit.clone() {
         children.push(vui::leaf_widget(widgets::ActionButton::new(
             literal!("Quit"),

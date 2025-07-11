@@ -42,6 +42,6 @@ pub mod logo;
 #[cfg(feature = "session")]
 mod ui_content;
 #[cfg(feature = "session")]
-pub use ui_content::notification;
+pub use ui_content::{Command, notification};
 
 pub mod vui;

@@ -1,5 +1,7 @@
+use alloc::boxed::Box;
 use alloc::string::{String, ToString as _};
 use alloc::sync::Arc;
+use core::fmt;
 use std::sync::Mutex;
 
 use flume::TryRecvError;
@@ -49,6 +51,20 @@ pub(crate) struct UiTargets {
     pub(crate) set_fullscreen: FullscreenSetter,
 
     pub(crate) quit: Option<QuitFn>,
+
+    pub(crate) custom_commands: listen::DynSource<Arc<[Command]>>,
+}
+
+// TODO: define a builder
+#[allow(missing_docs)]
+#[derive(Clone)]
+pub struct Command {
+    pub label: ArcStr,
+    // TODO: icon_name: Option<Name>,
+
+    // TODO: replace uses of arbitrary functions with some kind of channel to the session
+    pub command:
+        Arc<dyn Fn() -> Result<(), Box<dyn core::error::Error + Send + Sync>> + Send + Sync>,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -103,6 +119,7 @@ pub(crate) struct Vui {
     /// Our choice of `flume` in particular is just because our other crates use it.
     control_channel: flume::Receiver<VuiMessage>,
     changed_character: listen::Flag,
+    changed_custom_commands: listen::Flag,
     tooltip_state: Arc<Mutex<TooltipState>>,
     /// Messages from session to UI that don't fit as [`listen::DynSource`] changes.
     cue_channel: CueNotifier,
@@ -149,8 +166,7 @@ impl Vui {
             (*params.graphics_options.get()).clone(),
         )));
 
-        // TODO: HudInputs should own `UiTargets` or something so that we don’t have one
-        // line per thing.
+        let changed_custom_commands = listen::Flag::listening(false, &params.custom_commands);
         let changed_viewport = listen::Flag::listening(false, &viewport_source);
         let ui_size = UiSize::new(viewport_source.get());
         let hud_inputs = HudInputs {
@@ -192,6 +208,7 @@ impl Vui {
 
             control_channel: control_recv,
             changed_character: listen::Flag::listening(false, &params.character_source),
+            changed_custom_commands,
             tooltip_state,
             cue_channel,
             notif_hub,
@@ -247,7 +264,15 @@ impl Vui {
 
         let next_page: &mut PageInst = match &*self.state.get() {
             VuiPageState::Hud => &mut self.hud_page,
-            VuiPageState::Paused => &mut self.paused_page,
+            VuiPageState::Paused => {
+                if self.changed_custom_commands.get_and_clear() {
+                    // TODO: make this dependency solely the page's responsibility
+                    // instead of hardcoding it here
+                    self.paused_page =
+                        PageInst::new(pages::new_paused_page(universe, &self.hud_inputs).unwrap());
+                }
+                &mut self.paused_page
+            }
             VuiPageState::Options => &mut self.options_page,
             VuiPageState::AboutText => &mut self.about_page,
             VuiPageState::Progress => &mut self.progress_page,
@@ -629,6 +654,18 @@ pub(crate) enum CueMessage {
     Clicked(usize),
 }
 
+// -------------------------------------------------------------------------------------------------
+
+impl fmt::Debug for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Command")
+            .field("label", &self.label)
+            .finish_non_exhaustive()
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -645,6 +682,7 @@ mod tests {
             fullscreen_mode: listen::constant(None),
             set_fullscreen: None,
             quit: None,
+            custom_commands: listen::constant(Default::default()),
         })
         .await;
         (vui, ccrx)
