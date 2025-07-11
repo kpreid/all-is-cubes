@@ -96,9 +96,7 @@ pub fn create_terminal_session(
     dsession
         .viewport_cell
         .set(options.viewport_from_terminal_size(rect_size(Rect::default())));
-    let cameras = dsession
-        .session
-        .create_cameras(dsession.viewport_cell.as_source());
+    let cameras = dsession.create_cameras();
 
     // Generate reusable buffers for scene.
     // They are recirculated through the channels so that one can be updated while another is being raytraced.

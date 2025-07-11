@@ -8,7 +8,7 @@ use all_is_cubes::listen;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::universe::UniverseStepInfo;
 use all_is_cubes::util::ErrorChain;
-use all_is_cubes_render::camera::Viewport;
+use all_is_cubes_render::camera::{StandardCameras, Viewport};
 use all_is_cubes_ui::apps::{ExitMainTask, MainTaskContext};
 
 use crate::Session;
@@ -218,8 +218,17 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         );
     }
 
-    pub(crate) fn executor(&self) -> &Arc<crate::Executor> {
+    #[allow(missing_docs)]
+    pub fn executor(&self) -> &Arc<crate::Executor> {
         &self.executor
+    }
+
+    /// Returns a [`StandardCameras`] which may be used in rendering a view of this session,
+    /// including following changes to the current character or universe.
+    ///
+    /// They will be freshly [updated][StandardCameras::update].
+    pub fn create_cameras(&self) -> StandardCameras {
+        self.session.create_cameras(self.viewport_cell.as_source())
     }
 
     #[cfg_attr(not(feature = "terminal"), expect(dead_code))]
