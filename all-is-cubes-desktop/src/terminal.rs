@@ -2,7 +2,6 @@
 
 #![expect(clippy::module_name_repetitions)] // TODO: consider renaming relevant items
 
-use std::sync::Arc;
 use std::sync::mpsc::{self, TrySendError};
 use std::time::{Duration, Instant};
 
@@ -16,7 +15,7 @@ use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen;
 use all_is_cubes::math::Rgba;
 use all_is_cubes::universe::StrongHandle;
-use all_is_cubes_render::camera::{self, Camera, StandardCameras, Viewport};
+use all_is_cubes_render::camera::{self, Camera, StandardCameras};
 use all_is_cubes_render::raytracer::{
     self, Accumulate, CharacterBuf, CharacterRtData, ColorBuf, RtRenderer,
 };
@@ -91,13 +90,15 @@ struct FrameInput {
 
 /// Creates a [`DesktopSession`] which can be used with [`terminal_main_loop`].
 pub fn create_terminal_session(
-    executor: Arc<crate::Executor>,
-    session: Session,
+    dsession: DesktopSession<(), ()>,
     options: TerminalOptions,
-    viewport_cell: listen::Cell<Viewport>,
 ) -> Result<DesktopSession<TerminalRenderer, TerminalWindow>, anyhow::Error> {
-    viewport_cell.set(options.viewport_from_terminal_size(rect_size(Rect::default())));
-    let cameras = session.create_cameras(viewport_cell.as_source());
+    dsession
+        .viewport_cell
+        .set(options.viewport_from_terminal_size(rect_size(Rect::default())));
+    let cameras = dsession
+        .session
+        .create_cameras(dsession.viewport_cell.as_source());
 
     // Generate reusable buffers for scene.
     // They are recirculated through the channels so that one can be updated while another is being raytraced.
@@ -149,8 +150,7 @@ pub fn create_terminal_session(
         })
         .context("failed to create terminal raytracer thread")?;
 
-    Ok(DesktopSession::new(
-        executor,
+    Ok(dsession.attach_window(
         TerminalRenderer {
             cameras,
             options,
@@ -159,8 +159,6 @@ pub fn create_terminal_session(
             render_pipe_out,
         },
         TerminalWindow::new().context("failed to create TerminalWindow")?,
-        session,
-        viewport_cell,
         false, // tty might be remote, so no gamepad input
     ))
 }

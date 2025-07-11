@@ -38,8 +38,10 @@ pub struct DesktopSession<Ren, Win> {
     /// foreground window, rather than one per session.
     gilrs: Option<gilrs::Gilrs>,
 
-    /// The current viewport size linked to the renderer.
+    /// The current viewport size linked to the renderer, and, more irrevocably, the session UI.
+    /// This cell should be written whenever the window size changes.
     pub(crate) viewport_cell: listen::Cell<Viewport>,
+
     pub(crate) clock_source: ClockSource,
 
     /// If present, connection to system audio output.
@@ -58,37 +60,21 @@ pub struct DesktopSession<Ren, Win> {
     session_info_altered: listen::Flag,
 }
 
-impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
+impl DesktopSession<(), ()> {
     #[allow(missing_docs)]
     pub fn new(
         executor: Arc<crate::Executor>,
-        renderer: Ren,
-        window: Win,
         session: Session,
         viewport_cell: listen::Cell<Viewport>,
-        enable_gamepad_input: bool,
     ) -> Self {
-        // TODO: There should be one of this for the whole event loop, not per session
-        let gilrs = if enable_gamepad_input {
-            match gilrs::Gilrs::new() {
-                Ok(gilrs) => Some(gilrs),
-                Err(e) => {
-                    log::error!("Failed to access gamepads: {:?}", ErrorChain(&e));
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
         let new_self = Self {
             session_info_altered: listen::Flag::listening(false, session.universe_info()),
 
             session,
             executor,
-            renderer,
-            window,
-            gilrs,
+            renderer: (),
+            window: (),
+            gilrs: None,
             viewport_cell,
             clock_source: ClockSource::Instant,
             audio: None,
@@ -100,6 +86,43 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
         new_self
     }
 
+    /// Move the given renderer and window values into this session.
+    pub fn attach_window<Ren, Win: crate::glue::Window>(
+        self,
+        renderer: Ren,
+        window: Win,
+        enable_gamepad_input: bool,
+    ) -> DesktopSession<Ren, Win> {
+        let gilrs = match (self.gilrs, enable_gamepad_input) {
+            (None, true) => match gilrs::Gilrs::new() {
+                Ok(gilrs) => Some(gilrs),
+                Err(e) => {
+                    log::error!("Failed to access gamepads: {:?}", ErrorChain(&e));
+                    None
+                }
+            },
+            (Some(existing), true) => Some(existing),
+            (_, false) => None,
+        };
+
+        let new_self = DesktopSession {
+            session: self.session,
+            executor: self.executor,
+            renderer,
+            window,
+            gilrs,
+            viewport_cell: self.viewport_cell,
+            clock_source: self.clock_source,
+            audio: self.audio,
+            fixed_title: self.fixed_title,
+            session_info_altered: self.session_info_altered,
+        };
+        new_self.sync_title();
+        new_self
+    }
+}
+
+impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
     /// Steps the [`Universe`] if the [`ClockSource`] says to.
     pub fn advance_time_and_maybe_step(&mut self) -> Option<UniverseStepInfo> {
         if let Some(gilrs) = &mut self.gilrs {
@@ -193,6 +216,10 @@ impl<Ren, Win: crate::glue::Window> DesktopSession<Ren, Win> {
                 (true, None) => String::from("all-is-cubes based application"),
             },
         );
+    }
+
+    pub(crate) fn executor(&self) -> &Arc<crate::Executor> {
+        &self.executor
     }
 
     #[cfg_attr(not(feature = "terminal"), expect(dead_code))]

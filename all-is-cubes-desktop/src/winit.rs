@@ -10,11 +10,10 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::euclid::{Point2D, Size2D};
-use all_is_cubes::listen;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_gpu::FrameBudget;
 use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
-use all_is_cubes_render::camera::{self, Layers, StandardCameras, Viewport};
+use all_is_cubes_render::camera::{self, Layers, StandardCameras};
 
 use all_is_cubes_ui::apps::InputProcessor;
 
@@ -195,14 +194,12 @@ pub fn winit_main_loop_and_init<Ren: RendererToWinit + 'static>(
 /// Creates a [`DesktopSession`] that can be run in an [`winit`] event loop.
 #[allow(clippy::large_stack_frames, reason = "wildly overestimated somehow")]
 pub async fn create_winit_wgpu_desktop_session(
-    executor: Arc<crate::Executor>,
-    session: Session,
+    dsession: DesktopSession<(), ()>,
     window: WinAndState,
-    viewport_cell: listen::Cell<Viewport>,
 ) -> Result<DesktopSession<SurfaceRenderer, WinAndState>, anyhow::Error> {
     let start_time = Instant::now();
 
-    viewport_cell.set(physical_size_to_viewport(
+    dsession.viewport_cell.set(physical_size_to_viewport(
         window.window.scale_factor(),
         window.window.inner_size(),
     ));
@@ -232,16 +229,17 @@ pub async fn create_winit_wgpu_desktop_session(
     log::debug!("Adapter: {:?}", adapter.get_info());
 
     let renderer = SurfaceRenderer::new(
-        session.create_cameras(viewport_cell.as_source()),
+        dsession
+            .session
+            .create_cameras(dsession.viewport_cell.as_source()),
         surface,
         adapter,
-        executor.clone(),
+        dsession.executor().clone(),
     )
     .await
     .context("failed to obtain graphics device for new session’s window")?;
 
-    let mut dsession =
-        DesktopSession::new(executor, renderer, window, session, viewport_cell, true);
+    let mut dsession = dsession.attach_window(renderer, window, true);
 
     // Now that we have a session ready, draw immediately, before waiting for a redraw event.
     // This minimizes the flash of blank window, provided the window system is one

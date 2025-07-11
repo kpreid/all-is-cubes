@@ -113,6 +113,7 @@ fn main() -> Result<(), anyhow::Error> {
             .build(),
     );
     universe_task.attach_to_session(&mut session);
+    let dsession = DesktopSession::new(executor.clone(), session, viewport_cell);
     let session_done_time = Instant::now();
     log::debug!(
         "Initialized session ({:.3} s)",
@@ -145,7 +146,7 @@ fn main() -> Result<(), anyhow::Error> {
     // The graphics type selects not only the kind of 'window' we create, but also the
     // type of event loop to run. Hence, this match combines
     // * creating a window
-    // * creating a DesktopSession
+    // * parameterizing the DesktopSession with the type of window
     // * calling `inner_main()` to do the rest, including starting the event loop
     //
     // Note that _every_ branch of this match calls `inner_main()`.
@@ -163,8 +164,7 @@ fn main() -> Result<(), anyhow::Error> {
                     let dsession = inner_params
                         .runtime
                         .block_on(create_winit_wgpu_desktop_session(
-                            executor.clone(),
-                            session,
+                            dsession,
                             // TODO: turn this inside out and stop having `WinAndState` exposed
                             aic_winit::WinAndState::new(
                                 elwt,
@@ -173,7 +173,6 @@ fn main() -> Result<(), anyhow::Error> {
                                 fullscreen,
                             )
                             .context("failed to create window")?,
-                            viewport_cell,
                         ))
                         .context("failed to create session")?;
                     if graphics_type == GraphicsType::WindowRt {
@@ -189,13 +188,8 @@ fn main() -> Result<(), anyhow::Error> {
         }
         #[cfg(feature = "terminal")]
         GraphicsType::Terminal => {
-            let dsession = create_terminal_session(
-                executor,
-                session,
-                TerminalOptions::default(),
-                viewport_cell,
-            )
-            .context("failed to create session")?;
+            let dsession = create_terminal_session(dsession, TerminalOptions::default())
+                .context("failed to create session")?;
             inner_main(
                 inner_params,
                 |dsession| terminal_main_loop(dsession, universe_ready_rx),
@@ -207,13 +201,8 @@ fn main() -> Result<(), anyhow::Error> {
             // TODO: Replace having a special mode with this being a kind of record/export running
             // under the headless main loop. We're not doing that yet because, currently, "renderer"
             // and "recorder" are handled very differently.
-            let dsession = create_terminal_session(
-                executor,
-                session,
-                TerminalOptions::default(),
-                viewport_cell,
-            )
-            .context("failed to create session")?;
+            let dsession = create_terminal_session(dsession, TerminalOptions::default())
+                .context("failed to create session")?;
             inner_main(
                 inner_params,
                 |mut dsession| {
@@ -259,7 +248,7 @@ fn main() -> Result<(), anyhow::Error> {
                     duration.map(Duration::from_secs_f64),
                 )
             },
-            DesktopSession::new(executor, (), (), session, viewport_cell, false),
+            dsession,
         ),
 
         #[cfg(not(feature = "record"))]
@@ -271,7 +260,7 @@ fn main() -> Result<(), anyhow::Error> {
                     duration.map(Duration::from_secs_f64),
                 )
             },
-            DesktopSession::new(executor, (), (), session, viewport_cell, false),
+            dsession,
         ),
     }
 }
