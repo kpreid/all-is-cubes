@@ -58,6 +58,7 @@ pub(crate) struct UiTargets {
 // TODO: define a builder
 #[allow(missing_docs)]
 #[derive(Clone)]
+#[allow(clippy::exhaustive_structs)]
 pub struct Command {
     pub label: ArcStr,
     // TODO: icon_name: Option<Name>,

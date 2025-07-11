@@ -4,11 +4,12 @@ use std::mem;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use all_is_cubes::arcstr::literal;
-use all_is_cubes_content::TemplateParameters;
 use anyhow::Context as _;
 
+use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::universe::Universe;
+use all_is_cubes::util::ErrorChain;
+use all_is_cubes_content::TemplateParameters;
 use all_is_cubes_ui::apps::{ExitMainTask, MainTaskContext};
 use all_is_cubes_ui::notification;
 use all_is_cubes_ui::vui::widgets::ProgressBarState;
@@ -40,6 +41,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
                 future: universe_task_future,
                 progress_notification_handoff_tx: _,
                 mut replace_universe_command_rx,
+                replace_universe_command_tx,
             },
         headless,
         logging,
@@ -149,16 +151,60 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             _ = ctx.quit().await;
         }
 
+        // Add custom command to allow reloading the current universe source.
+        ctx.add_custom_command(all_is_cubes_ui::Command {
+            label: literal!("Reload"),
+            command: Arc::new(move || {
+                // TODO: redesign commands around channels so this is more intrinsically well-handled
+                let (Ok(()) | Err(_)) =
+                    replace_universe_command_tx.try_send(ReplaceUniverseCommand::Reload);
+
+                Ok(())
+            }),
+        });
+
         log::trace!("Startup task has completed all startup activities.");
 
+        // Signal that we are done with startup activities, which is used elsewhere to decide
+        // to exit the main loop if we are doing a headless one-shot operation rather than
+        // running interactively.
         _ = task_done_signal.send(());
 
+        // This will eventually generalize to global commands like "exit back to main menu"
+        // rather than solely being about replacing the universe.
         while let Some(source) = replace_universe_command_rx.recv().await {
             log::trace!("Startup task received request for new universe");
-            let mut task = UniverseTask::new(&executor, source, false);
-            task.attach_to_main_task(&mut ctx);
-            // TODO: non-exiting error reporting
-            ctx.set_universe(*task.future.await.unwrap().unwrap());
+            match source {
+                ReplaceUniverseCommand::New(source) => {
+                    let mut task = UniverseTask::new(&executor, source, false);
+                    task.attach_to_main_task(&mut ctx);
+                    // TODO: this should use set_universe_async but the progress reporting is not compatible
+                    ctx.set_universe(*task.future.await.unwrap().unwrap());
+                }
+                ReplaceUniverseCommand::Reload => {
+                    let whence = ctx.with_universe(|u| u.whence.clone());
+                    let title = whence
+                        .document_name()
+                        .map(arcstr::ArcStr::from)
+                        .unwrap_or(literal!(""));
+                    let executor = executor.clone();
+                    ctx.set_universe_async(async move |progress| {
+                        executor
+                            .tokio()
+                            .spawn(async move { whence.load(progress).await })
+                            .await
+                            .unwrap()
+                            .map_err(|error| {
+                                arcstr::format!(
+                                    // TODO: have better non-early-stringifying error displaying
+                                    "Failed to reload universe '{title}:\n{error}",
+                                    error = ErrorChain(&*error),
+                                )
+                            })
+                    })
+                    .await;
+                }
+            }
             log::trace!("Startup task completed new universe");
         }
 
@@ -243,7 +289,17 @@ pub struct UniverseTask {
     future: tokio::task::JoinHandle<Result<Box<Universe>, anyhow::Error>>,
     progress_notification_handoff_tx:
         Option<tokio::sync::oneshot::Sender<notification::Notification>>,
-    replace_universe_command_rx: tokio::sync::mpsc::Receiver<crate::UniverseSource>,
+    replace_universe_command_rx: tokio::sync::mpsc::Receiver<ReplaceUniverseCommand>,
+
+    /// This is not used by the future itself (it has its own clone)
+    /// but is used by other command sources feeding in to the same channel.
+    /// TODO: clean up the overall approach here
+    replace_universe_command_tx: tokio::sync::mpsc::Sender<ReplaceUniverseCommand>,
+}
+
+enum ReplaceUniverseCommand {
+    New(crate::UniverseSource),
+    Reload,
 }
 
 #[allow(missing_docs)] // sloppy API anyway
@@ -255,21 +311,27 @@ impl UniverseTask {
         let future = executor.tokio().spawn(source.create_universe(
             precompute_light,
             n_rx,
-            Arc::new(move |template| {
-                _ = r_tx.try_send(crate::UniverseSource::Template(
-                    template.clone(),
-                    TemplateParameters {
-                        // TODO: should have a seed
-                        seed: None,
-                        size: None,
-                    },
-                ));
+            Arc::new({
+                let r_tx = r_tx.clone();
+                move |template| {
+                    _ = r_tx.try_send(ReplaceUniverseCommand::New(
+                        crate::UniverseSource::Template(
+                            template.clone(),
+                            TemplateParameters {
+                                // TODO: should have a seed
+                                seed: None,
+                                size: None,
+                            },
+                        ),
+                    ));
+                }
             }),
         ));
         Self {
             future,
             progress_notification_handoff_tx: Some(n_tx),
             replace_universe_command_rx: r_rx,
+            replace_universe_command_tx: r_tx,
         }
     }
 

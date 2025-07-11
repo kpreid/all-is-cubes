@@ -255,20 +255,6 @@ pub enum ClockSource {
 
 // -------------------------------------------------------------------------------------------------
 
-#[expect(dead_code, reason = "TODO: hook this up to a user-issued command")]
-async fn reload_universe(ctx: &mut MainTaskContext, executor: Arc<crate::Executor>) {
-    let whence = ctx.with_universe(|universe| universe.whence.clone());
-    load_new_universe_async(ctx, executor, async move |progress| {
-        whence.load(progress).await.map_err(|error| {
-            arcstr::format!(
-                "Failed to reload universe:\n{error}",
-                error = ErrorChain(&*error),
-            )
-        })
-    })
-    .await
-}
-
 // TODO: except for being tokio-specific, this belongs in `Session` itself.
 pub(crate) async fn load_new_universe_async(
     ctx: &mut MainTaskContext,
