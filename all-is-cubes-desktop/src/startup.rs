@@ -155,9 +155,9 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
 
         while let Some(source) = replace_universe_command_rx.recv().await {
             log::trace!("Startup task received request for new universe");
-            let task = UniverseTask::new(&executor, source, false);
-            // TODO: should attach_to_session() for progress reporting but we can't have the `&mut Session` for it; it should be generalized better
-            // TODO: error reporting
+            let mut task = UniverseTask::new(&executor, source, false);
+            task.attach_to_main_task(&mut ctx);
+            // TODO: non-exiting error reporting
             ctx.set_universe(*task.future.await.unwrap().unwrap());
             log::trace!("Startup task completed new universe");
         }
@@ -273,18 +273,35 @@ impl UniverseTask {
         }
     }
 
-    pub fn attach_to_session(&mut self, session: &mut crate::Session) {
-        if let Ok(n) = session.show_notification(notification::NotificationContent::Progress {
+    #[allow(clippy::unused_self)]
+    fn initial_notification(&self) -> notification::NotificationContent {
+        notification::NotificationContent::Progress {
             title: literal!("Loading..."),
             progress: ProgressBarState::new(0.0),
             part: literal!(""),
-        }) {
-            // Ignore send error because the process might have finished and dropped the receiver.
-            _ = self
-                .progress_notification_handoff_tx
-                .take()
-                .expect("attach_to_session() must be called only once")
-                .send(n);
+        }
+    }
+
+    fn attach_notification(&mut self, n: notification::Notification) {
+        // Ignore send error because the process might have finished and dropped the receiver.
+        _ = self
+            .progress_notification_handoff_tx
+            .take()
+            .expect("attach_to_session() must be called only once")
+            .send(n);
+    }
+
+    // TODO: figure out a way the below code doesn't need to be duplicated
+
+    pub fn attach_to_session(&mut self, session: &mut crate::Session) {
+        if let Ok(n) = session.show_notification(self.initial_notification()) {
+            self.attach_notification(n);
+        }
+    }
+
+    pub fn attach_to_main_task(&mut self, ctx: &mut MainTaskContext) {
+        if let Ok(n) = ctx.show_notification(self.initial_notification()) {
+            self.attach_notification(n);
         }
     }
 }
