@@ -153,13 +153,9 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
 
         _ = task_done_signal.send(());
 
-        while let Some(template) = replace_universe_command_rx.recv().await {
+        while let Some(source) = replace_universe_command_rx.recv().await {
             log::trace!("Startup task received request for new universe");
-            let task = UniverseTask::new(
-                &executor,
-                crate::UniverseSource::Template(template, TemplateParameters::default()),
-                false,
-            );
+            let task = UniverseTask::new(&executor, source, false);
             // TODO: should attach_to_session() for progress reporting but we can't have the `&mut Session` for it; it should be generalized better
             // TODO: error reporting
             ctx.set_universe(*task.future.await.unwrap().unwrap());
@@ -247,8 +243,7 @@ pub struct UniverseTask {
     future: tokio::task::JoinHandle<Result<Box<Universe>, anyhow::Error>>,
     progress_notification_handoff_tx:
         Option<tokio::sync::oneshot::Sender<notification::Notification>>,
-    replace_universe_command_rx:
-        tokio::sync::mpsc::Receiver<all_is_cubes_content::UniverseTemplate>,
+    replace_universe_command_rx: tokio::sync::mpsc::Receiver<crate::UniverseSource>,
 }
 
 #[allow(missing_docs)] // sloppy API anyway
@@ -260,8 +255,15 @@ impl UniverseTask {
         let future = executor.tokio().spawn(source.create_universe(
             precompute_light,
             n_rx,
-            Arc::new(move |t| {
-                _ = r_tx.try_send(t.clone());
+            Arc::new(move |template| {
+                _ = r_tx.try_send(crate::UniverseSource::Template(
+                    template.clone(),
+                    TemplateParameters {
+                        // TODO: should have a seed
+                        seed: None,
+                        size: None,
+                    },
+                ));
             }),
         ));
         Self {
