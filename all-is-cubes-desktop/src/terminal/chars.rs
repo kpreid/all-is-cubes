@@ -30,7 +30,7 @@ pub(super) fn image_patch_to_character(
             let lum1 = color1.unwrap_or(Rgba::TRANSPARENT).luminance();
             let lum2 = color2.unwrap_or(Rgba::TRANSPARENT).luminance();
             // Checkerboard dithering.
-            let [threshold1, threshold2] = if char_pos.x % 2 == 0 {
+            let [threshold1, threshold2] = if char_pos.x.is_multiple_of(2) {
                 [0.5, 0.7]
             } else {
                 [0.7, 0.5]

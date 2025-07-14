@@ -209,7 +209,8 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
         for (i, color) in light_colors.iter().copied().enumerate() {
             let z = (i as GridCoordinate) * (room_length - 1)
                 / (light_colors.len() as GridCoordinate - 1);
-            let p = GridPoint::new(if i % 2 == 0 { 1 } else { room_width - 2 }, 0, z);
+            let on_low_side = i.is_multiple_of(2);
+            let p = GridPoint::new(if on_low_side { 1 } else { room_width - 2 }, 0, z);
             m.set(
                 p,
                 Block::builder()
@@ -229,7 +230,7 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
 
             // Separator between different light areas
             let wall_size = Size3D::new(separator_width, room_height, 1).to_u32();
-            if i % 2 == 0 {
+            if on_low_side {
                 m.fill_uniform(
                     GridAab::from_lower_size([room_width - separator_width, 0, z], wall_size),
                     &wall_block,

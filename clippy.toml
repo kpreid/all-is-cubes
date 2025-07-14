@@ -18,6 +18,12 @@ ignore-interior-mutability = [
     "test_renderers::harness::UniverseFuture", # contains futures::Shared but does not use it as key
 ]
 
+# This configures the `modulo_arithmetic` lint.
+# In general we almost always want to use `rem_euclid()` arithmetic, and any cases of
+# `% 2 == 0` will trip `manual_is_multiple_of` so we don't want those either, one way or another.
+# (Note that `modulo_arithmetic` does not apply 
+allow-comparison-to-zero = false
+
 # --- Configurations for "large values" kinds of lints ---
 # It'd be nice if these were per-package/per-crate, but clippy doesn't support that,
 # so we have to take the max.
