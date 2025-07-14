@@ -26,7 +26,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-#[cfg(test)]
+#[cfg(any(test, feature = "lukewarm-reload"))]
 #[macro_use]
 extern crate std;
 #[macro_use]

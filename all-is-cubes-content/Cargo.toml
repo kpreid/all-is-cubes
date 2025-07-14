@@ -25,11 +25,15 @@ harness = false
 [features]
 # Adds `UniverseTemplate::Random`.
 arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary"]
+# Causes reloading a `UniverseTemplate` to spawn a subprocess to load the template using freshly
+# compiled code, for development purposes. Only takes effect if running using `cargo run`.
+lukewarm-reload = ["dep:tempfile", "all-is-cubes/save", "all-is-cubes-port"]
 
 [dependencies]
 # std feature is required because this library does not yet participate in `maybe_sync`.
 all-is-cubes = { workspace = true, features = ["std"] }
 all-is-cubes-ui = { workspace = true }
+all-is-cubes-port = { workspace = true, optional = true, features = ["import", "native"] }
 arbitrary = { workspace = true, optional = true }
 either = { workspace = true }
 exhaust = { workspace = true }
@@ -44,6 +48,8 @@ petgraph = { workspace = true }
 rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
+tempfile = { workspace = true, optional = true }
+
 
 [dev-dependencies]
 criterion = { workspace = true, features = ["async_futures"] }

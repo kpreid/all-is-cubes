@@ -131,6 +131,7 @@ name = "all-is-cubes-content"
 version = "0.9.0"
 dependencies = [
  "all-is-cubes",
+ "all-is-cubes-port",
  "all-is-cubes-ui",
  "arbitrary",
  "criterion",
@@ -148,6 +149,7 @@ dependencies = [
  "rand 0.9.1",
  "rand_xoshiro",
  "strum",
+ "tempfile",
  "tokio",
 ]
 

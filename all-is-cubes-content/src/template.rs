@@ -5,6 +5,7 @@ use alloc::string::{String, ToString as _};
 use alloc::sync::Arc;
 use core::error::Error;
 
+use futures_core::future::BoxFuture;
 use macro_rules_attribute::macro_rules_derive;
 use paste::paste;
 
@@ -293,13 +294,24 @@ impl WhenceUniverse for TemplateAndParameters {
     fn load(
         &self,
         progress: YieldProgress,
-    ) -> futures_core::future::BoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>>
-    {
-        let ingredients = self.clone();
+    ) -> BoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>> {
+        let this = self.clone();
+
+        #[cfg(feature = "lukewarm-reload")]
+        let package = std::env::var_os("CARGO_PKG_NAME");
+        #[cfg(feature = "lukewarm-reload")]
+        if package.as_deref() == Some(std::ffi::OsStr::new("all-is-cubes-desktop")) {
+            return Box::pin(lukewarm_reload(this, progress));
+        } else {
+            log::warn!(
+                "lukewarm-reload enabled, but we do not appear to be running under Cargo \
+                (env package = {package:?})"
+            );
+        }
+
         Box::pin(async move {
-            ingredients
-                .template
-                .build(progress, ingredients.parameters)
+            this.template
+                .build(progress, this.parameters)
                 .await
                 .map_err(From::from)
         })
@@ -313,10 +325,61 @@ impl WhenceUniverse for TemplateAndParameters {
         &self,
         universe: &'u Universe,
         progress: YieldProgress,
-    ) -> futures_core::future::BoxFuture<'u, Result<(), Box<dyn Error + Send + Sync>>> {
+    ) -> BoxFuture<'u, Result<(), Box<dyn Error + Send + Sync>>> {
         // Delegate to the same error as () would produce. TODO: Have an error enum instead
         <() as WhenceUniverse>::save(&(), universe, progress)
     }
+}
+
+/// Reload the template by spawning a freshly compiled `all-is-cubes` process to generate it.
+/// This only works if *this* process was started by `cargo run`.
+#[cfg(feature = "lukewarm-reload")]
+async fn lukewarm_reload(
+    this: TemplateAndParameters,
+    progress: YieldProgress,
+) -> Result<Box<Universe>, Box<dyn Error + Send + Sync>> {
+    log::trace!("starting lukewarm-reload of {this:?}");
+    let this = Arc::new(this);
+    let dir = tempfile::TempDir::new()?;
+    let [mut build_and_generate_progress, mut load_progress] = progress.split(0.8);
+    build_and_generate_progress.set_label("Recompiling and regenerating");
+    load_progress.set_label("Loading");
+
+    build_and_generate_progress.progress(0.0).await;
+    let output_path = dir.path().join("reload.alliscubesjson");
+    std::process::Command::new("cargo")
+        .args([
+            "run",
+            // find workspace manifest
+            &format!(
+                "--manifest-path={}/../Cargo.toml",
+                env!("CARGO_MANIFEST_DIR")
+            ),
+            "--bin=all-is-cubes",
+            "--features=lukewarm-reload", // not needed but saves on rebuild cost
+            "--",
+            "--graphics=headless",
+            "--template",
+            &this.template.to_string(),
+            "--output",
+        ])
+        .arg(&output_path)
+        .spawn()?
+        .wait()? // TODO: should be an async wait
+        .success()
+        .then_some(())
+        .ok_or("lukewarm-reload process failed")?; // TODO: get error output from subprocess
+    build_and_generate_progress.finish().await;
+
+    load_progress.progress(0.0).await;
+    let mut universe: Box<Universe> =
+        all_is_cubes_port::load_universe_from_file(load_progress, Arc::new(output_path.clone()))
+            .await?;
+
+    // Overwrite the whence data pointing to a temporary file that will now be deleted.
+    universe.whence = this;
+
+    Ok::<_, Box<dyn Error + Send + Sync>>(universe)
 }
 
 // -- Specific templates below this point ---
