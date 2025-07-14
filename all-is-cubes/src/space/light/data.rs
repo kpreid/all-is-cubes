@@ -410,7 +410,7 @@ mod tests {
             .collect();
         print!("const PACKED_LIGHT_SCALAR_LOOKUP_TABLE: [PositiveSign<f32>; 256] = [");
         for i in 0..=u8::MAX {
-            if i % 5 == 0 {
+            if i.is_multiple_of(5) {
                 print!("\n   ");
             }
             print!(" ps32({:?}),", generated_table[i as usize]);

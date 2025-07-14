@@ -932,7 +932,7 @@ mod tests {
             (0..=u8::MAX).map(component_from_srgb8_arithmetic).collect();
         print!("const CONST_SRGB_LOOKUP_TABLE: [f32; 256] = [");
         for i in 0..=u8::MAX {
-            if i % 6 == 0 {
+            if i.is_multiple_of(6) {
                 print!("\n    {:?},", generated_table[i as usize]);
             } else {
                 print!(" {:?},", generated_table[i as usize]);

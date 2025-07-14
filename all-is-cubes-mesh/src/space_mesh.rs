@@ -121,8 +121,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
                     length ({len_transparent}) as others"
             );
         }
-        assert_eq!(self.opaque_range().end % 3, 0);
-        assert_eq!(self.indices().len() % 3, 0);
+        assert!(self.opaque_range().end.is_multiple_of(3));
+        assert!(self.indices().len().is_multiple_of(3));
         for index in self.indices().iter_u32() {
             assert!(index < self.vertices.0.len() as u32);
         }
