@@ -37,7 +37,13 @@ impl ShaderSpaceCamera {
     pub fn new(camera: &Camera) -> Self {
         let options = camera.options();
         let view_distance = camera.view_distance().into_inner() as f32;
-        let (fog_mode_blend, fog_distance) = match options.fog {
+
+        let effective_fog = if options.debug_pixel_cost {
+            &FogOption::None
+        } else {
+            &options.fog
+        };
+        let (fog_mode_blend, fog_distance) = match effective_fog {
             FogOption::Abrupt => (1.0, view_distance),
             FogOption::Compromise => (0.5, view_distance),
             FogOption::Physical => (0.0, view_distance),
@@ -73,7 +79,11 @@ impl ShaderSpaceCamera {
             fog_mode_blend,
             fog_distance,
 
-            exposure: camera.exposure().into_inner(),
+            exposure: if options.debug_pixel_cost {
+                1.0
+            } else {
+                camera.exposure().into_inner()
+            },
 
             _padding: Default::default(),
         }
