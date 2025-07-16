@@ -13,7 +13,7 @@ use all_is_cubes::euclid::{Point3D, Size3D, Vector3D, point3};
 use all_is_cubes::math::{
     Aab, Cube,
     Face6::{self, *},
-    Face7, FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba, zo32,
+    FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::ReadTicket;
@@ -528,8 +528,9 @@ fn shrunken_box_uniform_color() {
 }
 
 fn opacities<M: MeshTypes>(mesh: &BlockMesh<M>) -> FaceMap<bool> {
-    assert!(
-        !mesh.interior_vertices.fully_opaque,
+    assert_eq!(
+        mesh.interior_vertices.map_ref(|_, fm| fm.fully_opaque),
+        FaceMap::splat(false),
         "interior opacity should never be true because it doesn't mean anything"
     );
     mesh.face_vertices.map_ref(|_, sm| sm.fully_opaque)
@@ -801,9 +802,13 @@ fn texture_clamp_coordinate_ordering() {
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);
     let mesh = test_block_mesh(&universe, block);
-    for (face, sub_mesh) in mesh.all_sub_meshes_keyed() {
-        for vertex in sub_mesh.vertices.0.iter() {
-            let mut had_any_textured = false;
+    for (face, on_face, face_mesh) in mesh.all_sub_meshes_keyed() {
+        if !on_face {
+            // make_some_voxel_blocks has no interior
+            continue;
+        }
+        let mut had_any_textured = false;
+        for vertex in face_mesh.vertices.0.iter() {
             match vertex.coloring {
                 Coloring::Solid(_) => {}
                 Coloring::Texture {
@@ -828,11 +833,11 @@ fn texture_clamp_coordinate_ordering() {
                     );
                 }
             }
-            assert!(
-                had_any_textured,
-                "test invalid: {face:?} has no textured vertices"
-            )
         }
+        assert!(
+            !on_face || had_any_textured,
+            "test invalid: {face:?} has no textured vertices"
+        )
     }
 }
 
@@ -859,9 +864,9 @@ fn texture_coordinates_for_volumetric() {
 
     assert!(mesh.texture_used.is_some());
 
-    for (face, sub_mesh) in mesh.all_sub_meshes_keyed() {
+    for (face, on_face, sub_mesh) in mesh.all_sub_meshes_keyed() {
         eprintln!("Checking {face:?}...");
-        if face == Face7::Within {
+        if !on_face {
             assert_eq!(sub_mesh.vertices.0.len(), 0);
         } else {
             assert_eq!(sub_mesh.vertices.0.len(), 4);

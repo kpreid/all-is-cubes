@@ -59,6 +59,7 @@ impl IndexVec {
         self.as_slice(..).len()
     }
 
+    #[cfg_attr(not(feature = "dynamic"), allow(dead_code))]
     #[inline]
     pub(crate) fn is_empty(&self) -> bool {
         self.as_slice(..).is_empty()

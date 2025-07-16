@@ -1,10 +1,11 @@
 //! Stand-alone tests of [`BlockMesh`].
 //! See [`crate::tests`] for additional tests.
 
+use all_is_cubes::euclid::Size3D;
 use alloc::vec::Vec;
 
 use all_is_cubes::block::{self, AIR, Block, Resolution};
-use all_is_cubes::math::{Aab, Cube, Rgba};
+use all_is_cubes::math::{Aab, Cube, GridPoint, Rgba};
 use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::GraphicsOptions;
@@ -79,4 +80,42 @@ fn voxel_opacity_mask_not_set_with_voxel_colors() {
 
     // Check what we actually care about: given the vertex colors we must not have a mask.
     assert!(mesh.voxel_opacity_mask.is_none());
+}
+
+#[test]
+fn mesh_has_documented_depth_ordering() {
+    let mut universe = Universe::new();
+    // Define a block which has multiple surfaces in all directions.
+    let block = Block::builder()
+        .voxels_fn(Resolution::R8, |cube| {
+            if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == GridPoint::zero() {
+                block::from_color!(Rgba::WHITE)
+            } else {
+                AIR
+            }
+        })
+        .unwrap()
+        .build_into(&mut universe);
+
+    let mesh = test_block_mesh(&universe, block);
+
+    for (face, on_face, sub_mesh) in mesh.all_sub_meshes_keyed() {
+        assert!(
+            on_face || sub_mesh.count_indices() >= 12,
+            "test needs at least two quads, not {} indices, to mean anything",
+            sub_mesh.count_indices()
+        );
+        let increasing_direction = face.opposite().normal_vector();
+        assert!(
+            sub_mesh
+                .indices_opaque
+                .as_slice(..)
+                .iter_u32()
+                .is_sorted_by_key(|i| sub_mesh.vertices.0[i as usize]
+                    .position
+                    .to_vector()
+                    .dot(increasing_direction)),
+            "should be sorted along {face:?}"
+        );
+    }
 }

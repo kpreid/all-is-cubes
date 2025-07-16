@@ -203,7 +203,7 @@ fn push_box<M: MeshTypes>(
         let sub_mesh = if depth == 0 {
             &mut output.face_vertices[face]
         } else {
-            &mut output.interior_vertices
+            &mut output.interior_vertices[face]
         };
         sub_mesh.fully_opaque |= fully_opaque
             & (depth == 0)
@@ -312,7 +312,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         // cube is ourself.
         sub_mesh.fully_opaque = true;
     }
-    let output_interior = &mut output.interior_vertices;
 
     let texture_if_needed: Option<M::Tile> = if prefer_textures || analysis.needs_texture {
         texture::copy_voxels_to_new_texture(texture_allocator, voxels)
@@ -325,7 +324,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     for face in Face6::ALL {
         let voxel_transform = face.face_transform(resolution_g);
         let quad_transform = QuadTransform::new(face, resolution);
-        let sub_mesh = &mut output.face_vertices[face];
+        let face_mesh = &mut output.face_vertices[face];
+        let interior_mesh = &mut output.interior_vertices[face];
 
         // Rotate the voxel array's extent into our local coordinate system, so we can find
         // out what range to iterate over.
@@ -470,7 +470,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             } = if layer == 0 {
                 &mut *face_mesh
             } else {
-                &mut *output_interior
+                &mut *interior_mesh
             };
             let depth = FreeCoordinate::from(layer);
 

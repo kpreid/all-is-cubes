@@ -562,14 +562,12 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     let inst = M::Vertex::instantiate_block(translation);
     let bb_translation = translation.lower_bounds().to_f64().to_vector();
 
-    for (face, sub_mesh) in block_mesh.all_sub_meshes_keyed() {
+    for (face, on_block_face, sub_mesh) in block_mesh.all_sub_meshes_keyed() {
         if sub_mesh.is_empty() {
             // Nothing to do; skip opacity lookup.
             continue;
         }
-        if let Ok(face) = Face6::try_from(face)
-            && neighbor_is_fully_opaque(face)
-        {
+        if on_block_face && neighbor_is_fully_opaque(face) {
             // Skip face fully obscured by a neighbor.
             continue;
         }

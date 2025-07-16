@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::block::{EvaluatedBlock, VoxelOpacityMask};
-use all_is_cubes::math::{Aab, Face7, FaceMap};
+use all_is_cubes::math::{Aab, Face6, FaceMap};
 use all_is_cubes::space::Space;
 use all_is_cubes_render::Flaws;
 
@@ -41,12 +41,20 @@ mod tests;
 ///
 /// [`Block`]: all_is_cubes::block::Block
 pub struct BlockMesh<M: MeshTypes> {
-    /// Vertices grouped by which face being obscured would obscure those vertices.
+    /// Vertices grouped by which face being fully occluded would occlude all of those vertices.
+    ///
+    /// The effect and purpose of this grouping is that each face’s vertices may be omitted
+    /// from a generated [`SpaceMesh`] when an [`opaque`](EvaluatedBlock::opaque) block is adjacent.
+    ///
+    /// Currently, all of these vertices have positions which lie on the face of the unit cube
+    /// the block occupies.
+    /// In the future, vertices that make up the surfaces of concavities on the block faces might
+    /// also be included here.
     pub(super) face_vertices: FaceMap<SubMesh<M::Vertex>>,
 
-    /// Vertices not fitting into [`Self::face_vertices`] because they may be visible
-    /// from multiple directions or when the eye position is inside the block.
-    pub(super) interior_vertices: SubMesh<M::Vertex>,
+    /// All vertices not in [`Self::face_vertices`], grouped by their face normals.
+    /// All of these vertices have positions in the interior of the unit cube.
+    pub(super) interior_vertices: FaceMap<SubMesh<M::Vertex>>,
 
     /// Texture used by the vertices;
     /// holding this handle ensures that the texture coordinates stay valid.
@@ -66,18 +74,13 @@ pub struct BlockMesh<M: MeshTypes> {
     flaws: Flaws,
 }
 
-/// Part of the triangle mesh calculated for a [`Block`], stored in a [`BlockMesh`] keyed
-/// by [`Face7`].
+/// A portion of of the triangles of a [`BlockMesh`].
 ///
-/// All triangles which are on the surface of the unit cube (such that they may be omitted
-/// when a [`opaque`](EvaluatedBlock::opaque) block is adjacent) are grouped
-/// under the corresponding face, and all other triangles are grouped under
-/// [`Face7::Within`]. In future versions, the mesher might be improved so that blocks
-/// with concavities on their faces have the surface of each concavity included in that
-/// face mesh rather than in [`Face7::Within`].
-///
-/// The texture associated with the contained vertices' texture coordinates is recorded
+/// The texture associated with the contained triangles’ texture coordinates is recorded
 /// in the [`BlockMesh`] only.
+///
+/// All opaque triangles are ordered by depth (that is, position along the perpendicular axis),
+/// front to back.
 //--
 // Optimization note: I tried moving the non-generic parts of this into a separate struct and
 // methods to improve compilation performance. That turned out to affect too little code to be
@@ -90,6 +93,9 @@ pub(super) struct SubMesh<V: Vertex> {
     /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
     /// in counterclockwise order, for vertices whose coloring is fully opaque (or
     /// textured with binary opacity).
+    /// 
+    /// These triangles are ordered by depth (that is, position along the perpendicular axis),
+    /// front to back. This may be used to optimize drawing order.
     pub(super) indices_opaque: IndexVec,
 
     /// Indices for partially transparent (alpha neither 0 nor 1) vertices.
@@ -123,29 +129,43 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
             py: SubMesh::EMPTY,
             pz: SubMesh::EMPTY,
         },
-        interior_vertices: SubMesh::EMPTY,
+        interior_vertices: FaceMap {
+            nx: SubMesh::EMPTY,
+            ny: SubMesh::EMPTY,
+            nz: SubMesh::EMPTY,
+            px: SubMesh::EMPTY,
+            py: SubMesh::EMPTY,
+            pz: SubMesh::EMPTY,
+        },
         texture_used: None,
         voxel_opacity_mask: None,
         flaws: Flaws::empty(),
     };
 
-    /// Iterate over all seven [`SubMesh`]es, including the interior vertices.
+    /// Iterate over all [`SubMesh`]es, including identification for each one.
     ///
-    /// This function is not public because it is mostly a helper for higher-level
-    /// operations, and the details of [`SubMesh`] may change.
+    /// This function is not public because it is a helper for higher-level and tests operations,
+    /// and the details of subdivision into [`SubMesh`]es may change (and have changed).
+    ///
+    /// The produced tuples contain the following elements:
+    ///
+    /// * face/normal
+    /// * whether these vertices are on the face of the block and not the interior
+    /// * mesh data
     pub(super) fn all_sub_meshes_keyed(
         &self,
-    ) -> impl Iterator<Item = (Face7, &SubMesh<M::Vertex>)> {
-        core::iter::once((Face7::Within, &self.interior_vertices)).chain(
-            self.face_vertices
+    ) -> impl Iterator<Item = (Face6, bool, &SubMesh<M::Vertex>)> {
+        Iterator::chain(
+            self.interior_vertices
                 .iter()
-                .map(|(f, mesh)| (Face7::from(f), mesh)),
+                .map(|(f, mesh)| (f, false, mesh)),
+            self.face_vertices.iter().map(|(f, mesh)| (f, true, mesh)),
         )
     }
 
-    /// Iterate over all contained [`SubMesh`]es, ignoring keys.
+    /// As [`Self::all_sub_meshes_keyed()`] but without the keys, just the mesh data.
     pub(super) fn all_sub_meshes(&self) -> impl Iterator<Item = &SubMesh<M::Vertex>> {
-        self.all_sub_meshes_keyed().map(|(_, sm)| sm)
+        Iterator::chain(self.interior_vertices.values(), self.face_vertices.values())
     }
 
     /// Return the textures used for this block. This may be used to retain the textures
@@ -231,6 +251,12 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     }
 
     fn clear(&mut self) {
+        fn clear_sub_mesh_map<V: Vertex>(m: &mut FaceMap<SubMesh<V>>) {
+            for (_, sm) in m.iter_mut() {
+                sm.clear();
+            }
+        }
+
         let Self {
             face_vertices,
             interior_vertices,
@@ -238,10 +264,9 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
             voxel_opacity_mask,
             flaws,
         } = self;
-        for (_, fv) in face_vertices.iter_mut() {
-            fv.clear();
-        }
-        interior_vertices.clear();
+
+        clear_sub_mesh_map(face_vertices);
+        clear_sub_mesh_map(interior_vertices);
         *texture_used = None;
         *voxel_opacity_mask = None;
         *flaws = Flaws::empty();
@@ -297,7 +322,7 @@ impl<M: MeshTypes> Default for BlockMesh<M> {
         // This implementation can't be derived since `V` and `T` don't have defaults themselves.
         Self {
             face_vertices: FaceMap::default(),
-            interior_vertices: SubMesh::default(),
+            interior_vertices: FaceMap::default(),
             texture_used: None,
             voxel_opacity_mask: None,
             flaws: Flaws::empty(),
