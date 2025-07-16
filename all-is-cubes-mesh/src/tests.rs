@@ -532,8 +532,7 @@ fn opacities<M: MeshTypes>(mesh: &BlockMesh<M>) -> FaceMap<bool> {
         !mesh.interior_vertices.fully_opaque,
         "interior opacity should never be true because it doesn't mean anything"
     );
-    // TODO: this could be simplified by a FaceMap by-ref operation
-    FaceMap::from_fn(|face| mesh.face_vertices[face].fully_opaque)
+    mesh.face_vertices.map_ref(|_, fm| fm.fully_opaque)
 }
 
 #[test]

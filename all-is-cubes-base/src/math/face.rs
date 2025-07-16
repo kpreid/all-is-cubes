@@ -772,6 +772,18 @@ impl<V> FaceMap<V> {
         }
     }
 
+    /// Transform values, taking the input by reference.
+    pub fn map_ref<'map, U>(&'map self, mut f: impl FnMut(Face6, &'map V) -> U) -> FaceMap<U> {
+        FaceMap {
+            nx: f(Face6::NX, &self.nx),
+            ny: f(Face6::NY, &self.ny),
+            nz: f(Face6::NZ, &self.nz),
+            px: f(Face6::PX, &self.px),
+            py: f(Face6::PY, &self.py),
+            pz: f(Face6::PZ, &self.pz),
+        }
+    }
+
     /// Combine two [`FaceMap`]s using a function applied to each pair of corresponding values.
     pub fn zip<U, R>(self, other: FaceMap<U>, mut f: impl FnMut(Face6, V, U) -> R) -> FaceMap<R> {
         FaceMap {
