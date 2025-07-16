@@ -584,20 +584,9 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         for vertex in &mut vertices.0[index_offset_usize..] {
             vertex.instantiate_vertex(inst);
         }
-        opaque_indices.extend(
-            face_mesh
-                .indices_opaque
-                .as_slice(..)
-                .iter_u32()
-                .map(|i| i + index_offset),
-        );
-        transparent_indices.extend(
-            face_mesh
-                .indices_transparent
-                .as_slice(..)
-                .iter_u32()
-                .map(|i| i + index_offset),
-        );
+        opaque_indices.extend_with_offset(face_mesh.indices_opaque.as_slice(..), index_offset);
+        transparent_indices
+            .extend_with_offset(face_mesh.indices_transparent.as_slice(..), index_offset);
 
         if let Some(block_bounding_box) = face_mesh
             .bounding_box()

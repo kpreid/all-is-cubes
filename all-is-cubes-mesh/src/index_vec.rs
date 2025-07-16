@@ -85,6 +85,15 @@ impl IndexVec {
             IndexVec::U32(vec) => vec.reserve_exact(additional),
         }
     }
+
+    /// Appends `source` to `self`, with `offset` added to each element.
+    #[inline(always)]
+    pub(crate) fn extend_with_offset(&mut self, source: IndexSlice<'_>, offset: u32) {
+        // TODO: see if we can improve this by specializing to individual. u16/u32 cases.
+        // If we track the maximum value in self and source, then we can also predict whether
+        // a change to u32 will be necessary or not.
+        self.extend(source.iter_u32().map(|i| i + offset));
+    }
 }
 
 /// Data for meshes’ index lists, which may use either 16 or 32-bit values.
@@ -150,7 +159,8 @@ impl Extend<u16> for IndexVec {
 }
 
 impl Extend<u32> for IndexVec {
-    #[inline]
+    // This inline attribute validated by somewhat dubious benchmark.
+    #[inline(always)]
     fn extend<T: IntoIterator<Item = u32>>(&mut self, iter: T) {
         match self {
             IndexVec::U16(u16_vec) => {
