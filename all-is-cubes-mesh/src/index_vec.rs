@@ -59,6 +59,11 @@ impl IndexVec {
         self.as_slice(..).len()
     }
 
+    #[inline]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.as_slice(..).is_empty()
+    }
+
     /// Resets the vector to have zero length and the same capacity.
     /// Note that this preserves the previous index type.
     #[inline]

@@ -16,6 +16,8 @@ use crate::SpaceMesh;
 use crate::texture::{self, Tile as _};
 use crate::{IndexVec, MeshOptions, MeshTypes, Vertex};
 
+// -------------------------------------------------------------------------------------------------
+
 mod analyze;
 mod compute;
 mod planar;
@@ -25,6 +27,8 @@ pub use viz::Viz;
 
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 /// A triangle mesh for a single [`Block`].
 ///
@@ -38,11 +42,11 @@ mod tests;
 /// [`Block`]: all_is_cubes::block::Block
 pub struct BlockMesh<M: MeshTypes> {
     /// Vertices grouped by which face being obscured would obscure those vertices.
-    pub(super) face_vertices: FaceMap<BlockFaceMesh<M::Vertex>>,
+    pub(super) face_vertices: FaceMap<SubMesh<M::Vertex>>,
 
     /// Vertices not fitting into [`Self::face_vertices`] because they may be visible
     /// from multiple directions or when the eye position is inside the block.
-    pub(super) interior_vertices: BlockFaceMesh<M::Vertex>,
+    pub(super) interior_vertices: SubMesh<M::Vertex>,
 
     /// Texture used by the vertices;
     /// holding this handle ensures that the texture coordinates stay valid.
@@ -74,8 +78,12 @@ pub struct BlockMesh<M: MeshTypes> {
 ///
 /// The texture associated with the contained vertices' texture coordinates is recorded
 /// in the [`BlockMesh`] only.
+//--
+// Optimization note: I tried moving the non-generic parts of this into a separate struct and
+// methods to improve compilation performance. That turned out to affect too little code to be
+// worthwhile.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct BlockFaceMesh<V: Vertex> {
+pub(super) struct SubMesh<V: Vertex> {
     /// Vertices, as used by the indices vectors.
     pub(super) vertices: (Vec<V>, Vec<V::SecondaryData>),
 
@@ -89,12 +97,15 @@ pub(super) struct BlockFaceMesh<V: Vertex> {
 
     /// Whether the graphic entirely fills its cube face, such that nothing can be seen
     /// through it and faces of adjacent blocks may be removed.
+    // TODO: This field may make more sense kept in the BlockMesh, perhaps even as a bitmask
     pub(super) fully_opaque: bool,
 
     /// Bounding box of the mesh’s vertices.
     /// `None` if there are no vertices.
-    bounding_box: Option<Aab>,
+    pub(super) bounding_box: Option<Aab>,
 }
+
+// -------------------------------------------------------------------------------------------------
 
 impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// A reference to the mesh with no vertices, which has no effect when drawn.
@@ -105,31 +116,36 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// This is a `const` equivalent to [`Self::default()`].
     pub const EMPTY: Self = Self {
         face_vertices: FaceMap {
-            nx: BlockFaceMesh::EMPTY,
-            ny: BlockFaceMesh::EMPTY,
-            nz: BlockFaceMesh::EMPTY,
-            px: BlockFaceMesh::EMPTY,
-            py: BlockFaceMesh::EMPTY,
-            pz: BlockFaceMesh::EMPTY,
+            nx: SubMesh::EMPTY,
+            ny: SubMesh::EMPTY,
+            nz: SubMesh::EMPTY,
+            px: SubMesh::EMPTY,
+            py: SubMesh::EMPTY,
+            pz: SubMesh::EMPTY,
         },
-        interior_vertices: BlockFaceMesh::EMPTY,
+        interior_vertices: SubMesh::EMPTY,
         texture_used: None,
         voxel_opacity_mask: None,
         flaws: Flaws::empty(),
     };
 
-    /// Iterate over all seven [`BlockFaceMesh`]es, including the interior vertices.
+    /// Iterate over all seven [`SubMesh`]es, including the interior vertices.
     ///
     /// This function is not public because it is mostly a helper for higher-level
-    /// operations, and the details of [`BlockFaceMesh`] may change.
-    pub(super) fn all_face_meshes(
+    /// operations, and the details of [`SubMesh`] may change.
+    pub(super) fn all_sub_meshes_keyed(
         &self,
-    ) -> impl Iterator<Item = (Face7, &BlockFaceMesh<M::Vertex>)> {
+    ) -> impl Iterator<Item = (Face7, &SubMesh<M::Vertex>)> {
         core::iter::once((Face7::Within, &self.interior_vertices)).chain(
             self.face_vertices
                 .iter()
                 .map(|(f, mesh)| (Face7::from(f), mesh)),
         )
+    }
+
+    /// Iterate over all contained [`SubMesh`]es, ignoring keys.
+    pub(super) fn all_sub_meshes(&self) -> impl Iterator<Item = &SubMesh<M::Vertex>> {
+        self.all_sub_meshes_keyed().map(|(_, sm)| sm)
     }
 
     /// Return the textures used for this block. This may be used to retain the textures
@@ -149,8 +165,8 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// Note that a particular occurrence of this mesh in a [`SpaceMesh`] may have a smaller
     /// bounding box due to hidden face culling.
     pub fn bounding_box(&self) -> Option<Aab> {
-        self.all_face_meshes()
-            .filter_map(|(_, fm)| fm.bounding_box())
+        self.all_sub_meshes()
+            .filter_map(|sm| sm.bounding_box)
             .reduce(Aab::union)
     }
 
@@ -162,7 +178,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
     /// Returns whether this mesh contains no vertices so it has no visual effect.
     pub fn is_empty(&self) -> bool {
-        self.all_face_meshes().all(|(_, fm)| fm.is_empty())
+        self.all_sub_meshes().all(SubMesh::is_empty)
     }
 
     /// Returns the number of vertex indices in this mesh (three times the number of
@@ -173,9 +189,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     // Whatever is decided, also update `MeshMeta::count_indices()`.
     #[cfg_attr(not(feature = "dynamic"), allow(dead_code))]
     pub(crate) fn count_indices(&self) -> usize {
-        self.all_face_meshes()
-            .map(|(_, fm)| fm.indices_opaque.len() + fm.indices_transparent.len())
-            .sum()
+        self.all_sub_meshes().map(SubMesh::count_indices).sum()
     }
 
     /// Update this mesh's textures in-place to the given new block data, if this is
@@ -268,8 +282,8 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
 
     #[cfg(debug_assertions)]
     fn consistency_check(&self) {
-        for (_, face_mesh) in self.all_face_meshes() {
-            face_mesh.consistency_check();
+        for sub_mesh in self.all_sub_meshes() {
+            sub_mesh.consistency_check();
         }
     }
 }
@@ -283,7 +297,7 @@ impl<M: MeshTypes> Default for BlockMesh<M> {
         // This implementation can't be derived since `V` and `T` don't have defaults themselves.
         Self {
             face_vertices: FaceMap::default(),
-            interior_vertices: BlockFaceMesh::default(),
+            interior_vertices: SubMesh::default(),
             texture_used: None,
             voxel_opacity_mask: None,
             flaws: Flaws::empty(),
@@ -344,7 +358,7 @@ impl<M: MeshTypes> Clone for BlockMesh<M> {
     }
 }
 
-impl<V: Vertex> BlockFaceMesh<V> {
+impl<V: Vertex> SubMesh<V> {
     pub const EMPTY: Self = Self {
         vertices: (Vec::new(), Vec::new()),
         indices_opaque: IndexVec::new(),
@@ -373,15 +387,17 @@ impl<V: Vertex> BlockFaceMesh<V> {
         self.vertices.0.is_empty()
     }
 
-    /// Bounding box of this mesh’s vertices.
-    /// `None` if there are no vertices.
-    ///
-    pub fn bounding_box(&self) -> Option<Aab> {
-        self.bounding_box
+    pub fn count_indices(&self) -> usize {
+        let Self {
+            vertices: _,
+            indices_opaque,
+            indices_transparent,
+            fully_opaque: _,
+            bounding_box: _,
+        } = self;
+        indices_opaque.len() + indices_transparent.len()
     }
-}
 
-impl<V: Vertex> BlockFaceMesh<V> {
     #[cfg(debug_assertions)]
     fn consistency_check(&self) {
         // TODO: check vertex/index consistency like SpaceMesh does
@@ -399,18 +415,19 @@ impl<V: Vertex> BlockFaceMesh<V> {
             });
         }
         assert_eq!(
-            bounding_box,
-            self.bounding_box(),
+            bounding_box, self.bounding_box,
             "bounding box of vertices ≠ recorded bounding box"
         );
     }
 }
 
-impl<V: Vertex> Default for BlockFaceMesh<V> {
+impl<V: Vertex> Default for SubMesh<V> {
     fn default() -> Self {
         Self::EMPTY
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Computes [`BlockMeshes`] for blocks currently present in a [`Space`].
 /// Pass the result to [`SpaceMesh::new()`] to use it.

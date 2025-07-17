@@ -12,7 +12,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes_render::Flaws;
 
-use crate::block_mesh::BlockFaceMesh;
+use crate::block_mesh::SubMesh;
 use crate::block_mesh::analyze::{Analysis, analyze};
 use crate::block_mesh::planar::{
     GmRect, QuadColoring, QuadTransform, VisualVoxel, greedy_mesh, push_quad,
@@ -198,27 +198,30 @@ fn push_box<M: MeshTypes>(
         let upper_bounds = aab_in_face_coordinates.upper_bounds().xy();
         let depth = aab_in_face_coordinates.lower_bounds().z;
 
-        // Check whether this mesh face meets the unit cube face.
-        let face_mesh = if depth == 0 {
+        // Check whether this mesh layer meets the block face (face of a unit cube).
+        // If it does, put these vertices in the separate sub-mesh group for the block face.
+        let sub_mesh = if depth == 0 {
             &mut output.face_vertices[face]
         } else {
             &mut output.interior_vertices
         };
-        face_mesh.fully_opaque |= fully_opaque
+        sub_mesh.fully_opaque |= fully_opaque
             & (depth == 0)
             & (lower_bounds == point2(0, 0))
             & (upper_bounds == Point2D::splat(resolution.into()));
-        reserve_vertices(&mut face_mesh.vertices, 4);
+        reserve_vertices(&mut sub_mesh.vertices, 4);
 
+        // TODO: reduce duplication of code between push_box and push_full_box by factoring out
+        // "reserve 6 indices" but in a way that borrow checking likes
         let plane: <M::Tile as texture::Tile>::Plane;
         push_quad(
-            &mut face_mesh.vertices,
+            &mut sub_mesh.vertices,
             if fully_opaque {
-                face_mesh.indices_opaque.reserve_exact(6);
-                &mut face_mesh.indices_opaque
+                sub_mesh.indices_opaque.reserve_exact(6);
+                &mut sub_mesh.indices_opaque
             } else {
-                face_mesh.indices_transparent.reserve_exact(6);
-                &mut face_mesh.indices_transparent
+                sub_mesh.indices_transparent.reserve_exact(6);
+                &mut sub_mesh.indices_transparent
             },
             &QuadTransform::new(face, resolution),
             FreeCoordinate::from(depth),
@@ -236,7 +239,7 @@ fn push_box<M: MeshTypes>(
                 BoxColoring::Solid(face_colors) => QuadColoring::Solid(face_colors[face]),
             },
             viz,
-            &mut face_mesh.bounding_box,
+            &mut sub_mesh.bounding_box,
         );
     }
 }
@@ -252,17 +255,17 @@ fn push_full_box<M: MeshTypes>(
     viz: &mut Viz,
 ) {
     let fully_opaque = opacity_category == OpacityCategory::Opaque;
-    for (face, face_mesh) in output.face_vertices.iter_mut() {
+    for (face, sub_mesh) in output.face_vertices.iter_mut() {
         if opacity_category != OpacityCategory::Invisible {
-            reserve_vertices(&mut face_mesh.vertices, 4);
+            reserve_vertices(&mut sub_mesh.vertices, 4);
             push_quad(
-                &mut face_mesh.vertices,
+                &mut sub_mesh.vertices,
                 if fully_opaque {
-                    face_mesh.indices_opaque.reserve_exact(6);
-                    &mut face_mesh.indices_opaque
+                    sub_mesh.indices_opaque.reserve_exact(6);
+                    &mut sub_mesh.indices_opaque
                 } else {
-                    face_mesh.indices_transparent.reserve_exact(6);
-                    &mut face_mesh.indices_transparent
+                    sub_mesh.indices_transparent.reserve_exact(6);
+                    &mut sub_mesh.indices_transparent
                 },
                 &QuadTransform::new(face, Resolution::R1),
                 /* depth= */ 0.,
@@ -270,10 +273,10 @@ fn push_full_box<M: MeshTypes>(
                 point2(1., 1.),
                 coloring,
                 viz,
-                &mut face_mesh.bounding_box,
+                &mut sub_mesh.bounding_box,
             );
         }
-        face_mesh.fully_opaque |= fully_opaque;
+        sub_mesh.fully_opaque |= fully_opaque;
     }
 }
 
@@ -301,13 +304,13 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     let voxels_array = voxels.as_vol_ref();
 
     // Construct empty output to mutate.
-    for (_, face_mesh) in output.face_vertices.iter_mut() {
+    for (_, sub_mesh) in output.face_vertices.iter_mut() {
         // Start assuming opacity; if we find any transparent pixels we'll set
         // this to false. `Within` is always "transparent" because the algorithm
         // that consumes this structure will say "draw this face if its adjacent
         // cube's opposing face is not opaque", and `Within` means the adjacent
         // cube is ourself.
-        face_mesh.fully_opaque = true;
+        sub_mesh.fully_opaque = true;
     }
     let output_interior = &mut output.interior_vertices;
 
@@ -322,7 +325,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     for face in Face6::ALL {
         let voxel_transform = face.face_transform(resolution_g);
         let quad_transform = QuadTransform::new(face, resolution);
-        let face_mesh = &mut output.face_vertices[face];
+        let sub_mesh = &mut output.face_vertices[face];
 
         // Rotate the voxel array's extent into our local coordinate system, so we can find
         // out what range to iterate over.
@@ -458,7 +461,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             // Only the cube-surface faces go anywhere but `Within`.
             // (We could generalize this to blocks with concavities that still form a
             // light-tight seal against the cube face.)
-            let BlockFaceMesh {
+            let SubMesh {
                 vertices,
                 indices_opaque,
                 indices_transparent,

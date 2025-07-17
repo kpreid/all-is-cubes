@@ -537,7 +537,7 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 /// Copy and adjust vertices from a [`BlockMesh`] into the storage of a [`SpaceMesh`].
 ///
 /// This does not perform depth sorting and does not account for mesh or texture dependencies.
-/// It does not update `bounding_box` or `flaws`
+/// It does not update `flaws`.
 ///
 /// * `block_mesh` is the input mesh to copy.
 /// * `cube` is the position passed to `V::instantiate_block()`.
@@ -562,8 +562,8 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     let inst = M::Vertex::instantiate_block(translation);
     let bb_translation = translation.lower_bounds().to_f64().to_vector();
 
-    for (face, face_mesh) in block_mesh.all_face_meshes() {
-        if face_mesh.is_empty() {
+    for (face, sub_mesh) in block_mesh.all_sub_meshes_keyed() {
+        if sub_mesh.is_empty() {
             // Nothing to do; skip opacity lookup.
             continue;
         }
@@ -579,18 +579,17 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         let index_offset: u32 = index_offset_usize
             .try_into()
             .expect("vertex index overflow");
-        vertices.0.extend(face_mesh.vertices.0.iter());
-        vertices.1.extend(face_mesh.vertices.1.iter());
+        vertices.0.extend(sub_mesh.vertices.0.iter());
+        vertices.1.extend(sub_mesh.vertices.1.iter());
         for vertex in &mut vertices.0[index_offset_usize..] {
             vertex.instantiate_vertex(inst);
         }
-        opaque_indices.extend_with_offset(face_mesh.indices_opaque.as_slice(..), index_offset);
+        opaque_indices.extend_with_offset(sub_mesh.indices_opaque.as_slice(..), index_offset);
         transparent_indices
-            .extend_with_offset(face_mesh.indices_transparent.as_slice(..), index_offset);
+            .extend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset);
 
-        if let Some(block_bounding_box) = face_mesh
-            .bounding_box()
-            .map(|bb| bb.translate(bb_translation))
+        if let Some(block_bounding_box) =
+            sub_mesh.bounding_box.map(|bb| bb.translate(bb_translation))
         {
             *bounding_box = Some(match *bounding_box {
                 Some(bb) => bb.union(block_bounding_box),
@@ -624,8 +623,8 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
         block_indices_used.push(true);
 
         let vertex_count = block_mesh
-            .all_face_meshes()
-            .map(|(_, fm)| fm.vertices.0.len())
+            .all_sub_meshes()
+            .map(|sm| sm.vertices.0.len())
             .sum();
 
         let mut space_mesh = Self {
@@ -635,8 +634,8 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             ),
             indices: IndexVec::with_capacity(
                 block_mesh
-                    .all_face_meshes()
-                    .map(|(_, fm)| fm.indices_opaque.len())
+                    .all_sub_meshes()
+                    .map(|sm| sm.indices_opaque.len())
                     .sum(),
             ),
             meta: MeshMeta {
@@ -651,8 +650,8 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
 
         let mut transparent_indices = IndexVec::with_capacity(
             block_mesh
-                .all_face_meshes()
-                .map(|(_, fm)| fm.indices_transparent.len())
+                .all_sub_meshes()
+                .map(|sm| sm.indices_transparent.len())
                 .sum(),
         );
         write_block_mesh_to_space_mesh(

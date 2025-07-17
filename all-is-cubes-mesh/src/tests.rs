@@ -364,8 +364,8 @@ fn space_mesh_equals_block_mesh() {
     assert_eq!(
         space_rendered.vertices().0.to_vec(),
         block_meshes[0]
-            .all_face_meshes()
-            .flat_map(|(_, face_mesh)| face_mesh.vertices.0.clone().into_iter())
+            .all_sub_meshes()
+            .flat_map(|sm| sm.vertices.0.clone().into_iter())
             .collect::<Vec<_>>()
     );
     assert_eq!(tex.count_allocated(), 1); // for striped faces
@@ -532,7 +532,7 @@ fn opacities<M: MeshTypes>(mesh: &BlockMesh<M>) -> FaceMap<bool> {
         !mesh.interior_vertices.fully_opaque,
         "interior opacity should never be true because it doesn't mean anything"
     );
-    mesh.face_vertices.map_ref(|_, fm| fm.fully_opaque)
+    mesh.face_vertices.map_ref(|_, sm| sm.fully_opaque)
 }
 
 #[test]
@@ -801,8 +801,8 @@ fn texture_clamp_coordinate_ordering() {
     let mut universe = Universe::new();
     let [block] = make_some_voxel_blocks(&mut universe);
     let mesh = test_block_mesh(&universe, block);
-    for (face, face_mesh) in mesh.all_face_meshes() {
-        for vertex in face_mesh.vertices.0.iter() {
+    for (face, sub_mesh) in mesh.all_sub_meshes_keyed() {
+        for vertex in sub_mesh.vertices.0.iter() {
             let mut had_any_textured = false;
             match vertex.coloring {
                 Coloring::Solid(_) => {}
@@ -859,14 +859,14 @@ fn texture_coordinates_for_volumetric() {
 
     assert!(mesh.texture_used.is_some());
 
-    for (face, face_mesh) in mesh.all_face_meshes() {
+    for (face, sub_mesh) in mesh.all_sub_meshes_keyed() {
         eprintln!("Checking {face:?}...");
         if face == Face7::Within {
-            assert_eq!(face_mesh.vertices.0.len(), 0);
+            assert_eq!(sub_mesh.vertices.0.len(), 0);
         } else {
-            assert_eq!(face_mesh.vertices.0.len(), 4);
+            assert_eq!(sub_mesh.vertices.0.len(), 4);
         }
-        for (i, vertex) in face_mesh.vertices.0.iter().enumerate() {
+        for (i, vertex) in sub_mesh.vertices.0.iter().enumerate() {
             let Coloring::Texture {
                 pos,
                 clamp_min,

@@ -462,8 +462,8 @@ fn should_use_instances<M: DynamicMeshTypes>(
 
     // TODO(instancing): Remove the restriction to only nontransparent meshes when (if) rendering transparent instances is supported.
     if !block_mesh
-        .all_face_meshes()
-        .all(|(_, fm)| fm.indices_transparent.len() == 0)
+        .all_sub_meshes()
+        .all(|sm| sm.indices_transparent.is_empty())
     {
         return false;
     }
