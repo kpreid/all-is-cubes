@@ -36,10 +36,6 @@ allow-wildcard-paths = true
 # workspace-default-features = "warn"
 # external-default-features = "warn"
 
-skip = [
-    { name = "core-foundation", version = "0.9.4" }, # old used by `winit`
-]
-
 skip-tree = [
     { name = "criterion" }, # criterion is rarely updated but only used for benching
     { name = "bitflags", version = "=1.3.2", depth = 1 },
