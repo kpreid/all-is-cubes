@@ -250,8 +250,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
             block_indices_used.clear();
         }
 
-        // Use the existing index memory as an (empty) deque for ordered insertions.
-        let mut indices_deque = IndexVecDeque::from(mem::take(&mut self.indices));
+        // Use the existing index allocation as an (empty) deque for bidirectional insertions.
+        let mut opaque_indices_deque = IndexVecDeque::from(mem::take(&mut self.indices));
 
         // Use temporary buffer for positioning the transparent indices
         // TODO: Consider reuse
@@ -287,7 +287,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 block_mesh,
                 translation,
                 &mut self.vertices,
-                &mut indices_deque,
+                &mut opaque_indices_deque,
                 &mut transparent_indices,
                 &mut self.meta.bounding_box,
                 |face| {
@@ -306,16 +306,18 @@ impl<M: MeshTypes> SpaceMesh<M> {
             );
         });
 
-        self.indices = IndexVec::from(indices_deque);
-
-        self.sort_and_store_transparent_indices(transparent_indices);
-
-        #[cfg(debug_assertions)]
-        self.consistency_check();
+        self.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices);
     }
 
-    /// Given the indices of vertices of transparent quads (triangle pairs), copy them in
-    /// various depth-sorted permutations into `self.indices` and record the array-index
+    /// Store freshly computed indices into this mesh.
+    ///
+    /// This function is used at the end of [`Self::compute_inner()`] and `From<BlockMesh>`
+    /// to complete the common portions of their work, after the vertices have been written.
+    ///
+    /// ## Depth ordering of transparency
+    ///
+    /// Given the indices of vertices of transparent quads (triangle pairs), this function copies
+    /// them in various depth-sorted permutations into `self.indices` and record the array-index
     /// ranges which contain each of the orderings in `self.opaque_range` and
     /// `self.transparent_ranges`.
     ///
@@ -341,7 +343,13 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// using these sorts.
     ///
     /// [volumetric sort (2006)]: https://iquilezles.org/www/articles/volumesort/volumesort.htm
-    fn sort_and_store_transparent_indices(&mut self, transparent_indices: IndexVec) {
+    fn store_indices_and_finish_compute(
+        &mut self,
+        opaque_indices_deque: IndexVecDeque,
+        transparent_indices: IndexVec,
+    ) {
+        self.indices = IndexVec::from(opaque_indices_deque);
+
         // Set the opaque range to all indices which have already been stored
         // (which will be the opaque ones only).
         self.meta.opaque_range = 0..self.indices.len();
@@ -350,6 +358,9 @@ impl<M: MeshTypes> SpaceMesh<M> {
             IndexVec::U16(vec) => self.sort_and_store_transparent_indices_impl(vec),
             IndexVec::U32(vec) => self.sort_and_store_transparent_indices_impl(vec),
         }
+
+        #[cfg(debug_assertions)]
+        self.consistency_check();
     }
 
     // Subcomponent of [`Self::sort_and_store_transparent_indices()`] handling the index
@@ -639,12 +650,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 Vec::with_capacity(vertex_count),
                 Vec::with_capacity(vertex_count),
             ),
-            indices: IndexVec::with_capacity(
-                block_mesh
-                    .all_sub_meshes()
-                    .map(|sm| sm.indices_opaque.len())
-                    .sum(),
-            ),
+            indices: IndexVec::new(), // placeholder
             meta: MeshMeta {
                 opaque_range: 0..0,
                 transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
@@ -655,13 +661,19 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             block_indices_used,
         };
 
-        let mut opaque_indices_deque = IndexVecDeque::from(space_mesh.indices);
+        let mut opaque_indices_deque = IndexVecDeque::from(IndexVec::with_capacity(
+            block_mesh
+                .all_sub_meshes()
+                .map(|sm| sm.indices_opaque.len())
+                .sum(),
+        ));
         let mut transparent_indices = IndexVec::with_capacity(
             block_mesh
                 .all_sub_meshes()
                 .map(|sm| sm.indices_transparent.len())
                 .sum(),
         );
+
         write_block_mesh_to_space_mesh(
             block_mesh,
             Cube::ORIGIN,
@@ -671,8 +683,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             &mut space_mesh.meta.bounding_box, // redundant, but hard to skip
             |_| false,
         );
-        space_mesh.indices = opaque_indices_deque.into();
-        space_mesh.sort_and_store_transparent_indices(transparent_indices);
+        space_mesh.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices);
 
         space_mesh
     }
