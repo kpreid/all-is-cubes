@@ -15,6 +15,9 @@ use manyfmt::Refmt as _;
 mod custom_format;
 pub use custom_format::*;
 
+#[doc(hidden)] // Not intended as public API (yet)
+pub mod log;
+
 #[cfg(any(feature = "std", test))]
 mod multi_failure;
 #[doc(hidden)] // experimental, may become a library

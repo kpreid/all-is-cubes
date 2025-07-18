@@ -9,12 +9,10 @@ pub use manyfmt::{Fmt, Refmt, refmt};
 // Unfortunately, we can't use a glob re-export here or hidden items end up visible when they
 // shouldn't be, mysteriously. So, explicit everything instead, with their various visibilities
 // and cfgs. TODO: Does that only apply to macros?
-#[doc(hidden)]
-pub use all_is_cubes_base::util::ErrorChain;
 pub use all_is_cubes_base::util::{ConciseDebug, Executor, TimeStats};
 #[doc(hidden)]
 pub use all_is_cubes_base::util::{
-    MapExtend, TypeName, assert_conditional_send_sync, assert_send_sync,
+    ErrorChain, MapExtend, TypeName, assert_conditional_send_sync, assert_send_sync, log,
 };
 
 #[doc(hidden)] // public to allow our other crates to match, only

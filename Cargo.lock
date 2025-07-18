@@ -115,6 +115,7 @@ dependencies = [
  "indoc",
  "itertools 0.14.0",
  "libm",
+ "log",
  "manyfmt",
  "mutants",
  "num-traits",

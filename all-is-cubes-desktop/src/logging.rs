@@ -48,24 +48,20 @@ pub fn install(
         log::LevelFilter,
         Option<simplelog::WriteLogger<std::io::Stderr>>,
     ) = if options.verbose || !suppress_unless_explicit {
-        // Note: Something like this log configuration also appears in other binaries.
-        // Unclear how to deduplicate since we don't want to have a library-level dep on
-        // simplelog. For now, just remember to consider updating other instances.
         let logger = *simplelog::WriteLogger::new(
             match verbose {
                 // TODO: When we're closer to 1.0, change the default level to `Info`
                 false => Debug,
                 true => Trace,
             },
+            // Note: This has no target filters because `AicLogger` calls
+            // `util::log::standard_filter` to do it.
+            // TODO: Consider completely replacing `simplelog` with our own code
+            // and refining the formatting (e.g. show target but only for 'unknown' crates).
             simplelog::ConfigBuilder::new()
                 .set_target_level(Off)
                 .set_location_level(Off)
                 .set_time_level(if simplify_log_format { Off } else { Error })
-                .add_filter_ignore_str("tracing::span") // intentionally very verbose
-                .add_filter_ignore_str("wgpu") // noisy
-                .add_filter_ignore_str("naga") // noisy
-                .add_filter_ignore_str("winit") // noisy at Debug level since 0.30
-                .add_filter_ignore_str("h2") // used by Rerun and noisy at Debug level since 0.23
                 .build(),
             std::io::stderr(),
         );
@@ -136,13 +132,19 @@ impl log::Log for AicLogger {
         #[cfg(not(feature = "rerun"))]
         let rr = false;
 
-        self.stderr_logger
-            .as_ref()
-            .is_some_and(|l| l.enabled(metadata))
-            || rr
+        all_is_cubes::util::log::standard_filter(metadata)
+            && (rr
+                || self
+                    .stderr_logger
+                    .as_ref()
+                    .is_some_and(|l| l.enabled(metadata)))
     }
 
     fn log(&self, record: &log::Record<'_>) {
+        if !all_is_cubes::util::log::standard_filter(record.metadata()) {
+            return;
+        }
+
         if let Some(stderr_logger) = &self.stderr_logger {
             suspend_indicatif_in(|| stderr_logger.log(record));
         }
@@ -150,11 +152,11 @@ impl log::Log for AicLogger {
         if self.rerun_destination.is_enabled() {
             use rg::components::TextLogLevel;
 
-            // TODO: Need to implement our own log filtering here since simplelog doesn't let us
-            // borrow the filter rules.
-
             self.rerun_destination.log(
-                &rg::entity_path![],
+                &match record.module_path() {
+                    Some(m) => rg::entity_path![m],
+                    None => rg::entity_path![],
+                },
                 &rg::archetypes::TextLog::new(record.args().to_string()).with_level(TextLogLevel(
                     match record.level() {
                         log::Level::Error => TextLogLevel::ERROR,

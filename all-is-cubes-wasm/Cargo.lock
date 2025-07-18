@@ -68,6 +68,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "libm",
+ "log",
  "manyfmt",
  "mutants",
  "num-traits",

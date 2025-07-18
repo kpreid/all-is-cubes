@@ -24,16 +24,12 @@ pub async fn start_game() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
 
     // Initialize logging via the `log` crate's interface.
-    // We use `console_log` to perform the actual logging, but it doesn't offer a message source
-    // filter, so we have to do that ourselves.
+    // We use `console_log` to perform the actual logging, but use our own project-wide filter.
     log::set_logger({
         struct FilteredWebLogger;
         impl log::Log for FilteredWebLogger {
             fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
-                let t = metadata.target();
-                // Trace is the finest level, so no need to check it
-                /* metadata.level() <= log::LevelFilter::Trace && */
-                !t.starts_with("wgpu") && !t.starts_with("winit") && !t.starts_with("naga")
+                all_is_cubes::util::log::standard_filter(metadata)
             }
             fn log(&self, record: &log::Record<'_>) {
                 if self.enabled(record.metadata()) {
