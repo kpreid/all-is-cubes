@@ -1,3 +1,4 @@
+use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 use core::{mem, ops};
 
@@ -13,6 +14,24 @@ pub(crate) enum IndexVec {
     U16(Vec<u16>),
     /// 32-bit indices.
     U32(Vec<u32>),
+}
+
+/// Temporary storage for building an index list.
+///
+/// This is identical to [`IndexVec`] except that it allows extending from either end, which can be
+/// used to control overall drawing order.
+/// It should be constructed by conversion from [`IndexVec`].
+///
+/// (Note that in practice, the “either end” part, and thus the [`VecDeque`], is not needed per se;
+/// an equally valid implementation would be a gap buffer, where we have two fixed ends and insert
+/// on either side of a gap in the middle. These are identical except for the choice of ordering
+/// of the two halves of the storage.)
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum IndexVecDeque {
+    /// 16-bit indices.
+    U16(VecDeque<u16>),
+    /// 32-bit indices.
+    U32(VecDeque<u32>),
 }
 
 /// Data for meshes’ index lists, which may use either 16 or 32-bit values.
@@ -62,8 +81,8 @@ impl IndexVec {
         [u32]: ops::Index<R, Output = [u32]>,
     {
         match self {
-            IndexVec::U16(vec) => IndexSlice::U16(&vec.as_slice()[range]),
-            IndexVec::U32(vec) => IndexSlice::U32(&vec.as_slice()[range]),
+            Self::U16(vec) => IndexSlice::U16(&vec.as_slice()[range]),
+            Self::U32(vec) => IndexSlice::U32(&vec.as_slice()[range]),
         }
     }
 
@@ -84,16 +103,16 @@ impl IndexVec {
     #[inline]
     pub fn clear(&mut self) {
         match self {
-            IndexVec::U16(vec) => vec.clear(),
-            IndexVec::U32(vec) => vec.clear(),
+            Self::U16(vec) => vec.clear(),
+            Self::U32(vec) => vec.clear(),
         }
     }
 
     #[inline]
     pub(crate) fn capacity_bytes(&self) -> usize {
         match self {
-            IndexVec::U16(vec) => vec.capacity() * 2,
-            IndexVec::U32(vec) => vec.capacity() * 4,
+            Self::U16(vec) => vec.capacity() * 2,
+            Self::U32(vec) => vec.capacity() * 4,
         }
     }
 
@@ -101,8 +120,8 @@ impl IndexVec {
     #[inline]
     pub fn reserve_exact(&mut self, additional: usize) {
         match self {
-            IndexVec::U16(vec) => vec.reserve_exact(additional),
-            IndexVec::U32(vec) => vec.reserve_exact(additional),
+            Self::U16(vec) => vec.reserve_exact(additional),
+            Self::U32(vec) => vec.reserve_exact(additional),
         }
     }
 
@@ -113,6 +132,30 @@ impl IndexVec {
         // If we track the maximum value in self and source, then we can also predict whether
         // a change to u32 will be necessary or not.
         self.extend(source.iter_u32().map(|i| i + offset));
+    }
+}
+
+impl IndexVecDeque {
+    /// Appends `source` to `self`, with `offset` added to each element.
+    ///
+    /// If `on_front` is true, then the indices are inserted in the “front” of `self`,
+    /// and hence will be drawn before existing indices.
+    /// The internal order of the indices in [`source`] is not reversed.
+    #[inline(always)]
+    pub(crate) fn extend_with_offset(
+        &mut self,
+        source: IndexSlice<'_>,
+        offset: u32,
+        on_front: bool,
+    ) {
+        // TODO: see if we can improve this by specializing to individual. u16/u32 cases.
+        // If we track the maximum value in self and source, then we can also predict whether
+        // a change to u32 will be necessary or not.
+        if on_front {
+            self.extend_front(source.iter_u32().map(|i| i + offset));
+        } else {
+            self.extend(source.iter_u32().map(|i| i + offset));
+        }
     }
 }
 
@@ -143,13 +186,15 @@ impl<'a> IndexSlice<'a> {
 
     /// Returns the indices in this slice, each converted unconditionally to [`u32`].
     #[inline]
-    pub fn iter_u32(&self) -> impl Iterator<Item = u32> + '_ {
+    pub fn iter_u32(&self) -> impl DoubleEndedIterator<Item = u32> + '_ {
         match self {
             IndexSlice::U16(slice) => Either::Left(slice.iter().copied().map(u32::from)),
             IndexSlice::U32(slice) => Either::Right(slice.iter().copied()),
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 impl Default for IndexVec {
     #[inline]
@@ -167,6 +212,9 @@ impl Extend<u16> for IndexVec {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Implementations of extending `IndexVec` and `IndexVecDeque`.
 
 impl Extend<u32> for IndexVec {
     // This inline attribute validated by somewhat dubious benchmark.
@@ -217,6 +265,137 @@ impl Extend<u32> for IndexVec {
                 }
             }
             IndexVec::U32(vec) => vec.extend(iter),
+        }
+    }
+}
+
+impl Extend<u32> for IndexVecDeque {
+    // This inline attribute validated by somewhat dubious benchmark.
+    #[inline(always)]
+    fn extend<T: IntoIterator<Item = u32>>(&mut self, iter: T) {
+        match self {
+            IndexVecDeque::U16(u16_vec) => {
+                // In this case, we have u32s which we want to fit into a vector of u16s,
+                // if possible.
+                let mut iter = iter.into_iter();
+
+                let non_fitting_element: u32;
+                'try_to_use_u16: {
+                    for big_index in iter.by_ref() {
+                        match u16::try_from(big_index) {
+                            Ok(small_index) => u16_vec.push_back(small_index),
+                            Err(_) => {
+                                // Save the element that failed to fit,
+                                // so that we can put it in the u32 vector.
+                                non_fitting_element = big_index;
+                                break 'try_to_use_u16;
+                            }
+                        }
+                    }
+                    return; // succeeded at fitting all u32s in u16s
+                }
+
+                *self = upgrade_to_u32(u16_vec, non_fitting_element, iter);
+
+                #[cold]
+                #[inline(never)]
+                fn upgrade_to_u32(
+                    u16_vec: &mut VecDeque<u16>,
+                    non_fitting_element: u32,
+                    iter: impl Iterator<Item = u32>,
+                ) -> IndexVecDeque {
+                    // Construct new u32 vector using
+                    // * the existing items
+                    // * the new item triggering the conversion
+                    // * the remaining new items
+                    IndexVecDeque::U32(VecDeque::from_iter(
+                        mem::take(u16_vec)
+                            .into_iter()
+                            .map(u32::from)
+                            .chain([non_fitting_element])
+                            .chain(iter),
+                    ))
+                }
+            }
+            IndexVecDeque::U32(vecdeque) => vecdeque.extend(iter),
+        }
+    }
+}
+
+impl IndexVecDeque {
+    /// Identical to [`Extend::extend()`] except that the new indices are positioned before the
+    /// existing indices instead of after.
+    #[inline(always)]
+    fn extend_front<T: DoubleEndedIterator<Item = u32>>(&mut self, iter: T) {
+        let mut iter_rev = iter.into_iter().rev();
+        match self {
+            IndexVecDeque::U16(u16_vec) => {
+                let non_fitting_element: u32;
+                'try_to_use_u16: {
+                    for big_index in iter_rev.by_ref() {
+                        match u16::try_from(big_index) {
+                            Ok(small_index) => u16_vec.push_front(small_index),
+                            Err(_) => {
+                                // Save the element that failed to fit,
+                                // so that we can put it in the u32 vector.
+                                non_fitting_element = big_index;
+                                break 'try_to_use_u16;
+                            }
+                        }
+                    }
+                    return; // succeeded at fitting all u32s in u16s
+                }
+
+                #[cold]
+                #[inline(never)]
+                fn upgrade_to_u32(
+                    u16_vec: &mut VecDeque<u16>,
+                    non_fitting_element: u32,
+                    iter_rev: impl DoubleEndedIterator<Item = u32>,
+                ) -> IndexVecDeque {
+                    // Construct new VecDeque<u32> using
+                    // * the remaining new items
+                    // * the new item triggering the conversion
+                    // * the existing items
+                    IndexVecDeque::U32(VecDeque::from_iter(
+                        iter_rev
+                            .rev()
+                            .chain([non_fitting_element])
+                            .chain(mem::take(u16_vec).into_iter().map(u32::from)),
+                    ))
+                }
+
+                *self = upgrade_to_u32(u16_vec, non_fitting_element, iter_rev);
+            }
+            IndexVecDeque::U32(vec) => {
+                // TODO: reserve?
+                for index in iter_rev {
+                    vec.push_front(index);
+                }
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Interconversions.
+
+impl From<IndexVec> for IndexVecDeque {
+    fn from(value: IndexVec) -> Self {
+        match value {
+            IndexVec::U16(vec) => IndexVecDeque::U16(vec.into()),
+            IndexVec::U32(vec) => IndexVecDeque::U32(vec.into()),
+        }
+    }
+}
+
+impl From<IndexVecDeque> for IndexVec {
+    fn from(value: IndexVecDeque) -> Self {
+        match value {
+            // As noted in the documentation of `VecDeque`, this conversion will implicitly
+            // move elements to make them contiguous.
+            IndexVecDeque::U16(vecdeque) => IndexVec::U16(vecdeque.into()),
+            IndexVecDeque::U32(vecdeque) => IndexVec::U32(vecdeque.into()),
         }
     }
 }
