@@ -3,8 +3,10 @@ use core::{mem, ops};
 
 use either::Either;
 
+// -------------------------------------------------------------------------------------------------
+
 /// Data storage for meshes’ index lists, automatically choosing an element type which is
-/// large enough for the index values.
+/// large enough for the range of the index values.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum IndexVec {
     /// 16-bit indices.
@@ -12,6 +14,18 @@ pub(crate) enum IndexVec {
     /// 32-bit indices.
     U32(Vec<u32>),
 }
+
+/// Data for meshes’ index lists, which may use either 16 or 32-bit values.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[expect(clippy::exhaustive_enums)]
+pub enum IndexSlice<'a> {
+    /// 16-bit indices.
+    U16(&'a [u16]),
+    /// 32-bit indices.
+    U32(&'a [u32]),
+}
+
+// -------------------------------------------------------------------------------------------------
 
 impl IndexVec {
     /// Creates an empty [`IndexVec`].
@@ -100,16 +114,6 @@ impl IndexVec {
         // a change to u32 will be necessary or not.
         self.extend(source.iter_u32().map(|i| i + offset));
     }
-}
-
-/// Data for meshes’ index lists, which may use either 16 or 32-bit values.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[expect(clippy::exhaustive_enums)]
-pub enum IndexSlice<'a> {
-    /// 16-bit indices.
-    U16(&'a [u16]),
-    /// 32-bit indices.
-    U32(&'a [u32]),
 }
 
 impl<'a> IndexSlice<'a> {
@@ -216,6 +220,8 @@ impl Extend<u32> for IndexVec {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
