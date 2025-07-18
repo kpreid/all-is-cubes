@@ -37,6 +37,16 @@
         "glam"
       ],
       "enabled": false
+    },
+    {
+      "description": "Group Rerun packages to update them as a unit",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchPackageNames": [
+        "re_*"
+      ],
+      "groupName": "Rerun"
     }
   ]
 }
