@@ -68,7 +68,9 @@ impl<'a> PngAdapter<'a> {
         let DecodedPng { header, data } = png;
 
         // Group into whole pixels.
-        let rgba_image_data = bytemuck::cast_slice::<u8, [u8; 4]>(data);
+        let (rgba_image_data, []) = data.as_chunks::<4>() else {
+            panic!("wrong length")
+        };
 
         let mut color_map: HashMap<Srgba, VoxelBrush<'a>> = HashMap::new();
         let mut max_brush: Option<GridAab> = None;

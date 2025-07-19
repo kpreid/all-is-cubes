@@ -384,7 +384,9 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 indices: [I; 6],
                 midpoint: Point3D<S, Cube>,
             }
-            let quads = bytemuck::cast_slice::<I, [I; 6]>(&transparent_indices);
+            let (quads, []) = transparent_indices.as_chunks::<6>() else {
+                panic!("mesh is not quads")
+            };
             let mut sortable_quads: Vec<QuadWithMid<<M::Vertex as Vertex>::Coordinate, I>> = quads
                 .iter()
                 .map(|&indices| QuadWithMid {
@@ -458,27 +460,23 @@ impl<M: MeshTypes> SpaceMesh<M> {
             return false;
         }
 
+        fn generic_sort<M: MeshTypes, Ix: Copy + num_traits::NumCast>(
+            data: &mut [Ix],
+            positions: &[M::Vertex],
+            view_position: VPos<M>,
+        ) {
+            data.as_chunks_mut::<6>().0.sort_unstable_by_key(|indices| {
+                -OrderedFloat(
+                    (view_position - SpaceMesh::<M>::midpoint(positions, *indices)).square_length(),
+                )
+            });
+        }
+
         // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
-        let positions = &self.vertices.0; // borrow for closure
+        let positions = &self.vertices.0;
         match &mut self.indices {
-            IndexVec::U16(vec) => {
-                bytemuck::cast_slice_mut::<u16, [u16; 6]>(&mut vec[range]).sort_unstable_by_key(
-                    |indices| {
-                        -OrderedFloat(
-                            (view_position - Self::midpoint(positions, *indices)).square_length(),
-                        )
-                    },
-                );
-            }
-            IndexVec::U32(vec) => {
-                bytemuck::cast_slice_mut::<u32, [u32; 6]>(&mut vec[range]).sort_unstable_by_key(
-                    |indices| {
-                        -OrderedFloat(
-                            (view_position - Self::midpoint(positions, *indices)).square_length(),
-                        )
-                    },
-                );
-            }
+            IndexVec::U16(vec) => generic_sort::<M, u16>(&mut vec[range], positions, view_position),
+            IndexVec::U32(vec) => generic_sort::<M, u32>(&mut vec[range], positions, view_position),
         }
 
         true
