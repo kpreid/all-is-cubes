@@ -573,6 +573,7 @@ impl<P: Accumulate> TracingState<P> {
                 surface: Rgba::WHITE.into(),
                 t_distance: None,
                 block: &P::BlockData::error(options),
+                position: None,
             });
             true
         } else {
@@ -600,6 +601,7 @@ impl<P: Accumulate> TracingState<P> {
             surface: sky_color.into(),
             t_distance: Some(f64::INFINITY),
             block: sky_data,
+            position: None,
         });
 
         // Debug visualization of number of raytracing steps.
@@ -619,6 +621,7 @@ impl<P: Accumulate> TracingState<P> {
                 .into(),
                 t_distance: None, // TODO: would be nice to have distance available
                 block: sky_data,
+                position: None,
             });
         }
 
@@ -642,6 +645,12 @@ impl<P: Accumulate> TracingState<P> {
                 surface: light,
                 t_distance: Some(surface.t_distance),
                 block: surface.block_data,
+                position: Some(Position {
+                    cube: surface.cube,
+                    resolution: surface.voxel.0,
+                    voxel: surface.voxel.1,
+                    face: surface.normal,
+                }),
             });
             self.secondary_info += info;
         }
@@ -751,6 +760,7 @@ pub(crate) fn trace_for_eval(
             surface: adjusted_color.into(),
             t_distance: None, // we could compute this but it is not used
             block: &(),
+            position: None, // we could compute this but it is not used
         });
 
         if color_buf.opaque() {
@@ -836,6 +846,7 @@ mod tests {
                     surface: modified_color.into(),
                     t_distance: None,
                     block: &(),
+                    position: None,
                 });
             }
             let actual = Rgba::from(color_buf);

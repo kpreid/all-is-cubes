@@ -6,8 +6,11 @@ use euclid::Vector3D;
 
 use crate::block::Resolution;
 use crate::camera::GraphicsOptions;
-use crate::math::{Intensity, Rgb, Rgba, ZeroOne, rgb_const, zo32};
+use crate::math::{Cube, Face7, Intensity, Rgb, Rgba, ZeroOne, rgb_const, zo32};
 use crate::space::SpaceBlockData;
+
+#[cfg(doc)]
+use crate::space::Space;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -76,6 +79,30 @@ pub struct Hit<'d, D> {
 
     /// [`RtBlockData`] value for the block this surface or volume is part of.
     pub block: &'d D,
+
+    /// Which cube and voxel of the space the encountered surface belongs to,
+    /// or [`None`] if this is a special case without a definite position such as the sky or
+    /// an error report.
+    ///
+    /// If a position in continuous space is desired, use `t_distance` and the original ray
+    /// to reconstruct it instead.
+    // TODO: Use Point3D<u8> instead or not?
+    pub position: Option<Position>,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct Position {
+    /// The cube in the [`Space`] containing the block whose surface was hit.
+    pub cube: Cube,
+    /// The voxel resolution of the block.
+    pub resolution: Resolution,
+    /// The voxel within the block.
+    // TODO: Use Point3D<u8> instead or not?
+    pub voxel: Cube,
+    /// The surface normal of the hit surface, or [`Face7::Within`] if the ray started inside this
+    /// voxel.
+    pub face: Face7,
 }
 
 impl<'d, D> Hit<'d, D> {
@@ -84,6 +111,7 @@ impl<'d, D> Hit<'d, D> {
             surface: self.surface,
             t_distance: self.t_distance,
             block: f(self.block),
+            position: self.position,
         }
     }
 }
@@ -156,6 +184,7 @@ pub trait Accumulate: Default {
             surface: color.into(),
             t_distance: None,
             block: &Self::BlockData::sky(options),
+            position: None,
         });
         result
     }
@@ -507,6 +536,7 @@ mod tests {
             surface: color_1.into(),
             t_distance: None,
             block: &(),
+            position: None,
         });
         assert_eq!(Rgba::from(buf), color_1);
         assert!(!buf.opaque());
@@ -515,6 +545,7 @@ mod tests {
             surface: color_2.into(),
             t_distance: None,
             block: &(),
+            position: None,
         });
         // TODO: this is not the right assertion because it's the premultiplied form.
         // assert_eq!(
@@ -528,6 +559,7 @@ mod tests {
             surface: color_3.into(),
             t_distance: None,
             block: &(),
+            position: None,
         });
         assert!(Rgba::from(buf).fully_opaque());
         //assert_eq!(

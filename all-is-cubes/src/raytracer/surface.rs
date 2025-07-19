@@ -2,7 +2,7 @@ use all_is_cubes_base::math::FreeVector;
 use euclid::Vector3D;
 use rand_distr::Distribution;
 
-use crate::block::Evoxel;
+use crate::block::{Evoxel, Resolution};
 use crate::camera::LightingOption;
 use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, Vol};
 use crate::raycast::{Ray, RayIsh as _, RaycasterIsh};
@@ -22,7 +22,9 @@ pub(crate) struct Surface<'a, D> {
     pub emission: Rgb,
 
     /// The cube of the [`Space`] which contains the block this surface belongs to.
-    cube: Cube,
+    pub cube: Cube,
+
+    pub voxel: (Resolution, Cube),
 
     /// The distance along the ray, in units of the ray's direction vector,
     /// where it intersected the surface.
@@ -41,6 +43,7 @@ impl<D: RtBlockData> Surface<'_, D> {
             diffuse_color,
             emission,
             cube: _,
+            voxel: _,
             t_distance: _,
             intersection_point: _,
             normal: _,
@@ -321,6 +324,7 @@ where
                         diffuse_color: color,
                         emission,
                         cube: rc_step.cube_ahead(),
+                        voxel: (Resolution::R1, Cube::ORIGIN),
                         t_distance: rc_step.t_distance(),
                         intersection_point: rc_step.intersection_point(self.ray.into()),
                         normal: rc_step.face(),
@@ -339,6 +343,7 @@ where
                     voxel_ray: sub_ray,
                     voxel_raycaster: sub_raycaster,
                     block_data: &tb.block_data,
+                    resolution,
                     antiscale,
                     array,
                     block_cube,
@@ -364,6 +369,7 @@ where
     voxel_ray: R::Ray,
     voxel_raycaster: R,
     block_data: &'a D,
+    resolution: Resolution,
     /// Reciprocal of resolution, for scaling back to outer world
     antiscale: FreeCoordinate,
     array: Vol<&'a [Evoxel]>,
@@ -393,6 +399,7 @@ where
             diffuse_color: voxel.color,
             emission: voxel.emission,
             cube: self.block_cube,
+            voxel: (self.resolution, rc_step.cube_ahead()),
             // Note: The proper scaling here depends on the direction vector scale, that
             // recursive_raycast() _doesn't_ change.
             t_distance: rc_step.t_distance() * self.antiscale,
@@ -557,6 +564,7 @@ mod tests {
                     diffuse_color: solid_test_color,
                     emission: Rgb::ZERO,
                     cube: Cube::new(0, 1, 0),
+                    voxel: (R1, Cube::new(0, 0, 0)),
                     t_distance: 1.5, // half-block starting point + 1 empty block
                     intersection_point: point3(0.25, 1.0, 0.25),
                     normal: Face7::NY
@@ -570,6 +578,7 @@ mod tests {
                     diffuse_color: slab_test_color,
                     emission: Rgb::ZERO,
                     cube: Cube::new(0, 2, 0),
+                    voxel: (R4, Cube::new(1, 0, 1)),
                     t_distance: 2.5,
                     intersection_point: point3(0.25, 2.0, 0.25),
                     normal: Face7::NY
@@ -580,6 +589,7 @@ mod tests {
                     diffuse_color: slab_test_color,
                     emission: Rgb::ZERO,
                     cube: Cube::new(0, 2, 0),
+                    voxel: (R4, Cube::new(1, 1, 1)),
                     t_distance: 2.75, // previous surface + 1/4 block of depth
                     intersection_point: point3(0.25, 2.25, 0.25),
                     normal: Face7::NY
@@ -606,6 +616,7 @@ mod tests {
                         diffuse_color: solid_test_color,
                         emission: Rgb::ZERO,
                         cube: Cube::new(0, 1, 0),
+                        voxel: (R1, Cube::new(0, 0, 0)),
                         t_distance: 1.5,
                         intersection_point: point3(0.25, 1.0, 0.25),
                         normal: Face7::NY,
@@ -623,6 +634,7 @@ mod tests {
                         diffuse_color: rgba_const!(1., 1., 0., 1.),
                         emission: Rgb::ZERO,
                         cube: Cube::new(0, 2, 0),
+                        voxel: (R4, Cube::new(1, 0, 1)),
                         t_distance: 2.5,
                         intersection_point: point3(0.25, 2.0, 0.25),
                         normal: Face7::NY,
@@ -635,6 +647,7 @@ mod tests {
                         diffuse_color: rgba_const!(1., 1., 0., 1.),
                         emission: Rgb::ZERO,
                         cube: Cube::new(0, 2, 0),
+                        voxel: (R4, Cube::new(1, 1, 1)),
                         t_distance: 2.75,
                         intersection_point: point3(0.25, 2.25, 0.25),
                         normal: Face7::NY,
@@ -666,6 +679,7 @@ mod tests {
                     diffuse_color: solid_test_color,
                     emission: Rgb::ZERO,
                     cube: Cube::new(0, 0, 0),
+                    voxel: (R1, Cube::ORIGIN),
                     t_distance: 0.5, // half-block starting point
                     intersection_point: point3(0.0, 0.5, 0.5),
                     normal: Face7::NX

@@ -47,7 +47,7 @@ In order to resolve various design problems interfering with development, the `a
     - `camera::GraphicsOptions::maximum_intensity` may be used to specify the maximum brightness of the output device and thus properly apply tone mapping to HDR output. It may also be used to choose to restrict output to SDR.
     - `raytracer::Accumulate` is implemented for tuples of up to 2 elements.
     - `raytracer::Accumulate::add()` takes a new struct type `Hit` instead of separate arguments,
-      and `Hit` includes distance/depth information.
+      and `Hit` includes cube position and distance/depth information.
     - `raytracer::DepthBuf` can be used to produce depth images.
     - `raytracer::Hit`, used by `Accumulate` implementors.
 
