@@ -196,22 +196,13 @@ impl BloomResources {
         config: &super::frame_texture::FbtConfig,
         scene_texture: &wgpu::TextureView,
     ) -> Self {
-        let bloom_texture_size = size_for_bloom(config.size);
-
-        // TODO: how should bloom radius relate to viewport size? This sets a fixed
-        // radius while keeping it within the valid range.
-        let mip_level_count: u32 = {
-            let log_size = bloom_texture_size
-                .width
-                .min(bloom_texture_size.height)
-                .ilog2();
-            6.min(log_size + 1)
-        };
+        let (bloom_texture_size, mip_level_count) =
+            size_and_mip_levels_for_bloom_texture(config.size);
 
         // TODO: create bloom texture only if graphics options say bloom
         let bloom_texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("bloom_texture"),
-            size: size_for_bloom(config.size),
+            size: bloom_texture_size,
             mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -343,10 +334,36 @@ fn bloom_mip_view(mip_level: u32, bloom_texture: &wgpu::Texture) -> wgpu::Textur
     })
 }
 
-fn size_for_bloom(size: wgpu::Extent3d) -> wgpu::Extent3d {
-    wgpu::Extent3d {
-        width: size.width.div_ceil(2),
-        height: size.height.div_ceil(2),
+fn size_and_mip_levels_for_bloom_texture(
+    framebuffer_size: wgpu::Extent3d,
+) -> (wgpu::Extent3d, u32) {
+    // First, compute a bloom texture size that is half resolution relative to
+    // the normal rendering path. Essentially, our mip levels "start at 1 instead of 0".
+    let naive_size = wgpu::Extent3d {
+        width: framebuffer_size.width.div_ceil(2),
+        height: framebuffer_size.height.div_ceil(2),
         depth_or_array_layers: 1,
-    }
+    };
+
+    // Choose a mip level count that is possible given the overall size.
+    //
+    // TODO: how should bloom radius relate to viewport size? This sets a fixed
+    // radius while keeping it within the valid range.
+    const MAXIMUM_LEVELS: u32 = 6;
+    let mip_level_count: u32 = {
+        let log_size = naive_size.width.min(naive_size.height).ilog2();
+        MAXIMUM_LEVELS.min(log_size + 1)
+    };
+
+    // Round up the texture size so that it is evenly divisible down to the deepest mip levels.
+    // This ensures that each stage of downsampling or upsampling has an exact 2:1 or 1:2 ratio,
+    // so that its filtering behaves as intended.
+    let divisor = 2u32.pow(mip_level_count);
+    let final_size = wgpu::Extent3d {
+        width: naive_size.width.next_multiple_of(divisor),
+        height: naive_size.height.next_multiple_of(divisor),
+        depth_or_array_layers: 1,
+    };
+
+    (final_size, mip_level_count)
 }
