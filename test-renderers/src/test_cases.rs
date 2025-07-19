@@ -37,7 +37,6 @@ use crate::{
 /// Function to be called by the custom test harness to find all tests.
 pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     let fog_test_universe = &u("fog", fog_test_universe());
-    let light_test_universe = &u("light", light_test_universe());
 
     if false {
         c.insert("dummy_failing_test", None, |_| async {
@@ -53,7 +52,12 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
         // also test the "if cheap" logic .
         [AntialiasingOption::None, AntialiasingOption::Always],
     );
-    c.insert_variants("bloom", light_test_universe, bloom, [0.0, 0.25]);
+    c.insert_variants(
+        "bloom",
+        &u("bloom", bloom_test_universe()),
+        bloom,
+        [0.0, 0.25],
+    );
     c.insert("color_srgb_ramp", None, color_srgb_ramp);
     c.insert("cursor_basic", None, cursor_basic);
     c.insert(
@@ -91,7 +95,7 @@ pub fn all_tests(c: &mut TestCaseCollector<'_>) {
     c.insert("layers_ui_only", None, layers_ui_only);
     c.insert_variants(
         "light",
-        light_test_universe,
+        &u("light", light_test_universe()),
         light,
         [
             LightingOption::None,
@@ -159,8 +163,17 @@ async fn antialias(mut context: RenderTestContext, antialias_option: Antialiasin
 async fn bloom(mut context: RenderTestContext, bloom_intensity: f32) {
     let mut options = light_test_options();
     options.bloom_intensity = bloom_intensity.try_into().unwrap();
-    let scene =
-        StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
+    let scene = StandardCameras::from_constant_for_test(
+        options,
+        Viewport {
+            // Taller viewport to give more pixels to see the bloom in.
+            // TODO: We should have control over the distance scaling of the bloom effect,
+            // instead of requiring the test to use many pixels.
+            nominal_size: size2(128., 256.),
+            framebuffer_size: size2(128, 256),
+        },
+        context.universe(),
+    );
     context
         .render_comparison_test(12, scene, Overlays::NONE)
         .await;
@@ -1271,6 +1284,28 @@ async fn antialias_test_universe() -> Arc<Universe> {
     Arc::new(universe)
 }
 
+// Test scene for bloom (bright objects on a black background).
+async fn bloom_test_universe() -> Arc<Universe> {
+    let bounds = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
+    let space = Space::builder(bounds)
+        .spawn_position(point3(1.5, 3., 8.))
+        .light_physics(LightPhysics::None)
+        .sky_color(Rgb::ZERO)
+        .build_and_mutate(|m| {
+            let light_source_block = Block::builder()
+                .color(rgba_const!(0.0, 0.0, 0.0, 1.0))
+                .light_emission(rgb_const!(0.5, 100.0, 0.0))
+                .build();
+            m.set([0, 0, 0], &light_source_block).unwrap();
+            Ok(())
+        })
+        .unwrap();
+
+    let mut universe = Universe::new();
+    finish_universe_from_space(&mut universe, space);
+    Arc::new(universe)
+}
+
 /// Construct a space suitable for testing long-distance rendering (fog).
 async fn fog_test_universe() -> Arc<Universe> {
     let z_length = 60;
@@ -1326,7 +1361,7 @@ async fn fog_test_universe() -> Arc<Universe> {
     Arc::new(universe)
 }
 
-// Test scene for lighting.
+// Test scene for lighting from emissive blocks.
 async fn light_test_universe() -> Arc<Universe> {
     let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
     let mut space = Space::builder(bounds)
