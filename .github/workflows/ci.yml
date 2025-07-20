@@ -15,6 +15,16 @@ on:
       # usually by way of `[patch]`ing a dependency, thus won’t have outstanding PRs.
       - "next/*"
 
+# Cancel previous PR workflows when a push triggers a new one.
+# This idea and some of the implementation taken from <https://github.com/gfx-rs/wgpu/pull/7958>.
+# We special case pushes to main to use the commit hash as group so that testing main is never
+# cancelled even when pending.
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && format('main: {0}', github.sha) || github.ref }}"
+  # main should be tested at every push for detecting breakage;
+  # all other branches are considered ephemeral and we can cancel jobs
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   CARGO_TERM_COLOR: always
   # Disable incremental compilation because we aren't caching incremental compilation

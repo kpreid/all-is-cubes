@@ -29,6 +29,12 @@ on:
       - unstable-rust
       - ci
 
+# Cancel previous workflows when a push triggers a new one.
+# This idea and implementation taken from <https://github.com/gfx-rs/wgpu/pull/7958>.
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   # Disable incremental compilation because we aren't caching incremental compilation
