@@ -5,16 +5,22 @@ struct PostprocessUniforms {
     tone_mapping_id: i32,
     maximum_intensity: f32,
     bloom_intensity: f32,
-    _padding: i32,
+    bloom_debug_level: u32,
 }
 
 
-// This group is named postprocess_bind_group_layout in the code.
-@group(0) @binding(0) var text_texture: texture_2d<f32>; // red-only
-@group(0) @binding(1) var text_sampler: sampler;
-@group(0) @binding(2) var linear_scene_texture: texture_2d<f32>;
-@group(0) @binding(3) var<uniform> camera: PostprocessUniforms;
-@group(0) @binding(4) var bloom_texture: texture_2d<f32>;
+// Group 0 is named postprocess_bind_group_layout on the Rust side.
+@group(0) @binding(0) var<uniform> camera: PostprocessUniforms;
+// Not-yet-postprocessed scene rendering.
+@group(0) @binding(1) var linear_scene_texture: texture_2d<f32>;
+@group(0) @binding(2) var scene_sampler: sampler;
+// Rendered info text, as one-channel texture where 1 is foreground and 0 is background.
+@group(0) @binding(3) var text_texture: texture_2d<f32>;
+@group(0) @binding(4) var text_sampler: sampler;
+// Output of bloom calculation, to be blended with the scene.
+@group(0) @binding(5) var bloom_texture: texture_2d<f32>;
+// Sampler to be used for reading the bloom texture.
+@group(0) @binding(6) var bloom_sampler: sampler;
 
 // --- Vertex shader -----------------------------------------------------------
 
@@ -62,7 +68,7 @@ fn tone_map(linear_rgb: vec3<f32>) -> vec3<f32> {
 fn scene_pixel(texcoord: vec2<f32>) -> vec4<f32> {
     let scene_color = textureSampleLevel(
         linear_scene_texture,
-        text_sampler, // TODO: wrong sampler
+        scene_sampler,
         texcoord,
         0.0
     );
@@ -70,7 +76,7 @@ fn scene_pixel(texcoord: vec2<f32>) -> vec4<f32> {
     // Add bloom.
     let bloom_color = textureSampleLevel(
         bloom_texture,
-        text_sampler, // TODO: probably provide a sampler specifically for bloom?
+        bloom_sampler,
         texcoord,
         0.0
     );
@@ -117,7 +123,10 @@ fn postprocess_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let scene_color = scene_pixel(texcoord);
 
     // apply tone mapping, respecting premultiplied alpha
-    let tone_mapped_scene = vec4<f32>(tone_map(scene_color.rgb * scene_color.a) / scene_color.a, scene_color.a);
+    let tone_mapped_scene = vec4<f32>(
+        tone_map(scene_color.rgb * scene_color.a) / scene_color.a,
+        scene_color.a,
+    );
 
     let shadowing = text_shadow_alpha(texcoord);
     let foreground_texel = textureSampleLevel(text_texture, text_sampler, texcoord, 0.0).r;

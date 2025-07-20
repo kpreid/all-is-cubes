@@ -28,38 +28,9 @@ impl PostprocessResources {
     pub(super) fn new(device: &wgpu::Device) -> Self {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
-                // Binding for info_text_texture
                 wgpu::BindGroupLayoutEntry {
+                    // var<uniform> camera: PostprocessUniforms;
                     binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                // Binding for info_text_sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                // Binding for linear_scene_texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                // Binding for camera
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -68,15 +39,58 @@ impl PostprocessResources {
                     },
                     count: None,
                 },
-                // Binding for bloom_texture
                 wgpu::BindGroupLayoutEntry {
-                    binding: 4,
+                    // var linear_scene_texture: texture_2d<f32>;
+                    binding: 1,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
                         view_dimension: wgpu::TextureViewDimension::D2,
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
                     },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    // var scene_sampler: sampler;
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    // var text_texture: texture_2d<f32>;
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    // var text_sampler: sampler;
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    // var bloom_texture: texture_2d<f32>;
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    // var bloom_sampler: sampler;
+                    binding: 6,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
             ],
@@ -139,34 +153,58 @@ impl PostprocessResources {
                         fb.global_id(),
                     ),
                     || {
+                        // This sampler acts as the final resampling of the overall bloom
+                        // processing. We could get higher quality by running the bloom shader's
+                        // special sampling, but it would be completely unnoticeable.
+                        //
+                        // It is also used for the scene texture sampler, because that one does
+                        // not currently matter (sampling is always done with 1:1 texels).
+                        let bloom_sampler = &device.create_sampler(&wgpu::SamplerDescriptor {
+                            label: Some("bloom_sampler and scene_sampler"),
+                            // TODO: Would MirrorRepeat have better results?
+                            address_mode_u: wgpu::AddressMode::ClampToEdge,
+                            address_mode_v: wgpu::AddressMode::ClampToEdge,
+                            mag_filter: wgpu::FilterMode::Linear, // the final bloom resampling
+                            ..Default::default()
+                        });
+                        let scene_sampler = &bloom_sampler;
+
                         device.create_bind_group(&wgpu::BindGroupDescriptor {
                             layout: &self.bind_group_layout,
                             entries: &[
                                 wgpu::BindGroupEntry {
                                     binding: 0,
-                                    resource: wgpu::BindingResource::TextureView(
-                                        info_text_texture.view().unwrap(), // TODO: have a better plan than unwrap
-                                    ),
+                                    resource: self.camera_buffer.as_entire_binding(),
                                 },
                                 wgpu::BindGroupEntry {
                                     binding: 1,
-                                    resource: wgpu::BindingResource::Sampler(info_text_sampler),
-                                },
-                                wgpu::BindGroupEntry {
-                                    binding: 2,
                                     resource: wgpu::BindingResource::TextureView(
                                         fb.scene_for_postprocessing_input(),
                                     ),
                                 },
                                 wgpu::BindGroupEntry {
+                                    binding: 2,
+                                    resource: wgpu::BindingResource::Sampler(scene_sampler),
+                                },
+                                wgpu::BindGroupEntry {
                                     binding: 3,
-                                    resource: self.camera_buffer.as_entire_binding(),
+                                    resource: wgpu::BindingResource::TextureView(
+                                        info_text_texture.view().unwrap(), // TODO: have a better plan than unwrap
+                                    ),
                                 },
                                 wgpu::BindGroupEntry {
                                     binding: 4,
+                                    resource: wgpu::BindingResource::Sampler(info_text_sampler),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 5,
                                     resource: wgpu::BindingResource::TextureView(
                                         fb.bloom_data_texture(),
                                     ),
+                                },
+                                wgpu::BindGroupEntry {
+                                    binding: 6,
+                                    resource: wgpu::BindingResource::Sampler(bloom_sampler),
                                 },
                             ],
                             label: Some("PostprocessResources::bind_group"),
