@@ -1,11 +1,14 @@
-// --- Interface declarations --------------------------------------------------
+// Shaders used together with the `mip_ping` Rust module which executes them in a series of
+// downsampling followed by upsampling operations along a mip chain.
+
+// --- Interface declarations ----------------------------------------------------------------------
 
 // This group is named bloom_bind_group_layout in the code.
 @group(0) @binding(0) var previous_stage_input: texture_2d<f32>;
 @group(0) @binding(1) var higher_stage_input: texture_2d<f32>;
 @group(0) @binding(2) var linear_sampler: sampler;
 
-// --- Vertex shader -----------------------------------------------------------
+// --- Vertex shader -------------------------------------------------------------------------------
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
@@ -23,7 +26,7 @@ fn vertex_position(vertex_index: u32) -> vec4<f32> {
 }
 
 @vertex
-fn bloom_vertex(
+fn full_image_vertex(
     @builtin(vertex_index) in_vertex_index: u32,
     @builtin(instance_index) in_instance_index: u32,
 ) -> VertexOutput {
@@ -37,7 +40,7 @@ fn bloom_vertex(
     return VertexOutput(position, texcoord, in_instance_index);
 }
 
-// --- Fragment shader; doing the actual bloom scaling work -------------------
+// --- Fragment shader for bloom -------------------------------------------------------------------
 //
 // This bloom strategy is the “Dual filter” described in
 // _Bandwidth-Efficient Rendering_ by Marius Bjørge at SIGGRAPH 2015
@@ -60,7 +63,7 @@ fn input_pixel(in: VertexOutput, offset: vec2<f32>) -> vec4<f32> {
 }
 
 @fragment
-fn bloom_downsample_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+fn bloom_downsample(in: VertexOutput) -> @location(0) vec4<f32> {
     return 
         0.50 * input_pixel(in, vec2<f32>(0.0, 0.0))
         + 0.125 * input_pixel(in, vec2<f32>(0.5, 0.5))
@@ -70,7 +73,7 @@ fn bloom_downsample_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 @fragment
-fn bloom_upsample_fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+fn bloom_upsample(in: VertexOutput) -> @location(0) vec4<f32> {
     // This value controls how much we blend in from the *next higher downsampling* level,
     // to recover some of the high-spatial-frequency information we lost by downsampling so much.
     let higher_weight = 5.0 * pow(1.5, -f32(in.output_stage));

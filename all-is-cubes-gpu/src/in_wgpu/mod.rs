@@ -37,6 +37,7 @@ pub mod init;
 mod light_texture;
 #[doc(hidden)] // public for benchmark
 pub use light_texture::{LightChunk, LightTexture};
+mod mip_ping;
 mod pipelines;
 mod poll;
 mod postprocess;

@@ -28,7 +28,8 @@ pub(crate) struct Shaders {
 
 static BLOCKS_AND_LINES: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));
-static BLOOM: Lazy<Reloadable> = Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/bloom.wgsl"));
+static RESAMPLING: Lazy<Reloadable> =
+    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/resampling.wgsl"));
 static RT_COPY: Lazy<Reloadable> =
     Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/rt-copy.wgsl"));
 static POSTPROCESS: Lazy<Reloadable> =
@@ -45,7 +46,7 @@ impl Shaders {
                 "blocks_and_lines".into(),
                 BLOCKS_AND_LINES.as_source(),
             ),
-            bloom: ReloadableShader::new(device, "bloom".into(), BLOOM.as_source()),
+            bloom: ReloadableShader::new(device, "bloom".into(), RESAMPLING.as_source()),
             rt_copy: ReloadableShader::new(device, "rt_copy".into(), RT_COPY.as_source()),
             postprocess: ReloadableShader::new(
                 device,

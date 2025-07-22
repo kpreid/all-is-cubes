@@ -277,13 +277,16 @@ impl FramebufferTextures {
         };
 
         Self {
+            // TODO: create bloom resources only if graphics options say bloom
             bloom: Some(bloom::BloomResources::new(
                 device,
-                // TODO: Don't reconstruct on every resize, but reuse it. Has a circularity
-                // problem with needing FbtConfig, but it really only needs FbtFeatures.
-                &bloom::BloomPipelines::new(device, shaders, config.linear_scene_texture_format),
+                // TODO: Don't reconstruct on every resize, but reuse it.
+                &bloom::create_bloom_pipelines(device, shaders, config.linear_scene_texture_format),
                 &config,
                 bloom_input_view,
+                // TODO: set levels and repetitions to control size relative to framebuffer size?
+                6,
+                3,
             )),
             linear_scene_view,
             linear_scene_resolved_view,
@@ -387,7 +390,7 @@ impl FramebufferTextures {
             || self
                 .bloom
                 .as_ref()
-                .is_some_and(|b| b.bloom_shader_id() != shaders.bloom.get().global_id())
+                .is_some_and(|b| b.shader_id() != shaders.bloom.get().global_id())
         {
             *self = Self::new(device, shaders, new_config);
             true
@@ -410,7 +413,7 @@ impl FramebufferTextures {
             .bloom
             .as_ref()
             .expect("TODO: disabling bloom not implemented")
-            .bloom_output_texture_view
+            .output_texture_view
     }
 
     pub(crate) fn global_id(&self) -> FbtId {
