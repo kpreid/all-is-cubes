@@ -403,11 +403,12 @@ impl FramebufferTextures {
     }
 
     pub(crate) fn bloom_data_texture(&self) -> &wgpu::TextureView {
-        &self
+        let [ref view] = self
             .bloom
             .as_ref()
             .expect("TODO: disabling bloom not implemented")
-            .output_texture_view
+            .output_texture_views;
+        view
     }
 
     pub(crate) fn global_id(&self) -> FbtId {

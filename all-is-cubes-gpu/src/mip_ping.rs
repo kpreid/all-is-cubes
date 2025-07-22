@@ -1,5 +1,5 @@
 //! Image processing which downsamples and then upsamples, down and up a single mipmapped texture
-//! as temporary storage.
+//! (or group of textures used in parallel) as temporary storage.
 //!
 //! This can be used to allow screen-space effects such as bloom to cross large distances without
 //! requiring sampling of large numbers of texels.
@@ -15,14 +15,20 @@ use crate::queries::{Queries, Query};
 // -------------------------------------------------------------------------------------------------
 
 /// Render pipelines and non-size-dependent resources for a [`mip_ping`](self) effect.
+///
+/// # Generic parameters
+///
+/// * `N` is the number of textures bound and processed in parallel.
+///   `N` greater than 1 is used when the effect requires more than the 4 channels a single texture
+///   can provide.
 #[derive(Debug)]
-pub(crate) struct Pipelines {
+pub(crate) struct Pipelines<const N: usize = 1> {
     label: String,
 
     bind_group_layout: wgpu::BindGroupLayout,
 
-    /// Format of the intermediate textures and the input texture.
-    texture_format: wgpu::TextureFormat,
+    /// Formats of the intermediate textures and the corresponding input textures.
+    texture_formats: [wgpu::TextureFormat; N],
 
     sampler: wgpu::Sampler,
 
@@ -33,15 +39,15 @@ pub(crate) struct Pipelines {
     shader_id: crate::Id<wgpu::ShaderModule>,
 }
 
-impl Pipelines {
-    /// * `texture_format` is the format of the intermediate texture and must also match
-    ///   the format of the input texture provided later.
+impl<const N: usize> Pipelines<N> {
+    /// * `texture_formats` are the formats of the intermediate textures and must also match
+    ///   the formats of the input textures provided later.
     /// * `module` is the shader module containing the downsampling and upsampling functions.
     /// * `sampler` is a sampler that will be provided to the shaders for their use.
     pub fn new(
         device: &wgpu::Device,
         label: String,
-        texture_format: wgpu::TextureFormat,
+        texture_formats: [wgpu::TextureFormat; N],
         module: &Identified<wgpu::ShaderModule>,
         vertex_entry_point: &str,
         downsample_entry_point: &str,
@@ -50,40 +56,49 @@ impl Pipelines {
     ) -> Arc<Self> {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some(&format!("{label} mip_ping::Pipelines::bind_group_layout")),
-            entries: &[
-                // Binding for input texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                // Binding for "higher" texture.
-                // When downsampling, this is always the original input texture.
-                // When upsampling, this is what would have been the input to the downsampling
-                // pass for the same mip level (except for the last -- TODO)
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                // Binding for sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
+            entries: &(0..N * 2 + 1)
+                .map(|i| {
+                    let binding = u32::try_from(i).unwrap();
+                    if (0..N).contains(&i) {
+                        // Binding for input texture
+                        wgpu::BindGroupLayoutEntry {
+                            binding,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                multisampled: false,
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            },
+                            count: None,
+                        }
+                    } else if (N..N * 2).contains(&i) {
+                        // Binding for "higher" texture.
+                        // When downsampling, this is always the original input texture.
+                        // When upsampling, this is what would have been the input to the
+                        // downsampling pass for the same mip level (except for the last -- TODO)
+                        wgpu::BindGroupLayoutEntry {
+                            binding,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Texture {
+                                multisampled: false,
+                                view_dimension: wgpu::TextureViewDimension::D2,
+                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            },
+                            count: None,
+                        }
+                    } else if i == N * 2 {
+                        // Binding for sampler
+                        wgpu::BindGroupLayoutEntry {
+                            binding,
+                            visibility: wgpu::ShaderStages::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                            count: None,
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                })
+                .collect::<Vec<wgpu::BindGroupLayoutEntry>>(),
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -102,6 +117,14 @@ impl Pipelines {
             conservative: false,
         };
 
+        let color_targets = &texture_formats.map(|format| {
+            Some(wgpu::ColorTargetState {
+                format,
+                blend: None,
+                write_mask: wgpu::ColorWrites::ALL,
+            })
+        });
+
         let downsample_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(&format!("{label} mip_ping::Pipelines::downsample_pipeline")),
             layout: Some(&pipeline_layout),
@@ -115,11 +138,7 @@ impl Pipelines {
                 module,
                 entry_point: Some(downsample_entry_point),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: texture_format,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
+                targets: color_targets,
             }),
             primitive,
             depth_stencil: None,
@@ -141,11 +160,7 @@ impl Pipelines {
                 module,
                 entry_point: Some(upsample_entry_point),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: texture_format,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
+                targets: color_targets,
             }),
             primitive,
             depth_stencil: None,
@@ -160,7 +175,7 @@ impl Pipelines {
             shader_id: module.global_id(),
             label,
             bind_group_layout,
-            texture_format,
+            texture_formats,
             sampler,
             downsample_pipeline,
             upsample_pipeline,
@@ -171,70 +186,85 @@ impl Pipelines {
     fn bind_group(
         &self,
         device: &wgpu::Device,
-        input_texture_view: &wgpu::TextureView,
-        higher_texture_view: &wgpu::TextureView,
+        input_texture_views: [&wgpu::TextureView; N],
+        higher_texture_views: [&wgpu::TextureView; N],
     ) -> wgpu::BindGroup {
         let label = &self.label;
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &self.bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(input_texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(higher_texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
-                },
-            ],
+            entries: &(0..N * 2 + 1)
+                .map(|i| {
+                    let binding = u32::try_from(i).unwrap();
+                    if (0..N).contains(&i) {
+                        wgpu::BindGroupEntry {
+                            binding,
+                            resource: wgpu::BindingResource::TextureView(input_texture_views[i]),
+                        }
+                    } else if (N..N * 2).contains(&i) {
+                        wgpu::BindGroupEntry {
+                            binding,
+                            resource: wgpu::BindingResource::TextureView(
+                                higher_texture_views[i - N],
+                            ),
+                        }
+                    } else if i == N * 2 {
+                        wgpu::BindGroupEntry {
+                            binding,
+                            resource: wgpu::BindingResource::Sampler(&self.sampler),
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                })
+                .collect::<Vec<wgpu::BindGroupEntry<'_>>>(),
             label: Some(&format!("{label} bind group")),
         })
     }
 }
 
 /// Texture and size-dependent resources for a [`mip_ping`](self) effect.
+///
+/// # Generic parameters
+///
+/// * `N` is the number of textures bound and processed in parallel.
+///   `N` greater than 1 is used when the effect requires more than the 4 channels a single texture
+///   can provide.
 #[derive(Debug)]
-pub(crate) struct Texture {
+pub(crate) struct Texture<const N: usize> {
     /// When the render bundles in this vector are executed, they compute the effect on the
-    /// previously provided texture and leaves the result in [`Self::output_texture_view`].
-    ///
-    /// The `TextureView` in each element is
-    stages: Vec<Stage>,
+    /// previously provided texture and leave the results in [`Self::output_texture_views`].
+    stages: Vec<Stage<N>>,
 
-    pub output_texture_view: wgpu::TextureView,
+    pub output_texture_views: [wgpu::TextureView; N],
 
     shader_id: crate::Id<wgpu::ShaderModule>,
 }
 
 /// A [`wgpu::RenderBundle`] and ingredients for one render pass of those making up the whole.
 #[derive(Debug)]
-pub(crate) struct Stage {
+pub(crate) struct Stage<const N: usize> {
     /// Label for the render pass.
     pass_label: String,
 
     /// Render bundle to execute in the render pass.
     render_bundle: wgpu::RenderBundle,
 
-    /// Texture view to use as the color attachment for the render pass.
-    color_attachment: wgpu::TextureView,
+    /// Texture views to use as the color attachments for the render pass.
+    color_attachments: [wgpu::TextureView; N],
 
     // Timestamp indices to put in [`wgpu::RenderPassTimestampWrites`].
     begin_timestamp_query: Option<Query>,
     end_timestamp_query: Option<Query>,
 }
 
-impl Texture {
+impl<const N: usize> Texture<N> {
     /// * `requested_size` is the minimum size of texture,
     ///   but may be rounded up to ensure the mip levels are in perfect ratios.
     pub fn new(
         device: &wgpu::Device,
-        pipelines: &Pipelines,
+        pipelines: &Pipelines<N>,
         requested_size: wgpu::Extent3d,
-        scene_texture: &wgpu::TextureView,
+        input_texture_views: [&wgpu::TextureView; N],
         maximum_levels: u32,
         repetitions: u32,
         begin_timestamp_query: Query,
@@ -243,19 +273,23 @@ impl Texture {
         let label = &pipelines.label;
         let (intermediate_texture_size, mip_level_count) =
             size_and_mip_levels_for_texture(requested_size, maximum_levels);
-        let color_formats = &[Some(pipelines.texture_format)];
+        let color_formats: &[Option<wgpu::TextureFormat>; N] =
+            &array_map_refs(&pipelines.texture_formats, |&tf| Some(tf));
 
         // This texture stores all of the results of processing.
         // Mip level zero is the output.
-        let intermediate_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(&format!("{label} texture")),
-            size: intermediate_texture_size,
-            mip_level_count,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: pipelines.texture_format,
-            view_formats: &[],
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+        let intermediate_textures: [wgpu::Texture; N] = pipelines.texture_formats.map(|format| {
+            device.create_texture(&wgpu::TextureDescriptor {
+                label: Some(&format!("{label} texture")),
+                size: intermediate_texture_size,
+                mip_level_count,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                view_formats: &[],
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+            })
         });
 
         let mut stages = Vec::with_capacity(mip_level_count as usize * 2 - 1);
@@ -272,14 +306,17 @@ impl Texture {
                     continue;
                 }
 
-                let input_texture_view = if output_mip == 0 {
-                    scene_texture
+                let stage_input_texture_views: [wgpu::TextureView; N] = if output_mip == 0 {
+                    input_texture_views.map(Clone::clone)
                 } else {
                     let input_mip = output_mip - 1;
-                    &single_mip_view(label, input_mip, &intermediate_texture)
+                    intermediate_textures.each_ref().map(|t| single_mip_view(label, input_mip, t))
                 };
-                let input_bind_group =
-                    pipelines.bind_group(device, input_texture_view, input_texture_view);
+                let input_bind_group = pipelines.bind_group(
+                    device,
+                    stage_input_texture_views.each_ref(),
+                    stage_input_texture_views.each_ref(),
+                );
 
                 let mut encoder =
                     device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
@@ -301,7 +338,9 @@ impl Texture {
                 stages.push(Stage {
                     pass_label,
                     render_bundle,
-                    color_attachment: single_mip_view(label, output_mip, &intermediate_texture),
+                    color_attachments: intermediate_textures
+                        .each_ref()
+                        .map(|t| single_mip_view(label, output_mip, t)),
                     begin_timestamp_query: (repetition == 0 && output_mip == 0)
                         .then_some(begin_timestamp_query),
                     end_timestamp_query: None,
@@ -314,8 +353,14 @@ impl Texture {
                 let higher_mip = output_mip.checked_sub(1).unwrap_or(input_mip);
                 let input_bind_group = pipelines.bind_group(
                     device,
-                    &single_mip_view(label, input_mip, &intermediate_texture),
-                    &single_mip_view(label, higher_mip, &intermediate_texture),
+                    intermediate_textures
+                        .each_ref()
+                        .map(|t| single_mip_view(label, input_mip, t))
+                        .each_ref(),
+                    intermediate_textures
+                        .each_ref()
+                        .map(|t| single_mip_view(label, higher_mip, t))
+                        .each_ref(),
                 );
 
                 let mut encoder =
@@ -338,7 +383,9 @@ impl Texture {
                 stages.push(Stage {
                     pass_label,
                     render_bundle,
-                    color_attachment: single_mip_view(label, output_mip, &intermediate_texture),
+                    color_attachments: intermediate_textures
+                        .each_ref()
+                        .map(|t| single_mip_view(label, output_mip, t)),
                     begin_timestamp_query: None,
                     end_timestamp_query: (repetition == repetitions - 1 && output_mip == 0)
                         .then_some(end_timestamp_query),
@@ -349,7 +396,9 @@ impl Texture {
         Self {
             stages,
 
-            output_texture_view: single_mip_view(label, 0, &intermediate_texture),
+            output_texture_views: array_map_refs(&intermediate_textures, |t| {
+                single_mip_view(label, 0, t)
+            }),
             shader_id: pipelines.shader_id,
         }
     }
@@ -358,22 +407,24 @@ impl Texture {
         for Stage {
             pass_label,
             render_bundle,
-            color_attachment,
+            color_attachments,
             begin_timestamp_query,
             end_timestamp_query,
         } in &self.stages
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some(pass_label),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: color_attachment,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
+                color_attachments: &array_map_refs(color_attachments, |view| {
+                    Some(wgpu::RenderPassColorAttachment {
+                        view,
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })
+                }),
                 timestamp_writes: queries
                     .map(|queries| wgpu::RenderPassTimestampWrites {
                         query_set: &queries.query_set,
@@ -428,4 +479,11 @@ fn size_and_mip_levels_for_texture(
     };
 
     (final_size, mip_level_count)
+}
+
+fn array_map_refs<'a, const N: usize, T, R>(
+    array: &'a [T; N],
+    mut function: impl FnMut(&'a T) -> R,
+) -> [R; N] {
+    core::array::from_fn(|i| function(&array[i]))
 }

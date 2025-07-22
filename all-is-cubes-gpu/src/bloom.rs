@@ -5,7 +5,7 @@ use crate::mip_ping;
 use crate::shaders::Shaders;
 
 /// Resources for executing bloom on a specific image size.
-pub(crate) type BloomResources = mip_ping::Texture;
+pub(crate) type BloomResources = mip_ping::Texture<1>;
 
 pub fn create_bloom_pipelines(
     device: &wgpu::Device,
@@ -27,7 +27,7 @@ pub fn create_bloom_pipelines(
     mip_ping::Pipelines::new(
         device,
         String::from("bloom"),
-        linear_scene_texture_format,
+        [linear_scene_texture_format],
         shaders.resampling.get(),
         "full_image_vertex",
         "bloom_downsample",
@@ -51,7 +51,7 @@ pub fn create_bloom_texture(
             height: framebuffer_size.height.div_ceil(2),
             depth_or_array_layers: 1,
         },
-        bloom_input_view,
+        [bloom_input_view],
         // TODO: set levels and repetitions to control size relative to framebuffer size?
         6,
         3,
