@@ -17,10 +17,17 @@ use crate::Identified;
 #[derive(Debug)]
 pub(crate) struct Pipelines {
     label: String,
+
     bind_group_layout: wgpu::BindGroupLayout,
+
+    /// Format of the intermediate textures and the input texture.
+    texture_format: wgpu::TextureFormat,
+
     linear_sampler: wgpu::Sampler,
+
     downsample_pipeline: wgpu::RenderPipeline,
     upsample_pipeline: wgpu::RenderPipeline,
+
     // Id of the shader used in these pipelines.
     shader_id: crate::Id<wgpu::ShaderModule>,
 }
@@ -162,6 +169,7 @@ impl Pipelines {
 
             label,
             bind_group_layout,
+            texture_format,
             downsample_pipeline,
             upsample_pipeline,
         })
@@ -215,14 +223,15 @@ impl Texture {
     pub fn new(
         device: &wgpu::Device,
         pipelines: &Pipelines,
-        config: &super::frame_texture::FbtConfig,
+        size: wgpu::Extent3d,
         scene_texture: &wgpu::TextureView,
         maximum_levels: u32,
         repetitions: u32,
     ) -> Self {
         let label = &pipelines.label;
         let (intermediate_texture_size, mip_level_count) =
-            size_and_mip_levels_for_texture(config.size, maximum_levels);
+            size_and_mip_levels_for_texture(size, maximum_levels);
+        let color_formats = &[Some(pipelines.texture_format)];
 
         // This texture stores all of the results of processing.
         // Mip level zero is the output.
@@ -232,7 +241,7 @@ impl Texture {
             mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: config.linear_scene_texture_format,
+            format: pipelines.texture_format,
             view_formats: &[],
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         });
@@ -264,7 +273,7 @@ impl Texture {
                 let mut encoder =
                     device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
                         label: None,
-                        color_formats: &[Some(config.linear_scene_texture_format)],
+                        color_formats,
                         depth_stencil: None,
                         sample_count: 1,
                         multiview: None,
@@ -298,7 +307,7 @@ impl Texture {
                 let mut encoder =
                     device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
                         label: None,
-                        color_formats: &[Some(config.linear_scene_texture_format)],
+                        color_formats,
                         depth_stencil: None,
                         sample_count: 1,
                         multiview: None,
