@@ -104,6 +104,9 @@ enum XtaskCommand {
         duration: f64,
     },
 
+    /// Build binaries with the release profile and report their size on disk.
+    BinSize,
+
     /// Run the game server inside of `cargo watch` (must be installed) and with options
     /// suitable for development.
     RunDev,
@@ -305,6 +308,9 @@ fn main() -> Result<(), ActionError> {
                     .arg(format!("-max_total_time={duration}"))
                     .run()?;
             }
+        }
+        XtaskCommand::BinSize => {
+            measure_binary_sizes(&config)?;
         }
         XtaskCommand::RunDev => {
             // TODO: Replace cargo-watch with our own file watching built into the server
@@ -871,6 +877,39 @@ fn build_documentation(config: &Config<'_>, time_log: &mut Vec<Timing>) -> Resul
     Ok(())
 }
 
+fn measure_binary_sizes(config: &Config<'_>) -> Result<(), ActionError> {
+    fn measure(relative_path: &str) -> Result<(), ActionError> {
+        let path = PROJECT_DIR.join(relative_path);
+        let size = fs::metadata(&path)?.len();
+        let name = path.file_name().unwrap();
+        println!(
+            "{name:<30} {st} B",
+            name = name.display(),
+            st = WithCommas(size)
+        );
+        Ok(())
+    }
+
+    // Build
+    config
+        .cargo()
+        .args([
+            "build",
+            "--release",
+            "--bin=all-is-cubes",
+            "--bin=aic-server",
+        ])
+        .run()?;
+    build_web(config, &mut Vec::new(), Profile::Release)?;
+
+    // Print
+    measure("target/release/all-is-cubes")?;
+    measure("target/release/aic-server")?;
+    measure("all-is-cubes-wasm/target/wasm-pack-release/all_is_cubes_wasm_bg.wasm")?;
+
+    Ok(())
+}
+
 /// Create files which may be useful for development in the workspace but which cannot
 /// simply have constant contents.
 fn write_development_files(_config: &Config<'_>) -> Result<(), ActionError> {
@@ -1080,5 +1119,35 @@ impl Drop for CaptureTime<'_> {
             );
         }
         self.output.push(Timing { label, time });
+    }
+}
+
+struct WithCommas(u64);
+
+impl fmt::Display for WithCommas {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut in_leading_zeroes = true;
+        for i in (0..4).rev() {
+            let scale = 1000u64.pow(i);
+            let digits_in_group = (self.0 / scale) % 1000;
+            if in_leading_zeroes {
+                if digits_in_group != 0 {
+                    in_leading_zeroes = false;
+                    write!(f, "{digits_in_group:3}")?;
+                    if i > 0 {
+                        write!(f, ",")?;
+                    }
+                } else {
+                    // pad the absent group for constant width
+                    write!(f, "    ")?;
+                }
+            } else {
+                write!(f, "{digits_in_group:03}")?;
+                if i > 0 {
+                    write!(f, ",")?;
+                }
+            }
+        }
+        Ok(())
     }
 }
