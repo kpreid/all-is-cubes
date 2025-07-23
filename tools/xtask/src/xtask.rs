@@ -81,11 +81,17 @@ enum XtaskCommand {
         no_run: bool,
     },
 
-    /// Check for lint and generate documentation, but do not test.
+    /// Check for lint and generate documentation (to lint the doc markdown), but do not test.
     ///
     /// Caution: If there are rustc or clippy warnings only, the exit code is still zero.
     /// <https://github.com/rust-lang/rust-clippy/issues/1209>
     Lint,
+
+    /// Build documentation.
+    ///
+    /// This is approximately the same as `cargo doc` but uses the same options as `xtask lint`
+    /// does in order to avoid spurious rebuilds.
+    Doc,
 
     /// Format code (as `cargo fmt` but covering all packages)
     Fmt,
@@ -242,14 +248,12 @@ fn main() -> Result<(), ActionError> {
             // This applies to the main workspace & target only, because there are no
             // libraries with docs elsewhere.
             if config.scope.includes_main_workspace() {
-                let _t = CaptureTime::new(&mut time_log, "doc");
-                config
-                    .cargo()
-                    .env("RUSTDOCFLAGS", "-Dwarnings")
-                    .arg("doc")
-                    .args(config.cargo_build_args())
-                    .run()?;
+                build_documentation(&config, &mut time_log)?;
             }
+        }
+        XtaskCommand::Doc => {
+            assert!(config.scope.includes_main_workspace());
+            build_documentation(&config, &mut time_log)?;
         }
         XtaskCommand::Fmt => {
             config.do_for_all_workspaces(|| {
@@ -853,6 +857,17 @@ fn do_for_all_packages(
             .run()?;
     }
 
+    Ok(())
+}
+
+fn build_documentation(config: &Config<'_>, time_log: &mut Vec<Timing>) -> Result<(), ActionError> {
+    let _t = CaptureTime::new(time_log, "doc");
+    config
+        .cargo()
+        .env("RUSTDOCFLAGS", "-Dwarnings")
+        .arg("doc")
+        .args(config.cargo_build_args())
+        .run()?;
     Ok(())
 }
 
