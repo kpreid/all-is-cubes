@@ -17,180 +17,32 @@
 #![forbid(unsafe_code)]
 
 use std::collections::BTreeSet;
-use std::fmt;
 use std::fs;
 use std::io::Write as _;
-use std::mem;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::LazyLock;
-use std::time::Duration;
-use std::time::Instant;
 
 use anyhow::Context as _;
 use anyhow::Error as ActionError;
 use cargo_metadata::PackageId;
-use xshell::{Cmd, Shell, cmd};
+use xshell::{Shell, cmd};
+
+// -------------------------------------------------------------------------------------------------
+
+mod args;
+use args::{Profile, Scope, UpdateTo, XtaskArgs, XtaskCommand};
+
+mod context;
+use context::*;
 
 mod fs_ops;
-use fs_ops::{directory_tree_contents, newer_than};
+use fs_ops::{copy_file_with_context, directory_tree_contents, newer_than};
 
-use crate::fs_ops::copy_file_with_context;
+mod reporting;
+use reporting::*;
 
-#[derive(Debug, clap::Parser)]
-struct XtaskArgs {
-    #[clap(subcommand)]
-    command: XtaskCommand,
-
-    /// Control which workspaces and target triples are built.
-    #[arg(long = "scope", default_value = "all")]
-    scope: Scope,
-
-    /// Pass the `--timings` flag to all `cargo` build invocations, producing
-    /// HTML files reporting the time taken.
-    ///
-    /// Note that a single `xtask` command may end up invoking `cargo` multiple times.
-    #[arg(long, global = true)]
-    timings: bool,
-
-    /// Pass the `--quiet` flag to all `cargo` build/test invocations.
-    /// This hides build progress and also switches the test harness to a more concise output.
-    #[arg(long, global = true)]
-    quiet: bool,
-}
-
-#[derive(Debug, clap::Subcommand)]
-enum XtaskCommand {
-    /// Create items that are either necessary for builds to succeed, or trivial.
-    /// Currently this means:
-    ///
-    /// * wasm build output
-    /// * `all-is-cubes.desktop` file
-    Init,
-
-    /// Run all tests (and some builds without tests) with default features.
-    Test {
-        /// Build test executables, but don't run them.
-        #[arg(long)]
-        no_run: bool,
-    },
-
-    /// Run tests exercising more combinations of features.
-    TestMore {
-        #[arg(long)]
-        no_run: bool,
-    },
-
-    /// Check for lint and generate documentation (to lint the doc markdown), but do not test.
-    ///
-    /// Caution: If there are rustc or clippy warnings only, the exit code is still zero.
-    /// <https://github.com/rust-lang/rust-clippy/issues/1209>
-    Lint,
-
-    /// Build documentation.
-    ///
-    /// This is approximately the same as `cargo doc` but uses the same options as `xtask lint`
-    /// does in order to avoid spurious rebuilds.
-    Doc,
-
-    /// Format code (as `cargo fmt` but covering all packages)
-    Fmt,
-
-    /// Remove build files (as `cargo clean` but covering all packages)
-    Clean,
-
-    /// Fuzz: run all fuzz targets, with a chosen duration for each.
-    Fuzz {
-        duration: f64,
-    },
-
-    /// Build binaries with the release profile and report their size on disk.
-    BinSize,
-
-    /// Run the game server inside of `cargo watch` (must be installed) and with options
-    /// suitable for development.
-    RunDev,
-
-    RunGameServer {
-        server_args: Vec<String>,
-    },
-
-    BuildWebRelease,
-
-    /// Update dependency versions.
-    Update {
-        #[arg(default_value = "latest")]
-        to: UpdateTo,
-
-        /// Passes `--dry-run` to `cargo update`, causing it not to actually change the lock files.
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Additional arguments to pass unchanged to each of the `cargo update` commands.
-        additional_args: Vec<String>,
-    },
-
-    /// Set the version number of all packages and their dependencies on each other.
-    SetVersion {
-        version: String,
-    },
-
-    /// Publish all of the crates in this workspace that are intended to be published.
-    PublishAll {
-        /// Actually publish crates rather than dry run.
-        #[arg(long = "for-real")]
-        for_real: bool,
-    },
-}
-
-/// Mode for [`XtaskCommand::Update`]
-#[derive(Clone, Copy, Debug, clap::ValueEnum)]
-enum UpdateTo {
-    /// Don't actually update.
-    Locked,
-    /// Regular `cargo update`.
-    Latest,
-    /// `cargo update -Z direct-minimal-versions`.
-    Minimal,
-}
-
-/// Which (workspace × target) combination(s) to build/check/test.
-///
-/// This is used to allow splitting the work to different CI jobs, and not having them
-/// duplicate each other's work and cache data.
-///
-/// TODO: Add wasm workspace as a separate scope (and break it out in CI).
-#[derive(Clone, Copy, Debug, PartialEq, clap::ValueEnum)]
-enum Scope {
-    /// Default for interactive use — build/check/test everything.
-    All,
-    /// Build only the main workspace, not the fuzz workspace.
-    OnlyNormal,
-    /// Build only the fuzz workspace.
-    OnlyFuzz,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, strum::IntoStaticStr, strum::Display)]
-#[strum(serialize_all = "kebab-case")]
-enum Profile {
-    Dev,
-    Release,
-}
-impl Profile {
-    /// Name of the subdirectory in `target/` where Cargo puts builds with this profile.
-    fn target_subdirectory_name(self) -> &'static Path {
-        // The dev profile is a special case:
-        // <https://doc.rust-lang.org/cargo/guide/build-cache.html?highlight=debug%20directory#build-cache>
-        #[expect(
-            clippy::match_wildcard_for_single_variants,
-            reason = "this is the correct general form"
-        )]
-        match self {
-            Profile::Dev => Path::new("debug"),
-            other => Path::new(other.into()),
-        }
-    }
-}
+// -------------------------------------------------------------------------------------------------
 
 fn main() -> Result<(), ActionError> {
     let sh = &Shell::new()?;
@@ -475,79 +327,7 @@ fn main() -> Result<(), ActionError> {
     Ok(())
 }
 
-/// Configuration which is passed down through everything.
-#[derive(Debug)]
-struct Config<'a> {
-    sh: &'a Shell,
-    cargo_timings: bool,
-    cargo_quiet: bool,
-    scope: Scope,
-}
-
-impl Config<'_> {
-    /// Start a [`Cmd`] with the cargo command we should use.
-    /// Currently, this doesn’t actually depend on the configuration, just the Shell
-    fn cargo(&self) -> Cmd<'_> {
-        self.sh
-            .cmd(std::env::var("CARGO").expect("CARGO environment variable not set"))
-    }
-
-    /// Arguments that should be passed to any Cargo command that runs a build
-    /// (`build`, `test`, `run`)
-    fn cargo_build_args(&self) -> Vec<&str> {
-        let mut args = Vec::with_capacity(1);
-        if self.cargo_timings {
-            args.push("--timings")
-        }
-        if self.cargo_quiet {
-            args.push("--quiet")
-        }
-        args
-    }
-
-    /// cd into each in-scope workspace and do something.
-    ///
-    /// [`do_for_all_packages`] doesn't use this because it has more specialized handling
-    fn do_for_all_workspaces<F>(&self, mut f: F) -> Result<(), ActionError>
-    where
-        F: FnMut() -> Result<(), ActionError>,
-    {
-        // main workspace
-        if self.scope.includes_main_workspace() {
-            f()?;
-
-            // TODO: split out wasm as a Scope
-            {
-                let _pushd = self.sh.push_dir("all-is-cubes-wasm");
-                f()?;
-            }
-        }
-
-        if self.scope.includes_fuzz_workspace() {
-            let _pushd = self.sh.push_dir("fuzz");
-            f()?;
-        }
-        Ok(())
-    }
-}
-
-impl Scope {
-    fn includes_main_workspace(self) -> bool {
-        match self {
-            Scope::All => true,
-            Scope::OnlyNormal => true,
-            Scope::OnlyFuzz => false,
-        }
-    }
-
-    fn includes_fuzz_workspace(self) -> bool {
-        match self {
-            Scope::All => true,
-            Scope::OnlyNormal => false,
-            Scope::OnlyFuzz => true,
-        }
-    }
-}
+// -------------------------------------------------------------------------------------------------
 
 /// List of all packges that are part of the application and not development tools.
 ///
@@ -573,7 +353,6 @@ const ALL_NONTEST_PACKAGES: [&str; 11] = [
     "all-is-cubes-server",
 ];
 
-const CHECK_SUBCMD: &str = "clippy";
 const TARGET_WASM: &str = "--target=wasm32-unknown-unknown";
 
 // Test all combinations of situations (that we've bothered to program test
@@ -1003,51 +782,6 @@ fn generate_wasm_licenses_file(
     Ok(())
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum TestOrCheck {
-    Test,
-    BuildTests,
-    Lint,
-}
-
-impl TestOrCheck {
-    fn cargo_cmd<'a>(self, config: &'a Config<'_>) -> Cmd<'a> {
-        config
-            .cargo()
-            .args(match self {
-                Self::Test => vec!["test"],
-                Self::BuildTests => vec!["test", "--no-run"],
-                Self::Lint => vec![CHECK_SUBCMD],
-            })
-            .args(config.cargo_build_args())
-    }
-
-    /// Return the cargo subcommand to use for the targets that we are *not* planning or able
-    /// to run.
-    fn non_build_check_subcmd(self) -> &'static str {
-        match self {
-            // In place of testing, we use check instead of clippy.
-            // This is so that in CI, when a rustc beta release has a broken clippy lint,
-            // it doesn't block us running our tests.
-            // It also aligns with the behavior of actual testing — a `cargo build` or
-            // `cargo test` doesn't run clippy.
-            TestOrCheck::Test => "check",
-            TestOrCheck::BuildTests => "check",
-            TestOrCheck::Lint => CHECK_SUBCMD,
-        }
-    }
-}
-
-/// Which features we want to test building with.
-#[derive(Clone, Copy, Debug)]
-enum Features {
-    /// Test with default features only
-    Default,
-
-    /// Test each package with all features enabled and with all features disabled.
-    AllAndNothing,
-}
-
 /// Path to the main All is Cubes project/repository directory.
 ///
 /// (In the typical case, this will be equal to the current directory.)
@@ -1069,85 +803,3 @@ static PROJECT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     path.pop();
     path
 });
-
-/// Describe how long a sub-task took.
-struct Timing {
-    label: String,
-    time: Duration,
-}
-
-impl fmt::Display for Timing {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { label, time } = self;
-        write!(f, "{time:5.1?} s  {label}", time = time.as_secs_f64())
-    }
-}
-
-/// Measure the time from creation to drop. Also prints text to mark these spans.
-struct CaptureTime<'a> {
-    label: String,
-    start: Instant,
-    output: &'a mut Vec<Timing>,
-}
-
-impl<'a> CaptureTime<'a> {
-    fn new(time_log: &'a mut Vec<Timing>, label: impl Into<String>) -> Self {
-        let label = label.into();
-        if std::env::var("GITHUB_ACTIONS").is_ok() {
-            eprintln!("::group::{label}");
-        } else {
-            eprintln!("------ [xtask] START: {label} ------");
-        }
-        Self {
-            label,
-            start: Instant::now(),
-            output: time_log,
-        }
-    }
-}
-
-impl Drop for CaptureTime<'_> {
-    fn drop(&mut self) {
-        let label = mem::take(&mut self.label);
-        let time = Instant::now().duration_since(self.start);
-        if std::env::var("GITHUB_ACTIONS").is_ok() {
-            eprintln!("::endgroup::");
-        } else {
-            eprintln!(
-                "------ [xtask] END: {label} ({time:.1?} s) ------",
-                time = time.as_secs_f64()
-            );
-        }
-        self.output.push(Timing { label, time });
-    }
-}
-
-struct WithCommas(u64);
-
-impl fmt::Display for WithCommas {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut in_leading_zeroes = true;
-        for i in (0..4).rev() {
-            let scale = 1000u64.pow(i);
-            let digits_in_group = (self.0 / scale) % 1000;
-            if in_leading_zeroes {
-                if digits_in_group != 0 {
-                    in_leading_zeroes = false;
-                    write!(f, "{digits_in_group:3}")?;
-                    if i > 0 {
-                        write!(f, ",")?;
-                    }
-                } else {
-                    // pad the absent group for constant width
-                    write!(f, "    ")?;
-                }
-            } else {
-                write!(f, "{digits_in_group:03}")?;
-                if i > 0 {
-                    write!(f, ",")?;
-                }
-            }
-        }
-        Ok(())
-    }
-}

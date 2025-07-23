@@ -115,8 +115,11 @@ mod tests {
             BTreeSet::from([
                 "Cargo.toml".into(),
                 "src".into(),
+                "src/args.rs".into(),
+                "src/context.rs".into(),
                 "src/fs_ops.rs".into(),
-                "src/xtask.rs".into()
+                "src/main.rs".into(),
+                "src/reporting.rs".into(),
             ])
         );
     }

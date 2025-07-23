@@ -6,8 +6,6 @@ publish = false
 
 [[bin]]
 name = "xtask"
-# Rename main file so that the workspace only has one main.rs
-path = "src/xtask.rs"
 # Disable running as benchmark so that the default doesn't interfere with Criterion usage.
 bench = false
 
