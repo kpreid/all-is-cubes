@@ -158,7 +158,8 @@ impl Space {
     }
 
     /// Implementation of [`Builder`]'s terminal methods.
-    fn new_from_builder(builder: Builder<'_, Vol<()>>) -> Self {
+    #[inline(never)] // complex, expensive, infrequent
+    fn new_from_builder(builder: Builder<'_, Vol<()>>) -> Result<Self, builder::Error> {
         let Builder {
             read_ticket,
             bounds,
@@ -173,12 +174,21 @@ impl Space {
                 let volume = bounds.volume();
                 let palette = Palette::new(read_ticket, block, volume);
                 let opacity = palette.all_block_opacities_as_category();
+
+                // Vec::try_reserve is roundabout, but currently the only stable way to get fallible
+                // memory allocation for a slice.
+                let mut contents_buffer = Vec::new();
+                contents_buffer
+                    .try_reserve_exact(volume)
+                    .map_err(|_| builder::Error::OutOfMemory {})?;
+                contents_buffer.resize(volume, 0);
+
                 (
                     palette,
-                    vec![0; volume].into(),
+                    Box::from(contents_buffer),
                     LightStorage::new(
                         &physics,
-                        physics.light.initialize_lighting(bounds, opacity),
+                        physics.light.initialize_lighting(bounds, opacity)?,
                         LightUpdateQueue::new(), // TODO: nonempty if opacity is partial
                     ),
                 )
@@ -209,9 +219,10 @@ impl Space {
                     }
                     _ => LightStorage::new(
                         &physics,
-                        physics
-                            .light
-                            .initialize_lighting(bounds, palette.all_block_opacities_as_category()),
+                        physics.light.initialize_lighting(
+                            bounds,
+                            palette.all_block_opacities_as_category(),
+                        )?,
                         LightUpdateQueue::new(), // TODO: nonempty if needed
                     ),
                 };
@@ -220,7 +231,7 @@ impl Space {
             }
         };
 
-        Space {
+        Ok(Space {
             palette,
             contents: bounds.with_elements(contents).unwrap(),
             light,
@@ -231,7 +242,7 @@ impl Space {
             cubes_wanting_ticks: Default::default(),
             change_notifier: Notifier::new(),
             fluff_notifier: Notifier::new(),
-        }
+        })
     }
 
     /// Constructs a `Space` that is entirely empty and whose coordinate system

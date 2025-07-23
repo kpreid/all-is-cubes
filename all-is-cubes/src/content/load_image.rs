@@ -17,7 +17,7 @@ use crate::block::{self, AIR, Block, Resolution};
 use crate::camera::ImageSize;
 use crate::drawing::{VoxelBrush, rectangle_to_aab};
 use crate::math::{GridAab, GridCoordinate, GridRotation, Rgba};
-use crate::space::{SetCubeError, Space, SpacePhysics};
+use crate::space::{self, Space, SpacePhysics};
 use crate::universe::{ReadTicket, UniverseTransaction};
 
 // -------------------------------------------------------------------------------------------------
@@ -129,7 +129,7 @@ pub fn space_from_image<'b>(
     rotation: GridRotation,
     // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
     pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'b>,
-) -> Result<Space, SetCubeError> {
+) -> Result<Space, space::builder::Error> {
     let header = &png.header;
     let size: Size2D<i32, ()> = Size2D::new(header.width, header.height).to_i32();
 
@@ -223,7 +223,7 @@ pub enum BlockFromImageError {
     /// Error constructing the [`Space`].
     /// May occur if there are too many distinct colors in the image,
     /// or if block evaluation fails.
-    Space(SetCubeError),
+    Space(space::builder::Error),
 
     /// Image width and height are unequal or cannot be converted to [`Resolution`].
     Size(ImageSize),

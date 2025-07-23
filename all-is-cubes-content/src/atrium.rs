@@ -770,7 +770,7 @@ fn generate_arch<'b>(
     resolution: Resolution,
     width_blocks: GridCoordinate,
     height_blocks: GridCoordinate,
-) -> Result<Block, SetCubeError> {
+) -> Result<Block, space::builder::Error> {
     let resolution_g: GridCoordinate = resolution.into();
     let space = {
         let arch_opening_width = resolution_g * width_blocks;

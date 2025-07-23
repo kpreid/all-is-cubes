@@ -19,7 +19,7 @@ use exhaust::Exhaust;
 use hashbrown::HashMap as HbHashMap;
 
 use crate::block::{Block, BlockDef};
-use crate::space::{SetCubeError, SpaceTransaction};
+use crate::space::{self, SetCubeError, SpaceTransaction};
 use crate::transaction::ExecuteError;
 use crate::universe::{
     self, Handle, InsertError, Name, ReadTicket, Universe, UniverseTransaction, VisitHandles,
@@ -431,6 +431,9 @@ pub enum InGenError {
     // TODO: Any special handling? Phrase this as "missing dependency"?
     Provider(ProviderError),
 
+    /// Failed during [`Space`](crate::space::Space) construction.
+    Space(space::builder::Error),
+
     /// Failed during [`Space`](crate::space::Space) manipulation.
     SetCube(SetCubeError),
 
@@ -456,6 +459,7 @@ impl Error for InGenError {
             InGenError::Gen(e) => e.source(),
             InGenError::Insert(e) => e.source(),
             InGenError::Provider(e) => e.source(),
+            InGenError::Space(e) => e.source(),
             InGenError::SetCube(e) => e.source(),
             InGenError::UniverseTransaction(e) => e.source(),
             InGenError::SpaceTransaction(e) => e.source(),
@@ -470,6 +474,7 @@ impl fmt::Display for InGenError {
             InGenError::Gen(e) => e.fmt(f),
             InGenError::Insert(e) => e.fmt(f),
             InGenError::Provider(e) => e.fmt(f),
+            InGenError::Space(e) => e.fmt(f),
             InGenError::SetCube(e) => e.fmt(f),
             InGenError::UniverseTransaction(e) => e.fmt(f),
             InGenError::SpaceTransaction(e) => e.fmt(f),
@@ -491,6 +496,11 @@ impl From<InsertError> for InGenError {
 impl From<ProviderError> for InGenError {
     fn from(error: ProviderError) -> Self {
         InGenError::Provider(error)
+    }
+}
+impl From<space::builder::Error> for InGenError {
+    fn from(error: space::builder::Error) -> Self {
+        InGenError::Space(error)
     }
 }
 impl From<SetCubeError> for InGenError {

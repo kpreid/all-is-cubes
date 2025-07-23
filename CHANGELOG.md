@@ -29,6 +29,8 @@ In order to resolve various design problems interfering with development, the `a
     - `inv::InvInBlock` and `inv::IconRow` now have public `new()` functions.
     - `math::BoxPart::centered_on()`
     - `math::FaceMap::sum()`
+    - `space::Builder::build_and_mutate()`
+    - `space::Builder::try_build()` produces recoverable out-of-memory errors where `build()` does not.
     - New universe member type `sound::SoundDef` allows defining synthesized sounds as game content.
     - `impl IntoIterator for math::FaceMap`
     - `math::PositiveSign::INFINITY`

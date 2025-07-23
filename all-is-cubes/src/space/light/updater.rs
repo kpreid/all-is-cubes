@@ -88,9 +88,11 @@ impl LightStorage {
         if self.physics != old_physics {
             // TODO: If the new physics is broadly similar, then reuse the old data as a
             // starting point instead of immediately throwing it out.
+            // TODO: propagate allocation failure cleanly instead of unwrap()
             self.contents = self
                 .physics
-                .initialize_lighting(uc.contents.without_elements(), opacity);
+                .initialize_lighting(uc.contents.without_elements(), opacity)
+                .unwrap();
 
             match self.physics {
                 LightPhysics::None => {
@@ -632,22 +634,34 @@ impl LightPhysics {
     /// TODO: Also return whether light updates are needed.
     pub(crate) fn initialize_lighting(
         &self,
-        bounds: Vol<()>,
+        space_bounds: Vol<()>,
         opacity: OpacityCategory,
-    ) -> Vol<Box<[PackedLight]>> {
-        match self {
-            LightPhysics::None => {
-                Vol::repeat(GridAab::ORIGIN_EMPTY, PackedLight::UNINITIALIZED_AND_BLACK)
-            }
-            LightPhysics::Rays { .. } => {
-                let value = match opacity {
+    ) -> Result<Vol<Box<[PackedLight]>>, crate::space::builder::Error> {
+        let (storage_bounds, value) = match self {
+            LightPhysics::None => (
+                GridAab::ORIGIN_EMPTY.to_vol().unwrap(),
+                PackedLight::UNINITIALIZED_AND_BLACK,
+            ),
+            LightPhysics::Rays { .. } => (
+                space_bounds,
+                match opacity {
                     OpacityCategory::Invisible => PackedLight::NO_RAYS,
                     OpacityCategory::Partial => PackedLight::UNINITIALIZED_AND_BLACK,
                     OpacityCategory::Opaque => PackedLight::OPAQUE,
-                };
-                Vol::repeat(bounds.bounds(), value)
-            }
-        }
+                },
+            ),
+        };
+
+        // Vec::try_reserve is roundabout, but currently the only stable way to get fallible memory
+        // allocation for a slice.
+        let mut storage = Vec::new();
+        let volume = storage_bounds.volume();
+        storage
+            .try_reserve_exact(volume)
+            .map_err(|_| crate::space::builder::Error::OutOfMemory {})?;
+        storage.resize(volume, value);
+
+        Ok(Vol::with_elements(storage_bounds, storage.into_boxed_slice()).unwrap())
     }
 }
 

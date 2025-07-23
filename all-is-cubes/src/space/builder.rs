@@ -258,8 +258,23 @@ impl Builder<'_, Vol<()>> {
 
     /// Construct a [`Space`] with the contents and settings from this builder.
     ///
-    /// The builder must have had bounds specified.
+    /// The builder must have had bounds specified, or it will not be possible to call this method.
+    ///
+    /// Panics if insufficient memory is available is available for the [`Space`]’s data arrays.
+    //---
+    // TODO: Consider offering only a `Result`-returning `build()` instead of this.
+    #[track_caller]
     pub fn build(self) -> Space {
+        Space::new_from_builder(self).unwrap()
+    }
+
+    /// Construct a [`Space`] with the contents and settings from this builder.
+    ///
+    /// The builder must have had bounds specified, or it will not be possible to call this method.
+    ///
+    /// Returns an error if insufficient memory is available is available for the [`Space`]’s
+    /// data arrays.
+    pub fn try_build(self) -> Result<Space, Error> {
         Space::new_from_builder(self)
     }
 
@@ -268,15 +283,20 @@ impl Builder<'_, Vol<()>> {
     /// Use this when [`Builder::filled_with()`] is not enough control over the initial contents
     /// of the space.
     ///
-    /// If an error type other than [`SetCubeError`] is needed, use [`Space::mutate()`] instead
-    /// of this.
+    /// # Errors
+    ///
+    /// * Returns [`Error::OutOfMemory`] if insufficient memory is available for the [`Space`]’s
+    ///   data arrays.
+    /// * Returns [`Error::Mutate`] if `f` returns an error.
+    ///   If an error type within the mutation function other than [`SetCubeError`] is needed, use
+    ///   [`Space::mutate()`] instead of this function.
     pub fn build_and_mutate(
         self,
         f: impl FnOnce(&mut super::Mutation<'_, '_>) -> Result<(), SetCubeError>,
-    ) -> Result<Space, SetCubeError> {
+    ) -> Result<Space, Error> {
         let read_ticket = self.read_ticket;
-        let mut space = self.build();
-        space.mutate(read_ticket, f)?;
+        let mut space = self.try_build()?;
+        space.mutate(read_ticket, f).map_err(Error::Mutate)?;
         Ok(space)
     }
 }
@@ -374,6 +394,24 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
         Ok(space)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Errors that may occur when constructing a [`Space`].
+#[derive(Clone, Debug, displaydoc::Display)]
+#[non_exhaustive]
+pub enum Error {
+    /// insufficient memory available to allocate Space
+    #[non_exhaustive]
+    OutOfMemory {},
+
+    /// A mutation performed during [`Builder::build_and_mutate()`] failed.
+    Mutate(SetCubeError),
+}
+
+impl core::error::Error for Error {}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
