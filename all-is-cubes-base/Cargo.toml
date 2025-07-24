@@ -30,6 +30,7 @@ serde = [
     "dep:serde",
     "ordered-float/serde",
 ]
+_special_testing = ["dep:visibility"]
 
 [dependencies]
 arbitrary = { workspace = true, optional = true }
@@ -52,6 +53,7 @@ ordered-float = { workspace = true }
 rand = { workspace = true }
 re_types = { workspace = true, optional = true }
 serde = { workspace = true, optional = true, features = ["derive"] }
+visibility = { workspace = true, optional = true }
 
 [dev-dependencies]
 indoc = { workspace = true }

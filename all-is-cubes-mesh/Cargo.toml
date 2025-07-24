@@ -26,7 +26,7 @@ harness = false
 
 [[example]]
 name = "visualize-block-mesh"
-required-features = ["rerun"]
+required-features = ["rerun", "_special_testing"]
 
 [features]
 default = []
@@ -49,6 +49,11 @@ auto-threads = ["dep:rayon"]
 # Internal use only. Used to ensure that docs.rs builds have complete information;
 # in particular, `all-is-cubes/std` would otherwise be missing, making types appear `!Sync`.
 _full-documentation = ["all-is-cubes/std", "arbitrary"]
+# Makes certain internal items public.
+# This feature is intended only for use when developing All is Cubes,
+# to compile certain fuzzing, benchmark, and example targets.
+# It is not necessary to enable this feature to run the complete `cargo test` test suite.
+_special_testing = ["dep:visibility"]
 
 
 [dependencies]
@@ -70,6 +75,7 @@ mutants = { workspace = true }
 num-traits = { workspace = true }
 ordered-float = { workspace = true }
 rayon = { workspace = true, optional = true }
+visibility = { workspace = true, optional = true }
 
 [dev-dependencies]
 # used for visualize-block-mesh example

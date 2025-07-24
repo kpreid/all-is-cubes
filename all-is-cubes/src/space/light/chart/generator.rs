@@ -22,8 +22,8 @@ use super::{FlatNode, Weight};
 /// such that paths sharing a common prefix share a common tree ancestor.
 ///
 /// Before use, this is converted into [`FlatNode`] for denser storage.
-#[doc(hidden)] // public only for debug visualizations
-pub struct RayTreeNode {
+#[cfg_attr(feature = "_special_testing", visibility::make(pub))]
+struct RayTreeNode {
     /// Cube that this node represents the rays hitting, relative to the origin of rays
     /// (the block we're computing light for).
     /// Thus, the root of the tree is always `[0, 0, 0]`.
@@ -143,7 +143,8 @@ impl RayTreeNode {
     }
 }
 
-pub fn rays_to_tree(rays: impl Iterator<Item = OneRay>) -> RayTreeNode {
+#[cfg_attr(feature = "_special_testing", visibility::make(pub))]
+fn rays_to_tree(rays: impl Iterator<Item = OneRay>) -> RayTreeNode {
     let mut tree = RayTreeNode {
         relative_cube: Point3D::default(),
         children: FaceMap::default(),
@@ -166,7 +167,8 @@ pub fn rays_to_tree(rays: impl Iterator<Item = OneRay>) -> RayTreeNode {
 /// Flatten the `RayTreeNode` tree into a vector whose indices are used to identify nodes.
 ///
 /// This is the representation which is actually used.
-pub fn tree_to_flat(root: &RayTreeNode) -> Vec<FlatNode> {
+#[cfg_attr(feature = "_special_testing", visibility::make(pub))]
+fn tree_to_flat(root: &RayTreeNode) -> Vec<FlatNode> {
     let len = {
         let mut len = 0;
         root.traverse_post(&mut |_| len += 1);

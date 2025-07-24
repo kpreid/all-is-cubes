@@ -145,6 +145,7 @@
     warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
 )]
 #![cfg_attr(not(feature = "std"), allow(clippy::arc_with_non_send_sync))]
+#![cfg_attr(feature = "_special_testing", allow(private_interfaces))]
 
 #[cfg(any(feature = "std", test))]
 #[cfg_attr(test, macro_use)]

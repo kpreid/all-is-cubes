@@ -22,8 +22,8 @@ mod analyze;
 mod compute;
 mod planar;
 mod viz;
-#[doc(hidden)]
-pub use viz::Viz;
+#[cfg_attr(feature = "_special_testing", visibility::make(pub))]
+pub(crate) use viz::Viz;
 
 #[cfg(test)]
 mod tests;
@@ -93,7 +93,7 @@ pub(super) struct SubMesh<V: Vertex> {
     /// Indices into `self.vertices` that form triangles (i.e. length is a multiple of 3)
     /// in counterclockwise order, for vertices whose coloring is fully opaque (or
     /// textured with binary opacity).
-    /// 
+    ///
     /// These triangles are ordered by depth (that is, position along the perpendicular axis),
     /// front to back. This may be used to optimize drawing order.
     pub(super) indices_opaque: IndexVec,
