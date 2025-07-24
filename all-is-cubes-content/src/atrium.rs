@@ -38,22 +38,22 @@ pub(crate) async fn atrium(
     universe: &mut Universe,
     progress: YieldProgress,
 ) -> Result<Space, InGenError> {
-    // TODO: subdivide and report further progress
-    let blocks = {
-        let mut install_txn = UniverseTransaction::default();
-        let blocks = install_atrium_blocks(&mut install_txn, progress).await?;
-        install_txn.execute(universe, (), &mut transaction::no_outputs)?;
-        blocks
-    };
-
     let ceiling_height = 6u32;
     let between_small_arches = 3u32;
     let between_large_arches = between_small_arches * 2 + 1;
-    let balcony_radius = 4;
+    let balcony_radius: GridSizeCoord = 4;
     let large_arch_count_x = 1;
     let large_arch_count_z = 5;
     let floor_count = 4;
     let sun_height = 10;
+
+    // TODO: subdivide and report further progress after the block generation
+    let blocks = {
+        let mut install_txn = UniverseTransaction::default();
+        let blocks = install_atrium_blocks(&mut install_txn, progress, balcony_radius).await?;
+        install_txn.execute(universe, (), &mut transaction::no_outputs)?;
+        blocks
+    };
 
     let origin = GridAab::ORIGIN_CUBE;
     let atrium_footprint = origin.expand(FaceMap::symmetric([
@@ -228,6 +228,68 @@ pub(crate) async fn atrium(
                 )
             },
         )?;
+
+        // Ceiling vaults
+        // TODO: This only generates vaults along the long sides and not the short sides or corners.
+        for z_section in 0..(large_arch_count_z as i32) {
+            let z_low = z_section * (between_large_arches + UWALL) as i32;
+            for (flip_x, x_low) in [
+                (false, balconies_footprint.lower_bounds().x),
+                (true, atrium_footprint.upper_bounds().x + IWALL),
+            ] {
+                for which_floor in 0..2 {
+                    let start_y = which_floor * (ceiling_height + UWALL) as i32 + 4;
+                    let low_corner = GridPoint::new(
+                        x_low,
+                        start_y,
+                        atrium_footprint.lower_bounds().z - IWALL + z_low,
+                    );
+                    // TODO: Some of these blocks are in fact completely empty air and we should
+                    // be able to skip them, but `lookup_multiblock_2d` can't tell us which.
+                    // We need a better multiblock system that can.
+                    m.fill(
+                        GridAab::from_lower_size(
+                            low_corner,
+                            // TODO: have constant for arch height
+                            [balcony_radius, 3, between_large_arches + UWALL],
+                        ),
+                        |abs_cube| {
+                            let rel_cube = abs_cube - low_corner.to_vector();
+                            let balcony_axis_arch = lookup_multiblock_2d(
+                                &blocks,
+                                AtriumBlocks::VaultBalcony,
+                                [
+                                    if flip_x {
+                                        balcony_radius as GridCoordinate - rel_cube.x
+                                    } else {
+                                        // +1 because this arch doesn't have its own support pillar so we skip the full pillar part of the arch shape
+                                        rel_cube.x + 1
+                                    },
+                                    rel_cube.y,
+                                ],
+                            )
+                            .rotate(
+                                (if flip_x {
+                                    GridRotation::RxYZ
+                                } else {
+                                    GridRotation::IDENTITY
+                                }) * GridRotation::COUNTERCLOCKWISE,
+                            );
+                            let arch_axis_arch = lookup_multiblock_2d(
+                                &blocks,
+                                AtriumBlocks::VaultArch,
+                                [rel_cube.z, rel_cube.y],
+                            );
+                            // Combine the two arches to form a vault.
+                            Some(
+                                block::Composite::new(arch_axis_arch, block::CompositeOperator::In)
+                                    .compose_or_replace(balcony_axis_arch),
+                            )
+                        },
+                    )?;
+                }
+            }
+        }
 
         if MOVING_LIGHT {
             let mut movement = block::Move::new(Face6::PZ, 16, 16);
@@ -422,6 +484,10 @@ enum AtriumBlocks {
     SolidBricks,
     GroundArch,
     UpperArch,
+    /// Axis of the vault shape that is as wide as the `GroundArch`es
+    VaultArch,
+    /// Axis of the vault shape that is as wide as the `balcony_radius`
+    VaultBalcony,
     GroundColumn,
     SquareColumn,
     SmallColumn,
@@ -458,6 +524,8 @@ impl fmt::Display for AtriumBlocks {
             AtriumBlocks::SolidBricks => write!(f, "solid-bricks"),
             AtriumBlocks::GroundArch => write!(f, "ground-arch"),
             AtriumBlocks::UpperArch => write!(f, "upper-arch"),
+            AtriumBlocks::VaultArch => write!(f, "vault-arch"),
+            AtriumBlocks::VaultBalcony => write!(f, "vault-balcony"),
             AtriumBlocks::GroundColumn => write!(f, "ground-column"),
             AtriumBlocks::SquareColumn => write!(f, "square-column"),
             AtriumBlocks::SmallColumn => write!(f, "small-column"),
@@ -498,6 +566,7 @@ impl BannerColor {
 async fn install_atrium_blocks(
     txn: &mut UniverseTransaction,
     progress: YieldProgress,
+    balcony_radius: GridSizeCoord,
 ) -> Result<BlockProvider<AtriumBlocks>, InGenError> {
     let resolution = Resolution::R16;
     let resolution_g = GridCoordinate::from(resolution);
@@ -632,12 +701,42 @@ async fn install_atrium_blocks(
                 .display_name("Atrium Wall Bricks")
                 .voxels_fn(resolution, brick_pattern)?
                 .build_txn(txn),
-            AtriumBlocks::GroundArch => {
-                generate_arch(txn, &stone_range, brick_pattern, resolution, 7, 3)?
-            }
-            AtriumBlocks::UpperArch => {
-                generate_arch(txn, &stone_range, brick_pattern, resolution, 3, 2)?
-            }
+            AtriumBlocks::GroundArch => generate_arch(
+                txn,
+                &stone_range,
+                brick_pattern,
+                resolution,
+                ArchStyle::GroundFloor,
+                7,
+                3,
+            )?,
+            AtriumBlocks::UpperArch => generate_arch(
+                txn,
+                &stone_range,
+                brick_pattern,
+                resolution,
+                ArchStyle::UpperFloor,
+                3,
+                2,
+            )?,
+            AtriumBlocks::VaultArch => generate_arch(
+                txn,
+                &stone_range,
+                |_| &ceiling_paint,
+                resolution,
+                ArchStyle::Vault,
+                7, // size same as GroundArch
+                3,
+            )?,
+            AtriumBlocks::VaultBalcony => generate_arch(
+                txn,
+                &stone_range,
+                |_| &ceiling_paint,
+                resolution,
+                ArchStyle::Vault,
+                balcony_radius as GridCoordinate,
+                3,
+            )?,
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
@@ -763,74 +862,105 @@ async fn install_atrium_blocks(
 
 const MULTIBLOCK_SCALE: Resolution = Resolution::R8;
 
+#[derive(Clone, Copy, Debug)]
+enum ArchStyle {
+    GroundFloor,
+    UpperFloor,
+    /// Smooth ceiling surface to be composited with a rotated copy of itself to form a [groin vault].
+    ///
+    /// [groin vault]: https://en.wikipedia.org/wiki/Groin_vault
+    Vault,
+}
+
+/// Generates a multiblock (to be used with [`lookup_multiblock_2d()`]) forming an arch, whose
+/// bottom support is at cube (0, 0, 0) and which extends upward and towards the +Z direction.
 fn generate_arch<'b>(
     txn: &mut UniverseTransaction,
     stone_range: &[Block], // TODO: clarify
     brick_pattern: impl Fn(Cube) -> &'b Block,
     resolution: Resolution,
+    style: ArchStyle,
     width_blocks: GridCoordinate,
     height_blocks: GridCoordinate,
 ) -> Result<Block, space::builder::Error> {
     let resolution_g: GridCoordinate = resolution.into();
-    let space = {
-        let arch_opening_width = resolution_g * width_blocks;
-        let arch_opening_height = resolution_g * height_blocks;
-        let arch_center_z_doubled = resolution_g * (width_blocks - 1) /* midpoint assuming odd width */
+
+    let arch_opening_width = resolution_g * width_blocks;
+    let arch_opening_height = resolution_g * height_blocks;
+    let arch_center_z_doubled = resolution_g * (width_blocks - 1) /* midpoint assuming odd width */
             + resolution_g * 3 /* offset by a block and a half */;
-        let space = Space::builder(GridAab::from_lower_upper(
-            [0, 0, 0],
-            [
-                resolution_g,
-                arch_opening_height + resolution_g,
-                arch_center_z_doubled + resolution_g * 3,
-            ],
-        ))
-        .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
-        .build_and_mutate(|m| {
-            m.fill_all(|p| {
-                // Flip middle of first block, so that the arch to our left appears on it
-                let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 {
+
+    let space = Space::builder(GridAab::from_lower_upper(
+        [0, 0, 0],
+        [
+            resolution_g,
+            arch_opening_height + resolution_g,
+            arch_center_z_doubled + resolution_g * 3,
+        ],
+    ))
+    .physics(SpacePhysics::DEFAULT_FOR_BLOCK)
+    .build_and_mutate(|m| {
+        m.fill_all(|p| {
+            // Flip middle of first block, so that the arch to our left appears on it
+            let z_for_arch /* but not for bricks */ = if p.z < resolution_g / 2 {
                     resolution_g - 1 - p.z
                 } else {
                     p.z
                 };
-                let arch_z_doubled = z_for_arch * 2 - arch_center_z_doubled;
-                let arch_y_doubled = p.y * 2;
-                let distance_from_edge =
-                    p.x.min(resolution_g - 1 - p.x) as f32 / resolution_g as f32;
-                let r = (arch_z_doubled as f32 / arch_opening_width as f32)
-                    .hypot(arch_y_doubled as f32 / (arch_opening_height as f32 * 2.));
-                if r < 1.0 {
-                    // Empty space inside arch
-                    None
-                } else if r < 1.04 {
-                    // Beveled edge
-                    if distance_from_edge < ((1. - r) * 2.0 + 0.1) {
+            let arch_z_doubled = z_for_arch * 2 - arch_center_z_doubled;
+            let arch_y_doubled = p.y * 2;
+            let distance_from_edge = p.x.min(resolution_g - 1 - p.x) as f32 / resolution_g as f32;
+            let r = (arch_z_doubled as f32 / arch_opening_width as f32)
+                .hypot(arch_y_doubled as f32 / (arch_opening_height as f32 * 2.));
+            match style {
+                ArchStyle::GroundFloor | ArchStyle::UpperFloor => {
+                    if r < 1.0 {
+                        // Empty space inside arch
                         None
-                    } else {
+                    } else if r < 1.04 {
+                        // Beveled edge
+                        if distance_from_edge < ((1. - r) * 2.0 + 0.1) {
+                            None
+                        } else {
+                            Some(&stone_range[3])
+                        }
+                    } else if r < 1.1 {
+                        // Surface
                         Some(&stone_range[3])
+                    } else if r < 1.14 {
+                        // Groove
+                        if distance_from_edge == 0. {
+                            None
+                        } else {
+                            Some(&stone_range[4])
+                        }
+                    } else {
+                        // Body
+                        Some(brick_pattern(p))
                     }
-                } else if r < 1.1 {
-                    // Surface
-                    Some(&stone_range[3])
-                } else if r < 1.14 {
-                    // Groove
-                    if distance_from_edge == 0. {
+                }
+                ArchStyle::Vault => {
+                    if r < 1.02 {
+                        // Empty space inside arch
                         None
                     } else {
-                        Some(&stone_range[4])
+                        Some(brick_pattern(p))
                     }
-                } else {
-                    // Body
-                    Some(brick_pattern(p))
                 }
-            })
-        })?;
-        txn.insert_anonymous(space)
-    };
+            }
+        })
+    })?;
+
     Ok(Block::builder()
-        .display_name("Atrium Upper Floor Arch")
-        .voxels_handle((resolution * MULTIBLOCK_SCALE).unwrap(), space)
+        .display_name(match style {
+            ArchStyle::GroundFloor => "Atrium Ground Floor Arch",
+            ArchStyle::UpperFloor => "Atrium Upper Floor Arch",
+            ArchStyle::Vault => "Atrium Vault",
+        })
+        .voxels_handle(
+            (resolution * MULTIBLOCK_SCALE).unwrap(),
+            txn.insert_anonymous(space),
+        )
         .build())
 }
 
