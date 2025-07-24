@@ -155,6 +155,7 @@ tokio = { version = "1.44.2", default-features = false }
 trycmd = "0.15.4" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
 unicode-width = { version = "0.2", default-features = false }
+visibility = { version = "0.1.1", default-features = false }
 # explicitly enabling "std" needed for <https://github.com/rustwasm/wasm-bindgen/issues/4303>
 wasm-bindgen-futures = { version = "0.4.50", default-features = false, features = ["std"] }
 web-time = { version = "1.1.0", default-features = false }

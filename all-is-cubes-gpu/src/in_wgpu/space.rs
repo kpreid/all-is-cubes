@@ -39,11 +39,10 @@ use crate::in_wgpu::glue::{
     BeltWritingParts, MapVec, ResizingBuffer, buffer_size_of, to_wgpu_index_format,
     to_wgpu_index_range,
 };
-use crate::in_wgpu::light_texture::LightChunk;
 use crate::in_wgpu::pipelines::{BlockBufferSlot, Pipelines};
 use crate::in_wgpu::skybox;
 use crate::in_wgpu::vertex::{self, WgpuInstanceData, WgpuLinesVertex};
-use crate::in_wgpu::{LightTexture, WgpuMt};
+use crate::in_wgpu::{LightChunk, LightTexture, WgpuMt};
 use crate::{DebugLineVertex, Memo, Msw, SpaceDrawInfo, SpaceUpdateInfo};
 
 // temporarily public for a lighting kludge
@@ -937,14 +936,10 @@ fn depth_ordering_for_viewing(
 #[derive(Debug)]
 pub(in crate::in_wgpu) struct SpaceCameraBuffer {
     /// Buffer containing a [`ShaderSpaceCamera`].
-    ///
-    /// Public for use in `shader_tests`.
-    pub buffer: wgpu::Buffer,
+    pub(in crate::in_wgpu) buffer: wgpu::Buffer,
 
     /// Bind group binding the buffer.
-    ///
-    /// Public for use in `shader_tests`.
-    pub bind_group: wgpu::BindGroup,
+    pub(in crate::in_wgpu) bind_group: wgpu::BindGroup,
 }
 
 impl SpaceCameraBuffer {
@@ -969,7 +964,6 @@ impl SpaceCameraBuffer {
 
 /// Create the bind group to be used with [`Pipelines::space_texture_bind_group_layout`].
 ///
-/// Public for use in `shader_tests`.
 /// Must be called after `block_texture.flush()`.
 pub(in crate::in_wgpu) fn create_space_bind_group(
     space_label: &str,

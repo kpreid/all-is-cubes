@@ -387,11 +387,11 @@ impl Block {
     /// Returns whether this block’s evaluation would be affected at all by adding
     /// or removing a [`Modifier::Rotate`].
     ///
-    /// Note that this does not account for symmetry of the block’s evaluation; it only checks
-    /// the primitive’s own data, and so answers whether this primitive is *always* symmetric
-    /// under all possible conditions of the rest of the universe.
-    #[doc(hidden)] // TODO: unclear if good public API, but public for fuzz testing
-    pub fn rotationally_symmetric(&self) -> bool {
+    /// Note that this does not account for actual symmetry of the block’s current evaluation;
+    /// it only checks the primitive’s own data, and so answers whether this primitive is *always*
+    /// symmetric under all possible conditions of the rest of the universe.
+    #[cfg_attr(feature = "_special_testing", visibility::make(pub))] // TODO: unclear if good public API, but public for fuzz testing
+    pub(crate) fn rotationally_symmetric(&self) -> bool {
         // TODO: Just checking the definitions does not reveal sufficient information.
         // In particular, `Primitive::Indirect` is opaque. Therefore, for some applications,
         // we want a version that operates on `EvaluatedBlock` which can consult whether the

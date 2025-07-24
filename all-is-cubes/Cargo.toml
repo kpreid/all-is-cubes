@@ -29,6 +29,7 @@ harness = false
 [[bench]]
 name = "light"
 harness = false
+required-features = ["_special_testing"]
 
 [[bench]]
 name = "raycast"
@@ -45,7 +46,7 @@ harness = false
 
 [[example]]
 name = "light-tree"
-required-features = ["rerun"]
+required-features = ["rerun", "_special_testing"]
 
 [[example]]
 name = "visualize-raycast"
@@ -99,6 +100,11 @@ auto-threads = [
     "bevy_ecs/std", # shouldn't be necessary
     "bevy_ecs/async_executor", # shouldn't be necessary
 ]
+# Makes certain internal items public.
+# This feature is intended only for use when developing All is Cubes,
+# to compile certain fuzzing, benchmark, and example targets.
+# It is not necessary to enable this feature to run the complete `cargo test` test suite.
+_special_testing = ["all-is-cubes-base/_special_testing", "dep:visibility"]
 
 [dependencies]
 all-is-cubes-base = { workspace = true, features = ["std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
@@ -145,6 +151,7 @@ re_types = { workspace = true, optional = true }
 # alloc feature needed for #[serde(flatten)] — https://github.com/serde-rs/serde/issues/1935
 serde = { workspace = true, optional = true, features = ["alloc", "derive", "rc"] }
 unicode-segmentation = { workspace = true }
+visibility = { workspace = true, optional = true }
 yield-progress = { workspace = true, features = ["sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
 
 [dev-dependencies]

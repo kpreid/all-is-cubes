@@ -43,6 +43,7 @@ dependencies = [
  "rand_distr",
  "rand_xoshiro",
  "unicode-segmentation",
+ "visibility",
  "yield-progress",
 ]
 
@@ -67,6 +68,7 @@ dependencies = [
  "num-traits",
  "ordered-float",
  "rand",
+ "visibility",
 ]
 
 [[package]]
@@ -105,6 +107,7 @@ dependencies = [
  "rand_xoshiro",
  "resource",
  "send_wrapper",
+ "visibility",
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
@@ -131,6 +134,7 @@ dependencies = [
  "mutants",
  "num-traits",
  "ordered-float",
+ "visibility",
 ]
 
 [[package]]
@@ -1263,6 +1267,17 @@ name = "variadics_please"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41b6d82be61465f97d42bd1d15bf20f3b0a3a0905018f38f9d6f6962055b0b5c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "visibility"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d674d135b4a8c1d7e813e2f8d1c9a58308aee4a680323066025e53132218bd91"
 dependencies = [
  "proc-macro2",
  "quote",

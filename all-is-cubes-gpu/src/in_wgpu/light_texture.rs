@@ -74,10 +74,11 @@ const LIGHT_CHUNK_VOLUME: usize =
 ///
 /// This may be lossily converted from a [`Cube`] to find the containing chunk.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-#[doc(hidden)] // public for benchmark
+#[doc(hidden)] // public for tests and benchmarks only
 pub struct LightChunk(Point3D<i32, ()>);
 
 impl LightChunk {
+    /// Computes the light data chunk the given cube belongs to.
     pub fn new(cube: Cube) -> Self {
         LightChunk(
             cube.lower_bounds()
@@ -86,6 +87,7 @@ impl LightChunk {
         )
     }
 
+    /// Returns the lowest cube in this chunk.
     pub fn first_cube(self) -> Cube {
         Cube::from(
             self.0
@@ -99,6 +101,7 @@ impl LightChunk {
     }
 
     /// For testing only. Implemented in a brute-force way because it doesn’t need to be cheaper.
+    #[doc(hidden)]
     pub fn all_in_region(region: GridAab) -> Vec<LightChunk> {
         let mut chunks: Vec<LightChunk> = region
             .interior_iter()
@@ -124,7 +127,7 @@ impl LightChunk {
 ///
 /// The texels are in [`PackedLight::as_texel()`] form.
 #[derive(Debug)]
-#[doc(hidden)] // public for benchmark
+#[doc(hidden)] // public for tests and benchmarks only
 pub struct LightTexture {
     texture: wgpu::Texture,
     texture_view: Identified<wgpu::TextureView>,
@@ -184,7 +187,7 @@ impl LightTexture {
 
     /// Construct a new texture of the specified size with no data.
     ///
-    /// The size must be a size returned by [`LightTexture::choose_size()`].
+    /// The `size` must be a size returned by [`LightTexture::choose_size()`].
     pub fn new(
         label_prefix: &str,
         device: &wgpu::Device,
@@ -221,6 +224,11 @@ impl LightTexture {
         }
     }
 
+    /// Resize the texture if necessary to ensure that it has at least the given `size`.
+    ///
+    /// If resized, all previous data is discarded.
+    ///
+    /// The `size` must be a size returned by [`LightTexture::choose_size()`].
     pub fn ensure_as_big_as(&mut self, label_prefix: &str, device: &wgpu::Device, size: GridSize) {
         let current = extent_to_size3d(self.texture.size());
         if current.lower_than(size).any() {
@@ -500,7 +508,7 @@ impl LightTexture {
         total_count
     }
 
-    #[doc(hidden)] // for tests
+    #[doc(hidden)] // public for tests and benchmarks only
     pub fn texture(&self) -> &wgpu::Texture {
         &self.texture
     }

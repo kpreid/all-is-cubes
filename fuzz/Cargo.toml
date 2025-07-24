@@ -11,9 +11,9 @@ cargo-fuzz = true
 
 [dependencies]
 # Note: Cannot use workspace dependencies here!
-all-is-cubes = { path = "../all-is-cubes", features = ["arbitrary"] }
-all-is-cubes-gpu = { path = "../all-is-cubes-gpu" }
-all-is-cubes-mesh = { path = "../all-is-cubes-mesh", features = ["arbitrary"] }
+all-is-cubes = { path = "../all-is-cubes", features = ["arbitrary", "_special_testing"] }
+all-is-cubes-gpu = { path = "../all-is-cubes-gpu", features = ["_special_testing"] }
+all-is-cubes-mesh = { path = "../all-is-cubes-mesh", features = ["arbitrary", "_special_testing"] }
 arbitrary = { version = "1.4.1", features = ["derive"] }
 libfuzzer-sys = "0.4"
 pretty_assertions = { version = "1.2.0" }

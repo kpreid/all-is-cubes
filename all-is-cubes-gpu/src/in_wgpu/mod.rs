@@ -35,7 +35,7 @@ pub mod headless;
 #[doc(hidden)]
 pub mod init;
 mod light_texture;
-#[doc(hidden)] // public for benchmark
+#[doc(hidden)] // used by tests/shaders and by benchmark
 pub use light_texture::{LightChunk, LightTexture};
 mod mip_ping;
 mod pipelines;
@@ -44,7 +44,7 @@ mod postprocess;
 mod raytrace_to_texture;
 #[cfg(feature = "rerun")]
 mod rerun_image;
-#[doc(hidden)] // public for tests/shader_tests.rs
+#[doc(hidden)] // used by tests/shader_tests.rs
 pub mod shader_testing;
 mod shaders;
 mod skybox;

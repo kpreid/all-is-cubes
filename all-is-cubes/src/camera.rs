@@ -349,7 +349,7 @@ impl Camera {
         intersection_max < intersection_min
     }
 
-    #[doc(hidden)] // for tests
+    #[doc(hidden)] // used in other crates debugging; not stable API
     pub fn view_frustum_geometry(&self) -> &(impl math::Wireframe + '_) {
         &self.view_frustum
     }

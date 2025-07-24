@@ -28,7 +28,7 @@ required-features = ["wgpu"]
 [[bench]]
 name = "wgpu"
 harness = false
-required-features = ["wgpu"]
+required-features = ["wgpu", "_special_testing"]
 
 [features]
 # Adds support for render info logging to Rerun.
@@ -46,6 +46,11 @@ auto-threads = [
     "all-is-cubes-mesh/auto-threads",
     "all-is-cubes-render/auto-threads",
 ]
+# Makes certain internal items public.
+# This feature is intended only for use when developing All is Cubes,
+# to compile certain fuzzing, benchmark, and example targets.
+# It is not necessary to enable this feature to run the complete `cargo test` test suite.
+_special_testing = ["dep:visibility"]
 
 [dependencies]
 all-is-cubes = { workspace = true, features = ["std"] }
@@ -76,6 +81,7 @@ rand_xoshiro = { workspace = true }
 rayon = { workspace = true, optional = true }
 resource = "0.6.0"
 send_wrapper = { workspace = true, features = ["futures"] }
+visibility = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true }
 # For initializing tests on web. (This is not a dev-dependency because some of said tests are not in this package.)
 web-sys = { version = "0.3.77", features = ["OffscreenCanvas"] }

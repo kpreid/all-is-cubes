@@ -10,15 +10,13 @@ use crate::time::Instant;
 // -------------------------------------------------------------------------------------------------
 
 mod shared;
-#[cfg(feature = "rerun")]
-pub use shared::*;
-#[cfg(not(feature = "rerun"))]
+#[cfg_attr(feature = "_special_testing", visibility::make(pub))]
 pub(in crate::space) use shared::*;
 
-#[cfg(feature = "rerun")]
-#[doc(hidden)] // exposed only for
+#[cfg(feature = "_special_testing")]
+#[doc(hidden)] // exposed only for examples/light-tree.rs
 pub mod generator;
-#[cfg(not(feature = "rerun"))]
+#[cfg(not(feature = "_special_testing"))]
 mod generator;
 
 // -------------------------------------------------------------------------------------------------

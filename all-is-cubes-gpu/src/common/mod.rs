@@ -15,8 +15,11 @@ pub(crate) mod reloadable;
 mod time;
 pub use time::FrameBudget;
 
-#[doc(hidden)] // Exported only for use by fuzz_octree
+#[cfg(feature = "_special_testing")] // for use by fuzz_octree
+#[allow(missing_docs)]
 pub mod octree_alloc;
+#[cfg(not(feature = "_special_testing"))]
+pub(crate) mod octree_alloc;
 
 #[cfg(feature = "rerun")]
 #[doc(hidden)] // not stable, just exists to support config from desktop cmdline

@@ -27,9 +27,8 @@ type TreeCoord = u16;
 /// TODO: Add coordinate system type for the input, to reflect that it's also some-kind-of-texels
 /// that aren't necessarily cubes-for-blocks. If we can manage that without too much regression
 /// in necessary i32/u32 conversions.
-///
-/// Note: this struct is public (but hidden) for the `fuzz_octree` test.
-pub struct Alloctree<A> {
+#[cfg_attr(feature = "_special_testing", visibility::make(pub))] // used by fuzz_octree
+pub(crate) struct Alloctree<A> {
     /// log2 of the size of the region available to allocate. Lower bounds are always zero.
     size_exponent: u8,
 
@@ -202,7 +201,7 @@ impl<A> Alloctree<A> {
     /// This operation is intended only for tests of the allocator.
     ///
     /// TODO: This doesn’t currently check that the tree actualy reserves every handle.
-    #[doc(hidden)]
+    #[cfg(any(test, feature = "_special_testing"))]
     pub fn consistency_check(&self, handles: &[AlloctreeHandle<A>]) {
         for (i, h1) in handles.iter().enumerate() {
             assert!(

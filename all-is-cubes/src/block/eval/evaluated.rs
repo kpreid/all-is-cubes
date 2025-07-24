@@ -294,7 +294,9 @@ impl EvaluatedBlock {
 
     // --- Other ---
 
-    #[doc(hidden)] // TODO: unclear if good public API, but public for fuzz testing
+    /// Returns whether this block evaluation would have been different if a [`Modifier::Rotate`]
+    /// had been added or removed before evaluation.
+    #[cfg(feature = "_special_testing")]
     pub fn rotationally_symmetric(&self) -> bool {
         let Self {
             block,
@@ -309,9 +311,7 @@ impl EvaluatedBlock {
     }
 
     /// Check that the derived properties are consistent with the fundamental ones.
-    ///
-    /// This is public because it is used by `fuzz_block_eval`.
-    #[doc(hidden)]
+    #[cfg_attr(feature = "_special_testing", visibility::make(pub))] // used by fuzz_block_eval
     #[track_caller]
     pub fn consistency_check(&self) {
         let regenerated = EvaluatedBlock::from_voxels(
