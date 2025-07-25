@@ -256,6 +256,26 @@ impl ColorBuf {
             transmittance,
         }
     }
+
+    /// Returns the color (image pixel) accumulated in this buffer,
+    /// in premultiplied RGBA form.
+    ///
+    /// Note that since the scene may, and typically will, contain light sources,
+    /// it is not necessarily the case that the RGB components are less than or equal to
+    /// the alpha components.
+    //---
+    // TODO: We should have data type(s) for premultiplied RGBA (that aren't just ColorBuf itself)
+    // that this can return.
+    // TODO: Use this instead of Rgba::from() most places?
+    #[doc(hidden)] // TODO: unsure if good public API
+    pub fn into_premultiplied_rgba(self) -> [f32; 4] {
+        [
+            self.light.x,
+            self.light.y,
+            self.light.z,
+            (1.0 - self.transmittance).clamp(0.0, 1.0),
+        ]
+    }
 }
 
 impl Accumulate for ColorBuf {
@@ -314,6 +334,8 @@ impl From<ColorBuf> for Rgba {
     // in the general case. We should allow for tone-mapping in premultiplied form, either by
     // replacing this conversion with a custom method, or changing the [`Rgba`] type to be
     // premultiplied.
+    //
+    // We currently have `ColorBuf:into_premultiplied_alpha()` but aren't broadly using it.
     fn from(buf: ColorBuf) -> Rgba {
         if buf.transmittance >= 1.0 {
             // Special case to avoid dividing by zero

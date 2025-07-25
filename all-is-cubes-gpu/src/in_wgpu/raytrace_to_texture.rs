@@ -19,7 +19,7 @@ use web_time::{Duration, Instant};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
-use all_is_cubes::math::{Rgba, VectorOps as _};
+use all_is_cubes::math::VectorOps as _;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::camera::{
     Camera, ImagePixel, Layers, StandardCameras, Viewport, area_usize,
@@ -375,6 +375,7 @@ impl Inner {
         let render_viewport = self.update_strategy.render_viewport();
         let scene = self.rtr.scene::<Split>();
         let camera = &scene.cameras().world;
+        let exposure = camera.exposure().into_inner();
 
         // Compute the transformation which maps ray distance back to world-space distance.
         //
@@ -412,14 +413,18 @@ impl Inner {
                     render_viewport.normalize_fb_y_edge(y + 1),
                 ),
             });
+
             // Note: these are *not* postprocessed colors, because we let the GPU do that.
-            let color = Rgba::from(color_buf);
-            let color: [f16; 4] = [
-                f16::from_f32(color.red().into_inner()),
-                f16::from_f32(color.green().into_inner()),
-                f16::from_f32(color.blue().into_inner()),
-                f16::from_f32(color.alpha().into_inner()),
-            ];
+            // TODO: We should let the GPU do exposure too (needs rejiggering the uniform buffer).
+            let color: [f16; 4] = {
+                let [r, g, b, a]: [f32; 4] = color_buf.into_premultiplied_rgba();
+                [
+                    f16::from_f32(r * exposure),
+                    f16::from_f32(g * exposure),
+                    f16::from_f32(b * exposure),
+                    f16::from_f32(a),
+                ]
+            };
 
             let linear_depth = depth_buf.depth().clamp(0.0, 1.0);
             // Note that this assumes that depth doesn't interact with position in the image.
