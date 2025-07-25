@@ -7,6 +7,7 @@ use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
 use crate::in_wgpu::frame_texture::FramebufferTextures;
+use crate::in_wgpu::glue::size2d_to_extent;
 use crate::in_wgpu::shaders::Shaders;
 use crate::in_wgpu::vertex;
 
@@ -726,11 +727,7 @@ impl Pipelines {
                 queue,
                 &wgpu::TextureDescriptor {
                     label: None,
-                    size: wgpu::Extent3d {
-                        width: image.size().width,
-                        height: image.size().height,
-                        depth_or_array_layers: 1,
-                    },
+                    size: size2d_to_extent(image.size()),
                     mip_level_count: 1,
                     sample_count: 1,
                     dimension: wgpu::TextureDimension::D2,

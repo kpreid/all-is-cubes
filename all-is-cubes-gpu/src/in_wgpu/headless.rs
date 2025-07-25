@@ -10,10 +10,11 @@ use all_is_cubes::character::Cursor;
 use all_is_cubes::listen;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
-use all_is_cubes_render::camera::{Layers, StandardCameras, Viewport};
+use all_is_cubes_render::camera::{ImageSize, Layers, StandardCameras, Viewport};
 use all_is_cubes_render::{Flaws, HeadlessRenderer, RenderError, Rendering};
 
 use crate::common::FrameBudget;
+use crate::in_wgpu::glue::size2d_to_extent;
 use crate::in_wgpu::{self, init};
 
 /// Builder for configuring a [headless](HeadlessRenderer) [`Renderer`].
@@ -210,11 +211,7 @@ impl RendererImpl {
 fn create_color_texture(device: &wgpu::Device, viewport: Viewport) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: Some("headless::Renderer::color_texture"),
-        size: wgpu::Extent3d {
-            width: viewport.framebuffer_size.width.max(1),
-            height: viewport.framebuffer_size.height.max(1),
-            depth_or_array_layers: 1,
-        },
+        size: size2d_to_extent(viewport.framebuffer_size.max(ImageSize::splat(1))),
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,

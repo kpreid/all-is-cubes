@@ -7,7 +7,7 @@ use core::ops::Range;
 
 use bytemuck::Pod;
 
-use all_is_cubes::euclid::{Box3D, Point3D, Size3D};
+use all_is_cubes::euclid::{Box3D, Point3D, Size2D, Size3D};
 use all_is_cubes::math::{GridSize, Rgba};
 use all_is_cubes_mesh::IndexSlice;
 use num_traits::NumCast;
@@ -98,7 +98,16 @@ pub fn point_to_origin<U>(origin: Point3D<u32, U>) -> wgpu::Origin3d {
     }
 }
 
-/// Convert [`GridSize`] or similar size types to [`wgpu::Extent3d`].
+/// Convert [`Size2d`] to [`wgpu::Extent3d`].
+pub fn size2d_to_extent<T: Copy + NumCast, U>(size: Size2D<T, U>) -> wgpu::Extent3d {
+    let size = size.to_u32();
+    wgpu::Extent3d {
+        width: size.width,
+        height: size.height,
+        depth_or_array_layers: 1,
+    }
+}
+/// Convert [`Size3d`] to [`wgpu::Extent3d`].
 pub fn size3d_to_extent<T: Copy + NumCast, U>(size: Size3D<T, U>) -> wgpu::Extent3d {
     let size = size.to_u32();
     wgpu::Extent3d {

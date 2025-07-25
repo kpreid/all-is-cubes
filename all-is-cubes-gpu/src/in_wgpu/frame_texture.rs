@@ -8,6 +8,7 @@ use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{GraphicsOptions, ImagePixel};
 
 use super::bloom;
+use crate::in_wgpu::glue::size2d_to_extent;
 use crate::in_wgpu::shaders::Shaders;
 use crate::{EgFramebuffer, Identified};
 
@@ -47,11 +48,7 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
         label: Option<&str>,
         size: Size2D<u32, ImagePixel>,
     ) {
-        let new_extent = wgpu::Extent3d {
-            width: size.width,
-            height: size.height,
-            depth_or_array_layers: 1,
-        };
+        let new_extent = size2d_to_extent(size);
         if new_extent == self.size && self.texture.is_some() {
             return;
         }

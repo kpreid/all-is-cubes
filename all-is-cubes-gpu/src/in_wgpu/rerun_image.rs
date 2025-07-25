@@ -10,7 +10,7 @@ use all_is_cubes_render::camera::{Camera, ImageSize, Viewport};
 
 use crate::Memo;
 use crate::in_wgpu::camera::ShaderSpaceCamera;
-use crate::in_wgpu::glue::buffer_size_of;
+use crate::in_wgpu::glue::{buffer_size_of, size2d_to_extent};
 use crate::in_wgpu::init;
 use crate::in_wgpu::pipelines::Pipelines;
 
@@ -76,11 +76,7 @@ impl RerunImageExport {
         // Choose a smaller size than the full resolution.
         // The render pass will take care of downsampling.
         let logged_size = logged_image_size_policy(normal_camera.viewport().framebuffer_size);
-        let logged_size_extent = wgpu::Extent3d {
-            width: logged_size.width,
-            height: logged_size.height,
-            depth_or_array_layers: 1,
-        };
+        let logged_size_extent = size2d_to_extent(logged_size);
         let mut logged_camera = normal_camera.clone();
         logged_camera.set_viewport(Viewport::with_scale(1.0, logged_size));
 
