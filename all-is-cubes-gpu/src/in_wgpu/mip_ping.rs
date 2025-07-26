@@ -23,7 +23,7 @@ pub(crate) struct Pipelines {
     /// Format of the intermediate textures and the input texture.
     texture_format: wgpu::TextureFormat,
 
-    linear_sampler: wgpu::Sampler,
+    sampler: wgpu::Sampler,
 
     downsample_pipeline: wgpu::RenderPipeline,
     upsample_pipeline: wgpu::RenderPipeline,
@@ -36,6 +36,8 @@ impl Pipelines {
     /// * `texture_format` is the format of the intermediate texture and must also match
     ///   the format of the input texture provided later.
     /// * `module` is the shader module containing the downsampling and upsampling functions.
+    /// * `sampler` is a sampler that will be provided to the shaders for their use.
+    #[allow(clippy::too_many_arguments)] // we could maybe switch to a struct...
     pub fn new(
         device: &wgpu::Device,
         label: String,
@@ -44,6 +46,7 @@ impl Pipelines {
         vertex_entry_point: &str,
         downsample_entry_point: &str,
         upsample_entry_point: &str,
+        sampler: wgpu::Sampler,
     ) -> Arc<Self> {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some(&format!("{label} mip_ping::Pipelines::bind_group_layout")),
@@ -73,7 +76,7 @@ impl Pipelines {
                     },
                     count: None,
                 },
-                // Binding for linear_sampler
+                // Binding for sampler
                 wgpu::BindGroupLayoutEntry {
                     binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -154,22 +157,11 @@ impl Pipelines {
 
         #[cfg_attr(target_family = "wasm", expect(clippy::arc_with_non_send_sync))]
         Arc::new(Self {
-            linear_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
-                label: Some(&format!("{label} mip_ping::Pipelines::linear_sampler")),
-                // TODO: evaluate which address mode produces the best appearance
-                address_mode_u: wgpu::AddressMode::MirrorRepeat,
-                address_mode_v: wgpu::AddressMode::MirrorRepeat,
-                address_mode_w: wgpu::AddressMode::MirrorRepeat,
-                mag_filter: wgpu::FilterMode::Linear,
-                min_filter: wgpu::FilterMode::Linear,
-                mipmap_filter: wgpu::FilterMode::Nearest,
-                ..Default::default()
-            }),
             shader_id: module.global_id(),
-
             label,
             bind_group_layout,
             texture_format,
+            sampler,
             downsample_pipeline,
             upsample_pipeline,
         })
@@ -196,7 +188,7 @@ impl Pipelines {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&self.linear_sampler),
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
                 },
             ],
             label: Some(&format!("{label} bind group")),

@@ -12,6 +12,18 @@ pub fn create_bloom_pipelines(
     shaders: &Shaders,
     linear_scene_texture_format: wgpu::TextureFormat,
 ) -> Arc<mip_ping::Pipelines> {
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: Some("bloom linear sampler"),
+        // TODO: evaluate which address mode produces the best appearance
+        address_mode_u: wgpu::AddressMode::MirrorRepeat,
+        address_mode_v: wgpu::AddressMode::MirrorRepeat,
+        address_mode_w: wgpu::AddressMode::MirrorRepeat,
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        mipmap_filter: wgpu::FilterMode::Nearest,
+        ..Default::default()
+    });
+
     mip_ping::Pipelines::new(
         device,
         String::from("bloom"),
@@ -20,5 +32,6 @@ pub fn create_bloom_pipelines(
         "full_image_vertex",
         "bloom_downsample",
         "bloom_upsample",
+        sampler,
     )
 }

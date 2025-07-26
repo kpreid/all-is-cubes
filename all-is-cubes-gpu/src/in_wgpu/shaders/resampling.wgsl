@@ -3,10 +3,10 @@
 
 // --- Interface declarations ----------------------------------------------------------------------
 
-// This group is named bloom_bind_group_layout in the code.
+// This group is named mip_ping::Pipelines::bind_group_layout in the code.
 @group(0) @binding(0) var previous_stage_input: texture_2d<f32>;
 @group(0) @binding(1) var higher_stage_input: texture_2d<f32>;
-@group(0) @binding(2) var linear_sampler: sampler;
+@group(0) @binding(2) var input_sampler: sampler;
 
 // --- Vertex shader -------------------------------------------------------------------------------
 
@@ -54,7 +54,7 @@ fn input_pixel(in: VertexOutput, offset: vec2<f32>) -> vec4<f32> {
 
     return textureSampleLevel(
         previous_stage_input,
-        linear_sampler,
+        input_sampler,
         in.texcoord + offset * derivatives,
         // The mip level here is always 0 because selecting the actual mip level will be
         // handled by the texture view selection on the CPU side.
@@ -87,6 +87,6 @@ fn bloom_upsample(in: VertexOutput) -> @location(0) vec4<f32> {
         + input_pixel(in, vec2<f32>(0.0, -1.0))
         + input_pixel(in, vec2<f32>(-1.0, 0.0))
         + input_pixel(in, vec2<f32>(1.0, 0.0))
-        + higher_weight * textureSampleLevel(higher_stage_input, linear_sampler, in.texcoord, 0.0)
+        + higher_weight * textureSampleLevel(higher_stage_input, input_sampler, in.texcoord, 0.0)
     ) / (12.0 + higher_weight);
 }
