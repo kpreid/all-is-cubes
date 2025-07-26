@@ -16,7 +16,7 @@ pub fn create_bloom_pipelines(
         device,
         String::from("bloom"),
         linear_scene_texture_format,
-        shaders.bloom.get(),
+        shaders.resampling.get(),
         "full_image_vertex",
         "bloom_downsample",
         "bloom_upsample",

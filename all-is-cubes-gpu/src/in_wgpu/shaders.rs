@@ -17,7 +17,7 @@ use crate::reloadable::{Reloadable, reloadable_str};
 /// All shaders that are built into the source code of this crate.
 pub(crate) struct Shaders {
     pub(crate) blocks_and_lines: ReloadableShader,
-    pub(crate) bloom: ReloadableShader,
+    pub(crate) resampling: ReloadableShader,
     pub(crate) rt_copy: ReloadableShader,
     pub(crate) postprocess: ReloadableShader,
     #[cfg(feature = "rerun")]
@@ -46,7 +46,7 @@ impl Shaders {
                 "blocks_and_lines".into(),
                 BLOCKS_AND_LINES.as_source(),
             ),
-            bloom: ReloadableShader::new(device, "bloom".into(), RESAMPLING.as_source()),
+            resampling: ReloadableShader::new(device, "resampling".into(), RESAMPLING.as_source()),
             rt_copy: ReloadableShader::new(device, "rt_copy".into(), RT_COPY.as_source()),
             postprocess: ReloadableShader::new(
                 device,
@@ -65,7 +65,7 @@ impl Shaders {
 
         let Self {
             blocks_and_lines,
-            bloom,
+            resampling,
             rt_copy,
             postprocess,
             #[cfg(feature = "rerun")]
@@ -75,7 +75,7 @@ impl Shaders {
         let mut changed = false;
 
         changed |= blocks_and_lines.update(device);
-        changed |= bloom.update(device);
+        changed |= resampling.update(device);
         changed |= rt_copy.update(device);
         changed |= postprocess.update(device);
         #[cfg(feature = "rerun")]

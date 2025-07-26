@@ -387,7 +387,7 @@ impl FramebufferTextures {
             || self
                 .bloom
                 .as_ref()
-                .is_some_and(|b| b.shader_id() != shaders.bloom.get().global_id())
+                .is_some_and(|b| b.shader_id() != shaders.resampling.get().global_id())
         {
             *self = Self::new(device, shaders, new_config);
             true
