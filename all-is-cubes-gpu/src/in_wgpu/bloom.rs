@@ -35,3 +35,25 @@ pub fn create_bloom_pipelines(
         sampler,
     )
 }
+
+pub fn create_bloom_texture(
+    device: &wgpu::Device,
+    framebuffer_size: wgpu::Extent3d,
+    bloom_input_view: &crate::Identified<wgpu::TextureView>,
+    pipelines: &Arc<mip_ping::Pipelines>,
+) -> BloomResources {
+    mip_ping::Texture::new(
+        device,
+        pipelines,
+        // The bloom texture's largest mip level is 1/2 the size of the original image.
+        wgpu::Extent3d {
+            width: framebuffer_size.width.div_ceil(2),
+            height: framebuffer_size.height.div_ceil(2),
+            depth_or_array_layers: 1,
+        },
+        bloom_input_view,
+        // TODO: set levels and repetitions to control size relative to framebuffer size?
+        6,
+        3,
+    )
+}

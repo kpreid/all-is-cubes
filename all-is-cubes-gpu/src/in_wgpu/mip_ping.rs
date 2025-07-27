@@ -212,17 +212,19 @@ pub(crate) struct Texture {
 }
 
 impl Texture {
+    /// * `requested_size` is the minimum size of texture,
+    ///   but may be rounded up to ensure the mip levels are in perfect ratios.
     pub fn new(
         device: &wgpu::Device,
         pipelines: &Pipelines,
-        size: wgpu::Extent3d,
+        requested_size: wgpu::Extent3d,
         scene_texture: &wgpu::TextureView,
         maximum_levels: u32,
         repetitions: u32,
     ) -> Self {
         let label = &pipelines.label;
         let (intermediate_texture_size, mip_level_count) =
-            size_and_mip_levels_for_texture(size, maximum_levels);
+            size_and_mip_levels_for_texture(requested_size, maximum_levels);
         let color_formats = &[Some(pipelines.texture_format)];
 
         // This texture stores all of the results of processing.
@@ -366,20 +368,12 @@ fn single_mip_view(label: &str, mip_level: u32, texture: &wgpu::Texture) -> wgpu
 }
 
 fn size_and_mip_levels_for_texture(
-    input_texture_size: wgpu::Extent3d,
+    requested_size: wgpu::Extent3d,
     maximum_levels: u32,
 ) -> (wgpu::Extent3d, u32) {
-    // First, compute a texture size that is half resolution relative to the input texture.
-    // Essentially, our mip levels "start at 1 instead of 0".
-    let naive_size = wgpu::Extent3d {
-        width: input_texture_size.width.div_ceil(2),
-        height: input_texture_size.height.div_ceil(2),
-        depth_or_array_layers: 1,
-    };
-
     // Choose a mip level count that is possible given the overall size.
     let mip_level_count: u32 = {
-        let log_size = naive_size.width.min(naive_size.height).ilog2();
+        let log_size = requested_size.width.min(requested_size.height).ilog2();
         maximum_levels.min(log_size + 1)
     };
 
@@ -388,8 +382,8 @@ fn size_and_mip_levels_for_texture(
     // so that its filtering behaves as intended.
     let divisor = 2u32.pow(mip_level_count);
     let final_size = wgpu::Extent3d {
-        width: naive_size.width.next_multiple_of(divisor),
-        height: naive_size.height.next_multiple_of(divisor),
+        width: requested_size.width.next_multiple_of(divisor),
+        height: requested_size.height.next_multiple_of(divisor),
         depth_or_array_layers: 1,
     };
 

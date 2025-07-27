@@ -275,15 +275,12 @@ impl FramebufferTextures {
 
         Self {
             // TODO: create bloom resources only if graphics options say bloom
-            bloom: Some(bloom::BloomResources::new(
+            bloom: Some(bloom::create_bloom_texture(
                 device,
-                // TODO: Don't reconstruct on every resize, but reuse it.
-                &bloom::create_bloom_pipelines(device, shaders, config.linear_scene_texture_format),
                 config.size,
                 bloom_input_view,
-                // TODO: set levels and repetitions to control size relative to framebuffer size?
-                6,
-                3,
+                // TODO: Don't reconstruct on every resize, but reuse it.
+                &bloom::create_bloom_pipelines(device, shaders, config.linear_scene_texture_format),
             )),
             linear_scene_view,
             linear_scene_resolved_view,
