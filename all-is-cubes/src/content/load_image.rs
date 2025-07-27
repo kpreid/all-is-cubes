@@ -325,11 +325,12 @@ macro_rules! _content_load_image_include_image {
     }};
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
+cfg_select! {
+    feature = "std" => {
         #[doc(hidden)]
         type LazyImageInner = ::std::sync::OnceLock<DecodedPng>;
-    } else {
+    }
+    _ => {
         #[doc(hidden)]
         type LazyImageInner = ::once_cell::race::OnceBox<DecodedPng>;
     }

@@ -128,7 +128,6 @@ bevy_ecs = { workspace = true }
 bevy_platform = { workspace = true }
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
-cfg-if = { workspace = true }
 displaydoc = { workspace = true }
 # mint feature to guarantee that our callers can use mint types
 # libm feature to guarantee compilability and compatibility with no_std
