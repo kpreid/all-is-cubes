@@ -868,9 +868,9 @@ impl From<Rgba> for Block {
 // `#[macro_export]` to export an undocumented name, then re-export it publicly with a normal `use`.
 #[doc(hidden)]
 #[macro_export]
-#[expect(
+#[allow(
     clippy::module_name_repetitions,
-    reason = "macro export is actually at crate root"
+    reason = "TODO: remove after <https://github.com/rust-lang/rust-clippy/pull/15319> (Rust 1.90?)"
 )]
 macro_rules! _block_from_color {
     ($color:expr) => {
