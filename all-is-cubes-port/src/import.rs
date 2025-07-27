@@ -27,13 +27,14 @@ pub async fn load_universe_from_file(
     let (mut universe, format): (Box<Universe>, Format) = if bytes.starts_with(b"{") {
         // Assume it's JSON. Furthermore, assume it's ours.
         // TODO: better handling of foreign JSON?
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "native")] {
+        cfg_select! {
+            feature = "native" => {
                 (
                     crate::native::import_native_json(progress, &bytes, &*file)?,
                     Format::AicJson,
                 )
-            } else {
+            }
+            _ => {
                 return Err(ImportError {
                     source_path: file.display_full_path(),
                     detail: ImportErrorKind::FormatDisabled { format: Format::AicJson },
@@ -41,8 +42,8 @@ pub async fn load_universe_from_file(
             }
         }
     } else if bytes.starts_with(b"VOX ") {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "dot-vox")] {
+        cfg_select! {
+            feature = "dot-vox" => {
                 (
                     crate::mv::load_dot_vox(progress, &bytes)
                         .await
@@ -52,7 +53,8 @@ pub async fn load_universe_from_file(
                         })?,
                     Format::DotVox,
                 )
-                    } else {
+            }
+            _ => {
                 return Err(ImportError {
                     source_path: file.display_full_path(),
                     detail: ImportErrorKind::FormatDisabled { format: Format::DotVox },
