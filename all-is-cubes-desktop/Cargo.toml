@@ -80,7 +80,6 @@ async-channel = { workspace = true }
 async-executor = { workspace = true }
 async-io = { workspace = true }
 anyhow = { workspace = true }
-cfg-if = { workspace = true }
 clap = { workspace = true }
 directories-next = "2.0.0"
 # "serde" feature for TODO: explain

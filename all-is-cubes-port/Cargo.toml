@@ -66,7 +66,6 @@ auto-threads = [
 # Non-optional generally required dependencies
 # need all-is-cubes/std because we have boxed Send futures and errors
 all-is-cubes = { workspace = true, features = ["std"] }
-cfg-if = { workspace = true }
 futures-channel = { workspace = true }
 futures-core = { workspace = true }
 itertools = { workspace = true }

@@ -76,22 +76,24 @@ impl From<UniverseId> for OnceUniverseId {
 // -------------------------------------------------------------------------------------------------
 
 // Choose the best available atomic type.
-cfg_if::cfg_if! {
+cfg_select! {
     // Use 64 bit if possible, because 64 bits is enough to be infeasible to overflow
     // by counting one at a time. If not, compromise on a smaller counter.
-    if #[cfg(target_has_atomic = "64")] {
+    target_has_atomic = "64" => {
         type AtomicUpTo64 = atomic::AtomicU64;
         type NonAtomicUpTo64 = u64;
         fn from_atomic_value(value: u64) -> Option<NonZeroU64> {
             NonZeroU64::new(value)
         }
-    } else if #[cfg(target_has_atomic = "32")] {
+    }
+    target_has_atomic = "32" => {
         type AtomicUpTo64 = atomic::AtomicU32;
         type NonAtomicUpTo64 = u32;
         fn from_atomic_value(value: u32) -> Option<NonZeroU64> {
             NonZeroU64::new(u64::from(value))
         }
-    } else {
+    }
+    _ => {
         // If this doesn't work we'll give up.
         type AtomicUpTo64 = atomic::AtomicUsize;
         type NonAtomicUpTo64 = usize;

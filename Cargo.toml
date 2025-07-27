@@ -89,7 +89,6 @@ bevy_platform = { version = "0.18.0", default-features = false, features = ["all
 bitflags = { version = "2.10.0", default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.24.0", default-features = false, features = ["derive", "must_cast"] }
-cfg-if = { version = "1.0.4", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 criterion = { version = "0.8.0", features = ["async", "cargo_bench_support", "html_reports"] }

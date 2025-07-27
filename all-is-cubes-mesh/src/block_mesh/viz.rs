@@ -85,8 +85,8 @@ pub struct Inner {
     mesh_triangle_indices: Vec<rg::components::TriangleIndices>,
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "rerun")] {
+cfg_select! {
+    feature = "rerun" => {
         const BOUNDS_LINE_RADIUS: f32 = 0.01;
         const VOXEL_RADIUS: f32 = 0.1;
         const OCCUPIED_RADIUS: f32 = 0.01;
@@ -94,6 +94,7 @@ cfg_if::cfg_if! {
         // should be larger than EDGE_LINE_RADIUS and OCCUPIED_RADIUS
         const IN_PROGRESS_LINE_RADIUS: f32 = 0.07;
     }
+    _ => {}
 }
 
 impl Viz {

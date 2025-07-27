@@ -54,7 +54,6 @@ all-is-cubes-render = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 bitvec = { workspace = true }
 bytemuck = { workspace = true }
-cfg-if = { workspace = true }
 either = { workspace = true }
 exhaust = { workspace = true }
 flume = { workspace = true, optional = true }
