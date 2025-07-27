@@ -243,11 +243,12 @@ impl LateLogging {
         &self,
         renderer: &mut Ren,
     ) -> Result<(), NoRerunSupportError> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "rerun")] {
+        cfg_select! {
+            feature = "rerun" => {
                 // split out into a function so rustfmt isn't interfered with by the macro
                 log_renderer_to_rerun(self, renderer);
-            } else {
+            }
+            _ => {
                 // suppress warning
                 let _ = renderer;
 
@@ -264,11 +265,12 @@ impl LateLogging {
         self: LateLogging,
         universe: &mut all_is_cubes::universe::Universe,
     ) -> Result<(), NoRerunSupportError> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "rerun")] {
+        cfg_select! {
+            feature = "rerun" => {
                 // split out into a function so rustfmt isn't interfered with by the macro
                 log_universe_to_rerun(&self, universe);
-            } else {
+            }
+            _ => {
                 // suppress warning
                 let _ = universe;
 

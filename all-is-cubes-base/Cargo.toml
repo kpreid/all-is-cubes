@@ -36,7 +36,6 @@ _special_testing = ["dep:visibility"]
 arbitrary = { workspace = true, optional = true, public = true }
 bevy_platform = { workspace = true, features = ["alloc", "web"] }
 bytemuck = { workspace = true, features = ["derive"] }
-cfg-if = { workspace = true }
 displaydoc = { workspace = true }
 embedded-graphics-core = { workspace = true, public = true }
 # libm feature to guarantee compilability and compatibility with no_std
