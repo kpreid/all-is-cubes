@@ -1,3 +1,4 @@
+#![feature(cfg_select)]
 #![feature(doc_auto_cfg)]
 #![feature(never_type)]
 

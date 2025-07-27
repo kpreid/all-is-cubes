@@ -1,3 +1,4 @@
+#![feature(cfg_select)]
 #![feature(doc_auto_cfg)]
 #![feature(never_type)]
 #![allow(exported_private_dependencies, reason = "false positive on wgpu_types")]

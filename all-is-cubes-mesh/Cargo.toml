@@ -62,7 +62,6 @@ all-is-cubes-render = { workspace = true, public = true }
 arbitrary = { workspace = true, optional = true }
 bitvec = { workspace = true }
 bytemuck = { workspace = true }
-cfg-if = { workspace = true }
 either = { workspace = true }
 flume = { workspace = true, optional = true }
 futures-channel = { workspace = true, optional = true }
