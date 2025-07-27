@@ -2,7 +2,6 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use std::sync::OnceLock;
 
-use cfg_if::cfg_if;
 #[cfg(target_family = "wasm")]
 use futures_util::StreamExt as _;
 
@@ -149,8 +148,8 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
             rx.recv_async().await.map_err(flume::RecvTimeoutError::from)
         } else {
             log!("PT polled {count_after_prune} devices and will recv with timeout");
-            cfg_if! {
-                if #[cfg(target_family = "wasm")] {
+            cfg_select! {
+                target_family = "wasm" => {
                     // On wasm, we must not block, which means we must instead use async timers
                     futures_util::select! {
                         result = rx.recv_async() => {
@@ -160,7 +159,8 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
                             Err(flume::RecvTimeoutError::Timeout)
                         }
                     }
-                } else {
+                }
+                _ => {
                     // The function is async, but in this case, we are running it in a dedicated
                     // thread, so it's okay to block and saves us needing to pull in another
                     // async timer implementation for non-Wasm targets.
