@@ -76,7 +76,6 @@ all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 all-is-cubes-ui = { workspace = true, public = true, features = ["session"] }
 async_fn_traits = { workspace = true }
 anyhow = { workspace = true, public = true }
-cfg-if = { workspace = true }
 clap = { workspace = true }
 directories-next = "2.0.0"
 euclid = { workspace = true, optional = true }
