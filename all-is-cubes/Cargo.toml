@@ -115,7 +115,6 @@ base64 = { workspace = true, optional = true, features = ["std"] } # used in ser
 bevy_ecs = { workspace = true, public = true } # TODO(ecs): stop this being public if feasible
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
-cfg-if = { workspace = true }
 displaydoc = { workspace = true }
 # mint feature to guarantee that our callers can use mint types
 # libm feature to guarantee compilability and compatibility with no_std
