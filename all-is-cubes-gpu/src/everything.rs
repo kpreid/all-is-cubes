@@ -315,10 +315,11 @@ impl EverythingRenderer {
                 self.update_info_text_size(viewport);
             }
 
-            cfg_if::cfg_if! {
-                if #[cfg(feature = "rerun")] {
+            cfg_select! {
+                feature = "rerun" => {
                     let enable_copy_out = self.rerun_image.is_enabled();
-                } else {
+                }
+                _ => {
                     let enable_copy_out = false;
                 }
             }
