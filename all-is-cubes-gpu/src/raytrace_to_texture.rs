@@ -406,10 +406,12 @@ impl RaytraceToTexture {
 
         // If we don’t currently have a background tracing thread (either because it is not enabled
         // or because it died), do some tracing right now while we have the lock held.
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "auto-threads")] {
-                let is_background = self.background_thread.as_ref().is_some_and(|h| !h.is_finished());
-            } else {
+        cfg_select! {
+            feature = "auto-threads" => {
+                let is_background =
+                    self.background_thread.as_ref().is_some_and(|h| !h.is_finished());
+            }
+            _ => {
                 let is_background = false;
             }
         };
@@ -682,8 +684,8 @@ impl Inner {
 
         match self.update_strategy {
             UpdateStrategy::Incremental(ref mut pixel_picker) => {
-                cfg_if::cfg_if! {
-                    if #[cfg(feature = "auto-threads")] {
+                cfg_select! {
+                    feature = "auto-threads" => {
                         let this_frame_pixels: Vec<Point> =
                             pixel_picker.take(self.rays_per_frame).collect();
                         // Note: I tried making these steps execute in parallel using a channel
@@ -693,7 +695,8 @@ impl Inner {
                         for trace in traces {
                             store_one(trace);
                         }
-                    } else {
+                    }
+                    _ => {
                         for pixel in pixel_picker.take(self.rays_per_frame) {
                             store_one(trace_one(pixel));
                         }
@@ -703,8 +706,8 @@ impl Inner {
             UpdateStrategy::Consistent { ref mut next, .. } => {
                 let pixel_iter = (0..self.rays_per_frame)
                     .map(|i| point_from_pixel_index(render_viewport, i + *next));
-                cfg_if::cfg_if! {
-                    if #[cfg(feature = "auto-threads")] {
+                cfg_select! {
+                    feature = "auto-threads" => {
                         let this_frame_pixels: Vec<Point> =
                             pixel_iter.take(self.rays_per_frame).collect();
                         let traces: Vec<Trace> =
@@ -712,7 +715,8 @@ impl Inner {
                         for trace in traces {
                             store_one(trace);
                         }
-                    } else {
+                    }
+                    _ => {
                         for pixel in pixel_iter {
                             store_one(trace_one(pixel));
                         }
