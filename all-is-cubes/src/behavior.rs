@@ -354,14 +354,16 @@ impl Key {
 
         use core::sync::atomic::{self, Ordering};
 
-        cfg_if::cfg_if! {
+        cfg_select! {
             // Use 64 bit if possible, because 64 bits is enough to be infeasible to overflow
             // by counting one at a time.
-            if #[cfg(target_has_atomic = "64")] {
+            target_has_atomic = "64" => {
                 static ID_COUNTER: atomic::AtomicU64 = atomic::AtomicU64::new(0);
-            } else if #[cfg(target_has_atomic = "32")] {
+            }
+            target_has_atomic = "32" => {
                 static ID_COUNTER: atomic::AtomicU32 = atomic::AtomicU32::new(0);
-            } else {
+            }
+            _ => {
                 // If this doesn't work we'll give up.
                 static ID_COUNTER: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
             }

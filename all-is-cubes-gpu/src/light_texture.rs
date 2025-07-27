@@ -2,7 +2,6 @@ use alloc::format;
 use alloc::vec::Vec;
 use core::array;
 
-use cfg_if::cfg_if;
 #[cfg(feature = "auto-threads")]
 use rayon::{
     iter::{IndexedParallelIterator as _, IntoParallelIterator as _, ParallelIterator as _},
@@ -365,8 +364,8 @@ impl LightTexture {
         let volume = region.volume().unwrap();
 
         buffer.clear();
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "auto-threads")] {
+        cfg_select! {
+            feature = "auto-threads" => {
                 buffer.resize(volume, [0; Self::COMPONENTS]);
 
                 let x_chunk_size = region.x_range().len();
@@ -389,7 +388,8 @@ impl LightTexture {
                             }
                         });
                     });
-            } else {
+            }
+            _ => {
                 // Note: I tried using iproduct!() or flat_map() instead of these nested loops,
                 // and that was slower.
                 buffer.reserve(volume);
@@ -566,13 +566,14 @@ fn split_axis(
         // Range must be split into two parts to wrap around.
         let part_1 = space_range.start..first_half_endpoint;
         let part_2 = first_half_endpoint..space_range.end;
-        cfg_if! {
-            if #[cfg(feature = "auto-threads")] {
+        cfg_select! {
+            feature = "auto-threads" => {
                 rayon::join(
                     || function(part_1, buffer),
                     || function(part_2, &mut Vec::new()),
                 );
-            } else {
+            }
+            _ => {
                 function(part_1, buffer);
                 function(part_2, buffer);
             }
