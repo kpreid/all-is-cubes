@@ -2,8 +2,8 @@ use alloc::boxed::Box;
 use core::error::Error;
 use core::{fmt, ops};
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
+cfg_select! {
+    feature = "std" => {
         pub trait SendSyncIfStd: Send + Sync {}
         impl<T: Send + Sync> SendSyncIfStd for T {}
 
@@ -15,7 +15,8 @@ cfg_if::cfg_if! {
         /// enabled.
         #[doc(hidden)]
         pub type BoxError = Box<dyn Error + Send + Sync>;
-    } else {
+    }
+    _ => {
         pub trait SendSyncIfStd {}
         impl<T> SendSyncIfStd for T {}
 
@@ -58,14 +59,15 @@ pub(crate) struct RwLock<T: ?Sized>(InnerRwLock<T>);
 pub(crate) struct RwLockReadGuard<'a, T: ?Sized>(InnerRwLockReadGuard<'a, T>);
 pub(crate) struct RwLockWriteGuard<'a, T: ?Sized>(InnerRwLockWriteGuard<'a, T>);
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
+cfg_select! {
+    feature = "std" => {
         type InnerMutex<T> = std::sync::Mutex<T>;
         type InnerMutexGuard<'a, T> = std::sync::MutexGuard<'a, T>;
         type InnerRwLock<T> = std::sync::RwLock<T>;
         type InnerRwLockReadGuard<'a, T> = std::sync::RwLockReadGuard<'a, T>;
         type InnerRwLockWriteGuard<'a, T> =  std::sync::RwLockWriteGuard<'a, T>;
-    } else {
+    }
+    _ => {
         type InnerMutex<T> = core::cell::RefCell<T>;
         type InnerMutexGuard<'a, T> = core::cell::RefMut<'a, T>;
         type InnerRwLock<T> = core::cell::RefCell<T>;
@@ -94,11 +96,12 @@ impl<T> Mutex<T> {
 
 impl<T: ?Sized> Mutex<T> {
     pub fn lock(&self) -> Result<MutexGuard<'_, T>, LockError<MutexGuard<'_, T>>> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "std")] {
+        cfg_select! {
+            feature = "std" => {
                 let result = self.0.lock()
                     .map_err(|e: std::sync::PoisonError<_>| LockError::Poisoned(MutexGuard(e.into_inner())));
-            } else {
+            }
+            _ => {
                 let result = Ok(self.0.borrow_mut());
             }
         }
@@ -119,11 +122,12 @@ impl<T: ?Sized> RwLock<T> {
         reason = "part of a complete wrapper, but happens to be unused"
     )]
     pub fn read(&self) -> Result<RwLockReadGuard<'_, T>, LockError<RwLockReadGuard<'_, T>>> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "std")] {
+        cfg_select! {
+            feature = "std" => {
                 let result = self.0.read()
                     .map_err(|e: std::sync::PoisonError<_>| LockError::Poisoned(RwLockReadGuard(e.into_inner())));
-            } else {
+            }
+            _ => {
                 let result = Ok(self.0.borrow());
             }
         }
@@ -136,11 +140,12 @@ impl<T: ?Sized> RwLock<T> {
         reason = "part of a complete wrapper, but happens to be unused"
     )]
     pub fn write(&self) -> Result<RwLockWriteGuard<'_, T>, LockError<RwLockWriteGuard<'_, T>>> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "std")] {
+        cfg_select! {
+            feature = "std" => {
                 let result = self.0.write()
                     .map_err(|e: std::sync::PoisonError<_>| LockError::Poisoned(RwLockWriteGuard(e.into_inner())));
-            } else {
+            }
+            _ => {
                 let result = Ok(self.0.borrow_mut());
             }
         }
@@ -149,14 +154,15 @@ impl<T: ?Sized> RwLock<T> {
     }
 
     pub fn try_read(&self) -> Result<RwLockReadGuard<'_, T>, TryLockError<RwLockReadGuard<'_, T>>> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "std")] {
+        cfg_select! {
+            feature = "std" => {
                 use std::sync::TryLockError as E;
                 let result = self.0.try_read().map_err(|e| match e {
                     E::Poisoned(pe) => TryLockError::Poisoned(RwLockReadGuard(pe.into_inner())),
                     E::WouldBlock => TryLockError::WouldBlock,
                 });
-            } else {
+            }
+            _ => {
                 let result = self.0.try_borrow()
                     .map_err(|core::cell::BorrowError {..}| TryLockError::WouldBlock);
             }
@@ -168,14 +174,15 @@ impl<T: ?Sized> RwLock<T> {
     pub fn try_write(
         &self,
     ) -> Result<RwLockWriteGuard<'_, T>, TryLockError<RwLockWriteGuard<'_, T>>> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "std")] {
+        cfg_select! {
+            feature = "std" => {
                 use std::sync::TryLockError as E;
                 let result = self.0.try_write().map_err(|e| match e {
                     E::Poisoned(pe) => TryLockError::Poisoned(RwLockWriteGuard(pe.into_inner())),
                     E::WouldBlock => TryLockError::WouldBlock,
                 });
-            } else {
+            }
+            _ => {
                 let result = self.0.try_borrow_mut()
                     .map_err(|core::cell::BorrowMutError {..}| TryLockError::WouldBlock);
             }
@@ -188,13 +195,14 @@ impl<T: ?Sized> RwLock<T> {
     where
         T: Sized,
     {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "std")] {
+        cfg_select! {
+            feature = "std" => {
                 match self.0.into_inner() {
                     Ok(value) => Ok(value),
                     Err(poison_error) => Err(LockError::Poisoned(poison_error.into_inner())),
                 }
-            } else {
+            }
+            _ => {
                 Ok(self.0.into_inner())
             }
         }
