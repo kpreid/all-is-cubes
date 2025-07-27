@@ -31,11 +31,12 @@ use crate::util::ignore_poison;
 #[cfg(doc)]
 use crate::space;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
+cfg_select! {
+    feature = "std" => {
         // HashDoS-resistant
         use std::collections::HashMap as BlockHashMap;
-    } else {
+    }
+    _ => {
         // no_std compatible
         use hashbrown::HashMap as BlockHashMap;
     }
