@@ -265,8 +265,8 @@ pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
+cfg_select! {
+    feature = "std" => {
         #[doc(hidden)]
         pub use ::std::sync::LazyLock as LazyForIncludeImage;
 
@@ -284,7 +284,8 @@ cfg_if::cfg_if! {
                 &*IMAGE
             }};
         }
-    } else {
+    }
+    _ => {
         #[doc(hidden)]
         pub use ::once_cell::race::OnceBox as OnceBoxForIncludeImage;
         #[doc(hidden)]
