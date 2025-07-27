@@ -3,12 +3,13 @@
 //! On wasm, [`wgpu`] is not [`Send`], but for the same reason, we never use any other threads,
 //! so a `SendWrapper` will let the GPU resources be [`Send`].
 
-cfg_if::cfg_if! {
-    if #[cfg(target_family = "wasm")] {
+cfg_select! {
+    target_family = "wasm" => {
         use send_wrapper::SendWrapper;
 
         pub(crate) type Msw<T> = SendWrapper<T>;
-    } else {
+    }
+    _ => {
         /// A substitute for [`send_wrapper::SendWrapper`] which doesn't have any of its
         /// special properties or overhead — suitable to use when the inner type *is* [`Send`].
         #[derive(Clone, Copy, Debug, Default)]
