@@ -86,7 +86,7 @@ impl Allocator {
     }
 }
 
-impl Default for Allocator {
+impl const Default for Allocator {
     fn default() -> Self {
         Self::new()
     }

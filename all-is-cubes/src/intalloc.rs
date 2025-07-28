@@ -21,7 +21,7 @@ pub struct IntAllocator<T: PrimInt + Debug> {
 }
 
 impl<T: PrimInt + Debug> IntAllocator<T> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             last_allocated: None,
             free_list: Vec::new(),
@@ -73,7 +73,7 @@ impl<T: PrimInt + Debug> IntAllocator<T> {
     }
 }
 
-impl<T: PrimInt + Debug> Default for IntAllocator<T> {
+impl<T: PrimInt + Debug> const Default for IntAllocator<T> {
     fn default() -> Self {
         Self::new()
     }

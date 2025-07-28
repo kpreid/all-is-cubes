@@ -517,7 +517,7 @@ impl GridRotation {
     }
 }
 
-impl Default for GridRotation {
+impl const Default for GridRotation {
     /// Returns the identity (no rotation).
     #[inline]
     fn default() -> Self {
