@@ -1,6 +1,8 @@
 //! Miscellanous demonstrations of capability and manual test-cases.
 //! The exhibits defined in this module are combined into [`crate::demo_city()`].
 
+use all_is_cubes::math::GridCoordinate;
+
 mod prelude;
 
 mod animation;
@@ -23,6 +25,8 @@ mod transparency;
 mod trees;
 mod ui;
 mod zoom;
+
+pub(crate) const NEEDED_RADIUS: GridCoordinate = 55;
 
 /// All exhibits which will show up in [`crate::UniverseTemplate::DemoCity`].
 ///

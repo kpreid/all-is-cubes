@@ -12,11 +12,12 @@ use all_is_cubes::character::Spawn;
 use all_is_cubes::content::palette;
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::drawing::embedded_graphics::text::{Alignment, Baseline, TextStyleBuilder};
+use all_is_cubes::euclid::{Point2D, vec3};
 use all_is_cubes::inv::{Slot, Tool};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridSize, GridSizeCoord,
-    GridVector, Gridgid, VectorOps, rgba_const,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSize,
+    GridSizeCoord, GridVector, Gridgid, VectorOps, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{self, LightPhysics, Space, SpacePhysics};
@@ -25,11 +26,12 @@ use all_is_cubes::transaction::{self, Transaction};
 use all_is_cubes::universe::UniverseTransaction;
 use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes::util::YieldProgress;
+use all_is_cubes_ui::vui::Layoutable as _;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
-use crate::alg::{space_to_space_copy, walk};
-use crate::landscape::{self, LandscapeBlocksAndVariants::Base as LbBase};
-use crate::{DemoBlocks, LandscapeBlocks, clouds::clouds, wavy_landscape};
+use crate::alg::{NoiseFnExt as _, space_to_space_copy, walk};
+use crate::landscape;
+use crate::{DemoBlocks, LandscapeBlocks, clouds::clouds};
 use crate::{LandscapeBlocksAndVariants, TemplateParameters};
 
 mod exhibit;
@@ -43,8 +45,6 @@ pub(crate) async fn demo_city(
     params: TemplateParameters,
 ) -> Result<Space, InGenError> {
     let start_city_time = Instant::now();
-
-    use LandscapeBlocks::*;
 
     // Also install blocks some exhibits want.
     // We do this once so that if multiple exhibits end up wanting them there are no conflicts.
@@ -72,60 +72,24 @@ pub(crate) async fn demo_city(
 
     let mut state = State::new(universe, params)?;
 
-    // Fill basic layers, underground and top
-    state.space.mutate(state.universe.read_ticket(), |m| {
-        m.fill_uniform(
-            state.planner.y_range(m.bounds().lower_bounds().y, 0),
-            &state.landscape_blocks[LbBase(Stone)],
-        )
-    })?;
-    progress.progress(0.1).await;
-    state.space.mutate(state.universe.read_ticket(), |m| {
-        m.fill_uniform(
-            state.planner.y_range(0, 1),
-            &state.landscape_blocks[LbBase(Grass)],
-        )
-    })?;
-    progress.progress(0.2).await;
-
-    // Stray grass
-    state.plant_grass()?;
+    // Generate basic terrain we carve everything else into.
+    state.place_terrain()?;
     progress.progress(0.3).await;
 
     // Roads and lamps
     state.space.mutate(state.universe.read_ticket(), |m| {
-        place_roads_and_tunnels(m, &state.demo_blocks)
+        place_roads_and_tunnels(m, &state.demo_blocks, &state.planner)
     })?;
     progress.progress(0.4).await;
 
-    let blank_city_time = Instant::now();
+    // TODO: Integrate logging and YieldProgress
+    let blank_landscape_time = Instant::now();
     log::trace!(
-        "Blank city took {:.3} s",
-        blank_city_time
+        "Blank landscape took {:.3} s",
+        blank_landscape_time
             .saturating_duration_since(start_city_time)
             .as_secs_f32()
     );
-
-    // Landscape filling one quadrant
-    let landscape_progress = progress.start_and_cut(0.4, "Landscape").await;
-    landscape_progress.progress(0.0).await;
-    state.space.mutate(state.universe.read_ticket(), |m| {
-        m.fill_uniform(state.planner.landscape_region(), &AIR)
-    })?;
-    landscape_progress.progress(0.5).await;
-    state.space.mutate(state.universe.read_ticket(), |m| {
-        wavy_landscape(
-            state.planner.landscape_region(),
-            m,
-            &state.landscape_blocks,
-            1.0,
-        )
-    })?;
-    state
-        .planner
-        .occupied_plots
-        .push(state.planner.landscape_region());
-    landscape_progress.finish().await;
 
     // Clouds (needs to be done after landscape to not be overwritten)
     // TODO: Enable this once transparency rendering is better.
@@ -136,14 +100,6 @@ pub(crate) async fn demo_city(
         })?;
     }
 
-    // TODO: Integrate logging and YieldProgress
-    let landscape_time = Instant::now();
-    log::trace!(
-        "Landscape took {:.3} s",
-        landscape_time
-            .saturating_duration_since(blank_city_time)
-            .as_secs_f32()
-    );
     let [exhibits_progress, mut final_progress] = progress.split(0.8);
 
     state.place_logo()?;
@@ -204,7 +160,7 @@ impl<'u> State<'u> {
 
         let bounds = {
             let sky_height = 30;
-            let ground_depth = 30; // TODO: wavy_landscape is forcing us to have extra symmetry here
+            let ground_depth = 30;
             let space_size = params
                 .size
                 .unwrap_or(GridSize::new(160, 60, 160))
@@ -234,10 +190,74 @@ impl<'u> State<'u> {
         })
     }
 
+    fn terrain_height_function(
+        &self,
+    ) -> impl Fn(Point2D<GridCoordinate, Cube>) -> GridCoordinate + use<> {
+        let start_terrain_radius = FreeCoordinate::from(self.planner.city_radius) - 2.5;
+        let terrain_noise_fn =
+            noise::ScalePoint::new(noise::OpenSimplex::new(0x2e24bb62)).set_scale(0.1);
+        let distance_to_landscape_quadrant = FreeCoordinate::from(-CityPlanner::PLOT_FRONT_RADIUS);
+
+        move |xz_cube| {
+            let free_xz = xz_cube.to_f64();
+            let r = free_xz.to_vector().length();
+
+            // increases from zero when we are far from all of the city
+            let radial_scale = ((r - start_terrain_radius) * 0.3)
+                .max(0.0) // make area < start_terrain_radius flat
+                .powf(1.5) // then ramp upward
+                .min(16.0); // to a limit
+
+            // increases from zero when we are in the quadrant that has landscape
+            // instead of exhibits
+            let landscape_region_scale = ((distance_to_landscape_quadrant - free_xz.x)
+                .min(distance_to_landscape_quadrant - free_xz.y)
+                .max(0.0)
+                * 0.3)
+                .powf(2.0)
+                .min(8.0);
+
+            // determines how much noise we use
+            let scale = radial_scale.max(landscape_region_scale);
+            let noise_value = terrain_noise_fn.at_cube(Cube::new(xz_cube.x, 0, xz_cube.y));
+
+            // adding radial_scale creates surrounding wall of mountains
+            1 + (scale * noise_value + radial_scale).round() as GridCoordinate
+        }
+    }
+
+    #[inline(never)]
+    fn place_terrain(&mut self) -> Result<(), InGenError> {
+        let height_function = self.terrain_height_function();
+        self.space.mutate(self.universe.read_ticket(), |m| {
+            landscape::fill_with_height_function(
+                m,
+                self.planner.space_bounds,
+                height_function,
+                landscape::grass_covered_stone_terrain_function(&self.landscape_blocks),
+            )
+        })?;
+
+        self.planner
+            .occupied_plots
+            .push(self.planner.landscape_region());
+
+        Ok(())
+    }
+
     #[inline(never)]
     fn place_logo(&mut self) -> Result<(), InGenError> {
-        let logo_location = self
-            .space
+        let widget = vui::leaf_widget(logo_text());
+        let r = self.planner.city_radius;
+        let lower_y = 13;
+        let lower_z = -r * 8 / 10;
+        let height = widget.requirements().minimum.height.cast_signed();
+        let logo_location = GridAab::from_lower_upper(
+            [-r, lower_y, lower_z],
+            [r + 1, lower_y + height, lower_z + 2],
+        );
+
+        self.space
             .bounds()
             .abut(Face6::NZ, -3)
             .unwrap()
@@ -245,7 +265,7 @@ impl<'u> State<'u> {
             .unwrap();
         vui::install_widgets(
             vui::LayoutGrant::new(logo_location),
-            &vui::leaf_widget(logo_text()),
+            &widget,
             self.universe.read_ticket(),
         )?
         .execute(
@@ -257,29 +277,22 @@ impl<'u> State<'u> {
         Ok(())
     }
 
-    fn plant_grass(&mut self) -> Result<(), InGenError> {
-        let grass_at = landscape::grass_placement_function(0x21b5cc6b);
-        self.space.mutate(self.universe.read_ticket(), |m| {
-            m.fill(self.planner.y_range(1, 2), |cube| {
-                if cube.x.abs() <= CityPlanner::ROAD_RADIUS
-                    || cube.z.abs() <= CityPlanner::ROAD_RADIUS
-                {
-                    return None;
-                }
-                grass_at(cube)
-                    .map(|grass| &self.landscape_blocks[LandscapeBlocksAndVariants::Grass(grass)])
-            })
-        })?;
-        Ok(())
-    }
-
     async fn plant_trees(&mut self, progress: YieldProgress) -> Result<(), InGenError> {
+        // TODO: This routine can't place trees in `landscape_region()` but it should be able to.
+        // Extend the planner to distinguish different kinds of obstruction.
+
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(self.params.seed.unwrap_or(0));
         let possible_tree_origins: GridAab = self.planner.y_range(1, 2);
+        let terrain_height_function = self.terrain_height_function();
 
-        for progress in progress.split_evenly(60) {
-            // won't get this many trees, because some will be blocked
-            let tree_origin = possible_tree_origins.random_cube(&mut rng).unwrap();
+        // won't get this many trees, because some will be blocked
+        let attempts = 60;
+
+        for progress in progress.split_evenly(attempts) {
+            let mut tree_origin = possible_tree_origins.random_cube(&mut rng).unwrap();
+            // compensate for terrain even though the planner doesn't
+            tree_origin.y = terrain_height_function(tree_origin.lower_bounds().xz());
+
             let height = rng.random_range(1..8);
             let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
                 nx: height / 3,
@@ -318,7 +331,9 @@ impl<'u> State<'u> {
             'directions: for direction in CityPlanner::ROAD_DIRECTIONS {
                 let perpendicular: GridVector =
                     GridRotation::CLOCKWISE.transform(direction).normal_vector();
-                for distance in (CityPlanner::LAMP_POSITION_RADIUS..).step_by(lamp_spacing) {
+                for distance in (CityPlanner::LAMP_POSITION_RADIUS..self.planner.city_radius)
+                    .step_by(lamp_spacing)
+                {
                     for side_of_road in [-1, 1] {
                         let globe_cube = Cube::new(0, 4, 0)
                             + direction.normal_vector() * distance
@@ -688,6 +703,7 @@ fn place_one_exhibit(
 fn place_roads_and_tunnels(
     m: &mut space::Mutation<'_, '_>,
     demo_blocks: &BlockProvider<DemoBlocks>,
+    planner: &CityPlanner,
 ) -> Result<(), InGenError> {
     use DemoBlocks::*;
 
@@ -700,48 +716,57 @@ fn place_roads_and_tunnels(
         let raycaster = all_is_cubes::raycast::AaRay::new(Cube::ORIGIN, face.into())
             .cast()
             .within(m.bounds());
-        let curb_y = GridVector::new(0, 1, 0);
+        let curb_y = vec3(0, 1, 0);
         for (i, step) in (0i32..).zip(raycaster) {
-            // Road surface
-            for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
-                m.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
-            }
+            let road_not_ended = i < planner.city_radius;
 
-            // Curbs
-            if i >= CityPlanner::ROAD_RADIUS {
-                for (side, p) in [
-                    (1, -CityPlanner::ROAD_RADIUS),
-                    (0, CityPlanner::ROAD_RADIUS),
-                ] {
-                    let position = step.cube_ahead() + perpendicular * p + curb_y;
+            if road_not_ended {
+                // Road surface
+                for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
+                    m.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
+                }
+                // Delete grass (but narrowly so as not to delete previously placed curbs)
+                // TODO: Perhaps a local rule "delete grass that is on road" would work better?
+                let clear_radius = CityPlanner::ROAD_RADIUS - 1;
+                for p in -clear_radius..=clear_radius {
+                    m.set(step.cube_ahead() + perpendicular * p + vec3(0, 1, 0), &AIR)?;
+                }
 
-                    // Place curb and combine it with other curb blocks .
-                    let mut to_compose_with = m[position].clone();
-                    // TODO: .unspecialize() is a maybe expensive way to make this test, and
-                    // this isn't the first time this has come up. Benchmark a "block view"
-                    // to cheaply filter out modifiers.
-                    if to_compose_with.clone().unspecialize() != *vec![demo_blocks[Curb].clone()] {
-                        to_compose_with = AIR;
+                // Curbs
+                if i >= CityPlanner::ROAD_RADIUS {
+                    for (side, p) in [
+                        (1, -CityPlanner::ROAD_RADIUS),
+                        (0, CityPlanner::ROAD_RADIUS),
+                    ] {
+                        let position = step.cube_ahead() + perpendicular * p + curb_y;
+
+                        // Place curb and combine it with other curb blocks .
+                        let mut to_compose_with = m[position].clone();
+                        // TODO: .unspecialize() is a maybe expensive way to make this test, and
+                        // this isn't the first time this has come up. Benchmark a "block view"
+                        // to cheaply filter out modifiers.
+                        if to_compose_with.clone().unspecialize()
+                            != *vec![demo_blocks[Curb].clone()]
+                        {
+                            to_compose_with = AIR;
+                        }
+                        m.set(
+                            position,
+                            block::Composite::new(
+                                demo_blocks[Curb].clone().rotate(rotations[side]),
+                                block::CompositeOperator::In,
+                            )
+                            .with_disassemblable()
+                            .compose_or_replace(to_compose_with),
+                        )?;
                     }
-                    m.set(
-                        position,
-                        block::Composite::new(
-                            demo_blocks[Curb].clone().rotate(rotations[side]),
-                            block::CompositeOperator::In,
-                        )
-                        .with_disassemblable()
-                        .compose_or_replace(to_compose_with),
-                    )?;
                 }
             }
 
-            // Dig underground passages
+            // Dig underground passages (don't stop when the road does)
             for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
                 for y in CityPlanner::UNDERGROUND_FLOOR_Y..0 {
-                    m.set(
-                        step.cube_ahead() + perpendicular * p + GridVector::new(0, y, 0),
-                        &AIR,
-                    )?;
+                    m.set(step.cube_ahead() + perpendicular * p + vec3(0, y, 0), &AIR)?;
                 }
             }
 
@@ -866,9 +891,17 @@ fn draw_exhibit_info(read_ticket: ReadTicket<'_>, exhibit: &Exhibit) -> Result<S
 #[derive(Clone, Debug, PartialEq)]
 struct CityPlanner {
     space_bounds: GridAab,
-    /// Count of blocks beyond the origin that are included in the city space.
-    city_radius: GridCoordinate, // TODO redundant with space_bounds
-    /// Each plot/exhibit that has already been placed. (This could be a spatial data structure but we're not that big yet.)
+
+    /// Count of blocks beyond the origin that are included in the space the planner manages.
+    /// Inside of this are exhibits and outside of this is non-flat terrain.
+    /// Roads stop at this distance.
+    ///
+    /// Kludge: This is treated as a rectangle for planning purposes even though the terrain
+    /// generation treats it as a circle.
+    city_radius: GridCoordinate,
+
+    /// Each plot/exhibit that has already been placed.
+    /// (This could be a spatial data structure but we're not that big yet.)
     occupied_plots: Vec<GridAab>,
 }
 
@@ -886,7 +919,11 @@ impl CityPlanner {
     const UNDERGROUND_FLOOR_Y: GridCoordinate = -10;
 
     pub fn new(space_bounds: GridAab) -> Self {
-        let city_radius = space_bounds.upper_bounds().x; // TODO: compare everything and take the max
+        let city_radius = exhibits::NEEDED_RADIUS
+            .min(space_bounds.upper_bounds().x - 1)
+            .min(space_bounds.upper_bounds().z - 1)
+            .min(-space_bounds.lower_bounds().x)
+            .min(-space_bounds.lower_bounds().z);
 
         let mut occupied_plots = Vec::new();
         let road = GridAab::from_lower_upper(
@@ -1001,13 +1038,18 @@ impl CityPlanner {
         ])
     }
 
+    /// The region that we let be non-flat ground and don't put any exhibits in despite being
+    /// close to the city center.
     #[inline(never)]
     pub fn landscape_region(&self) -> GridAab {
         let bounds = self.space_bounds;
         GridAab::from_lower_upper(
             [
                 bounds.lower_bounds().x,
-                bounds.lower_bounds().y * 8 / 10,
+                // This being high enough allows underground exhibits to be under this region.
+                // In principle, this should be the terrain_height_function's lower bound in this
+                // region, but we're not bothering to calculate that exactly.
+                -1,
                 bounds.lower_bounds().z,
             ],
             [
