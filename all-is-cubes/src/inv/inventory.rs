@@ -308,7 +308,7 @@ impl fmt::Debug for Slot {
     }
 }
 
-impl From<Tool> for Slot {
+impl const From<Tool> for Slot {
     fn from(tool: Tool) -> Self {
         Self::Stack(Self::COUNT_ONE, tool)
     }
