@@ -196,7 +196,7 @@ impl<'a> IndexSlice<'a> {
 
 // -------------------------------------------------------------------------------------------------
 
-impl Default for IndexVec {
+impl const Default for IndexVec {
     #[inline]
     fn default() -> Self {
         Self::new()

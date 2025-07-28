@@ -16,6 +16,8 @@
 //!   * [`raytracer::RtRenderer`] does not implement [`headless::HeadlessRenderer`].
 
 #![no_std]
+#![feature(const_default)]
+#![feature(const_trait_impl)]
 #![feature(doc_auto_cfg)]
 #![feature(never_type)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)

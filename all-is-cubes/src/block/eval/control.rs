@@ -140,7 +140,7 @@ impl Budget {
     }
 }
 
-impl Default for Budget {
+impl const Default for Budget {
     /// Returns the standard budget for starting any evaluation.
     fn default() -> Self {
         Self {
@@ -301,7 +301,7 @@ impl core::error::Error for EvalBlockError {
     }
 }
 
-impl From<HandleError> for InEvalError {
+impl const From<HandleError> for InEvalError {
     fn from(value: HandleError) -> Self {
         InEvalError::Handle(value)
     }
