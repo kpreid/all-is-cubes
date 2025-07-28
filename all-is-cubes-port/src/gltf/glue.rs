@@ -59,14 +59,14 @@ impl PartialEq for Lef32 {
     }
 }
 
-impl From<f32> for Lef32 {
+impl const From<f32> for Lef32 {
     #[inline]
     fn from(input: f32) -> Self {
         Self(f32::to_le_bytes(input))
     }
 }
 
-impl From<Lef32> for f32 {
+impl const From<Lef32> for f32 {
     #[inline]
     fn from(input: Lef32) -> Self {
         f32::from_le_bytes(input.0)

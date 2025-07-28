@@ -233,7 +233,7 @@ impl UniverseTemplate {
     }
 }
 
-impl Default for UniverseTemplate {
+impl const Default for UniverseTemplate {
     fn default() -> Self {
         Self::DemoCity
     }
