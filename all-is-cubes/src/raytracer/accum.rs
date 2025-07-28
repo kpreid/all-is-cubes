@@ -38,7 +38,7 @@ impl<'a, C> RtOptionsRef<'a, C> {
 
 // Non-derived implementations for no `C: Clone` bound.
 impl<C> Copy for RtOptionsRef<'_, C> {}
-impl<C> Clone for RtOptionsRef<'_, C> {
+impl<C> const Clone for RtOptionsRef<'_, C> {
     fn clone(&self) -> Self {
         *self
     }
@@ -376,11 +376,11 @@ impl Accumulate for ColorBuf {
     }
 }
 
-impl Default for ColorBuf {
+impl const Default for ColorBuf {
     #[inline]
     fn default() -> Self {
         Self {
-            light: Vector3D::zero(),
+            light: Vector3D::new(0.0, 0.0, 0.0),
             transmittance: 1.0,
         }
     }
@@ -413,7 +413,7 @@ impl From<ColorBuf> for Rgba {
     }
 }
 
-impl From<Rgba> for ColorBuf {
+impl const From<Rgba> for ColorBuf {
     /// Converts the given [`Rgba`] color value, interpreted as the reflectance and opacity of
     /// a surface lit by white light with luminance 1.0, into a [`ColorBuf`].
     fn from(value: Rgba) -> Self {

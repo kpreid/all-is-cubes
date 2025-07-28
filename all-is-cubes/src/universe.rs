@@ -979,7 +979,7 @@ impl Fmt<StatusText> for UniverseStepInfo {
 /// This structure is not currently publicly documented because it is a helper for
 /// `all_is_cubes_port::ExportSet` and doesn't play a role in the API itself.
 #[doc(hidden)]
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HandleSet {
     /// Invariants:
     ///
@@ -1022,6 +1022,15 @@ impl HandleSet {
             .into_values()
             .map(|handle| handle.downcast_ref::<T>().unwrap().clone())
             .collect()
+    }
+}
+
+#[allow(clippy::derivable_impls)]
+impl const Default for HandleSet {
+    fn default() -> Self {
+        Self {
+            handles: BTreeMap::new(),
+        }
     }
 }
 

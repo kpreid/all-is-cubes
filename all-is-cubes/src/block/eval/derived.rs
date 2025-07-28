@@ -445,8 +445,10 @@ mod tests {
         )]
         color: Rgba,
     ) {
-        let mut attributes = block::BlockAttributes::default();
-        attributes.display_name = "foo".into();
+        let attributes = block::BlockAttributes {
+            display_name: "foo".into(),
+            ..block::BlockAttributes::default()
+        };
 
         let voxel = Evoxel::from_color(color);
         let ev_one = compute_derived(&attributes, &Evoxels::from_one(voxel));
