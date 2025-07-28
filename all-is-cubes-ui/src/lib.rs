@@ -1,3 +1,5 @@
+#![feature(const_default)]
+#![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(large_assignments)]
 #![move_size_limit = "2500"] // TODO: look at `Session` size

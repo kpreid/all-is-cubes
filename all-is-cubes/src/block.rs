@@ -883,7 +883,7 @@ impl BlRotate for Block {
     }
 }
 
-impl From<&'static Primitive> for Block {
+const impl From<&'static Primitive> for Block {
     /// Constructs a [`Block`] which references the given static [`Primitive`].
     ///
     /// This performs no allocation.
@@ -905,12 +905,12 @@ impl From<Primitive> for Block {
 // or borrowed `Block`. The motivation for this is to avoid unnecessary cloning
 // (in case an individual block has large data).
 // TODO: Eliminate these given the new Block-is-a-pointer world.
-impl From<Block> for Cow<'_, Block> {
+const impl From<Block> for Cow<'_, Block> {
     fn from(block: Block) -> Self {
         Cow::Owned(block)
     }
 }
-impl<'a> From<&'a Block> for Cow<'a, Block> {
+const impl<'a> From<&'a Block> for Cow<'a, Block> {
     fn from(block: &'a Block) -> Self {
         Cow::Borrowed(block)
     }
@@ -1070,9 +1070,6 @@ pub const AIR: Block = Block(BlockPtr::Static(&Primitive::Air));
 // TODO: uncomfortable with where this impl block is located
 impl Primitive {
     /// Construct a [`Primitive`] from a reflectance color.
-    ///
-    /// This function is equivalent to `Block::from(color)` but it can be used in const contexts
-    /// and returns a [`Primitive`] instead of a [`Block`].
     pub const fn from_color(color: Rgba) -> Primitive {
         Primitive::Atom(Atom::from_color(color))
     }
@@ -1201,20 +1198,20 @@ mod conversions_for_atom {
         }
     }
 
-    impl From<Rgb01> for Atom {
+    const impl From<Rgb01> for Atom {
         /// Construct an [`Atom`] with the given reflectance color, and default attributes.
         fn from(color: Rgb01) -> Self {
             Self::from_color(color.with_alpha_one())
         }
     }
-    impl From<Rgba> for Atom {
+    const impl From<Rgba> for Atom {
         /// Construct an [`Atom`] with the given reflectance color, and default attributes.
         fn from(color: Rgba) -> Self {
             Self::from_color(color)
         }
     }
 
-    impl From<Atom> for Primitive {
+    const impl From<Atom> for Primitive {
         fn from(value: Atom) -> Self {
             Primitive::Atom(value)
         }

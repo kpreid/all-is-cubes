@@ -154,8 +154,11 @@ pub struct ExportSet {
 
 impl ExportSet {
     /// Set containing no elements.
-    pub fn empty() -> Self {
-        Self::default()
+    pub const fn empty() -> Self {
+        Self {
+            multiple: false,
+            contents: HandleSet::default(),
+        }
     }
 
     fn new(handle_set: HandleSet) -> Self {
@@ -254,9 +257,9 @@ impl<H: Into<universe::AnyHandle>> FromIterator<H> for ExportSet {
     }
 }
 
-impl Default for ExportSet {
+const impl Default for ExportSet {
     fn default() -> Self {
-        Self::new(HandleSet::default())
+        Self::empty()
     }
 }
 
