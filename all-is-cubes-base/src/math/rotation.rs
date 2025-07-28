@@ -100,7 +100,7 @@ impl GridRotation {
     }
 
     // TODO: This is public-hidden because we need the const form.
-    // When const traits are available, make regular `from_basis()` const.
+    // When const traits and formatting are available, make regular `from_basis()` const.
     #[doc(hidden)]
     #[inline]
     pub const fn try_from_basis_const(basis: [Face; 3]) -> Option<Self> {
@@ -543,7 +543,7 @@ impl GridRotation {
     }
 }
 
-impl Default for GridRotation {
+impl const Default for GridRotation {
     /// Returns the identity (no rotation).
     #[inline]
     fn default() -> Self {
