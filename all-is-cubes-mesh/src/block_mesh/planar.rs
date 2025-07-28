@@ -252,7 +252,7 @@ pub(super) enum QuadColoring<'a, T> {
     },
 }
 impl<T> Copy for QuadColoring<'_, T> {}
-impl<T> Clone for QuadColoring<'_, T> {
+impl<T> const Clone for QuadColoring<'_, T> {
     fn clone(&self) -> Self {
         *self
     }

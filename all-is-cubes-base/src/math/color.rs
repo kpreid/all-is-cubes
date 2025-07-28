@@ -684,14 +684,14 @@ impl Rgba {
     }
 }
 
-impl From<Rgb01> for Rgb {
+impl const From<Rgb01> for Rgb {
     #[inline]
     fn from(value: Rgb01) -> Self {
         value.to_rgb()
     }
 }
 
-impl From<Vector3D<PositiveSign<f32>, Intensity>> for Rgb {
+impl const From<Vector3D<PositiveSign<f32>, Intensity>> for Rgb {
     #[inline]
     fn from(value: Vector3D<PositiveSign<f32>, Intensity>) -> Self {
         Self(value)
