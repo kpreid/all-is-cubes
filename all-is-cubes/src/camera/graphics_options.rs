@@ -181,7 +181,7 @@ impl GraphicsOptions {
         show_ui: true,
         antialiasing: AntialiasingOption::None,
         debug_info_text: true,
-        debug_info_text_contents: ShowStatus::DEFAULT,
+        debug_info_text_contents: ShowStatus::default(),
         debug_behaviors: false,
         debug_chunk_boxes: false,
         debug_collision_boxes: false,
@@ -249,6 +249,7 @@ impl fmt::Debug for GraphicsOptions {
     }
 }
 
+// TODO: impl const default (needs more impls)
 impl Default for GraphicsOptions {
     /// Default graphics options broadly have “everything reasonable” turned on
     /// (they may disable things that are not well-implemented yet).
@@ -270,7 +271,7 @@ impl Default for GraphicsOptions {
             show_ui: true,
             antialiasing: AntialiasingOption::default(),
             debug_info_text: true,
-            debug_info_text_contents: ShowStatus::DEFAULT,
+            debug_info_text_contents: ShowStatus::default(),
             debug_behaviors: false,
             debug_chunk_boxes: false,
             debug_collision_boxes: false,
@@ -420,7 +421,7 @@ impl ExposureOption {
     }
 }
 
-impl Default for ExposureOption {
+impl const Default for ExposureOption {
     fn default() -> Self {
         ExposureOption::Fixed(PositiveSign::<f32>::ONE)
     }

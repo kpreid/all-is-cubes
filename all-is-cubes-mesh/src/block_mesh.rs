@@ -123,12 +123,14 @@ pub(super) struct SubMesh<V: Vertex> {
 
 impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// A reference to the mesh with no vertices, which has no effect when drawn.
+    ///
+    /// This is the same value as `&BlockMesh::default()`.
     pub const EMPTY_REF: &'static Self = &Self::EMPTY;
 
     /// The mesh with no vertices, which has no effect when drawn.
     ///
-    /// This is a `const` equivalent to [`Self::default()`].
-    pub const EMPTY: Self = Self {
+    /// This is needed to help declare `EMPTY_REF`.
+    const EMPTY: Self = Self {
         face_vertices: FaceMap {
             nx: SubMesh::EMPTY,
             ny: SubMesh::EMPTY,
@@ -332,20 +334,13 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     }
 }
 
-impl<M: MeshTypes> Default for BlockMesh<M> {
+impl<M: MeshTypes> const Default for BlockMesh<M> {
     /// Returns a [`BlockMesh`] that contains no vertices, which has no effect when drawn.
     ///
-    /// This is equivalent to [`BlockMesh::EMPTY`].
+    /// This is the same value as [`*BlockMesh::EMPTY_REF`][BlockMesh::EMPTY_REF]
     #[inline]
     fn default() -> Self {
-        // This implementation can't be derived since `V` and `T` don't have defaults themselves.
-        Self {
-            face_vertices: FaceMap::default(),
-            interior_vertices: FaceMap::default(),
-            texture_used: None,
-            voxel_opacity_mask: None,
-            flaws: Flaws::empty(),
-        }
+        Self::EMPTY
     }
 }
 

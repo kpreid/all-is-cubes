@@ -51,7 +51,7 @@ bitflags::bitflags! {
     }
 }
 
-impl Default for Flaws {
+impl const Default for Flaws {
     /// Equivalent to [`Self::empty()`].
     fn default() -> Self {
         Self::empty()

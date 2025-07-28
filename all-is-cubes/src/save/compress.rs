@@ -113,12 +113,12 @@ enum GzSerdeInternal<'a> {
 #[repr(transparent)]
 pub(crate) struct Leu16([u8; 2]);
 
-impl From<u16> for Leu16 {
+impl const From<u16> for Leu16 {
     fn from(value: u16) -> Self {
         Self(value.to_le_bytes())
     }
 }
-impl From<Leu16> for u16 {
+impl const From<Leu16> for u16 {
     fn from(value: Leu16) -> Self {
         u16::from_le_bytes(value.0)
     }

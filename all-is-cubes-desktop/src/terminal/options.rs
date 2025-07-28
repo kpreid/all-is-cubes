@@ -38,7 +38,7 @@ impl TerminalOptions {
     }
 }
 
-impl Default for TerminalOptions {
+impl const Default for TerminalOptions {
     fn default() -> Self {
         Self {
             colors: ColorMode::TwoFiftySix, // TODO: default to 16-color mode once we have it implemented

@@ -39,10 +39,10 @@ pub struct SpacePhysics {
 }
 
 impl SpacePhysics {
-    pub(crate) const DEFAULT: Self = Self {
+    const DEFAULT: Self = Self {
         gravity: vec3(notnan!(0.), notnan!(-20.), notnan!(0.)),
-        sky: Sky::DEFAULT,
-        light: LightPhysics::DEFAULT,
+        sky: Sky::default(),
+        light: LightPhysics::default(),
     };
 
     /// Recommended defaults for spaces which are going to define a [`Block`]'s voxels.
@@ -72,7 +72,7 @@ impl fmt::Debug for SpacePhysics {
     }
 }
 
-impl Default for SpacePhysics {
+impl const Default for SpacePhysics {
     fn default() -> Self {
         Self::DEFAULT
     }
@@ -98,14 +98,10 @@ pub enum LightPhysics {
     },
 }
 
-impl LightPhysics {
-    pub(crate) const DEFAULT: Self = Self::Rays {
-        maximum_distance: 30,
-    };
-}
-
-impl Default for LightPhysics {
+impl const Default for LightPhysics {
     fn default() -> Self {
-        Self::DEFAULT
+        Self::Rays {
+            maximum_distance: 30,
+        }
     }
 }

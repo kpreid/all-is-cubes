@@ -576,7 +576,7 @@ impl TextBuilder {
     }
 }
 
-impl Default for TextBuilder {
+impl const Default for TextBuilder {
     fn default() -> Self {
         Self {
             string: ArcStr::new(),

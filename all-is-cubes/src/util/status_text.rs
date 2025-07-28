@@ -52,16 +52,11 @@ bitflags::bitflags! {
     }
 }
 
-impl ShowStatus {
-    #[doc(hidden)] // just a substitute for const trait impl
-    pub const DEFAULT: Self = Self::WORLD.union(Self::STEP).union(Self::RENDER).union(Self::CURSOR);
-}
-
-impl Default for ShowStatus {
+impl const Default for ShowStatus {
     /// A partial set of flags which makes a reasonable default for introducing users to the
     /// status text.
     fn default() -> Self {
-        Self::DEFAULT
+        Self::WORLD.union(Self::STEP).union(Self::RENDER).union(Self::CURSOR)
     }
 }
 

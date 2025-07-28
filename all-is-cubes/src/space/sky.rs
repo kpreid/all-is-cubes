@@ -21,8 +21,6 @@ pub enum Sky {
 }
 
 impl Sky {
-    pub(crate) const DEFAULT: Self = Self::Uniform(palette::DAY_SKY_COLOR);
-
     /// Return the incoming light from the specified direction.
     ///
     /// The result is a [luminance]; see [voxel light emission] for information about the units.
@@ -80,9 +78,9 @@ impl Sky {
     }
 }
 
-impl Default for Sky {
+impl const Default for Sky {
     fn default() -> Self {
-        Self::DEFAULT
+        Self::Uniform(palette::DAY_SKY_COLOR)
     }
 }
 

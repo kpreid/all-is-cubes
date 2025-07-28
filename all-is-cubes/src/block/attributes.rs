@@ -474,23 +474,14 @@ impl BlockAttributes {
     /// without constructing and dropping an instance which would trigger a
     /// `feature(const_precise_live_drops)` requirement.
     pub(crate) const DEFAULT_REF: &'static Self = &Self::DEFAULT;
-
-    /// Block attributes suitable as default values for in-game use.
-    ///
-    /// This function differs from the [`Default::default`] trait implementation only
-    /// in that it is a `const fn`.
-    pub const fn default() -> BlockAttributes {
-        Self::DEFAULT
-    }
 }
 
-impl Default for BlockAttributes {
+impl const Default for BlockAttributes {
     /// Block attributes suitable as default values for in-game use.
     ///
     /// These attributes are equal to the attributes of a block with no modifiers.
     fn default() -> BlockAttributes {
-        // Delegate to the inherent impl `const fn`.
-        BlockAttributes::default()
+        Self::DEFAULT
     }
 }
 
@@ -630,7 +621,7 @@ impl AnimationHint {
     }
 }
 
-impl Default for AnimationHint {
+impl const Default for AnimationHint {
     fn default() -> Self {
         Self::UNCHANGING
     }
