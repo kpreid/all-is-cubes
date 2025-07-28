@@ -1,4 +1,8 @@
 #![feature(cfg_select)]
+#![feature(const_clone)]
+#![feature(const_default)]
+#![feature(const_convert)]
+#![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(large_assignments)]
 #![move_size_limit = "5000"]
