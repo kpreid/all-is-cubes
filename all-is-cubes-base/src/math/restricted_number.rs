@@ -334,39 +334,39 @@ macro_rules! non_generic_impls {
             }
         }
 
-        impl From<PositiveSign<$t>> for NotNan<$t> {
+        impl const From<PositiveSign<$t>> for NotNan<$t> {
             #[inline]
             fn from(value: PositiveSign<$t>) -> Self {
                 value.into_nn()
             }
         }
-        impl From<PositiveSign<$t>> for $t {
+        impl const From<PositiveSign<$t>> for $t {
             #[inline]
             fn from(value: PositiveSign<$t>) -> Self {
                 value.0
             }
         }
-        impl From<ZeroOne<$t>> for NotNan<$t> {
+        impl const From<ZeroOne<$t>> for NotNan<$t> {
             #[inline]
             fn from(value: ZeroOne<$t>) -> Self {
                 value.into_nn()
             }
         }
-        impl From<ZeroOne<$t>> for $t {
+        impl const From<ZeroOne<$t>> for $t {
             #[inline]
             fn from(value: ZeroOne<$t>) -> Self {
                 value.0
             }
         }
 
-        impl From<ZeroOne<$t>> for PositiveSign<$t> {
+        impl const From<ZeroOne<$t>> for PositiveSign<$t> {
             #[inline]
             fn from(value: ZeroOne<$t>) -> Self {
                 value.into_ps()
             }
         }
 
-        impl TryFrom<$t> for PositiveSign<$t> {
+        impl const TryFrom<$t> for PositiveSign<$t> {
             type Error = NotPositiveSign<$t>;
 
             /// Checks that `value` is non-negative and non-NaN.
@@ -380,7 +380,7 @@ macro_rules! non_generic_impls {
                 Self::try_new(value)
             }
         }
-        impl TryFrom<$t> for ZeroOne<$t> {
+        impl const TryFrom<$t> for ZeroOne<$t> {
             type Error = NotZeroOne<$t>;
 
             /// Checks that `value` is within the range 0 to 1.
@@ -704,13 +704,13 @@ where
 }
 // cannot implement Sum for ZeroOne, but could implement Product
 
-impl<T> AsRef<T> for PositiveSign<T> {
+impl<T> const AsRef<T> for PositiveSign<T> {
     #[inline]
     fn as_ref(&self) -> &T {
         &self.0
     }
 }
-impl<T> AsRef<T> for ZeroOne<T> {
+impl<T> const AsRef<T> for ZeroOne<T> {
     #[inline]
     fn as_ref(&self) -> &T {
         &self.0
@@ -740,7 +740,7 @@ mod integer_to_positive_sign {
     use super::*;
     macro_rules! integer_to_positive_sign {
         ($int:ident, $float:ident) => {
-            impl From<$int> for PositiveSign<$float> {
+            impl const From<$int> for PositiveSign<$float> {
                 #[inline]
                 fn from(value: $int) -> PositiveSign<$float> {
                     PositiveSign(value.into())
