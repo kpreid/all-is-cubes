@@ -67,7 +67,7 @@ impl OnceUniverseId {
     }
 }
 
-impl From<UniverseId> for OnceUniverseId {
+impl const From<UniverseId> for OnceUniverseId {
     fn from(id: UniverseId) -> Self {
         Self(AtomicUpTo64::new(to_atomic_value(id.0)))
     }
@@ -110,7 +110,7 @@ cfg_select! {
     clippy::cast_possible_truncation,
     reason = "platform dependent"
 )]
-fn to_atomic_value(value: NonZeroU64) -> NonAtomicUpTo64 {
+const fn to_atomic_value(value: NonZeroU64) -> NonAtomicUpTo64 {
     // This should never overflow because we'll overflow UNIVERSE_ID_COUNTER first.
     value.get() as NonAtomicUpTo64
 }

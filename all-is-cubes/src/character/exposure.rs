@@ -45,7 +45,7 @@ pub(crate) struct State {
     exposure_log: f32,
 }
 
-impl Default for State {
+impl const Default for State {
     fn default() -> Self {
         Self {
             luminance_samples: [1.0; _],

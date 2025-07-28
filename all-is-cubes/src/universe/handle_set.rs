@@ -8,7 +8,7 @@ use crate::universe::{self, Handle, Universe};
 /// This structure is not currently publicly documented because it is a helper for
 /// `all_is_cubes_port::ExportSet` and doesn't play a role in the API itself.
 #[doc(hidden)]
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct HandleSet {
     /// Invariants:
     ///
@@ -70,6 +70,14 @@ impl<H: universe::ErasedHandle> FromIterator<H> for HandleSet {
             })
             .collect();
         Self { handles }
+    }
+}
+
+impl const Default for HandleSet {
+    fn default() -> Self {
+        Self {
+            handles: BTreeMap::new(),
+        }
     }
 }
 
