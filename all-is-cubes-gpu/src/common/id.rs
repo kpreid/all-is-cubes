@@ -42,7 +42,7 @@ impl<T> Identified<T> {
     }
 }
 
-impl<T> ops::Deref for Identified<T> {
+impl<T> const ops::Deref for Identified<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.value
@@ -68,7 +68,7 @@ impl<T> fmt::Debug for Id<T> {
 }
 
 impl<T> Copy for Id<T> {}
-impl<T> Clone for Id<T> {
+impl<T> const Clone for Id<T> {
     fn clone(&self) -> Self {
         *self
     }

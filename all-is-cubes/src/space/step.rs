@@ -185,7 +185,7 @@ pub(crate) fn execute_tick_actions_system(
             palette: &palette,
             contents: contents.0.as_ref(),
             light: &light,
-            physics: &SpacePhysics::DEFAULT, // TODO: wrong
+            physics: const { &SpacePhysics::default() }, // TODO: wrong
             behaviors: &behaviors,
             default_spawn: &default_spawn.0,
             notifiers,

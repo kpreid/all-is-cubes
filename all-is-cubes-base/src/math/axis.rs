@@ -34,7 +34,7 @@ impl Axis {
     /// * Z = blue
     #[mutants::skip]
     #[inline]
-    pub fn color(self) -> Rgb01 {
+    pub const fn color(self) -> Rgb01 {
         match self {
             Axis::X => Rgb01::UNIFORM_LUMINANCE_RED,
             Axis::Y => Rgb01::UNIFORM_LUMINANCE_GREEN,
@@ -44,7 +44,7 @@ impl Axis {
 
     /// Returns the [`Face`] value which corresponds to the positive direction on this axis.
     #[inline]
-    pub fn positive_face(self) -> Face {
+    pub const fn positive_face(self) -> Face {
         match self {
             Axis::X => Face::PX,
             Axis::Y => Face::PY,
@@ -54,7 +54,7 @@ impl Axis {
 
     /// Returns the [`Face`] value which corresponds to the negative direction on this axis.
     #[inline]
-    pub fn negative_face(self) -> Face {
+    pub const fn negative_face(self) -> Face {
         match self {
             Axis::X => Face::NX,
             Axis::Y => Face::NY,
@@ -114,13 +114,13 @@ impl fmt::UpperHex for Axis {
     }
 }
 
-impl From<Axis> for u8 {
+impl const From<Axis> for u8 {
     #[inline]
     fn from(value: Axis) -> Self {
         value as u8
     }
 }
-impl From<Axis> for usize {
+impl const From<Axis> for usize {
     #[inline]
     fn from(value: Axis) -> Self {
         value as usize
@@ -131,7 +131,7 @@ mod impl_index_axis {
     use super::Axis;
     use core::ops;
 
-    impl<T> ops::Index<Axis> for [T; 3] {
+    impl<T> const ops::Index<Axis> for [T; 3] {
         type Output = T;
 
         #[inline]
@@ -139,7 +139,7 @@ mod impl_index_axis {
             &self[index as usize]
         }
     }
-    impl<T> ops::IndexMut<Axis> for [T; 3] {
+    impl<T> const ops::IndexMut<Axis> for [T; 3] {
         #[inline]
         fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
             &mut self[index as usize]
@@ -148,7 +148,7 @@ mod impl_index_axis {
 
     macro_rules! impl_xyz_e {
         ($x:ident $y:ident $z:ident, $($type:tt)*) => {
-            impl<T, U> ops::Index<Axis> for $($type)*<T, U> {
+            impl<T, U> const ops::Index<Axis> for $($type)*<T, U> {
                 type Output = T;
 
                 #[inline]
@@ -160,7 +160,7 @@ mod impl_index_axis {
                     }
                 }
             }
-            impl<T, U> ops::IndexMut<Axis> for $($type)*<T, U> {
+            impl<T, U> const ops::IndexMut<Axis> for $($type)*<T, U> {
                 #[inline]
                 fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
                     match index {

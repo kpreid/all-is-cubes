@@ -217,7 +217,7 @@ impl Move {
     }
 }
 
-impl From<Move> for Modifier {
+impl const From<Move> for Modifier {
     fn from(value: Move) -> Self {
         Modifier::Move(value)
     }

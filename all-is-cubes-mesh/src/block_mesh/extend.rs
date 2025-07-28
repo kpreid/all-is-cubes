@@ -273,7 +273,7 @@ impl<T: texture::Tile> Copy for QuadColoring<'_, T> {}
     clippy::expl_impl_clone_on_copy,
     reason = "TODO: report false positive"
 )]
-impl<T: texture::Tile> Clone for QuadColoring<'_, T> {
+impl<T: texture::Tile> const Clone for QuadColoring<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
