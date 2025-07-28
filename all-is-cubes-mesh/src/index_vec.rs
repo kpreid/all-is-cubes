@@ -231,7 +231,7 @@ impl IndexSliceMut<'_> {
 
 // -------------------------------------------------------------------------------------------------
 
-impl Default for IndexVec {
+const impl Default for IndexVec {
     #[inline]
     fn default() -> Self {
         Self::new()

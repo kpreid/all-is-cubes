@@ -362,26 +362,26 @@ mod conversion {
         }
     }
 
-    impl From<Cube> for [GridCoordinate; 3] {
+    const impl From<Cube> for [GridCoordinate; 3] {
         #[inline]
         fn from(Cube { x, y, z }: Cube) -> [GridCoordinate; 3] {
             [x, y, z]
         }
     }
-    impl From<Cube> for GridPoint {
+    const impl From<Cube> for GridPoint {
         #[inline]
         fn from(Cube { x, y, z }: Cube) -> GridPoint {
             GridPoint::new(x, y, z)
         }
     }
 
-    impl From<[GridCoordinate; 3]> for Cube {
+    const impl From<[GridCoordinate; 3]> for Cube {
         #[inline]
         fn from([x, y, z]: [GridCoordinate; 3]) -> Self {
             Self { x, y, z }
         }
     }
-    impl From<GridPoint> for Cube {
+    const impl From<GridPoint> for Cube {
         #[inline]
         fn from(GridPoint { x, y, z, _unit }: GridPoint) -> Self {
             Self { x, y, z }
