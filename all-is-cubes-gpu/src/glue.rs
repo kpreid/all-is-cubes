@@ -18,11 +18,9 @@ use num_traits::NumCast;
 ///
 /// Panics if `T`’s size is zero.
 pub const fn buffer_size_of<T>() -> wgpu::BufferSize {
-    let size: usize = size_of::<T>();
-
-    // Ideally this would be `try_into()` but that's not available in const yet.
-    // It will never overflow unless 128-bit pointers become a thing.
-    let size: u64 = size as u64;
+    let Ok(size) = u64::try_from(size_of::<T>()) else {
+        panic!("nice job overflowing u64")
+    };
 
     match wgpu::BufferSize::new(size) {
         Some(size) => size,
@@ -393,7 +391,7 @@ impl<'buf, T: bytemuck::NoUninit> MapVec<'buf, T> {
     }
 }
 
-impl<T> Default for MapVec<'_, T> {
+impl<T> const Default for MapVec<'_, T> {
     fn default() -> Self {
         Self {
             unwritten: Default::default(),

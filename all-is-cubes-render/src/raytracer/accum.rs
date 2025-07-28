@@ -259,7 +259,7 @@ pub struct DepthBuf {
     depth: f64,
 }
 
-impl Default for DepthBuf {
+impl const Default for DepthBuf {
     fn default() -> Self {
         Self {
             depth: f64::INFINITY,
