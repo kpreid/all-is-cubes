@@ -1,4 +1,3 @@
-use all_is_cubes::space;
 use alloc::boxed::Box;
 use core::array;
 use core::fmt;
@@ -12,13 +11,17 @@ use all_is_cubes::block::{
     Resolution::{self, R16},
 };
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
+use all_is_cubes::math::GridRotation;
 use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, zo32};
+use all_is_cubes::space;
 use all_is_cubes::space::{SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
 use crate::alg::{NoiseFnExt, array_of_noise, scale_color, voronoi_pattern};
 use crate::{palette, tree};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Names for blocks assigned specific roles in generating outdoor landscapes.
 ///
@@ -53,8 +56,44 @@ pub enum GrassHeight {
     H7 = 7,
     H8 = 8,
 }
+
+/// Combines a [`GrassHeight`] with eight rotations/reflections to add more variety
+/// in the same number of block definitions.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+pub(crate) struct GrassHeightAndRot {
+    height: GrassHeight,
+    /// This should only be a rotation that doesn't affect the Y axis.
+    rotation: GrassRotation,
+}
+
+/// Subset of [`GridRotation`] that doesn't affect the Y axis.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[allow(clippy::upper_case_acronyms)]
+pub(crate) enum GrassRotation {
+    RXYZ,
+    RxYZ,
+    RXYz,
+    RxYz,
+    RZYX,
+    RzYX,
+    RZYx,
+    RzYx,
+}
+
+/// Builds on [`LandscapeBlocks`] to include rotated grass blocks.
+///
+/// In the future this might include other pre-composed blocks, like perhaps
+/// “this grass with this flower in it” or something.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+pub(crate) enum LandscapeBlocksAndVariants {
+    Base(LandscapeBlocks),
+    Grass(GrassHeightAndRot),
+}
+
+// -------------------------------------------------------------------------------------------------
+
 impl GrassHeight {
-    fn from_int(i: u8) -> Option<GrassHeight> {
+    fn from_int(i: u8) -> Option<Self> {
         match i {
             0 => None,
             1 => Some(Self::H1),
@@ -65,6 +104,36 @@ impl GrassHeight {
             6 => Some(Self::H6),
             7 => Some(Self::H7),
             _ => Some(Self::H8), // clamped high
+        }
+    }
+}
+
+impl GrassRotation {
+    fn from_int(i: u8) -> Self {
+        match i.rem_euclid(8) {
+            0 => Self::RXYZ,
+            1 => Self::RxYZ,
+            2 => Self::RXYz,
+            3 => Self::RxYz,
+            4 => Self::RZYX,
+            5 => Self::RzYX,
+            6 => Self::RZYx,
+            _ => Self::RzYx,
+        }
+    }
+}
+
+impl From<GrassRotation> for GridRotation {
+    fn from(value: GrassRotation) -> Self {
+        match value {
+            GrassRotation::RXYZ => GridRotation::RXYZ,
+            GrassRotation::RxYZ => GridRotation::RxYZ,
+            GrassRotation::RXYz => GridRotation::RXYz,
+            GrassRotation::RxYz => GridRotation::RxYz,
+            GrassRotation::RZYX => GridRotation::RZYX,
+            GrassRotation::RzYX => GridRotation::RzYX,
+            GrassRotation::RZYx => GridRotation::RZYx,
+            GrassRotation::RzYx => GridRotation::RzYx,
         }
     }
 }
@@ -313,24 +382,28 @@ pub async fn install_landscape_blocks(
     Ok(())
 }
 
+/// Creates a [`BlockProvider<LandscapeBlocksAndVariants>`] by generating the variants from the
+/// given [`LandscapeBlocks`].
+pub(crate) fn create_landscape_blocks_and_variants(
+    blocks: &BlockProvider<LandscapeBlocks>,
+) -> BlockProvider<LandscapeBlocksAndVariants> {
+    BlockProvider::new_sync(|key| match key {
+        LandscapeBlocksAndVariants::Base(base) => blocks[base].clone(),
+        LandscapeBlocksAndVariants::Grass(GrassHeightAndRot { height, rotation }) => blocks
+            [LandscapeBlocks::GrassBlades { height }]
+        .clone()
+        .rotate(rotation.into()),
+    })
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Generate a landscape of grass-on-top-of-rock with some bumps to it.
 /// Replaces all blocks in the specified region except for those intended to be “air”.
-///
-/// ```
-/// use all_is_cubes::space::Space;
-/// use all_is_cubes::linking::BlockProvider;
-/// use all_is_cubes::universe::ReadTicket;
-/// use all_is_cubes_content::{LandscapeBlocks, wavy_landscape};
-///
-/// let blocks = BlockProvider::<LandscapeBlocks>::default();
-/// let mut space = Space::empty_positive(10, 10, 10);
-/// space.mutate(ReadTicket::stub(), |m| wavy_landscape(m.bounds(), m, &blocks, 1.0)).unwrap();
-/// # // TODO: It didn't panic, but how about some assertions?
-/// ```
-pub fn wavy_landscape(
+pub(crate) fn wavy_landscape(
     region: GridAab,
     m: &mut space::Mutation<'_, '_>,
-    blocks: &BlockProvider<LandscapeBlocks>,
+    blocks: &BlockProvider<LandscapeBlocksAndVariants>,
     max_slope: FreeCoordinate,
 ) -> Result<(), SetCubeError> {
     // TODO: justify this constant (came from cubes v1 code).
@@ -349,24 +422,25 @@ pub fn wavy_landscape(
                     + ((fx / 2.0).sin() + (fz / 2.0).sin()) * 0.6);
             let surface_y = middle_y + (terrain_variation as GridCoordinate);
             for y in region.y_range() {
-                let altitude = y - surface_y;
                 use LandscapeBlocks::*;
+                use LandscapeBlocksAndVariants::Base;
+
+                let altitude = y - surface_y;
                 let cube = Cube::new(x, y, z);
                 let block: &Block = if altitude > 1 {
                     continue;
                 } else if altitude == 1 {
-                    if let Some(height) = grass_at(cube) {
-                        // TODO: add randomized rotation like the city grass has
-                        &blocks[GrassBlades { height }]
+                    if let Some(grass) = grass_at(cube) {
+                        &blocks[LandscapeBlocksAndVariants::Grass(grass)]
                     } else {
                         &AIR
                     }
                 } else if altitude == 0 {
-                    &blocks[Grass]
+                    &blocks[Base(Grass)]
                 } else if altitude == -1 {
-                    &blocks[Dirt]
+                    &blocks[Base(Dirt)]
                 } else {
-                    &blocks[Stone]
+                    &blocks[Base(Stone)]
                 };
                 m.set(cube, block)?;
                 // TODO: Add various decorations on the ground. And trees.
@@ -376,7 +450,7 @@ pub fn wavy_landscape(
     Ok(())
 }
 
-pub(crate) fn grass_placement_function(seed: u32) -> impl Fn(Cube) -> Option<GrassHeight> {
+pub(crate) fn grass_placement_function(seed: u32) -> impl Fn(Cube) -> Option<GrassHeightAndRot> {
     let grass_noise = noise::ScalePoint::new(
         noise::ScaleBias::new(noise::OpenSimplex::new(seed))
             .set_bias(1.0) // grass rather than nongrass
@@ -384,7 +458,14 @@ pub(crate) fn grass_placement_function(seed: u32) -> impl Fn(Cube) -> Option<Gra
     )
     .set_scale(0.25);
 
-    move |cube| GrassHeight::from_int(grass_noise.at_cube(cube) as u8)
+    move |cube| {
+        let noise_value = grass_noise.at_cube(cube);
+        Some(GrassHeightAndRot {
+            height: GrassHeight::from_int(noise_value as u8)?,
+            // use the low bits of the float as basically random
+            rotation: GrassRotation::from_int(noise_value.to_le_bytes()[0]),
+        })
+    }
 }
 
 /// Sky whose lower half pretends to be a grassy plane.

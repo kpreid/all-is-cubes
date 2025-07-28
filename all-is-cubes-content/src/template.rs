@@ -24,7 +24,7 @@ use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe, UniverseTransac
 use all_is_cubes::util::YieldProgress;
 
 use crate::fractal::menger_sponge_from_size;
-use crate::{LandscapeBlocks, wavy_landscape};
+use crate::landscape::{self, LandscapeBlocks, wavy_landscape};
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
 use crate::{free_editing_starter_inventory, palette};
 
@@ -389,7 +389,9 @@ async fn islands(
     p: YieldProgress,
     params: TemplateParameters,
 ) -> Result<Space, InGenError> {
-    let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
+    let landscape_blocks = landscape::create_landscape_blocks_and_variants(&BlockProvider::<
+        LandscapeBlocks,
+    >::using(universe)?);
 
     let TemplateParameters { size, seed: _ } = params;
     let size = size.unwrap_or(GridSize::new(1000, 400, 1000));

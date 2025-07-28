@@ -4,7 +4,6 @@
 use alloc::{sync::Arc, vec::Vec};
 
 use itertools::Itertools;
-use rand::seq::IndexedRandom as _;
 use rand::{Rng, SeedableRng as _};
 
 use all_is_cubes::arcstr::literal;
@@ -28,9 +27,10 @@ use all_is_cubes::universe::{ReadTicket, Universe};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_ui::{logo::logo_text, vui, vui::widgets};
 
-use crate::TemplateParameters;
 use crate::alg::{space_to_space_copy, walk};
+use crate::landscape::{self, LandscapeBlocksAndVariants::Base as LbBase};
 use crate::{DemoBlocks, LandscapeBlocks, clouds::clouds, wavy_landscape};
+use crate::{LandscapeBlocksAndVariants, TemplateParameters};
 
 mod exhibit;
 use exhibit::{Context, Exhibit, Placement};
@@ -76,12 +76,15 @@ pub(crate) async fn demo_city(
     state.space.mutate(state.universe.read_ticket(), |m| {
         m.fill_uniform(
             state.planner.y_range(m.bounds().lower_bounds().y, 0),
-            &state.landscape_blocks[Stone],
+            &state.landscape_blocks[LbBase(Stone)],
         )
     })?;
     progress.progress(0.1).await;
     state.space.mutate(state.universe.read_ticket(), |m| {
-        m.fill_uniform(state.planner.y_range(0, 1), &state.landscape_blocks[Grass])
+        m.fill_uniform(
+            state.planner.y_range(0, 1),
+            &state.landscape_blocks[LbBase(Grass)],
+        )
     })?;
     progress.progress(0.2).await;
 
@@ -188,12 +191,15 @@ struct State<'u> {
     space: Space,
     planner: CityPlanner,
     demo_blocks: BlockProvider<DemoBlocks>,
-    landscape_blocks: BlockProvider<LandscapeBlocks>,
+    landscape_blocks: BlockProvider<LandscapeBlocksAndVariants>,
 }
 
 impl<'u> State<'u> {
     fn new(universe: &'u mut Universe, params: TemplateParameters) -> Result<Self, InGenError> {
-        let landscape_blocks = BlockProvider::<LandscapeBlocks>::using(universe)?;
+        let landscape_blocks =
+            landscape::create_landscape_blocks_and_variants(
+                &BlockProvider::<LandscapeBlocks>::using(universe)?,
+            );
         let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
 
         let bounds = {
@@ -213,7 +219,7 @@ impl<'u> State<'u> {
         let planner = CityPlanner::new(bounds);
 
         let space = Space::builder(bounds)
-            .sky(crate::landscape::sky_with_grass(palette::DAY_SKY_COLOR))
+            .sky(landscape::sky_with_grass(palette::DAY_SKY_COLOR))
             .light_physics(LightPhysics::None) // disable until we are done with bulk updates
             .spawn(Self::spawn(bounds, &demo_blocks, &landscape_blocks))
             .build();
@@ -252,19 +258,7 @@ impl<'u> State<'u> {
     }
 
     fn plant_grass(&mut self) -> Result<(), InGenError> {
-        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(self.params.seed.unwrap_or(0));
-        let rotations = &[
-            // all transformations that leave Y unaltered
-            GridRotation::RXYZ,
-            GridRotation::RxYZ,
-            GridRotation::RXYz,
-            GridRotation::RxYz,
-            GridRotation::RZYX,
-            GridRotation::RzYX,
-            GridRotation::RZYx,
-            GridRotation::RzYx,
-        ];
-        let grass_at = crate::landscape::grass_placement_function(0x21b5cc6b);
+        let grass_at = landscape::grass_placement_function(0x21b5cc6b);
         self.space.mutate(self.universe.read_ticket(), |m| {
             m.fill(self.planner.y_range(1, 2), |cube| {
                 if cube.x.abs() <= CityPlanner::ROAD_RADIUS
@@ -272,14 +266,8 @@ impl<'u> State<'u> {
                 {
                     return None;
                 }
-                grass_at(cube).map(|height| {
-                    // TODO: this is inefficient re-allocation per cube.
-                    // Build a way to look up the blocks that already exist and reuse them,
-                    // or build a table of (height,rotation)s up before fill()ing.
-                    self.landscape_blocks[LandscapeBlocks::GrassBlades { height }]
-                        .clone()
-                        .rotate(*rotations.choose(&mut rng).unwrap())
-                })
+                grass_at(cube)
+                    .map(|grass| &self.landscape_blocks[LandscapeBlocksAndVariants::Grass(grass)])
             })
         })?;
         Ok(())
@@ -304,12 +292,19 @@ impl<'u> State<'u> {
             if self.space.bounds().contains_box(tree_bounds)
                 && !self.planner.is_occupied(tree_bounds)
             {
-                crate::tree::make_tree(&self.landscape_blocks, &mut rng, tree_origin, tree_bounds)
-                    .execute(
-                        &mut self.space,
-                        self.universe.read_ticket(),
-                        &mut transaction::no_outputs,
-                    )?;
+                crate::tree::make_tree(
+                    &self
+                        .landscape_blocks
+                        .subset(LandscapeBlocksAndVariants::Base),
+                    &mut rng,
+                    tree_origin,
+                    tree_bounds,
+                )
+                .execute(
+                    &mut self.space,
+                    self.universe.read_ticket(),
+                    &mut transaction::no_outputs,
+                )?;
             }
             progress.finish().await;
         }
@@ -349,7 +344,7 @@ impl<'u> State<'u> {
     fn spawn(
         bounds: GridAab,
         demo_blocks: &BlockProvider<DemoBlocks>,
-        landscape_blocks: &BlockProvider<LandscapeBlocks>,
+        landscape_blocks: &BlockProvider<LandscapeBlocksAndVariants>,
     ) -> Spawn {
         let mut spawn = Spawn::default_for_new_space(bounds);
         spawn.set_bounds(GridAab::from_lower_upper(
@@ -379,7 +374,7 @@ impl<'u> State<'u> {
             .map(Slot::from),
         );
         for block in [
-            &landscape_blocks[LandscapeBlocks::Stone],
+            &landscape_blocks[LandscapeBlocksAndVariants::Base(LandscapeBlocks::Stone)],
             &demo_blocks[DemoBlocks::Lamp(true)],
         ] {
             inventory.push(Slot::stack(40, Tool::Block(block.clone())));
