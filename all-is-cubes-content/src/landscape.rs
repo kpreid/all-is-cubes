@@ -10,11 +10,12 @@ use all_is_cubes::block::{
     AIR, Block, BlockAttributes, BlockCollision, Primitive,
     Resolution::{self, R16},
 };
+use all_is_cubes::euclid::Point2D;
+use all_is_cubes::euclid::point2;
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::GridRotation;
 use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, zo32};
-use all_is_cubes::space;
-use all_is_cubes::space::{SetCubeError, Sky};
+use all_is_cubes::space::{self, SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 
@@ -408,48 +409,86 @@ pub(crate) fn wavy_landscape(
 ) -> Result<(), SetCubeError> {
     // TODO: justify this constant (came from cubes v1 code).
     let slope_scaled = max_slope / 0.904087;
-    let middle_y = region.lower_bounds().y.midpoint(region.upper_bounds().y);
+    let middle_y = region.lower_bounds().y.midpoint(region.upper_bounds().y) + 1;
 
-    let grass_at = grass_placement_function(0x21b5cc6b);
-
-    for x in region.x_range() {
-        for z in region.z_range() {
-            let fx = FreeCoordinate::from(x);
-            let fz = FreeCoordinate::from(z);
+    fill_with_height_function(
+        m,
+        region,
+        |column| -> GridCoordinate {
+            let fx = FreeCoordinate::from(column.x);
+            let fz = FreeCoordinate::from(column.y);
             let terrain_variation = slope_scaled
                 * (((fx / 8.0).sin() + (fz / 8.0).sin()) * 1.0
                     + ((fx / 14.0).sin() + (fz / 14.0).sin()) * 3.0
                     + ((fx / 2.0).sin() + (fz / 2.0).sin()) * 0.6);
-            let surface_y = middle_y + (terrain_variation as GridCoordinate);
-            for y in region.y_range() {
-                use LandscapeBlocks::*;
-                use LandscapeBlocksAndVariants::Base;
+            middle_y + (terrain_variation as GridCoordinate)
+        },
+        grass_covered_stone_terrain_function(blocks),
+    )
+}
 
-                let altitude = y - surface_y;
-                let cube = Cube::new(x, y, z);
-                let block: &Block = if altitude > 1 {
-                    continue;
-                } else if altitude == 1 {
-                    if let Some(grass) = grass_at(cube) {
-                        &blocks[LandscapeBlocksAndVariants::Grass(grass)]
-                    } else {
-                        &AIR
-                    }
-                } else if altitude == 0 {
-                    &blocks[Base(Grass)]
-                } else if altitude == -1 {
-                    &blocks[Base(Dirt)]
-                } else {
-                    &blocks[Base(Stone)]
-                };
-                m.set(cube, block)?;
-                // TODO: Add various decorations on the ground. And trees.
+/// Returns a function which, given cubes in some region, produces a grass-covered stone terrain
+/// which has its solid surface at exactly y = 0.
+///
+/// This function can be used with [`fill_with_height_function()`].
+pub(crate) fn grass_covered_stone_terrain_function<'b>(
+    blocks: &'b BlockProvider<LandscapeBlocksAndVariants>,
+) -> impl Fn(Cube) -> Option<&'b Block> {
+    let grass_at = grass_placement_function(0x21b5cc6b);
+
+    move |y_rel_cube| {
+        use LandscapeBlocks::*;
+        use LandscapeBlocksAndVariants::{Base, Grass};
+        let altitude = y_rel_cube.y;
+        Some(if altitude > 0 {
+            return None;
+        } else if altitude == 0 {
+            if let Some(grass) = grass_at(y_rel_cube) {
+                &blocks[Grass(grass)]
+            } else {
+                &AIR
+            }
+        } else if altitude == -1 {
+            &blocks[Base(LandscapeBlocks::Grass)]
+        } else if altitude == -2 {
+            &blocks[Base(Dirt)]
+        } else {
+            &blocks[Base(Stone)]
+        })
+
+        // TODO: Add various decorations on the ground. And trees.
+    }
+}
+
+/// Fill space with a terrain or other “height map” shape.
+///
+/// * `region` is the region filled.
+/// * `height_function` is a function of the [`Cube`] X and Z coordinates (lower corner coordinates)
+///   within the region, which returns the vertical displacement at this position.
+/// * `block_function` defines what blocks to place, given cube positions **displaced vertically**
+///   by the output of `height_function`.
+pub(crate) fn fill_with_height_function<'b>(
+    m: &mut space::Mutation<'_, '_>,
+    region: GridAab,
+    height_function: impl Fn(Point2D<GridCoordinate, Cube>) -> GridCoordinate,
+    block_function: impl Fn(Cube) -> Option<&'b Block>,
+) -> Result<(), SetCubeError> {
+    // We don't use region.interior_iter() because we want to call the height function once per
+    // (x, z) pair, not once per cube.
+    for x in region.x_range() {
+        for z in region.z_range() {
+            let surface_y = height_function(point2(x, z));
+            for y in region.y_range() {
+                if let Some(block) = block_function(Cube::new(x, y - surface_y, z)) {
+                    m.set(Cube::new(x, y, z), block)?;
+                }
             }
         }
     }
     Ok(())
 }
 
+/// Returns a noise function that can be used to decide where to place grass blades.
 pub(crate) fn grass_placement_function(seed: u32) -> impl Fn(Cube) -> Option<GrassHeightAndRot> {
     let grass_noise = noise::ScalePoint::new(
         noise::ScaleBias::new(noise::OpenSimplex::new(seed))
@@ -475,4 +514,51 @@ pub(crate) fn sky_with_grass(sky_color: Rgb) -> Sky {
         ground, ground, sky_color, sky_color, //
         ground, ground, sky_color, sky_color, //
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use all_is_cubes::space::Space;
+    use pretty_assertions::assert_eq;
+    use std::vec::Vec;
+
+    // Tests the cooperation of [`fill_with_height_function()`] and
+    // [`grass_covered_stone_terrain_function()`] to produce the correct surface height.
+    #[test]
+    fn heights() {
+        use GrassHeight::H1;
+        use LandscapeBlocks::*;
+        use LandscapeBlocksAndVariants::Base;
+
+        let blocks = create_landscape_blocks_and_variants(&BlockProvider::default());
+        let bounds = GridAab::from_lower_size([0, 100, 0], [2, 4, 1]);
+
+        let space = Space::builder(bounds)
+            .build_and_mutate(|m| {
+                fill_with_height_function(
+                    m,
+                    bounds,
+                    |xz| xz.x + 102,
+                    grass_covered_stone_terrain_function(&blocks),
+                )
+            })
+            .unwrap();
+
+        assert_eq!(
+            space
+                .extract::<Vec<Block>, _>(bounds, |e| e.block_data().block().clone())
+                .as_linear(),
+            vec![
+                blocks[Base(Dirt)].clone(),                       // [0, 100, 0]
+                blocks[Base(Grass)].clone(),                      // [0, 101, 0]
+                blocks[Base(GrassBlades { height: H1 })].clone(), // [0, 102, 0]
+                AIR,                                              // [0, 103, 0]
+                blocks[Base(Stone)].clone(),                      // [1, 100, 0]
+                blocks[Base(Dirt)].clone(),                       // [1, 101, 0]
+                blocks[Base(Grass)].clone(),                      // [1, 102, 0]
+                blocks[Base(GrassBlades { height: H1 })].clone(), // [1, 103, 0]
+            ]
+        );
+    }
 }
