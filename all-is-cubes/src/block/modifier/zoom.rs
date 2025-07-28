@@ -139,7 +139,7 @@ impl Zoom {
     }
 }
 
-impl From<Zoom> for Modifier {
+impl const From<Zoom> for Modifier {
     fn from(value: Zoom) -> Self {
         Modifier::Zoom(value)
     }

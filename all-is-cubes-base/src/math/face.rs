@@ -437,7 +437,7 @@ impl Face {
         }
     }
 
-    /// Helper to convert in const context; equivalent to `.into()`.
+    /// Converts this [`Face6`] to [`Face7`].
     #[inline]
     pub(crate) const fn into7(self) -> Face7 {
         match self {
@@ -708,13 +708,13 @@ impl ops::Neg for Face7 {
     }
 }
 
-impl From<Face> for Face7 {
+impl const From<Face> for Face7 {
     #[inline]
     fn from(value: Face) -> Self {
         value.into7()
     }
 }
-impl TryFrom<Face7> for Face {
+impl const TryFrom<Face7> for Face {
     type Error = Faceless;
     #[inline]
     fn try_from(value: Face7) -> Result<Face, Self::Error> {
@@ -803,7 +803,7 @@ impl TryFrom<GridVector> for Face7 {
 pub struct Faceless;
 
 #[cfg(feature = "rerun")]
-impl From<Face> for re_sdk_types::view_coordinates::SignedAxis3 {
+impl const From<Face> for re_sdk_types::view_coordinates::SignedAxis3 {
     #[inline]
     fn from(face: Face) -> Self {
         use re_sdk_types::view_coordinates::{Axis3, Sign, SignedAxis3};
@@ -880,6 +880,21 @@ impl<V> FaceMap<V> {
         }
     }
 
+    /// Constructs a [`FaceMap`] containing clones of the provided value.
+    #[inline]
+    pub const fn splat(value: V) -> Self
+    where
+        V: [const] Clone,
+    {
+        Self {
+            nx: value.clone(),
+            ny: value.clone(),
+            nz: value.clone(),
+            px: value.clone(),
+            py: value.clone(),
+            pz: value,
+        }
+    }
     /// Constructs a [`FaceMap`] whose negative and positive directions are equal.
     // TODO: Evaluate whether this is a good API.
     #[inline]
@@ -1051,21 +1066,6 @@ impl<V> FaceMap<V> {
         let to_source = rotation.inverse();
         let mut source = self.map(|_, value| Some(value));
         Self::from_fn(|face| source[to_source.transform(face)].take().unwrap())
-    }
-}
-
-impl<V: Clone> FaceMap<V> {
-    /// Constructs a [`FaceMap`] containing clones of the provided value.
-    #[inline]
-    pub fn splat(value: V) -> Self {
-        Self {
-            nx: value.clone(),
-            ny: value.clone(),
-            nz: value.clone(),
-            px: value.clone(),
-            py: value.clone(),
-            pz: value,
-        }
     }
 }
 
