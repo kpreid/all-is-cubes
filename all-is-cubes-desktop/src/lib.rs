@@ -1,4 +1,6 @@
 #![feature(cfg_select)]
+#![feature(const_default)]
+#![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(never_type)]
 
