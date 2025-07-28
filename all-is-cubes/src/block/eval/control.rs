@@ -162,7 +162,7 @@ impl Budget {
     }
 }
 
-impl Default for Budget {
+const impl Default for Budget {
     /// Returns the standard budget for starting any evaluation.
     fn default() -> Self {
         let recursion = 30;
@@ -332,7 +332,7 @@ impl core::error::Error for EvalBlockError {
     }
 }
 
-impl From<HandleError> for InEvalError {
+const impl From<HandleError> for InEvalError {
     fn from(value: HandleError) -> Self {
         InEvalError {
             kind: ErrorKind::Handle(value),

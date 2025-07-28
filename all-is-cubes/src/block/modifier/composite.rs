@@ -467,7 +467,7 @@ fn bounds_excluding_air(voxels: &Evoxels, src_scale: block::Resolution) -> GridA
     }
 }
 
-impl From<Composite> for Modifier {
+const impl From<Composite> for Modifier {
     fn from(value: Composite) -> Self {
         Modifier::Composite(value)
     }

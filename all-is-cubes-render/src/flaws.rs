@@ -100,7 +100,7 @@ impl Flaws {
     }
 }
 
-impl Default for Flaws {
+const impl Default for Flaws {
     /// Equivalent to [`Self::empty()`].
     fn default() -> Self {
         Self::empty()

@@ -34,7 +34,7 @@ impl Axis {
     /// * Z = blue
     #[mutants::skip]
     #[inline]
-    pub fn color(self) -> Rgb01 {
+    pub const fn color(self) -> Rgb01 {
         match self {
             Axis::X => Rgb01::UNIFORM_LUMINANCE_RED,
             Axis::Y => Rgb01::UNIFORM_LUMINANCE_GREEN,
@@ -114,13 +114,13 @@ impl fmt::UpperHex for Axis {
     }
 }
 
-impl From<Axis> for u8 {
+const impl From<Axis> for u8 {
     #[inline]
     fn from(value: Axis) -> Self {
         value as u8
     }
 }
-impl From<Axis> for usize {
+const impl From<Axis> for usize {
     #[inline]
     fn from(value: Axis) -> Self {
         value as usize
@@ -132,7 +132,7 @@ mod impl_index_axis {
     use crate::math;
     use core::ops;
 
-    impl<T> ops::Index<Axis> for [T; 3] {
+    const impl<T> ops::Index<Axis> for [T; 3] {
         type Output = T;
 
         #[inline]
@@ -140,7 +140,7 @@ mod impl_index_axis {
             &self[index as usize]
         }
     }
-    impl<T> ops::IndexMut<Axis> for [T; 3] {
+    const impl<T> ops::IndexMut<Axis> for [T; 3] {
         #[inline]
         fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
             &mut self[index as usize]
@@ -154,7 +154,7 @@ mod impl_index_axis {
 
     macro_rules! impl_euclid_generic {
         ($x:ident $y:ident $z:ident, $($container_type:tt)*) => {
-            impl<T, U> ops::Index<Axis> for $($container_type)*<T, U> {
+            const impl<T, U> ops::Index<Axis> for $($container_type)*<T, U> {
                 type Output = T;
 
                 #[inline]
@@ -166,7 +166,7 @@ mod impl_index_axis {
                     }
                 }
             }
-            impl<T, U> ops::IndexMut<Axis> for $($container_type)*<T, U> {
+            const impl<T, U> ops::IndexMut<Axis> for $($container_type)*<T, U> {
                 #[inline]
                 fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
                     match index {
@@ -184,7 +184,7 @@ mod impl_index_axis {
 
     macro_rules! impl_concrete {
         ($x:ident $y:ident $z:ident, $container_type:ty, $field_type:ty) => {
-            impl ops::Index<Axis> for $container_type {
+            const impl ops::Index<Axis> for $container_type {
                 type Output = $field_type;
 
                 #[inline]
@@ -196,7 +196,7 @@ mod impl_index_axis {
                     }
                 }
             }
-            impl ops::IndexMut<Axis> for $container_type {
+            const impl ops::IndexMut<Axis> for $container_type {
                 #[inline]
                 fn index_mut(&mut self, index: Axis) -> &mut Self::Output {
                     match index {

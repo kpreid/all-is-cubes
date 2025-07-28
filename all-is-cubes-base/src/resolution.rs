@@ -213,7 +213,7 @@ impl fmt::Display for Resolution {
 //
 macro_rules! impl_try_from {
     ($t:ty) => {
-        impl TryFrom<$t> for Resolution {
+        const impl TryFrom<$t> for Resolution {
             type Error = IntoResolutionError<$t>;
             #[inline]
             fn try_from(value: $t) -> Result<Self, Self::Error> {
