@@ -1,3 +1,6 @@
+#![feature(const_clone)]
+#![feature(const_default)]
+#![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(doc_notable_trait)]
 #![feature(never_type)]

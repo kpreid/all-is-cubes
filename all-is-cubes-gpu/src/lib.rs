@@ -1,3 +1,6 @@
+#![feature(const_clone)]
+#![feature(const_convert)]
+#![feature(const_trait_impl)]
 #![feature(doc_cfg)]
 #![feature(never_type)]
 #![allow(exported_private_dependencies, reason = "false positive on wgpu_types")]
