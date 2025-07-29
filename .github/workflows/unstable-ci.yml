@@ -41,6 +41,11 @@ env:
   # artifacts, so they won't be useful for anything (other than maybe the exhaustive
   # builds with different features).
   CARGO_INCREMENTAL: 0
+  # Collect backtrace on panic.
+  RUST_BACKTRACE: 1
+  # Tell `anyhow` *not* to collect backtraces for errors.
+  # <https://users.rust-lang.org/t/anyhow-backtraces/107437>
+  RUST_LIB_BACKTRACE: 0
   # This will cause a test to fail if it has a dependence on a system/user config file.
   AIC_DO_NOT_USE_CONFIG_FILES_IN_TESTS: 1
 
@@ -59,7 +64,7 @@ jobs:
           - os: windows
             toolchain: nightly
             depversions: locked
-          
+
           # macOS
           - os: macos
             toolchain: nightly
@@ -77,6 +82,7 @@ jobs:
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
+        shared-key: "build"
         workspaces: |
           ./
           all-is-cubes-wasm/
@@ -116,12 +122,12 @@ jobs:
         cargo xtask update "${{ matrix.depversions }}"
         cargo tree --all-features
 
-    - name: Compile basic tests
+    - name: Compile tests
       # compile is broken out so we have visibility into compile vs. run times
       run: cargo xtask --scope=only-normal test --timings --no-run
-    - name: Run basic tests
+    - name: Run tests
       run: cargo xtask --scope=only-normal test --timings
-    
+
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
       if: ${{ always() }}
@@ -133,7 +139,7 @@ jobs:
 
     - name: Lint
       run: cargo xtask --scope=only-normal lint --timings
-    
+
     # Save timing reports so we can download and view them
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
@@ -141,6 +147,73 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: cargo-timings ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
+        path: |
+          target/cargo-timings/cargo-timing-*.html
+
+  # Run `xtask lint`.
+  #
+  # This job is separate from the main "build" job so that:
+  # * Lint results are delivered quickly by running them in parallel with other jobs.
+  # * We build with `-Dwarnings` so the failures aren't silent, but don't want this to
+  #   cause *re*building in the main build job and its cache.
+  lint:
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: ["nightly"]
+
+    runs-on: ubuntu-latest
+    continue-on-error: false
+
+    env:
+      RUSTFLAGS: "-Dwarnings"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: Swatinem/rust-cache@v2.8.0
+      with:
+        # We cannot reuse the cache from the `build` job, because `RUSTFLAGS=-Dwarnings`
+        # would invalidate all cached artifacts anyway.
+        prefix-key: "v1-rust-unstablefeatures-${{ matrix.toolchain }}"
+        shared-key: "lint"
+        # Job's likely to fail and yet have useful cache material.
+        cache-on-failure: true
+        workspaces: |
+          ./
+          all-is-cubes-wasm/
+
+    - name: Install tools
+      run: |
+        cargo install --locked wasm-pack@0.13.1
+
+    - name: Set Rust toolchain
+      # The rust-toolchain.toml file specifies the targets and components we need,
+      # but we may want to override the toolchain.
+      if: ${{ matrix.toolchain != 'stable' }}
+      run: perl -pi -e "s/stable/${{ matrix.toolchain }}/" rust-toolchain.toml
+
+    - name: Install Rust toolchain
+      run: rustup show active-toolchain || rustup toolchain install
+
+    - name: Install native libraries
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+          sudo apt update
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
+
+    # break this out as a separate non-silenced build step
+    - name: Compile xtask
+      run: cargo build --package xtask
+
+    - name: Lint
+      run: cargo xtask --scope=all lint --timings
+
+    - name: Save cargo --timings output
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: cargo-timings lint ${{ matrix.toolchain }}
         path: |
           target/cargo-timings/cargo-timing-*.html
 
@@ -158,7 +231,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         rustup toolchain install nightly --component miri
-    
+
     - name: Run Miri tests
       # `universe::owning_guard` is the only module that contains nontrivial unsafe code,
       # and the tests in `universe` are those most worth running to exercise it.
