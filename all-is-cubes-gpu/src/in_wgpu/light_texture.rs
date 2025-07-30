@@ -1,6 +1,6 @@
 use alloc::format;
 use alloc::vec::Vec;
-use core::{array, num::NonZero};
+use core::array;
 
 use cfg_if::cfg_if;
 #[cfg(feature = "auto-threads")]
@@ -502,16 +502,19 @@ impl LightTexture {
                 total_count += 1;
             }
 
-            // Note: Using [`wgpu::util::StagingBelt`] instead of this write_buffer() did not
-            // turn out to be more efficient.
-            let data: &[u8] = data[..batch_count].as_flattened().as_flattened();
-            bwp.reborrow()
-                .write_buffer(
-                    &self.copy_buffer,
-                    0,
-                    wgpu::BufferSize::new(data.len() as u64).unwrap(),
-                )
-                .copy_from_slice(data);
+            {
+                // Note: Using StagingBelt directly for the individual texture copies
+                // (instead of copying to `self.copy_buffer` first) was tried and seemed to be
+                // less efficient than either this or a plain write_buffer().
+                let data: &[u8] = data[..batch_count].as_flattened().as_flattened();
+                bwp.reborrow()
+                    .write_buffer(
+                        &self.copy_buffer,
+                        0,
+                        wgpu::BufferSize::new(u64::try_from(data.len()).unwrap()).unwrap(),
+                    )
+                    .copy_from_slice(data);
+            }
         }
 
         total_count
