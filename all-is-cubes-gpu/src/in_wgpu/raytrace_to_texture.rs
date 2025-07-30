@@ -56,6 +56,9 @@ pub(crate) struct RaytraceToTexture {
 
     /// Camera that was used for the frame currently stored in `Inner::color_render_target`.
     camera_used: Camera,
+
+    #[cfg(feature = "auto-threads")]
+    background_thread: Option<std::thread::JoinHandle<()>>,
 }
 
 /// State for the possibly-asynchronous tracing job.
@@ -135,23 +138,26 @@ impl RaytraceToTexture {
         }));
 
         #[cfg(feature = "auto-threads")]
-        {
+        let background_thread = {
             let weak_inner = Arc::downgrade(&inner);
             match std::thread::Builder::new()
                 .name("RaytraceToTexture".into())
                 .spawn(move || background_tracing_task(weak_inner))
             {
-                Ok(_) => {
+                Ok(handle) => {
                     // The thread will stop itself when its weak reference breaks.
+                    // The join handle is only used to check if the thread is alive.
+                    Some(handle)
                 }
                 Err(e) => {
                     log::error!(
                         "RaytraceToTexture failed to create background tracing thread: {e}. \
                             Tracing will proceed synchronously."
-                    )
+                    );
+                    None
                 }
             }
-        }
+        };
 
         Self {
             rt_bind_group: Memo::new(),
@@ -165,6 +171,9 @@ impl RaytraceToTexture {
             may_start_next_frame: true,
             should_reproject: None,
             camera_used,
+
+            #[cfg(feature = "auto-threads")]
+            background_thread,
         }
     }
 
@@ -232,7 +241,19 @@ impl RaytraceToTexture {
                 })
             });
 
-        inner.do_some_tracing();
+        // If we don’t currently have a background tracing thread (either because it is not enabled
+        // or because it died), do some tracing right now while we have the lock held.
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "auto-threads")] {
+                let is_background = self.background_thread.as_ref().is_some_and(|h| !h.is_finished());
+            } else {
+                let is_background = false;
+            }
+        };
+        if !is_background {
+            inner.do_some_tracing();
+        }
+
         // Copy to GPU texture if we are in incremental mode or the frame is finished.
         if inner.update_strategy.incremental() || inner.dirty_pixels == 0 {
             inner.color_render_target.upload(queue);
@@ -498,11 +519,11 @@ impl Inner {
 
         match tracing_duration.cmp(&Duration::from_millis(2)) {
             std::cmp::Ordering::Greater => {
-                self.rays_per_frame = (self.rays_per_frame.saturating_sub(5000)).max(100);
+                self.rays_per_frame = (self.rays_per_frame.saturating_sub(500)).max(100);
             }
             std::cmp::Ordering::Equal => {}
             std::cmp::Ordering::Less => {
-                self.rays_per_frame = (self.rays_per_frame + 5000)
+                self.rays_per_frame = (self.rays_per_frame + 500)
                     .min(area_usize(render_viewport.framebuffer_size).unwrap());
             }
         }
