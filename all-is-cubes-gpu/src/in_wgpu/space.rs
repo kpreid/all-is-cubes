@@ -348,7 +348,7 @@ impl SpaceRenderer {
                 // Update individual cubes.
                 light_update_count +=
                     self.light_texture
-                        .update_scatter(bwp.reborrow(), space, set.drain());
+                        .update_scatter(device, queue, space, set.drain());
             } else {
                 self.light_texture.forget_mapped();
                 todo.light = Some(HashSet::new());

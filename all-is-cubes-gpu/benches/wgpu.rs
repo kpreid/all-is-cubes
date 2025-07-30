@@ -18,7 +18,7 @@ use all_is_cubes_render::Flaws;
 use all_is_cubes_render::HeadlessRenderer;
 use all_is_cubes_render::camera::{GraphicsOptions, Layers, StandardCameras, Viewport};
 
-use all_is_cubes_gpu::in_wgpu::{BeltWritingParts, LightChunk, LightTexture, headless, init};
+use all_is_cubes_gpu::in_wgpu::{LightChunk, LightTexture, headless, init};
 
 fn main() {
     let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
@@ -159,7 +159,10 @@ fn light_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance
             texture.forget_mapped();
             texture.ensure_mapped(&queue, &space, bounds);
 
-            queue.submit([]);
+            scopeguard::guard((), |()| {
+                // flush wgpu's buffering of copy commands (not sure if this is effective).
+                queue.submit([]);
+            })
         });
     });
 
@@ -173,24 +176,13 @@ fn light_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance
         // update_scatter() will do nothing if not mapped first
         texture.ensure_mapped(&queue, &space, bounds);
 
-        let mut staging_belt = wgpu::util::StagingBelt::new(2048);
-
         b.iter_with_large_drop(|| {
-            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("lt update encoder"),
-            });
+            texture.update_scatter(&device, &queue, &space, updates.iter().copied());
 
-            let bwp = BeltWritingParts {
-                device: &device,
-                belt: &mut staging_belt,
-                encoder: &mut encoder,
-            };
-
-            texture.update_scatter(bwp, &space, updates.iter().copied());
-
-            staging_belt.finish();
-            queue.submit([encoder.finish()]);
-            staging_belt.recall();
+            scopeguard::guard((), |()| {
+                // flush wgpu's buffering of copy commands (not sure if this is effective).
+                queue.submit([]);
+            })
         });
     });
 }

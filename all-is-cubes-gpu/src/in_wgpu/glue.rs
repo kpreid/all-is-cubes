@@ -123,10 +123,7 @@ pub fn extent_to_size3d(size: wgpu::Extent3d) -> GridSize {
 }
 
 /// The ingredients to make use of a [`wgpu::util::StagingBelt`].
-#[doc(hidden)]
-#[allow(clippy::exhaustive_structs)]
-#[derive(Debug)]
-pub struct BeltWritingParts<'a> {
+pub(crate) struct BeltWritingParts<'a> {
     pub device: &'a wgpu::Device,
     pub belt: &'a mut wgpu::util::StagingBelt,
     pub encoder: &'a mut wgpu::CommandEncoder,

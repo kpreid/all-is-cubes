@@ -31,7 +31,6 @@ use everything::{EverythingRenderer, surface_view_format};
 mod frame_texture;
 use frame_texture::{DrawableTexture, FramebufferTextures};
 mod glue;
-pub use glue::BeltWritingParts; // public for bench
 pub mod headless;
 #[doc(hidden)]
 pub mod init;
