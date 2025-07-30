@@ -21,9 +21,7 @@ use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
 use all_is_cubes::math::VectorOps as _;
 use all_is_cubes::universe::ReadTicket;
-use all_is_cubes_render::camera::{
-    Camera, ImagePixel, Layers, StandardCameras, Viewport, area_usize,
-};
+use all_is_cubes_render::camera::{Camera, ImagePixel, Layers, StandardCameras, Viewport};
 use all_is_cubes_render::raytracer::{self, RtRenderer};
 use all_is_cubes_render::{Flaws, RenderError};
 
@@ -517,16 +515,22 @@ impl Inner {
 
         let tracing_duration = Instant::now().duration_since(start_time);
 
-        match tracing_duration.cmp(&Duration::from_millis(2)) {
-            std::cmp::Ordering::Greater => {
-                self.rays_per_frame = (self.rays_per_frame.saturating_sub(500)).max(100);
-            }
-            std::cmp::Ordering::Equal => {}
-            std::cmp::Ordering::Less => {
-                self.rays_per_frame = (self.rays_per_frame + 500)
-                    .min(area_usize(render_viewport.framebuffer_size).unwrap());
-            }
+        if tracing_duration > Duration::from_micros(30_000) {
+            // Greatly exceeding budget; drop quickly
+            self.rays_per_frame = self.rays_per_frame.saturating_div(2);
+        } else if tracing_duration > Duration::from_micros(2_000) {
+            // Somewhat over budget
+            self.rays_per_frame = (self.rays_per_frame.saturating_sub(100)).max(100);
+        } else if tracing_duration < Duration::from_micros(1_500) {
+            // Under budget; increase, but not above the whole frame
+            self.rays_per_frame =
+                (self.rays_per_frame + 500).min(self.update_strategy.cycle_length());
         }
+        // std::eprintln!(
+        //     "{:10} {:10}",
+        //     tracing_duration.as_micros(),
+        //     self.rays_per_frame
+        // );
     }
 }
 
