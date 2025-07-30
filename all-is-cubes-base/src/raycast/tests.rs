@@ -49,7 +49,7 @@ fn assert_steps_option<T: IntoIterator<Item = Option<TestStep>>>(r: &mut Raycast
                     actual:   {actual_step:?}\n\
                     before: {r_backup:?}\n\
                     after:  {r:?}\n",
-                actual_ts = actual_step.map(|s| TestStep::from(&s, r.param.ray)),
+                actual_ts = actual_step.map(|s| TestStep::from(&s, r.state.param.ray)),
             );
         }
     }
@@ -346,11 +346,6 @@ fn within_bounds() {
     r2.next();
     // Compare the Debug strings, since the state is otherwise private.
     assert_eq!(format!("{r:?}"), format!("{r2:?}"));
-}
-
-#[test]
-fn no_steps() {
-    assert_no_steps(Raycaster::new_empty());
 }
 
 /// An example of an axis-aligned ray that wasn't working.

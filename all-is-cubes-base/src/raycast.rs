@@ -12,6 +12,8 @@ use crate::math::{
 };
 use crate::resolution::Resolution;
 
+// -------------------------------------------------------------------------------------------------
+
 mod axis_aligned;
 pub use axis_aligned::AxisAlignedRaycaster;
 
@@ -20,6 +22,8 @@ pub use ray::{AaRay, Ray};
 
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Vector unit type for units of "t" (ray-length).
 enum Tc {}
@@ -50,20 +54,51 @@ enum Tc {}
 // t_max.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Raycaster {
-    param: Parameters,
+    /// State of the raycast algorithm itself, without the extra parts needed from
+    /// implementing [`Iterator`].
+    state: State,
 
     /// Have we not yet produced the origin cube itself?
     emit_current: bool,
+}
 
-    /// Cube we're in; always the next cube to return from the iterator.
-    ///
-    /// This is stored as a [`GridPoint`], not a [`Cube`], for easier arithmetic on it.
-    cube: GridPoint,
+/// State of the algorithm that is independent of [`Raycaster`]’s public API as an iterator.
+///
+/// This state always describes the ray being in and crossing some particular cube,
+/// and a step of the algorithm determines which face of that cube is *exited* by the ray,
+/// in order to cross into another cube.
+///
+/// # Rationale
+///
+/// TODO: This struct is separate from [`Raycaster`] in anticipation of the possibility of providing
+/// better API if we don’t confine ourselves to the [`Iterator`] shape (where the iterator has
+/// exactly one item type rather than being able to be queried for multiple facts about the current
+/// item). In particular:
+///
+/// * [`recursive_raycast()`] could produce more consistent/robust results if it could take more
+///   information from the [`State`] than just what is put into [`RaycastStep`].
+/// * [`RaycastStep::intersection_point()`] could be more convenient to use if it didn't need to
+///   be given the original ray separately.
+///
+/// All of these things could in principle be done by storing more information in [`RaycastStep`],
+/// but doing so could reduce performance when that information isn’t going to be used for the
+/// current step; we’d be relying on the optimizer a lot to skip conditionally-unused calculations.
+#[derive(Clone, Debug, PartialEq)]
+struct State {
+    param: Parameters,
+
+    /// Bounds to filter our outputs to within.
+    bounds: GridAab,
 
     /// `t_max` stores the t-value at which we would next cross a cube boundary,
     /// for each axis in which we could move. Thus, the least element of `t_max`
     /// is the next intersection between the grid and the ray.
     t_max: Vector3D<FreeCoordinate, Tc>,
+
+    /// Cube we're in; always the next cube to return from the iterator.
+    ///
+    /// This is stored as a [`GridPoint`], not a [`Cube`], for easier arithmetic on it.
+    cube: GridPoint,
 
     /// Last face we passed through.
     last_face: Face7,
@@ -71,36 +106,17 @@ pub struct Raycaster {
     /// The `t_max` value used in the previous step; thus, the position along the
     /// ray where we passed through `last_face`.
     last_t_distance: FreeCoordinate,
-
-    /// Bounds to filter our outputs to within.
-    bounds: GridAab,
 }
 
-/// The input ray and values derived from it, which do not change over the duration of
-/// a single raycast.
-///
-/// # Rationale
-///
-/// TODO: This struct is separate from [`Raycaster`] in anticipation of the possibility of providing
-/// better functionality based on reusing this information:
-///
-/// * [`recursive_raycast()`] could produce more consistent/robust results if it could take more
-///   information from the [`Raycaster`] than just what is put into [`RaycastStep`], and this would
-///   lead to an alternate way of constructing [`Raycaster`] from [`Parameters`].
-/// * [`RaycastStep::intersection_point()`] could be more convenient to use if it didn't need to
-///   be given the original ray separately, and so we might end up with something that looks like
-///   [`RaycastStep`] borrowing the [`Parameters`]. Might.
-///
-/// All of these things could in principle be done by storing more information in [`RaycastStep`],
-/// but doing so could reduce performance when that information isn’t going to be used for the
-/// current step; we’d be relying on the optimizer a lot to skip conditionally-unused calculations.
+/// Parameters derived from the input ray direction, which do not change over the duration
+/// of the raycast.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Parameters {
     /// The ray being cast.
     ///
     /// Note that this is not the *original* ray, in two cases:
     ///
-    /// * [`Raycaster::fast_forward()`] replaces it with a ray moved forward.
+    /// * [`Self::fast_forward()`] replaces it with a ray moved forward.
     /// * If the original ray numbers are large and would break the algorithm,
     ///   they are replaced with zero.
     ///
@@ -148,51 +164,9 @@ impl Raycaster {
     #[must_use]
     #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
     pub fn new(origin: impl Into<FreePoint>, direction: impl Into<FreeVector>) -> Self {
-        Self::from_parameters(Parameters::new(origin.into(), direction.into()))
-    }
-
-    /// Constructor from [`Parameters`], and non-generic to discourage excess codegen.
-    fn from_parameters(param: Parameters) -> Self {
-        // If there is no enclosing cube then the current cube is undefined so we cannot make
-        // meaningful progress. (In the event of within(), we could in theory have a
-        // suitably bounded interpretation, but that is not of practical interest.)
-        let cube = match Cube::containing(param.ray.origin) {
-            Some(cube) => cube.lower_bounds(),
-            None => {
-                // Return a raycaster which emits no cubes.
-                // TODO: preserve the original ray so we can use the ray for more things.
-                return Self::new_empty();
-            }
-        };
-
         Self {
-            t_max: param
-                .ray
-                .origin
-                .to_vector()
-                .zip(param.ray.direction, scale_to_integer_step)
-                .cast_unit(),
-
-            param,
+            state: State::from_parameters(Parameters::new(origin.into(), direction.into())),
             emit_current: true,
-            cube,
-            last_face: Face7::Within,
-            last_t_distance: 0.0,
-            bounds: GridAab::EVERYWHERE,
-        }
-    }
-
-    /// Construct a [`Raycaster`] which will produce no items.
-    /// This is used when numeric overflow prevents success.
-    fn new_empty() -> Self {
-        Self {
-            param: Parameters::new(FreePoint::origin(), FreeVector::zero()),
-            emit_current: false,
-            cube: GridPoint::origin(),
-            t_max: Vector3D::zero(),
-            last_face: Face7::Within,
-            last_t_distance: 0.0,
-            bounds: GridAab::ORIGIN_EMPTY,
         }
     }
 
@@ -216,11 +190,12 @@ impl Raycaster {
     #[doc(hidden)]
     #[allow(clippy::missing_inline_in_public_items)]
     pub fn add_bounds(&mut self, bounds: GridAab) {
-        self.bounds = self
+        self.state.bounds = self
+            .state
             .bounds
             .intersection_cubes(bounds)
             .unwrap_or(GridAab::ORIGIN_EMPTY);
-        self.fast_forward();
+        self.state.fast_forward();
     }
 
     /// Cancels a previous [`Raycaster::within`], allowing the raycast to proceed
@@ -233,179 +208,7 @@ impl Raycaster {
     #[doc(hidden)]
     #[inline]
     pub fn remove_bounds(&mut self) {
-        self.bounds = GridAab::EVERYWHERE;
-    }
-
-    /// Determine the axis to step on and move in the appropriate direction along that axis.
-    ///
-    /// If this step would overflow the [`GridCoordinate`] range, returns [`Err`].
-    #[inline(always)]
-    #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
-    fn step(&mut self) -> Result<(), ()> {
-        // t_max stores the t-value at which we cross a cube boundary along the
-        // X axis, per component. Therefore, choosing the least t_max axis
-        // chooses the closest cube boundary.
-        let axis: Axis = if self.t_max.x < self.t_max.y {
-            if self.t_max.x < self.t_max.z {
-                Axis::X
-            } else {
-                Axis::Z
-            }
-        } else {
-            if self.t_max.y < self.t_max.z {
-                Axis::Y
-            } else {
-                Axis::Z
-            }
-        };
-
-        assert!(
-            self.param.step[axis] != 0,
-            "step on axis {axis:X} which is zero; state = {self:#?}"
-        );
-
-        // Save t position before we update it.
-        // We could back-compute this instead as
-        //     let axis = self.last_face.axis().unwrap();
-        //     self.t_max[axis] - self.t_delta[axis]
-        // but that seems an excessive computation to save a field.
-        self.last_t_distance = self.t_max[axis];
-
-        // Move into the new cube, checking for overflow.
-        self.cube[axis] = self.cube[axis]
-            .checked_add(self.param.step[axis])
-            .ok_or(())?;
-
-        // Update t_max to reflect that we have crossed the previous t_max boundary.
-        self.t_max[axis] += self.param.t_delta[axis];
-
-        // Update face crossing info.
-        // Performance note: Using a match for this turns out to be just slightly slower.
-        const FACE_TABLE: [[Face7; 2]; 3] = [
-            [Face7::PX, Face7::NX],
-            [Face7::PY, Face7::NY],
-            [Face7::PZ, Face7::NZ],
-        ];
-        self.last_face = FACE_TABLE[axis][usize::from(self.param.step[axis] > 0)];
-
-        Ok(())
-    }
-
-    #[inline(always)]
-    fn valid_for_stepping(&self) -> bool {
-        // If all stepping directions are 0, then we cannot make progress.
-        self.param.step != Vector3D::zero()
-        // Also check if we had some kind of arithmetic problem in the state.
-        // But permit some positive infinity, because that's just an axis-aligned ray.
-        && !vec_iter(self.t_max).any(|t| t.is_nan())
-        && vec_iter(self.t_max).any(|t| t.is_finite())
-    }
-
-    /// Returns whether `self.cube` is outside of `self.bounds`.
-    ///
-    /// The first boolean is if the ray has _not yet entered_ the bounds,
-    /// and the second boolean is if it the ray has _left_ the bounds. If the ray does
-    /// not intersect the bounds, one or both might be true.
-    fn is_out_of_bounds(&self) -> (bool, bool) {
-        let mut oob_enter = false;
-        let mut oob_exit = false;
-        for axis in Axis::ALL {
-            let range = self.bounds.axis_range(axis);
-            let oob_low = self.cube[axis] < range.start;
-            let oob_high = self.cube[axis] >= range.end;
-            if self.param.step[axis] == 0 {
-                // Case where the ray has no motion on that axis.
-                oob_enter |= oob_low | oob_high;
-                oob_exit |= oob_low | oob_high;
-            } else {
-                if self.param.step[axis] > 0 {
-                    oob_enter |= oob_low;
-                    oob_exit |= oob_high;
-                } else {
-                    oob_enter |= oob_high;
-                    oob_exit |= oob_low;
-                }
-            }
-        }
-        (oob_enter, oob_exit)
-    }
-
-    /// In the case where the current position is outside the bounds but might intersect
-    /// the bounds later, attempt to move the position to intersect sooner.
-    #[mutants::skip] // an optimization not a behavior change
-    fn fast_forward(&mut self) {
-        // Find the point which is the origin of all three planes that we want to
-        // intersect with. (Strictly speaking, this could be combined with the next
-        // loop, but it seems more elegant to have a well-defined point.)
-        let plane_origin: GridPoint = {
-            let mut plane_origin = GridPoint::new(0, 0, 0);
-            for axis in Axis::ALL {
-                let which_bounds = if self.param.step[axis] < 0 {
-                    // Iff the ray is going negatively, then we must use the upper bound
-                    // for the plane origin in this axis. Otherwise, either it doesn't
-                    // matter (parallel) or should be lower bound.
-                    self.bounds.upper_bounds()
-                } else {
-                    self.bounds.lower_bounds()
-                };
-                plane_origin[axis] = which_bounds[axis];
-            }
-            plane_origin
-        };
-
-        // Perform intersections.
-        let mut max_t: FreeCoordinate = 0.0;
-        for axis in Axis::ALL {
-            let direction = self.param.step[axis];
-            if direction == 0 {
-                // Parallel ray; no intersection.
-                continue;
-            }
-            let mut plane_normal = Vector3D::zero();
-            plane_normal[axis] = direction;
-            let intersection_t = ray_plane_intersection(self.param.ray, plane_origin, plane_normal);
-            max_t = max_t.max(intersection_t);
-        }
-
-        // TODO: Right test?
-        if max_t > self.last_t_distance {
-            // Go forward to half a cube behind where we think we found the intersection point.
-            let t_start = max_t - 0.5 / self.param.ray.direction.length();
-            let t_start = if t_start.is_finite() { t_start } else { max_t };
-            let ff_ray = self.param.ray.advance(t_start);
-
-            let Some(cube) = Cube::containing(ff_ray.origin) else {
-                // Can't fast-forward if we would numeric overflow.
-                // But in that case, also, we almost certainly can't feasibly
-                // raycast either.
-                *self = Self::new_empty();
-                return;
-            };
-
-            *self = Self {
-                param: Parameters {
-                    ray: ff_ray,
-                    step: self.param.step,
-                    t_delta: self.param.t_delta,
-                },
-
-                emit_current: false,
-                last_face: self.last_face,
-                cube: cube.lower_bounds(),
-
-                // t_max is done the same as in new(), except with an offset
-                t_max: ff_ray
-                    .origin
-                    .to_vector()
-                    .zip(ff_ray.direction, scale_to_integer_step)
-                    .cast_unit()
-                    .map(|t| t + t_start),
-                last_t_distance: t_start,
-
-                // These fields don't depend on position.
-                bounds: self.bounds,
-            };
-        }
+        self.state.bounds = GridAab::EVERYWHERE;
     }
 }
 
@@ -420,14 +223,14 @@ impl Iterator for Raycaster {
             if self.emit_current {
                 self.emit_current = false;
             } else {
-                if !self.valid_for_stepping() {
+                if !self.state.valid_for_stepping() {
                     // Can't make progress, and we already have done emit_current duty, so stop.
                     return None;
                 }
-                self.step().ok()?;
+                self.state.step().ok()?;
             }
 
-            let (oob_enter, oob_exit) = self.is_out_of_bounds();
+            let (oob_enter, oob_exit) = self.state.is_out_of_bounds();
             if oob_exit {
                 // We are past the bounds. There will never again be a cube to report.
                 // Prevent extraneous next() calls from doing any stepping that could overflow
@@ -442,11 +245,11 @@ impl Iterator for Raycaster {
 
             return Some(RaycastStep {
                 cube_face: CubeFace {
-                    cube: Cube::from(self.cube),
-                    face: self.last_face,
+                    cube: Cube::from(self.state.cube),
+                    face: self.state.last_face,
                 },
-                t_distance: self.last_t_distance,
-                t_max: self.t_max,
+                t_distance: self.state.last_t_distance,
+                t_max: self.state.t_max,
             });
         }
     }
@@ -457,35 +260,6 @@ impl Iterator for Raycaster {
 }
 
 impl core::iter::FusedIterator for Raycaster {}
-
-// -------------------------------------------------------------------------------------------------
-
-impl Parameters {
-    #[inline]
-    fn new(origin: FreePoint, mut direction: FreeVector) -> Self {
-        // A ray whose direction vector is infinite — or very large — cannot be processed
-        // correctly because we rely on discriminating between different `t` values
-        // (distance in units of the direction vector) to choose the correct next cube.
-        // Specifically, it will cause [`Raycaster::fast_forward()`] to drastically misestimate
-        // its target and lead to arbitrarily long computations.
-        //
-        // Therefore, treat it as no stepping -- this is too large to be practical anyway.
-        // (We cannot simply rescale the direction vector because that would change the
-        // reported `t` outputs.)
-        // TODO: Define better threshold value.
-        if !vec_iter(direction)
-            .all(|d| d.abs().partial_cmp(&1e100) == Some(core::cmp::Ordering::Less))
-        {
-            direction = Vector3D::zero();
-        }
-
-        Self {
-            ray: Ray::new(origin, direction),
-            step: direction.map(signum_101),
-            t_delta: direction.map(|x| x.abs().recip()).cast_unit(),
-        }
-    }
-}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -667,6 +441,267 @@ impl RaycastStep {
             direction: ray.direction,
         };
         (sub_ray.cast().within(bounds), sub_ray)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+impl State {
+    pub const EMPTY: Self = Self {
+        param: Parameters::ZERO,
+        cube: GridPoint::new(0, 0, 0),
+        t_max: Vector3D::new(0., 0., 0.),
+        last_face: Face7::Within,
+        last_t_distance: 0.0,
+        bounds: GridAab::ORIGIN_EMPTY,
+    };
+
+    #[inline(always)]
+    /// Constructor from [`Parameters`], and non-generic to discourage excess codegen.
+    fn from_parameters(param: Parameters) -> Self {
+        // If there is no enclosing cube then the current cube is undefined so we cannot make
+        // meaningful progress. (In the event of within(), we could in theory have a
+        // suitably bounded interpretation, but that is not of practical interest.)
+        let cube = match Cube::containing(param.ray.origin) {
+            Some(cube) => cube.lower_bounds(),
+            None => {
+                // Return a raycaster which emits no cubes.
+                // TODO: preserve the original ray so we can use the ray for more things.
+                return Self::EMPTY;
+            }
+        };
+
+        Self {
+            param,
+            cube,
+            t_max: param
+                .ray
+                .origin
+                .to_vector()
+                .zip(param.ray.direction, scale_to_integer_step)
+                .cast_unit(),
+            last_face: Face7::Within,
+            last_t_distance: 0.0,
+            bounds: GridAab::EVERYWHERE,
+        }
+    }
+
+    /// Returns whether a [`Self::step()`] will be able to make forward progress
+    /// (rather than leaving the state unchanged because the ray points in no direction
+    /// or the state is no longer numerically valid).
+    #[inline(always)]
+    fn valid_for_stepping(&self) -> bool {
+        // If all stepping directions are 0, then we cannot make progress.
+        self.param.step != Vector3D::zero()
+        // Also check if we had some kind of arithmetic problem in the state.
+        // But permit some positive infinity, because that's just an axis-aligned ray.
+        && !vec_iter(self.t_max).any(|t| t.is_nan())
+        && vec_iter(self.t_max).any(|t| t.is_finite())
+    }
+
+    /// Determine the axis to step on and move in the appropriate direction along that axis.
+    ///
+    /// If this step would overflow the [`GridCoordinate`] range, returns [`Err`].
+    #[inline(always)]
+    #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
+    fn step(&mut self) -> Result<(), ()> {
+        // t_max stores the t-value at which we cross a cube boundary along the
+        // X axis, per component. Therefore, choosing the least t_max axis
+        // chooses the closest cube boundary.
+        let axis: Axis = if self.t_max.x < self.t_max.y {
+            if self.t_max.x < self.t_max.z {
+                Axis::X
+            } else {
+                Axis::Z
+            }
+        } else {
+            if self.t_max.y < self.t_max.z {
+                Axis::Y
+            } else {
+                Axis::Z
+            }
+        };
+
+        assert!(
+            self.param.step[axis] != 0,
+            "step on axis {axis:X} which is zero; state = {self:#?}"
+        );
+
+        // Save t position before we update it.
+        // We could back-compute this instead as
+        //     let axis = self.last_face.axis().unwrap();
+        //     self.t_max[axis] - self.t_delta[axis]
+        // but that seems an excessive computation to save a field.
+        self.last_t_distance = self.t_max[axis];
+
+        // Move into the new cube, checking for overflow.
+        self.cube[axis] = self.cube[axis]
+            .checked_add(self.param.step[axis])
+            .ok_or(())?;
+
+        // Update t_max to reflect that we have crossed the previous t_max boundary.
+        self.t_max[axis] += self.param.t_delta[axis];
+
+        // Update face crossing info.
+        // Performance note: Using a match for this turns out to be just slightly slower.
+        const FACE_TABLE: [[Face7; 2]; 3] = [
+            [Face7::PX, Face7::NX],
+            [Face7::PY, Face7::NY],
+            [Face7::PZ, Face7::NZ],
+        ];
+        self.last_face = FACE_TABLE[axis][usize::from(self.param.step[axis] > 0)];
+
+        Ok(())
+    }
+
+    /// In the case where the current position is outside the bounds but might intersect
+    /// the bounds later, attempt to move the position to intersect sooner.
+    #[mutants::skip] // an optimization not a behavior change
+    #[inline(always)]
+    fn fast_forward(&mut self) {
+        // Find the point which is the origin of all three planes that we want to
+        // intersect with. (Strictly speaking, this could be combined with the next
+        // loop, but it seems more elegant to have a well-defined point.)
+        let plane_origin: GridPoint = {
+            let mut plane_origin = GridPoint::new(0, 0, 0);
+            for axis in Axis::ALL {
+                let which_bounds = if self.param.step[axis] < 0 {
+                    // Iff the ray is going negatively, then we must use the upper bound
+                    // for the plane origin in this axis. Otherwise, either it doesn't
+                    // matter (parallel) or should be lower bound.
+                    self.bounds.upper_bounds()
+                } else {
+                    self.bounds.lower_bounds()
+                };
+                plane_origin[axis] = which_bounds[axis];
+            }
+            plane_origin
+        };
+
+        // Perform intersections.
+        let mut max_t: FreeCoordinate = 0.0;
+        for axis in Axis::ALL {
+            let direction = self.param.step[axis];
+            if direction == 0 {
+                // Parallel ray; no intersection.
+                continue;
+            }
+            let mut plane_normal = Vector3D::zero();
+            plane_normal[axis] = direction;
+            let intersection_t = ray_plane_intersection(self.param.ray, plane_origin, plane_normal);
+            max_t = max_t.max(intersection_t);
+        }
+
+        // TODO: Right test?
+        if max_t > self.last_t_distance {
+            // Go forward to half a cube behind where we think we found the intersection point.
+            let t_start = max_t - 0.5 / self.param.ray.direction.length();
+            let t_start = if t_start.is_finite() { t_start } else { max_t };
+            let ff_ray = self.param.ray.advance(t_start);
+
+            let Some(cube) = Cube::containing(ff_ray.origin) else {
+                // Can't fast-forward if we would numeric overflow.
+                // But in that case, also, we almost certainly can't feasibly
+                // raycast either.
+                // TODO: Instead of replacing everything with a constant, preserve ray and dir
+                // so they always match the original input.
+                *self = Self::EMPTY;
+                return;
+            };
+
+            *self = Self {
+                param: Parameters {
+                    ray: ff_ray,
+                    ..self.param
+                },
+                last_face: self.last_face,
+                cube: cube.lower_bounds(),
+
+                // t_max is done the same as in new(), except with an offset
+                t_max: ff_ray
+                    .origin
+                    .to_vector()
+                    .zip(ff_ray.direction, scale_to_integer_step)
+                    .cast_unit()
+                    .map(|t| t + t_start),
+                last_t_distance: t_start,
+
+                // These fields don't depend on position.
+                bounds: self.bounds,
+            };
+        }
+    }
+
+    /// Returns whether `self.cube` is outside of `self.bounds`, with additional distinctions.
+    ///
+    /// The first boolean is if the ray has _not yet entered_ the bounds,
+    /// and the second boolean is if it the ray has _left_ the bounds. If the ray does
+    /// not intersect the bounds, one or both might be true.
+    fn is_out_of_bounds(&self) -> (bool, bool) {
+        let mut oob_enter = false;
+        let mut oob_exit = false;
+        for axis in Axis::ALL {
+            let range = self.bounds.axis_range(axis);
+            let oob_low = self.cube[axis] < range.start;
+            let oob_high = self.cube[axis] >= range.end;
+            if self.param.step[axis] == 0 {
+                // Case where the ray has no motion on that axis.
+                oob_enter |= oob_low | oob_high;
+                oob_exit |= oob_low | oob_high;
+            } else {
+                if self.param.step[axis] > 0 {
+                    oob_enter |= oob_low;
+                    oob_exit |= oob_high;
+                } else {
+                    oob_enter |= oob_high;
+                    oob_exit |= oob_low;
+                }
+            }
+        }
+        (oob_enter, oob_exit)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+impl Parameters {
+    /// Constant equal to `new([0, 0, 0], [0, 0, 0])`.
+    pub const ZERO: Self = Self {
+        ray: Ray {
+            origin: FreePoint::new(0., 0., 0.),
+            direction: FreeVector::new(0., 0., 0.),
+        },
+        step: Vector3D::new(0, 0, 0),
+        t_delta: Vector3D::new(
+            FreeCoordinate::INFINITY,
+            FreeCoordinate::INFINITY,
+            FreeCoordinate::INFINITY,
+        ),
+    };
+
+    #[inline]
+    fn new(origin: FreePoint, mut direction: FreeVector) -> Self {
+        // A ray whose direction vector is infinite — or very large — cannot be processed
+        // correctly because we rely on discriminating between different `t` values
+        // (distance in units of the direction vector) to choose the correct next cube.
+        // Specifically, it will cause [`Raycaster::fast_forward()`] to drastically misestimate
+        // its target and lead to arbitrarily long computations.
+        //
+        // Therefore, treat it as no stepping -- this is too large to be practical anyway.
+        // (We cannot simply rescale the direction vector because that would change the
+        // reported `t` outputs.)
+        // TODO: Define better threshold value.
+        if !vec_iter(direction)
+            .all(|d| d.abs().partial_cmp(&1e100) == Some(core::cmp::Ordering::Less))
+        {
+            direction = Vector3D::zero();
+        }
+
+        Self {
+            ray: Ray::new(origin, direction),
+            step: direction.map(signum_101),
+            t_delta: direction.map(|x| x.abs().recip()).cast_unit(),
+        }
     }
 }
 
