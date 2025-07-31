@@ -1,4 +1,4 @@
-//! That which contains many blocks.
+//! [`Space`] and related types; the physical space of All is Cubes.
 
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
@@ -69,8 +69,27 @@ mod tests;
 
 // -------------------------------------------------------------------------------------------------
 
-/// Container for [`Block`]s arranged in three-dimensional space. The main “game world”
-/// data structure.
+/// A physical space consisting mostly of [`Block`]s arranged in a grid.
+/// The main “game world” data structure.
+///
+/// A `Space` consists of:
+///
+/// * A bounding box outside of which there is only emptiness.
+///   Set using [`Builder::bounds()`] and read using [`Space::bounds()`].
+/// * [`Block`]s for each [cube][Cube] within the bounds.
+///   For efficiency, identical blocks are deduplicated.
+///   Set using [`Space::mutate()`] or [`SpaceTransaction`]; and
+///   read using [the indexing operator](#impl-Index%3CT%3E-for-Space), [`Space::get_evaluated()`], [`Space::get_block_index()`],
+///   and [`Space::extract()`].
+/// * Information about light passing through the space and falling on each block.
+///   Light can be emitted by blocks and by the surrounding “sky”.
+///   Updated automatically and read using [`Space::get_lighting()`] or [`Space::extract()`].
+/// * [`SpacePhysics`] defining global properties of the space.
+///   Set using [`Space::set_physics()`] and read using [`Space::physics()`].
+/// * A default [`Spawn`] location for characters entering the space.
+///   Set using [`Space::set_spawn()`] and read using [`Space::spawn()`].
+/// * A [`BehaviorSet`].
+///   Set using [`SpaceTransaction::behaviors()`].
 ///
 #[doc = include_str!("save/serde-warning.md")]
 #[derive(bevy_ecs::component::Component)]
