@@ -49,7 +49,7 @@ fn assert_steps_option<T: IntoIterator<Item = Option<TestStep>>>(r: &mut Raycast
                     actual:   {actual_step:?}\n\
                     before: {r_backup:?}\n\
                     after:  {r:?}\n",
-                actual_ts = actual_step.map(|s| TestStep::from(&s, r.ray)),
+                actual_ts = actual_step.map(|s| TestStep::from(&s, r.param.ray)),
             );
         }
     }
