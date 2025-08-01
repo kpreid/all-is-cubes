@@ -26,6 +26,8 @@ use crate::math::GridAab;
 ///
 /// * [`Face6`] is less general, in that it specifies a single axis but not
 ///   rotation about that axis.
+///     * [`Face6::clockwise()`] and [`Face6::counterclockwise()`] can be used to obtain
+///       [`GridRotation`] values.
 /// * [`GridMatrix`] is more general, specifying an affine transformation.
 ///
 #[doc = include_str!("../serde-warning.md")]

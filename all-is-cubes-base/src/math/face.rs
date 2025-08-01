@@ -270,6 +270,71 @@ impl Face6 {
         self.rotation_from_nz().to_positive_octant_transform(scale)
     }
 
+    /// Returns the rotation which is clockwise,
+    /// when looking towards the face `self` of the rotated object.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::Face6::*;
+    ///
+    /// assert_eq!(PY.clockwise().transform(PX), PZ);
+    /// ```
+    #[inline]
+    pub const fn clockwise(self) -> GridRotation {
+        match self {
+            Face6::NX => GridRotation::RXzY,
+            Face6::NY => GridRotation::RzYX,
+            Face6::NZ => GridRotation::RYxZ,
+            Face6::PX => GridRotation::RXZy,
+            Face6::PY => GridRotation::RZYx,
+            Face6::PZ => GridRotation::RyXZ,
+        }
+    }
+
+    /// Returns the rotation which is counterclockwise (anticlockwise),
+    /// when looking towards the face `self` of the rotated object.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::Face6::*;
+    ///
+    /// assert_eq!(PY.counterclockwise().transform(PZ), PX);
+    /// ```
+    #[inline]
+    pub const fn counterclockwise(self) -> GridRotation {
+        self.clockwise().inverse()
+    }
+
+    /// Returns the rotation which is a half turn or 180º,
+    /// when looking towards the face `self` of the rotated object.
+    ///
+    /// This result only depends on the axis, not the direction, but it is available here to
+    /// complete the set
+    /// `[self, self.clockwise(), self.r180(), self.counterclockwise()]`,
+    /// which can also be expressed as
+    /// <code>self.[clockwise][Self::clockwise]().[iterate][GridRotation::iterate]()</code>.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::Face6::*;
+    ///
+    /// assert_eq!(PY.r180().transform(PX), NX);
+    /// ```
+    #[inline]
+    pub const fn r180(self) -> GridRotation {
+        match self {
+            Face6::NX | Face6::PX => GridRotation::RXyz,
+            Face6::NY | Face6::PY => GridRotation::RxYz,
+            Face6::NZ | Face6::PZ => GridRotation::RxyZ,
+        }
+    }
+
     /// Helper to convert in const context; equivalent to `.into()`.
     #[inline]
     pub(crate) const fn into7(self) -> Face7 {
@@ -1169,6 +1234,39 @@ mod tests {
     }
 
     // TODO: More tests of face.face_transform()
+
+    #[test]
+    fn clockwise_properties() {
+        let mut f = MultiFailure::new();
+        for face in Face6::ALL {
+            f.catch(|| {
+                assert_eq!(
+                    face.counterclockwise(),
+                    face.clockwise().inverse(),
+                    "{face:?} ccw is inverse of cw"
+                );
+                assert!(
+                    !face.clockwise().is_reflection(),
+                    "{face:?}.clockwise() is not a reflection"
+                );
+                assert_eq!(
+                    face.clockwise().transform(face),
+                    face,
+                    "{face:?}.clockwise() leaves itself unchanged"
+                );
+                assert_eq!(
+                    face.clockwise().iterate().count(),
+                    4,
+                    "{face:?}.clockwise() is a 90° rotation"
+                );
+                assert_eq!(
+                    face.clockwise() * face.clockwise(),
+                    face.r180(),
+                    "{face:?}.clockwise() twice equals 180°"
+                )
+            });
+        }
+    }
 
     #[test]
     fn face_map_debug_cmp() {
