@@ -1,13 +1,8 @@
 //! [`LightUpdateQueue`] and other types pertaining to the scheduling of light updates.
 
-use alloc::collections::BTreeSet;
 use core::fmt;
-use euclid::Vector3D;
 
-use hashbrown::HashMap as HbHashMap;
-use hashbrown::hash_map::Entry;
-
-use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint};
+use crate::math::{Cube, GridAab, GridIter};
 use crate::space::light::PackedLightScalar;
 
 /// An entry in a [`LightUpdateQueue`], specifying a cube that needs its stored light updated.
@@ -16,56 +11,6 @@ use crate::space::light::PackedLightScalar;
 pub struct LightUpdateRequest {
     pub priority: Priority,
     pub cube: Cube,
-}
-
-impl LightUpdateRequest {
-    /// A priority comparison for entries with equal specified priority:
-    /// prefer cubes closer to the origin. (This is for prettier initial startup:
-    /// assuming the viewpoint starts close to the origin it will see good nearby
-    /// lighting sooner.)
-    fn fallback_priority(&self) -> GridCoordinate {
-        const COORD_OFFSET: GridCoordinate = 0;
-
-        let cube = GridPoint::from(self.cube);
-
-        // Give first priority to a half-resolution grid (8 times faster), then its offset
-        // by 1 copy, then further slices of it.
-        let bits = cube.to_vector().map(|c| c.rem_euclid(2) == 0);
-        #[rustfmt::skip]
-        let boost = match bits {
-            Vector3D {x: false, y: false, z: false, _unit } => 1_000_000,
-            Vector3D {x: true, y: true, z: true, _unit } => 900_000,
-            // Now the other cases in arbitrary order
-            Vector3D {x: true, y: false, z: true, _unit } => 500_000,
-            Vector3D {x: true, y: true, z: false, _unit } => 400_000,
-            Vector3D {x: true, y: false, z: false, _unit } => 300_000,
-            Vector3D {x: false, y: false, z: true, _unit } => 200_000,
-            Vector3D {x: false, y: true, z: false, _unit } => 100_000,
-            Vector3D {x: false, y: true, z: true, _unit } => 0,
-        };
-
-        let GridPoint { x, y, z, _unit } = cube.map(|c| if c > 0 { -c } else { c } + COORD_OFFSET);
-        x.saturating_add(y).saturating_add(z).saturating_add(boost)
-    }
-}
-
-impl Ord for LightUpdateRequest {
-    fn cmp(&self, other: &LightUpdateRequest) -> core::cmp::Ordering {
-        self.priority
-            .cmp(&other.priority)
-            .then_with(|| self.fallback_priority().cmp(&other.fallback_priority()))
-            // To obey Ord's contract we must not return equal ordering when unequal by Eq,
-            // so we must break all ties until only completely identical remains.
-            .then_with(|| self.cube.x.cmp(&other.cube.x))
-            .then_with(|| self.cube.y.cmp(&other.cube.y))
-            .then_with(|| self.cube.z.cmp(&other.cube.z))
-    }
-}
-
-impl PartialOrd for LightUpdateRequest {
-    fn partial_cmp(&self, other: &LightUpdateRequest) -> Option<core::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
 }
 
 /// Priority of a [`LightUpdateRequest`] in a [`LightUpdateQueue`].
@@ -112,13 +57,7 @@ impl fmt::Debug for Priority {
 /// A priority queue for [`LightUpdateRequest`]s which contains cubes
 /// at most once, even when added with different priorities.
 pub struct LightUpdateQueue {
-    /// Sorted storage of queue elements.
-    /// This is a `BTreeSet` rather than a `BinaryHeap` so that items can be removed.
-    queue: BTreeSet<LightUpdateRequest>,
-
-    /// Maps [`Cube`] to priority value. This allows deduplicating entries, including
-    /// removing low-priority entries in favor of high-priority ones
-    table: HbHashMap<Cube, Priority>,
+    queue: priority_queue::PriorityQueue<Cube, Priority, rustc_hash::FxBuildHasher>,
 
     /// If not `None`, then we are performing an update of **every** cube of the space,
     /// and this iterator returns the next cube to update at `sweep_priority`.
@@ -134,8 +73,7 @@ pub struct LightUpdateQueue {
 impl LightUpdateQueue {
     pub fn new() -> Self {
         Self {
-            queue: BTreeSet::new(),
-            table: HbHashMap::new(),
+            queue: Default::default(),
             sweep: None,
             sweep_priority: Priority::MIN,
             sweep_again: false,
@@ -144,7 +82,7 @@ impl LightUpdateQueue {
 
     #[inline]
     pub fn contains(&self, cube: Cube) -> bool {
-        self.table.contains_key(&cube)
+        self.queue.contains(&cube)
             || self
                 .sweep
                 .as_ref()
@@ -154,24 +92,7 @@ impl LightUpdateQueue {
     /// Inserts a queue entry or increases the priority of an existing one.
     #[inline]
     pub fn insert(&mut self, request: LightUpdateRequest) {
-        match self.table.entry(request.cube) {
-            Entry::Occupied(mut e) => {
-                let existing_priority = *e.get();
-                if request.priority > existing_priority {
-                    let removed = self.queue.remove(&LightUpdateRequest {
-                        cube: request.cube,
-                        priority: existing_priority,
-                    });
-                    debug_assert!(removed);
-                    e.insert(request.priority);
-                    self.queue.insert(request);
-                }
-            }
-            Entry::Vacant(e) => {
-                e.insert(request.priority);
-                self.queue.insert(request);
-            }
-        }
+        self.queue.push_increase(request.cube, request.priority);
     }
 
     /// Requests that the queue should produce every cube in `bounds` at `priority`,
@@ -201,13 +122,7 @@ impl LightUpdateQueue {
     ///
     /// Sweeps do not count as present entries.
     pub fn remove(&mut self, cube: Cube) -> bool {
-        if let Some(priority) = self.table.remove(&cube) {
-            let q_removed = self.queue.remove(&LightUpdateRequest { priority, cube });
-            debug_assert!(q_removed);
-            true
-        } else {
-            false
-        }
+        self.queue.remove(&cube).is_some()
     }
 
     /// Removes and returns the highest priority queue entry.
@@ -229,17 +144,13 @@ impl LightUpdateQueue {
             }
         }
 
-        let result = self.queue.pop_last();
-        if let Some(request) = result {
-            let removed = self.table.remove(&request.cube);
-            debug_assert!(removed.is_some());
-        }
-        result
+        self.queue
+            .pop()
+            .map(|(cube, priority)| LightUpdateRequest { priority, cube })
     }
 
     pub fn clear(&mut self) {
         self.queue.clear();
-        self.table.clear();
         self.sweep = None;
         self.sweep_priority = Priority::MIN;
         self.sweep_again = false;
@@ -270,13 +181,16 @@ impl LightUpdateQueue {
 }
 
 #[inline]
-fn peek_priority(queue: &BTreeSet<LightUpdateRequest>) -> Option<Priority> {
-    queue.last().copied().map(|r| r.priority)
+fn peek_priority(
+    queue: &priority_queue::PriorityQueue<Cube, Priority, rustc_hash::FxBuildHasher>,
+) -> Option<Priority> {
+    queue.peek().map(|(_, &priority)| priority)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::GridCoordinate;
     use alloc::vec::Vec;
 
     fn drain(queue: &mut LightUpdateQueue) -> Vec<LightUpdateRequest> {
@@ -306,15 +220,18 @@ mod tests {
         assert!(Priority::from_difference(255) < least_special_priority);
     }
 
+    /// This test used to be more interesting because we used to have an ordering that
+    /// dependended in a fancy way on cubes. Now, we just want to check that priority is obeyed
+    /// at all.
     #[test]
     fn queue_ordering() {
         let mut queue = LightUpdateQueue::new();
         queue.insert(r([0, 0, 0], 1));
-        queue.insert(r([2, 0, 0], 1));
-        queue.insert(r([1, 0, 0], 1));
-        queue.insert(r([3, 0, 0], 1));
-        queue.insert(r([4, 0, 0], 1));
-        queue.insert(r([3, 0, 0], 1)); // duplicate
+        queue.insert(r([2, 0, 0], 20));
+        queue.insert(r([1, 0, 0], 10));
+        queue.insert(r([3, 0, 0], 30));
+        queue.insert(r([4, 0, 0], 40));
+        queue.insert(r([3, 0, 0], 30)); // duplicate
         queue.insert(r([0, 0, 2], 200));
         queue.insert(r([0, 0, 1], 100));
 
@@ -322,15 +239,13 @@ mod tests {
         assert_eq!(
             drain(&mut queue),
             vec![
-                // High priorities
                 r([0, 0, 2], 200),
                 r([0, 0, 1], 100),
-                // Half-resolution and distance orderings
+                r([4, 0, 0], 40),
+                r([3, 0, 0], 30),
+                r([2, 0, 0], 20),
+                r([1, 0, 0], 10),
                 r([0, 0, 0], 1),
-                r([2, 0, 0], 1),
-                r([4, 0, 0], 1),
-                r([1, 0, 0], 1),
-                r([3, 0, 0], 1),
             ]
         );
         assert_eq!(queue.len(), 0);

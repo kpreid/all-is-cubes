@@ -39,9 +39,11 @@ dependencies = [
  "ordered-float",
  "paste",
  "png-decoder",
+ "priority-queue",
  "rand",
  "rand_distr",
  "rand_xoshiro",
+ "rustc-hash",
  "unicode-segmentation",
  "visibility",
  "yield-progress",
@@ -1015,6 +1017,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "priority-queue"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5676d703dda103cbb035b653a9f11448c0a7216c7926bd35fcb5865475d0c970"
+dependencies = [
+ "autocfg",
+ "equivalent",
+ "indexmap",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.97"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1104,6 +1117,12 @@ checksum = "fd4ffd64e61cd0b962d75f623355e06ba6318d5028920394b269bb8972b61ace"
 dependencies = [
  "quote",
 ]
+
+[[package]]
+name = "rustc-hash"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 
 [[package]]
 name = "rustversion"

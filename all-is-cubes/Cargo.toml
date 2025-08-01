@@ -137,6 +137,7 @@ num-traits = { workspace = true }
 once_cell = { workspace = true, features = ["alloc", "race", "std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
 ordered-float = { workspace = true }
 paste = { workspace = true }
+priority-queue = { workspace = true }
 png-decoder = { workspace = true }
 rand = { workspace = true, features = ["small_rng"] }
 rand_distr = { workspace = true }
@@ -147,6 +148,7 @@ rayon = { workspace = true, optional = true }
 re_log_types = { workspace = true, optional = true }
 re_sdk = { workspace = true, optional = true }
 re_types = { workspace = true, optional = true }
+rustc-hash = { workspace = true }
 # rc feature needed because we are [de]serializing `Arc`s
 # alloc feature needed for #[serde(flatten)] — https://github.com/serde-rs/serde/issues/1935
 serde = { workspace = true, optional = true, features = ["alloc", "derive", "rc"] }

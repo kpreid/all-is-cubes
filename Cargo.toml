@@ -128,6 +128,7 @@ png-decoder = { version = "0.1.1", default-features = false } # used by all-is-c
 png = { version = "0.18.0", default-features = false } # used by all-is-cubes-desktop for writing pngs
 pollster = { version = "0.4.0", default-features = false }
 pretty_assertions = { version = "1.2.0" }
+priority-queue = { version = "2.5.0", default-features = false }
 rand = { version = "0.9.0", default-features = false }
 rand_distr = { version = "0.5.1", default-features = false }
 rand_xoshiro = { version = "0.7.0", default-features = false }
@@ -140,6 +141,7 @@ rendiff = { version = "0.2.0", default-features = false }
 # We use rstest for parameterized tests where each case can fail or succeed independently.
 # If there are too many cases to write literally, use `all_is_cubes::util::MultiFailure` instead.
 rstest = { version = "0.26.1", default-features = false }
+rustc-hash = { version = "2.1.1", default-features = false }
 scopeguard = { version = "1.2.0", default-features = false }
 # "futures" feature is used by all-is-cubes-gpu, but it's small so we enable it everywhere 
 send_wrapper = { version = "0.6.0", default-features = false, features = ["futures"] }
