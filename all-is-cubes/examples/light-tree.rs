@@ -14,7 +14,7 @@ use all_is_cubes::raycast::Ray;
 
 use all_is_cubes::rerun_glue as rg;
 /// Private — do not use.
-use all_is_cubes::space::light_chart::generator;
+use all_is_cubes::space::light::chart::generator;
 
 fn main() {
     let destination = rg::Destination {

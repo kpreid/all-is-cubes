@@ -37,12 +37,14 @@ pub use behaviors::{ActivatableRegion, SpaceBehaviorAttachment};
 pub mod builder;
 pub use builder::Builder;
 
+#[cfg(not(feature = "_special_testing"))]
 mod light;
-#[doc(hidden)] // pub only for visualization by all-is-cubes-gpu
+#[cfg(feature = "_special_testing")]
+#[doc(hidden)]
+pub mod light;
+
+#[doc(hidden)] // pub only for debug visualization by all-is-cubes-gpu
 pub use light::LightUpdateCubeInfo;
-#[cfg(feature = "rerun")]
-#[doc(hidden)] // unstable
-pub use light::chart as light_chart;
 pub(crate) use light::{LightStatus, LightUpdateRequest};
 use light::{LightStorage, LightUpdateQueue, PackedLightScalar};
 pub use light::{LightUpdatesInfo, PackedLight};

@@ -10,11 +10,12 @@ use hashbrown::hash_map::Entry;
 use crate::math::{Cube, GridAab, GridCoordinate, GridIter, GridPoint};
 use crate::space::light::PackedLightScalar;
 
-/// An entry in a [`LightUpdateQueue`], specifying a cubes that needs its light updated.
+/// An entry in a [`LightUpdateQueue`], specifying a cube that needs its stored light updated.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct LightUpdateRequest {
-    pub(crate) priority: Priority,
-    pub(crate) cube: Cube,
+#[allow(clippy::exhaustive_structs)]
+pub struct LightUpdateRequest {
+    pub priority: Priority,
+    pub cube: Cube,
 }
 
 impl LightUpdateRequest {
@@ -67,9 +68,9 @@ impl PartialOrd for LightUpdateRequest {
     }
 }
 
-/// Priorities a [`LightUpdateRequest`] can have.
+/// Priority of a [`LightUpdateRequest`] in a [`LightUpdateQueue`].
 #[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub(crate) struct Priority(PackedLightScalar);
+pub struct Priority(PackedLightScalar);
 impl Priority {
     /// The cube used to be [`LightStatus::Opaque`] or [`LightStatus::NoRays`],
     /// but now needs its light computed because of a change in the space contents.
@@ -110,7 +111,7 @@ impl fmt::Debug for Priority {
 
 /// A priority queue for [`LightUpdateRequest`]s which contains cubes
 /// at most once, even when added with different priorities.
-pub(crate) struct LightUpdateQueue {
+pub struct LightUpdateQueue {
     /// Sorted storage of queue elements.
     /// This is a `BTreeSet` rather than a `BinaryHeap` so that items can be removed.
     queue: BTreeSet<LightUpdateRequest>,
@@ -152,7 +153,7 @@ impl LightUpdateQueue {
 
     /// Inserts a queue entry or increases the priority of an existing one.
     #[inline]
-    pub(crate) fn insert(&mut self, request: LightUpdateRequest) {
+    pub fn insert(&mut self, request: LightUpdateRequest) {
         match self.table.entry(request.cube) {
             Entry::Occupied(mut e) => {
                 let existing_priority = *e.get();
