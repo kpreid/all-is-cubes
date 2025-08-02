@@ -1,13 +1,12 @@
 //! Types and algorithms for depth sorting.
 
 use alloc::vec::Vec;
-use core::cmp::Ordering;
 use core::ops::{self, Range};
 
 use ordered_float::OrderedFloat;
 
 use all_is_cubes::euclid::{Point3D, Vector3D, vec3};
-use all_is_cubes::math::{Cube, GridRotation, GridVector};
+use all_is_cubes::math::{Aab, Axis, Cube, FreePoint, GridRotation};
 
 #[cfg(doc)]
 use crate::SpaceMesh;
@@ -92,25 +91,19 @@ impl DepthOrdering {
         (x as usize * 3 + y as usize) * 3 + z as usize
     }
 
-    /// Calculates the `DepthOrdering` value for a particular viewing direction, expressed
-    /// as a vector from the camera to the geometry.
-    ///
-    /// If the vector is zero, [`DepthOrdering::WITHIN`] will be returned. Thus, passing
-    /// coordinates in units of chunks will result in returning `Within` exactly when the
-    /// viewpoint is within the chunk (implying the need for finer-grained sorting).
-    //---
-    // TODO: This should be made able to be more precise by accepting a mesh bounding box
-    // instead of a whole-chunk position.
-    pub fn from_view_direction(direction: GridVector) -> DepthOrdering {
-        DepthOrdering(
-            direction
-                .map(|coord| match 0.cmp(&coord) {
-                    Ordering::Less => Rel::Lower,
-                    Ordering::Equal => Rel::Within,
-                    Ordering::Greater => Rel::Higher,
-                })
-                .cast_unit(),
-        )
+    /// Calculates the [`DepthOrdering`] value for a particular viewpoint and bounds of viewed
+    /// geometry.
+    pub fn from_view_of_aabb(camera_position: FreePoint, geometry_bounds: Aab) -> DepthOrdering {
+        let mut ord = DepthOrdering::WITHIN;
+        for axis in Axis::ALL {
+            if camera_position[axis] < geometry_bounds.lower_bounds_p()[axis] {
+                ord.0[axis] = Rel::Lower
+            } else if camera_position[axis] > geometry_bounds.upper_bounds_p()[axis] {
+                ord.0[axis] = Rel::Higher
+            }
+        }
+
+        ord
     }
 
     fn rev(self) -> Self {
@@ -392,10 +385,10 @@ mod tests {
     /// Let's exercise some boring cases “end to end” with explanation.
     #[test]
     fn concrete_test_1() {
-        // Suppose that the geometry is located in the -X-Y-Z octant relative to the camera.
-        let ordering = DepthOrdering::from_view_direction(vec3(-1, -1, -1));
+        // Suppose that the camera is located in the +X+Y+Z octant relative to the geometry.
+        let ordering = DepthOrdering::from_view_of_aabb(point3(1., 1., 1.), Aab::ZERO);
 
-        // `Rel` names refer to the position of the *camera* relative to the *geometry*.
+        // `Rel` names refer to the position of the camera relative to the geometry.
         // Here, the camera is higher.
         assert_eq!(ordering, DepthOrdering(Vector3D::splat(Rel::Higher)));
 
@@ -409,8 +402,8 @@ mod tests {
     /// As [`concrete_test_1`] but with a non-identity transform.
     #[test]
     fn concrete_test_2() {
-        // Suppose that the geometry is located in the +X-Y-Z octant relative to the camera.
-        let ordering = DepthOrdering::from_view_direction(vec3(1, -1, -1));
+        // Suppose that the camera is located in the +X-Y-Z octant relative to the geometry.
+        let ordering = DepthOrdering::from_view_of_aabb(point3(-1., 1., 1.), Aab::ZERO);
 
         assert_eq!(
             ordering,
@@ -437,35 +430,39 @@ mod tests {
     // TODO: This test was originally from an older design of `DepthOrdering`.
     // It exercises more cases than needed and I don’t know if it has complete coverage any more.
     #[test]
-    fn depth_ordering_from_view_direction() {
+    fn depth_ordering_from_view_of_aabb() {
         let mut problems = Vec::new();
         // A coordinate range of ±3 will (more than) exercise every combination of axis orderings.
         let range = -3..3;
+        // TODO: exercise the bounds not being near 0
+        let bounds = Aab::from_lower_upper([-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]);
         for x in range.clone() {
             for y in range.clone() {
                 for z in range.clone() {
-                    let direction = GridVector::new(x, y, z);
-                    let ordering = DepthOrdering::from_view_direction(direction);
-                    let rotated_direction =
-                        ordering.sort_key_rotation().transform_vector(direction);
+                    let camera_position = point3(x, y, z);
+                    let ordering =
+                        DepthOrdering::from_view_of_aabb(camera_position.to_f64(), bounds);
+                    let rotated_position = ordering
+                        .sort_key_rotation()
+                        .transform_vector(camera_position.to_vector());
                     // The sort rotation is supposed to rotate vertex positions so that they
                     // are back-to-front as coordinates increase.
                     // Therefore, if we rotate the vector which is the direction
-                    // pointing towards the geometry, it is now a vector pointing towards
-                    // more negative coordinates, i.e. its components are negative.
-                    let good = rotated_direction.x <= 0
-                        && rotated_direction.y <= 0
-                        && rotated_direction.z <= 0;
+                    // pointing towards the camera, it is now a vector pointing towards
+                    // more positive coordinates, i.e. its components are non-negative.
+                    let good = rotated_position.x >= 0
+                        && rotated_position.y >= 0
+                        && rotated_position.z >= 0;
                     println!(
                         "{:?} → {:?} → {:?}{}",
-                        direction,
+                        camera_position,
                         ordering,
-                        rotated_direction,
+                        rotated_position,
                         if good { "" } else { " (wrong)" }
                     );
                     if !good {
                         // Defer assertions to end so we can report all cases before panicking.
-                        problems.push(direction);
+                        problems.push(rotated_position);
                     }
                 }
             }

@@ -16,7 +16,8 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
-    Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, Rgb, Rgba, Wireframe as _, ZeroOne,
+    Aab, Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, Rgb, Rgba, Wireframe as _,
+    ZeroOne,
 };
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
@@ -494,8 +495,6 @@ impl SpaceRenderer {
             };
         };
 
-        let view_chunk = csm.view_chunk();
-
         self.write_camera_only(bwp.reborrow(), camera);
 
         // If we have a instance buffer (which will have been previously allocated with sufficient
@@ -740,11 +739,18 @@ impl SpaceRenderer {
             {
                 if mesh_in_view {
                     if let Some(buffers) = &chunk.render_data {
+                        let depth_ordering = DepthOrdering::from_view_of_aabb(
+                            // Translate camera to the same chunk-relative coordinates
+                            // as the camera.
+                            camera.view_position()
+                                - chunk.position().bounds().to_free().lower_bounds_v(),
+                            // TODO: this should be the bounding box of the transparent
+                            // portion, but we don’t store that yet.
+                            chunk.mesh().bounding_box().unwrap_or(Aab::ZERO),
+                        );
+
                         draw_chunk_instance(
-                            chunk.mesh().transparent_range(depth_ordering_for_viewing(
-                                chunk.position(),
-                                view_chunk,
-                            )),
+                            chunk.mesh().transparent_range(depth_ordering),
                             render_pass,
                             buffers,
                             &mut instance_buffer_writer,
@@ -861,13 +867,6 @@ impl SpaceRenderer {
     pub(crate) fn texture_allocator_log_to_rerun(&self, destination: rg::Destination) {
         self.block_texture.log_to_rerun(destination);
     }
-}
-
-fn depth_ordering_for_viewing(
-    rendering_chunk: ChunkPos<CHUNK_SIZE>,
-    view_chunk: ChunkPos<CHUNK_SIZE>,
-) -> DepthOrdering {
-    DepthOrdering::from_view_direction(rendering_chunk.0 - view_chunk.0)
 }
 
 /// GPU resources for the camera uniform that [`BLOCKS_AND_LINES_SHADER`] expects,
