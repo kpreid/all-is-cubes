@@ -38,12 +38,16 @@ use core::fmt;
 
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
+// -------------------------------------------------------------------------------------------------
+
 mod vertex;
 pub use vertex::*;
 mod block_mesh;
 pub use block_mesh::*;
 #[cfg(feature = "dynamic")]
 mod cache;
+mod depth_sorting;
+pub use depth_sorting::{DepthOrdering, DepthSortInfo};
 #[cfg(feature = "dynamic")]
 pub mod dynamic;
 mod index_vec;
@@ -56,6 +60,8 @@ pub mod texture;
 
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Parameters for creating meshes that aren't the block/space data itself
 /// (or the texture allocator, since that may need to be mutable).
