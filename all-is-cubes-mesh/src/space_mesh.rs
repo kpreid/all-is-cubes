@@ -4,8 +4,9 @@ use core::ops::Range;
 use core::{fmt, mem, ops};
 
 use bitvec::vec::BitVec;
+use exhaust::Exhaust;
 
-use all_is_cubes::math::{Aab, Cube, Face6, FaceMap, GridAab, GridRotation, Vol};
+use all_is_cubes::math::{Aab, Cube, Face6, FaceMap, GridAab, Vol};
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes_render::Flaws;
 
@@ -111,11 +112,11 @@ impl<M: MeshTypes> SpaceMesh<M> {
         assert_eq!(self.vertices.0.len(), self.vertices.1.len());
         assert_eq!(self.opaque_range().start, 0);
         let len_transparent = self.transparent_range(DepthOrdering::ANY).len();
-        for &rot in &GridRotation::ALL {
+        for ordering in DepthOrdering::exhaust() {
             assert_eq!(
-                self.transparent_range(DepthOrdering::Direction(rot)).len(),
+                self.transparent_range(ordering).len(),
                 len_transparent,
-                "transparent range {rot:?} does not have the same \
+                "transparent range {ordering:?} does not have the same \
                     length ({len_transparent}) as others"
             );
         }
@@ -317,30 +318,9 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// Given the indices of vertices of transparent quads (triangle pairs), this function copies
     /// them in various depth-sorted permutations into `self.indices` and record the array-index
     /// ranges which contain each of the orderings in `self.opaque_range` and
-    /// `self.transparent_ranges`.
+    /// `self.transparent_ranges`. The orderings are identified by [`DepthOrdering`] values.
     ///
     /// The indices of the opaque quads must have already been written into `self.indices`.
-    ///
-    /// The orderings are identified by [`GridRotation`] values, in the following way:
-    /// each rotation defines three basis vectors which we usually think of as “rotated
-    /// X, rotated Y, rotated Z”; we instead treat them as “tertiary sort key, secondary
-    /// sort key, primary sort key”, with descending order. As a key example, the identity
-    /// rotation designates an ordering which is suitable for looking at the world in the
-    /// the -Z direction (which is our unrotated camera orientation), because the sort
-    /// ordering puts the objects with largest Z frontmost. To tie-break, the Y and X axes
-    /// are considered; thus the remaining sort order is one suitable for looking somewhat
-    /// downward and leftward.
-    ///
-    /// It is not sufficient to merely use the view direction vector to pick a rotation,
-    /// unless the projection is orthographic; given perspective, instead, the direction
-    /// from the viewpoint to the geometry should be used. For any volume the camera
-    /// does not occupy, there is a suitable single such direction; for those it does,
-    /// dynamic sorting must be used.
-    ///
-    /// See [volumetric sort (2006)] for a description of the algorithm we're implementing
-    /// using these sorts.
-    ///
-    /// [volumetric sort (2006)]: https://iquilezles.org/articles/volumesort/
     fn store_indices_and_finish_compute(
         &mut self,
         opaque_indices_deque: IndexVecDeque,
@@ -371,14 +351,14 @@ impl<M: MeshTypes> SpaceMesh<M> {
         self.consistency_check();
     }
 
-    /// Sort the existing indices of `self.transparent_range(DepthOrdering::Within)` for
+    /// Sort the existing indices of `self.transparent_range(DepthOrdering::WITHIN)` for
     /// the given view position.
     ///
     /// This is intended to be cheap enough to do every frame.
     ///
     /// Returns information including whether there was any change in ordering.
     pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> DepthSortInfo {
-        let range = self.transparent_range(DepthOrdering::Within);
+        let range = self.transparent_range(DepthOrdering::WITHIN);
         depth_sorting::dynamic_depth_sort_for_view::<M>(
             &self.vertices.0,
             &mut self.indices,
@@ -739,10 +719,12 @@ impl<M: MeshTypes> MeshMeta<M> {
         self.opaque_range.clone()
     }
 
-    /// A range of index data which contains the triangles with alpha values other
+    /// Returns a range of index data which contains the triangles with alpha values other
     /// than 0 and 1 which therefore must be drawn with consideration for ordering.
-    /// There are multiple such ranges providing different depth-sort orderings.
-    /// Notably, [`DepthOrdering::Within`] is reserved for dynamic (frame-by-frame)
+    ///
+    /// There are multiple such ranges providing different orderings depending on which
+    /// direction is your “depth” direction.
+    /// Notably, [`DepthOrdering::WITHIN`] is reserved for dynamic (frame-by-frame)
     /// sorting, invoked by [`SpaceMesh::depth_sort_for_view()`].
     #[inline]
     pub fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {

@@ -261,7 +261,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         self.block_instances.iter()
     }
 
-    /// Sort the existing indices of `self.mesh().transparent_range(DepthOrdering::Within)` for
+    /// Sort the existing indices of `self.mesh().transparent_range(DepthOrdering::WITHIN)` for
     /// the given view position in world coordinates.
     ///
     /// This is intended to be cheap enough to do every frame.

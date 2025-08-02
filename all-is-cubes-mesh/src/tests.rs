@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 
+use exhaust::Exhaust as _;
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{
@@ -13,7 +14,7 @@ use all_is_cubes::euclid::{Point3D, Size3D, Vector3D, point3};
 use all_is_cubes::math::{
     Aab, Cube,
     Face6::{self, *},
-    FaceMap, FreeCoordinate, GridAab, GridRotation, Rgb, Rgba, zo32,
+    FaceMap, FreeCoordinate, GridAab, Rgb, Rgba, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::ReadTicket;
@@ -682,14 +683,8 @@ fn transparency_split() {
     // ...one of which is opaque...
     assert_eq!(space_rendered.opaque_range().len(), 6 * 6);
     // ...and one of which is transparent
-    for &r in &GridRotation::ALL {
-        // TODO: probably DepthOrdering should have an iteration tool directly
-        assert_eq!(
-            space_rendered
-                .transparent_range(DepthOrdering::Direction(r))
-                .len(),
-            6 * 6
-        );
+    for ordering in DepthOrdering::exhaust() {
+        assert_eq!(space_rendered.transparent_range(ordering).len(), 6 * 6);
     }
 }
 

@@ -138,6 +138,7 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "either",
+ "exhaust",
  "flume",
  "futures-channel",
  "futures-util",

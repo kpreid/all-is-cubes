@@ -1,11 +1,13 @@
 //! Types and algorithms for depth sorting.
 
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 use core::ops::{self, Range};
+
 use ordered_float::OrderedFloat;
 
-use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Cube, GridCoordinate, GridRotation, GridVector};
+use all_is_cubes::euclid::{Point3D, Vector3D, vec3};
+use all_is_cubes::math::{Cube, GridRotation, GridVector};
 
 #[cfg(doc)]
 use crate::SpaceMesh;
@@ -15,28 +17,27 @@ use crate::{IndexVec, MeshTypes, VPos, Vertex};
 
 /// Identifies a back-to-front order in which to draw triangles (of a [`SpaceMesh`]),
 /// based on the direction from which they are being viewed.
-#[expect(clippy::exhaustive_enums)]
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub enum DepthOrdering {
-    /// The viewpoint is within the volume; therefore dynamic rather than precomputed
-    /// sorting must be used.
-    Within,
-    /// The viewpoint is outside the volume in a particular direction.
+pub struct DepthOrdering(
+    /// Specifies the relationship which the viewpoint has to the viewed mesh’s bounding box,
+    /// per axis.
     ///
-    /// The [`GridRotation`] is a rotation which will rotate the vector pointing from
-    /// the viewpoint to the triangles such that it lies in the crooked-pyramid-shaped
-    /// 48th of space where <var>x</var> &ge; <var>y</var> &ge; <var>z</var> &ge; 0.
-    ///
-    /// For more information on this classification scheme and the sort that uses it,
-    /// see [volumetric sort (2006)].
-    ///
-    /// [volumetric sort (2006)]: https://iquilezles.org/articles/volumesort/
-    //---
-    // TODO: This sorting strategy is overkill for what we need. We need *at most* the 27
-    // orderings of octants + aligned-in-one-axis views, not the 48 orderings this defines.
-    // <https://github.com/kpreid/all-is-cubes/issues/53#issuecomment-3146236910>
-    // Reduce this to represent only those.
-    Direction(GridRotation),
+    /// `Ordering::Equal` means that the viewpoint is within the bounding box’s projection
+    /// onto that axis.
+    Vector3D<Rel, ()>,
+);
+
+/// Relationship of the viewpoint to the mesh on one axis.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
+#[doc(hidden)] // public-in-private just for convenience in the `Exhaust` implementation.
+#[allow(unnameable_types)]
+pub enum Rel {
+    /// The viewpoint is lower on this axis than the bounding box.
+    Lower = 0,
+    /// The viewpoint is within the bounding box on this axis.
+    Within = 1,
+    /// The viewpoint is higher on this axis than the bounding box.
+    Higher = 2,
 }
 
 impl DepthOrdering {
@@ -44,83 +45,142 @@ impl DepthOrdering {
     ///
     /// Use this when querying the mesh’s indices without regard for ordering.
     //---
-    // Note: `Within` is used because in principle, we should be omitting known back-faces
-    // from the ordered index lists, whereas `Within` always has to be sorted.
-    pub const ANY: Self = Self::Within;
+    // Note: The use of `WITHIN` is because in principle, we should be omitting known back-faces
+    // from the other options, whereas `WITHIN` always has to be complete — well, except that
+    // it could omit faces that are _on_ the bounding box which cannot be seen from within, but
+    // I’m not planning to implement that. If I was, it would be important to have a dedicated case
+    // for “ALL” vertices, not just “ANY”.
+    pub const ANY: Self = Self::WITHIN;
 
-    // The numeric ordering is used only internally.
-    const ROT_COUNT: usize = GridRotation::ALL.len();
-    pub(crate) const COUNT: usize = Self::ROT_COUNT + 1;
+    /// The viewpoint is within the volume; therefore dynamic rather than precomputed
+    /// sorting must be used.
+    pub const WITHIN: Self = Self(vec3(Rel::Within, Rel::Within, Rel::Within));
 
+    /// Number of distinct [`Self`] values; one plus the maximum of [`Self::to_index()`].
+    pub(crate) const COUNT: usize = 3_usize.pow(3);
+
+    /// List of all [`DepthOrdering`]s except for
+    ///
+    /// * [`DepthOrdering::WITHIN`]
+    /// * the reflections of ones that are in the list
+    const ALL_WITHOUT_REFLECTIONS_OR_WITHIN: [Self; Self::COUNT / 2] = [
+        // Permutations of HWW (mirrors to LWW)
+        Self(vec3(Rel::Higher, Rel::Within, Rel::Within)),
+        Self(vec3(Rel::Within, Rel::Higher, Rel::Within)),
+        Self(vec3(Rel::Within, Rel::Within, Rel::Higher)),
+        // Permutations of HHW (mirrors to LLW)
+        Self(vec3(Rel::Higher, Rel::Higher, Rel::Within)),
+        Self(vec3(Rel::Within, Rel::Higher, Rel::Higher)),
+        Self(vec3(Rel::Higher, Rel::Within, Rel::Higher)),
+        // HHH (mirrors to LLL)
+        Self(vec3(Rel::Higher, Rel::Higher, Rel::Higher)),
+        // Permutations of HHL (mirrors to LLH)
+        Self(vec3(Rel::Higher, Rel::Higher, Rel::Lower)),
+        Self(vec3(Rel::Higher, Rel::Lower, Rel::Higher)),
+        Self(vec3(Rel::Lower, Rel::Higher, Rel::Higher)),
+        // Permutations of HLW (mirrors to LHW)
+        Self(vec3(Rel::Higher, Rel::Lower, Rel::Within)),
+        Self(vec3(Rel::Higher, Rel::Within, Rel::Lower)),
+        Self(vec3(Rel::Within, Rel::Higher, Rel::Lower)),
+    ];
+
+    /// Maps `self` to a unique integer.
     pub(crate) fn to_index(self) -> usize {
-        match self {
-            DepthOrdering::Direction(rotation) => rotation as usize,
-            DepthOrdering::Within => DepthOrdering::ROT_COUNT,
-        }
+        let [x, y, z] = self.0.into();
+
+        // This is the same ordering as `exhaust()` gives (not that that matters)
+        (x as usize * 3 + y as usize) * 3 + z as usize
     }
 
     /// Calculates the `DepthOrdering` value for a particular viewing direction, expressed
     /// as a vector from the camera to the geometry.
     ///
-    /// If the vector is zero, [`DepthOrdering::Within`] will be returned. Thus, passing
+    /// If the vector is zero, [`DepthOrdering::WITHIN`] will be returned. Thus, passing
     /// coordinates in units of chunks will result in returning `Within` exactly when the
     /// viewpoint is within the chunk (implying the need for finer-grained sorting).
+    ///---
+    /// TODO: This should be made able to be more precise by accepting a mesh bounding box
+    /// instead of a whole-chunk position.
     pub fn from_view_direction(direction: GridVector) -> DepthOrdering {
-        if direction == GridVector::zero() {
-            return DepthOrdering::Within;
-        }
+        DepthOrdering(
+            direction
+                .map(|coord| match coord.cmp(&0) {
+                    Ordering::Less => Rel::Lower,
+                    Ordering::Equal => Rel::Within,
+                    Ordering::Greater => Rel::Higher,
+                })
+                .cast_unit(),
+        )
+    }
 
-        // Find the axis permutation that sorts the coordinates descending.
-        // Or, actually, its inverse, because that's easier to think about and write down.
-        let abs = direction.map(GridCoordinate::abs);
-        let permutation = if abs.z > abs.x {
-            if abs.y > abs.x {
-                if abs.z > abs.y {
-                    GridRotation::RZYX
-                } else {
-                    GridRotation::RYZX
-                }
-            } else if abs.z > abs.y {
-                GridRotation::RZXY
+    fn rev(self) -> Self {
+        Self(self.0.map(|ord| match ord {
+            Rel::Lower => Rel::Higher,
+            Rel::Within => Rel::Within,
+            Rel::Higher => Rel::Lower,
+        }))
+    }
+
+    /// Returns a rotation which rotates vertex positions into positions whose lexicographic
+    /// ordering is this ordering.
+    fn sort_key_rotation(self) -> GridRotation {
+        // Find the axis permutation that puts the `Within` axes last.
+        // (This only affects partly-Within cases and TODO: doesn't fully solve them.
+        // 2-Within cases actually need dynamic sorting, and 1-Within cases need a strategy
+        // that is normal-dependent. See <https://github.com/kpreid/all-is-cubes/issues/53>.)
+        //
+        // (This is defined as the inverse permutation because the way `GridRotation` names work
+        // makes it easier to read that way.)
+        let inverse_permutation = if self.0.x == Rel::Within {
+            if self.0.y == Rel::Within {
+                GridRotation::RZYX
             } else {
+                // either X and Z are Within, or only X is
                 GridRotation::RYZX
             }
-        } else if abs.y > abs.x {
-            GridRotation::RYXZ
+        } else if self.0.y == Rel::Within {
+            // Y is Within and X is not
+            GridRotation::RXZY
         } else {
-            if abs.z > abs.y {
-                GridRotation::RXZY
-            } else {
-                GridRotation::RXYZ
-            }
+            // either only Z is Within or nothing is
+            GridRotation::RXYZ
         };
 
         // Find which axes need to be negated to get a nonnegative result.
-        let flips = if direction.x < 0 {
+        let flips = if self.0.x == Rel::Lower {
             GridRotation::RxYZ
         } else {
             GridRotation::IDENTITY
-        } * if direction.y < 0 {
+        } * if self.0.y == Rel::Lower {
             GridRotation::RXyZ
         } else {
             GridRotation::IDENTITY
-        } * if direction.z < 0 {
+        } * if self.0.z == Rel::Lower {
             GridRotation::RXYz
         } else {
             GridRotation::IDENTITY
         };
 
         // Compose the transformations.
-        DepthOrdering::Direction(permutation.inverse() * flips)
-    }
-
-    pub(crate) fn rev(self) -> Self {
-        match self {
-            DepthOrdering::Within => self,
-            DepthOrdering::Direction(rot) => DepthOrdering::Direction(rot * GridRotation::Rxyz),
-        }
+        inverse_permutation.inverse() * flips
     }
 }
+
+// This explicit impl is needed because Vector3D doesn't implement Exhaust
+impl exhaust::Exhaust for DepthOrdering {
+    type Iter = <[Rel; 3] as exhaust::Exhaust>::Iter;
+    type Factory = <[Rel; 3] as exhaust::Exhaust>::Factory;
+
+    fn exhaust_factories() -> Self::Iter {
+        <[Rel; 3]>::exhaust_factories()
+    }
+
+    fn from_factory(factory: Self::Factory) -> Self {
+        Self(factory.map(Rel::from_factory).into())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Information returned by [`SpaceMesh::depth_sort_for_view()`].
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -195,20 +255,18 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I>(
             .collect();
 
         // Copy unsorted indices into the main array, for later dynamic sorting.
-        transparent_ranges[DepthOrdering::Within.to_index()] =
+        transparent_ranges[DepthOrdering::WITHIN.to_index()] =
             extend_giving_range(indices, transparent_indices.iter().copied());
 
         // Perform sorting by each possible ordering.
         // Note that half of the orderings are mirror images of each other,
         // so do not require independent sorting; instead we copy the previous sorted
         // result in reverse.
-        for rot in GridRotation::ALL_BUT_REFLECTIONS {
-            let ordering = DepthOrdering::Direction(rot);
-
+        for ordering in DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN {
             // This inverse() is because the rotation is defined as
             // "rotate the view direction to a fixed orientation",
             // but we're doing "rotate the geometry" instead.
-            let basis = rot.inverse().to_basis();
+            let basis = ordering.sort_key_rotation().to_basis();
 
             // Note: Benchmarks show that `sort_by_key` is fastest
             // (not `sort_unstable_by_key`).
@@ -328,25 +386,38 @@ mod tests {
     use all_is_cubes::euclid::point3;
     use all_is_cubes::math::GridAab;
     use all_is_cubes::space::Space;
+    use exhaust::Exhaust as _;
+    use std::collections::HashSet;
 
+    #[test]
+    fn list_of_orderings_is_complete() {
+        let exhaust: HashSet<DepthOrdering> = DepthOrdering::exhaust().collect();
+        let flip: HashSet<DepthOrdering> = DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN
+            .into_iter()
+            .chain(DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN.map(DepthOrdering::rev))
+            .chain([DepthOrdering::WITHIN])
+            .collect();
+        assert_eq!(exhaust, flip);
+        assert_eq!(exhaust.len(), 3usize.pow(3));
+    }
+
+    // TODO: This test was originally from an older design of `DepthOrdering`.
+    // It exercises more cases than needed and I don’t know if it has complete coverage any more.
     #[test]
     fn depth_ordering_from_view_direction() {
         let mut problems = Vec::new();
-        // A coordinate range of ±3 will exercise every combination of axis orderings.
+        // A coordinate range of ±3 will (more than) exercise every combination of axis orderings.
         let range = -3..3;
         for x in range.clone() {
             for y in range.clone() {
                 for z in range.clone() {
                     let direction = GridVector::new(x, y, z);
                     let ordering = DepthOrdering::from_view_direction(direction);
-                    let rotated_direction = match ordering {
-                        DepthOrdering::Within => direction,
-                        DepthOrdering::Direction(rotation) => {
-                            rotation.to_rotation_matrix().transform_vector(direction)
-                        }
-                    };
-                    let good = rotated_direction.x >= rotated_direction.y
-                        && rotated_direction.y >= rotated_direction.z;
+                    let rotated_direction =
+                        ordering.sort_key_rotation().transform_vector(direction);
+                    let good = rotated_direction.x >= 0
+                        && rotated_direction.y >= 0
+                        && rotated_direction.z >= 0;
                     println!(
                         "{:?} → {:?} → {:?}{}",
                         direction,
