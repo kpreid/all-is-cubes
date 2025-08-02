@@ -261,14 +261,13 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         self.block_instances.iter()
     }
 
-    /// Sort the existing indices of `self.transparent_range(DepthOrdering::Within)` for
+    /// Sort the existing indices of `self.mesh().transparent_range(DepthOrdering::Within)` for
     /// the given view position in world coordinates.
     ///
     /// This is intended to be cheap enough to do every frame.
     ///
-    /// Returns whether anything was done, i.e. whether the new indices should be copied
-    /// to the GPU.
-    pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> bool {
+    /// Returns information including whether there was any change in ordering.
+    pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> crate::DepthSortInfo {
         // Subtract chunk origin because the mesh coordinates are in chunk-relative
         // coordinates but the incoming view position is in world coordinates.
         // TODO: This makes poor use of the precision of Vert::Coordinate (probably f32).

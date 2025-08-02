@@ -24,8 +24,8 @@ use all_is_cubes_render::camera::TransparencyOption;
 use crate::testing::{Allocator, TexPoint, TextureMt, mesh_blocks_and_space};
 use crate::texture::TexelUnit;
 use crate::{
-    BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering, IndexSlice, MeshOptions,
-    MeshTypes, SpaceMesh, block_meshes_for_space,
+    BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering, DepthSortInfo, IndexSlice,
+    MeshOptions, MeshTypes, SpaceMesh, block_meshes_for_space,
 };
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
@@ -751,6 +751,41 @@ fn space_mesh_empty() {
     assert_eq!(t.flaws(), Flaws::empty());
     assert_eq!(t.vertices(), (&[][..], &[][..]));
     assert_eq!(t.indices(), IndexSlice::U16(&[]));
+}
+
+#[rstest::rstest]
+fn depth_sort_info(#[values(false, true)] transparent: bool) {
+    let maybe_transparent_block = if transparent {
+        block::from_color!(1.0, 0.0, 0.0, 0.5)
+    } else {
+        block::from_color!(1.0, 0.0, 0.0, 1.0)
+    };
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1]))
+        .build_and_mutate(|m| {
+            // Two blocks that need to be sorted vs. each other, if transparent
+            m.set([0, 0, 0], &maybe_transparent_block)?;
+            m.set([2, 0, 0], &maybe_transparent_block)?;
+            Ok(())
+        })
+        .unwrap();
+    let (_, _, mut space_mesh) = mesh_blocks_and_space(&space);
+
+    let info = space_mesh.depth_sort_for_view(point3(0., 0., 0.));
+
+    assert_eq!(
+        info,
+        if transparent {
+            DepthSortInfo {
+                changed: true,
+                quads_sorted: 12,
+            }
+        } else {
+            DepthSortInfo {
+                changed: false,
+                quads_sorted: 0,
+            }
+        }
+    );
 }
 
 #[test]

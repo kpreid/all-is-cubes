@@ -445,19 +445,27 @@ impl<M: MeshTypes> SpaceMesh<M> {
     ///
     /// This is intended to be cheap enough to do every frame.
     ///
-    /// Returns whether anything was done, i.e. whether the new indices should be copied
-    /// to the GPU.
-    ///
-    /// Note that in the current implementation, the return value is `true` even if no
-    /// reordering occurred, unless there is nothing to sort. This may be improved in the future.
-    pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> bool {
+    /// Returns information including whether there was any change in ordering.
+    pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> DepthSortInfo {
         if !M::Vertex::WANTS_DEPTH_SORTING {
-            return false;
+            return DepthSortInfo {
+                changed: false,
+                quads_sorted: 0,
+            };
         }
         let range = self.transparent_range(DepthOrdering::Within);
-        if range.len() < 12 {
+        let quad_count = range.len() / 6;
+        if quad_count < 2 {
             // No point in sorting unless there's at least two quads.
-            return false;
+            // TODO: It would be more precise to ask “is there more than one _box_ to sort?”,
+            // but while the current mesh generator always generates whole boxes under
+            // `TransparencyFormat::Volumetric`, we don't have any guarantee that’s true in general
+            // (we might later optimize to omit some transparent faces that are always occluded)
+            // so we can’t just ask whether the quad count is greater than 6.
+            return DepthSortInfo {
+                changed: false,
+                quads_sorted: quad_count,
+            };
         }
 
         fn generic_sort<M: MeshTypes, Ix: Copy + num_traits::NumCast>(
@@ -479,7 +487,10 @@ impl<M: MeshTypes> SpaceMesh<M> {
             IndexVec::U32(vec) => generic_sort::<M, u32>(&mut vec[range], positions, view_position),
         }
 
-        true
+        DepthSortInfo {
+            changed: true,
+            quads_sorted: quad_count,
+        }
     }
 
     /// Compute quad midpoint from quad vertices, for depth sorting.
@@ -1056,6 +1067,34 @@ impl DepthOrdering {
             DepthOrdering::Any | DepthOrdering::Within => self,
             DepthOrdering::Direction(rot) => DepthOrdering::Direction(rot * GridRotation::Rxyz),
         }
+    }
+}
+
+/// Information returned by [`SpaceMesh::depth_sort_for_view()`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub struct DepthSortInfo {
+    /// Whether the order actually changed as a result of sorting.
+    ///
+    /// This may be used to determine, for example, whether the newly sorted indices need to be
+    /// copied to a GPU buffers.
+    ///
+    /// Note that in the current implementation, this is `true` if the sort was performed even if no
+    /// reordering occurred, unless there is nothing to sort. This may be improved in the future.
+    pub changed: bool,
+
+    /// How many quads were in the data to be sorted.
+    pub(crate) quads_sorted: usize,
+}
+
+impl ops::AddAssign for DepthSortInfo {
+    fn add_assign(&mut self, rhs: Self) {
+        let Self {
+            changed,
+            quads_sorted,
+        } = self;
+        *changed |= rhs.changed;
+        *quads_sorted += rhs.quads_sorted;
     }
 }
 

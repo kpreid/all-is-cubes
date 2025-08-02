@@ -74,6 +74,7 @@ In order to resolve various design problems interfering with development, the `a
 
 - `all-is-cubes-mesh` library:
     - Renamed `GfxVertex` to `Vertex`.
+    - The return type of `depth_sort_for_view()` functions has changed from `bool` to a new `struct DepthSortInfo` (which contains that boolean).
 
 - `all-is-cubes-render` library:
     - `HeadlessRenderer::update()` is no longer async.
