@@ -135,7 +135,7 @@ rectangle-pack = { version = "0.4.2" } # currently only used in all-is-cubes-por
 rendiff = { version = "0.2.0", default-features = false }
 # We use rstest for parameterized tests where each case can fail or succeed independently.
 # If there are too many cases to write literally, use `all_is_cubes::util::MultiFailure` instead.
-rstest = { version = "0.25.0", default-features = false }
+rstest = { version = "0.26.0", default-features = false }
 scopeguard = { version = "1.2.0", default-features = false }
 # "futures" feature is used by all-is-cubes-gpu, but it's small so we enable it everywhere 
 send_wrapper = { version = "0.6.0", default-features = false, features = ["futures"] }
