@@ -213,9 +213,9 @@ impl GridRotation {
                     return None;
                 }
                 NZ => Self::IDENTITY,
-                PX => Self::CLOCKWISE,
-                PZ => Self::RxYz,
-                NX => Self::COUNTERCLOCKWISE,
+                PX => PY.clockwise(),
+                PZ => PY.r180(),
+                NX => PY.counterclockwise(),
             };
             // Transform that rotation into the given frame.
             Some(canonical_to_given * canonical_rotation * given_to_canonical)
@@ -304,10 +304,10 @@ impl GridRotation {
     /// #   pub use all_is_cubes_base::math;
     /// # }
     /// use all_is_cubes::block::Resolution;
-    /// use all_is_cubes::math::{GridAab, GridRotation};
+    /// use all_is_cubes::math::{Face6, GridAab, GridRotation};
     ///
     /// let b = GridAab::for_block(Resolution::R8);
-    /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_transform(8);
+    /// let rotation = Face6::PY.clockwise().to_positive_octant_transform(8);
     /// assert_eq!(b.transform(rotation), Some(b));
     /// ```
     ///
@@ -317,9 +317,9 @@ impl GridRotation {
     /// (due to the lower-corner format of cube coordinates).
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{GridAab, Cube, GridRotation};
+    /// # use all_is_cubes::math::{Cube, Face6, GridAab, GridRotation};
     ///
-    /// let rotation = GridRotation::CLOCKWISE.to_positive_octant_transform(4);
+    /// let rotation = Face6::PY.clockwise().to_positive_octant_transform(4);
     /// assert_eq!(rotation.transform_cube(Cube::new(0, 0, 0)), Cube::new(3, 0, 0));
     /// assert_eq!(rotation.transform_cube(Cube::new(3, 0, 0)), Cube::new(3, 0, 3));
     /// assert_eq!(rotation.transform_cube(Cube::new(3, 0, 3)), Cube::new(0, 0, 3));
@@ -516,12 +516,12 @@ impl GridRotation {
     /// );
     ///
     /// assert_eq!(
-    ///     GridRotation::CLOCKWISE.iterate().collect::<Vec<_>>(),
+    ///     PY.clockwise().iterate().collect::<Vec<_>>(),
     ///     vec![
     ///         GridRotation::IDENTITY,
-    ///         GridRotation::CLOCKWISE,
-    ///         GridRotation::CLOCKWISE * GridRotation::CLOCKWISE,
-    ///         GridRotation::COUNTERCLOCKWISE,
+    ///         PY.clockwise(),
+    ///         PY.r180(),
+    ///         PY.counterclockwise(),
     ///    ],
     /// );
     /// ```

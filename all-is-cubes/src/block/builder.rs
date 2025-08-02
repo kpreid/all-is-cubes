@@ -569,7 +569,7 @@ mod tests {
                 .animation_hint(block::AnimationHint::replacement(
                     block::AnimationChange::Shape
                 ))
-                .modifier(Modifier::Rotate(GridRotation::CLOCKWISE))
+                .modifier(Modifier::Rotate(Face6::PY.clockwise()))
                 .build(),
             Block::from(block::Atom {
                 color,
@@ -586,7 +586,7 @@ mod tests {
                 activation_action,
                 animation_hint: block::AnimationHint::replacement(block::AnimationChange::Shape),
             })
-            .with_modifier(Modifier::Rotate(GridRotation::CLOCKWISE))
+            .with_modifier(Modifier::Rotate(Face6::PY.clockwise()))
         );
     }
 

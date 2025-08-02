@@ -160,13 +160,13 @@ impl BoxStyle {
         ceiling: Option<Block>,
         corner: Option<Block>,
     ) -> Self {
-        let corner_px_nz = corner
-            .clone()
-            .map(|block| block.rotate(GridRotation::CLOCKWISE));
+        let up = Face6::PY;
+
+        let corner_px_nz = corner.clone().map(|block| block.rotate(up.clockwise()));
         let corner_px_pz = corner.clone().map(|block| block.rotate(GridRotation::RxYz));
         let corner_nx_pz = corner
             .clone()
-            .map(|block| block.rotate(GridRotation::COUNTERCLOCKWISE));
+            .map(|block| block.rotate(up.counterclockwise()));
         let corner_nx_nz = corner;
         let unsupported = || None;
 

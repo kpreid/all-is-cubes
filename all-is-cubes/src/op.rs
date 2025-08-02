@@ -600,7 +600,7 @@ mod tests {
     fn rotated_become_atom() {
         let [atom] = make_some_blocks();
         let op = Operation::Become(atom);
-        assert_eq!(op.clone(), op.rotate(GridRotation::CLOCKWISE));
+        assert_eq!(op.clone(), op.rotate(Face6::PY.clockwise()));
     }
 
     #[test]
@@ -650,14 +650,14 @@ mod tests {
             })
             .unwrap();
 
-        let op = Operation::AddModifiers([block::Modifier::Rotate(GridRotation::CLOCKWISE)].into());
+        let op = Operation::AddModifiers([block::Modifier::Rotate(Face6::PY.clockwise())].into());
 
         assert_eq!(
             op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
             (
                 CubeTransaction::replacing(
                     Some(block.clone()),
-                    Some(block.clone().rotate(GridRotation::CLOCKWISE))
+                    Some(block.clone().rotate(Face6::PY.clockwise()))
                 )
                 .at(Cube::ORIGIN),
                 InventoryTransaction::default()
@@ -728,7 +728,7 @@ mod tests {
             op.apply(
                 &space,
                 None,
-                GridRotation::CLOCKWISE.to_positive_octant_transform(1)
+                Face6::PY.clockwise().to_positive_octant_transform(1)
             )
             .unwrap(),
             (
@@ -811,7 +811,7 @@ mod tests {
     ///
     /// This function should be called at least once for each Operation variant.
     fn transform_consistent_with_rotate(universe: &Universe, initial_block: Block, op: Operation) {
-        let rotation = GridRotation::CLOCKWISE;
+        let rotation = Face6::PY.clockwise();
         let space = Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]))
             .read_ticket(universe.read_ticket())
             .build_and_mutate(|m| {

@@ -978,7 +978,7 @@ mod tests {
                 let mut t = SpaceTransaction::set_cube(
                     Cube::ORIGIN,
                     Some(AIR),
-                    Some(tool_block.clone().rotate(GridRotation::CLOCKWISE)),
+                    Some(tool_block.clone().rotate(Face6::PY.clockwise())),
                 );
                 t.at(Cube::ORIGIN).add_fluff(Fluff::PlaceBlockGeneric);
                 t
@@ -1197,7 +1197,7 @@ mod tests {
             SpaceTransaction::set_cube(
                 [0, 0, 0],
                 Some(existing),
-                Some(placed.rotate(GridRotation::CLOCKWISE)),
+                Some(placed.rotate(Face6::PY.clockwise())),
             )
             .bind(tester.space_handle)
         );

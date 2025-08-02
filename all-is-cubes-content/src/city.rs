@@ -330,7 +330,7 @@ impl<'u> State<'u> {
         self.space.mutate(self.universe.read_ticket(), |m| {
             'directions: for direction in CityPlanner::ROAD_DIRECTIONS {
                 let perpendicular: GridVector =
-                    GridRotation::CLOCKWISE.transform(direction).normal_vector();
+                    Face6::PY.clockwise().transform(direction).normal_vector();
                 for distance in (CityPlanner::LAMP_POSITION_RADIUS..self.planner.city_radius)
                     .step_by(lamp_spacing)
                 {
@@ -377,7 +377,7 @@ impl<'u> State<'u> {
                 Tool::PushPull,
                 Tool::Custom {
                     op: Operation::AddModifiers(
-                        [block::Modifier::Rotate(GridRotation::CLOCKWISE)].into(),
+                        [block::Modifier::Rotate(Face6::PY.clockwise())].into(),
                     ),
                     icon: block::Block::builder()
                         .color(rgba_const!(0.0, 0.5, 0.0, 1.0))
@@ -708,7 +708,7 @@ fn place_roads_and_tunnels(
     use DemoBlocks::*;
 
     for face in CityPlanner::ROAD_DIRECTIONS {
-        let perpendicular: GridVector = GridRotation::CLOCKWISE.transform(face).normal_vector();
+        let perpendicular: GridVector = Face6::PY.clockwise().transform(face).normal_vector();
         let road_aligned_rotation = GridRotation::from_to(Face6::NZ, face, Face6::PY).unwrap();
         let other_side_of_road =
             GridRotation::from_basis([Face6::NX, Face6::PY, Face6::NZ]) * road_aligned_rotation;
@@ -781,7 +781,7 @@ fn place_roads_and_tunnels(
                         step.cube_ahead() + GridVector::new(0, -2, 0) + perpendicular * p,
                         demo_blocks[Sconce(true)]
                             .clone()
-                            .rotate(GridRotation::CLOCKWISE * rotations[side]),
+                            .rotate(Face6::PY.clockwise() * rotations[side]),
                     )?;
                 }
             }
@@ -935,7 +935,7 @@ impl CityPlanner {
             [Self::ROAD_RADIUS + 1, Self::SURFACE_Y + 2, city_radius + 1],
         );
         occupied_plots.push(road);
-        occupied_plots.push(road.transform(GridRotation::CLOCKWISE.into()).unwrap());
+        occupied_plots.push(road.transform(Face6::PY.clockwise().into()).unwrap());
         Self {
             space_bounds,
             city_radius,
@@ -947,7 +947,7 @@ impl CityPlanner {
         // TODO: We'd like to resume the search from _when we left off_, but that's tricky since a
         // smaller plot might fit where a large one didn't. So, quadratic search it is for now.
         for d in 0..=self.city_radius {
-            for street_axis in GridRotation::CLOCKWISE.iterate() {
+            for street_axis in Face6::PY.clockwise().iterate() {
                 // TODO exercising opposite sides logic
                 'search: for &left_side in &[false, true] {
                     // The translation is expressed along the +X axis street, so
@@ -967,8 +967,7 @@ impl CityPlanner {
                     )) * if left_side {
                         Gridgid::IDENTITY
                     } else {
-                        (GridRotation::COUNTERCLOCKWISE * GridRotation::COUNTERCLOCKWISE)
-                            .to_positive_octant_transform(1)
+                        (Face6::PY.r180()).to_positive_octant_transform(1)
                     };
                     // Rotate to match street
                     transform = street_axis.to_positive_octant_transform(1) * transform;

@@ -5,7 +5,7 @@ use libfuzzer_sys::fuzz_target;
 use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{self, Block};
-use all_is_cubes::math::GridRotation;
+use all_is_cubes::math::Face6;
 use all_is_cubes::universe::{self, ReadTicket, VisitHandles as _};
 
 fuzz_target!(
@@ -33,7 +33,7 @@ fn check_block(read_ticket: ReadTicket<'_>, block: &Block) {
                 let mut rotated = block.clone();
                 rotated
                     .modifiers_mut()
-                    .push(block::Modifier::Rotate(GridRotation::CLOCKWISE));
+                    .push(block::Modifier::Rotate(Face6::PY.clockwise()));
                 if let Ok(ev_rotated) = rotated.evaluate(ReadTicket::stub()) {
                     assert_eq!(
                         (ev_rotated.attributes(), ev_rotated.voxels()),

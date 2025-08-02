@@ -4,7 +4,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 
 use all_is_cubes::block::{EvaluatedBlock, Modifier};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
-use all_is_cubes::math::GridRotation;
+use all_is_cubes::math::Face6;
 use all_is_cubes::universe::Universe;
 
 pub fn evaluate_bench(c: &mut Criterion) {
@@ -39,7 +39,7 @@ pub fn evaluate_bench(c: &mut Criterion) {
         let [mut block] = make_some_voxel_blocks(&mut universe);
         {
             let m = block.modifiers_mut();
-            m.extend(vec![Modifier::Rotate(GridRotation::CLOCKWISE); 100]);
+            m.extend(vec![Modifier::Rotate(Face6::PY.clockwise()); 100]);
         }
         b.iter_with_large_drop(|| -> EvaluatedBlock {
             block.evaluate(universe.read_ticket()).unwrap()

@@ -21,7 +21,7 @@ fn TRANSPARENCY_WHOLE_BLOCK(ctx: Context<'_>) {
     let space = Space::builder(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]))
         .read_ticket(ctx.universe.read_ticket())
         .build_and_mutate(|m| {
-            for (rot, color) in GridRotation::CLOCKWISE.iterate().zip(&colors) {
+            for (rot, color) in Face6::PY.clockwise().iterate().zip(&colors) {
                 m.fill(
                     windowpane
                         .transform(rot.to_positive_octant_transform(1))
@@ -69,7 +69,7 @@ fn TRANSPARENCY_SHRUNKEN_BLOCK(ctx: Context<'_>) {
     let space = Space::builder(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]))
         .read_ticket(ctx.universe.read_ticket())
         .build_and_mutate(|m| {
-            for rot in GridRotation::CLOCKWISE.iterate() {
+            for rot in Face6::PY.clockwise().iterate() {
                 let region = GridAab::from_lower_upper([-1, 0, 3], [2, 4, 4]);
                 m.fill(
                     region

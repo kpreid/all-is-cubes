@@ -240,11 +240,11 @@ impl OrthoCamera {
         }
         .to_f64();
         let rotation = Gridgid::from_rotation_about_origin(match viewed_face {
-            Face6::NX => GridRotation::CLOCKWISE,
-            Face6::NY => GridRotation::RXZy,
-            Face6::NZ => GridRotation::CLOCKWISE * GridRotation::CLOCKWISE,
-            Face6::PX => GridRotation::COUNTERCLOCKWISE,
-            Face6::PY => GridRotation::RXzY,
+            Face6::NX => Face6::PY.clockwise(),
+            Face6::NY => Face6::PX.clockwise(),
+            Face6::NZ => Face6::PY.clockwise() * Face6::PY.clockwise(), // arbitrary 180°
+            Face6::PX => Face6::PY.counterclockwise(),
+            Face6::PY => Face6::PX.counterclockwise(),
             Face6::PZ => GridRotation::IDENTITY,
         })
         .to_matrix()

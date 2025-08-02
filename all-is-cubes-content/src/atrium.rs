@@ -273,7 +273,7 @@ pub(crate) async fn atrium(
                                     GridRotation::RxYZ
                                 } else {
                                     GridRotation::IDENTITY
-                                }) * GridRotation::COUNTERCLOCKWISE,
+                                }) * Face6::PY.counterclockwise(),
                             );
                             let arch_axis_arch = lookup_multiblock_2d(
                                 &blocks,
@@ -329,7 +329,7 @@ fn map_text_block(
         b'.' => AIR,
         b'#' => blocks[AtriumBlocks::SolidBricks]
             .clone()
-            .rotate(GridRotation::CLOCKWISE),
+            .rotate(Face6::PY.clockwise()),
         b'G' => blocks[AtriumBlocks::GroundColumn].clone(),
         b'o' => blocks[AtriumBlocks::SmallColumn].clone(),
         b'|' => blocks[AtriumBlocks::SquareColumn].clone(),
@@ -347,7 +347,7 @@ fn map_text_block(
             // TODO: Coordinate systems in use aren't really consistent.
             // If we reorient the bricks so that they run along the X axis instead of the Z axis, that should help.
             block.rotate(
-                GridRotation::CLOCKWISE
+                Face6::PY.clockwise()
                     * if mirrored_half {
                         GridRotation::IDENTITY
                     } else {
@@ -371,7 +371,7 @@ fn map_text_block(
             // TODO: Coordinate systems in use aren't really consistent.
             // If we reorient the bricks so that they run along the X axis instead of the Z axis, that should help.
             block.rotate(
-                GridRotation::CLOCKWISE
+                Face6::PY.clockwise()
                     * if mirrored_half {
                         GridRotation::IDENTITY
                     } else {
@@ -382,7 +382,7 @@ fn map_text_block(
         b'T' => block::Composite::new(
             blocks[AtriumBlocks::Molding]
                 .clone()
-                .rotate(GridRotation::CLOCKWISE),
+                .rotate(Face6::PY.clockwise()),
             block::CompositeOperator::Over,
         )
         .with_disassemblable()

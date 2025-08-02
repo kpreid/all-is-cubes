@@ -434,7 +434,7 @@ mod tests {
     fn move_inside_rotation() {
         let universe = Universe::new();
         let [base] = make_some_blocks();
-        const R: Modifier = Modifier::Rotate(GridRotation::CLOCKWISE);
+        const R: Modifier = Modifier::Rotate(Face6::PY.clockwise());
 
         let block = base
             .clone()

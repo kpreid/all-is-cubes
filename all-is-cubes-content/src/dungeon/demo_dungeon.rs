@@ -173,7 +173,7 @@ impl DemoTheme {
         let room_1_box = self.actual_room_box(room_1_position, room_1_data);
         let room_2_box = self.actual_room_box(room_2_position, room_2_data);
 
-        let wall_parallel = GridRotation::CLOCKWISE.transform(face);
+        let wall_parallel = Face6::PY.clockwise().transform(face);
         let parallel_axis = wall_parallel.axis();
         assert!(parallel_axis != Axis::Y);
 
@@ -317,7 +317,8 @@ impl DemoTheme {
         // TODO: there should be an operation-modifier that means "match this against any rotation"
         // instead of this approach of making rotated copies of the operation
         let unlock = op::Operation::Alt(
-            GridRotation::CLOCKWISE
+            Face6::PY
+                .clockwise()
                 .iterate()
                 .map(|r| unlock_unrotated.clone().rotate(r))
                 .collect::<Arc<_>>(),
@@ -408,7 +409,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 four_walls(
                     interior.expand(FaceMap::splat(1)),
                     |origin, along_wall, length, wall_excluding_corners_box| {
-                        let wall = GridRotation::CLOCKWISE.transform(along_wall); // TODO: make four_walls provide this in a nice name
+                        let wall = Face6::PY.clockwise().transform(along_wall); // TODO: make four_walls provide this in a nice name
                         let midpoint = (length / 2).cast_signed();
 
                         if let WallFeature::Window = room_data.wall_features[wall] {

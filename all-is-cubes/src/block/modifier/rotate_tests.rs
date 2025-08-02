@@ -140,5 +140,5 @@ fn rotate_by_identity() {
     let [block] = make_some_voxel_blocks(universe);
     assert_eq!(block, block.clone().rotate(GridRotation::IDENTITY));
     // prove that the test didn't trivially pass by applying to a symmetric block
-    assert_ne!(block, block.clone().rotate(GridRotation::CLOCKWISE));
+    assert_ne!(block, block.clone().rotate(Face6::PY.clockwise()));
 }

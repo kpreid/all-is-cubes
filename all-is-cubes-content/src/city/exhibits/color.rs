@@ -127,12 +127,7 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
             .read_ticket(ctx.universe.read_ticket())
             .filled_with(wall_color_block.clone())
             .build_and_mutate(|m| {
-                for rotation in [
-                    GridRotation::IDENTITY,
-                    GridRotation::CLOCKWISE,
-                    GridRotation::CLOCKWISE * GridRotation::CLOCKWISE,
-                    GridRotation::COUNTERCLOCKWISE,
-                ] {
+                for rotation in Face6::PY.clockwise().iterate() {
                     let transform = rotation.to_positive_octant_transform(wall_resolution_g)
                         * Gridgid::from_translation([4, 4, wall_resolution_g - 1]);
 
