@@ -603,7 +603,7 @@ impl SpaceRenderer {
                         "",
                     );
                     draw_chunk_instance(
-                        chunk.mesh().transparent_range(DepthOrdering::Any),
+                        chunk.mesh().transparent_range(DepthOrdering::ANY),
                         render_pass,
                         buffers,
                         &mut instance_buffer_writer,
@@ -861,11 +861,6 @@ impl SpaceRenderer {
                     let ordering = depth_ordering_for_viewing(near_chunk_pos, view_chunk);
 
                     let glyph: Vec<FreePoint> = match ordering {
-                        DepthOrdering::Any => vec![
-                            FreePoint::new(0.0, 0.0, 0.0),
-                            FreePoint::new(0.5, 1.0, 0.5),
-                            FreePoint::new(1.0, 0.0, 1.0),
-                        ],
                         DepthOrdering::Within => vec![
                             FreePoint::new(0.0, 1.0, 0.0),
                             FreePoint::new(0.5, 0.0, 0.5),

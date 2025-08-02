@@ -112,7 +112,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     fn consistency_check(&self) {
         assert_eq!(self.vertices.0.len(), self.vertices.1.len());
         assert_eq!(self.opaque_range().start, 0);
-        let len_transparent = self.transparent_range(DepthOrdering::Any).len();
+        let len_transparent = self.transparent_range(DepthOrdering::ANY).len();
         for &rot in &GridRotation::ALL {
             assert_eq!(
                 self.transparent_range(DepthOrdering::Direction(rot)).len(),
@@ -863,7 +863,7 @@ impl<M: MeshTypes> MeshMeta<M> {
     // TODO(instancing): this exists to match `BlockMesh::count_indices()`.
     #[allow(unused)]
     pub(crate) fn count_indices(&self) -> usize {
-        self.opaque_range.len() + self.transparent_range(DepthOrdering::Any).len()
+        self.opaque_range.len() + self.transparent_range(DepthOrdering::ANY).len()
     }
 
     /// The range of index data which contains the triangles with only alpha values
@@ -968,8 +968,6 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
 #[expect(clippy::exhaustive_enums)]
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub enum DepthOrdering {
-    /// Any ordering is acceptable.
-    Any,
     /// The viewpoint is within the volume; therefore dynamic rather than precomputed
     /// sorting must be used.
     Within,
@@ -992,6 +990,14 @@ pub enum DepthOrdering {
 }
 
 impl DepthOrdering {
+    /// An arbitrary choice of ordering.
+    ///
+    /// Use this when querying the mesh’s indices without regard for ordering.
+    //---
+    // Note: `Within` is used because in principle, we should be omitting known back-faces
+    // from the ordered index lists, whereas `Within` always has to be sorted.
+    pub const ANY: Self = Self::Within;
+
     // The numeric ordering is used only internally.
     const ROT_COUNT: usize = GridRotation::ALL.len();
     const COUNT: usize = Self::ROT_COUNT + 1;
@@ -1008,7 +1014,7 @@ impl DepthOrdering {
     fn to_index(self) -> usize {
         match self {
             DepthOrdering::Direction(rotation) => rotation as usize,
-            DepthOrdering::Within | DepthOrdering::Any => DepthOrdering::ROT_COUNT,
+            DepthOrdering::Within => DepthOrdering::ROT_COUNT,
         }
     }
 
@@ -1069,7 +1075,7 @@ impl DepthOrdering {
 
     fn rev(self) -> Self {
         match self {
-            DepthOrdering::Any | DepthOrdering::Within => self,
+            DepthOrdering::Within => self,
             DepthOrdering::Direction(rot) => DepthOrdering::Direction(rot * GridRotation::Rxyz),
         }
     }

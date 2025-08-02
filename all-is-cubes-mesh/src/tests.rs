@@ -799,9 +799,6 @@ fn depth_ordering_from_view_direction() {
                 let direction = Vector3D::new(x, y, z);
                 let ordering = DepthOrdering::from_view_direction(direction);
                 let rotated_direction = match ordering {
-                    DepthOrdering::Any => {
-                        panic!("from_view_direction should not return Any")
-                    }
                     DepthOrdering::Within => direction,
                     DepthOrdering::Direction(rotation) => {
                         rotation.to_rotation_matrix().transform_vector(direction)
