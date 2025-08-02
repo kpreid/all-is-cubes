@@ -342,7 +342,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// See [volumetric sort (2006)] for a description of the algorithm we're implementing
     /// using these sorts.
     ///
-    /// [volumetric sort (2006)]: https://iquilezles.org/www/articles/volumesort/volumesort.htm
+    /// [volumetric sort (2006)]: https://iquilezles.org/articles/volumesort/
     fn store_indices_and_finish_compute(
         &mut self,
         opaque_indices_deque: IndexVecDeque,
@@ -982,7 +982,12 @@ pub enum DepthOrdering {
     /// For more information on this classification scheme and the sort that uses it,
     /// see [volumetric sort (2006)].
     ///
-    /// [volumetric sort (2006)]: https://iquilezles.org/www/articles/volumesort/volumesort.htm
+    /// [volumetric sort (2006)]: https://iquilezles.org/articles/volumesort/
+    //---
+    // TODO: This sorting strategy is overkill for what we need. We need *at most* the 27
+    // orderings of octants + aligned-in-one-axis views, not the 48 orderings this defines.
+    // <https://github.com/kpreid/all-is-cubes/issues/53#issuecomment-3146236910>
+    // Reduce this to represent only those.
     Direction(GridRotation),
 }
 
