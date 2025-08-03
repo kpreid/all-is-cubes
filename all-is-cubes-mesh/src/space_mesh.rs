@@ -358,8 +358,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         let range = self.transparent_range(DepthOrdering::WITHIN);
         depth_sorting::dynamic_depth_sort_for_view::<M>(
             &self.vertices.0,
-            &mut self.indices,
-            range,
+            self.indices.as_mut_slice(range),
             view_position,
         )
     }

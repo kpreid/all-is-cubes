@@ -44,6 +44,13 @@ pub enum IndexSlice<'a> {
     U32(&'a [u32]),
 }
 
+pub(crate) enum IndexSliceMut<'a> {
+    /// 16-bit indices.
+    U16(&'a mut [u16]),
+    /// 32-bit indices.
+    U32(&'a mut [u32]),
+}
+
 // -------------------------------------------------------------------------------------------------
 
 impl IndexVec {
@@ -83,6 +90,18 @@ impl IndexVec {
         match self {
             Self::U16(vec) => IndexSlice::U16(&vec.as_slice()[range]),
             Self::U32(vec) => IndexSlice::U32(&vec.as_slice()[range]),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn as_mut_slice<R>(&mut self, range: R) -> IndexSliceMut<'_>
+    where
+        [u16]: ops::IndexMut<R, Output = [u16]>,
+        [u32]: ops::IndexMut<R, Output = [u32]>,
+    {
+        match self {
+            Self::U16(vec) => IndexSliceMut::U16(&mut vec.as_mut_slice()[range]),
+            Self::U32(vec) => IndexSliceMut::U32(&mut vec.as_mut_slice()[range]),
         }
     }
 
@@ -190,6 +209,16 @@ impl<'a> IndexSlice<'a> {
         match self {
             IndexSlice::U16(slice) => Either::Left(slice.iter().copied().map(u32::from)),
             IndexSlice::U32(slice) => Either::Right(slice.iter().copied()),
+        }
+    }
+}
+
+impl IndexSliceMut<'_> {
+    #[inline]
+    pub fn len(&self) -> usize {
+        match self {
+            IndexSliceMut::U16(slice) => slice.len(),
+            IndexSliceMut::U32(slice) => slice.len(),
         }
     }
 }

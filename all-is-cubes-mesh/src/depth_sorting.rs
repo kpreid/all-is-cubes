@@ -10,7 +10,7 @@ use all_is_cubes::math::{Aab, Axis, Cube, FreePoint, GridRotation};
 
 #[cfg(doc)]
 use crate::SpaceMesh;
-use crate::{IndexVec, MeshTypes, VPos, Vertex};
+use crate::{IndexSliceMut, IndexVec, MeshTypes, VPos, Vertex};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -295,8 +295,7 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I>(
 /// Returns information including whether there was any change in ordering.
 pub fn dynamic_depth_sort_for_view<M: MeshTypes>(
     vertices: &[M::Vertex],
-    indices: &mut IndexVec,
-    range: Range<usize>,
+    indices: IndexSliceMut<'_>,
     view_position: VPos<M>,
 ) -> DepthSortInfo {
     if !M::Vertex::WANTS_DEPTH_SORTING {
@@ -305,7 +304,7 @@ pub fn dynamic_depth_sort_for_view<M: MeshTypes>(
             quads_sorted: 0,
         };
     }
-    let quad_count = range.len() / 6;
+    let quad_count = indices.len() / 6;
     if quad_count < 2 {
         // No point in sorting unless there's at least two quads.
         // TODO: It would be more precise to ask “is there more than one _box_ to sort?”,
@@ -331,8 +330,8 @@ pub fn dynamic_depth_sort_for_view<M: MeshTypes>(
     }
 
     match indices {
-        IndexVec::U16(vec) => generic_sort::<M, u16>(&mut vec[range], vertices, view_position),
-        IndexVec::U32(vec) => generic_sort::<M, u32>(&mut vec[range], vertices, view_position),
+        IndexSliceMut::U16(slice) => generic_sort::<M, u16>(slice, vertices, view_position),
+        IndexSliceMut::U32(slice) => generic_sort::<M, u32>(slice, vertices, view_position),
     }
 
     DepthSortInfo {
