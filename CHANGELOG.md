@@ -75,7 +75,8 @@ In order to resolve various design problems interfering with development, the `a
 - `all-is-cubes-mesh` library:
     - Renamed `GfxVertex` to `Vertex`.
     - The return type of `depth_sort_for_view()` functions has changed from `bool` to a new `struct DepthSortInfo` (which contains that boolean).
-    - `DepthOrdering::Any` has been replaced with `DepthOrdering::ANY`, not a distinct variant.
+    - `DepthOrdering` is now an `struct`, and the variants `DepthOrdering::{Any, Within}` have been replaced with constants.
+      Additionally, there are now fewer distinct `DepthOrdering`s, reducing the amount of index data required for transparent meshes.
 
 - `all-is-cubes-render` library:
     - `HeadlessRenderer::update()` is no longer async.
