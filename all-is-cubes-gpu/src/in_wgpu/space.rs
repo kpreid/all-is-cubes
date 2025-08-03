@@ -4,7 +4,6 @@ use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::mem;
 use core::sync::atomic;
@@ -12,16 +11,13 @@ use core::time::Duration;
 use std::sync::{Mutex, PoisonError, mpsc};
 
 use hashbrown::HashSet;
-use itertools::Itertools as _;
 
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
-    Face6, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, GridSize, GridVector,
-    Rgb, Rgba, Wireframe as _, ZeroOne, rgba_const,
+    Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, Rgb, Rgba, Wireframe as _, ZeroOne,
 };
-use all_is_cubes::raycast::Ray;
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{Sky, Space, SpaceChange, SpaceFluff};
@@ -846,58 +842,6 @@ impl SpaceRenderer {
                     push(GridPoint::new(i, CHUNK_SIZE, 0));
                     push(GridPoint::new(0, i, 0));
                     push(GridPoint::new(CHUNK_SIZE, i, 0));
-                }
-            }
-
-            // Depth sorting order debug.
-            // TODO: Make this more legible and shown in more distant chunks.
-            if false {
-                for near_chunk_pos in
-                    GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]).interior_iter()
-                {
-                    let near_chunk_pos: ChunkPos<CHUNK_SIZE> =
-                        ChunkPos(view_chunk.0 + near_chunk_pos.lower_bounds().to_vector());
-
-                    let ordering = depth_ordering_for_viewing(near_chunk_pos, view_chunk);
-
-                    let glyph: Vec<FreePoint> = match ordering {
-                        DepthOrdering::Within => vec![
-                            FreePoint::new(0.0, 1.0, 0.0),
-                            FreePoint::new(0.5, 0.0, 0.5),
-                            FreePoint::new(1.0, 1.0, 1.0),
-                        ],
-                        DepthOrdering::Direction(d) => {
-                            Ray {
-                                origin: near_chunk_pos.bounds().center(),
-                                direction: d.transform_vector(GridVector::new(-1, -2, -4)).to_f64()
-                                    * 2.0,
-                            }
-                            .wireframe_points(
-                                &mut crate::map_line_vertices::<WgpuLinesVertex>(
-                                    v,
-                                    rgba_const!(1.0, 0.0, 1.0, 1.0),
-                                ),
-                            );
-
-                            continue;
-                        }
-                    };
-
-                    let lb = near_chunk_pos.bounds().lower_bounds().to_f64();
-
-                    let lines =
-                        glyph
-                            .iter()
-                            .tuple_windows()
-                            .flat_map(|(a, b)| [a, b])
-                            .map(|&point| {
-                                WgpuLinesVertex::from_position_color(
-                                    lb + point.to_vector() * f64::from(CHUNK_SIZE),
-                                    rgba_const!(1.0, 0.0, 1.0, 1.0),
-                                )
-                            });
-
-                    v.extend(lines);
                 }
             }
         }
