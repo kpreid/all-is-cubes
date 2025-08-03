@@ -744,9 +744,11 @@ impl SpaceRenderer {
                             // as the camera.
                             camera.view_position()
                                 - chunk.position().bounds().to_free().lower_bounds_v(),
-                            // TODO: this should be the bounding box of the transparent
-                            // portion.
-                            chunk.mesh().bounding_box().all().unwrap_or(Aab::ZERO),
+                            chunk
+                                .mesh()
+                                .bounding_box()
+                                .transparent()
+                                .unwrap_or(Aab::ZERO),
                         );
 
                         draw_chunk_instance(
