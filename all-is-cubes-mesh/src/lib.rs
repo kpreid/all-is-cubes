@@ -40,8 +40,8 @@ use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
 // -------------------------------------------------------------------------------------------------
 
-mod vertex;
-pub use vertex::*;
+mod aabb;
+use aabb::Aabb;
 mod block_mesh;
 pub use block_mesh::*;
 #[cfg(feature = "dynamic")]
@@ -57,6 +57,8 @@ pub use space_mesh::*;
 #[doc(hidden)]
 pub mod testing;
 pub mod texture;
+mod vertex;
+pub use vertex::*;
 
 #[cfg(test)]
 mod tests;

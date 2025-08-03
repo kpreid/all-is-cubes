@@ -13,8 +13,8 @@ use all_is_cubes_render::Flaws;
 #[cfg(doc)]
 use crate::texture;
 use crate::{
-    BlockMesh, DepthOrdering, DepthSortInfo, IndexSlice, IndexVec, IndexVecDeque, MeshOptions,
-    MeshTypes, VPos, Vertex, depth_sorting,
+    Aabb, BlockMesh, DepthOrdering, DepthSortInfo, IndexSlice, IndexVec, IndexVecDeque,
+    MeshOptions, MeshTypes, VPos, Vertex, depth_sorting,
 };
 
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
@@ -437,7 +437,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     vertices: &mut (Vec<M::Vertex>, Vec<<M::Vertex as Vertex>::SecondaryData>),
     opaque_indices: &mut IndexVecDeque,
     transparent_indices: &mut IndexVec,
-    bounding_box: &mut Option<Aab>,
+    bounding_box: &mut Aabb,
     mut neighbor_is_fully_opaque: impl FnMut(Face6) -> bool,
 ) {
     if block_mesh.is_empty() {
@@ -475,14 +475,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         transparent_indices
             .extend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset);
 
-        if let Some(block_bounding_box) =
-            sub_mesh.bounding_box.map(|bb| bb.translate(bb_translation))
-        {
-            *bounding_box = Some(match *bounding_box {
-                Some(bb) => bb.union(block_bounding_box),
-                None => block_bounding_box,
-            });
-        }
+        *bounding_box |= sub_mesh.bounding_box.translate(bb_translation);
     }
 }
 
@@ -524,7 +517,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 opaque_range: 0..0,
                 transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
-                bounding_box: block_mesh.bounding_box(),
+                bounding_box: block_mesh.bounding_box().into(),
                 flaws: block_mesh.flaws(),
             },
             block_indices_used,
@@ -678,8 +671,7 @@ pub struct MeshMeta<M: MeshTypes> {
     textures_used: Vec<M::Tile>,
 
     /// Bounding box of this mesh’s vertices.
-    /// `None` if there are no vertices.
-    bounding_box: Option<Aab>,
+    bounding_box: Aabb,
 
     /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
     //
@@ -695,7 +687,7 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// Note that this bounding box is not the same as the bounding box of non-fully-transparent
     /// voxels in the scene; it does not include interior volumes which are omitted from the mesh.
     pub fn bounding_box(&self) -> Option<Aab> {
-        self.bounding_box
+        self.bounding_box.into()
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
@@ -743,7 +735,7 @@ impl<M: MeshTypes> MeshMeta<M> {
         *opaque_range = 0..0;
         *transparent_ranges = [const { 0..0 }; DepthOrdering::COUNT];
         textures_used.clear();
-        *bounding_box = None;
+        *bounding_box = Aabb::None;
         *flaws = Flaws::empty();
     }
 }
@@ -757,7 +749,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
             opaque_range: 0..0,
             transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
             textures_used: Vec::new(),
-            bounding_box: None,
+            bounding_box: Aabb::None,
             flaws: Flaws::empty(),
         }
     }

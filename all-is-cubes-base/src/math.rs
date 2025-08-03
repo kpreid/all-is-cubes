@@ -167,6 +167,18 @@ pub trait Wireframe {
         E: Extend<LineVertex>;
 }
 
+impl<T: Wireframe> Wireframe for Option<T> {
+    #[allow(clippy::missing_inline_in_public_items)]
+    fn wireframe_points<E>(&self, output: &mut E)
+    where
+        E: Extend<LineVertex>,
+    {
+        if let Some(value) = self {
+            value.wireframe_points(output)
+        }
+    }
+}
+
 /// One end of a line to be drawn.
 ///
 /// These are the output of [`Wireframe::wireframe_points()`].

@@ -14,7 +14,7 @@ use all_is_cubes_render::Flaws;
 #[cfg(doc)]
 use crate::SpaceMesh;
 use crate::texture::{self, Tile as _};
-use crate::{IndexVec, MeshOptions, MeshTypes, Vertex};
+use crate::{Aabb, IndexVec, MeshOptions, MeshTypes, Vertex};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -107,8 +107,7 @@ pub(super) struct SubMesh<V: Vertex> {
     pub(super) fully_opaque: bool,
 
     /// Bounding box of the mesh’s vertices.
-    /// `None` if there are no vertices.
-    pub(super) bounding_box: Option<Aab>,
+    pub(super) bounding_box: Aabb,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -186,8 +185,9 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// bounding box due to hidden face culling.
     pub fn bounding_box(&self) -> Option<Aab> {
         self.all_sub_meshes()
-            .filter_map(|sm| sm.bounding_box)
-            .reduce(Aab::union)
+            .map(|sm| sm.bounding_box)
+            .reduce(Aabb::union)
+            .and_then(Aabb::into)
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
@@ -389,7 +389,7 @@ impl<V: Vertex> SubMesh<V> {
         indices_opaque: IndexVec::new(),
         indices_transparent: IndexVec::new(),
         fully_opaque: false,
-        bounding_box: None,
+        bounding_box: Aabb::None,
     };
 
     pub fn clear(&mut self) {
@@ -405,7 +405,7 @@ impl<V: Vertex> SubMesh<V> {
         indices_opaque.clear();
         indices_transparent.clear();
         *fully_opaque = false;
-        *bounding_box = None;
+        *bounding_box = Aabb::None;
     }
 
     pub fn is_empty(&self) -> bool {
@@ -429,15 +429,12 @@ impl<V: Vertex> SubMesh<V> {
 
         assert_eq!(self.vertices.0.len(), self.vertices.1.len());
 
-        let mut bounding_box: Option<Aab> = None;
+        let mut bounding_box = Aabb::None;
         for vertex in self.vertices.0.iter() {
             let position = vertex
                 .position()
                 .map(|coord| num_traits::ToPrimitive::to_f64(&coord).unwrap());
-            bounding_box = Some(match bounding_box {
-                None => Aab::from_lower_upper(position, position),
-                Some(aab) => aab.union_point(position),
-            });
+            bounding_box.add_point(position);
         }
         assert_eq!(
             bounding_box, self.bounding_box,

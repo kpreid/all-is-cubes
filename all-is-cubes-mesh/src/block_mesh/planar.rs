@@ -6,11 +6,11 @@ use core::ops::Range;
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D, vec3};
 use all_is_cubes::math::{
-    Aab, Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba, rgba_const,
+    Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba, rgba_const,
 };
 
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
-use crate::{BlockVertex, Coloring, IndexVec, Viz};
+use crate::{Aabb, BlockVertex, Coloring, IndexVec, Viz};
 
 /// This is the subset of `Evoxel` which is processed by the [`greedy_mesh()`] planar mesh
 /// generator. It does not distinguish emission other than “has some”, because we always
@@ -248,7 +248,7 @@ pub(super) fn push_quad<V, Tex>(
     high_corner: Point2D<FreeCoordinate, TexelUnit>,
     coloring: QuadColoring<'_, Tex>,
     viz: &mut Viz,
-    bounding_box: &mut Option<Aab>,
+    bounding_box: &mut Aabb,
 ) where
     V: crate::Vertex<TexPoint = Tex::Point>,
     Tex: texture::Plane,
@@ -286,12 +286,7 @@ pub(super) fn push_quad<V, Tex>(
                 vertices,
                 position_iter.map(|voxel_grid_point| {
                     let position = transform.transform_position(voxel_grid_point);
-
-                    *bounding_box = Some(match *bounding_box {
-                        None => Aab::from_lower_upper(position, position),
-                        Some(aab) => aab.union_point(position),
-                    });
-
+                    bounding_box.add_point(position);
                     V::from_block_vertex(BlockVertex {
                         position,
                         face,
@@ -320,12 +315,7 @@ pub(super) fn push_quad<V, Tex>(
                 vertices,
                 position_iter.map(|voxel_grid_point| {
                     let position = transform.transform_position(voxel_grid_point);
-
-                    *bounding_box = Some(match *bounding_box {
-                        None => Aab::from_lower_upper(position, position),
-                        Some(aab) => aab.union_point(position),
-                    });
-
+                    bounding_box.add_point(position);
                     V::from_block_vertex(BlockVertex {
                         position,
                         face,
@@ -368,12 +358,7 @@ pub(super) fn push_quad<V, Tex>(
                 vertices,
                 position_iter.map(|voxel_grid_point| {
                     let position = transform.transform_position(voxel_grid_point);
-
-                    *bounding_box = Some(match *bounding_box {
-                        None => Aab::from_lower_upper(position, position),
-                        Some(aab) => aab.union_point(position),
-                    });
-
+                    bounding_box.add_point(position);
                     V::from_block_vertex(BlockVertex {
                         position,
                         face,
