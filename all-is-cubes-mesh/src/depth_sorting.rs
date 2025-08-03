@@ -98,13 +98,13 @@ impl DepthOrdering {
     /// If the vector is zero, [`DepthOrdering::WITHIN`] will be returned. Thus, passing
     /// coordinates in units of chunks will result in returning `Within` exactly when the
     /// viewpoint is within the chunk (implying the need for finer-grained sorting).
-    ///---
-    /// TODO: This should be made able to be more precise by accepting a mesh bounding box
-    /// instead of a whole-chunk position.
+    //---
+    // TODO: This should be made able to be more precise by accepting a mesh bounding box
+    // instead of a whole-chunk position.
     pub fn from_view_direction(direction: GridVector) -> DepthOrdering {
         DepthOrdering(
             direction
-                .map(|coord| match coord.cmp(&0) {
+                .map(|coord| match 0.cmp(&coord) {
                     Ordering::Less => Rel::Lower,
                     Ordering::Equal => Rel::Within,
                     Ordering::Greater => Rel::Higher,
@@ -263,17 +263,16 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I>(
         // so do not require independent sorting; instead we copy the previous sorted
         // result in reverse.
         for ordering in DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN {
-            // This inverse() is because the rotation is defined as
-            // "rotate the view direction to a fixed orientation",
-            // but we're doing "rotate the geometry" instead.
-            let basis = ordering.sort_key_rotation().to_basis();
+            // This inverse() is because ... TODO: The old explanation was wrong but I'm not sure
+            // what one is right
+            let basis = ordering.sort_key_rotation().inverse().to_basis();
 
             // Note: Benchmarks show that `sort_by_key` is fastest
             // (not `sort_unstable_by_key`).
             sortable_quads.sort_by_key(
                 |quad| -> [OrderedFloat<<M::Vertex as Vertex>::Coordinate>; 3] {
                     basis
-                        .map(|f| OrderedFloat(-f.dot(quad.midpoint.to_vector())))
+                        .map(|f| OrderedFloat(f.dot(quad.midpoint.to_vector())))
                         .into()
                 },
             );
@@ -389,6 +388,40 @@ mod tests {
     use exhaust::Exhaust as _;
     use std::collections::HashSet;
 
+    /// Generic tests for all cases can be confusing and themselves incorrect.
+    /// Let's exercise some boring cases “end to end” with explanation.
+    #[test]
+    fn concrete_test_1() {
+        // Suppose that the geometry is located in the -X-Y-Z octant relative to the camera.
+        let ordering = DepthOrdering::from_view_direction(vec3(-1, -1, -1));
+
+        // `Rel` names refer to the position of the *camera* relative to the *geometry*.
+        // Here, the camera is higher.
+        assert_eq!(ordering, DepthOrdering(Vector3D::splat(Rel::Higher)));
+
+        // In this case, the sorting rotation can be the identity rotation, because the
+        // drawing order is the ordering where coordinates increase.
+        assert_eq!(ordering.sort_key_rotation(), GridRotation::IDENTITY);
+
+        // TODO: run an actual depth sorting function and confirm it agrees with this.
+    }
+
+    /// As [`concrete_test_1`] but with a non-identity transform.
+    #[test]
+    fn concrete_test_2() {
+        // Suppose that the geometry is located in the +X-Y-Z octant relative to the camera.
+        let ordering = DepthOrdering::from_view_direction(vec3(1, -1, -1));
+
+        assert_eq!(
+            ordering,
+            DepthOrdering(vec3(Rel::Lower, Rel::Higher, Rel::Higher))
+        );
+
+        // The sorting rotation flips the X axis so that drawing order is the order where
+        // the X axis decreases.
+        assert_eq!(ordering.sort_key_rotation(), GridRotation::RxYZ);
+    }
+
     #[test]
     fn list_of_orderings_is_complete() {
         let exhaust: HashSet<DepthOrdering> = DepthOrdering::exhaust().collect();
@@ -415,9 +448,14 @@ mod tests {
                     let ordering = DepthOrdering::from_view_direction(direction);
                     let rotated_direction =
                         ordering.sort_key_rotation().transform_vector(direction);
-                    let good = rotated_direction.x >= 0
-                        && rotated_direction.y >= 0
-                        && rotated_direction.z >= 0;
+                    // The sort rotation is supposed to rotate vertex positions so that they
+                    // are back-to-front as coordinates increase.
+                    // Therefore, if we rotate the vector which is the direction
+                    // pointing towards the geometry, it is now a vector pointing towards
+                    // more negative coordinates, i.e. its components are negative.
+                    let good = rotated_direction.x <= 0
+                        && rotated_direction.y <= 0
+                        && rotated_direction.z <= 0;
                     println!(
                         "{:?} → {:?} → {:?}{}",
                         direction,
