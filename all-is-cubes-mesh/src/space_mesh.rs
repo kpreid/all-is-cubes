@@ -126,19 +126,15 @@ impl<M: MeshTypes> SpaceMesh<M> {
             assert!(index < self.vertices.0.len() as u32);
         }
 
-        let mut bounding_box: Option<Aab> = None;
+        let mut bounding_box: Aabb = Aabb::None;
         for vertex in &self.vertices.0 {
             let position = vertex
                 .position()
                 .map(|coord| num_traits::ToPrimitive::to_f64(&coord).unwrap());
-            bounding_box = Some(match bounding_box {
-                None => Aab::from_lower_upper(position, position),
-                Some(aab) => aab.union_point(position),
-            });
+            bounding_box.add_point(position);
         }
         assert_eq!(
-            bounding_box,
-            self.bounding_box(),
+            bounding_box, self.bounding_box,
             "bounding box of vertices ≠ recorded bounding box"
         );
     }
