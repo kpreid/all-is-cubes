@@ -22,10 +22,11 @@ use all_is_cubes::math::{Aab, FreePoint, FreeVector};
 //---
 // TODO: Try using a more implicit representation where the empty box is represented as the
 // inside-out box from +inf to -inf, and see whether that is more efficient where it matters.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 #[allow(clippy::exhaustive_enums)]
 pub(crate) enum Aabb {
     /// No content, so there is not even a location where it isn't.
+    #[default]
     None,
     /// Non-empty region.
     Some(Aab),

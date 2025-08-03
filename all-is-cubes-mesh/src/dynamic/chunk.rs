@@ -12,7 +12,7 @@ use all_is_cubes::math::{Cube, GridCoordinate, LineVertex, Wireframe as _};
 use all_is_cubes::space::{BlockIndex, Space};
 
 use crate::dynamic::{self, DynamicMeshTypes};
-use crate::{BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
+use crate::{Aabb, BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
@@ -300,9 +300,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
                 .wireframe_points(output)
         }
 
-        if let Some(aab) = self.block_instances_bounding_box() {
-            aab.wireframe_points(output);
-        }
+        self.block_instances_bounding_box().wireframe_points(output);
     }
 
     /// Returns the bounding box of the mesh in this chunk.
@@ -314,7 +312,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             .map(|bb| bb.translate(self.position().bounds().lower_bounds().to_f64().to_vector()))
     }
 
-    pub(crate) fn block_instances_bounding_box(&self) -> Option<Aab> {
+    pub(crate) fn block_instances_bounding_box(&self) -> Aabb {
         self.block_instances.bounding_box()
     }
 }

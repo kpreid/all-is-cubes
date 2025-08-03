@@ -1,9 +1,10 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use all_is_cubes::math::{Aab, Cube};
+use all_is_cubes::math::Cube;
 use all_is_cubes::space::BlockIndex;
 
+use crate::Aabb;
 #[cfg(doc)]
 use crate::dynamic::ChunkMesh;
 
@@ -73,9 +74,7 @@ pub(crate) struct InstanceMap {
 
     by_cube: hashbrown::HashMap<Cube, BlockIndex>,
 
-    /// Note: This could be stored as a `GridAab`, but all the calculations using this
-    /// proceed with `Aab`.
-    bounding_box: Option<Aab>,
+    bounding_box: Aabb,
 }
 
 impl InstanceMap {
@@ -99,7 +98,7 @@ impl InstanceMap {
         } = self;
         by_block.clear();
         by_cube.clear();
-        *bounding_box = None;
+        *bounding_box = Aabb::None;
     }
 
     pub(crate) fn insert(&mut self, index: BlockIndex, cube: Cube) {
@@ -128,14 +127,11 @@ impl InstanceMap {
             }
         }
 
-        self.bounding_box = Some(match self.bounding_box {
-            None => cube.aab(),
-            Some(bb) => bb.union(cube.aab()),
-        });
+        self.bounding_box |= Aabb::from(cube.aab());
     }
 
     /// Returns the bounding box of all instances.
-    pub fn bounding_box(&self) -> Option<Aab> {
+    pub fn bounding_box(&self) -> Aabb {
         self.bounding_box
     }
 }
