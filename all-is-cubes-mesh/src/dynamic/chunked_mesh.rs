@@ -155,8 +155,11 @@ where
                 let chunk = self.chunk(pos)?;
                 let item = InViewChunkRef {
                     chunk,
+                    // TODO: distinguish between opaque in view and transparent in view
+                    // so callers can benefit from our tracking of that distinction.
                     mesh_in_view: chunk
                         .mesh_bounding_box()
+                        .all()
                         .is_some_and(|bb| camera.aab_in_view(bb)),
                     instances_in_view: <Option<Aab>>::from(chunk.block_instances_bounding_box())
                         .is_some_and(|bb| camera.aab_in_view(bb)),

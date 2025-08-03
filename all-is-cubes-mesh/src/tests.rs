@@ -455,7 +455,7 @@ fn shrunken_box_has_no_extras() {
         ],
     );
     assert_eq!(
-        space_rendered.bounding_box(),
+        space_rendered.bounding_box().all(),
         Some(Aab::from_lower_upper([0.25, 0.25, 0.25], [0.75, 0.75, 0.75]))
     );
 }
@@ -523,7 +523,7 @@ fn shrunken_box_uniform_color() {
         ],
     );
     assert_eq!(
-        space_rendered.bounding_box(),
+        space_rendered.bounding_box().all(),
         Some(Aab::from_lower_upper([0.25, 0.25, 0.25], [0.75, 0.75, 0.75]))
     );
 }

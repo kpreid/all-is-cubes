@@ -7,14 +7,14 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use all_is_cubes::block::{EvaluatedBlock, VoxelOpacityMask};
-use all_is_cubes::math::{Aab, Face6, FaceMap};
+use all_is_cubes::math::{Face6, FaceMap};
 use all_is_cubes::space::Space;
 use all_is_cubes_render::Flaws;
 
 #[cfg(doc)]
 use crate::SpaceMesh;
 use crate::texture::{self, Tile as _};
-use crate::{Aabb, IndexVec, MeshOptions, MeshTypes, Vertex};
+use crate::{Aabb, Aabbs, IndexVec, MeshOptions, MeshTypes, Vertex};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -107,7 +107,7 @@ pub(super) struct SubMesh<V: Vertex> {
     pub(super) fully_opaque: bool,
 
     /// Bounding box of the mesh’s vertices.
-    pub(super) bounding_box: Aabb,
+    pub(super) bounding_box: Aabbs,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -179,15 +179,14 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     }
 
     /// Bounding box of this mesh’s vertices.
-    /// `None` if there are no vertices.
     ///
     /// Note that a particular occurrence of this mesh in a [`SpaceMesh`] may have a smaller
     /// bounding box due to hidden face culling.
-    pub fn bounding_box(&self) -> Option<Aab> {
+    pub fn bounding_box(&self) -> Aabbs {
         self.all_sub_meshes()
             .map(|sm| sm.bounding_box)
-            .reduce(Aabb::union)
-            .and_then(Aabb::into)
+            .reduce(Aabbs::union)
+            .unwrap()
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
@@ -389,7 +388,7 @@ impl<V: Vertex> SubMesh<V> {
         indices_opaque: IndexVec::new(),
         indices_transparent: IndexVec::new(),
         fully_opaque: false,
-        bounding_box: Aabb::None,
+        bounding_box: Aabbs::EMPTY,
     };
 
     pub fn clear(&mut self) {
@@ -405,7 +404,7 @@ impl<V: Vertex> SubMesh<V> {
         indices_opaque.clear();
         indices_transparent.clear();
         *fully_opaque = false;
-        *bounding_box = Aabb::None;
+        *bounding_box = Aabbs::EMPTY;
     }
 
     pub fn is_empty(&self) -> bool {
@@ -437,7 +436,8 @@ impl<V: Vertex> SubMesh<V> {
             bounding_box.add_point(position);
         }
         assert_eq!(
-            bounding_box, self.bounding_box,
+            bounding_box,
+            Aabb::from(self.bounding_box.all()),
             "bounding box of vertices ≠ recorded bounding box"
         );
     }

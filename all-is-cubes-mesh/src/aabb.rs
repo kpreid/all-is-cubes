@@ -2,6 +2,11 @@ use core::ops;
 
 use all_is_cubes::math::{Aab, FreePoint, FreeVector};
 
+#[cfg(doc)]
+use crate::{BlockMesh, SpaceMesh};
+
+// -------------------------------------------------------------------------------------------------
+
 /// Axis-Aligned Bounding Box.
 ///
 /// This type is structurally identical to <code>[Option]&lt;[Aab]&gt;</code>,
@@ -117,5 +122,81 @@ impl all_is_cubes::math::Wireframe for Aabb {
         E: Extend<all_is_cubes::math::LineVertex>,
     {
         <Option<Aab>>::from(*self).wireframe_points(output)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Axis-aligned bounding boxes of a [`SpaceMesh`] or [`BlockMesh`].
+///
+/// The triangles in the mesh are grouped by whether they are opaque or transparent, and the
+/// separate boxes can be obtained using [`Aabbs::opaque()`] and [`Aabbs::transparent()`].
+/// This allows obtaining precise bounding boxes for culling and sorting when rendering in separate
+/// opaque and transparent passes.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct Aabbs {
+    pub(crate) opaque: Aabb,
+    pub(crate) transparent: Aabb,
+}
+
+impl Aabbs {
+    // Getters are public.
+    // Mutators are pub(crate) — we are not making any promises about how this type can be used
+    // except to obtain information about a mesh.
+
+    pub(crate) const EMPTY: Self = Self {
+        opaque: Aabb::None,
+        transparent: Aabb::None,
+    };
+
+    /// Returns the bounding box of all triangles in the mesh,
+    /// or [`None`] if there are no triangles.
+    ///
+    /// This value is the union of [`Aabbs::opaque()`] and [`Aabbs::transparent()`].
+    pub fn all(&self) -> Option<Aab> {
+        (self.opaque | self.transparent).into()
+    }
+
+    /// Returns the bounding box of all fully opaque triangles in the mesh,
+    /// or [`None`] if there are no such triangles.
+    pub fn opaque(&self) -> Option<Aab> {
+        self.opaque.into()
+    }
+
+    /// Returns the bounding box of all partially-transparent triangles in the mesh,
+    /// or [`None`] if there are no such triangles.
+    pub fn transparent(&self) -> Option<Aab> {
+        self.transparent.into()
+    }
+
+    pub(crate) fn union(self, other: Self) -> Self {
+        Self {
+            opaque: self.opaque.union(other.opaque),
+            transparent: other.transparent.union(other.transparent),
+        }
+    }
+
+    /// Translate this box by the given offset.
+    ///
+    /// Panics if the offset contains NaN.
+    #[inline]
+    #[must_use]
+    #[track_caller] // in case of NaN
+    pub(crate) fn translate(self, offset: FreeVector) -> Self {
+        Self {
+            opaque: self.opaque.translate(offset),
+            transparent: self.transparent.translate(offset),
+        }
+    }
+
+    // This isn't an implementation of `BitOrAssign`, so that it can be pub(crate).
+    #[inline]
+    pub(crate) fn union_mut(&mut self, rhs: Self) {
+        let Self {
+            opaque,
+            transparent,
+        } = self;
+        *opaque |= rhs.opaque;
+        *transparent |= rhs.transparent;
     }
 }

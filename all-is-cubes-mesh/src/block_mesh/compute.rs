@@ -239,7 +239,11 @@ fn push_box<M: MeshTypes>(
                 BoxColoring::Solid(face_colors) => QuadColoring::Solid(face_colors[face]),
             },
             viz,
-            &mut sub_mesh.bounding_box,
+            if fully_opaque {
+                &mut sub_mesh.bounding_box.opaque
+            } else {
+                &mut sub_mesh.bounding_box.transparent
+            },
         );
     }
 }
@@ -273,7 +277,11 @@ fn push_full_box<M: MeshTypes>(
                 point2(1., 1.),
                 coloring,
                 viz,
-                &mut sub_mesh.bounding_box,
+                if fully_opaque {
+                    &mut sub_mesh.bounding_box.opaque
+                } else {
+                    &mut sub_mesh.bounding_box.transparent
+                },
             );
         }
         sub_mesh.fully_opaque |= fully_opaque;
@@ -526,7 +534,11 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     high_corner.map(FreeCoordinate::from),
                     coloring,
                     viz,
-                    bounding_box,
+                    if rect_has_alpha {
+                        &mut bounding_box.transparent
+                    } else {
+                        &mut bounding_box.opaque
+                    },
                 );
             });
         }

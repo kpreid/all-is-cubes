@@ -42,6 +42,7 @@ use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
 mod aabb;
 use aabb::Aabb;
+pub use aabb::Aabbs;
 mod block_mesh;
 pub use block_mesh::*;
 #[cfg(feature = "dynamic")]

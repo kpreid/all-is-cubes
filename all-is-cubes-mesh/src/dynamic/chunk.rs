@@ -290,9 +290,13 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     }
 
     pub(crate) fn chunk_debug_lines(&self, output: &mut impl Extend<LineVertex>) {
-        // TODO: distinguishing colors
+        // TODO: distinguishing colors or marks for these up-to-3 boxes
 
-        if let Some(aab) = self.mesh_bounding_box() {
+        let meshbb = self.mesh_bounding_box();
+        for aab in [meshbb.opaque, meshbb.transparent]
+            .into_iter()
+            .filter_map(<Option<Aab>>::from)
+        {
             aab.wireframe_points(output);
 
             // Additional border that wiggles when updates happen.
@@ -305,11 +309,11 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
 
     /// Returns the bounding box of the mesh in this chunk.
     /// Note that this does not include block instances not merged into the mesh.
-    pub(crate) fn mesh_bounding_box(&self) -> Option<Aab> {
+    pub(crate) fn mesh_bounding_box(&self) -> crate::Aabbs {
         self.mesh
             .meta()
             .bounding_box()
-            .map(|bb| bb.translate(self.position().bounds().lower_bounds().to_f64().to_vector()))
+            .translate(self.position().bounds().lower_bounds().to_f64().to_vector())
     }
 
     pub(crate) fn block_instances_bounding_box(&self) -> Aabb {

@@ -6,14 +6,14 @@ use core::{fmt, mem, ops};
 use bitvec::vec::BitVec;
 use exhaust::Exhaust;
 
-use all_is_cubes::math::{Aab, Cube, Face6, FaceMap, GridAab, Vol};
+use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, Vol};
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes_render::Flaws;
 
 #[cfg(doc)]
 use crate::texture;
 use crate::{
-    Aabb, BlockMesh, DepthOrdering, DepthSortInfo, IndexSlice, IndexVec, IndexVecDeque,
+    Aabb, Aabbs, BlockMesh, DepthOrdering, DepthSortInfo, IndexSlice, IndexVec, IndexVecDeque,
     MeshOptions, MeshTypes, VPos, Vertex, depth_sorting,
 };
 
@@ -134,7 +134,8 @@ impl<M: MeshTypes> SpaceMesh<M> {
             bounding_box.add_point(position);
         }
         assert_eq!(
-            bounding_box, self.bounding_box,
+            bounding_box,
+            self.bounding_box.all().into(),
             "bounding box of vertices ≠ recorded bounding box"
         );
     }
@@ -433,7 +434,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     vertices: &mut (Vec<M::Vertex>, Vec<<M::Vertex as Vertex>::SecondaryData>),
     opaque_indices: &mut IndexVecDeque,
     transparent_indices: &mut IndexVec,
-    bounding_box: &mut Aabb,
+    bounding_box: &mut Aabbs,
     mut neighbor_is_fully_opaque: impl FnMut(Face6) -> bool,
 ) {
     if block_mesh.is_empty() {
@@ -471,7 +472,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         transparent_indices
             .extend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset);
 
-        *bounding_box |= sub_mesh.bounding_box.translate(bb_translation);
+        bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
     }
 }
 
@@ -513,7 +514,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 opaque_range: 0..0,
                 transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
-                bounding_box: block_mesh.bounding_box().into(),
+                bounding_box: block_mesh.bounding_box(),
                 flaws: block_mesh.flaws(),
             },
             block_indices_used,
@@ -667,7 +668,7 @@ pub struct MeshMeta<M: MeshTypes> {
     textures_used: Vec<M::Tile>,
 
     /// Bounding box of this mesh’s vertices.
-    bounding_box: Aabb,
+    bounding_box: Aabbs,
 
     /// Flaws in this mesh, that should be reported as flaws in any rendering containing it.
     //
@@ -677,13 +678,13 @@ pub struct MeshMeta<M: MeshTypes> {
 }
 
 impl<M: MeshTypes> MeshMeta<M> {
-    /// Returns the bounding box of this mesh’s vertices, or
-    /// `None` if there are no vertices.
+    /// Returns the bounding box of this mesh’s vertices.
     ///
     /// Note that this bounding box is not the same as the bounding box of non-fully-transparent
-    /// voxels in the scene; it does not include interior volumes which are omitted from the mesh.
-    pub fn bounding_box(&self) -> Option<Aab> {
-        self.bounding_box.into()
+    /// voxels in the scene; it does not include interior volumes which are omitted from the mesh
+    /// by hidden face culling.
+    pub fn bounding_box(&self) -> Aabbs {
+        self.bounding_box
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would
@@ -731,7 +732,7 @@ impl<M: MeshTypes> MeshMeta<M> {
         *opaque_range = 0..0;
         *transparent_ranges = [const { 0..0 }; DepthOrdering::COUNT];
         textures_used.clear();
-        *bounding_box = Aabb::None;
+        *bounding_box = Aabbs::EMPTY;
         *flaws = Flaws::empty();
     }
 }
@@ -745,7 +746,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
             opaque_range: 0..0,
             transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
             textures_used: Vec::new(),
-            bounding_box: Aabb::None,
+            bounding_box: Aabbs::EMPTY,
             flaws: Flaws::empty(),
         }
     }
@@ -808,7 +809,7 @@ mod tests {
     use crate::texture::NoTextures;
     use crate::{BlockVertex, block_meshes_for_space};
     use all_is_cubes::block;
-    use all_is_cubes::math::Rgba;
+    use all_is_cubes::math::{Aab, Rgba};
     use all_is_cubes_render::camera::GraphicsOptions;
 
     type TestMesh = SpaceMesh<TextureMt>;
@@ -872,9 +873,11 @@ mod tests {
         assert_eq!(
             space_mesh
                 .bounding_box()
-                .unwrap()
                 .translate(mesh_region.lower_bounds().to_vector().to_f64()),
-            Aab::from_lower_upper([1., 2., 1.], [3., 2., 3.])
+            Aabbs {
+                opaque: Some(Aab::from_lower_upper([1., 2., 1.], [3., 2., 3.])).into(),
+                transparent: Aabb::None
+            },
         );
     }
 }

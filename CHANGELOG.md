@@ -35,6 +35,9 @@ In order to resolve various design problems interfering with development, the `a
     - `impl IntoIterator for math::FaceMap`
     - `math::PositiveSign::INFINITY`
 
+- `all-is-cubes-mesh` library:
+    - `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` now return the new type `Aabbs` which provides separate boxes for opaque and transparent geometry. This allows precise culling when rendering in separate opaque and transparent passes.
+
 - `all-is-cubes-port` library:
     - `export_to_path()` no longer accesses the `Universe` while its future is running, but instead only when initially called. This allows the latter portion of the export operation to run concurrently with other uses of the `Universe`.
 
@@ -74,6 +77,7 @@ In order to resolve various design problems interfering with development, the `a
 
 - `all-is-cubes-mesh` library:
     - Renamed `GfxVertex` to `Vertex`.
+    - The return type of `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` has changed from `Option<Aab>` to `Aabbs`.
     - The return type of `depth_sort_for_view()` functions has changed from `bool` to a new `struct DepthSortInfo` (which contains that boolean).
     - `DepthOrdering` is now a `struct`, and the variants `DepthOrdering::{Any, Within}` have been replaced with constants.
       Additionally, there are now fewer distinct `DepthOrdering`s, reducing the amount of index data required for transparent meshes.

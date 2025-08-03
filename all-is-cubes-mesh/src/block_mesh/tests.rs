@@ -12,7 +12,7 @@ use all_is_cubes_render::camera::GraphicsOptions;
 
 use crate::tests::test_block_mesh;
 use crate::texture::NoTextures;
-use crate::{BlockMesh, MeshOptions};
+use crate::{Aabbs, BlockMesh, MeshOptions};
 use crate::{BlockVertex, Coloring};
 
 type TestMesh = BlockMesh<crate::testing::NoTextureMt>;
@@ -26,7 +26,7 @@ fn default_is_empty() {
     assert_eq!(mesh.voxel_opacity_mask, None);
     assert!(mesh.textures().is_empty());
     assert_eq!(mesh.count_indices(), 0);
-    assert_eq!(mesh.bounding_box(), None);
+    assert_eq!(mesh.bounding_box(), Aabbs::EMPTY);
     assert_eq!(mesh.flaws(), Flaws::empty());
 }
 
@@ -44,9 +44,10 @@ fn nonempty() {
     assert!(!mesh.is_empty());
     assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
     assert_eq!(
-        mesh.bounding_box(),
+        mesh.bounding_box().opaque(),
         Some(Aab::from_lower_upper([0., 0., 0.], [1., 1., 1.]))
     );
+    assert_eq!(mesh.bounding_box().transparent(), None);
     assert_eq!(mesh.flaws(), Flaws::empty());
 }
 
