@@ -121,6 +121,16 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.6.0"
 
+[[audits.rstest]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-run"
+delta = "0.25.0 -> 0.26.1"
+
+[[audits.rstest_macros]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-run"
+delta = "0.25.0 -> 0.26.1"
+
 [[audits.stl_io]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
