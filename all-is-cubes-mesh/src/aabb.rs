@@ -75,6 +75,14 @@ impl Aabb {
             Aabb::None => Aabb::None,
         }
     }
+
+    /// Returns whether this box, including the boundary, contains the point.
+    pub fn contains(&self, point: FreePoint) -> bool {
+        match self {
+            Aabb::Some(aab) => aab.contains(point),
+            Aabb::None => false,
+        }
+    }
 }
 
 impl ops::BitOr for Aabb {

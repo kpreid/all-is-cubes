@@ -134,6 +134,7 @@ impl MeshRecorder {
 
 /// Data stream sent from the mesh creation stage to the glTF serialization stage.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum MeshRecordMsg {
     AddMesh(MeshId, mesh::SpaceMesh<RecordGltfMt>, MeshIndexCell),
     FinishFrame(

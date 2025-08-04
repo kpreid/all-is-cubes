@@ -150,6 +150,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 MeshMeta {
                     opaque_range: _,
                     transparent_ranges: _,
+                    depth_sort_validity: _,
                     textures_used,
                     bounding_box: _,
                     flaws: _,
@@ -375,6 +376,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             self.indices.as_mut_slice(range),
             view_position,
             ordering,
+            &mut self.meta.depth_sort_validity[ordering.to_index()],
         )
     }
 }
@@ -527,6 +529,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             meta: MeshMeta {
                 opaque_range: 0..0,
                 transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
+                depth_sort_validity: [Aabb::None; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
                 bounding_box: block_mesh.bounding_box(),
                 flaws: block_mesh.flaws(),
@@ -677,6 +680,12 @@ pub struct MeshMeta<M: MeshTypes> {
     /// The indices of this array are those produced by [`DepthOrdering::to_index()`].
     transparent_ranges: [Range<usize>; DepthOrdering::COUNT],
 
+    /// For each depth ordering, stores a volume within which the current depth sort of the indices
+    /// in `transparent_ranges[ordering.to_index()]` is still valid and does not need to be redone.
+    ///
+    /// This field is updated by, and used as an early exit within, [`crate::depth_sorting`].
+    depth_sort_validity: [Aabb; DepthOrdering::COUNT],
+
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
     /// the texture coordinates remain allocated to the intended texels.
     textures_used: Vec<M::Tile>,
@@ -739,12 +748,14 @@ impl<M: MeshTypes> MeshMeta<M> {
         let Self {
             opaque_range,
             transparent_ranges,
+            depth_sort_validity,
             textures_used,
             bounding_box,
             flaws,
         } = self;
         *opaque_range = 0..0;
         *transparent_ranges = [const { 0..0 }; DepthOrdering::COUNT];
+        *depth_sort_validity = [Aabb::None; DepthOrdering::COUNT];
         textures_used.clear();
         *bounding_box = Aabbs::EMPTY;
         *flaws = Flaws::empty();
@@ -759,6 +770,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
         Self {
             opaque_range: 0..0,
             transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
+            depth_sort_validity: [Aabb::None; DepthOrdering::COUNT],
             textures_used: Vec::new(),
             bounding_box: Aabbs::EMPTY,
             flaws: Flaws::empty(),
@@ -771,6 +783,7 @@ impl<M: MeshTypes> PartialEq for MeshMeta<M> {
         let Self {
             opaque_range,
             transparent_ranges,
+            depth_sort_validity,
             textures_used,
             bounding_box,
             flaws,
@@ -778,6 +791,7 @@ impl<M: MeshTypes> PartialEq for MeshMeta<M> {
         *bounding_box == other.bounding_box
             && *opaque_range == other.opaque_range
             && *transparent_ranges == other.transparent_ranges
+            && *depth_sort_validity == other.depth_sort_validity
             && *textures_used == other.textures_used
             && *flaws == other.flaws
     }
@@ -788,6 +802,7 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
         let Self {
             opaque_range,
             transparent_ranges,
+            depth_sort_validity,
             textures_used,
             bounding_box,
             flaws,
@@ -795,6 +810,7 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
         f.debug_struct("MeshMeta")
             .field("opaque_range", opaque_range)
             .field("transparent_ranges", transparent_ranges)
+            .field("depth_sort_validity", depth_sort_validity)
             .field("textures_used", textures_used)
             .field("bounding_box", bounding_box)
             .field("flaws", flaws)
@@ -807,6 +823,7 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
         Self {
             opaque_range: self.opaque_range.clone(),
             transparent_ranges: self.transparent_ranges.clone(),
+            depth_sort_validity: self.depth_sort_validity,
             textures_used: self.textures_used.clone(),
             bounding_box: self.bounding_box,
             flaws: self.flaws,

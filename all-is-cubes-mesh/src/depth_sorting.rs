@@ -5,10 +5,10 @@ use core::ops::{self, Range};
 
 use ordered_float::OrderedFloat;
 
-use all_is_cubes::euclid::{Point3D, Vector3D, vec3};
-use all_is_cubes::math::{Aab, Axis, Cube, FreePoint, GridRotation};
+use all_is_cubes::euclid::{Box3D, Point3D, Vector3D, vec3};
+use all_is_cubes::math::{Aab, Axis, Cube, FreeCoordinate, FreePoint, GridRotation};
 
-use crate::{IndexSliceMut, IndexVec, MeshTypes, VPos, Vertex};
+use crate::{Aabb, IndexSliceMut, IndexVec, MeshTypes, VPos, Vertex};
 #[cfg(doc)]
 use crate::{MeshMeta, SpaceMesh};
 
@@ -336,6 +336,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     indices: IndexSliceMut<'_>,
     view_position: VPos<M>,
     ordering: DepthOrdering,
+    current_region_of_validity: &mut Aabb,
 ) -> DepthSortInfo {
     if !M::Vertex::WANTS_DEPTH_SORTING {
         return DepthSortInfo {
@@ -369,6 +370,23 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         };
     }
 
+    if current_region_of_validity.contains(view_position.to_f64()) {
+        return DepthSortInfo {
+            changed: false,
+            quads_sorted: 0,
+        };
+    }
+
+    // Accumulator of the new region of validity of this sort.
+    // This will be shrunk to exclude any position that crosses the plane of any surface of the
+    // mesh. As long as the viewpoint doesn’t exit this box, the sorting is still valid.
+    // (TODO: Prove this claim. I think it might actually require changing the sort key to
+    // use Manhattan distance instead of Euclidean distance.)
+    let mut new_validity = Box3D {
+        min: FreePoint::splat(FreeCoordinate::NEG_INFINITY),
+        max: FreePoint::splat(FreeCoordinate::INFINITY),
+    };
+
     // TODO: The following sorting algorithm is only optimal for `within_on_axes` 3.
     // When it is 1, we can use a different static order instead of dynamic ordering.
     // When it is 2, we can sort in smaller partitions because there is one “major” axis on which
@@ -379,17 +397,37 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         data: &mut [Ix],
         positions: &[M::Vertex],
         view_position: VPos<M>,
+        new_validity: &mut Box3D<FreeCoordinate, Cube>,
     ) {
+        // TODO: this function contains way too much numeric conversion per vertex.
+        // Think about how to reduce it (and maybe use truncating casts).
+
+        let view_position_f64 = view_position.to_f64();
+
         // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
         data.as_chunks_mut::<6>().0.sort_unstable_by_key(|indices| {
             -OrderedFloat((view_position - midpoint::<M, Ix>(positions, *indices)).square_length())
         });
+
+        // Update the range of validity to not go past any of the sorted vertices.
+        for &mut ix in data {
+            // TODO: recuce the amount of per-vertex casting involved here.
+            let vertex_position =
+                M::Vertex::position(&positions[num_traits::cast::<Ix, usize>(ix).unwrap()])
+                    .to_f64();
+            exclude_beyond(new_validity, vertex_position, view_position_f64);
+        }
     }
 
     match indices {
-        IndexSliceMut::U16(slice) => generic_sort::<M, u16>(slice, vertices, view_position),
-        IndexSliceMut::U32(slice) => generic_sort::<M, u32>(slice, vertices, view_position),
+        IndexSliceMut::U16(slice) => {
+            generic_sort::<M, u16>(slice, vertices, view_position, &mut new_validity)
+        }
+        IndexSliceMut::U32(slice) => {
+            generic_sort::<M, u32>(slice, vertices, view_position, &mut new_validity)
+        }
     }
+    *current_region_of_validity = Aab::from_lower_upper(new_validity.min, new_validity.max).into();
 
     DepthSortInfo {
         changed: true,
@@ -423,6 +461,26 @@ where
     storage.extend(items);
     let end = storage.len();
     start..end
+}
+
+/// Shrink the box so that, presuming it contains `include`, it still contains `include` but
+/// excludes everything further away than `exclude` on all axes.
+fn exclude_beyond(b: &mut Box3D<FreeCoordinate, Cube>, exclude: FreePoint, include: FreePoint) {
+    use core::cmp::Ordering;
+    for axis in Axis::ALL {
+        let e = exclude[axis];
+        // Note: If the comparison succeeded, neither coordinate is NaN.
+        match PartialOrd::partial_cmp(&e, &include[axis]) {
+            Some(Ordering::Less) => {
+                b.min[axis] = b.min[axis].max(e);
+            }
+            Some(Ordering::Equal) => {} // nothing to do
+            Some(Ordering::Greater) => {
+                b.max[axis] = b.max[axis].min(e);
+            }
+            None => {} // NaN
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
