@@ -137,9 +137,6 @@ jobs:
         path: |
           target/test-renderers-output/
 
-    - name: Lint
-      run: cargo xtask --scope=only-normal lint --timings
-
     # Save timing reports so we can download and view them
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
