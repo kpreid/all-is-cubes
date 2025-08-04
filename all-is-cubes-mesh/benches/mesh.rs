@@ -332,7 +332,7 @@ fn dynamic_benches(c: &mut Criterion) {
                     time::Deadline::Whenever,
                     |_| {},
                 );
-                assert!(info.depth_sort_time.is_some());
+                assert_ne!(info.depth_sort_info.quads_sorted, 0);
             }
         }
 

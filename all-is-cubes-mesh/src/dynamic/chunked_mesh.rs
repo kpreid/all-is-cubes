@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::{fmt, mem, ops};
+use core::{fmt, mem};
 
 use hashbrown::hash_map::Entry;
 use indoc::indoc;
@@ -22,7 +22,7 @@ use all_is_cubes_render::{Flaws, camera::Camera};
 use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::chunk::ChunkTodoState;
 use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
-use crate::{MeshOptions, Vertex, texture};
+use crate::{DepthSortInfo, MeshOptions, Vertex, texture};
 
 #[cfg(test)]
 mod tests;
@@ -513,13 +513,13 @@ where
                 if info.changed {
                     render_data_updater(chunk.borrow_for_update(true));
                 }
-                (Some(info), Some(time::Instant::now()))
+                (info, time::Instant::now())
             } else {
-                (None, None)
+                (DepthSortInfo::default(), chunk_scan_end_time)
             };
 
         // Instant at which we finished all processing
-        let end_all_time = depth_sort_end_time.unwrap_or(chunk_scan_end_time);
+        let end_all_time = depth_sort_end_time;
 
         let complete = block_updates.all_done() && !did_not_finish;
         if complete && self.complete_time.is_none() {
@@ -561,8 +561,7 @@ where
                 chunk_instance_generation_times,
                 chunk_mesh_callback_times,
                 depth_sort_info,
-                depth_sort_time: depth_sort_end_time
-                    .map(|t| t.saturating_duration_since(chunk_scan_end_time)),
+                depth_sort_time: depth_sort_end_time.saturating_duration_since(chunk_scan_end_time),
                 block_updates,
 
                 // TODO: remember this rather than computing it
@@ -640,10 +639,10 @@ pub struct CsmUpdateInfo {
     /// Time spent on `chunk_mesh_updater` callbacks this frame.
     pub chunk_mesh_callback_times: TimeStats,
     #[doc(hidden)]
-    pub depth_sort_info: Option<crate::DepthSortInfo>,
+    pub depth_sort_info: DepthSortInfo,
     /// Time spent on dynamic depth sorting, or [`None`] if no sorting happened.
     #[doc(hidden)]
-    pub depth_sort_time: Option<Duration>,
+    pub depth_sort_time: Duration,
     /// Time spent on building block meshes this frame.
     block_updates: dynamic::blocks::VbmUpdateInfo,
 
@@ -688,8 +687,8 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             chunk_mesh_generation_times = chunk_mesh_generation_times,
             chunk_instance_generation_times = chunk_instance_generation_times,
             chunk_mesh_callback_times = chunk_mesh_callback_times,
-            depth_sort_quad_count = depth_sort_info.map_or(0, |info| info.quads_sorted),
-            depth_sort_time = depth_sort_time.unwrap_or(Duration::ZERO).refmt(fopt),
+            depth_sort_quad_count = depth_sort_info.quads_sorted,
+            depth_sort_time = depth_sort_time.refmt(fopt),
             chunk_mib = chunk_total_cpu_byte_size / (1024 * 1024),
             chunk_count = chunk_count,
         )
@@ -702,14 +701,6 @@ impl CsmUpdateInfo {
     ///
     /// Times are summed, but flaws are replaced and counts are kept.
     fn add_second_pass(&mut self, other: Self) {
-        fn add_option<T: ops::AddAssign>(a: &mut Option<T>, b: Option<T>) {
-            match (a, b) {
-                (_, None) => {}
-                (a @ None, b @ Some(_)) => *a = b,
-                (Some(a), Some(b)) => *a += b,
-            }
-        }
-
         let Self {
             flaws,
             total_time,
@@ -731,8 +722,8 @@ impl CsmUpdateInfo {
         *chunk_mesh_generation_times += other.chunk_mesh_generation_times;
         *chunk_instance_generation_times += other.chunk_instance_generation_times;
         *chunk_mesh_callback_times += other.chunk_mesh_callback_times;
-        add_option(depth_sort_info, other.depth_sort_info);
-        add_option(depth_sort_time, other.depth_sort_time);
+        *depth_sort_info += other.depth_sort_info;
+        *depth_sort_time += other.depth_sort_time;
         *block_updates += other.block_updates;
         *chunk_count = other.chunk_count; // replace!
         *chunk_total_cpu_byte_size = other.chunk_total_cpu_byte_size; // replace!

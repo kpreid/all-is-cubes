@@ -189,7 +189,18 @@ pub struct DepthSortInfo {
     pub changed: bool,
 
     /// How many quads were in the data to be sorted.
-    pub(crate) quads_sorted: usize,
+    #[doc(hidden)] // public for benchmark checking whether depth sorting happened as expected
+    pub quads_sorted: usize,
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for DepthSortInfo {
+    fn default() -> Self {
+        Self {
+            changed: false,
+            quads_sorted: 0,
+        }
+    }
 }
 
 impl ops::AddAssign for DepthSortInfo {
