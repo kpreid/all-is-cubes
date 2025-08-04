@@ -322,7 +322,7 @@ fn dynamic_benches(c: &mut Criterion) {
                 self.pos_step = (self.pos_step + 1.).rem_euclid(16.);
                 self.camera.set_view_transform(ViewTransform {
                     rotation: euclid::Rotation3D::around_y(euclid::Angle::frac_pi_2()),
-                    // This position must be within the chunk or depth sorting won't happen.
+                    // This position must be within the chunk or full depth sorting won't happen.
                     translation: vec3(self.pos_step, 0.5, 0.5),
                 });
 
