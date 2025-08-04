@@ -270,12 +270,15 @@ where
             mesh_generation_time: TimeStats,
             mesh_callback_time: TimeStats,
             instance_generation_time: TimeStats,
+            depth_sort_info: DepthSortInfo,
+            depth_sort_time: TimeStats,
         }
 
         let update_start_time = time::Instant::now();
 
         let graphics_options = camera.options();
         let view_point = camera.view_position();
+        let view_point_as_vertex_position = view_point.cast::<<M::Vertex as Vertex>::Coordinate>();
 
         let view_chunk = point_to_chunk(view_point);
         let view_chunk_is_different = self.view_chunk != view_chunk;
@@ -393,6 +396,7 @@ where
 
                 let mut chunk_todo = todo.chunks.remove(&chunk_pos).unwrap_or_else(|| ChunkTodo {
                     state: ChunkTodoState::DirtyMeshAndInstances,
+                    needs_depth_sort: None,
                     always_instanced_or_empty: Some(
                         self.block_meshes.always_instanced_or_empty.clone(),
                     ),
@@ -405,6 +409,17 @@ where
                     Entry::Occupied(ref oe) if oe.get().stale_blocks(&self.block_meshes)
                 ) {
                     chunk_todo.state = ChunkTodoState::DirtyMeshAndInstances;
+                }
+
+                // Check whether the chunk is in a position where it needs depth sorting
+                // (and whether it has any transparent geometry).
+                // TODO: We could also do frustum culling here.
+                if let Entry::Occupied(chunk_mesh) = &chunk_mesh_entry
+                    && let Some(bb) = chunk_mesh.get().mesh_bounding_box().transparent()
+                    && let depth_ordering = DepthOrdering::from_view_of_aabb(view_point, bb)
+                    && depth_ordering.needs_dynamic_sorting()
+                {
+                    chunk_todo.needs_depth_sort = Some(depth_ordering);
                 }
 
                 // Decide whether to update the chunk
@@ -425,6 +440,8 @@ where
                         mesh_generation_time: TimeStats::default(),
                         mesh_callback_time: TimeStats::default(),
                         instance_generation_time: TimeStats::default(),
+                        depth_sort_info: DepthSortInfo::default(),
+                        depth_sort_time: TimeStats::default(),
                     })
                 } else {
                     todo.chunks.insert(chunk_pos, chunk_todo);
@@ -432,29 +449,64 @@ where
                 }
             });
 
-        // Update some chunk geometry.
+        // Update some chunk geometry and depth sorting.
         let chunk_updater = |mut state: ChunkUpdateState<M, CHUNK_SIZE>| {
+            // TODO: The current split between this function and ChunkMesh::recompute() is
+            // awkward and leads to misleading TimeStats results. It is motivated by keeping
+            // ChunkUpdateState private to the parallel update process, but it's not clear
+            // whether that has any value, and got messier when depth sorting moved in here.
+
+            let is_instances_only = state.chunk_todo.state == ChunkTodoState::DirtyInstances;
+
+            // Run mesh and instance calculation, if needed.
             let compute_start = time::Instant::now();
-            let actually_changed_mesh = state.chunk_mesh.recompute(
-                &mut state.chunk_todo,
-                space,
-                mesh_options,
-                &self.block_meshes,
-            );
-            let compute_end_update_start = time::Instant::now();
-            if actually_changed_mesh {
-                render_data_updater(state.chunk_mesh.borrow_for_update(false));
+            let actually_changed_mesh = state.chunk_todo.state != ChunkTodoState::Clean
+                && state.chunk_mesh.recompute(
+                    &mut state.chunk_todo,
+                    space,
+                    mesh_options,
+                    &self.block_meshes,
+                );
+            let compute_end_depth_sort_start = time::Instant::now();
+
+            // Run depth sort, if needed.
+            let mut actually_sorted_indices = false;
+            let mut ran_depth_sort = false;
+            if let Some(ordering) = state.chunk_todo.needs_depth_sort.take() {
+                ran_depth_sort = true;
+                let info = state
+                    .chunk_mesh
+                    .depth_sort_for_view(ordering, view_point_as_vertex_position);
+                if info.changed {
+                    actually_sorted_indices = true;
+                }
+                state.depth_sort_info += info;
+            }
+            let depth_sort_end_update_start = time::Instant::now();
+
+            // Update render data, if we made any changes requiring it.
+            let run_updater = actually_changed_mesh || actually_sorted_indices;
+            if run_updater {
+                render_data_updater(state.chunk_mesh.borrow_for_update(!actually_changed_mesh));
             }
             let update_end = time::Instant::now();
 
-            let compute_time = compute_end_update_start.saturating_duration_since(compute_start);
-            let update_time = update_end.saturating_duration_since(compute_end_update_start);
+            let compute_time =
+                compute_end_depth_sort_start.saturating_duration_since(compute_start);
+            let updater_time = update_end.saturating_duration_since(depth_sort_end_update_start);
             if actually_changed_mesh {
                 state.mesh_generation_time += TimeStats::one(compute_time);
-                state.mesh_callback_time += TimeStats::one(update_time);
-            } else {
+            } else if is_instances_only {
                 state.instance_generation_time += TimeStats::one(compute_time);
-                // update_time should be nothing
+            }
+            if run_updater {
+                state.mesh_callback_time += TimeStats::one(updater_time);
+            }
+            if ran_depth_sort {
+                state.depth_sort_time += TimeStats::one(
+                    depth_sort_end_update_start
+                        .saturating_duration_since(compute_end_depth_sort_start),
+                );
             }
 
             #[cfg(feature = "rerun")]
@@ -465,7 +517,7 @@ where
                 );
                 self.rerun_destination.log(
                     &"one_chunk_update_ms".into(),
-                    &rg::milliseconds(update_time),
+                    &rg::milliseconds(updater_time),
                 );
             }
 
@@ -482,6 +534,8 @@ where
         let mut chunk_mesh_generation_times = TimeStats::default();
         let mut chunk_instance_generation_times = TimeStats::default();
         let mut chunk_mesh_callback_times = TimeStats::default();
+        let mut chunk_depth_sort_info = DepthSortInfo::default();
+        let mut chunk_depth_sort_times = TimeStats::default();
         for ChunkUpdateState {
             chunk_pos,
             chunk_todo,
@@ -489,6 +543,8 @@ where
             mesh_generation_time,
             mesh_callback_time,
             instance_generation_time,
+            depth_sort_info,
+            depth_sort_time,
         } in to_put_back
         {
             self.chunks.insert(chunk_pos, chunk_mesh);
@@ -496,6 +552,8 @@ where
             chunk_mesh_generation_times += mesh_generation_time;
             chunk_mesh_callback_times += mesh_callback_time;
             chunk_instance_generation_times += instance_generation_time;
+            chunk_depth_sort_info += depth_sort_info;
+            chunk_depth_sort_times += depth_sort_time;
         }
 
         // Record outcome of processing
@@ -503,24 +561,6 @@ where
         if !did_not_finish {
             self.startup_chunks_only = false;
         }
-
-        let chunk_scan_end_time = time::Instant::now();
-
-        // Update the drawing order of transparent parts of the chunk the camera is in.
-        // TODO: More chunks than this need sorting <https://github.com/kpreid/all-is-cubes/issues/53>
-        let (depth_sort_info, depth_sort_times) =
-            if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
-                let info = chunk.depth_sort_for_view(
-                    DepthOrdering::WITHIN,
-                    view_point.cast::<<M::Vertex as Vertex>::Coordinate>(),
-                );
-                if info.changed {
-                    render_data_updater(chunk.borrow_for_update(true));
-                }
-                (info, TimeStats::one(chunk_scan_end_time.elapsed()))
-            } else {
-                (DepthSortInfo::default(), TimeStats::default())
-            };
 
         // Instant at which we finished all processing
         let end_all_time = time::Instant::now();
@@ -556,7 +596,7 @@ where
                 flaws,
                 total_time: end_all_time.saturating_duration_since(update_start_time),
                 prep_time: prep_to_update_meshes_time.saturating_duration_since(update_start_time),
-                chunk_scan_time: chunk_scan_end_time
+                chunk_scan_time: end_all_time
                     .saturating_duration_since(block_update_to_chunk_scan_time)
                     .saturating_sub(
                         chunk_mesh_generation_times.sum + chunk_mesh_callback_times.sum,
@@ -564,8 +604,8 @@ where
                 chunk_mesh_generation_times,
                 chunk_instance_generation_times,
                 chunk_mesh_callback_times,
-                depth_sort_info,
-                depth_sort_times,
+                depth_sort_info: chunk_depth_sort_info,
+                depth_sort_times: chunk_depth_sort_times,
                 block_updates,
 
                 // TODO: remember this rather than computing it
@@ -684,8 +724,8 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                 Chunk scan     {chunk_scan_time}
                       mesh gen {chunk_mesh_generation_times}
                       inst gen {chunk_instance_generation_times}
+                      Z sort   {depth_sort_times} ({depth_sort_quad_count:5} quads)
                       upload   {chunk_mesh_callback_times}
-                      Z sort   {depth_sort_times} ({depth_sort_quad_count} quads)
                 Mem: {chunk_mib} MiB for {chunk_count} chunks\
             "},
             flaws = flaws,

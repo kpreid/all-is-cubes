@@ -1,5 +1,3 @@
-use all_is_cubes::euclid::Translation3D;
-use all_is_cubes::math::Aab;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
@@ -8,11 +6,13 @@ use core::ops;
 
 use all_is_cubes::chunking::{ChunkPos, ChunkRelative};
 use all_is_cubes::euclid::Point3D;
+use all_is_cubes::euclid::Translation3D;
+use all_is_cubes::math::Aab;
 use all_is_cubes::math::{Cube, GridCoordinate, LineVertex, Wireframe as _};
 use all_is_cubes::space::{BlockIndex, Space};
 
 use crate::dynamic::{self, DynamicMeshTypes};
-use crate::{Aabb, BlockMesh, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
+use crate::{Aabb, BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
@@ -241,6 +241,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
 
         *chunk_todo = ChunkTodo {
             state: ChunkTodoState::Clean,
+            needs_depth_sort: chunk_todo.needs_depth_sort,
             always_instanced_or_empty: Some(block_meshes.always_instanced_or_empty.clone()),
         };
 
@@ -273,7 +274,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     /// Returns information including whether there was any change in ordering.
     pub fn depth_sort_for_view(
         &mut self,
-        ordering: crate::DepthOrdering,
+        ordering: DepthOrdering,
         view_position: VPos<M>,
     ) -> crate::DepthSortInfo {
         // Subtract chunk origin because the mesh coordinates are in chunk-relative
@@ -371,6 +372,8 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshS
 pub(crate) struct ChunkTodo {
     pub(crate) state: ChunkTodoState,
 
+    pub(crate) needs_depth_sort: Option<DepthOrdering>,
+
     /// Copy of [`dynamic::VersionedBlockMeshes::always_instanced_or_empty`] as of when this chunk
     /// was last re-meshed. Optional just to allow constant `CLEAN`.
     pub(crate) always_instanced_or_empty: Option<Arc<[BlockIndex]>>,
@@ -387,11 +390,19 @@ impl ChunkTodo {
     #[cfg(test)]
     pub const CLEAN: Self = Self {
         state: ChunkTodoState::Clean,
+        needs_depth_sort: None,
         always_instanced_or_empty: None,
     };
 
     pub(crate) fn is_not_clean(&self) -> bool {
-        self.state != ChunkTodoState::Clean
+        !matches!(
+            self,
+            Self {
+                state: ChunkTodoState::Clean,
+                needs_depth_sort: None,
+                always_instanced_or_empty: _
+            }
+        )
     }
 
     /// Returns whether the block index is in the `always_instanced_or_empty` list.
