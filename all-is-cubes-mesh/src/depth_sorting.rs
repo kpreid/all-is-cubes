@@ -8,14 +8,17 @@ use ordered_float::OrderedFloat;
 use all_is_cubes::euclid::{Point3D, Vector3D, vec3};
 use all_is_cubes::math::{Aab, Axis, Cube, FreePoint, GridRotation};
 
-#[cfg(doc)]
-use crate::SpaceMesh;
 use crate::{IndexSliceMut, IndexVec, MeshTypes, VPos, Vertex};
+#[cfg(doc)]
+use crate::{MeshMeta, SpaceMesh};
 
 // -------------------------------------------------------------------------------------------------
 
 /// Identifies a back-to-front order in which to draw triangles (of a [`SpaceMesh`]),
 /// based on the direction from which they are being viewed.
+///
+/// Create this using [`DepthOrdering::from_view_of_aabb()`], then use it in
+/// [`MeshMeta::transparent_range()`].
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DepthOrdering(
     /// Specifies the relationship which the viewpoint has to the viewed mesh’s bounding box,
@@ -60,8 +63,10 @@ impl DepthOrdering {
 
     /// List of all [`DepthOrdering`]s except for
     ///
-    /// * [`DepthOrdering::WITHIN`]
-    /// * the reflections of ones that are in the list
+    /// * [`DepthOrdering::WITHIN`], and
+    /// * the reflections of ones that are in the list.
+    ///
+    /// Thus, this is a list of all the “static” sorts that a [`SpaceMesh`] needs to perform.
     const ALL_WITHOUT_REFLECTIONS_OR_WITHIN: [Self; Self::COUNT / 2] = [
         // Permutations of HWW (mirrors to LWW)
         Self(vec3(Rel::Higher, Rel::Within, Rel::Within)),
@@ -93,6 +98,9 @@ impl DepthOrdering {
 
     /// Calculates the [`DepthOrdering`] value for a particular viewpoint and bounds of viewed
     /// geometry.
+    ///
+    /// The coordinate system used for the provided point and bounding box does not matter as
+    /// long as they use the same one.
     pub fn from_view_of_aabb(camera_position: FreePoint, geometry_bounds: Aab) -> DepthOrdering {
         let mut ord = DepthOrdering::WITHIN;
         for axis in Axis::ALL {
@@ -106,12 +114,31 @@ impl DepthOrdering {
         ord
     }
 
-    fn rev(self) -> Self {
+    /// Returns the ordering which is opposite this one.
+    ///
+    /// When called with [`DepthOrdering::WITHIN`], returns the same value.
+    #[must_use]
+    pub fn reverse(self) -> Self {
         Self(self.0.map(|ord| match ord {
             Rel::Lower => Rel::Higher,
             Rel::Within => Rel::Within,
             Rel::Higher => Rel::Lower,
         }))
+    }
+
+    /// Returns whether this [`DepthOrdering`] makes use of dynamic sorting.
+    ///
+    /// * `true`: You need to call [`SpaceMesh::depth_sort_for_view()`] when using this ordering.
+    /// * `false`: You do not.
+    pub fn needs_dynamic_sorting(self) -> bool {
+        // TODO: Switch this to > 1 once we have the special 1-axis pre-sort case
+        self.within_on_axes() > 0
+    }
+
+    /// Counts how many axes have the viewpoint within the bounding box when projected on that axis.
+    fn within_on_axes(self) -> u8 {
+        let Self(Vector3D { x, y, z, .. }) = self;
+        u8::from(x == Rel::Within) + u8::from(y == Rel::Within) + u8::from(z == Rel::Within)
     }
 
     /// Returns a rotation which rotates vertex positions into positions whose lexicographic
@@ -258,7 +285,7 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I>(
             })
             .collect();
 
-        // Copy unsorted indices into the main array, for later dynamic sorting.
+        // Copy unsorted indices for the only case where the required ordering is fully unknown.
         transparent_ranges[DepthOrdering::WITHIN.to_index()] =
             extend_giving_range(indices, transparent_indices.iter().copied());
 
@@ -290,7 +317,7 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I>(
             // (We could save some memory by reusing the coinciding last quad which is
             // this ordering's first quad, but that doesn't currently feel worth
             // implementing.)
-            transparent_ranges[ordering.rev().to_index()] = extend_giving_range(
+            transparent_ranges[ordering.reverse().to_index()] = extend_giving_range(
                 indices,
                 sortable_quads.iter().rev().flat_map(|tri| tri.indices),
             );
@@ -430,7 +457,7 @@ mod tests {
         let exhaust: HashSet<DepthOrdering> = DepthOrdering::exhaust().collect();
         let flip: HashSet<DepthOrdering> = DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN
             .into_iter()
-            .chain(DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN.map(DepthOrdering::rev))
+            .chain(DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN.map(DepthOrdering::reverse))
             .chain([DepthOrdering::WITHIN])
             .collect();
         assert_eq!(exhaust, flip);

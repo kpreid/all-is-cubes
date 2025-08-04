@@ -354,6 +354,9 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// This is intended to be cheap enough to do every frame.
     ///
     /// Returns information including whether there was any change in ordering.
+    //---
+    // TODO: In order to realize the potential of `MeshMeta`, we need to make it possible to
+    // perform this operation using only `MeshMeta` and data slices instead of `SpaceMesh`.
     pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> DepthSortInfo {
         let range = self.transparent_range(DepthOrdering::WITHIN);
         depth_sorting::dynamic_depth_sort_for_view::<M>(
@@ -710,10 +713,10 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// Returns a range of index data which contains the triangles with alpha values other
     /// than 0 and 1 which therefore must be drawn with consideration for ordering.
     ///
-    /// There are multiple such ranges providing different orderings depending on which
-    /// direction is your “depth” direction.
-    /// Notably, [`DepthOrdering::WITHIN`] is reserved for dynamic (frame-by-frame)
-    /// sorting, invoked by [`SpaceMesh::depth_sort_for_view()`].
+    /// There are multiple such ranges providing different orderings depending on the viewpoint.
+    /// Certain orderings additionally require dynamic (viewpoint-dependent, frame-by-frame)
+    /// sorting, which you should perform using [`SpaceMesh::depth_sort_for_view()`] before drawing.
+    /// [`DepthOrdering::needs_dynamic_sorting()`] identifies whether this is necessary.
     #[inline]
     pub fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {
         self.transparent_ranges[ordering.to_index()].clone()
