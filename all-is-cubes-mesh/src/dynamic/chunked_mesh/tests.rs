@@ -224,8 +224,12 @@ fn basic_chunk_presence() {
     // TODO: Check that chunks end at the view distance.
 }
 
+/// Tests that we don’t spuriously call the render data updater.
+///
+/// (This used to be a test expecting ongoing `indices_only` updates, but we added caching that
+/// skips that too. TODO: Expand this test to trigger a depth sort and look for that.)
 #[test]
-fn sort_view_every_frame_only_if_transparent() {
+fn no_render_data_updates_after_completion() {
     let mut tester: CsmTester<NO_INSTANCES> = CsmTester::new(
         Universe::new(),
         Space::empty_positive(1, 1, 1),
@@ -234,6 +238,7 @@ fn sort_view_every_frame_only_if_transparent() {
     tester.update(|u| {
         assert!(!u.indices_only);
     });
+
     tester
         .universe
         .execute_1(
@@ -245,21 +250,22 @@ fn sort_view_every_frame_only_if_transparent() {
             ),
         )
         .unwrap();
-    let mut did_call = false;
     tester.update(|u| {
-        if u.indices_only {
-            did_call = true;
-        }
+        assert!(!u.indices_only);
     });
-    assert!(did_call, "Expected indices_only_updater");
-    did_call = false;
+
+    // In the current implementation there is one extra indices-only update because we don't
+    // properly depth sort just-created chunks, but ideally there wouldn't be this one.
     tester.update(|u| {
-        if u.indices_only {
-            did_call = true;
-        }
+        assert!(u.indices_only);
     });
-    assert!(did_call, "Expected indices_only_updater #2");
-    // TODO: Change the behavior so additional frames *don't* depth sort if the view is unchanged.
+
+    // Now, expect quiescence.
+    let mut did_call = None;
+    tester.update(|u| {
+        did_call = Some((u.mesh_id, u.indices_only));
+    });
+    assert_eq!(did_call, None, "Expected no update when nothing changed");
 }
 
 #[test]
