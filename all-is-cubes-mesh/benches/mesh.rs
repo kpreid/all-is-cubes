@@ -299,8 +299,11 @@ fn dynamic_benches(c: &mut Criterion) {
                     time::Deadline::Whenever,
                     |_| {},
                 );
+                // Note: this number will change if the number of `DepthOrdering`s changes.
+                // It will also change when we add culling of always-back-facing triangles from the
+                // index slices.
                 assert_eq!(
-                    3612672,
+                    1990656,
                     csm.chunk(ChunkPos::new(0, 0, 0))
                         .unwrap()
                         .mesh()
@@ -342,6 +345,7 @@ fn dynamic_benches(c: &mut Criterion) {
             0.0, 1.0, 0.0, 0.5
         ))));
 
+        // Uses non-split vertices (no secondary data)
         g.bench_function("depth-sort-whole", |b| {
             b.iter_batched_ref(
                 || {
@@ -357,6 +361,7 @@ fn dynamic_benches(c: &mut Criterion) {
             );
         });
 
+        // Uses secondary data
         g.bench_function("depth-sort-split", |b| {
             b.iter_batched_ref(
                 || {
