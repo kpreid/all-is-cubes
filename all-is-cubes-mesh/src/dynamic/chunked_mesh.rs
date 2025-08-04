@@ -97,7 +97,8 @@ impl<M, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<M, CHUNK_SIZE>
 where
     M: DynamicMeshTypes,
     // These bounds are redundant with `DynamicMeshTypes` but the compiler needs to see them
-    M::Vertex: Vertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
+    M::Vertex:
+        Vertex<TexPoint = <M::Tile as texture::Tile>::Point, Coordinate: Send + Sync> + PartialEq,
     M::Alloc: Send + Sync,
     M::Tile: texture::Tile + PartialEq + Send + Sync,
 {

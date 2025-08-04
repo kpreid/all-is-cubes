@@ -38,7 +38,9 @@ pub use render_data::{MeshId, RenderDataUpdate};
     clippy::module_name_repetitions,
     reason = "practically needs to be distinct from MeshTypes"
 )]
-pub trait DynamicMeshTypes: MeshTypes {
+pub trait DynamicMeshTypes:
+    MeshTypes<Vertex: Send + Sync + crate::Vertex<Coordinate: Send + Sync>>
+{
     /// Data accompanying meshes within a [`ChunkedSpaceMesh`] and derived from the individual
     /// chunk or block instance meshes, for purposes such as handles to GPU buffers.
     ///
