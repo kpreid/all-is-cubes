@@ -22,7 +22,7 @@ use all_is_cubes_render::{Flaws, camera::Camera};
 use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::chunk::ChunkTodoState;
 use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
-use crate::{DepthSortInfo, MeshOptions, Vertex, texture};
+use crate::{DepthOrdering, DepthSortInfo, MeshOptions, Vertex, texture};
 
 #[cfg(test)]
 mod tests;
@@ -506,10 +506,13 @@ where
         let chunk_scan_end_time = time::Instant::now();
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
+        // TODO: More chunks than this need sorting <https://github.com/kpreid/all-is-cubes/issues/53>
         let (depth_sort_info, depth_sort_times) =
             if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
-                let info = chunk
-                    .depth_sort_for_view(view_point.cast::<<M::Vertex as Vertex>::Coordinate>());
+                let info = chunk.depth_sort_for_view(
+                    DepthOrdering::WITHIN,
+                    view_point.cast::<<M::Vertex as Vertex>::Coordinate>(),
+                );
                 if info.changed {
                     render_data_updater(chunk.borrow_for_update(true));
                 }

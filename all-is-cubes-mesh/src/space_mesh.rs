@@ -348,8 +348,15 @@ impl<M: MeshTypes> SpaceMesh<M> {
         self.consistency_check();
     }
 
-    /// Sort the existing indices of `self.transparent_range(DepthOrdering::WITHIN)` for
+    /// Sort the existing indices of `self.transparent_range(ordering)` as appropriate for
     /// the given view position.
+    ///
+    /// The amount of sorting performed, if any, depends on the specific value of `ordering`.
+    /// Some orderings are fully static and do not require any sorting; calling this function
+    /// does nothing in those cases.
+    ///
+    /// The resulting ordering is unspecified if `view_position` is not a position for which
+    /// [`DepthOrdering::from_view_of_aabb()`] would return `ordering`.
     ///
     /// This is intended to be cheap enough to do every frame.
     ///
@@ -357,12 +364,17 @@ impl<M: MeshTypes> SpaceMesh<M> {
     //---
     // TODO: In order to realize the potential of `MeshMeta`, we need to make it possible to
     // perform this operation using only `MeshMeta` and data slices instead of `SpaceMesh`.
-    pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> DepthSortInfo {
-        let range = self.transparent_range(DepthOrdering::WITHIN);
+    pub fn depth_sort_for_view(
+        &mut self,
+        ordering: DepthOrdering,
+        view_position: VPos<M>,
+    ) -> DepthSortInfo {
+        let range = self.transparent_range(ordering);
         depth_sorting::dynamic_depth_sort_for_view::<M>(
             &self.vertices.0,
             self.indices.as_mut_slice(range),
             view_position,
+            ordering,
         )
     }
 }

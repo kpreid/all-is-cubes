@@ -261,20 +261,28 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         self.block_instances.iter()
     }
 
-    /// Sort the existing indices of `self.mesh().transparent_range(DepthOrdering::WITHIN)` for
+    /// Sort the existing indices of `self.mesh().transparent_range(ordering)` for
     /// the given view position in world coordinates.
+    ///
+    /// The amount of sorting performed, if any, depends on the specific value of `ordering`.
+    /// Some orderings are fully static and do not require any sorting; calling this function
+    /// does nothing in those cases.
     ///
     /// This is intended to be cheap enough to do every frame.
     ///
     /// Returns information including whether there was any change in ordering.
-    pub fn depth_sort_for_view(&mut self, view_position: VPos<M>) -> crate::DepthSortInfo {
+    pub fn depth_sort_for_view(
+        &mut self,
+        ordering: crate::DepthOrdering,
+        view_position: VPos<M>,
+    ) -> crate::DepthSortInfo {
         // Subtract chunk origin because the mesh coordinates are in chunk-relative
         // coordinates but the incoming view position is in world coordinates.
         // TODO: This makes poor use of the precision of Vert::Coordinate (probably f32).
         // Instead we should explicitly accept relative coordinates.
         let lbp: VPos<M> = self.position.bounds().lower_bounds().cast();
         self.mesh
-            .depth_sort_for_view(view_position - lbp.to_vector())
+            .depth_sort_for_view(ordering, view_position - lbp.to_vector())
     }
 
     pub(crate) fn stale_blocks(&self, block_meshes: &dynamic::VersionedBlockMeshes<M>) -> bool {

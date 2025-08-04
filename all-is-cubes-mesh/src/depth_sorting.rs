@@ -331,10 +331,11 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I>(
 /// the transparent mesh and therefore cannot be described using a [`DepthOrdering`] simplification.
 ///
 /// Returns information including whether there was any change in ordering.
-pub fn dynamic_depth_sort_for_view<M: MeshTypes>(
+pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     vertices: &[M::Vertex],
     indices: IndexSliceMut<'_>,
     view_position: VPos<M>,
+    ordering: DepthOrdering,
 ) -> DepthSortInfo {
     if !M::Vertex::WANTS_DEPTH_SORTING {
         return DepthSortInfo {
@@ -352,9 +353,27 @@ pub fn dynamic_depth_sort_for_view<M: MeshTypes>(
         // so we can’t just ask whether the quad count is greater than 6.
         return DepthSortInfo {
             changed: false,
-            quads_sorted: quad_count,
+            quads_sorted: 0,
         };
     }
+
+    let within_on_axes = ordering.within_on_axes();
+    if within_on_axes == 0 {
+        // If within on zero axes, then dynamic depth sorting is not required; the indices
+        // have already been sorted into an order which suffices for all such views.
+        //
+        // TODO: test the behavior under this condition and others
+        return DepthSortInfo {
+            changed: false,
+            quads_sorted: 0,
+        };
+    }
+
+    // TODO: The following sorting algorithm is only optimal for `within_on_axes` 3.
+    // When it is 1, we can use a different static order instead of dynamic ordering.
+    // When it is 2, we can sort in smaller partitions because there is one “major” axis on which
+    // the order never needs to change.
+    // <https://github.com/kpreid/all-is-cubes/issues/53>
 
     fn generic_sort<M: MeshTypes, Ix: Copy + num_traits::NumCast>(
         data: &mut [Ix],
@@ -524,7 +543,7 @@ mod tests {
             .unwrap();
         let (_, _, mut space_mesh) = crate::testing::mesh_blocks_and_space(&space);
 
-        let info = space_mesh.depth_sort_for_view(point3(0., 0., 0.));
+        let info = space_mesh.depth_sort_for_view(DepthOrdering::WITHIN, point3(0., 0., 0.));
 
         assert_eq!(
             info,
