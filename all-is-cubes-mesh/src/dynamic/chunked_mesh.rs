@@ -506,20 +506,20 @@ where
         let chunk_scan_end_time = time::Instant::now();
 
         // Update the drawing order of transparent parts of the chunk the camera is in.
-        let (depth_sort_info, depth_sort_end_time) =
+        let (depth_sort_info, depth_sort_times) =
             if let Some(chunk) = self.chunks.get_mut(&view_chunk) {
                 let info = chunk
                     .depth_sort_for_view(view_point.cast::<<M::Vertex as Vertex>::Coordinate>());
                 if info.changed {
                     render_data_updater(chunk.borrow_for_update(true));
                 }
-                (info, time::Instant::now())
+                (info, TimeStats::one(chunk_scan_end_time.elapsed()))
             } else {
-                (DepthSortInfo::default(), chunk_scan_end_time)
+                (DepthSortInfo::default(), TimeStats::default())
             };
 
         // Instant at which we finished all processing
-        let end_all_time = depth_sort_end_time;
+        let end_all_time = time::Instant::now();
 
         let complete = block_updates.all_done() && !did_not_finish;
         if complete && self.complete_time.is_none() {
@@ -561,7 +561,7 @@ where
                 chunk_instance_generation_times,
                 chunk_mesh_callback_times,
                 depth_sort_info,
-                depth_sort_time: depth_sort_end_time.saturating_duration_since(chunk_scan_end_time),
+                depth_sort_times,
                 block_updates,
 
                 // TODO: remember this rather than computing it
@@ -640,9 +640,9 @@ pub struct CsmUpdateInfo {
     pub chunk_mesh_callback_times: TimeStats,
     #[doc(hidden)]
     pub depth_sort_info: DepthSortInfo,
-    /// Time spent on dynamic depth sorting, or [`None`] if no sorting happened.
+    /// Time spent on dynamic depth sorting.
     #[doc(hidden)]
-    pub depth_sort_time: Duration,
+    pub depth_sort_times: TimeStats,
     /// Time spent on building block meshes this frame.
     block_updates: dynamic::blocks::VbmUpdateInfo,
 
@@ -662,8 +662,12 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             chunk_mesh_generation_times,
             chunk_instance_generation_times,
             chunk_mesh_callback_times,
-            depth_sort_info,
-            depth_sort_time,
+            depth_sort_info:
+                DepthSortInfo {
+                    changed: _,
+                    quads_sorted,
+                },
+            depth_sort_times,
             block_updates,
             chunk_count,
             chunk_total_cpu_byte_size,
@@ -677,7 +681,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                       mesh gen {chunk_mesh_generation_times}
                       inst gen {chunk_instance_generation_times}
                       upload   {chunk_mesh_callback_times}
-                      depthsort {depth_sort_quad_count} quads in {depth_sort_time}
+                      Z sort   {depth_sort_times} ({depth_sort_quad_count} quads)
                 Mem: {chunk_mib} MiB for {chunk_count} chunks\
             "},
             flaws = flaws,
@@ -687,8 +691,8 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             chunk_mesh_generation_times = chunk_mesh_generation_times,
             chunk_instance_generation_times = chunk_instance_generation_times,
             chunk_mesh_callback_times = chunk_mesh_callback_times,
-            depth_sort_quad_count = depth_sort_info.quads_sorted,
-            depth_sort_time = depth_sort_time.refmt(fopt),
+            depth_sort_quad_count = quads_sorted,
+            depth_sort_times = depth_sort_times,
             chunk_mib = chunk_total_cpu_byte_size / (1024 * 1024),
             chunk_count = chunk_count,
         )
@@ -710,7 +714,7 @@ impl CsmUpdateInfo {
             chunk_instance_generation_times,
             chunk_mesh_callback_times,
             depth_sort_info,
-            depth_sort_time,
+            depth_sort_times,
             block_updates,
             chunk_count,
             chunk_total_cpu_byte_size,
@@ -723,7 +727,7 @@ impl CsmUpdateInfo {
         *chunk_instance_generation_times += other.chunk_instance_generation_times;
         *chunk_mesh_callback_times += other.chunk_mesh_callback_times;
         *depth_sort_info += other.depth_sort_info;
-        *depth_sort_time += other.depth_sort_time;
+        *depth_sort_times += other.depth_sort_times;
         *block_updates += other.block_updates;
         *chunk_count = other.chunk_count; // replace!
         *chunk_total_cpu_byte_size = other.chunk_total_cpu_byte_size; // replace!
