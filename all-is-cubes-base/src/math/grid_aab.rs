@@ -241,7 +241,8 @@ impl GridAab {
     /// Computes the volume of this box in cubes, i.e. the product of all sizes.
     ///
     /// Returns [`None`] if the volume does not fit in a `usize`.
-    /// (If this fallibility is undesirable, consider using a [`Vol<()>`] instead of [`GridAab.`])
+    /// (If this fallibility is undesirable, consider using a [`Vol<()>`][Vol] instead of
+    /// [`GridAab`].)
     ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
