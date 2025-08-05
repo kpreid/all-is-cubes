@@ -8,7 +8,7 @@ use ordered_float::OrderedFloat;
 use all_is_cubes::euclid::{Box3D, Point3D, Vector3D, vec3};
 use all_is_cubes::math::{Aab, Axis, Cube, FreeCoordinate, FreePoint, GridRotation};
 
-use crate::{Aabb, IndexSliceMut, IndexVec, MeshTypes, VPos, Vertex};
+use crate::{Aabb, IndexInt, IndexSliceMut, IndexVec, MeshTypes, VPos, Vertex};
 #[cfg(doc)]
 use crate::{MeshMeta, SpaceMesh};
 
@@ -251,13 +251,12 @@ impl ops::AddAssign for DepthSortInfo {
 ///
 /// The relevant vertices must have already been stored `vertices`, and this function will
 /// store sorted copies of `transparent_indices` and update `transparent_ranges` to include them.
-pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I>(
+pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
     vertices: &[M::Vertex],
     indices: &mut IndexVec,
     transparent_ranges: &mut [Range<usize>; DepthOrdering::COUNT],
     transparent_indices: Vec<I>,
 ) where
-    I: Ord + bytemuck::Pod + num_traits::NumCast,
     IndexVec: Extend<I>,
 {
     if !M::Vertex::WANTS_DEPTH_SORTING || transparent_indices.is_empty() {
@@ -393,7 +392,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     // the order never needs to change.
     // <https://github.com/kpreid/all-is-cubes/issues/53>
 
-    fn generic_sort<M: MeshTypes, Ix: Copy + num_traits::NumCast>(
+    fn generic_sort<M: MeshTypes, Ix: IndexInt>(
         data: &mut [Ix],
         positions: &[M::Vertex],
         view_position: VPos<M>,
@@ -412,9 +411,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         // Update the range of validity to not go past any of the sorted vertices.
         for &mut ix in data {
             // TODO: recuce the amount of per-vertex casting involved here.
-            let vertex_position =
-                M::Vertex::position(&positions[num_traits::cast::<Ix, usize>(ix).unwrap()])
-                    .to_f64();
+            let vertex_position = M::Vertex::position(&positions[ix.to_slice_index()]).to_f64();
             exclude_beyond(new_validity, vertex_position, view_position_f64);
         }
     }
@@ -437,15 +434,11 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
 
 /// Compute quad midpoint from quad vertices, for depth sorting.
 #[inline]
-fn midpoint<M: MeshTypes, Ix>(vertices: &[M::Vertex], indices: [Ix; 6]) -> VPos<M>
-where
-    Ix: num_traits::NumCast,
-{
+fn midpoint<M: MeshTypes, Ix: IndexInt>(vertices: &[M::Vertex], indices: [Ix; 6]) -> VPos<M> {
     let one_half = num_traits::cast::<f32, <M::Vertex as Vertex>::Coordinate>(0.5f32).unwrap();
     // We only need to look at one of the two triangles,
     // because they have the same bounding rectangle.
-    let [v0, v1, v2, ..]: [VPos<M>; 6] =
-        indices.map(|i| vertices[num_traits::cast::<Ix, usize>(i).unwrap()].position());
+    let [v0, v1, v2, ..]: [VPos<M>; 6] = indices.map(|i| vertices[i.to_slice_index()].position());
     (v0.max(v1).max(v2) + v0.min(v1).min(v2).to_vector()) * one_half
 }
 

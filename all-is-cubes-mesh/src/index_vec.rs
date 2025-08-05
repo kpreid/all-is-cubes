@@ -431,6 +431,36 @@ impl From<IndexVecDeque> for IndexVec {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Helper trait defining operations and supertraits that all our allowed index types
+/// ([`u16`] and [`u32`]) meet.
+pub(crate) trait IndexInt: Ord + bytemuck::Pod + num_traits::NumCast + From<u16> {
+    /// Convert this index value to a [`usize`].
+    ///
+    /// This operation is infallible because we do not support 16-bit `usize`.
+    fn to_slice_index(self) -> usize;
+}
+
+impl IndexInt for u16 {
+    fn to_slice_index(self) -> usize {
+        self as usize
+    }
+}
+impl IndexInt for u32 {
+    fn to_slice_index(self) -> usize {
+        const {
+            assert!(
+                size_of::<usize>() >= 4,
+                "16-bit platforms are not supported by all-is-cubes-mesh"
+            );
+        }
+
+        // Given the condition we statically checked, this cannot overflow.
+        self as usize
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
