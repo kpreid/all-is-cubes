@@ -1,10 +1,9 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use all_is_cubes::math::Cube;
+use all_is_cubes::math::{Cube, GridAab};
 use all_is_cubes::space::BlockIndex;
 
-use crate::Aabb;
 #[cfg(doc)]
 use crate::dynamic::ChunkMesh;
 
@@ -68,18 +67,21 @@ where
 /// Bidirectional map data structure for block mesh instances.
 ///
 /// Unlike [`InstanceCollector`], this is used only internally, and does prohibit duplicates.
-#[derive(Default)]
 pub(crate) struct InstanceMap {
     by_block: hashbrown::HashMap<BlockIndex, hashbrown::HashSet<Cube>>,
 
     by_cube: hashbrown::HashMap<Cube, BlockIndex>,
 
-    bounding_box: Aabb,
+    bounding_box: GridAab,
 }
 
 impl InstanceMap {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            by_block: hashbrown::HashMap::new(),
+            by_cube: hashbrown::HashMap::new(),
+            bounding_box: GridAab::ORIGIN_EMPTY,
+        }
     }
 
     pub fn iter(
@@ -98,10 +100,12 @@ impl InstanceMap {
         } = self;
         by_block.clear();
         by_cube.clear();
-        *bounding_box = Aabb::None;
+        *bounding_box = GridAab::ORIGIN_EMPTY;
     }
 
     pub(crate) fn insert(&mut self, index: BlockIndex, cube: Cube) {
+        let cube_box = cube.grid_aab();
+
         let old_index = self.by_cube.get(&cube).copied();
         match old_index {
             Some(old_index) if old_index == index => {
@@ -118,20 +122,22 @@ impl InstanceMap {
             }
             None => {
                 // No entry at all.
-                // (The try_reserve is because, just for fun, I'm trying to design this data
+                // (The reserve() is because, just for fun, I'm trying to design this data
                 // structure to be robust against continuing to be used after an OOM panic;
-                // no changes are made until all allocations have succeeded.)
+                // no changes are made until all allocations and grid_aab() have succeeded.)
                 self.by_cube.reserve(1);
                 self.by_block.entry(index).or_default().insert(cube);
                 self.by_cube.insert(cube, index);
             }
         }
 
-        self.bounding_box |= Aabb::from(cube.aab());
+        self.bounding_box = self.bounding_box.union_cubes(cube_box);
     }
 
     /// Returns the bounding box of all instances.
-    pub fn bounding_box(&self) -> Aabb {
+    ///
+    /// If there are no instances, returns [`GridAab::ORIGIN_EMPTY`].
+    pub fn bounding_box(&self) -> GridAab {
         self.bounding_box
     }
 }

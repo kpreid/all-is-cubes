@@ -8,9 +8,7 @@ use rayon::iter::{ParallelBridge, ParallelIterator as _};
 
 use all_is_cubes::chunking::{ChunkChart, ChunkPos, cube_to_chunk, point_to_chunk};
 use all_is_cubes::listen::{self, Listen as _};
-use all_is_cubes::math::{
-    Aab, Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex, OctantMask,
-};
+use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex, OctantMask};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
@@ -162,7 +160,8 @@ where
                         .mesh_bounding_box()
                         .all()
                         .is_some_and(|bb| camera.aab_in_view(bb)),
-                    instances_in_view: <Option<Aab>>::from(chunk.block_instances_bounding_box())
+                    instances_in_view: chunk
+                        .block_instances_bounding_box()
                         .is_some_and(|bb| camera.aab_in_view(bb)),
                 };
                 (item.mesh_in_view || item.instances_in_view).then_some(item)

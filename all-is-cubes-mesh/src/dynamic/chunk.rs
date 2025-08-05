@@ -12,7 +12,7 @@ use all_is_cubes::math::{Cube, GridCoordinate, LineVertex, Wireframe as _};
 use all_is_cubes::space::{BlockIndex, Space};
 
 use crate::dynamic::{self, DynamicMeshTypes};
-use crate::{Aabb, BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
+use crate::{BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
@@ -325,8 +325,14 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             .translate(self.position().bounds().lower_bounds().to_f64().to_vector())
     }
 
-    pub(crate) fn block_instances_bounding_box(&self) -> Aabb {
-        self.block_instances.bounding_box()
+    /// Returns the bounding box of all instances in this chunk, in global [`Space`] coordinates.
+    pub(crate) fn block_instances_bounding_box(&self) -> Option<Aab> {
+        let b = self.block_instances.bounding_box();
+        if b.is_empty() {
+            None
+        } else {
+            Some(b.to_free())
+        }
     }
 }
 
