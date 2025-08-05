@@ -684,7 +684,17 @@ fn transparency_split() {
     assert_eq!(space_rendered.opaque_range().len(), 6 * 6);
     // ...and one of which is transparent
     for ordering in DepthOrdering::exhaust() {
-        assert_eq!(space_rendered.transparent_range(ordering).len(), 6 * 6);
+        let num_visible_faces = match ordering.within_on_axes() {
+            0 => 3,
+            1 => 4,
+            2 => 5,
+            3 => 6,
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            space_rendered.transparent_range(ordering).len(),
+            6 * num_visible_faces
+        );
     }
 }
 

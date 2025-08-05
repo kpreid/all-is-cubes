@@ -247,9 +247,10 @@ impl<M: MeshTypes> SpaceMesh<M> {
         // Use the existing index allocation as an (empty) deque for bidirectional insertions.
         let mut opaque_indices_deque = IndexVecDeque::from(mem::take(&mut self.indices));
 
-        // Use temporary buffer for positioning the transparent indices
+        // Use temporary buffer for preparing the transparent indices (split by direction)
+        // which are going to be sorted and duplicated.
         // TODO: Consider reuse
-        let mut transparent_indices = IndexVec::new();
+        let mut transparent_indices: FaceMap<IndexVec> = FaceMap::default();
 
         bounds.interior_iter().for_each(|cube| {
             // TODO: On out-of-range, draw an obviously invalid block instead of an invisible one?
@@ -319,7 +320,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     fn store_indices_and_finish_compute(
         &mut self,
         opaque_indices_deque: IndexVecDeque,
-        transparent_indices: IndexVec,
+        transparent_indices: FaceMap<IndexVec>,
     ) {
         self.indices = IndexVec::from(opaque_indices_deque);
 
@@ -327,20 +328,52 @@ impl<M: MeshTypes> SpaceMesh<M> {
         // (which will be the opaque ones only).
         self.meta.opaque_range = 0..self.indices.len();
 
+        // Dispatch to the depth sorting algorithm in its u16 or u32 version.
+        #[rustfmt::skip]
+        #[expect(clippy::unnecessary_semicolon, reason = "false positive")]
         match transparent_indices {
-            IndexVec::U16(vec) => depth_sorting::sort_and_store_transparent_indices::<M, u16>(
-                &self.vertices.0,
-                &mut self.indices,
-                &mut self.meta.transparent_ranges,
-                vec,
-            ),
-            IndexVec::U32(vec) => depth_sorting::sort_and_store_transparent_indices::<M, u32>(
-                &self.vertices.0,
-                &mut self.indices,
-                &mut self.meta.transparent_ranges,
-                vec,
-            ),
-        }
+            FaceMap {
+                nx: IndexVec::U16(nx),
+                ny: IndexVec::U16(ny),
+                nz: IndexVec::U16(nz),
+                px: IndexVec::U16(px),
+                py: IndexVec::U16(py),
+                pz: IndexVec::U16(pz),
+            } => {
+                depth_sorting::sort_and_store_transparent_indices::<M, u16>(
+                    &self.vertices.0,
+                    &mut self.indices,
+                    &mut self.meta.transparent_ranges,
+                    FaceMap { nx, ny, nz, px, py, pz },
+                );
+            }
+            FaceMap {
+                nx: IndexVec::U32(nx),
+                ny: IndexVec::U32(ny),
+                nz: IndexVec::U32(nz),
+                px: IndexVec::U32(px),
+                py: IndexVec::U32(py),
+                pz: IndexVec::U32(pz),
+            } => {
+                depth_sorting::sort_and_store_transparent_indices::<M, u32>(
+                    &self.vertices.0,
+                    &mut self.indices,
+                    &mut self.meta.transparent_ranges,
+                    FaceMap { nx, ny, nz, px, py, pz },
+                );
+            }
+            _ => {
+                // Mixed type index vectors.
+                // This should only come up in very rare cases where the mesh is just big enough
+                // to have switched to u32 indices while writing the very last transparent block.
+                depth_sorting::sort_and_store_transparent_indices::<M, u32>(
+                    &self.vertices.0,
+                    &mut self.indices,
+                    &mut self.meta.transparent_ranges,
+                    transparent_indices.map(|_, index_vec| index_vec.into_u32s()),
+                );
+            }
+        };
 
         #[cfg(debug_assertions)]
         self.consistency_check();
@@ -449,7 +482,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     translation: Cube,
     vertices: &mut (Vec<M::Vertex>, Vec<<M::Vertex as Vertex>::SecondaryData>),
     opaque_indices: &mut IndexVecDeque,
-    transparent_indices: &mut IndexVec,
+    transparent_indices: &mut FaceMap<IndexVec>,
     bounding_box: &mut Aabbs,
     mut neighbor_is_fully_opaque: impl FnMut(Face6) -> bool,
 ) {
@@ -489,7 +522,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
             index_offset,
             face.is_positive(),
         );
-        transparent_indices
+        transparent_indices[face]
             .extend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset);
 
         bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
@@ -547,12 +580,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 .map(|sm| sm.indices_opaque.len())
                 .sum(),
         ));
-        let mut transparent_indices = IndexVec::with_capacity(
-            block_mesh
-                .all_sub_meshes()
-                .map(|sm| sm.indices_transparent.len())
-                .sum(),
-        );
+        let mut transparent_indices: FaceMap<IndexVec> = FaceMap::default();
 
         write_block_mesh_to_space_mesh(
             block_mesh,

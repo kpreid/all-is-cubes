@@ -3,10 +3,11 @@
 use alloc::vec::Vec;
 use core::ops::{self, Range};
 
+use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
 
 use all_is_cubes::euclid::{self, Vector3D, vec3};
-use all_is_cubes::math::{Axis, Face6, GridRotation};
+use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation};
 
 use crate::{Aabb, IndexInt, IndexSliceMut, IndexVec, MeshTypes, Position, Vertex};
 #[cfg(doc)]
@@ -60,33 +61,6 @@ impl DepthOrdering {
 
     /// Number of distinct [`Self`] values; one plus the maximum of [`Self::to_index()`].
     pub(crate) const COUNT: usize = 3_usize.pow(3);
-
-    /// List of all [`DepthOrdering`]s except for
-    ///
-    /// * [`DepthOrdering::WITHIN`], and
-    /// * the reflections of ones that are in the list.
-    ///
-    /// Thus, this is a list of all the “static” sorts that a [`SpaceMesh`] needs to perform.
-    const ALL_WITHOUT_REFLECTIONS_OR_WITHIN: [Self; Self::COUNT / 2] = [
-        // Permutations of HWW (mirrors to LWW)
-        Self(vec3(Rel::Higher, Rel::Within, Rel::Within)),
-        Self(vec3(Rel::Within, Rel::Higher, Rel::Within)),
-        Self(vec3(Rel::Within, Rel::Within, Rel::Higher)),
-        // Permutations of HHW (mirrors to LLW)
-        Self(vec3(Rel::Higher, Rel::Higher, Rel::Within)),
-        Self(vec3(Rel::Within, Rel::Higher, Rel::Higher)),
-        Self(vec3(Rel::Higher, Rel::Within, Rel::Higher)),
-        // HHH (mirrors to LLL)
-        Self(vec3(Rel::Higher, Rel::Higher, Rel::Higher)),
-        // Permutations of HHL (mirrors to LLH)
-        Self(vec3(Rel::Higher, Rel::Higher, Rel::Lower)),
-        Self(vec3(Rel::Higher, Rel::Lower, Rel::Higher)),
-        Self(vec3(Rel::Lower, Rel::Higher, Rel::Higher)),
-        // Permutations of HLW (mirrors to LHW)
-        Self(vec3(Rel::Higher, Rel::Lower, Rel::Within)),
-        Self(vec3(Rel::Higher, Rel::Within, Rel::Lower)),
-        Self(vec3(Rel::Within, Rel::Higher, Rel::Lower)),
-    ];
 
     /// Maps `self` to a unique integer.
     pub(crate) fn to_index(self) -> usize {
@@ -149,7 +123,7 @@ impl DepthOrdering {
     }
 
     /// Counts how many axes have the viewpoint within the bounding box when projected on that axis.
-    fn within_on_axes(self) -> u8 {
+    pub(crate) fn within_on_axes(self) -> u8 {
         let Self(Vector3D { x, y, z, .. }) = self;
         u8::from(x == Rel::Within) + u8::from(y == Rel::Within) + u8::from(z == Rel::Within)
     }
@@ -275,25 +249,38 @@ impl ops::AddAssign for DepthSortInfo {
 /// Called by `SpaceMesh::store_indices_and_finish_compute()` to perform the “static”
 /// depth sorting — that is, the depth sorting which is done once when the mesh is created.
 ///
-/// The relevant vertices must have already been stored in `vertices`, and this function will
-/// store sorted copies of `transparent_indices` into `indices` and overwrite `transparent_ranges`
-/// to refer to the new indices in `indices`.
+/// The relevant vertices must have already been stored `vertices`, and this function will
+/// store sorted copies of `transparent_indices` and update `transparent_ranges` to include them.
 pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
     vertices: &[M::Vertex],
     indices: &mut IndexVec,
     transparent_ranges: &mut [Range<usize>; DepthOrdering::COUNT],
-    transparent_indices: Vec<I>,
+    transparent_indices: FaceMap<Vec<I>>,
 ) where
     IndexVec: Extend<I>,
 {
-    if !M::Vertex::WANTS_DEPTH_SORTING || transparent_indices.is_empty() {
+    if !M::Vertex::WANTS_DEPTH_SORTING || transparent_indices.values().all(|v| v.is_empty()) {
         // Either there is nothing to sort (and all ranges will be length 0),
         // or the destination doesn't want sorting anyway. In either case, write the
         // indices once and fill out transparent_ranges with copies of that range.
-        let range = extend_giving_range(indices, transparent_indices);
+        //
+        // TODO: There is inadequate testing for this case (only the glTF export test catches if
+        // these are missing or extra).
+        let range = extend_giving_range(indices, transparent_indices.into_values_iter().flatten());
         transparent_ranges.fill(range);
         return;
     }
+
+    // Copy unsorted indices for the only case where the required ordering is fully dynamic.
+    // and therefore we cannot usefully sort it now. (We don’t just skip the sorting because
+    // that would also waste time computing `sortable_quads`.)
+    transparent_ranges[DepthOrdering::WITHIN.to_index()] =
+        extend_giving_range(indices, transparent_indices.values().flatten().copied());
+
+    // Figure capacity for temporary storage. We need to be able to store up to 5 out of 6 faces.
+    let iter_quad_counts = transparent_indices.values().map(|vec| vec.len() / 6);
+    let capacity: usize =
+        iter_quad_counts.clone().sum::<usize>() - iter_quad_counts.clone().max().unwrap_or(0);
 
     // Precompute midpoints (as sort keys) of all of the transparent quads.
     // This assumes that the input `BlockMesh`es contain strictly quads and no other polygons,
@@ -303,30 +290,36 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         indices: [I; 6],
         midpoint: Position,
     }
-    let (quads, []) = transparent_indices.as_chunks::<6>() else {
-        panic!("mesh is not quads")
-    };
-    let mut sortable_quads: Vec<QuadWithMid<I>> = quads
-        .iter()
-        .map(|&indices_of_quad| QuadWithMid {
-            indices: indices_of_quad,
-            midpoint: midpoint::<M, I>(vertices, indices_of_quad),
-        })
-        .collect();
-
-    // Copy unsorted indices for the only case where the required ordering is fully dynamic.
-    // and therefore we cannot usefully sort it now.
-    transparent_ranges[DepthOrdering::WITHIN.to_index()] =
-        extend_giving_range(indices, transparent_indices.iter().copied());
+    // Reused in loop to hold the ordering's quads while we sort them.
+    let mut sortable_quads: Vec<QuadWithMid<I>> = Vec::with_capacity(capacity);
 
     // Perform sorting by each possible ordering.
-    // Note that half of the orderings are mirror images of each other,
-    // so do not require independent sorting; instead we copy the previous sorted
-    // result in reverse.
-    for ordering in DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN {
+    for ordering in DepthOrdering::exhaust() {
+        if ordering == DepthOrdering::WITHIN {
+            // These were already copied and do not benefit from this sorting.
+            continue;
+        }
+
         // This inverse() is because ... TODO: The old explanation was wrong but I'm not sure
         // what one is right
         let basis = ordering.sort_key_rotation().inverse().to_basis();
+
+        // Fill sortable_quads with quads -- *only* the ones that might be visible.
+        sortable_quads.clear();
+        sortable_quads.extend(
+            transparent_indices
+                .iter()
+                .filter(|&(face, _)| ordering.face_visible_from_here(face))
+                .flat_map(|(_, index_vec)| {
+                    let (quads, []) = index_vec.as_chunks::<6>() else {
+                        panic!("mesh is not quads")
+                    };
+                    quads.iter().map(|&indices_of_quad| QuadWithMid {
+                        indices: indices_of_quad,
+                        midpoint: midpoint::<M, I>(vertices, indices_of_quad),
+                    })
+                }),
+        );
 
         // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
         sortable_quads.sort_by(|a, b| {
@@ -339,14 +332,6 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         // Copy the sorted indices into the main array, and set the corresponding range.
         transparent_ranges[ordering.to_index()] =
             extend_giving_range(indices, sortable_quads.iter().flat_map(|tri| tri.indices));
-
-        // Store a mirrored copy of the ordering.
-        // (We could save some memory by reusing the coinciding last quad which is
-        // this ordering's first quad, but that doesn't currently feel worth implementing.)
-        transparent_ranges[ordering.reverse().to_index()] = extend_giving_range(
-            indices,
-            sortable_quads.iter().rev().flat_map(|quad| quad.indices),
-        );
     }
 }
 
@@ -495,8 +480,6 @@ mod tests {
     use all_is_cubes::euclid::point3;
     use all_is_cubes::math::{Aab, GridAab};
     use all_is_cubes::space::Space;
-    use exhaust::Exhaust as _;
-    use std::collections::HashSet;
 
     /// Generic tests for all cases can be confusing and themselves incorrect.
     /// Let's exercise some boring cases “end to end” with explanation.
@@ -534,14 +517,7 @@ mod tests {
 
     #[test]
     fn list_of_orderings_is_complete() {
-        let exhaust: HashSet<DepthOrdering> = DepthOrdering::exhaust().collect();
-        let flip: HashSet<DepthOrdering> = DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN
-            .into_iter()
-            .chain(DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN.map(DepthOrdering::reverse))
-            .chain([DepthOrdering::WITHIN])
-            .collect();
-        assert_eq!(exhaust, flip);
-        assert_eq!(exhaust.len(), 3usize.pow(3));
+        assert_eq!(DepthOrdering::exhaust().count(), 3usize.pow(3));
     }
 
     // TODO: This test was originally from an older design of `DepthOrdering`.

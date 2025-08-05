@@ -299,10 +299,8 @@ fn dynamic_benches(c: &mut Criterion) {
                     |_| {},
                 );
                 // Note: this number will change if the number of `DepthOrdering`s changes.
-                // It will also change when we add culling of always-back-facing triangles from the
-                // index slices.
                 assert_eq!(
-                    1990656,
+                    1400832,
                     csm.chunk(ChunkPos::new(0, 0, 0))
                         .unwrap()
                         .mesh()

@@ -152,6 +152,14 @@ impl IndexVec {
         // a change to u32 will be necessary or not.
         self.extend(source.iter_u32().map(|i| i + offset));
     }
+
+    /// Convert to `Vec<u32>`, reallocating if needed.
+    pub(crate) fn into_u32s(self) -> Vec<u32> {
+        match self {
+            IndexVec::U32(vec) => vec,
+            IndexVec::U16(vec) => vec.into_iter().map(u32::from).collect(),
+        }
+    }
 }
 
 impl IndexVecDeque {
