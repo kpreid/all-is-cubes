@@ -44,7 +44,8 @@ pub trait DynamicMeshTypes:
     /// Data accompanying meshes within a [`ChunkedSpaceMesh`] and derived from the individual
     /// chunk or block instance meshes, for purposes such as handles to GPU buffers.
     ///
-    /// If no data is needed, such as if [`ChunkedSpaceMesh`] is not being used, use [`()`] here.
+    /// If no data is needed, such as if [`ChunkedSpaceMesh`] is not being used, use
+    /// [`()`][primitive@unit] here.
     //-
     // TODO: This `Default` bound is used for initializing, but it might be better replaced
     // with `Option`?

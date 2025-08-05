@@ -44,7 +44,7 @@ use crate::space;
 ///
 /// * `P` is a type corresponding to the type of [`Primitive`] that is being built.
 /// * `Txn` is [`UniverseTransaction`] if the block builder is also building a transaction
-///   that must be executed, and [`()`] otherwise.
+///   that must be executed, and [`()`][primitive@unit] otherwise.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[must_use]
 pub struct Builder<'u, P, Txn> {

@@ -1161,7 +1161,7 @@ pub enum QuitCancelled {
 /// only controlled externally.
 ///
 /// This type carries no information and merely exists to distinguish an intentional exit
-/// from accidentally returning [`()`].
+/// from accidentally returning early.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[expect(clippy::exhaustive_structs)]
 pub struct ExitMainTask;

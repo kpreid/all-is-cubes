@@ -148,7 +148,7 @@ pub trait Vertex: Copy + Sized + 'static {
     /// Additional data making up this vertex.
     ///
     /// This data will be stored in a second vector.
-    /// If none is necessary, use [`()`] for this type.
+    /// If none is necessary, use [`()`][primitive@unit] for this type.
     ///
     /// The data needed to implement [`Vertex::position()`] and [`Vertex::instantiate_vertex()`]
     /// *must* be stored in `Self`,

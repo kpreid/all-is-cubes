@@ -187,7 +187,7 @@ impl GltfWriter {
 
     /// Add one [`SpaceMesh`] to the output.
     ///
-    /// The mesh's texture allocator must be [`self.texture_allocator()`].
+    /// The mesh's texture allocator must be [`self.texture_allocator()`][Self::texture_allocator].
     pub fn add_mesh<M>(
         &mut self,
         name: &dyn fmt::Display,
