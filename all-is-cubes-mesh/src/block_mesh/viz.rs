@@ -5,8 +5,9 @@
 #![cfg_attr(not(feature = "rerun"), expect(clippy::unused_self))]
 
 use all_is_cubes::block::{Evoxel, Evoxels};
-use all_is_cubes::math::{Face6, FreePoint, GridCoordinate, GridPoint, Rgba, Vol};
+use all_is_cubes::math::{Face6, GridCoordinate, GridPoint, Rgba, Vol};
 
+use crate::Position;
 use crate::block_mesh::analyze::Analysis;
 
 #[cfg(feature = "rerun")]
@@ -212,7 +213,7 @@ impl Viz {
 
     pub(crate) fn extend_vertices(
         &mut self,
-        #[allow(unused)] mut vertex_position_iter: impl Iterator<Item = FreePoint> + Clone,
+        #[allow(unused)] mut vertex_position_iter: impl Iterator<Item = Position> + Clone,
         #[allow(unused)] mut relative_indices_iter: impl Iterator<Item = u32> + Clone,
         #[allow(unused)] color_fn: impl FnOnce() -> Rgba,
         #[allow(unused)] normal: Face6,

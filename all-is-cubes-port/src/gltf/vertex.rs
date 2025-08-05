@@ -2,7 +2,7 @@
 
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::Cube;
-use all_is_cubes_mesh::{BlockVertex, Coloring, Vertex};
+use all_is_cubes_mesh::{self as mesh, BlockVertex, Coloring, Vertex};
 
 use super::glue::Lef32;
 use super::texture::GltfAtlasPoint;
@@ -32,7 +32,6 @@ pub struct GltfVertex {
 impl Vertex for GltfVertex {
     const WANTS_DEPTH_SORTING: bool = false;
     type SecondaryData = ();
-    type Coordinate = f32;
     type BlockInst = Vector3D<f32, Cube>;
     type TexPoint = GltfAtlasPoint;
 
@@ -47,7 +46,7 @@ impl Vertex for GltfVertex {
     }
 
     #[inline]
-    fn position(&self) -> Point3D<Self::Coordinate, Cube> {
+    fn position(&self) -> mesh::Position {
         Point3D::<Lef32, _>::from(self.position).map(f32::from)
     }
 

@@ -3,17 +3,46 @@
 use core::fmt;
 
 use all_is_cubes::block::Resolution;
-use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, Rgba};
+use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::math::{Cube, Face6, Rgba};
 use all_is_cubes::util::{ConciseDebug, Fmt, Refmt as _};
-
-use crate::MeshTypes;
 
 #[cfg(doc)]
 use {
     crate::{BlockMesh, SpaceMesh},
     all_is_cubes::{block::Block, space::Space},
 };
+
+// -------------------------------------------------------------------------------------------------
+
+/// A vertex position within a [`BlockMesh`] or [`SpaceMesh`].
+///
+/// Note that custom [`Vertex`] types may use any storage format they like for the position,
+/// as long as they can convert it from and to this.
+///
+/// # Coordinate system
+///
+/// * When found in a [`BlockMesh`], the origin of the coordinate system of these points is
+///   the most-negative corner of the unit cube within which the block resides.
+/// * When found in a [`SpaceMesh`], the origin is the most-negative corner of the bounding box
+///   with which the mesh was extracted from a [`Space`].
+///
+/// Note that in both cases, this origin is not necessarily equal to the most-negative corner of
+/// the bounding box of the actual mesh vertices, but it is always less than or equal to that.
+//---
+// TODO: replace `Cube` with a mesh-specific coordinate system to unconfuse mesh vs Space coords.
+pub type Position = Point3D<PosCoord, Cube>;
+
+/// Type used for the coordinates of vertex [Position]s.
+///
+/// # Note on the choice of `f32`
+///
+/// Because All is Cubes voxels have side lengths that are powers of 2 down to
+/// 1/128 = 2<sup>-7</sup>, and [`f32`] has 24 bits of significand,
+/// this means that *no* rounding errors will occur until the size of a single mesh is at least
+/// 2<sup>24 - 7</sup> = 2<sup>17</sup> = 131,072 blocks.
+/// You do not need to worry about floating-point inaccuracy.
+pub type PosCoord = f32;
 
 /// Basic vertex data type for a [`BlockMesh`].
 /// Implement <code>[`From`]&lt;[`BlockVertex`]&gt;</code> (and usually [`Vertex`])
@@ -32,7 +61,7 @@ pub struct BlockVertex<T> {
     ///
     /// Vertices produced for a [`BlockMesh`] always have positions in the range 0 to 1, inclusive.
     /// Positions outside this range only occur when block meshes are composed into a [`SpaceMesh`].
-    pub position: FreePoint,
+    pub position: Position,
 
     /// Cube face, or vertex normal, of the surface this vertex is part of.
     ///
@@ -159,9 +188,6 @@ pub trait Vertex: Copy + Sized + 'static {
     /// for culled vertices..
     type SecondaryData: Copy + Sized + 'static;
 
-    /// Number type for the vertex position coordinates.
-    type Coordinate: num_traits::float::FloatCore;
-
     /// Point type identifying a point in the block's texture.
     type TexPoint: Copy;
 
@@ -189,28 +215,27 @@ pub trait Vertex: Copy + Sized + 'static {
     /// Returns the position of this vertex.
     ///
     /// Note: This is used to perform depth sorting for transparent vertices.
-    fn position(&self) -> Point3D<Self::Coordinate, Cube>;
+    fn position(&self) -> Position;
 }
 
 /// Trivial implementation of [`Vertex`] for testing purposes. Discards lighting.
 impl<T: Copy + 'static> Vertex for BlockVertex<T> {
     const WANTS_DEPTH_SORTING: bool = true;
     type SecondaryData = ();
-    type Coordinate = FreeCoordinate;
     type TexPoint = T;
-    type BlockInst = FreeVector;
+    type BlockInst = Vector3D<PosCoord, Cube>;
 
     fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> (Self, ()) {
         (vertex, ())
     }
 
-    fn position(&self) -> FreePoint {
+    fn position(&self) -> Position {
         self.position
     }
 
     #[inline]
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
-        cube.lower_bounds().to_f64().to_vector()
+        cube.lower_bounds().to_f32().to_vector()
     }
 
     #[inline]
@@ -218,6 +243,3 @@ impl<T: Copy + 'static> Vertex for BlockVertex<T> {
         self.position += offset;
     }
 }
-
-/// A vertex type's position using its coordinate type.
-pub(crate) type VPos<M> = Point3D<<<M as MeshTypes>::Vertex as Vertex>::Coordinate, Cube>;

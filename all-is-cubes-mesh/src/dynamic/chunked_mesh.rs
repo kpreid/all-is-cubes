@@ -95,8 +95,7 @@ impl<M, const CHUNK_SIZE: GridCoordinate> ChunkedSpaceMesh<M, CHUNK_SIZE>
 where
     M: DynamicMeshTypes,
     // These bounds are redundant with `DynamicMeshTypes` but the compiler needs to see them
-    M::Vertex:
-        Vertex<TexPoint = <M::Tile as texture::Tile>::Point, Coordinate: Send + Sync> + PartialEq,
+    M::Vertex: Vertex<TexPoint = <M::Tile as texture::Tile>::Point> + PartialEq,
     M::Alloc: Send + Sync,
     M::Tile: texture::Tile + PartialEq + Send + Sync,
 {
@@ -157,9 +156,11 @@ where
                     // TODO: distinguish between opaque in view and transparent in view
                     // so callers can benefit from our tracking of that distinction.
                     mesh_in_view: chunk
-                        .mesh_bounding_box()
+                        .mesh_local_bounding_box()
                         .all()
-                        .is_some_and(|bb| camera.aab_in_view(bb)),
+                        .is_some_and(|local_bb| {
+                            camera.aab_in_view(local_bb.translate(chunk.mesh_origin().to_vector()))
+                        }),
                     instances_in_view: chunk
                         .block_instances_bounding_box()
                         .is_some_and(|bb| camera.aab_in_view(bb)),
@@ -277,7 +278,6 @@ where
 
         let graphics_options = camera.options();
         let view_point = camera.view_position();
-        let view_point_as_vertex_position = view_point.cast::<<M::Vertex as Vertex>::Coordinate>();
 
         let view_chunk = point_to_chunk(view_point);
         let view_chunk_is_different = self.view_chunk != view_chunk;
@@ -413,9 +413,13 @@ where
                 // Check whether the chunk is in a position where it needs depth sorting
                 // (and whether it has any transparent geometry).
                 // TODO: We could also do frustum culling here.
-                if let Entry::Occupied(chunk_mesh) = &chunk_mesh_entry
-                    && let Some(bb) = chunk_mesh.get().mesh_bounding_box().transparent()
-                    && let depth_ordering = DepthOrdering::from_view_of_aabb(view_point, bb)
+                if let Entry::Occupied(chunk_mesh_oe) = &chunk_mesh_entry
+                    && let chunk_mesh = chunk_mesh_oe.get()
+                    && let Some(lbb) = chunk_mesh.mesh_local_bounding_box().transparent()
+                    && let depth_ordering = DepthOrdering::from_view_of_aabb(
+                        view_point - chunk_mesh.mesh_origin().to_vector(),
+                        lbb,
+                    )
                     && depth_ordering.needs_dynamic_sorting()
                 {
                     chunk_todo.needs_depth_sort = Some(depth_ordering);
@@ -473,9 +477,7 @@ where
             let mut ran_depth_sort = false;
             if let Some(ordering) = state.chunk_todo.needs_depth_sort.take() {
                 ran_depth_sort = true;
-                let info = state
-                    .chunk_mesh
-                    .depth_sort_for_view(ordering, view_point_as_vertex_position);
+                let info = state.chunk_mesh.depth_sort_for_view(ordering, view_point);
                 if info.changed {
                     actually_sorted_indices = true;
                 }

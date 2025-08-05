@@ -192,7 +192,7 @@ fn slow_mesh_benches(c: &mut Criterion) {
 fn dynamic_benches(c: &mut Criterion) {
     use all_is_cubes::chunking::ChunkPos;
     use all_is_cubes::euclid::{self, vec3};
-    use all_is_cubes::math::{Cube, FreePoint};
+    use all_is_cubes::math::Cube;
     use all_is_cubes::time;
     use all_is_cubes::universe::Handle;
     use all_is_cubes_mesh::dynamic;
@@ -233,13 +233,12 @@ fn dynamic_benches(c: &mut Criterion) {
         /// sorting applies to.
         #[derive(Clone, Copy, Debug, PartialEq)]
         struct PositionOnlyVertex {
-            position: FreePoint,
+            position: mesh::Position,
         }
         impl mesh::Vertex for PositionOnlyVertex {
             // These choices match `BlockVertex`.
             const WANTS_DEPTH_SORTING: bool = true;
             type SecondaryData = mesh::Coloring<mesh::texture::NoTexture>;
-            type Coordinate = f64;
             type TexPoint = mesh::texture::NoTexture;
             type BlockInst = Cube;
 
@@ -259,10 +258,10 @@ fn dynamic_benches(c: &mut Criterion) {
             }
 
             fn instantiate_vertex(&mut self, block: Self::BlockInst) {
-                self.position += block.lower_bounds().to_f64().to_vector();
+                self.position += block.lower_bounds().to_f32().to_vector();
             }
 
-            fn position(&self) -> FreePoint {
+            fn position(&self) -> mesh::Position {
                 self.position
             }
         }

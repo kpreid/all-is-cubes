@@ -43,7 +43,6 @@ struct Vertex {
 impl mesh::Vertex for Vertex {
     const WANTS_DEPTH_SORTING: bool = false;
     type SecondaryData = ();
-    type Coordinate = f32;
     type TexPoint = NoTexture;
     type BlockInst = Vector3D<f32, Cube>;
 
@@ -72,7 +71,7 @@ impl mesh::Vertex for Vertex {
         self.position = rg::components::Position3D::from(new_pos);
     }
 
-    fn position(&self) -> Point3D<f32, Cube> {
+    fn position(&self) -> mesh::Position {
         Point3D::from(self.position.0.0)
     }
 }

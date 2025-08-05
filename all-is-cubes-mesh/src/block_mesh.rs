@@ -430,10 +430,7 @@ impl<V: Vertex> SubMesh<V> {
 
         let mut bounding_box = crate::Aabb::EMPTY;
         for vertex in self.vertices.0.iter() {
-            let position = vertex
-                .position()
-                .map(|coord| num_traits::ToPrimitive::to_f64(&coord).unwrap());
-            bounding_box.add_point(position);
+            bounding_box.add_point(vertex.position());
         }
         assert_eq!(
             bounding_box,

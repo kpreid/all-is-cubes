@@ -5,12 +5,10 @@ use core::ops::Range;
 
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D, vec3};
-use all_is_cubes::math::{
-    Axis, Cube, Face6, FreeCoordinate, FreePoint, GridCoordinate, Rgba, rgba_const,
-};
+use all_is_cubes::math::{Axis, Cube, Face6, GridCoordinate, Rgba, rgba_const};
 
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
-use crate::{Aabb, BlockVertex, Coloring, IndexVec, Viz};
+use crate::{Aabb, BlockVertex, Coloring, IndexVec, PosCoord, Position, Viz};
 
 /// This is the subset of `Evoxel` which is processed by the [`greedy_mesh()`] planar mesh
 /// generator. It does not distinguish emission other than “has some”, because we always
@@ -221,7 +219,7 @@ pub(super) enum QuadColoring<'a, T> {
     Volume {
         plane: &'a T,
         /// Depth
-        far_depth: FreeCoordinate,
+        far_depth: PosCoord,
     },
 }
 impl<T> Copy for QuadColoring<'_, T> {}
@@ -243,9 +241,9 @@ pub(super) fn push_quad<V, Tex>(
     vertices: &mut (Vec<V>, Vec<V::SecondaryData>),
     indices: &mut IndexVec,
     transform: &QuadTransform,
-    depth: FreeCoordinate,
-    low_corner: Point2D<FreeCoordinate, TexelUnit>,
-    high_corner: Point2D<FreeCoordinate, TexelUnit>,
+    depth: PosCoord,
+    low_corner: Point2D<PosCoord, TexelUnit>,
+    high_corner: Point2D<PosCoord, TexelUnit>,
     coloring: QuadColoring<'_, Tex>,
     viz: &mut Viz,
     bounding_box: &mut Aabb,
@@ -259,7 +257,7 @@ pub(super) fn push_quad<V, Tex>(
 
     // This iterator computes the coordinates but not the vertex --
     // it is shared between the colored and textured cases.
-    let position_iter = QUAD_VERTICES.iter().map(|&unit_square_point| -> FreePoint {
+    let position_iter = QUAD_VERTICES.iter().map(|&unit_square_point| -> Position {
         let rectangle_point =
             low_corner.to_vector() + unit_square_point.component_mul(high_corner - low_corner);
         rectangle_point.extend(depth).to_point().cast_unit()
@@ -268,7 +266,7 @@ pub(super) fn push_quad<V, Tex>(
     viz.extend_vertices(
         position_iter
             .clone()
-            .map(|p| transform.transform_position(p) * f64::from(transform.resolution)),
+            .map(|p| transform.transform_position(p) * PosCoord::from(transform.resolution)),
         QUAD_INDICES.iter().copied(),
         || match coloring {
             QuadColoring::Solid(color) => color,
@@ -300,14 +298,14 @@ pub(super) fn push_quad<V, Tex>(
                 plane,
                 transform,
                 TilePoint::new(
-                    low_corner.x as TextureCoordinate + half_texel,
-                    low_corner.y as TextureCoordinate + half_texel,
-                    depth as TextureCoordinate + half_texel,
+                    low_corner.x + half_texel,
+                    low_corner.y + half_texel,
+                    depth + half_texel,
                 ),
                 TilePoint::new(
-                    high_corner.x as TextureCoordinate - half_texel,
-                    high_corner.y as TextureCoordinate - half_texel,
-                    depth as TextureCoordinate + half_texel,
+                    high_corner.x - half_texel,
+                    high_corner.y - half_texel,
+                    depth + half_texel,
                 ),
             );
 
@@ -320,13 +318,9 @@ pub(super) fn push_quad<V, Tex>(
                         position,
                         face,
                         coloring: Coloring::Texture {
-                            pos: plane.grid_to_texcoord(
-                                transform.transform_texture_point(
-                                    (voxel_grid_point + vec3(0., 0., 0.5))
-                                        .map(|s| s as TextureCoordinate)
-                                        .cast_unit(),
-                                ),
-                            ),
+                            pos: plane.grid_to_texcoord(transform.transform_texture_point(
+                                (voxel_grid_point + vec3(0., 0., 0.5)).cast_unit(),
+                            )),
                             clamp_min,
                             clamp_max,
                             resolution: transform.resolution,
@@ -341,16 +335,8 @@ pub(super) fn push_quad<V, Tex>(
                 transform,
                 // No half-texel offsets because the raymarcher uses the clamp box as the
                 // actual volume boundaries, and is precise about applying them.
-                TilePoint::new(
-                    low_corner.x as TextureCoordinate,
-                    low_corner.y as TextureCoordinate,
-                    depth as TextureCoordinate,
-                ),
-                TilePoint::new(
-                    high_corner.x as TextureCoordinate,
-                    high_corner.y as TextureCoordinate,
-                    far_depth as TextureCoordinate,
-                ),
+                TilePoint::new(low_corner.x, low_corner.y, depth),
+                TilePoint::new(high_corner.x, high_corner.y, far_depth),
             );
 
             // TODO: deduplicate this code
@@ -363,9 +349,9 @@ pub(super) fn push_quad<V, Tex>(
                         position,
                         face,
                         coloring: Coloring::Texture {
-                            pos: plane.grid_to_texcoord(transform.transform_texture_point(
-                                voxel_grid_point.map(|s| s as TextureCoordinate).cast_unit(),
-                            )),
+                            pos: plane.grid_to_texcoord(
+                                transform.transform_texture_point(voxel_grid_point.cast_unit()),
+                            ),
                             clamp_min,
                             clamp_max,
                             resolution: transform.resolution,
@@ -420,18 +406,23 @@ pub(super) struct QuadTransform {
     // so we don't need as many ops as a full matrix-vector multiplication?
     // Or would the branching needed make it pointless?
     // We can at least make this a euclid::RigidTransform3D.
-    position_transform: Transform3D<FreeCoordinate, Cube, Cube>,
+    position_transform: Transform3D<PosCoord, Cube, Cube>,
     texture_transform: Transform3D<TextureCoordinate, TexelUnit, TexelUnit>,
 }
 
 impl QuadTransform {
     pub fn new(face: Face6, resolution: Resolution) -> Self {
-        let voxel_to_block_scale = FreeCoordinate::from(resolution).recip();
+        let voxel_to_block_scale = PosCoord::from(resolution).recip();
         Self {
             face,
             resolution,
-            position_transform: Transform3D::from_scale(Scale::new(voxel_to_block_scale))
-                .then(&face.face_transform(1).to_matrix().to_free()),
+            position_transform: Transform3D::from_scale(Scale::new(voxel_to_block_scale)).then(
+                &face
+                    .face_transform(1)
+                    .to_matrix()
+                    .to_free()
+                    .cast::<PosCoord>(),
+            ),
             texture_transform: Transform3D::from_untyped(
                 &face
                     .face_transform(resolution.to_grid())
@@ -444,7 +435,7 @@ impl QuadTransform {
     }
 
     #[inline]
-    fn transform_position(&self, voxel_grid_point: FreePoint) -> FreePoint {
+    fn transform_position(&self, voxel_grid_point: Position) -> Position {
         self.position_transform
             .transform_point3d(voxel_grid_point)
             .unwrap(/* would only fail in case of perspective projection */)
@@ -458,7 +449,7 @@ impl QuadTransform {
     }
 }
 
-const QUAD_VERTICES: &[Vector2D<FreeCoordinate, TexelUnit>; 4] = &[
+const QUAD_VERTICES: &[Vector2D<PosCoord, TexelUnit>; 4] = &[
     // Two-triangle quad.
     // Note that looked at from a X-right Y-up view, these triangles are
     // clockwise, but they're properly counterclockwise from the perspective

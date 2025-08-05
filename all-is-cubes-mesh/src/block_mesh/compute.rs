@@ -7,8 +7,8 @@ use itertools::Itertools as _;
 
 use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSizeCoord, OpacityCategory,
-    Rgb, Rgba, Vol, ZeroOne,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSizeCoord, OpacityCategory, Rgb, Rgba, Vol,
+    ZeroOne,
 };
 use all_is_cubes_render::Flaws;
 
@@ -18,7 +18,7 @@ use crate::block_mesh::planar::{
     GmRect, QuadColoring, QuadTransform, VisualVoxel, greedy_mesh, push_quad,
 };
 use crate::texture::{self, Tile as _};
-use crate::{BlockMesh, MeshOptions, MeshTypes, Viz};
+use crate::{BlockMesh, MeshOptions, MeshTypes, PosCoord, Viz};
 
 /// Generate the [`BlockMesh`] data for the given [`EvaluatedBlock`], writing it into `output`.
 ///
@@ -224,16 +224,16 @@ fn push_box<M: MeshTypes>(
                 &mut sub_mesh.indices_transparent
             },
             &QuadTransform::new(face, resolution),
-            FreeCoordinate::from(depth),
-            lower_bounds.to_f64().cast_unit(),
-            upper_bounds.to_f64().cast_unit(),
+            depth as f32, // TODO: eliminate this case by using a smaller integer type for `aab`?
+            lower_bounds.to_f32().cast_unit(),
+            upper_bounds.to_f32().cast_unit(),
             match &coloring {
                 // TODO: for our actual purposes, this should be a volume and not face slices
                 BoxColoring::VolumeTexture(tile) => {
                     plane = tile.slice(aab.abut(face, -1).unwrap());
                     QuadColoring::Volume {
                         plane: &plane,
-                        far_depth: FreeCoordinate::from(aab_in_face_coordinates.upper_bounds().z),
+                        far_depth: (aab_in_face_coordinates.upper_bounds().z as f32),
                     }
                 }
                 BoxColoring::Solid(face_colors) => QuadColoring::Solid(face_colors[face]),
@@ -480,7 +480,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             } else {
                 &mut *interior_mesh
             };
-            let depth = FreeCoordinate::from(layer);
+            let depth = layer as PosCoord; // TODO: centralize this conversion
 
             // Traverse `visible_image` using the "greedy meshing" algorithm for
             // breaking an irregular shape into quads.
@@ -530,8 +530,10 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     },
                     &quad_transform,
                     depth,
-                    low_corner.map(FreeCoordinate::from),
-                    high_corner.map(FreeCoordinate::from),
+                    // cannot fail or round because the maximum resolution of a block is well below
+                    // f32 precision -- TODO: write a function to centralize this claim.
+                    low_corner.cast::<PosCoord>(),
+                    high_corner.cast::<PosCoord>(),
                     coloring,
                     viz,
                     if rect_has_alpha {

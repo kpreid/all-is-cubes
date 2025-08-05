@@ -2,7 +2,7 @@ use core::fmt::{self, Write as _};
 
 use all_is_cubes::euclid::{Point3D, Vector3D};
 use all_is_cubes::math::{Cube, GridVector, Rgba};
-use all_is_cubes_mesh::{BlockVertex, Coloring, Vertex};
+use all_is_cubes_mesh::{self as mesh, BlockVertex, Vertex};
 
 use crate::DebugLineVertex;
 
@@ -118,10 +118,6 @@ impl BColor {
 impl Vertex for BPosition {
     const WANTS_DEPTH_SORTING: bool = true;
     type SecondaryData = BColor;
-    /// TODO: no reason this should be f32 other than scaling to fractional integers.
-    /// The depth sorting system should be made more flexible here.
-    type Coordinate = f32;
-
     /// Packed cube coordinates
     type BlockInst = u32;
     type TexPoint = TexPoint;
@@ -140,7 +136,7 @@ impl Vertex for BPosition {
             | (position_in_cube_fixed.z << 16)
             | (normal << 24);
         match vertex.coloring {
-            Coloring::Solid(color) => {
+            mesh::Coloring::Solid(color) => {
                 let mut color_attribute: [f32; 4] = color.into();
                 // Clamp out-of-range alpha values so they fit into the
                 // VertexColorOrTexture protocol (not less than zero).
@@ -157,7 +153,7 @@ impl Vertex for BPosition {
                     },
                 )
             }
-            Coloring::Texture {
+            mesh::Coloring::Texture {
                 pos: TexPoint { tc, atlas_id },
                 clamp_min,
                 clamp_max,
@@ -193,7 +189,7 @@ impl Vertex for BPosition {
     }
 
     #[inline]
-    fn position(&self) -> Point3D<Self::Coordinate, Cube> {
+    fn position(&self) -> mesh::Position {
         let cube = Point3D::new(
             self.cube_packed & 0xFF,
             (self.cube_packed >> 8) & 0xFF,
@@ -213,7 +209,7 @@ impl Vertex for BPosition {
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct WgpuInstanceData {
-    /// Translation vector which may be added to [`WgpuBlockVertex::position`]
+    /// Translation vector which may be added to [`BPosition::position`]
     /// to obtain world (that is, [`Space`]) coordinates.
     ///
     /// TODO: Eventually we want to be able to use camera-relative coordinates, to make
@@ -230,7 +226,7 @@ impl WgpuInstanceData {
         step_mode: wgpu::VertexStepMode::Instance,
         attributes: const {
             &wgpu::vertex_attr_array![
-                // location numbers must start after WgpuBlockVertex ends
+                // location numbers must start after BPosition ends
                 6 => Float32x3,
                 7 => Uint32x4,
             ]
@@ -283,7 +279,7 @@ impl DebugLineVertex for WgpuLinesVertex {
 /// Fixed-point texture coordinate, with a multiplier of 2 so it can represent edges and
 /// middles of texels (0.0, 0.5, 1.0, 1.5, ...)
 ///
-/// This type should not be used directly; it is public as an element of [`WgpuBlockVertex`]'s
+/// This type should not be used directly; it is public as an element of [`BPosition`]'s
 /// trait implementations.
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[allow(unnameable_types)]
@@ -370,7 +366,7 @@ mod tests {
         let mut vertex = BPosition::from_block_vertex(BlockVertex {
             position: Point3D::new(0.25, 0.0, 1.0),
             face: Face6::PX,
-            coloring: Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
+            coloring: mesh::Coloring::Solid(Rgba::new(0.0, 0.5, 1.0, 0.5)),
         })
         .0;
         vertex.instantiate_vertex(BPosition::instantiate_block(Cube::new(100, 50, 7)));

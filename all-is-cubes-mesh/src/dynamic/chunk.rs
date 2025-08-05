@@ -1,3 +1,5 @@
+use all_is_cubes::math::FreeCoordinate;
+use all_is_cubes::math::FreePoint;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
@@ -5,14 +7,13 @@ use core::mem;
 use core::ops;
 
 use all_is_cubes::chunking::{ChunkPos, ChunkRelative};
-use all_is_cubes::euclid::Point3D;
-use all_is_cubes::euclid::Translation3D;
-use all_is_cubes::math::Aab;
-use all_is_cubes::math::{Cube, GridCoordinate, LineVertex, Wireframe as _};
+use all_is_cubes::euclid::{Point3D, Translation3D};
+use all_is_cubes::math::{Aab, Cube, GridCoordinate, LineVertex, Wireframe as _};
 use all_is_cubes::space::{BlockIndex, Space};
 
+use crate::Position;
 use crate::dynamic::{self, DynamicMeshTypes};
-use crate::{BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, SpaceMesh, VPos};
+use crate::{BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, SpaceMesh};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
@@ -275,15 +276,14 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     pub fn depth_sort_for_view(
         &mut self,
         ordering: DepthOrdering,
-        view_position: VPos<M>,
+        view_position: FreePoint,
     ) -> crate::DepthSortInfo {
         // Subtract chunk origin because the mesh coordinates are in chunk-relative
         // coordinates but the incoming view position is in world coordinates.
-        // TODO: This makes poor use of the precision of Vert::Coordinate (probably f32).
-        // Instead we should explicitly accept relative coordinates.
-        let lbp: VPos<M> = self.position.bounds().lower_bounds().cast();
+        let relative_view_position: Position =
+            (view_position - self.mesh_origin().to_vector()).to_f32();
         self.mesh
-            .depth_sort_for_view(ordering, view_position - lbp.to_vector())
+            .depth_sort_for_view(ordering, relative_view_position)
     }
 
     pub(crate) fn stale_blocks(&self, block_meshes: &dynamic::VersionedBlockMeshes<M>) -> bool {
@@ -301,7 +301,10 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     pub(crate) fn chunk_debug_lines(&self, output: &mut impl Extend<LineVertex>) {
         // TODO: distinguishing colors or marks for these up-to-3 boxes
 
-        let meshbb = self.mesh_bounding_box();
+        // loses potential precision if origin is large, but this is only debug info
+        let meshbb = self
+            .mesh_local_bounding_box()
+            .translate(self.mesh_origin().to_f32().to_vector());
         for aab in [meshbb.opaque, meshbb.transparent]
             .into_iter()
             .filter_map(<Option<Aab>>::from)
@@ -316,13 +319,30 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         self.block_instances_bounding_box().wireframe_points(output);
     }
 
-    /// Returns the bounding box of the mesh in this chunk.
+    /// Returns the position in world coordinates (the same as the [`Space`]) of the origin of
+    /// this chunk's mesh.
+    ///
+    /// Interpreted as a vector, this is the translation to apply to this mesh to place it in the
+    /// scene.
+    //TODO: Use euclid::Translation3D instead.
+    ///
+    /// It is expressed in [`f64`] coordinates to ensure that no rounding error can possibly occur.
+    pub(crate) fn mesh_origin(&self) -> FreePoint {
+        self.position()
+            .bounds()
+            .lower_bounds()
+            .map(FreeCoordinate::from)
+    }
+
+    /// Returns the bounding box of the mesh in this chunk, in coordinates relative to
+    /// [`Self::mesh_origin()`].
     /// Note that this does not include block instances not merged into the mesh.
-    pub(crate) fn mesh_bounding_box(&self) -> crate::Aabbs {
-        self.mesh
-            .meta()
-            .bounding_box()
-            .translate(self.position().bounds().lower_bounds().to_f64().to_vector())
+    //---
+    // TODO: Translating to global f32 coordinates can in result in precision loss.
+    // Consider changing the signature or eliminating this entirely in favor of making the caller
+    // do the transform they need.
+    pub(crate) fn mesh_local_bounding_box(&self) -> crate::Aabbs {
+        self.mesh.meta().bounding_box()
     }
 
     /// Returns the bounding box of all instances in this chunk, in global [`Space`] coordinates.

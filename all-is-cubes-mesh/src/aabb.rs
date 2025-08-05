@@ -1,17 +1,18 @@
 use core::ops;
 
-use all_is_cubes::euclid::Point3D;
-use all_is_cubes::math::{Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector};
+use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::math::{Aab, Axis, Cube};
 use ordered_float::NotNan;
 
 #[cfg(doc)]
 use crate::{BlockMesh, SpaceMesh};
+use crate::{PosCoord, Position};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Axis-Aligned Bounding Box.
+/// Axis-Aligned Bounding Box of the vertices belonging to a mesh.
 ///
-/// This type is structurally identical to <code>[Option]&lt;[Aab]&gt;</code>,
+/// This type is structurally identical to <code>[Option]&lt;[Box3D]&gt;</code>,
 /// but has methods allowing it to be used more conveniently to manage the bounding box of a
 /// possibly-empty set of points (vertices). In particular, [`Aabb::union()`] combines two
 /// such possibly-absent boxes.
@@ -37,29 +38,29 @@ pub(crate) struct Aabb {
     // If no points have been added, then this box's coordinates are inverted (+inf to -inf).
     // We are not using `euclid::Box3D` because its `union()` function does not do what we want
     // for finite zero-sized boxes (they are counted as empty and ignored).
-    low: Point3D<NotNan<FreeCoordinate>, Cube>,
-    high: Point3D<NotNan<FreeCoordinate>, Cube>,
+    low: Point3D<NotNan<PosCoord>, Cube>,
+    high: Point3D<NotNan<PosCoord>, Cube>,
 }
+
+// SAFETY: Infinity is not NaN, so it is permitted.
+const NN_INF: NotNan<PosCoord> = unsafe { NotNan::new_unchecked(f32::INFINITY) };
+// SAFETY: Infinity is not NaN, so it is permitted.
+const NN_NEG_INF: NotNan<PosCoord> = unsafe { NotNan::new_unchecked(f32::NEG_INFINITY) };
 
 impl Aabb {
     /// The empty box, containing no points.
-    pub const EMPTY: Self = {
-        // SAFETY: Infinity is not NaN, so it is permitted.
-        // (There is no safe way to construct this value as a constant.)
-        let (inf, neg_inf) = unsafe {
-            (
-                NotNan::new_unchecked(f64::INFINITY),
-                NotNan::new_unchecked(f64::NEG_INFINITY),
-            )
-        };
+    pub const EMPTY: Self = Self {
+        // These infinite bounds *inverted*, which is a natural representation for emptiness
+        // because the `min()`-and-`max()`-based union of it with any finite point produces
+        // the box containing that point.
+        low: Point3D::new(NN_INF, NN_INF, NN_INF),
+        high: Point3D::new(NN_NEG_INF, NN_NEG_INF, NN_NEG_INF),
+    };
 
-        Self {
-            // These infinite bounds *inverted*, which is a natural representation for emptiness
-            // because the `min()`-and-`max()`-based union of it with any finite point produces
-            // the box containing that point.
-            low: Point3D::new(inf, inf, inf),
-            high: Point3D::new(neg_inf, neg_inf, neg_inf),
-        }
+    /// The box containing all points, including infinite ones.
+    pub const EVERYWHERE: Self = Self {
+        low: Point3D::new(NN_NEG_INF, NN_NEG_INF, NN_NEG_INF),
+        high: Point3D::new(NN_INF, NN_INF, NN_INF),
     };
 
     pub fn is_empty(&self) -> bool {
@@ -82,7 +83,7 @@ impl Aabb {
     /// Panics if the point contains NaN.
     // #[inline]
     // #[track_caller] // in case of NaN
-    pub fn add_point(&mut self, point: FreePoint) {
+    pub fn add_point(&mut self, point: Position) {
         // TODO: consider switching to NotNan inputs
         let point = point.try_cast().expect("point must not be NaN");
         self.low = self.low.min(point);
@@ -92,7 +93,7 @@ impl Aabb {
     /// Translate this box by the given offset.
     #[inline]
     #[track_caller]
-    pub fn translate(self, offset: FreeVector) -> Self {
+    pub fn translate(self, offset: Vector3D<PosCoord, Cube>) -> Self {
         // TODO: consider switching to NotNan inputs
         let offset = offset.try_cast().expect("offset must not be NaN");
 
@@ -105,7 +106,7 @@ impl Aabb {
     /// Returns whether this box contains the point.
     ///
     /// Points on the boundary of the box are included.
-    pub fn contains(&self, point: FreePoint) -> bool {
+    pub fn contains(&self, point: Position) -> bool {
         for axis in Axis::ALL {
             let coord = point[axis];
             if !((self.low[axis].into_inner() <= coord) & (coord <= self.high[axis].into_inner())) {
@@ -113,6 +114,37 @@ impl Aabb {
             }
         }
         true
+    }
+
+    /// Shrink the box so that, presuming it contains `include`, it still contains `include` but
+    /// excludes everything further away than `exclude` on all axes.
+    ///
+    /// This operation is not proof against breaking the invariant that every box is either
+    /// `EMPTY` or non-inverted, in the case that `include` is out of bounds.
+    /// To protect against that, we will keep this private to the crate even if `Aabb` is made
+    /// public.
+    /// A more thorough solution would be to write a dedicated type for
+    /// "`Aabb` plus this guaranteed included point" for the particular use case.
+    pub(crate) fn exclude_beyond(&mut self, exclude: Position, include: Position) {
+        use core::cmp::Ordering;
+        for axis in Axis::ALL {
+            let Ok(e) = NotNan::new(exclude[axis]) else {
+                continue;
+            };
+            let Ok(i) = NotNan::new(include[axis]) else {
+                continue;
+            };
+            match PartialOrd::partial_cmp(&e, &i) {
+                Some(Ordering::Less) => {
+                    self.low[axis] = self.low[axis].max(e);
+                }
+                Some(Ordering::Equal) => {} // nothing to do
+                Some(Ordering::Greater) => {
+                    self.high[axis] = self.high[axis].min(e);
+                }
+                None => {} // NaN -- TODO: integrate this with the NotNan checks
+            }
+        }
     }
 }
 
@@ -130,10 +162,13 @@ impl ops::BitOrAssign for Aabb {
     }
 }
 
+// TODO: This conversion should be removed as it is lossy (f64 to f32).
+// To replace it, we should consider exposing `Aabb` or making `Aab` able to have `f32` components.
 impl From<Aab> for Aabb {
     #[inline]
     fn from(aab: Aab) -> Self {
         Self {
+            // TODO: Aab should have NotNan-returning getters
             low: aab.lower_bounds_p().cast(),
             high: aab.upper_bounds_p().cast(),
         }
@@ -157,11 +192,7 @@ impl From<Option<Aab>> for Aabb {
     #[inline]
     fn from(value: Option<Aab>) -> Self {
         match value {
-            Some(aab) => Self {
-                // TODO: Aab should have NotNan-returning getters
-                low: aab.lower_bounds_p().cast(),
-                high: aab.upper_bounds_p().cast(),
-            },
+            Some(aab) => Aabb::from(aab),
             None => Aabb::EMPTY,
         }
     }
@@ -233,7 +264,7 @@ impl Aabbs {
     #[inline]
     #[must_use]
     #[track_caller] // in case of NaN
-    pub(crate) fn translate(self, offset: FreeVector) -> Self {
+    pub(crate) fn translate(self, offset: Vector3D<PosCoord, Cube>) -> Self {
         Self {
             opaque: self.opaque.translate(offset),
             transparent: self.transparent.translate(offset),

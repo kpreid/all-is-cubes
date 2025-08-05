@@ -5,10 +5,10 @@ use core::ops::{self, Range};
 
 use ordered_float::OrderedFloat;
 
-use all_is_cubes::euclid::{Box3D, Point3D, Vector3D, vec3};
-use all_is_cubes::math::{Aab, Axis, Cube, FreeCoordinate, FreePoint, GridRotation};
+use all_is_cubes::euclid::{Vector3D, vec3};
+use all_is_cubes::math::{Aab, Axis, FreePoint, GridRotation};
 
-use crate::{Aabb, IndexInt, IndexSliceMut, IndexVec, MeshTypes, VPos, Vertex};
+use crate::{Aabb, IndexInt, IndexSliceMut, IndexVec, MeshTypes, Position, Vertex};
 #[cfg(doc)]
 use crate::{MeshMeta, SpaceMesh};
 
@@ -269,14 +269,14 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         // Precompute midpoints (as sort keys) of all of the transparent quads.
         // This does assume that the input `BlockMesh`es contain strictly quads
         // and no other polygons, though.
-        struct QuadWithMid<S, I> {
+        struct QuadWithMid<I> {
             indices: [I; 6],
-            midpoint: Point3D<S, Cube>,
+            midpoint: Position,
         }
         let (quads, []) = transparent_indices.as_chunks::<6>() else {
             panic!("mesh is not quads")
         };
-        let mut sortable_quads: Vec<QuadWithMid<<M::Vertex as Vertex>::Coordinate, I>> = quads
+        let mut sortable_quads: Vec<QuadWithMid<I>> = quads
             .iter()
             .map(|&indices_of_quad| QuadWithMid {
                 indices: indices_of_quad,
@@ -299,13 +299,11 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
 
             // Note: Benchmarks show that `sort_by_key` is fastest
             // (not `sort_unstable_by_key`).
-            sortable_quads.sort_by_key(
-                |quad| -> [OrderedFloat<<M::Vertex as Vertex>::Coordinate>; 3] {
-                    basis
-                        .map(|f| OrderedFloat(f.dot(quad.midpoint.to_vector())))
-                        .into()
-                },
-            );
+            sortable_quads.sort_by_key(|quad| -> [OrderedFloat<f32>; 3] {
+                basis
+                    .map(|f| OrderedFloat(f.dot(quad.midpoint.to_vector())))
+                    .into()
+            });
 
             // Copy the sorted indices into the main array, and set the corresponding
             // range.
@@ -333,7 +331,7 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
 pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     vertices: &[M::Vertex],
     indices: IndexSliceMut<'_>,
-    view_position: VPos<M>,
+    view_position: Position,
     ordering: DepthOrdering,
     current_region_of_validity: &mut Aabb,
 ) -> DepthSortInfo {
@@ -369,7 +367,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         };
     }
 
-    if current_region_of_validity.contains(view_position.to_f64()) {
+    if current_region_of_validity.contains(view_position) {
         return DepthSortInfo {
             changed: false,
             quads_sorted: 0,
@@ -381,10 +379,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     // mesh. As long as the viewpoint doesn’t exit this box, the sorting is still valid.
     // (TODO: Prove this claim. I think it might actually require changing the sort key to
     // use Manhattan distance instead of Euclidean distance.)
-    let mut new_validity = Box3D {
-        min: FreePoint::splat(FreeCoordinate::NEG_INFINITY),
-        max: FreePoint::splat(FreeCoordinate::INFINITY),
-    };
+    let mut new_validity = Aabb::EVERYWHERE;
 
     // TODO: The following sorting algorithm is only optimal for `within_on_axes` 3.
     // When it is 1, we can use a different static order instead of dynamic ordering.
@@ -395,13 +390,11 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     fn generic_sort<M: MeshTypes, Ix: IndexInt>(
         data: &mut [Ix],
         positions: &[M::Vertex],
-        view_position: VPos<M>,
-        new_validity: &mut Box3D<FreeCoordinate, Cube>,
+        view_position: Position,
+        new_validity: &mut Aabb,
     ) {
         // TODO: this function contains way too much numeric conversion per vertex.
         // Think about how to reduce it (and maybe use truncating casts).
-
-        let view_position_f64 = view_position.to_f64();
 
         // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
         data.as_chunks_mut::<6>().0.sort_unstable_by_key(|indices| {
@@ -410,9 +403,8 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
 
         // Update the range of validity to not go past any of the sorted vertices.
         for &mut ix in data {
-            // TODO: recuce the amount of per-vertex casting involved here.
-            let vertex_position = M::Vertex::position(&positions[ix.to_slice_index()]).to_f64();
-            exclude_beyond(new_validity, vertex_position, view_position_f64);
+            let vertex_position = M::Vertex::position(&positions[ix.to_slice_index()]);
+            new_validity.exclude_beyond(vertex_position, view_position);
         }
     }
 
@@ -424,7 +416,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
             generic_sort::<M, u32>(slice, vertices, view_position, &mut new_validity)
         }
     }
-    *current_region_of_validity = Aab::from_lower_upper(new_validity.min, new_validity.max).into();
+    *current_region_of_validity = new_validity;
 
     DepthSortInfo {
         changed: true,
@@ -434,12 +426,11 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
 
 /// Compute quad midpoint from quad vertices, for depth sorting.
 #[inline]
-fn midpoint<M: MeshTypes, Ix: IndexInt>(vertices: &[M::Vertex], indices: [Ix; 6]) -> VPos<M> {
-    let one_half = num_traits::cast::<f32, <M::Vertex as Vertex>::Coordinate>(0.5f32).unwrap();
+fn midpoint<M: MeshTypes, Ix: IndexInt>(vertices: &[M::Vertex], indices: [Ix; 6]) -> Position {
     // We only need to look at one of the two triangles,
     // because they have the same bounding rectangle.
-    let [v0, v1, v2, ..]: [VPos<M>; 6] = indices.map(|i| vertices[i.to_slice_index()].position());
-    (v0.max(v1).max(v2) + v0.min(v1).min(v2).to_vector()) * one_half
+    let [v0, v1, v2, ..]: [Position; 6] = indices.map(|i| vertices[i.to_slice_index()].position());
+    (v0.max(v1).max(v2) + v0.min(v1).min(v2).to_vector()) * 0.5
 }
 
 /// `storage.extend(items)` plus reporting the added range of items
@@ -454,26 +445,6 @@ where
     storage.extend(items);
     let end = storage.len();
     start..end
-}
-
-/// Shrink the box so that, presuming it contains `include`, it still contains `include` but
-/// excludes everything further away than `exclude` on all axes.
-fn exclude_beyond(b: &mut Box3D<FreeCoordinate, Cube>, exclude: FreePoint, include: FreePoint) {
-    use core::cmp::Ordering;
-    for axis in Axis::ALL {
-        let e = exclude[axis];
-        // Note: If the comparison succeeded, neither coordinate is NaN.
-        match PartialOrd::partial_cmp(&e, &include[axis]) {
-            Some(Ordering::Less) => {
-                b.min[axis] = b.min[axis].max(e);
-            }
-            Some(Ordering::Equal) => {} // nothing to do
-            Some(Ordering::Greater) => {
-                b.max[axis] = b.max[axis].min(e);
-            }
-            None => {} // NaN
-        }
-    }
 }
 
 // -------------------------------------------------------------------------------------------------

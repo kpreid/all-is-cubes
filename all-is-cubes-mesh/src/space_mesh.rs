@@ -14,7 +14,7 @@ use all_is_cubes_render::Flaws;
 use crate::texture;
 use crate::{
     Aabb, Aabbs, BlockMesh, DepthOrdering, DepthSortInfo, IndexSlice, IndexVec, IndexVecDeque,
-    MeshOptions, MeshTypes, VPos, Vertex, depth_sorting,
+    MeshOptions, MeshTypes, Position, Vertex, depth_sorting,
 };
 
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
@@ -128,10 +128,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
 
         let mut bounding_box: Aabb = Aabb::EMPTY;
         for vertex in &self.vertices.0 {
-            let position = vertex
-                .position()
-                .map(|coord| num_traits::ToPrimitive::to_f64(&coord).unwrap());
-            bounding_box.add_point(position);
+            bounding_box.add_point(vertex.position());
         }
         assert_eq!(
             bounding_box,
@@ -350,7 +347,10 @@ impl<M: MeshTypes> SpaceMesh<M> {
     }
 
     /// Sort the existing indices of `self.transparent_range(ordering)` as appropriate for
-    /// the given view position.
+    /// the given `view_position`.
+    ///
+    /// `view_position` must be in the same coordinate system as `self`’s vertices;
+    /// see [`SpaceMesh::compute()`] for what that system is.
     ///
     /// The amount of sorting performed, if any, depends on the specific value of `ordering`.
     /// Some orderings are fully static and do not require any sorting; calling this function
@@ -368,7 +368,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     pub fn depth_sort_for_view(
         &mut self,
         ordering: DepthOrdering,
-        view_position: VPos<M>,
+        view_position: Position,
     ) -> DepthSortInfo {
         let range = self.transparent_range(ordering);
         depth_sorting::dynamic_depth_sort_for_view::<M>(
@@ -458,7 +458,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     }
 
     let inst = M::Vertex::instantiate_block(translation);
-    let bb_translation = translation.lower_bounds().to_f64().to_vector();
+    let bb_translation = translation.lower_bounds().to_f32().to_vector();
 
     for (face, on_block_face, sub_mesh) in block_mesh.all_sub_meshes_keyed() {
         if sub_mesh.is_empty() {
@@ -904,7 +904,7 @@ mod tests {
         assert_eq!(
             space_mesh
                 .bounding_box()
-                .translate(mesh_region.lower_bounds().to_vector().to_f64()),
+                .translate(mesh_region.lower_bounds().to_vector().to_f32()),
             Aabbs {
                 opaque: Some(Aab::from_lower_upper([1., 2., 1.], [3., 2., 3.])).into(),
                 transparent: Aabb::EMPTY

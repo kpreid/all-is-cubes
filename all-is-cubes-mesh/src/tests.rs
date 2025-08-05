@@ -14,7 +14,7 @@ use all_is_cubes::euclid::{Point3D, Size3D, Vector3D, point3};
 use all_is_cubes::math::{
     Aab, Cube,
     Face6::{self, *},
-    FaceMap, FreeCoordinate, GridAab, Rgb, Rgba, zo32,
+    FaceMap, GridAab, Rgb, Rgba, zo32,
 };
 use all_is_cubes::space::{Space, SpacePhysics};
 use all_is_cubes::universe::ReadTicket;
@@ -26,11 +26,11 @@ use crate::testing::{Allocator, TexPoint, TextureMt, mesh_blocks_and_space};
 use crate::texture::TexelUnit;
 use crate::{
     BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering, IndexSlice, MeshOptions,
-    MeshTypes, SpaceMesh, block_meshes_for_space,
+    MeshTypes, PosCoord, SpaceMesh, block_meshes_for_space,
 };
 
 /// Shorthand for writing out an entire [`BlockVertex`] with solid color.
-fn v_c<T>(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockVertex<T> {
+fn v_c<T>(position: [PosCoord; 3], face: Face6, color: [f32; 4]) -> BlockVertex<T> {
     BlockVertex {
         position: position.into(),
         face,
@@ -40,7 +40,7 @@ fn v_c<T>(position: [FreeCoordinate; 3], face: Face6, color: [f32; 4]) -> BlockV
 
 /// Shorthand for writing out an entire [`BlockVertex`] with texturing.
 fn v_t(
-    position: [FreeCoordinate; 3],
+    position: [PosCoord; 3],
     face: Face6,
     resolution: Resolution,
     texture: [f32; 3],

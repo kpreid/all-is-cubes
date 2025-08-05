@@ -37,6 +37,7 @@ In order to resolve various design problems interfering with development, the `a
 
 - `all-is-cubes-mesh` library:
     - `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` now return the new type `Aabbs` which provides separate boxes for opaque and transparent geometry. This allows precise culling when rendering in separate opaque and transparent passes.
+    - New type aliases `Position` and `PosCoord` for vertex positions.
 
 - `all-is-cubes-port` library:
     - `export_to_path()` no longer accesses the `Universe` while its future is running, but instead only when initially called. This allows the latter portion of the export operation to run concurrently with other uses of the `Universe`.
@@ -77,6 +78,8 @@ In order to resolve various design problems interfering with development, the `a
 
 - `all-is-cubes-mesh` library:
     - Renamed `GfxVertex` to `Vertex`.
+    - Vertex position coordinates are now conveyed as `f32` (you may use the new type alias `PosCoord`) instead of `f64`.
+      (This will not reduce the precision of any mesh of reasonable size, because vertex positions are relative to the bounds of the individual mesh.)
     - The return type of `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` has changed from `Option<Aab>` to `Aabbs`.
     - The return type of `depth_sort_for_view()` functions has changed from `bool` to a new `struct DepthSortInfo` (which contains that boolean).
     - `DepthOrdering` is now a `struct`, and the variants `DepthOrdering::{Any, Within}` have been replaced with constants.
@@ -97,6 +100,10 @@ In order to resolve various design problems interfering with development, the `a
       In general, to make time pass, create a `Universe` and `step()` it instead.
     - `universe::Handle::new_pending()` has been replaced by `UniverseTransaction::insert()`.
       Handles are now always associated with some container, either `Universe` or `UniverseTransaction`, except for those in the “gone” defunct state.
+
+- `all-is-cubes-mesh` library:
+    - The associated type `GfxVertex::Coordinate` no longer exists.
+      `GfxVertex` (now `Vertex`) implementors may still use whatever coordinate storage format they wish, but must be able to convert it back to `f32`.
 
 ## 0.9.0 (2025-01-01)
 
