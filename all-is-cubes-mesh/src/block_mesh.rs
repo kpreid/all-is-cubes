@@ -14,7 +14,7 @@ use all_is_cubes_render::Flaws;
 #[cfg(doc)]
 use crate::SpaceMesh;
 use crate::texture::{self, Tile as _};
-use crate::{Aabb, Aabbs, IndexVec, MeshOptions, MeshTypes, Vertex};
+use crate::{Aabbs, IndexVec, MeshOptions, MeshTypes, Vertex};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -428,7 +428,7 @@ impl<V: Vertex> SubMesh<V> {
 
         assert_eq!(self.vertices.0.len(), self.vertices.1.len());
 
-        let mut bounding_box = Aabb::None;
+        let mut bounding_box = crate::Aabb::None;
         for vertex in self.vertices.0.iter() {
             let position = vertex
                 .position()
@@ -437,7 +437,7 @@ impl<V: Vertex> SubMesh<V> {
         }
         assert_eq!(
             bounding_box,
-            Aabb::from(self.bounding_box.all()),
+            crate::Aabb::from(self.bounding_box.all()),
             "bounding box of vertices ≠ recorded bounding box"
         );
     }
