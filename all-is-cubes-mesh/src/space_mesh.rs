@@ -126,7 +126,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             assert!(index < self.vertices.0.len() as u32);
         }
 
-        let mut bounding_box: Aabb = Aabb::None;
+        let mut bounding_box: Aabb = Aabb::EMPTY;
         for vertex in &self.vertices.0 {
             let position = vertex
                 .position()
@@ -529,7 +529,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             meta: MeshMeta {
                 opaque_range: 0..0,
                 transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
-                depth_sort_validity: [Aabb::None; DepthOrdering::COUNT],
+                depth_sort_validity: [Aabb::EMPTY; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
                 bounding_box: block_mesh.bounding_box(),
                 flaws: block_mesh.flaws(),
@@ -755,7 +755,7 @@ impl<M: MeshTypes> MeshMeta<M> {
         } = self;
         *opaque_range = 0..0;
         *transparent_ranges = [const { 0..0 }; DepthOrdering::COUNT];
-        *depth_sort_validity = [Aabb::None; DepthOrdering::COUNT];
+        *depth_sort_validity = [Aabb::EMPTY; DepthOrdering::COUNT];
         textures_used.clear();
         *bounding_box = Aabbs::EMPTY;
         *flaws = Flaws::empty();
@@ -770,7 +770,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
         Self {
             opaque_range: 0..0,
             transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
-            depth_sort_validity: [Aabb::None; DepthOrdering::COUNT],
+            depth_sort_validity: [Aabb::EMPTY; DepthOrdering::COUNT],
             textures_used: Vec::new(),
             bounding_box: Aabbs::EMPTY,
             flaws: Flaws::empty(),
@@ -907,7 +907,7 @@ mod tests {
                 .translate(mesh_region.lower_bounds().to_vector().to_f64()),
             Aabbs {
                 opaque: Some(Aab::from_lower_upper([1., 2., 1.], [3., 2., 3.])).into(),
-                transparent: Aabb::None
+                transparent: Aabb::EMPTY
             },
         );
     }

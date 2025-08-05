@@ -428,7 +428,7 @@ impl<V: Vertex> SubMesh<V> {
 
         assert_eq!(self.vertices.0.len(), self.vertices.1.len());
 
-        let mut bounding_box = crate::Aabb::None;
+        let mut bounding_box = crate::Aabb::EMPTY;
         for vertex in self.vertices.0.iter() {
             let position = vertex
                 .position()
