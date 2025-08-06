@@ -5,8 +5,8 @@ use core::ops::{self, Range};
 
 use ordered_float::OrderedFloat;
 
-use all_is_cubes::euclid::{Vector3D, vec3};
-use all_is_cubes::math::{Aab, Axis, FreePoint, GridRotation};
+use all_is_cubes::euclid::{self, Vector3D, vec3};
+use all_is_cubes::math::{Axis, GridRotation};
 
 use crate::{Aabb, IndexInt, IndexSliceMut, IndexVec, MeshTypes, Position, Vertex};
 #[cfg(doc)]
@@ -96,22 +96,35 @@ impl DepthOrdering {
         (x as usize * 3 + y as usize) * 3 + z as usize
     }
 
-    /// Calculates the [`DepthOrdering`] value for a particular viewpoint and bounds of viewed
-    /// geometry.
+    /// Calculates the [`DepthOrdering`] value suitable for `camera_position` viewing a mesh with
+    /// bounds `geometry_bounds`.
     ///
     /// The coordinate system used for the provided point and bounding box does not matter as
     /// long as they use the same one.
-    pub fn from_view_of_aabb(camera_position: FreePoint, geometry_bounds: Aab) -> DepthOrdering {
-        let mut ord = DepthOrdering::WITHIN;
-        for axis in Axis::ALL {
-            if camera_position[axis] < geometry_bounds.lower_bounds_p()[axis] {
-                ord.0[axis] = Rel::Lower
-            } else if camera_position[axis] > geometry_bounds.upper_bounds_p()[axis] {
-                ord.0[axis] = Rel::Higher
+    pub fn from_view_of_aabb<U>(
+        camera_position: euclid::Point3D<f64, U>,
+        geometry_bounds: impl Into<euclid::Box3D<f64, U>>,
+    ) -> DepthOrdering {
+        fn inner(
+            camera_position: euclid::Point3D<f64, euclid::UnknownUnit>,
+            geometry_bounds: euclid::Box3D<f64, euclid::UnknownUnit>,
+        ) -> DepthOrdering {
+            let mut ord = DepthOrdering::WITHIN;
+            for axis in Axis::ALL {
+                if camera_position[axis] < geometry_bounds.min[axis] {
+                    ord.0[axis] = Rel::Lower
+                } else if camera_position[axis] > geometry_bounds.min[axis] {
+                    ord.0[axis] = Rel::Higher
+                }
             }
+
+            ord
         }
 
-        ord
+        inner(
+            camera_position.to_untyped(),
+            geometry_bounds.into().to_untyped(),
+        )
     }
 
     /// Returns the ordering which is opposite this one.
@@ -454,7 +467,7 @@ mod tests {
     use super::*;
     use all_is_cubes::block;
     use all_is_cubes::euclid::point3;
-    use all_is_cubes::math::GridAab;
+    use all_is_cubes::math::{Aab, GridAab};
     use all_is_cubes::space::Space;
     use exhaust::Exhaust as _;
     use std::collections::HashSet;
