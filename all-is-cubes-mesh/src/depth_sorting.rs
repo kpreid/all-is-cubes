@@ -262,8 +262,9 @@ impl ops::AddAssign for DepthSortInfo {
 /// Called by `SpaceMesh::store_indices_and_finish_compute()` to perform the “static”
 /// depth sorting — that is, the depth sorting which is done once when the mesh is created.
 ///
-/// The relevant vertices must have already been stored `vertices`, and this function will
-/// store sorted copies of `transparent_indices` and update `transparent_ranges` to include them.
+/// The relevant vertices must have already been stored in `vertices`, and this function will
+/// store sorted copies of `transparent_indices` into `indices` and overwrite `transparent_ranges`
+/// to refer to the new indices in `indices`.
 pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
     vertices: &[M::Vertex],
     indices: &mut IndexVec,
@@ -278,60 +279,60 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         // indices once and fill out transparent_ranges with copies of that range.
         let range = extend_giving_range(indices, transparent_indices);
         transparent_ranges.fill(range);
-    } else {
-        // Precompute midpoints (as sort keys) of all of the transparent quads.
-        // This does assume that the input `BlockMesh`es contain strictly quads
-        // and no other polygons, though.
-        struct QuadWithMid<I> {
-            indices: [I; 6],
-            midpoint: Position,
-        }
-        let (quads, []) = transparent_indices.as_chunks::<6>() else {
-            panic!("mesh is not quads")
-        };
-        let mut sortable_quads: Vec<QuadWithMid<I>> = quads
-            .iter()
-            .map(|&indices_of_quad| QuadWithMid {
-                indices: indices_of_quad,
-                midpoint: midpoint::<M, I>(vertices, indices_of_quad),
-            })
-            .collect();
+        return;
+    }
 
-        // Copy unsorted indices for the only case where the required ordering is fully unknown.
-        transparent_ranges[DepthOrdering::WITHIN.to_index()] =
-            extend_giving_range(indices, transparent_indices.iter().copied());
+    // Precompute midpoints (as sort keys) of all of the transparent quads.
+    // This assumes that the input `BlockMesh`es contain strictly quads and no other polygons,
+    // but that is true of the outputs of the block mesh generator currently, and will likely
+    // continue to be true even once we fix the T-junction problems with opaque geometry.
+    struct QuadWithMid<I> {
+        indices: [I; 6],
+        midpoint: Position,
+    }
+    let (quads, []) = transparent_indices.as_chunks::<6>() else {
+        panic!("mesh is not quads")
+    };
+    let mut sortable_quads: Vec<QuadWithMid<I>> = quads
+        .iter()
+        .map(|&indices_of_quad| QuadWithMid {
+            indices: indices_of_quad,
+            midpoint: midpoint::<M, I>(vertices, indices_of_quad),
+        })
+        .collect();
 
-        // Perform sorting by each possible ordering.
-        // Note that half of the orderings are mirror images of each other,
-        // so do not require independent sorting; instead we copy the previous sorted
-        // result in reverse.
-        for ordering in DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN {
-            // This inverse() is because ... TODO: The old explanation was wrong but I'm not sure
-            // what one is right
-            let basis = ordering.sort_key_rotation().inverse().to_basis();
+    // Copy unsorted indices for the only case where the required ordering is fully dynamic.
+    // and therefore we cannot usefully sort it now.
+    transparent_ranges[DepthOrdering::WITHIN.to_index()] =
+        extend_giving_range(indices, transparent_indices.iter().copied());
 
-            // Note: Benchmarks show that `sort_by_key` is fastest
-            // (not `sort_unstable_by_key`).
-            sortable_quads.sort_by_key(|quad| -> [OrderedFloat<f32>; 3] {
-                basis
-                    .map(|f| OrderedFloat(f.dot(quad.midpoint.to_vector())))
-                    .into()
-            });
+    // Perform sorting by each possible ordering.
+    // Note that half of the orderings are mirror images of each other,
+    // so do not require independent sorting; instead we copy the previous sorted
+    // result in reverse.
+    for ordering in DepthOrdering::ALL_WITHOUT_REFLECTIONS_OR_WITHIN {
+        // This inverse() is because ... TODO: The old explanation was wrong but I'm not sure
+        // what one is right
+        let basis = ordering.sort_key_rotation().inverse().to_basis();
 
-            // Copy the sorted indices into the main array, and set the corresponding
-            // range.
-            transparent_ranges[ordering.to_index()] =
-                extend_giving_range(indices, sortable_quads.iter().flat_map(|tri| tri.indices));
+        // Note: Benchmarks show that `sort_by_key` is fastest (not `sort_unstable_by_key`).
+        sortable_quads.sort_by_key(|quad| -> [OrderedFloat<f32>; 3] {
+            basis
+                .map(|face| OrderedFloat(face.dot(quad.midpoint.to_vector())))
+                .into()
+        });
 
-            // Store a mirrored copy of the ordering.
-            // (We could save some memory by reusing the coinciding last quad which is
-            // this ordering's first quad, but that doesn't currently feel worth
-            // implementing.)
-            transparent_ranges[ordering.reverse().to_index()] = extend_giving_range(
-                indices,
-                sortable_quads.iter().rev().flat_map(|tri| tri.indices),
-            );
-        }
+        // Copy the sorted indices into the main array, and set the corresponding range.
+        transparent_ranges[ordering.to_index()] =
+            extend_giving_range(indices, sortable_quads.iter().flat_map(|tri| tri.indices));
+
+        // Store a mirrored copy of the ordering.
+        // (We could save some memory by reusing the coinciding last quad which is
+        // this ordering's first quad, but that doesn't currently feel worth implementing.)
+        transparent_ranges[ordering.reverse().to_index()] = extend_giving_range(
+            indices,
+            sortable_quads.iter().rev().flat_map(|quad| quad.indices),
+        );
     }
 }
 
