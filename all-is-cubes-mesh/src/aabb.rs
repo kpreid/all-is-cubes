@@ -1,12 +1,12 @@
 use core::ops;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Vector3D};
-use all_is_cubes::math::{Aab, Axis, Cube};
+use all_is_cubes::math::{Aab, Axis};
 use ordered_float::NotNan;
 
 #[cfg(doc)]
 use crate::{BlockMesh, SpaceMesh};
-use crate::{PosCoord, Position};
+use crate::{MeshRel, PosCoord, Position};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -38,8 +38,8 @@ pub(crate) struct Aabb {
     // If no points have been added, then this box's coordinates are inverted (+inf to -inf).
     // We are not using `euclid::Box3D` because its `union()` function does not do what we want
     // for finite zero-sized boxes (they are counted as empty and ignored).
-    low: Point3D<NotNan<PosCoord>, Cube>,
-    high: Point3D<NotNan<PosCoord>, Cube>,
+    low: Point3D<NotNan<PosCoord>, MeshRel>,
+    high: Point3D<NotNan<PosCoord>, MeshRel>,
 }
 
 // SAFETY: Infinity is not NaN, so it is permitted.
@@ -93,7 +93,7 @@ impl Aabb {
     /// Translate this box by the given offset.
     #[inline]
     #[track_caller]
-    pub fn translate(self, offset: Vector3D<PosCoord, Cube>) -> Self {
+    fn translate(self, offset: Vector3D<PosCoord, MeshRel>) -> Self {
         // TODO: consider switching to NotNan inputs
         let offset = offset.try_cast().expect("offset must not be NaN");
 
@@ -168,9 +168,8 @@ impl From<Aab> for Aabb {
     #[inline]
     fn from(aab: Aab) -> Self {
         Self {
-            // TODO: Aab should have NotNan-returning getters
-            low: aab.lower_bounds_p().cast(),
-            high: aab.upper_bounds_p().cast(),
+            low: aab.lower_bounds_p().cast().cast_unit(),
+            high: aab.upper_bounds_p().cast().cast_unit(),
         }
     }
 }
@@ -192,8 +191,8 @@ impl From<Aabb> for Option<Aab> {
         } else {
             // TODO: Aab should have a NotNan-accepting constructor method.
             Some(Aab::from_lower_upper(
-                value.low.cast::<f64>(),
-                value.high.cast::<f64>(),
+                value.low.cast::<f64>().cast_unit(),
+                value.high.cast::<f64>().cast_unit(),
             ))
         }
     }
@@ -201,7 +200,7 @@ impl From<Aabb> for Option<Aab> {
 
 // Box3D considers an inside-out box to be one kind of “empty”, so we can convert to it without
 // caveat.
-impl From<Aabb> for Box3D<f32, Cube> {
+impl From<Aabb> for Box3D<f32, MeshRel> {
     #[inline]
     fn from(value: Aabb) -> Self {
         Box3D {
@@ -210,10 +209,10 @@ impl From<Aabb> for Box3D<f32, Cube> {
         }
     }
 }
-impl From<Aabb> for Box3D<f64, Cube> {
+impl From<Aabb> for Box3D<f64, MeshRel> {
     #[inline]
     fn from(value: Aabb) -> Self {
-        Box3D::<f32, Cube>::from(value).cast::<f64>()
+        Box3D::<f32, MeshRel>::from(value).cast::<f64>()
     }
 }
 
@@ -283,7 +282,7 @@ impl Aabbs {
     #[inline]
     #[must_use]
     #[track_caller] // in case of NaN
-    pub(crate) fn translate(self, offset: Vector3D<PosCoord, Cube>) -> Self {
+    pub(crate) fn translate(self, offset: Vector3D<PosCoord, MeshRel>) -> Self {
         Self {
             opaque: self.opaque.translate(offset),
             transparent: self.transparent.translate(offset),
@@ -321,6 +320,6 @@ mod tests {
 
     #[test]
     fn euclid_agrees_with_empty() {
-        assert!(Box3D::<f32, Cube>::from(Aabb::EMPTY).is_empty());
+        assert!(Box3D::<f32, MeshRel>::from(Aabb::EMPTY).is_empty());
     }
 }

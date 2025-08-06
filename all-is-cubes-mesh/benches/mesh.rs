@@ -258,7 +258,7 @@ fn dynamic_benches(c: &mut Criterion) {
             }
 
             fn instantiate_vertex(&mut self, block: Self::BlockInst) {
-                self.position += block.lower_bounds().to_f32().to_vector();
+                self.position += block.lower_bounds().to_f32().to_vector().cast_unit();
             }
 
             fn position(&self) -> mesh::Position {

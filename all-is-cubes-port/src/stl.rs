@@ -8,7 +8,7 @@ use stl_io::Triangle;
 
 use all_is_cubes::block;
 use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::math::{Cube, zo32};
+use all_is_cubes::math::zo32;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe;
 use all_is_cubes::util::YieldProgress;
@@ -108,7 +108,7 @@ fn space_mesh_to_triangles(mesh: &mesh::SpaceMesh<StlMt>) -> Vec<Triangle> {
 }
 
 #[inline]
-fn convert_vector(input: Vector3D<f32, Cube>) -> stl_io::Vector<f32> {
+fn convert_vector(input: Vector3D<f32, mesh::MeshRel>) -> stl_io::Vector<f32> {
     stl_io::Vector::new(input.into())
 }
 

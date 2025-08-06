@@ -38,6 +38,7 @@ In order to resolve various design problems interfering with development, the `a
 - `all-is-cubes-mesh` library:
     - `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` now return the new type `Aabbs` which provides separate boxes for opaque and transparent geometry. This allows precise culling when rendering in separate opaque and transparent passes.
     - New type aliases `Position` and `PosCoord` for vertex positions.
+    - We now use `euclid`’s static coordinate system checking for distinguishing between points in a `Space` and points in a mesh. The new marker type `MeshRel` identifies the coordinates used in a mesh.
 
 - `all-is-cubes-port` library:
     - `export_to_path()` no longer accesses the `Universe` while its future is running, but instead only when initially called. This allows the latter portion of the export operation to run concurrently with other uses of the `Universe`.
@@ -80,6 +81,7 @@ In order to resolve various design problems interfering with development, the `a
     - Renamed `GfxVertex` to `Vertex`.
     - Vertex position coordinates are now conveyed as `f32` (you may use the new type alias `PosCoord`) instead of `f64`.
       (This will not reduce the precision of any mesh of reasonable size, because vertex positions are relative to the bounds of the individual mesh.)
+      Furthermore, their coordinate system marker type is now `MeshRel` instead of `Cube`, indicating that the coordinate system origin for a mesh is not the same as that of the `Space` it was created from.
     - The return type of `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` has changed from `Option<Aab>` to `Aabbs`.
     - The return type of `depth_sort_for_view()` functions has changed from `bool` to a new `struct DepthSortInfo` (which contains that boolean).
     - `DepthOrdering` is now a `struct`, and the variants `DepthOrdering::{Any, Within}` have been replaced with constants.

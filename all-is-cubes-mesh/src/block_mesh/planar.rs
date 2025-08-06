@@ -5,10 +5,10 @@ use core::ops::Range;
 
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D, vec3};
-use all_is_cubes::math::{Axis, Cube, Face6, GridCoordinate, Rgba, rgba_const};
+use all_is_cubes::math::{Axis, Face6, GridCoordinate, Rgba, rgba_const};
 
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
-use crate::{Aabb, BlockVertex, Coloring, IndexVec, PosCoord, Position, Viz};
+use crate::{Aabb, BlockVertex, Coloring, IndexVec, MeshRel, PosCoord, Position, Viz};
 
 /// This is the subset of `Evoxel` which is processed by the [`greedy_mesh()`] planar mesh
 /// generator. It does not distinguish emission other than “has some”, because we always
@@ -406,21 +406,26 @@ pub(super) struct QuadTransform {
     // so we don't need as many ops as a full matrix-vector multiplication?
     // Or would the branching needed make it pointless?
     // We can at least make this a euclid::RigidTransform3D.
-    position_transform: Transform3D<PosCoord, Cube, Cube>,
+    position_transform: Transform3D<PosCoord, MeshRel, MeshRel>,
     texture_transform: Transform3D<TextureCoordinate, TexelUnit, TexelUnit>,
 }
 
 impl QuadTransform {
     pub fn new(face: Face6, resolution: Resolution) -> Self {
-        let voxel_to_block_scale = PosCoord::from(resolution).recip();
+        // TODO: Have a different coordinate system type for planar coordinates
+        let voxel_to_block_scale: Scale<PosCoord, MeshRel, MeshRel> =
+            Scale::new(PosCoord::from(resolution).recip());
         Self {
             face,
             resolution,
-            position_transform: Transform3D::from_scale(Scale::new(voxel_to_block_scale)).then(
+            position_transform: Transform3D::from_scale(voxel_to_block_scale).then(
+                // TODO: make it possible to get this transform from Face6 with less casting.
                 &face
                     .face_transform(1)
                     .to_matrix()
                     .to_free()
+                    .with_source::<MeshRel>()
+                    .with_destination::<MeshRel>()
                     .cast::<PosCoord>(),
             ),
             texture_transform: Transform3D::from_untyped(

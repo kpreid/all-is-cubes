@@ -10,10 +10,28 @@ use all_is_cubes::util::{ConciseDebug, Fmt, Refmt as _};
 #[cfg(doc)]
 use {
     crate::{BlockMesh, SpaceMesh},
-    all_is_cubes::{block::Block, space::Space},
+    all_is_cubes::{block::Block, math::GridAab, space::Space},
 };
 
 // -------------------------------------------------------------------------------------------------
+
+/// Coordinate system marker type for [points][Position] within a [`SpaceMesh`].
+///
+/// This marker type is used in [`euclid`](all_is_cubes::euclid)’s static typing scheme for points,
+/// vectors, and boxes. Use the type alias [`Position`] for such points.
+///
+/// * The origin of this coordinate system is the [lower bounds][GridAab::lower_bounds] of
+///   the bounding box with which the mesh was extracted from a [`Space`]
+///   (which is not the same as the origin of that [`Space`]’s coordinates).
+///
+///   When these points are found in the vertices being constructed for a [`BlockMesh`],
+///   the origin is the the most-negative corner of the unit cube within which the block resides,
+///   as if the block existed in a single-cube [`Space`].
+///
+/// * The scale of this coordinate system is 1 unit = one [`Cube`] edge.
+#[derive(Debug)]
+#[allow(clippy::exhaustive_structs)]
+pub struct MeshRel;
 
 /// A vertex position within a [`BlockMesh`] or [`SpaceMesh`].
 ///
@@ -22,16 +40,18 @@ use {
 ///
 /// # Coordinate system
 ///
-/// * When found in a [`BlockMesh`], the origin of the coordinate system of these points is
-///   the most-negative corner of the unit cube within which the block resides.
-/// * When found in a [`SpaceMesh`], the origin is the most-negative corner of the bounding box
-///   with which the mesh was extracted from a [`Space`].
+/// These points are “relative to the mesh”;
+/// when found in a [`SpaceMesh`], the origin of these points’ coordinate system is the
+/// most-negative corner of the bounding box with which the mesh was extracted from a [`Space`]
+/// (which is not the same as the origin of that [`Space`]’s coordinates).
+///
+/// When these points are found in the vertices being constructed for a [`BlockMesh`],
+/// the origin is the the most-negative corner of the unit cube within which the block resides,
+/// as if the block existed in a single-cube [`Space`].
 ///
 /// Note that in both cases, this origin is not necessarily equal to the most-negative corner of
 /// the bounding box of the actual mesh vertices, but it is always less than or equal to that.
-//---
-// TODO: replace `Cube` with a mesh-specific coordinate system to unconfuse mesh vs Space coords.
-pub type Position = Point3D<PosCoord, Cube>;
+pub type Position = Point3D<PosCoord, MeshRel>;
 
 /// Type used for the coordinates of vertex [Position]s.
 ///
@@ -41,7 +61,8 @@ pub type Position = Point3D<PosCoord, Cube>;
 /// 1/128 = 2<sup>-7</sup>, and [`f32`] has 24 bits of significand,
 /// this means that *no* rounding errors will occur until the size of a single mesh is at least
 /// 2<sup>24 - 7</sup> = 2<sup>17</sup> = 131,072 blocks.
-/// You do not need to worry about floating-point inaccuracy.
+/// You do not need to worry about floating-point inaccuracy unless your mesh is extremely long
+/// and narrow, or you translate the mesh’s coordinates to a global coordinate system.
 pub type PosCoord = f32;
 
 /// Basic vertex data type for a [`BlockMesh`].
@@ -223,7 +244,7 @@ impl<T: Copy + 'static> Vertex for BlockVertex<T> {
     const WANTS_DEPTH_SORTING: bool = true;
     type SecondaryData = ();
     type TexPoint = T;
-    type BlockInst = Vector3D<PosCoord, Cube>;
+    type BlockInst = Vector3D<PosCoord, MeshRel>;
 
     fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> (Self, ()) {
         (vertex, ())
@@ -235,7 +256,7 @@ impl<T: Copy + 'static> Vertex for BlockVertex<T> {
 
     #[inline]
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
-        cube.lower_bounds().to_f32().to_vector()
+        cube.lower_bounds().to_f32().to_vector().cast_unit()
     }
 
     #[inline]

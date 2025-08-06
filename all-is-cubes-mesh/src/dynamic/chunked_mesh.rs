@@ -159,7 +159,10 @@ where
                         .mesh_local_bounding_box()
                         .all()
                         .is_some_and(|local_bb| {
-                            camera.aab_in_view(local_bb.translate(chunk.mesh_origin().to_vector()))
+                            camera.aab_in_view(
+                                // TODO: make this more coordinate-space-type-safe
+                                local_bb.translate(chunk.mesh_origin().to_vector().cast_unit()),
+                            )
                         }),
                     instances_in_view: chunk
                         .block_instances_bounding_box()
@@ -415,9 +418,12 @@ where
                 // TODO: We could also do frustum culling here.
                 if let Entry::Occupied(chunk_mesh_oe) = &chunk_mesh_entry
                     && let chunk_mesh = chunk_mesh_oe.get()
-                    && let Some(lbb) = chunk_mesh.mesh_local_bounding_box().transparent()
+                    && let lbb = chunk_mesh.mesh_local_bounding_box().transparent
                     && let depth_ordering = DepthOrdering::from_view_of_aabb(
-                        view_point - chunk_mesh.mesh_origin().to_vector(),
+                        chunk_mesh
+                            .mesh_origin()
+                            .inverse()
+                            .transform_point3d(&view_point),
                         lbb,
                     )
                     && depth_ordering.needs_dynamic_sorting()

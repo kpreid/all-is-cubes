@@ -32,12 +32,15 @@ pub struct GltfVertex {
 impl Vertex for GltfVertex {
     const WANTS_DEPTH_SORTING: bool = false;
     type SecondaryData = ();
-    type BlockInst = Vector3D<f32, Cube>;
+    type BlockInst = Vector3D<f32, mesh::MeshRel>;
     type TexPoint = GltfAtlasPoint;
 
     #[inline]
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
-        cube.lower_bounds().to_vector().map(|s| s as f32)
+        cube.lower_bounds()
+            .to_vector()
+            .map(|s| s as f32)
+            .cast_unit()
     }
 
     #[inline]

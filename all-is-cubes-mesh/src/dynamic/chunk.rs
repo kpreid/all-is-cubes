@@ -6,20 +6,19 @@ use core::fmt;
 use core::mem;
 use core::ops;
 
-use all_is_cubes::chunking::{ChunkPos, ChunkRelative};
+use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::euclid::{Point3D, Translation3D};
 use all_is_cubes::math::{Aab, Cube, GridCoordinate, LineVertex, Wireframe as _};
 use all_is_cubes::space::{BlockIndex, Space};
 
-use crate::Position;
 use crate::dynamic::{self, DynamicMeshTypes};
-use crate::{BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, SpaceMesh};
+use crate::{BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, MeshRel, Position, SpaceMesh};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;
 
-/// Hash set that stores chunk-relative cubes
-type MeshCubeSet = hashbrown::HashSet<Point3D<u8, ChunkRelative>>;
+/// Hash set that stores chunk-relative cubes.
+type MeshCubeSet = hashbrown::HashSet<Point3D<u8, MeshRel>>;
 
 /// Stores a [`SpaceMesh`] covering one [chunk](all_is_cubes::chunking) of a [`Space`],
 /// a list of blocks to render instanced instead, caller-provided rendering data, and incidentals.
@@ -263,8 +262,9 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         self.block_instances.iter()
     }
 
-    /// Sort the existing indices of `self.mesh().transparent_range(ordering)` for
-    /// the given view position in world coordinates.
+    /// Sort the existing indices of
+    /// [`self.mesh().transparent_range(ordering)`][crate::MeshMeta::transparent_range]
+    /// as appropriate for the given `view_position` in world coordinates.
     ///
     /// The amount of sorting performed, if any, depends on the specific value of `ordering`.
     /// Some orderings are fully static and do not require any sorting; calling this function
@@ -278,10 +278,14 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         ordering: DepthOrdering,
         view_position: FreePoint,
     ) -> crate::DepthSortInfo {
-        // Subtract chunk origin because the mesh coordinates are in chunk-relative
-        // coordinates but the incoming view position is in world coordinates.
-        let relative_view_position: Position =
-            (view_position - self.mesh_origin().to_vector()).to_f32();
+        // The mesh coordinates are in chunk-relative coordinates,
+        // but the incoming view position is in world coordinates,
+        // so we bring the view position into chunk-relative coordinates.
+        let relative_view_position: Position = self
+            .mesh_origin()
+            .inverse()
+            .transform_point3d(&view_position)
+            .to_f32();
         self.mesh
             .depth_sort_for_view(ordering, relative_view_position)
     }
@@ -319,19 +323,19 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         self.block_instances_bounding_box().wireframe_points(output);
     }
 
-    /// Returns the position in world coordinates (the same as the [`Space`]) of the origin of
-    /// this chunk's mesh.
-    ///
-    /// Interpreted as a vector, this is the translation to apply to this mesh to place it in the
-    /// scene.
-    //TODO: Use euclid::Translation3D instead.
+    /// Returns the transformation from this chunk’s vertex coordinates to [`Space`] coordinates.
+    /// (In other words, the translation to apply to this mesh to place it in the scene.)
     ///
     /// It is expressed in [`f64`] coordinates to ensure that no rounding error can possibly occur.
-    pub(crate) fn mesh_origin(&self) -> FreePoint {
-        self.position()
-            .bounds()
-            .lower_bounds()
-            .map(FreeCoordinate::from)
+    pub(crate) fn mesh_origin(&self) -> Translation3D<f64, MeshRel, Cube> {
+        Translation3D::from(
+            self.position()
+                .bounds()
+                .lower_bounds()
+                .to_vector()
+                .map(FreeCoordinate::from)
+                .cast_unit(),
+        )
     }
 
     /// Returns the bounding box of the mesh in this chunk, in coordinates relative to
@@ -361,7 +365,7 @@ struct InstanceTrackingBlockMeshSource<'a, M: DynamicMeshTypes> {
     block_meshes: &'a dynamic::VersionedBlockMeshes<M>,
     instances: &'a mut dynamic::InstanceMap,
     mesh_cubes: &'a mut MeshCubeSet,
-    absolute_to_relative: Translation3D<GridCoordinate, Cube, ChunkRelative>,
+    absolute_to_relative: Translation3D<GridCoordinate, Cube, MeshRel>,
 }
 
 impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshSource<'a, M> {

@@ -91,7 +91,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     ///
     /// This is the same criterion that [`ChunkChart`] uses for
     /// deciding whether a chunk is included in the chart or not.
-    pub fn min_distance_squared_from(self, origin_chunk: ChunkPos<CHUNK_SIZE>) -> GridCoordinate {
+    pub fn min_distance_squared_from(self, origin_chunk: Self) -> GridCoordinate {
         // TODO: change this to return the `Distance` instead of a value derived from it.
         // That'll be less exactly-one-use-case.
         self.distance(origin_chunk).nearest_approach_squared * CHUNK_SIZE.pow(2)
