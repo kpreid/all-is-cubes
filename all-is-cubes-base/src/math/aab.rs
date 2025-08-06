@@ -393,6 +393,16 @@ impl fmt::Debug for Aab {
 /// even though it contains floats.
 impl Eq for Aab {}
 
+impl From<Aab> for euclid::Box3D<FreeCoordinate, Cube> {
+    #[inline]
+    fn from(value: Aab) -> Self {
+        euclid::Box3D {
+            min: value.lower_bounds_p(),
+            max: value.upper_bounds_p(),
+        }
+    }
+}
+
 impl Wireframe for Aab {
     #[inline(never)]
     fn wireframe_points<E>(&self, output: &mut E)

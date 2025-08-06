@@ -1,6 +1,6 @@
 use core::ops;
 
-use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::euclid::{Box3D, Point3D, Vector3D};
 use all_is_cubes::math::{Aab, Axis, Cube};
 use ordered_float::NotNan;
 
@@ -174,6 +174,16 @@ impl From<Aab> for Aabb {
         }
     }
 }
+impl From<Option<Aab>> for Aabb {
+    #[inline]
+    fn from(value: Option<Aab>) -> Self {
+        match value {
+            Some(aab) => Aabb::from(aab),
+            None => Aabb::EMPTY,
+        }
+    }
+}
+
 impl From<Aabb> for Option<Aab> {
     #[inline]
     fn from(value: Aabb) -> Self {
@@ -188,13 +198,22 @@ impl From<Aabb> for Option<Aab> {
         }
     }
 }
-impl From<Option<Aab>> for Aabb {
+
+// Box3D considers an inside-out box to be one kind of “empty”, so we can convert to it without
+// caveat.
+impl From<Aabb> for Box3D<f32, Cube> {
     #[inline]
-    fn from(value: Option<Aab>) -> Self {
-        match value {
-            Some(aab) => Aabb::from(aab),
-            None => Aabb::EMPTY,
+    fn from(value: Aabb) -> Self {
+        Box3D {
+            min: value.low.map(NotNan::into_inner),
+            max: value.high.map(NotNan::into_inner),
         }
+    }
+}
+impl From<Aabb> for Box3D<f64, Cube> {
+    #[inline]
+    fn from(value: Aabb) -> Self {
+        Box3D::<f32, Cube>::from(value).cast::<f64>()
     }
 }
 
@@ -298,5 +317,10 @@ mod tests {
         aabb.add_point(Point3D::new(0.0, 0.0, 0.0));
         assert!(!std::dbg!(aabb).is_empty());
         assert!(aabb.contains(Point3D::new(0.0, 0.0, 0.0)));
+    }
+
+    #[test]
+    fn euclid_agrees_with_empty() {
+        assert!(Box3D::<f32, Cube>::from(Aabb::EMPTY).is_empty());
     }
 }
