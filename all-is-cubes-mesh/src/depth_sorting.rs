@@ -113,7 +113,7 @@ impl DepthOrdering {
             for axis in Axis::ALL {
                 if camera_position[axis] < geometry_bounds.min[axis] {
                     ord.0[axis] = Rel::Lower
-                } else if camera_position[axis] > geometry_bounds.min[axis] {
+                } else if camera_position[axis] > geometry_bounds.max[axis] {
                     ord.0[axis] = Rel::Higher
                 }
             }
@@ -531,8 +531,17 @@ mod tests {
             for y in range.clone() {
                 for z in range.clone() {
                     let camera_position = point3(x, y, z);
+
                     let ordering =
                         DepthOrdering::from_view_of_aabb(camera_position.to_f64(), bounds);
+
+                    // TODO: this added assertion doesn't fit well in this test
+                    for axis in Axis::ALL {
+                        if camera_position[axis] == 0 {
+                            assert_eq!(ordering.0[axis], Rel::Within);
+                        }
+                    }
+
                     let rotated_position = ordering
                         .sort_key_rotation()
                         .transform_vector(camera_position.to_vector());
