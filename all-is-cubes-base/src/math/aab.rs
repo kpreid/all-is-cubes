@@ -590,4 +590,15 @@ mod tests {
             ],
         );
     }
+
+    #[test]
+    fn aab_to_euclid_box() {
+        let b = euclid::Box3D::from(Aab::from_lower_upper([1., 2., 3.], [4., 5., 6.]));
+        assert_eq!(
+            b,
+            euclid::Box3D::new(point3(1., 2., 3.), point3(4., 5., 6.))
+        );
+        assert!(!b.is_negative());
+        assert!(!b.is_empty());
+    }
 }
