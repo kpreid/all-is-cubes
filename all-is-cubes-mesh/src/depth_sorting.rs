@@ -282,16 +282,16 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
     let capacity: usize =
         iter_quad_counts.clone().sum::<usize>() - iter_quad_counts.clone().max().unwrap_or(0);
 
-    // Precompute midpoints (as sort keys) of all of the transparent quads.
+    // Precompute sort keys of all of the transparent quads.
     // This assumes that the input `BlockMesh`es contain strictly quads and no other polygons,
     // but that is true of the outputs of the block mesh generator currently, and will likely
     // continue to be true even once we fix the T-junction problems with opaque geometry.
-    struct QuadWithMid<I> {
+    struct OrderedQuad<I> {
+        order: [f32; 3],
         indices: [I; 6],
-        midpoint: Position,
     }
     // Reused in loop to hold the ordering's quads while we sort them.
-    let mut sortable_quads: Vec<QuadWithMid<I>> = Vec::with_capacity(capacity);
+    let mut sortable_quads: Vec<OrderedQuad<I>> = Vec::with_capacity(capacity);
 
     // Perform sorting by each possible ordering.
     for ordering in DepthOrdering::exhaust() {
@@ -314,18 +314,25 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
                     let (quads, []) = index_vec.as_chunks::<6>() else {
                         panic!("mesh is not quads")
                     };
-                    quads.iter().map(|&indices_of_quad| QuadWithMid {
-                        indices: indices_of_quad,
-                        midpoint: midpoint::<M, I>(vertices, indices_of_quad),
+                    quads.iter().map(|&indices_of_quad| {
+                        let midpoint = midpoint::<M, I>(vertices, indices_of_quad);
+                        OrderedQuad {
+                            indices: indices_of_quad,
+                            order: [
+                                basis.x.dot(midpoint.to_vector()),
+                                basis.y.dot(midpoint.to_vector()),
+                                basis.z.dot(midpoint.to_vector()),
+                            ],
+                        }
                     })
                 }),
         );
 
         // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
         sortable_quads.sort_by(|a, b| {
-            cmp_by_projection(a.midpoint, b.midpoint, basis.x).then_with(|| {
-                cmp_by_projection(a.midpoint, b.midpoint, basis.y)
-                    .then_with(|| cmp_by_projection(a.midpoint, b.midpoint, basis.z))
+            assume_no_nan_cmp(a.order[0], b.order[0]).then_with(|| {
+                assume_no_nan_cmp(a.order[1], b.order[1])
+                    .then_with(|| assume_no_nan_cmp(a.order[2], b.order[2]))
             })
         });
 
@@ -460,15 +467,12 @@ where
     start..end
 }
 
-/// Compare two positions by their projection onto the vector `face`.
-///
-/// This is used once per axis to apply the [`DepthOrdering::sort_key_rotation()`] to vertices.
 #[inline]
-fn cmp_by_projection(a: Position, b: Position, face: Face6) -> core::cmp::Ordering {
+fn assume_no_nan_cmp(a: f32, b: f32) -> core::cmp::Ordering {
     // `unwrap_or()` because we expect a complete lack of NaNs, and if there are any, more things
     // are going to be broken than just this sort (so we don't need to detect it here by panicking).
-    PartialOrd::partial_cmp(&face.dot(a.to_vector()), &face.dot(b.to_vector()))
-        .unwrap_or(core::cmp::Ordering::Equal)
+    // Not having any panic branch improves the performance of the sort.
+    PartialOrd::partial_cmp(&a, &b).unwrap_or(core::cmp::Ordering::Equal)
 }
 
 // -------------------------------------------------------------------------------------------------
