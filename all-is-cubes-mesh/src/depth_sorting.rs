@@ -6,7 +6,7 @@ use core::ops::{self, Range};
 use ordered_float::OrderedFloat;
 
 use all_is_cubes::euclid::{self, Vector3D, vec3};
-use all_is_cubes::math::{Axis, GridRotation};
+use all_is_cubes::math::{Axis, Face6, GridRotation};
 
 use crate::{Aabb, IndexInt, IndexSliceMut, IndexVec, MeshTypes, Position, Vertex};
 #[cfg(doc)]
@@ -315,11 +315,12 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         // what one is right
         let basis = ordering.sort_key_rotation().inverse().to_basis();
 
-        // Note: Benchmarks show that `sort_by_key` is fastest (not `sort_unstable_by_key`).
-        sortable_quads.sort_by_key(|quad| -> [OrderedFloat<f32>; 3] {
-            basis
-                .map(|face| OrderedFloat(face.dot(quad.midpoint.to_vector())))
-                .into()
+        // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
+        sortable_quads.sort_by(|a, b| {
+            cmp_by_projection(a.midpoint, b.midpoint, basis.x).then_with(|| {
+                cmp_by_projection(a.midpoint, b.midpoint, basis.y)
+                    .then_with(|| cmp_by_projection(a.midpoint, b.midpoint, basis.z))
+            })
         });
 
         // Copy the sorted indices into the main array, and set the corresponding range.
@@ -459,6 +460,17 @@ where
     storage.extend(items);
     let end = storage.len();
     start..end
+}
+
+/// Compare two positions by their projection onto the vector `face`.
+///
+/// This is used once per axis to apply the [`DepthOrdering::sort_key_rotation()`] to vertices.
+#[inline]
+fn cmp_by_projection(a: Position, b: Position, face: Face6) -> core::cmp::Ordering {
+    // `unwrap_or()` because we expect a complete lack of NaNs, and if there are any, more things
+    // are going to be broken than just this sort (so we don't need to detect it here by panicking).
+    PartialOrd::partial_cmp(&face.dot(a.to_vector()), &face.dot(b.to_vector()))
+        .unwrap_or(core::cmp::Ordering::Equal)
 }
 
 // -------------------------------------------------------------------------------------------------
