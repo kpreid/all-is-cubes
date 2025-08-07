@@ -26,7 +26,7 @@ mod trees;
 mod ui;
 mod zoom;
 
-pub(crate) const NEEDED_RADIUS: GridCoordinate = 55;
+pub(crate) const NEEDED_RADIUS: GridCoordinate = 60;
 
 /// All exhibits which will show up in [`crate::UniverseTemplate::DemoCity`].
 ///
@@ -40,6 +40,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[prelude::Exhibit] = &[
     transparency::TRANSPARENCY_GLASS_AND_WATER,
     collision::COLLISION,
     resolutions::RESOLUTIONS,
+    transparency::TRANSPARENCY_SHRUNKEN_BLOCK,
     move_modifier::PROJECTILE,
     animation::ANIMATION,
     make_some_blocks::MAKE_SOME_BLOCKS,

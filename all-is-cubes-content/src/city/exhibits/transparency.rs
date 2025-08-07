@@ -9,19 +9,19 @@ use super::prelude::*;
     placement: Placement::Surface,
 )]
 fn TRANSPARENCY_WHOLE_BLOCK(ctx: Context<'_>) {
+    let colors = [
+        Rgb::new(1.0, 0.5, 0.5),
+        Rgb::new(0.5, 1.0, 0.5),
+        Rgb::new(0.5, 0.5, 1.0),
+        Rgb::new(0.9, 0.9, 0.9),
+    ];
+    let alphas = [0.25, 0.5, 0.75, 0.95].map(zo32);
+    let windowpane = GridAab::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);
+
     let space = Space::builder(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]))
         .read_ticket(ctx.universe.read_ticket())
         .build_and_mutate(|m| {
-            let colors = [
-                Rgb::new(1.0, 0.5, 0.5),
-                Rgb::new(0.5, 1.0, 0.5),
-                Rgb::new(0.5, 0.5, 1.0),
-                Rgb::new(0.9, 0.9, 0.9),
-            ];
-            let alphas = [0.25, 0.5, 0.75, 0.95].map(zo32);
             for (rot, color) in GridRotation::CLOCKWISE.iterate().zip(&colors) {
-                let windowpane =
-                    GridAab::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);
                 m.fill(
                     windowpane
                         .transform(rot.to_positive_octant_transform(1))
@@ -33,6 +33,61 @@ fn TRANSPARENCY_WHOLE_BLOCK(ctx: Context<'_>) {
             Ok(())
         })?;
     Ok((space, ExhibitTransaction::default()))
+}
+
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Smaller Block Transparency",
+    subtitle:
+        "Large but not full blocks.",
+    placement: Placement::Surface,
+)]
+fn TRANSPARENCY_SHRUNKEN_BLOCK(ctx: Context<'_>) {
+    let mut txn = ExhibitTransaction::default();
+
+    // TODO: add some more variety of shape variations and overlaps
+
+    let slab_1 = Block::builder()
+        .voxels_fn(R2, |cube| {
+            if cube.x >= 1 {
+                block::from_color!(0.9, 0.9, 1.0, 0.99)
+            } else {
+                AIR
+            }
+        })?
+        .build_txn(&mut txn);
+    let slab_2 = Block::builder()
+        .voxels_fn(R2, |cube| {
+            if cube.x < 1 {
+                block::from_color!(0.05, 0.05, 0.05, 0.99)
+            } else {
+                AIR
+            }
+        })?
+        .build_txn(&mut txn);
+
+    let space = Space::builder(GridAab::from_lower_size([-3, 0, -3], [7, 5, 7]))
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| {
+            for rot in GridRotation::CLOCKWISE.iterate() {
+                let region = GridAab::from_lower_upper([-1, 0, 3], [2, 4, 4]);
+                m.fill(
+                    region
+                        .transform(rot.to_positive_octant_transform(1))
+                        .unwrap(),
+                    |Cube { x, y, z, .. }| {
+                        Some(
+                            [&slab_1, &slab_2]
+                                [x.wrapping_add(y).wrapping_add(z).rem_euclid(2) as usize],
+                        )
+                    },
+                )?;
+            }
+
+            Ok(())
+        })?;
+
+    Ok((space, txn))
 }
 
 #[macro_rules_attribute::apply(exhibit!)]
