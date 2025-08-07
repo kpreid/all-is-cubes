@@ -197,6 +197,19 @@ impl DepthOrdering {
         // Compose the transformations.
         inverse_permutation.inverse() * flips
     }
+
+    /// Returns whether a triangle with the given orientation may be visible from this ordering.
+    ///
+    /// For example, if this ordering is out of bounds in the negative X direction, then any
+    /// [`Face6::PX`] cannot possibly be visible.
+    fn face_visible_from_here(self, face: Face6) -> bool {
+        self.0[face.axis()]
+            != if face.is_negative() {
+                Rel::Higher
+            } else {
+                Rel::Lower
+            }
+    }
 }
 
 // This explicit impl is needed because Vector3D doesn't implement Exhaust
