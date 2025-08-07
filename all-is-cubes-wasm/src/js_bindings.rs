@@ -1,11 +1,5 @@
 //! Bindings for our own JS code.
 
-#![allow(
-    renamed_and_removed_lints, // wasm_c_abi lint only exists in Rust 1.88
-    wasm_c_abi,
-    reason = "tested and confirmed not affected by ABI transition"
-)]
-
 use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::HtmlCanvasElement;
 
