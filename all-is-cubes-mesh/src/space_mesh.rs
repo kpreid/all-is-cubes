@@ -111,13 +111,13 @@ impl<M: MeshTypes> SpaceMesh<M> {
     fn consistency_check(&self) {
         assert_eq!(self.vertices.0.len(), self.vertices.1.len());
         assert_eq!(self.opaque_range().start, 0);
-        let len_transparent = self.transparent_range(DepthOrdering::ANY).len();
+        let len_transparent_unculled = self.transparent_range(DepthOrdering::WITHIN).len();
         for ordering in DepthOrdering::exhaust() {
-            assert_eq!(
-                self.transparent_range(ordering).len(),
-                len_transparent,
-                "transparent range {ordering:?} does not have the same \
-                    length ({len_transparent}) as others"
+            let len = self.transparent_range(ordering).len();
+            assert!(
+                len <= len_transparent_unculled,
+                "transparent range {ordering:?} is longer \
+                    ({len}) than the unculled length {len_transparent_unculled}"
             );
         }
         assert!(self.opaque_range().end.is_multiple_of(3));
