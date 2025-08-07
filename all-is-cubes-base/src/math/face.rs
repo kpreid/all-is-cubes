@@ -730,7 +730,7 @@ impl<V> FaceMap<V> {
     }
 
     /// Iterate over the map values by reference, in the same order as [`Face6::ALL`].
-    pub fn values(&self) -> impl Iterator<Item = &V> {
+    pub fn values(&self) -> impl Iterator<Item = &V> + Clone {
         Face6::ALL.iter().copied().map(move |f| &self[f])
     }
 
