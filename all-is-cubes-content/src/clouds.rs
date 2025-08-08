@@ -26,6 +26,7 @@ pub fn clouds(
     let combined_noise = noise::Add::new(large_noise, small_noise);
 
     fn cloud_block(alpha: f32) -> Block {
+        let alpha = alpha * 0.2;
         Block::builder()
             .display_name("Cloud")
             .color(Rgb::ONE.with_alpha(zo32(alpha)))

@@ -91,12 +91,19 @@ pub(crate) async fn demo_city(
             .as_secs_f32()
     );
 
-    // Clouds (needs to be done after landscape to not be overwritten)
-    // TODO: Enable this once transparency rendering is better.
+    // Clouds
+    // TODO: Enable this after improving the performance of rendering transparent/volume meshes
     if false {
+        let cloud_thickness = 3;
         let sky_height = state.space.bounds().upper_bounds().y;
         state.space.mutate(state.universe.read_ticket(), |m| {
-            clouds(state.planner.y_range(sky_height - 2, sky_height), m, 0.1)
+            clouds(
+                state
+                    .planner
+                    .y_range(sky_height - cloud_thickness, sky_height),
+                m,
+                0.1,
+            )
         })?;
     }
 
