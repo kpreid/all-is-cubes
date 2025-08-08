@@ -1,7 +1,7 @@
 //! Types and algorithms for depth sorting.
 
 use alloc::vec::Vec;
-use core::ops::{self, Range};
+use core::ops::{self, Deref, Range};
 
 use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
@@ -313,20 +313,19 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
                 .iter()
                 .filter(|&(face, _)| ordering.face_visible_from_here(face))
                 .flat_map(|(_, index_vec)| {
-                    let (quads, []) = index_vec.as_chunks::<6>() else {
-                        panic!("mesh is not quads")
-                    };
-                    quads.iter().map(|&indices_of_quad| {
-                        let midpoint = midpoint::<M, I>(vertices, indices_of_quad);
-                        OrderedQuad {
-                            indices: indices_of_quad,
-                            order: [
-                                basis.x.dot(midpoint.to_vector()),
-                                basis.y.dot(midpoint.to_vector()),
-                                basis.z.dot(midpoint.to_vector()),
-                            ],
-                        }
-                    })
+                    expect_quads(index_vec.as_chunks::<6>())
+                        .iter()
+                        .map(|&indices_of_quad| {
+                            let midpoint = midpoint::<M, I>(vertices, indices_of_quad);
+                            OrderedQuad {
+                                indices: indices_of_quad,
+                                order: [
+                                    basis.x.dot(midpoint.to_vector()),
+                                    basis.y.dot(midpoint.to_vector()),
+                                    basis.z.dot(midpoint.to_vector()),
+                                ],
+                            }
+                        })
                 }),
         );
 
@@ -419,7 +418,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         // Think about how to reduce it (and maybe use truncating casts).
 
         // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
-        data.as_chunks_mut::<6>().0.sort_unstable_by_key(|indices| {
+        expect_quads(data.as_chunks_mut::<6>()).sort_unstable_by_key(|indices| {
             -OrderedFloat(manhattan_length(
                 view_position - midpoint::<M, Ix>(positions, *indices),
             ))
@@ -484,6 +483,14 @@ fn assume_no_nan_cmp(a: f32, b: f32) -> core::cmp::Ordering {
 /// I suspect, creates fewer unnecessary ordering changes.
 fn manhattan_length(v: Vector3D<PosCoord, MeshRel>) -> f32 {
     v.x.abs() + v.y.abs() + v.z.abs()
+}
+
+/// Takes the return value of `as_chunks()` or `as_chunks_mut()` and asserts it is evenly divisible.
+fn expect_quads<Ix: IndexInt, Q: Deref<Target = [[Ix; 6]]>, R: Deref<Target = [Ix]>>(
+    (quads, rest): (Q, R),
+) -> Q {
+    assert_eq!(rest.len(), 0, "expected an index list divisible into quads");
+    quads
 }
 
 // -------------------------------------------------------------------------------------------------
