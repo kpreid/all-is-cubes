@@ -332,13 +332,20 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
                 }),
         );
 
-        // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
-        sortable_quads.sort_by(|a, b| {
-            assume_no_nan_cmp(a.order[0], b.order[0]).then_with(|| {
-                assume_no_nan_cmp(a.order[1], b.order[1])
-                    .then_with(|| assume_no_nan_cmp(a.order[2], b.order[2]))
-            })
-        });
+        if ordering.needs_dynamic_sorting() {
+            // If we are going to do dynamic sorting, the static sort is wasted; skip it.
+            // TODO: We can do better than this and use a hybrid approach where the static sort
+            // produces ranges to dynamically sort; see
+            // <https://github.com/kpreid/all-is-cubes/issues/660> for details.
+        } else {
+            // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
+            sortable_quads.sort_by(|a, b| {
+                assume_no_nan_cmp(a.order[0], b.order[0]).then_with(|| {
+                    assume_no_nan_cmp(a.order[1], b.order[1])
+                        .then_with(|| assume_no_nan_cmp(a.order[2], b.order[2]))
+                })
+            });
+        }
 
         // Copy the sorted indices into the main array, and set the corresponding range.
         transparent_ranges[ordering.to_index()] =
