@@ -659,7 +659,7 @@ fn stringify_variant(variant: &serde_json::Value) -> String {
     use serde_json::Value;
     match variant {
         Value::Null | Value::Bool(_) | Value::Number(_) => variant.to_string(),
-        Value::String(s) => s.to_string(),
+        Value::String(s) => s.clone(),
         Value::Array(a) => a.iter().map(stringify_variant).join("-"),
         Value::Object(_) => panic!("objects not allowed in stringify_variant()"),
     }
