@@ -9,7 +9,9 @@ use ordered_float::OrderedFloat;
 use all_is_cubes::euclid::{self, Vector3D, vec3};
 use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation};
 
-use crate::{Aabb, IndexInt, IndexSliceMut, IndexVec, MeshTypes, Position, Vertex};
+use crate::{
+    Aabb, IndexInt, IndexSliceMut, IndexVec, MeshRel, MeshTypes, PosCoord, Position, Vertex,
+};
 #[cfg(doc)]
 use crate::{MeshMeta, SpaceMesh};
 
@@ -418,7 +420,9 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
 
         // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
         data.as_chunks_mut::<6>().0.sort_unstable_by_key(|indices| {
-            -OrderedFloat((view_position - midpoint::<M, Ix>(positions, *indices)).square_length())
+            -OrderedFloat(manhattan_length(
+                view_position - midpoint::<M, Ix>(positions, *indices),
+            ))
         });
 
         // Update the range of validity to not go past any of the sorted vertices.
@@ -473,6 +477,13 @@ fn assume_no_nan_cmp(a: f32, b: f32) -> core::cmp::Ordering {
     // are going to be broken than just this sort (so we don't need to detect it here by panicking).
     // Not having any panic branch improves the performance of the sort.
     PartialOrd::partial_cmp(&a, &b).unwrap_or(core::cmp::Ordering::Equal)
+}
+
+/// This is used for dynamic depth sorting as the “depth” to sort by, because it is more efficient
+/// than [`Vector3D::square_length()`] for our purposes. It requires no multiplication and,
+/// I suspect, creates fewer unnecessary ordering changes.
+fn manhattan_length(v: Vector3D<PosCoord, MeshRel>) -> f32 {
+    v.x.abs() + v.y.abs() + v.z.abs()
 }
 
 // -------------------------------------------------------------------------------------------------
