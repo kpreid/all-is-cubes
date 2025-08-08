@@ -235,6 +235,12 @@ fn modulo(a: f32, b: f32) -> f32 {
     return ((a % b) + b) % b;
 }
 
+// Take continuous 0..1 input, divide it into 4 equal buckets, and return the midpoint
+// of the bucket (one of: 0.125, 0.375, 0.625, 0.875)
+fn coarsestep(x: f32) -> f32 {
+    return (floor(x * 4.0) + 0.5) / 4.0;
+}
+
 // Find the smallest positive `t` such that `s + t * ds` is an integer.
 //
 // In the current implementation, `s` must be in the range 0 to 1.
@@ -370,6 +376,12 @@ fn interpolated_space_light(in: BlockFragmentInput) -> vec3<f32> {
             mix_2 = smoothstep(0.0, 1.0, mix_2);
         }
 
+        // LightingOption::Coarse
+        case 4: {
+            mix_1 = coarsestep(mix_1);
+            mix_2 = coarsestep(mix_2);
+        }
+
         // LightingOption::Linear or erroneous
         default: {
             // do nothing
@@ -468,8 +480,8 @@ fn lighting(in: BlockFragmentInput) -> vec3<f32> {
             return light_texture_fetch(origin).rgb;
         }
 
-        // LightingOption::Linear | LightingOption::Smoothstep
-        case 2, 3 {
+        // LightingOption::Linear | LightingOption::Smoothstep | LightingOption::Coarse
+        case 2, 3, 4 {
             return interpolated_space_light(in);
         }
     }

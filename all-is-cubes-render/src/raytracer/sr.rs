@@ -250,11 +250,12 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         }
     }
 
-    pub(crate) fn get_interpolated_light<const SMOOTHSTEP: bool>(
+    pub(crate) fn get_interpolated_light(
         &self,
         cube: Cube,
         surface_point: FreePoint,
         face: Face7,
+        interpolation_modifier: impl Fn(f64) -> f64,
     ) -> Rgb {
         // This implementation is duplicated in WGSL in interpolated_space_light()
         // in all-is-cubes-gpu/src/in_wgpu/shaders/blocks-and-lines.wgsl.
@@ -288,10 +289,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let dir_1 = flip_mix(&mut mix_1, reference_frame_x);
         let dir_2 = flip_mix(&mut mix_2, reference_frame_y);
 
-        if SMOOTHSTEP {
-            mix_1 = smoothstep(mix_1);
-            mix_2 = smoothstep(mix_2);
-        }
+        mix_1 = interpolation_modifier(mix_1);
+        mix_2 = interpolation_modifier(mix_2);
 
         // Choose sample positions, again using the half-cube-offset grid (this way we won't have edge artifacts).
         let lin_lo = -0.5;
@@ -500,12 +499,6 @@ fn mix4(a: [f32; 4], b: [f32; 4], amount: f32) -> [f32; 4] {
         let b = b[i];
         a + (b - a) * amount
     })
-}
-
-#[inline]
-pub(crate) fn smoothstep(x: f64) -> f64 {
-    let x = x.clamp(0.0, 1.0);
-    3. * x.powi(2) - 2. * x.powi(3)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -808,19 +801,5 @@ impl<T: num_traits::Euclid + Copy> Euclid for T {
     }
     fn rem_euclid(self, rhs: Self) -> Self {
         <T as num_traits::Euclid>::rem_euclid(&self, &rhs)
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn smoothstep_test() {
-        assert_eq!(smoothstep(0.0), 0.0);
-        assert_eq!(smoothstep(0.5), 0.5);
-        assert_eq!(smoothstep(1.0), 1.0);
     }
 }

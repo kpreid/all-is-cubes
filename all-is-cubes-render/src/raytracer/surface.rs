@@ -172,18 +172,29 @@ impl<D: RtBlockData> Surface<'_, D> {
             }
 
             (LightingOption::Linear, _) => {
-                let light = rt.get_interpolated_light::<false>(
+                let light = rt.get_interpolated_light(
                     self.cube,
                     self.intersection_point,
                     self.normal,
+                    core::convert::identity,
+                );
+                (light, RaytraceInfo::default())
+            }
+            (LightingOption::Coarse, _) => {
+                let light = rt.get_interpolated_light(
+                    self.cube,
+                    self.intersection_point,
+                    self.normal,
+                    coarsestep,
                 );
                 (light, RaytraceInfo::default())
             }
             (LightingOption::Smoothstep, _) => {
-                let light = rt.get_interpolated_light::<true>(
+                let light = rt.get_interpolated_light(
                     self.cube,
                     self.intersection_point,
                     self.normal,
+                    smoothstep,
                 );
                 (light, RaytraceInfo::default())
             }
@@ -498,6 +509,24 @@ pub(crate) enum DepthStep<'a, D> {
     },
 }
 
+// -------------------------------------------------------------------------------------------------
+// Light interpolation functions
+
+#[inline]
+fn coarsestep(x: f64) -> f64 {
+    const STEPS: f64 = 4.0;
+    // clamping is done in this way so that coarsestep(1.0) == coarsestep(0.999)
+    ((x * STEPS).floor().clamp(0.0, const { STEPS - 1.0 }) + 0.5) / STEPS
+}
+
+#[inline]
+fn smoothstep(x: f64) -> f64 {
+    let x = x.clamp(0.0, 1.0);
+    3. * x.powi(2) - 2. * x.powi(3)
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -809,5 +838,25 @@ mod tests {
                 DepthStep::Invisible,
             ]
         );
+    }
+
+    #[test]
+    fn interpolation_smoothstep() {
+        assert_eq!(smoothstep(0.0), 0.0);
+        assert_eq!(smoothstep(0.5), 0.5);
+        assert_eq!(smoothstep(1.0), 1.0);
+    }
+
+    #[test]
+    fn interpolation_coarse() {
+        assert_eq!(coarsestep(0.0), 1. / 8.);
+        assert_eq!(coarsestep(0.24), 1. / 8.);
+        assert_eq!(coarsestep(0.26), 3. / 8.);
+        assert_eq!(coarsestep(0.49), 3. / 8.);
+        assert_eq!(coarsestep(0.51), 5. / 8.);
+        assert_eq!(coarsestep(0.74), 5. / 8.);
+        assert_eq!(coarsestep(0.76), 7. / 8.);
+        assert_eq!(coarsestep(0.99), 7. / 8.);
+        assert_eq!(coarsestep(1.0), 7. / 8.);
     }
 }

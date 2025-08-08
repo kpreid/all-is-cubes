@@ -355,7 +355,8 @@ impl InputProcessor {
                         settings.update(settings::LIGHTING_DISPLAY, |setting, others| {
                             match setting {
                                 LightingOption::None => LightingOption::Flat,
-                                LightingOption::Flat => LightingOption::Linear,
+                                LightingOption::Flat => LightingOption::Coarse,
+                                LightingOption::Coarse => LightingOption::Linear,
                                 LightingOption::Linear => LightingOption::Smoothstep,
                                 LightingOption::Smoothstep => {
                                     // TODO: the question we actually want to ask is,

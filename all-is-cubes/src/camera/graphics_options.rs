@@ -451,6 +451,10 @@ pub enum LightingOption {
     /// [flat shading]: https://en.wikipedia.org/w/index.php?title=Shading&oldid=1337938191#Flat_shading
     Flat,
 
+    /// Light is interpolated in four steps (i.e. 16 squares on one block face),
+    /// for a deliberately pixelated look.
+    Coarse,
+
     /// Light data is linearly interpolated across surfaces, between adjacent cubes.
     Linear,
 
