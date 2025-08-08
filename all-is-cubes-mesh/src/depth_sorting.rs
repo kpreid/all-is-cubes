@@ -50,11 +50,10 @@ impl DepthOrdering {
     ///
     /// Use this when querying the mesh’s indices without regard for ordering.
     //---
-    // Note: The use of `WITHIN` is because in principle, we should be omitting known back-faces
-    // from the other options, whereas `WITHIN` always has to be complete — well, except that
-    // it could omit faces that are _on_ the bounding box which cannot be seen from within, but
-    // I’m not planning to implement that. If I was, it would be important to have a dedicated case
-    // for “ALL” vertices, not just “ANY”.
+    // Note: The use of `WITHIN` is because we omit known back-faces from the other options,
+    // whereas `WITHIN` always has to be complete — well, except that it could omit faces that are
+    // _on_ the bounding box which cannot be seen from within, but that is not currently
+    // implemented.
     pub const ANY: Self = Self::WITHIN;
 
     /// The viewpoint is within the volume; therefore dynamic rather than precomputed
@@ -119,8 +118,11 @@ impl DepthOrdering {
     ///
     /// * `true`: You need to call [`SpaceMesh::depth_sort_for_view()`] when using this ordering.
     /// * `false`: You do not.
+    //--
+    // From an implementation perspective: this function must return `false` only ig
+    // `sort_and_store_transparent_indices()` produces an ordering which is valid for all
+    // viewpoints that fall into this `DepthOrdering`,
     pub fn needs_dynamic_sorting(self) -> bool {
-        // TODO: Switch this to > 1 once we have the special 1-axis pre-sort case
         self.within_on_axes() > 0
     }
 
@@ -134,9 +136,10 @@ impl DepthOrdering {
     /// ordering is this ordering.
     fn sort_key_rotation(self) -> GridRotation {
         // Find the axis permutation that puts the `Within` axes last.
-        // (This only affects partly-Within cases and TODO: doesn't fully solve them.
-        // 2-Within cases actually need dynamic sorting, and 1-Within cases need a strategy
-        // that is normal-dependent. See <https://github.com/kpreid/all-is-cubes/issues/53>.)
+        // (This only affects partly-Within cases and TODO: we don't take advantage of the fact
+        // that it helps them. Both 2-Within and 1-Within *potentially* need dynamic sorting,
+        // but could benefit from partly static sorting.
+        // See <https://github.com/kpreid/all-is-cubes/issues/660>.)
         //
         // (This is defined as the inverse permutation because the way `GridRotation` names work
         // makes it easier to read that way.)
@@ -398,15 +401,14 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     // Accumulator of the new region of validity of this sort.
     // This will be shrunk to exclude any position that crosses the plane of any surface of the
     // mesh. As long as the viewpoint doesn’t exit this box, the sorting is still valid.
-    // (TODO: Prove this claim. I think it might actually require changing the sort key to
-    // use Manhattan distance instead of Euclidean distance.)
+    // (TODO: Prove this claim.)
     let mut new_validity = Aabb::EVERYWHERE;
 
-    // TODO: The following sorting algorithm is only optimal for `within_on_axes` 3.
-    // When it is 1, we can use a different static order instead of dynamic ordering.
-    // When it is 2, we can sort in smaller partitions because there is one “major” axis on which
+    // TODO: Sorting *all* of the quads together is only optimal for `within_on_axes` 3.
+    // When it is 1 or 2, we can sort smaller sub-slices by finding boundaries across which
     // the order never needs to change.
-    // <https://github.com/kpreid/all-is-cubes/issues/53>
+    // (Also, remembering those slices will subsume all “is this the WITHIN case” checks.)
+    // See: <https://github.com/kpreid/all-is-cubes/issues/660>
 
     fn generic_sort<M: MeshTypes, Ix: IndexInt>(
         data: &mut [Ix],
