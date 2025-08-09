@@ -415,7 +415,9 @@ where
 
                 // Check whether the chunk is in a position where it needs depth sorting
                 // (and whether it has any transparent geometry).
-                // TODO: We could also do frustum culling here.
+                //
+                // TODO: We could also do frustum culling here, and prioritize sorting
+                // chunks that are unsorted and visible.
                 if let Entry::Occupied(chunk_mesh_oe) = &chunk_mesh_entry
                     && let chunk_mesh = chunk_mesh_oe.get()
                     && let lbb = chunk_mesh.mesh_local_bounding_box().transparent
@@ -426,6 +428,8 @@ where
                             .transform_point3d(&view_point),
                         lbb,
                     )
+                    // TODO: needs_dynamic_sorting is an over-approximation here; we should actually
+                    // ask “is the old sort still valid?” but there isn’t a function for that yet.
                     && depth_ordering.needs_dynamic_sorting()
                 {
                     chunk_todo.needs_depth_sort = Some(depth_ordering);

@@ -121,9 +121,10 @@ impl DepthOrdering {
     /// * `true`: You need to call [`SpaceMesh::depth_sort_for_view()`] when using this ordering.
     /// * `false`: You do not.
     //--
-    // From an implementation perspective: this function must return `false` only ig
+    // From an implementation perspective: this function must return `false` only if
     // `sort_and_store_transparent_indices()` produces an ordering which is valid for all
-    // viewpoints that fall into this `DepthOrdering`,
+    // viewpoints that fall into this `DepthOrdering`. Otherwise, it returns `true` (but the
+    // specific mesh may not actually have anything to sort in this ordering).
     pub fn needs_dynamic_sorting(self) -> bool {
         self.within_on_axes() > 0
     }
