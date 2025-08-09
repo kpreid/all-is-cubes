@@ -138,11 +138,8 @@ impl DepthOrdering {
     /// Returns a rotation which rotates vertex positions into positions whose lexicographic
     /// ordering is this ordering.
     fn sort_key_rotation(self) -> GridRotation {
-        // Find the axis permutation that puts the `Within` axes last.
-        // (This only affects partly-Within cases and TODO: we don't take advantage of the fact
-        // that it helps them. Both 2-Within and 1-Within *potentially* need dynamic sorting,
-        // but could benefit from partly static sorting.
-        // See <https://github.com/kpreid/all-is-cubes/issues/660>.)
+        // Find the axis permutation that puts the `Within` axes last,
+        // to support the partly-static sorting of partly-`Within` orderings.
         //
         // (This is defined as the inverse permutation because the way `GridRotation` names work
         // makes it easier to read that way.)
@@ -358,12 +355,9 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
                 }),
         );
 
-        if ordering.needs_dynamic_sorting() {
-            // If we are going to do dynamic sorting, the static sort is wasted; skip it.
-            // TODO: We can do better than this and use a hybrid approach where the static sort
-            // produces ranges to dynamically sort; see
-            // <https://github.com/kpreid/all-is-cubes/issues/660> for details.
-        } else {
+        // Sort the vertices, unless we are going to do fully dynamic sorting, in which case this
+        // sort would be wasted.
+        if ordering.within_on_axes() < 3 {
             // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
             sortable_quads.sort_by(|a, b| {
                 assume_no_nan_cmp(a.order[0], b.order[0]).then_with(|| {
@@ -373,22 +367,71 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
             });
         }
 
-        // Copy the sorted indices into the main array, and set the corresponding range.
+        // Copy the sorted indices into the main array.
         let index_range =
             extend_giving_range(indices, sortable_quads.iter().flat_map(|tri| tri.indices));
+
+        // Figure out what ranges of this sorting result need to be sorted dynamically,
+        // and store them in `dynamic_sub_ranges`.
+        let mut dynamic_sub_ranges = SmallVec::new();
+        match ordering.within_on_axes() {
+            _ if index_range.is_empty() => {
+                // There are no quads to sort, so don't generate any range (that would be empty).
+                // It is an invariant of `TransparentMeta` that `dynamic_sub_ranges` contains no
+                // empty ranges.
+            }
+            0 => {
+                // The static sort we have already done suffices.
+            }
+            3 => {
+                // Everything must be sorted dynamically.
+                dynamic_sub_ranges.push(0..index_range.len());
+            }
+            1 | 2 => {
+                // Find non-overlapping ranges along the non-within axis, because we only need to.
+                // do dynamic sort of things that overlap in that way.
+                //
+                // TODO: if within_on_axes = 1, then we have *two* non-within axes to work with.
+                // We could take advantage of that by grouping by rectangles instead of on a line.
+
+                let projection = basis.x;
+                debug_assert_ne!(ordering.0[projection.axis()], Rel::Within);
+
+                let mut quad_group = 0..1; // indices into sortable_quads, not single indices!
+                let mut group_upper_bound =
+                    min_max_on_axis::<M, I>(vertices, sortable_quads[0].indices, basis.x).1;
+                for (i, quad) in sortable_quads[1..].iter().enumerate() {
+                    let (qmin, qmax) = min_max_on_axis::<M, I>(vertices, quad.indices, basis.x);
+                    if qmin < group_upper_bound {
+                        // Add this quad to the group because it overlaps on the axis
+                        quad_group.end = i + 1;
+                        group_upper_bound = qmax;
+                    } else {
+                        // Quad does not overlap; finish the current group and start a new one.
+                        if quad_group.len() > 1 {
+                            dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
+                        }
+                        quad_group = i..(i + 1);
+                        group_upper_bound = qmax;
+                    }
+                }
+                // Write the last group
+                if quad_group.len() > 1 {
+                    dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
+                }
+            }
+            4.. => unreachable!(),
+        }
+
         transparent_meta[ordering.to_index()] = TransparentMeta {
             depth_sort_validity: if ordering.needs_dynamic_sorting() {
+                // Haven't performed any dynamic sorting yet, so there is no region of validity.
                 Aabb::EMPTY
             } else {
+                // Never need dynamic sorting.
                 Aabb::EVERYWHERE
             },
-            // TODO: Implement finding sub-ranges smaller than the whole, then record them here.
-            // See: <https://github.com/kpreid/all-is-cubes/issues/660>
-            dynamic_sub_ranges: if ordering.needs_dynamic_sorting() && sortable_quads.len() >= 2 {
-                SmallVec::from([0..index_range.len()])
-            } else {
-                SmallVec::new()
-            },
+            dynamic_sub_ranges,
             index_range,
         };
     }
@@ -491,6 +534,25 @@ fn midpoint<M: MeshTypes, Ix: IndexInt>(vertices: &[M::Vertex], indices: [Ix; 6]
     let p2 = vertices[i2.to_slice_index()].position();
     // TODO: consider deleting the * 0.5 and scaling the view position by * 2.0 instead
     (p0.max(p1).max(p2) + p0.min(p1).min(p2).to_vector()) * 0.5
+}
+
+#[inline(always)]
+fn min_max_on_axis<M: MeshTypes, Ix: IndexInt>(
+    vertices: &[M::Vertex],
+    indices: [Ix; 6],
+    direction: Face6,
+) -> (PosCoord, PosCoord) {
+    // We only need to look at one of the two triangles,
+    // because they have the same bounding rectangle.
+    let [i0, i1, i2, ..] = indices;
+    // This is unrolled because map()ing it might end up not inlining it, which would be very bad.
+    let p0 = vertices[i0.to_slice_index()].position();
+    let p1 = vertices[i1.to_slice_index()].position();
+    let p2 = vertices[i2.to_slice_index()].position();
+    let c0 = direction.dot(p0.to_vector());
+    let c1 = direction.dot(p1.to_vector());
+    let c2 = direction.dot(p2.to_vector());
+    (c0.min(c1).min(c2), c0.max(c1).max(c2))
 }
 
 /// `storage.extend(items)` plus reporting the added range of items
