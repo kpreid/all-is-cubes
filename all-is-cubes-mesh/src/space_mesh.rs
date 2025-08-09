@@ -446,12 +446,17 @@ impl<M: MeshTypes> fmt::Debug for SpaceMesh<M> {
             meta,
             block_indices_used,
         } = self;
-        f.debug_struct("SpaceMesh")
-            .field("vertices", vertices)
-            .field("indices", indices)
-            .field("meta", meta)
-            .field("block_indices_used", block_indices_used)
-            .finish()
+        let mut s = f.debug_struct("SpaceMesh");
+        if size_of::<<M::Vertex as Vertex>::SecondaryData>() == 0 {
+            // Don't print secondary data array if it will just be `[(), (), ...]` or similar
+            s.field("vertices", &vertices.0);
+        } else {
+            s.field("vertices", vertices);
+        }
+        s.field("indices", indices);
+        s.field("meta", meta);
+        s.field("block_indices_used", &BitVecDebugAsSet(block_indices_used));
+        s.finish()
     }
 }
 
@@ -834,10 +839,12 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
         } = self;
         f.debug_struct("MeshMeta")
             .field("opaque_range", opaque_range)
+            // TODO: include DepthOrdering keys in `transparent` formatting.
+            // (We will need to design a way to format them clearly and concisely.)
             .field("transparent", transparent)
             .field("textures_used", textures_used)
             .field("bounding_box", bounding_box)
-            .field("flaws", flaws)
+            .field("flaws", &DebugAsDisplay(flaws))
             .finish()
     }
 }
@@ -857,7 +864,7 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
 // -------------------------------------------------------------------------------------------------
 
 /// Component of [`MeshMeta`] describing the mesh’s contents under a specific [`DepthOrdering`].
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub(crate) struct TransparentMeta {
     /// Range of the mesh’s indices that should be *drawn* to draw its transparent parts in this
     /// ordering. Each [`DepthOrdering`] has a non-overlapping range.
@@ -867,6 +874,8 @@ pub(crate) struct TransparentMeta {
     /// is still valid and does not need to be redone.
     ///
     /// This field is updated by, and used as an early exit within, [`crate::depth_sorting`].
+    /// It ignores the bounds of validity of the [`DepthOrdering`] this [`TransparentMeta`] is for;
+    /// those checks are to be done seperately before even looking at this struct.
     pub(crate) depth_sort_validity: Aabb,
 }
 
@@ -876,6 +885,33 @@ impl TransparentMeta {
         // If there is nothing to sort, then it's always sorted!
         depth_sort_validity: Aabb::EVERYWHERE,
     };
+}
+
+impl fmt::Debug for TransparentMeta {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            index_range,
+            depth_sort_validity,
+        } = self;
+        // Compact formatting that will end up on one line if the validity is trivial
+        write!(f, "{index_range:?} sorted for {depth_sort_validity:?}")
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+struct BitVecDebugAsSet<'a>(&'a BitVec);
+impl fmt::Debug for BitVecDebugAsSet<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_set().entries(self.0.iter_ones()).finish()
+    }
+}
+
+struct DebugAsDisplay<T>(T);
+impl<T: fmt::Display> fmt::Debug for DebugAsDisplay<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -893,6 +929,278 @@ mod tests {
     use all_is_cubes_render::camera::GraphicsOptions;
 
     type TestMesh = SpaceMesh<TextureMt>;
+
+    #[test]
+    fn debug_empty() {
+        let mesh = TestMesh::default();
+
+        pretty_assertions::assert_eq!(
+            format!("{mesh:#?}"),
+            indoc::indoc! {
+                "SpaceMesh {
+                    vertices: [],
+                    indices: U16[],
+                    meta: MeshMeta {
+                        opaque_range: 0..0,
+                        transparent: [
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                            0..0 sorted for EVERYWHERE,
+                        ],
+                        textures_used: [],
+                        bounding_box: Aabbs {
+                            opaque: EMPTY,
+                            transparent: EMPTY,
+                        },
+                        flaws: ,
+                    },
+                    block_indices_used: {},
+                }"
+            }
+        );
+    }
+
+    #[test]
+    fn debug_opaque() {
+        let (_, _, mesh) = mesh_blocks_and_space(
+            &Space::builder(GridAab::ORIGIN_CUBE)
+                .filled_with(block::from_color!(Rgba::WHITE))
+                .build(),
+        );
+
+        pretty_assertions::assert_eq!(
+            format!("{mesh:#?}"),
+            indoc::indoc! {
+                "SpaceMesh {
+                    vertices: [
+                        { p: (+0.000, +0.000, +0.000) n: NX c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +0.000, +1.000) n: NX c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +1.000, +0.000) n: NX c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +1.000, +1.000) n: NX c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +0.000, +0.000) n: NY c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +0.000, +0.000) n: NY c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +0.000, +1.000) n: NY c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +0.000, +1.000) n: NY c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +0.000, +0.000) n: NZ c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +1.000, +0.000) n: NZ c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +0.000, +0.000) n: NZ c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +1.000, +0.000) n: NZ c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +1.000, +0.000) n: PX c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +1.000, +1.000) n: PX c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +0.000, +0.000) n: PX c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +0.000, +1.000) n: PX c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +1.000, +0.000) n: PY c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +1.000, +0.000) n: PY c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +1.000, +1.000) n: PY c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +1.000, +1.000) n: PY c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +1.000, +1.000) n: PZ c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+0.000, +0.000, +1.000) n: PZ c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +1.000, +1.000) n: PZ c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                        { p: (+1.000, +0.000, +1.000) n: PZ c: Solid(Rgba(1.0, 1.0, 1.0, 1.0)) },
+                    ],
+                    indices: U16[
+                        20, 21, 22, 22, 21, 23,   16, 17, 18, 18, 17, 19,   12, 13, 14, 14, 13, 15, 
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11, 
+                    ],
+                    meta: MeshMeta {
+                        opaque_range: 0..36,
+                        transparent: [
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                            36..36 sorted for EVERYWHERE,
+                        ],
+                        textures_used: [],
+                        bounding_box: Aabbs {
+                            opaque: Aabb(
+                                0.0..=1.0,
+                                0.0..=1.0,
+                                0.0..=1.0,
+                            ),
+                            transparent: EMPTY,
+                        },
+                        flaws: ,
+                    },
+                    block_indices_used: {
+                        0,
+                    },
+                }"
+            }
+        );
+    }
+
+    #[test]
+    fn debug_transparent() {
+        let (_, _, mesh) = mesh_blocks_and_space(
+            &Space::builder(GridAab::ORIGIN_CUBE)
+                .filled_with(block::from_color!(1.0, 1.0, 1.0, 0.5))
+                .build(),
+        );
+
+        pretty_assertions::assert_eq!(
+            format!("{mesh:#?}"),
+            indoc::indoc! {
+                "SpaceMesh {
+                    vertices: [
+                        { p: (+0.000, +0.000, +0.000) n: NX c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +0.000, +1.000) n: NX c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +1.000, +0.000) n: NX c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +1.000, +1.000) n: NX c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +0.000, +0.000) n: NY c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +0.000, +0.000) n: NY c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +0.000, +1.000) n: NY c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +0.000, +1.000) n: NY c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +0.000, +0.000) n: NZ c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +1.000, +0.000) n: NZ c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +0.000, +0.000) n: NZ c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +1.000, +0.000) n: NZ c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +1.000, +0.000) n: PX c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +1.000, +1.000) n: PX c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +0.000, +0.000) n: PX c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +0.000, +1.000) n: PX c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +1.000, +0.000) n: PY c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +1.000, +0.000) n: PY c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +1.000, +1.000) n: PY c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +1.000, +1.000) n: PY c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +1.000, +1.000) n: PZ c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+0.000, +0.000, +1.000) n: PZ c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +1.000, +1.000) n: PZ c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                        { p: (+1.000, +0.000, +1.000) n: PZ c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
+                    ],
+                    indices: U16[
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
+                         8,  9, 10, 10,  9, 11,    4,  5,  6,  6,  5,  7,    0,  1,  2,  2,  1,  3, 
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11, 
+                        20, 21, 22, 22, 21, 23,   20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7, 
+                         0,  1,  2,  2,  1,  3,    0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7, 
+                         8,  9, 10, 10,  9, 11,   16, 17, 18, 18, 17, 19,    0,  1,  2,  2,  1,  3, 
+                         4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11,   16, 17, 18, 18, 17, 19, 
+                        20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7, 
+                        16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23,    8,  9, 10, 10,  9, 11, 
+                        16, 17, 18, 18, 17, 19,    0,  1,  2,  2,  1,  3,    0,  1,  2,  2,  1,  3, 
+                         8,  9, 10, 10,  9, 11,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
+                        20, 21, 22, 22, 21, 23,   16, 17, 18, 18, 17, 19,    0,  1,  2,  2,  1,  3, 
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11, 
+                        12, 13, 14, 14, 13, 15,    0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7, 
+                         8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15,   20, 21, 22, 22, 21, 23, 
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,   12, 13, 14, 14, 13, 15, 
+                        20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7, 
+                         8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19, 
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,   12, 13, 14, 14, 13, 15, 
+                        16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3, 
+                         8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19, 
+                         0,  1,  2,  2,  1,  3,    8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15, 
+                        16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
+                         8,  9, 10, 10,  9, 11,    4,  5,  6,  6,  5,  7,   12, 13, 14, 14, 13, 15, 
+                         4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15, 
+                        20, 21, 22, 22, 21, 23,   20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7, 
+                        12, 13, 14, 14, 13, 15,    4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,    4,  5,  6,  6,  5,  7, 
+                         8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19, 
+                        20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7,   12, 13, 14, 14, 13, 15, 
+                        16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23,    8,  9, 10, 10,  9, 11, 
+                        16, 17, 18, 18, 17, 19,   12, 13, 14, 14, 13, 15,    8,  9, 10, 10,  9, 11, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
+                        20, 21, 22, 22, 21, 23,   16, 17, 18, 18, 17, 19,   12, 13, 14, 14, 13, 15, 
+                    ],
+                    meta: MeshMeta {
+                        opaque_range: 0..0,
+                        transparent: [
+                            36..54 sorted for EVERYWHERE,
+                            54..78 sorted for EMPTY,
+                            78..96 sorted for EVERYWHERE,
+                            96..120 sorted for EMPTY,
+                            120..150 sorted for EMPTY,
+                            150..174 sorted for EMPTY,
+                            174..192 sorted for EVERYWHERE,
+                            192..216 sorted for EMPTY,
+                            216..234 sorted for EVERYWHERE,
+                            234..258 sorted for EMPTY,
+                            258..288 sorted for EMPTY,
+                            288..312 sorted for EMPTY,
+                            312..342 sorted for EMPTY,
+                            0..36 sorted for EMPTY,
+                            342..372 sorted for EMPTY,
+                            372..396 sorted for EMPTY,
+                            396..426 sorted for EMPTY,
+                            426..450 sorted for EMPTY,
+                            450..468 sorted for EVERYWHERE,
+                            468..492 sorted for EMPTY,
+                            492..510 sorted for EVERYWHERE,
+                            510..534 sorted for EMPTY,
+                            534..564 sorted for EMPTY,
+                            564..588 sorted for EMPTY,
+                            588..606 sorted for EVERYWHERE,
+                            606..630 sorted for EMPTY,
+                            630..648 sorted for EVERYWHERE,
+                        ],
+                        textures_used: [],
+                        bounding_box: Aabbs {
+                            opaque: EMPTY,
+                            transparent: Aabb(
+                                0.0..=1.0,
+                                0.0..=1.0,
+                                0.0..=1.0,
+                            ),
+                        },
+                        flaws: ,
+                    },
+                    block_indices_used: {
+                        0,
+                    },
+                }"
+            }
+        );
+    }
 
     /// Test that `default()` returns an empty mesh and the characteristics of such a mesh.
     #[test]
