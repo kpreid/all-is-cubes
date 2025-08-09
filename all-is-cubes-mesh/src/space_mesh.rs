@@ -17,6 +17,8 @@ use crate::{
     MeshOptions, MeshRel, MeshTypes, Position, Vertex, depth_sorting,
 };
 
+// -------------------------------------------------------------------------------------------------
+
 /// A triangle mesh representation of a [`Space`] (or part of it) which may
 /// then be rasterized.
 ///
@@ -146,8 +148,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             meta:
                 MeshMeta {
                     opaque_range: _,
-                    transparent_ranges: _,
-                    depth_sort_validity: _,
+                    transparent: _,
                     textures_used,
                     bounding_box: _,
                     flaws: _,
@@ -343,7 +344,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 depth_sorting::sort_and_store_transparent_indices::<M, u16>(
                     &self.vertices.0,
                     &mut self.indices,
-                    &mut self.meta.transparent_ranges,
+                    &mut self.meta.transparent,
                     FaceMap { nx, ny, nz, px, py, pz },
                 );
             }
@@ -358,7 +359,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 depth_sorting::sort_and_store_transparent_indices::<M, u32>(
                     &self.vertices.0,
                     &mut self.indices,
-                    &mut self.meta.transparent_ranges,
+                    &mut self.meta.transparent,
                     FaceMap { nx, ny, nz, px, py, pz },
                 );
             }
@@ -369,7 +370,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 depth_sorting::sort_and_store_transparent_indices::<M, u32>(
                     &self.vertices.0,
                     &mut self.indices,
-                    &mut self.meta.transparent_ranges,
+                    &mut self.meta.transparent,
                     transparent_indices.map(|_, index_vec| index_vec.into_u32s()),
                 );
             }
@@ -409,7 +410,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             self.indices.as_mut_slice(range),
             view_position,
             ordering,
-            &mut self.meta.depth_sort_validity[ordering.to_index()],
+            &mut self.meta.transparent[ordering.to_index()],
         )
     }
 }
@@ -565,8 +566,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             indices: IndexVec::new(), // placeholder
             meta: MeshMeta {
                 opaque_range: 0..0,
-                transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
-                depth_sort_validity: [Aabb::EMPTY; DepthOrdering::COUNT],
+                transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
                 bounding_box: block_mesh.bounding_box(),
                 flaws: block_mesh.flaws(),
@@ -609,6 +609,8 @@ fn bitset_set_and_get(v: &mut BitVec, index: usize) -> bool {
     v.set(index, true);
     previous
 }
+
+// -------------------------------------------------------------------------------------------------
 
 pub(crate) struct Snapshot {
     data: Vol<Box<[BlockIndex]>>,
@@ -694,6 +696,8 @@ impl<'a, M: MeshTypes> GetBlockMesh<'a, M> for &'a [BlockMesh<M>] {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Index ranges and other metadata about a [`SpaceMesh`], excluding the vertices and indices
 /// themselves.
 ///
@@ -707,16 +711,11 @@ pub struct MeshMeta<M: MeshTypes> {
     opaque_range: Range<usize>,
 
     /// Ranges of index data for all partially-transparent triangles, sorted by depth
-    /// as documented in [`Self::transparent_range()`].
+    /// as documented in [`Self::transparent_range()`], and other information to assist
+    /// the depth sorting process.
     ///
     /// The indices of this array are those produced by [`DepthOrdering::to_index()`].
-    transparent_ranges: [Range<usize>; DepthOrdering::COUNT],
-
-    /// For each depth ordering, stores a volume within which the current depth sort of the indices
-    /// in `transparent_ranges[ordering.to_index()]` is still valid and does not need to be redone.
-    ///
-    /// This field is updated by, and used as an early exit within, [`crate::depth_sorting`].
-    depth_sort_validity: [Aabb; DepthOrdering::COUNT],
+    transparent: [TransparentMeta; DepthOrdering::COUNT],
 
     /// Texture tiles used by the vertices; holding these objects is intended to ensure
     /// the texture coordinates remain allocated to the intended texels.
@@ -772,22 +771,20 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// [`DepthOrdering::needs_dynamic_sorting()`] identifies whether this is necessary.
     #[inline]
     pub fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {
-        self.transparent_ranges[ordering.to_index()].clone()
+        self.transparent[ordering.to_index()].index_range.clone()
     }
 
     /// Overwrite `self` with [`MeshMeta::default()`].
     fn clear(&mut self) {
         let Self {
             opaque_range,
-            transparent_ranges,
-            depth_sort_validity,
+            transparent,
             textures_used,
             bounding_box,
             flaws,
         } = self;
         *opaque_range = 0..0;
-        *transparent_ranges = [const { 0..0 }; DepthOrdering::COUNT];
-        *depth_sort_validity = [Aabb::EMPTY; DepthOrdering::COUNT];
+        *transparent = [TransparentMeta::EMPTY; DepthOrdering::COUNT];
         textures_used.clear();
         *bounding_box = Aabbs::EMPTY;
         *flaws = Flaws::empty();
@@ -801,8 +798,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
         // Note that this must be consistent with `Self::clear()`.
         Self {
             opaque_range: 0..0,
-            transparent_ranges: [const { 0..0 }; DepthOrdering::COUNT],
-            depth_sort_validity: [Aabb::EMPTY; DepthOrdering::COUNT],
+            transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
             textures_used: Vec::new(),
             bounding_box: Aabbs::EMPTY,
             flaws: Flaws::empty(),
@@ -814,16 +810,14 @@ impl<M: MeshTypes> PartialEq for MeshMeta<M> {
     fn eq(&self, other: &Self) -> bool {
         let Self {
             opaque_range,
-            transparent_ranges,
-            depth_sort_validity,
+            transparent,
             textures_used,
             bounding_box,
             flaws,
         } = self;
         *bounding_box == other.bounding_box
             && *opaque_range == other.opaque_range
-            && *transparent_ranges == other.transparent_ranges
-            && *depth_sort_validity == other.depth_sort_validity
+            && *transparent == other.transparent
             && *textures_used == other.textures_used
             && *flaws == other.flaws
     }
@@ -833,16 +827,14 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             opaque_range,
-            transparent_ranges,
-            depth_sort_validity,
+            transparent,
             textures_used,
             bounding_box,
             flaws,
         } = self;
         f.debug_struct("MeshMeta")
             .field("opaque_range", opaque_range)
-            .field("transparent_ranges", transparent_ranges)
-            .field("depth_sort_validity", depth_sort_validity)
+            .field("transparent", transparent)
             .field("textures_used", textures_used)
             .field("bounding_box", bounding_box)
             .field("flaws", flaws)
@@ -854,14 +846,38 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
     fn clone(&self) -> Self {
         Self {
             opaque_range: self.opaque_range.clone(),
-            transparent_ranges: self.transparent_ranges.clone(),
-            depth_sort_validity: self.depth_sort_validity,
+            transparent: self.transparent.clone(),
             textures_used: self.textures_used.clone(),
             bounding_box: self.bounding_box,
             flaws: self.flaws,
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Component of [`MeshMeta`] describing the mesh’s contents under a specific [`DepthOrdering`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct TransparentMeta {
+    /// Range of the mesh’s indices that should be *drawn* to draw its transparent parts in this
+    /// ordering. Each [`DepthOrdering`] has a non-overlapping range.
+    pub(crate) index_range: Range<usize>,
+
+    /// Volume within which the current depth sort of the indices stored within `self.range`
+    /// is still valid and does not need to be redone.
+    ///
+    /// This field is updated by, and used as an early exit within, [`crate::depth_sorting`].
+    pub(crate) depth_sort_validity: Aabb,
+}
+
+impl TransparentMeta {
+    const EMPTY: Self = Self {
+        index_range: 0..0,
+        depth_sort_validity: Aabb::EMPTY,
+    };
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// See also [`super::tests`]. This module is for tests that are very specific to
 /// [`SpaceMesh`] as a data type itself.

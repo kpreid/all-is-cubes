@@ -10,7 +10,8 @@ use all_is_cubes::euclid::{self, Vector3D, vec3};
 use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation};
 
 use crate::{
-    Aabb, IndexInt, IndexSliceMut, IndexVec, MeshRel, MeshTypes, PosCoord, Position, Vertex,
+    Aabb, IndexInt, IndexSliceMut, IndexVec, MeshRel, MeshTypes, PosCoord, Position,
+    TransparentMeta, Vertex,
 };
 #[cfg(doc)]
 use crate::{MeshMeta, SpaceMesh};
@@ -259,7 +260,7 @@ impl ops::AddAssign for DepthSortInfo {
 pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
     vertices: &[M::Vertex],
     indices: &mut IndexVec,
-    transparent_ranges: &mut [Range<usize>; DepthOrdering::COUNT],
+    transparent_meta: &mut [TransparentMeta; DepthOrdering::COUNT],
     transparent_indices: FaceMap<Vec<I>>,
 ) where
     IndexVec: Extend<I>,
@@ -270,17 +271,23 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         // indices once and fill out transparent_ranges with copies of that range.
         //
         // TODO: There is inadequate testing for this case (only the glTF export test catches if
-        // these are missing or extra).
-        let range = extend_giving_range(indices, transparent_indices.into_values_iter().flatten());
-        transparent_ranges.fill(range);
+        // these indices are missing or extra).
+        let index_range =
+            extend_giving_range(indices, transparent_indices.into_values_iter().flatten());
+        transparent_meta.fill(TransparentMeta {
+            index_range,
+            depth_sort_validity: Aabb::EVERYWHERE,
+        });
         return;
     }
 
     // Copy unsorted indices for the only case where the required ordering is fully dynamic.
     // and therefore we cannot usefully sort it now. (We don’t just skip the sorting because
     // that would also waste time computing `sortable_quads`.)
-    transparent_ranges[DepthOrdering::WITHIN.to_index()] =
-        extend_giving_range(indices, transparent_indices.values().flatten().copied());
+    transparent_meta[DepthOrdering::WITHIN.to_index()] = TransparentMeta {
+        index_range: extend_giving_range(indices, transparent_indices.values().flatten().copied()),
+        depth_sort_validity: Aabb::EMPTY,
+    };
 
     // Figure capacity for temporary storage. We need to be able to store up to 5 out of 6 faces.
     let iter_quad_counts = transparent_indices.values().map(|vec| vec.len() / 6);
@@ -348,8 +355,17 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         }
 
         // Copy the sorted indices into the main array, and set the corresponding range.
-        transparent_ranges[ordering.to_index()] =
-            extend_giving_range(indices, sortable_quads.iter().flat_map(|tri| tri.indices));
+        transparent_meta[ordering.to_index()] = TransparentMeta {
+            index_range: extend_giving_range(
+                indices,
+                sortable_quads.iter().flat_map(|tri| tri.indices),
+            ),
+            depth_sort_validity: if ordering.needs_dynamic_sorting() {
+                Aabb::EMPTY
+            } else {
+                Aabb::EVERYWHERE
+            },
+        };
     }
 }
 
@@ -364,7 +380,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     indices: IndexSliceMut<'_>,
     view_position: Position,
     ordering: DepthOrdering,
-    current_region_of_validity: &mut Aabb,
+    meta: &mut TransparentMeta,
 ) -> DepthSortInfo {
     if !M::Vertex::WANTS_DEPTH_SORTING {
         return DepthSortInfo {
@@ -398,7 +414,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         };
     }
 
-    if current_region_of_validity.contains(view_position) {
+    if meta.depth_sort_validity.contains(view_position) {
         return DepthSortInfo {
             changed: false,
             quads_sorted: 0,
@@ -448,7 +464,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
             generic_sort::<M, u32>(slice, vertices, view_position, &mut new_validity)
         }
     }
-    *current_region_of_validity = new_validity;
+    meta.depth_sort_validity = new_validity;
 
     DepthSortInfo {
         changed: true,
