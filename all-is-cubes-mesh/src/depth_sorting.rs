@@ -433,6 +433,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     // (Also, remembering those slices will subsume all “is this the WITHIN case” checks.)
     // See: <https://github.com/kpreid/all-is-cubes/issues/660>
 
+    #[inline(never)] // save our inlining budget for the *contents* of this function
     fn generic_sort<M: MeshTypes, Ix: IndexInt>(
         data: &mut [Ix],
         positions: &[M::Vertex],
@@ -443,11 +444,14 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         // Think about how to reduce it (and maybe use truncating casts).
 
         // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
-        expect_quads(data.as_chunks_mut::<6>()).sort_unstable_by_key(|indices| {
-            -OrderedFloat(manhattan_length(
-                view_position - midpoint::<M, Ix>(positions, *indices),
-            ))
-        });
+        expect_quads(data.as_chunks_mut::<6>()).sort_unstable_by_key(
+            #[inline]
+            |indices| {
+                -OrderedFloat(manhattan_length(
+                    view_position - midpoint::<M, Ix>(positions, *indices),
+                ))
+            },
+        );
 
         // Update the range of validity to not go past any of the sorted vertices.
         for &mut ix in data {
@@ -473,12 +477,20 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
 }
 
 /// Compute quad midpoint from quad vertices, for depth sorting.
-#[inline]
+///
+/// (The midpoint isn’t actually very meaningful to depth sorting, but it’s cheap to compute and,
+/// AFAIK, correct in all the cases we currently care about.)
+#[inline(always)] // the very hottest of inner loop code
 fn midpoint<M: MeshTypes, Ix: IndexInt>(vertices: &[M::Vertex], indices: [Ix; 6]) -> Position {
     // We only need to look at one of the two triangles,
     // because they have the same bounding rectangle.
-    let [v0, v1, v2, ..]: [Position; 6] = indices.map(|i| vertices[i.to_slice_index()].position());
-    (v0.max(v1).max(v2) + v0.min(v1).min(v2).to_vector()) * 0.5
+    let [i0, i1, i2, ..] = indices;
+    // This is unrolled because map()ing it might end up not inlining it, which would be very bad.
+    let p0 = vertices[i0.to_slice_index()].position();
+    let p1 = vertices[i1.to_slice_index()].position();
+    let p2 = vertices[i2.to_slice_index()].position();
+    // TODO: consider deleting the * 0.5 and scaling the view position by * 2.0 instead
+    (p0.max(p1).max(p2) + p0.min(p1).min(p2).to_vector()) * 0.5
 }
 
 /// `storage.extend(items)` plus reporting the added range of items
@@ -506,6 +518,7 @@ fn assume_no_nan_cmp(a: f32, b: f32) -> core::cmp::Ordering {
 /// This is used for dynamic depth sorting as the “depth” to sort by, because it is more efficient
 /// than [`Vector3D::square_length()`] for our purposes. It requires no multiplication and,
 /// I suspect, creates fewer unnecessary ordering changes.
+#[inline]
 fn manhattan_length(v: Vector3D<PosCoord, MeshRel>) -> f32 {
     v.x.abs() + v.y.abs() + v.z.abs()
 }
