@@ -873,7 +873,8 @@ pub(crate) struct TransparentMeta {
 impl TransparentMeta {
     const EMPTY: Self = Self {
         index_range: 0..0,
-        depth_sort_validity: Aabb::EMPTY,
+        // If there is nothing to sort, then it's always sorted!
+        depth_sort_validity: Aabb::EVERYWHERE,
     };
 }
 
