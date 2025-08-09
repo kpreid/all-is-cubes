@@ -1,6 +1,6 @@
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
-use core::{mem, ops};
+use core::{fmt, mem, ops};
 
 use either::Either;
 
@@ -8,7 +8,7 @@ use either::Either;
 
 /// Data storage for meshes’ index lists, automatically choosing an element type which is
 /// large enough for the range of the index values.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub(crate) enum IndexVec {
     /// 16-bit indices.
     U16(Vec<u16>),
@@ -26,7 +26,7 @@ pub(crate) enum IndexVec {
 /// an equally valid implementation would be a gap buffer, where we have two fixed ends and insert
 /// on either side of a gap in the middle. These are identical except for the choice of ordering
 /// of the two halves of the storage.)
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub(crate) enum IndexVecDeque {
     /// 16-bit indices.
     U16(VecDeque<u16>),
@@ -35,7 +35,7 @@ pub(crate) enum IndexVecDeque {
 }
 
 /// Data for meshes’ index lists, which may use either 16 or 32-bit values.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[expect(clippy::exhaustive_enums)]
 pub enum IndexSlice<'a> {
     /// 16-bit indices.
@@ -441,7 +441,9 @@ impl From<IndexVecDeque> for IndexVec {
 
 /// Helper trait defining operations and supertraits that all our allowed index types
 /// ([`u16`] and [`u32`]) meet.
-pub(crate) trait IndexInt: Ord + bytemuck::Pod + num_traits::NumCast + From<u16> {
+pub(crate) trait IndexInt:
+    Ord + bytemuck::Pod + num_traits::NumCast + From<u16> + fmt::Display
+{
     /// Convert this index value to a [`usize`].
     ///
     /// This operation is infallible because we do not support 16-bit `usize`.
@@ -468,10 +470,85 @@ impl IndexInt for u32 {
 }
 
 // -------------------------------------------------------------------------------------------------
+// Debug formatting.
+
+impl fmt::Debug for IndexSlice<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::U16(slice) => fmt_index_list(f, "U16", slice.iter().copied()),
+            Self::U32(slice) => fmt_index_list(f, "U32", slice.iter().copied()),
+        }
+    }
+}
+
+impl fmt::Debug for IndexVec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_slice(..).fmt(f)
+    }
+}
+
+impl fmt::Debug for IndexVecDeque {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::U16(deque) => fmt_index_list(f, "U16", deque.iter().copied()),
+            Self::U32(deque) => fmt_index_list(f, "U32", deque.iter().copied()),
+        }
+    }
+}
+
+fn fmt_index_list<Ix: IndexInt>(
+    f: &mut fmt::Formatter<'_>,
+    type_prefix: &'static str,
+    iter: impl ExactSizeIterator<Item = Ix>,
+) -> fmt::Result {
+    if iter.len() == 0 {
+        return write!(f, "{type_prefix}[]");
+    }
+
+    write!(f, "{type_prefix}[\n    ")?;
+    for (i, elem) in iter.enumerate() {
+        if i != 0 {
+            if i.rem_euclid(18) == 0 {
+                // Line breaks
+                write!(f, "\n    ")?;
+            } else if i.rem_euclid(6) == 0 {
+                // Extra padding between quads
+                write!(f, "  ")?;
+            }
+        }
+
+        // TODO: pad based on index type in use?
+        // 2 is a compromise between tidy arrangement and compactness for cases where printing is
+        // actually useful.
+        write!(f, "{elem:2}, ")?;
+    }
+    write!(f, "\n]")?;
+    Ok(())
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn debug_empty() {
+        assert_eq!(format!("{:#?}", IndexVec::new()), "U16[]");
+    }
+
+    #[test]
+    fn debug_nonempty() {
+        assert_eq!(
+            format!("{:#?}", IndexVec::U16(Vec::from_iter(0..24))),
+            indoc::indoc! {
+                "U16[
+                     0,  1,  2,  3,  4,  5,    6,  7,  8,  9, 10, 11,   12, 13, 14, 15, 16, 17, 
+                    18, 19, 20, 21, 22, 23, 
+                ]"
+            }
+        );
+    }
 
     #[test]
     fn extend_u32_upgrades_only_when_necessary() {
