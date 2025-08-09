@@ -225,6 +225,12 @@ pub struct DepthSortInfo {
     /// How many quads were in the data to be sorted.
     #[doc(hidden)] // public for benchmark checking whether depth sorting happened as expected
     pub quads_sorted: usize,
+
+    /// How many independent sorting operations were performed.
+    ///
+    /// All else being equal, it is better if this number is larger for a given `quads_sorted`,
+    /// since the cost of sorting grows faster than linear.
+    pub(crate) groups_sorted: usize,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -233,6 +239,7 @@ impl Default for DepthSortInfo {
         Self {
             changed: false,
             quads_sorted: 0,
+            groups_sorted: 0,
         }
     }
 }
@@ -242,9 +249,11 @@ impl ops::AddAssign for DepthSortInfo {
         let Self {
             changed,
             quads_sorted,
+            groups_sorted,
         } = self;
         *changed |= rhs.changed;
         *quads_sorted += rhs.quads_sorted;
+        *groups_sorted += rhs.groups_sorted;
     }
 }
 
@@ -400,6 +409,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         return DepthSortInfo {
             changed: false,
             quads_sorted: 0,
+            groups_sorted: 0,
         };
     }
     if meta.depth_sort_validity.contains(view_position) {
@@ -407,6 +417,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         return DepthSortInfo {
             changed: false,
             quads_sorted: 0,
+            groups_sorted: 0,
         };
     }
 
@@ -418,6 +429,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         meta: &mut TransparentMeta,
     ) -> DepthSortInfo {
         let mut quads_sorted = 0;
+        let mut groups_sorted = 0;
 
         // Accumulator of the new region of validity of this sort.
         // This will be shrunk to exclude any position that crosses the plane of any surface of the
@@ -439,6 +451,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
                 },
             );
             quads_sorted += quads_slice.len();
+            groups_sorted += 1;
 
             // Update the range of validity to not go past any of the sorted vertices.
             for &mut ix in data_slice {
@@ -452,6 +465,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         DepthSortInfo {
             changed: quads_sorted > 0,
             quads_sorted,
+            groups_sorted,
         }
     }
 
@@ -642,11 +656,13 @@ mod tests {
                 DepthSortInfo {
                     changed: true,
                     quads_sorted: 12,
+                    groups_sorted: 1,
                 }
             } else {
                 DepthSortInfo {
                     changed: false,
                     quads_sorted: 0,
+                    groups_sorted: 0,
                 }
             }
         );
