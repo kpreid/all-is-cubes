@@ -1,4 +1,4 @@
-use core::ops;
+use core::{fmt, ops};
 
 use all_is_cubes::euclid::{Box3D, Point3D, Vector3D};
 use all_is_cubes::math::{Aab, Axis};
@@ -32,7 +32,7 @@ use crate::{MeshRel, PosCoord, Position};
 /// In the unlikely event that an [`Aabb`] is constructed with a point containing the coordinate
 /// `-0.0`, this box will be considered equal to, but print differently than, one with a positive
 /// `0.0`. This should never matter in practice here.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Clone, Default, Eq, PartialEq)]
 #[allow(clippy::exhaustive_enums)]
 pub(crate) struct Aabb {
     // If no points have been added, then this box's coordinates are inverted (+inf to -inf).
@@ -144,6 +144,23 @@ impl Aabb {
                 }
                 None => {} // NaN -- TODO: integrate this with the NotNan checks
             }
+        }
+    }
+}
+
+impl fmt::Debug for Aabb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_empty() {
+            f.pad("EMPTY")
+        } else if *self == Self::EVERYWHERE {
+            f.pad("EVERYWHERE")
+        } else {
+            let Aabb { low, high } = *self;
+            f.debug_tuple("Aabb")
+                .field(&(low.x..=high.x))
+                .field(&(low.y..=high.y))
+                .field(&(low.z..=high.z))
+                .finish()
         }
     }
 }
