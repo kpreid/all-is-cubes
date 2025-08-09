@@ -221,6 +221,7 @@ impl<'a> IndexSlice<'a> {
     }
 }
 
+#[cfg(false)] // currently unused
 impl IndexSliceMut<'_> {
     #[inline]
     pub fn len(&self) -> usize {

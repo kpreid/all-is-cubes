@@ -135,6 +135,7 @@ dependencies = [
  "mutants",
  "num-traits",
  "ordered-float",
+ "smallvec",
  "visibility",
 ]
 

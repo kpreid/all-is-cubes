@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::ops::Range;
 use core::{fmt, mem, ops};
+use smallvec::SmallVec;
 
 use bitvec::vec::BitVec;
 use exhaust::Exhaust;
@@ -137,6 +138,10 @@ impl<M: MeshTypes> SpaceMesh<M> {
             self.bounding_box.all().into(),
             "bounding box of vertices ≠ recorded bounding box"
         );
+
+        self.transparent
+            .iter()
+            .for_each(TransparentMeta::consistency_check);
     }
 
     /// Returns the total memory (not counting allocator overhead) occupied by this
@@ -409,7 +414,6 @@ impl<M: MeshTypes> SpaceMesh<M> {
             &self.vertices.0,
             self.indices.as_mut_slice(range),
             view_position,
-            ordering,
             &mut self.meta.transparent[ordering.to_index()],
         )
     }
@@ -877,6 +881,14 @@ pub(crate) struct TransparentMeta {
     /// It ignores the bounds of validity of the [`DepthOrdering`] this [`TransparentMeta`] is for;
     /// those checks are to be done seperately before even looking at this struct.
     pub(crate) depth_sort_validity: Aabb,
+
+    /// Ranges of mesh indices, within (relative to) `self.index_range`,
+    /// which need to be individually sorted whenever the viewpoint moves out of
+    /// `self.depth_sort_validity`.
+    ///
+    /// Each range is non-empty. `dynamic_sub_ranges` as whole may be empty, indicating that dynamic
+    /// sorting is never needed (e.g. because there is only one transparent box in the mesh).
+    pub(crate) dynamic_sub_ranges: SmallVec<[Range<usize>; 1]>,
 }
 
 impl TransparentMeta {
@@ -884,7 +896,26 @@ impl TransparentMeta {
         index_range: 0..0,
         // If there is nothing to sort, then it's always sorted!
         depth_sort_validity: Aabb::EVERYWHERE,
+        dynamic_sub_ranges: SmallVec::new_const(),
     };
+
+    #[allow(dead_code, reason = "used conditionally")]
+    fn consistency_check(&self) {
+        let Self {
+            index_range,
+            depth_sort_validity: _,
+            dynamic_sub_ranges,
+        } = self;
+
+        for (i, sub_range) in dynamic_sub_ranges.iter().enumerate() {
+            assert!(
+                !sub_range.is_empty() && sub_range.end <= index_range.len(),
+                "sub-range {i} of {range_count}, {sub_range:?}, \
+                is empty or does not fit in index range {index_range:?}",
+                range_count = dynamic_sub_ranges.len(),
+            );
+        }
+    }
 }
 
 impl fmt::Debug for TransparentMeta {
@@ -892,9 +923,17 @@ impl fmt::Debug for TransparentMeta {
         let Self {
             index_range,
             depth_sort_validity,
+            dynamic_sub_ranges,
         } = self;
         // Compact formatting that will end up on one line if the validity is trivial
-        write!(f, "{index_range:?} sorted for {depth_sort_validity:?}")
+        write!(f, "{index_range:?} ")?;
+        if dynamic_sub_ranges.len() <= 1 {
+            write!(f, "{dynamic_sub_ranges:?}")?;
+        } else {
+            write!(f, "{dynamic_sub_ranges:#?}")?;
+        }
+        write!(f, " sorted for {depth_sort_validity:?}")?;
+        Ok(())
     }
 }
 
@@ -943,33 +982,33 @@ mod tests {
                     meta: MeshMeta {
                         opaque_range: 0..0,
                         transparent: [
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
-                            0..0 sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
+                            0..0 [] sorted for EVERYWHERE,
                         ],
                         textures_used: [],
                         bounding_box: Aabbs {
@@ -1029,33 +1068,33 @@ mod tests {
                     meta: MeshMeta {
                         opaque_range: 0..36,
                         transparent: [
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
-                            36..36 sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
+                            36..36 [] sorted for EVERYWHERE,
                         ],
                         textures_used: [],
                         bounding_box: Aabbs {
@@ -1155,33 +1194,33 @@ mod tests {
                     meta: MeshMeta {
                         opaque_range: 0..0,
                         transparent: [
-                            36..54 sorted for EVERYWHERE,
-                            54..78 sorted for EMPTY,
-                            78..96 sorted for EVERYWHERE,
-                            96..120 sorted for EMPTY,
-                            120..150 sorted for EMPTY,
-                            150..174 sorted for EMPTY,
-                            174..192 sorted for EVERYWHERE,
-                            192..216 sorted for EMPTY,
-                            216..234 sorted for EVERYWHERE,
-                            234..258 sorted for EMPTY,
-                            258..288 sorted for EMPTY,
-                            288..312 sorted for EMPTY,
-                            312..342 sorted for EMPTY,
-                            0..36 sorted for EMPTY,
-                            342..372 sorted for EMPTY,
-                            372..396 sorted for EMPTY,
-                            396..426 sorted for EMPTY,
-                            426..450 sorted for EMPTY,
-                            450..468 sorted for EVERYWHERE,
-                            468..492 sorted for EMPTY,
-                            492..510 sorted for EVERYWHERE,
-                            510..534 sorted for EMPTY,
-                            534..564 sorted for EMPTY,
-                            564..588 sorted for EMPTY,
-                            588..606 sorted for EVERYWHERE,
-                            606..630 sorted for EMPTY,
-                            630..648 sorted for EVERYWHERE,
+                            36..54 [] sorted for EVERYWHERE,
+                            54..78 [0..24] sorted for EMPTY,
+                            78..96 [] sorted for EVERYWHERE,
+                            96..120 [0..24] sorted for EMPTY,
+                            120..150 [0..30] sorted for EMPTY,
+                            150..174 [0..24] sorted for EMPTY,
+                            174..192 [] sorted for EVERYWHERE,
+                            192..216 [0..24] sorted for EMPTY,
+                            216..234 [] sorted for EVERYWHERE,
+                            234..258 [0..24] sorted for EMPTY,
+                            258..288 [0..30] sorted for EMPTY,
+                            288..312 [0..24] sorted for EMPTY,
+                            312..342 [0..30] sorted for EMPTY,
+                            0..36 [0..36] sorted for EMPTY,
+                            342..372 [0..30] sorted for EMPTY,
+                            372..396 [0..24] sorted for EMPTY,
+                            396..426 [0..30] sorted for EMPTY,
+                            426..450 [0..24] sorted for EMPTY,
+                            450..468 [] sorted for EVERYWHERE,
+                            468..492 [0..24] sorted for EMPTY,
+                            492..510 [] sorted for EVERYWHERE,
+                            510..534 [0..24] sorted for EMPTY,
+                            534..564 [0..30] sorted for EMPTY,
+                            564..588 [0..24] sorted for EMPTY,
+                            588..606 [] sorted for EVERYWHERE,
+                            606..630 [0..24] sorted for EMPTY,
+                            630..648 [] sorted for EVERYWHERE,
                         ],
                         textures_used: [],
                         bounding_box: Aabbs {

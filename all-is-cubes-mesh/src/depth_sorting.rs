@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 use core::ops::{self, Deref, Range};
+use smallvec::SmallVec;
 
 use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
@@ -265,6 +266,8 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
 ) where
     IndexVec: Extend<I>,
 {
+    #![allow(clippy::single_range_in_vec_init)]
+
     if !M::Vertex::WANTS_DEPTH_SORTING || transparent_indices.values().all(|v| v.is_empty()) {
         // Either there is nothing to sort (and all ranges will be length 0),
         // or the destination doesn't want sorting anyway. In either case, write the
@@ -277,6 +280,7 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         transparent_meta.fill(TransparentMeta {
             index_range,
             depth_sort_validity: Aabb::EVERYWHERE,
+            dynamic_sub_ranges: SmallVec::new(),
         });
         return;
     }
@@ -284,10 +288,15 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
     // Copy unsorted indices for the only case where the required ordering is fully dynamic.
     // and therefore we cannot usefully sort it now. (We don’t just skip the sorting because
     // that would also waste time computing `sortable_quads`.)
-    transparent_meta[DepthOrdering::WITHIN.to_index()] = TransparentMeta {
-        index_range: extend_giving_range(indices, transparent_indices.values().flatten().copied()),
-        depth_sort_validity: Aabb::EMPTY,
-    };
+    {
+        let index_range_for_within =
+            extend_giving_range(indices, transparent_indices.values().flatten().copied());
+        transparent_meta[DepthOrdering::WITHIN.to_index()] = TransparentMeta {
+            dynamic_sub_ranges: SmallVec::from([0..index_range_for_within.len()]),
+            depth_sort_validity: Aabb::EMPTY,
+            index_range: index_range_for_within.clone(),
+        };
+    }
 
     // Figure capacity for temporary storage. We need to be able to store up to 5 out of 6 faces.
     let iter_quad_counts = transparent_indices.values().map(|vec| vec.len() / 6);
@@ -355,16 +364,22 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         }
 
         // Copy the sorted indices into the main array, and set the corresponding range.
+        let index_range =
+            extend_giving_range(indices, sortable_quads.iter().flat_map(|tri| tri.indices));
         transparent_meta[ordering.to_index()] = TransparentMeta {
-            index_range: extend_giving_range(
-                indices,
-                sortable_quads.iter().flat_map(|tri| tri.indices),
-            ),
             depth_sort_validity: if ordering.needs_dynamic_sorting() {
                 Aabb::EMPTY
             } else {
                 Aabb::EVERYWHERE
             },
+            // TODO: Implement finding sub-ranges smaller than the whole, then record them here.
+            // See: <https://github.com/kpreid/all-is-cubes/issues/660>
+            dynamic_sub_ranges: if ordering.needs_dynamic_sorting() && sortable_quads.len() >= 2 {
+                SmallVec::from([0..index_range.len()])
+            } else {
+                SmallVec::new()
+            },
+            index_range,
         };
     }
 }
@@ -379,7 +394,6 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     vertices: &[M::Vertex],
     indices: IndexSliceMut<'_>,
     view_position: Position,
-    ordering: DepthOrdering,
     meta: &mut TransparentMeta,
 ) -> DepthSortInfo {
     if !M::Vertex::WANTS_DEPTH_SORTING {
@@ -388,91 +402,62 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
             quads_sorted: 0,
         };
     }
-    let quad_count = indices.len() / 6;
-    if quad_count < 2 {
-        // No point in sorting unless there's at least two quads.
-        // TODO: It would be more precise to ask “is there more than one _box_ to sort?”,
-        // but while the current mesh generator always generates whole boxes under
-        // `TransparencyFormat::Volumetric`, we don't have any guarantee that’s true in general
-        // (we might later optimize to omit some transparent faces that are always occluded)
-        // so we can’t just ask whether the quad count is greater than 6.
-        return DepthSortInfo {
-            changed: false,
-            quads_sorted: 0,
-        };
-    }
-
-    let within_on_axes = ordering.within_on_axes();
-    if within_on_axes == 0 {
-        // If within on zero axes, then dynamic depth sorting is not required; the indices
-        // have already been sorted into an order which suffices for all such views.
-        //
-        // TODO: test the behavior under this condition and others
-        return DepthSortInfo {
-            changed: false,
-            quads_sorted: 0,
-        };
-    }
-
     if meta.depth_sort_validity.contains(view_position) {
+        // Previous dynamic sort is still valid.
         return DepthSortInfo {
             changed: false,
             quads_sorted: 0,
         };
     }
-
-    // Accumulator of the new region of validity of this sort.
-    // This will be shrunk to exclude any position that crosses the plane of any surface of the
-    // mesh. As long as the viewpoint doesn’t exit this box, the sorting is still valid.
-    // (TODO: Prove this claim.)
-    let mut new_validity = Aabb::EVERYWHERE;
-
-    // TODO: Sorting *all* of the quads together is only optimal for `within_on_axes` 3.
-    // When it is 1 or 2, we can sort smaller sub-slices by finding boundaries across which
-    // the order never needs to change.
-    // (Also, remembering those slices will subsume all “is this the WITHIN case” checks.)
-    // See: <https://github.com/kpreid/all-is-cubes/issues/660>
 
     #[inline(never)] // save our inlining budget for the *contents* of this function
     fn generic_sort<M: MeshTypes, Ix: IndexInt>(
         data: &mut [Ix],
         positions: &[M::Vertex],
         view_position: Position,
-        new_validity: &mut Aabb,
-    ) {
-        // TODO: this function contains way too much numeric conversion per vertex.
-        // Think about how to reduce it (and maybe use truncating casts).
+        meta: &mut TransparentMeta,
+    ) -> DepthSortInfo {
+        let mut quads_sorted = 0;
 
-        // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
-        expect_quads(data.as_chunks_mut::<6>()).sort_unstable_by_key(
-            #[inline]
-            |indices| {
-                -OrderedFloat(manhattan_length(
-                    view_position - midpoint::<M, Ix>(positions, *indices),
-                ))
-            },
-        );
+        // Accumulator of the new region of validity of this sort.
+        // This will be shrunk to exclude any position that crosses the plane of any surface of the
+        // mesh. As long as the viewpoint doesn’t exit this box, the sorting is still valid.
+        // (TODO: Prove this claim.)
+        let mut new_validity = Aabb::EVERYWHERE;
 
-        // Update the range of validity to not go past any of the sorted vertices.
-        for &mut ix in data {
-            let vertex_position = M::Vertex::position(&positions[ix.to_slice_index()]);
-            new_validity.exclude_beyond(vertex_position, view_position);
+        for sub_range in meta.dynamic_sub_ranges.iter().cloned() {
+            let data_slice: &mut [Ix] = &mut data[sub_range];
+            // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
+            let quads_slice: &mut [[Ix; 6]] = expect_quads(data_slice.as_chunks_mut::<6>());
+
+            quads_slice.sort_unstable_by_key(
+                #[inline]
+                |indices| {
+                    -OrderedFloat(manhattan_length(
+                        view_position - midpoint::<M, Ix>(positions, *indices),
+                    ))
+                },
+            );
+            quads_sorted += quads_slice.len();
+
+            // Update the range of validity to not go past any of the sorted vertices.
+            for &mut ix in data_slice {
+                let vertex_position = M::Vertex::position(&positions[ix.to_slice_index()]);
+                new_validity.exclude_beyond(vertex_position, view_position);
+            }
+        }
+
+        meta.depth_sort_validity = new_validity;
+
+        DepthSortInfo {
+            changed: quads_sorted > 0,
+            quads_sorted,
         }
     }
 
     match indices {
-        IndexSliceMut::U16(slice) => {
-            generic_sort::<M, u16>(slice, vertices, view_position, &mut new_validity)
-        }
-        IndexSliceMut::U32(slice) => {
-            generic_sort::<M, u32>(slice, vertices, view_position, &mut new_validity)
-        }
-    }
-    meta.depth_sort_validity = new_validity;
-
-    DepthSortInfo {
-        changed: true,
-        quads_sorted: quad_count,
+        IndexSliceMut::U16(slice) => generic_sort::<M, u16>(slice, vertices, view_position, meta),
+        IndexSliceMut::U32(slice) => generic_sort::<M, u32>(slice, vertices, view_position, meta),
     }
 }
 
