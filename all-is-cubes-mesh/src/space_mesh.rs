@@ -14,8 +14,8 @@ use all_is_cubes_render::Flaws;
 #[cfg(doc)]
 use crate::texture;
 use crate::{
-    Aabb, Aabbs, BlockMesh, DepthOrdering, DepthSortInfo, IndexSlice, IndexVec, IndexVecDeque,
-    MeshOptions, MeshRel, MeshTypes, Position, Vertex, depth_sorting,
+    Aabb, Aabbs, BlockMesh, DepthOrdering, IndexSlice, IndexVec, IndexVecDeque, MeshOptions,
+    MeshRel, MeshTypes, Position, Vertex, depth_sorting,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -400,7 +400,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     ///
     /// This is intended to be cheap enough to do every frame.
     ///
-    /// Returns information including whether there was any change in ordering.
+    /// Returns the changed range of indices, if any, and diagnostic information.
     //---
     // TODO: In order to realize the potential of `MeshMeta`, we need to make it possible to
     // perform this operation using only `MeshMeta` and data slices instead of `SpaceMesh`.
@@ -408,7 +408,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         &mut self,
         ordering: DepthOrdering,
         view_position: Position,
-    ) -> DepthSortInfo {
+    ) -> crate::DepthSortResult {
         let range = self.transparent_range(ordering);
         depth_sorting::dynamic_depth_sort_for_view::<M>(
             &self.vertices.0,

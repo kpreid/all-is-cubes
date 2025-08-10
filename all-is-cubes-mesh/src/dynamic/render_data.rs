@@ -1,4 +1,5 @@
 use core::fmt;
+use core::ops::Range;
 
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::{FreeVector, GridCoordinate};
@@ -21,8 +22,9 @@ pub struct RenderDataUpdate<'a, M: DynamicMeshTypes> {
     /// Destination to update.
     pub render_data: &'a mut M::RenderData,
 
-    /// Whether *only* the indices need to be copied (and their length and type has not changed).
-    pub indices_only: bool,
+    /// Whether *only* the specified range of [`self.mesh.indices()`][SpaceMesh::indices]
+    /// need to be copied (and their length and type has not changed).
+    pub indices_only: Option<Range<usize>>,
 
     /// Unique identifier for this mesh. See the type documentation for details.
     pub mesh_id: MeshId,

@@ -47,7 +47,7 @@ pub use block_mesh::*;
 #[cfg(feature = "dynamic")]
 mod cache;
 mod depth_sorting;
-pub use depth_sorting::{DepthOrdering, DepthSortInfo};
+pub use depth_sorting::{DepthOrdering, DepthSortInfo, DepthSortResult};
 #[cfg(feature = "dynamic")]
 pub mod dynamic;
 mod index_vec;

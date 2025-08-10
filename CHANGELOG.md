@@ -87,6 +87,7 @@ In order to resolve various design problems interfering with development, the `a
     - `DepthOrdering` is now a `struct`, and the variants `DepthOrdering::{Any, Within}` have been replaced with constants.
       Additionally, there are now fewer distinct `DepthOrdering`s, reducing the amount of index data required for transparent meshes.
     - `DepthOrdering::from_view_direction()` is now called `from_view_of_aabb()` and takes a viewpoint and bounding box instead of only a view direction.
+    - `dynamic::RenderDataUpdate`’s `indices_only` field now specifies the range of indices to update, allowing you to copy less data.
 
 - `all-is-cubes-render` library:
     - `HeadlessRenderer::update()` is no longer async.

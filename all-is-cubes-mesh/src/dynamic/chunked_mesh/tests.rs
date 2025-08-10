@@ -236,7 +236,7 @@ fn no_render_data_updates_after_completion() {
         LARGE_VIEW_DISTANCE,
     );
     tester.update(|u| {
-        assert!(!u.indices_only);
+        assert_eq!(u.indices_only, None);
     });
 
     tester
@@ -251,13 +251,13 @@ fn no_render_data_updates_after_completion() {
         )
         .unwrap();
     tester.update(|u| {
-        assert!(!u.indices_only);
+        assert_eq!(u.indices_only, None);
     });
 
     // In the current implementation there is one extra indices-only update because we don't
     // properly depth sort just-created chunks, but ideally there wouldn't be this one.
     tester.update(|u| {
-        assert!(u.indices_only);
+        assert_eq!(u.indices_only, Some(0..36));
     });
 
     // Now, expect quiescence.

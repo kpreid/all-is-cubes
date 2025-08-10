@@ -20,7 +20,7 @@ use all_is_cubes_render::{Flaws, camera::Camera};
 use crate::dynamic::blocks::InstanceMesh;
 use crate::dynamic::chunk::ChunkTodoState;
 use crate::dynamic::{self, ChunkMesh, ChunkTodo, DynamicMeshTypes};
-use crate::{DepthOrdering, DepthSortInfo, MeshOptions, Vertex, texture};
+use crate::{DepthOrdering, DepthSortInfo, DepthSortResult, MeshOptions, Vertex, texture};
 
 #[cfg(test)]
 mod tests;
@@ -483,22 +483,29 @@ where
             let compute_end_depth_sort_start = time::Instant::now();
 
             // Run depth sort, if needed.
-            let mut actually_sorted_indices = false;
+            let mut actually_sorted_indices = None;
             let mut ran_depth_sort = false;
             if let Some(ordering) = state.chunk_todo.needs_depth_sort.take() {
                 ran_depth_sort = true;
-                let info = state.chunk_mesh.depth_sort_for_view(ordering, view_point);
-                if info.changed {
-                    actually_sorted_indices = true;
-                }
+                let DepthSortResult { changed, info } =
+                    state.chunk_mesh.depth_sort_for_view(ordering, view_point);
+                actually_sorted_indices = changed;
                 state.depth_sort_info += info;
             }
             let depth_sort_end_update_start = time::Instant::now();
 
             // Update render data, if we made any changes requiring it.
-            let run_updater = actually_changed_mesh || actually_sorted_indices;
+            let run_updater = actually_changed_mesh || actually_sorted_indices.is_some();
             if run_updater {
-                render_data_updater(state.chunk_mesh.borrow_for_update(!actually_changed_mesh));
+                render_data_updater(
+                    state
+                        .chunk_mesh
+                        .borrow_for_update(if actually_changed_mesh {
+                            None
+                        } else {
+                            actually_sorted_indices
+                        }),
+                );
             }
             let update_end = time::Instant::now();
 
@@ -719,7 +726,6 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             chunk_mesh_callback_times,
             depth_sort_info:
                 DepthSortInfo {
-                    changed: _,
                     quads_sorted,
                     groups_sorted,
                 },

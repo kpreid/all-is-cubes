@@ -80,7 +80,7 @@ impl MeshRecorder {
                 &self.cameras.cameras().world,
                 time::Deadline::Whenever,
                 |u| {
-                    if u.indices_only {
+                    if u.indices_only.is_some() {
                         // We don't do depth sorting.
                         return;
                     }

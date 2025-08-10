@@ -1,14 +1,14 @@
-use all_is_cubes::math::FreeCoordinate;
-use all_is_cubes::math::FreePoint;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 use core::mem;
-use core::ops;
+use core::ops::{self, Range};
 
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::euclid::{Point3D, Translation3D};
-use all_is_cubes::math::{Aab, Cube, GridCoordinate, LineVertex, Wireframe as _};
+use all_is_cubes::math::{
+    Aab, Cube, FreeCoordinate, FreePoint, GridCoordinate, LineVertex, Wireframe as _,
+};
 use all_is_cubes::space::{BlockIndex, Space};
 
 use crate::dynamic::{self, DynamicMeshTypes};
@@ -124,7 +124,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
 
     pub(crate) fn borrow_for_update(
         &mut self,
-        indices_only: bool,
+        indices_only: Option<Range<usize>>,
     ) -> dynamic::RenderDataUpdate<'_, M> {
         dynamic::RenderDataUpdate {
             mesh: &self.mesh,
@@ -273,11 +273,11 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     /// This is intended to be cheap enough to do every frame.
     ///
     /// Returns information including whether there was any change in ordering.
-    pub fn depth_sort_for_view(
+    pub(crate) fn depth_sort_for_view(
         &mut self,
         ordering: DepthOrdering,
         view_position: FreePoint,
-    ) -> crate::DepthSortInfo {
+    ) -> crate::DepthSortResult {
         // The mesh coordinates are in chunk-relative coordinates,
         // but the incoming view position is in world coordinates,
         // so we bring the view position into chunk-relative coordinates.

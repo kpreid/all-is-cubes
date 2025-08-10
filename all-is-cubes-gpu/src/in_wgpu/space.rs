@@ -368,23 +368,21 @@ impl SpaceRenderer {
                 |u| {
                     #[expect(clippy::shadow_unrelated)]
                     let bwp = &mut *bwp_mutex.lock().unwrap();
-                    if u.indices_only {
+                    if let Some(index_range) = u.indices_only {
                         if let Some(index_buf) =
                             u.render_data.as_ref().and_then(|b| b.index_buf.get())
                         {
-                            // It's OK to ignore which type the indices are because they will
-                            // always be the same type as they were previously.
-                            let index_buf_bytes = u.mesh.indices().as_bytes();
-                            if let Some(len) = index_buf_bytes
-                                .len()
-                                .try_into()
-                                .ok()
-                                .and_then(wgpu::BufferSize::new)
-                            {
-                                bwp.reborrow()
-                                    .write_buffer(index_buf, 0, len)
-                                    .copy_from_slice(index_buf_bytes);
-                            }
+                            let mesh_indices = u.mesh.indices();
+                            let byte_range = (index_range.start * mesh_indices.element_size())
+                                ..(index_range.end * mesh_indices.element_size());
+
+                            bwp.reborrow()
+                                .write_buffer(
+                                    index_buf,
+                                    byte_range.start as u64,
+                                    wgpu::BufferSize::new(byte_range.len() as u64).unwrap(),
+                                )
+                                .copy_from_slice(&mesh_indices.as_bytes()[byte_range]);
                         }
                     } else {
                         update_chunk_buffers(bwp.reborrow(), u, &self.space_label);

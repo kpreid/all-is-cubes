@@ -205,6 +205,16 @@ impl<'a> IndexSlice<'a> {
         }
     }
 
+    /// Returns the [`size_of`] one element of this slice.
+    ///
+    /// This value is always either 2 or 4.
+    pub fn element_size(&self) -> usize {
+        match self {
+            IndexSlice::U16(_) => size_of::<u16>(),
+            IndexSlice::U32(_) => size_of::<u32>(),
+        }
+    }
+
     /// Returns whether this slice is empty (`len() == 0`).
     #[inline]
     pub fn is_empty(&self) -> bool {

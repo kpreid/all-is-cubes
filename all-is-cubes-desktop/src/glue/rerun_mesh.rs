@@ -106,7 +106,7 @@ impl RerunMesher {
         let _info = self
             .csm
             .update(read_ticket, camera, Deadline::Whenever, |u| {
-                assert!(!u.indices_only);
+                assert_eq!(u.indices_only, None);
 
                 let singleton_translation = u.mesh_id.singleton_translation(CHUNK_SIZE);
 

@@ -356,7 +356,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMesh<M> {
             render_data_updater(super::RenderDataUpdate {
                 mesh: &space_mesh,
                 render_data: &mut render_data,
-                indices_only: false,
+                indices_only: None,
                 mesh_id: super::MeshId(super::MeshIdImpl::Block(block_index)),
             });
 

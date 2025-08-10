@@ -207,19 +207,28 @@ impl exhaust::Exhaust for DepthOrdering {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Information returned by [`SpaceMesh::depth_sort_for_view()`].
+/// Outcome of [`SpaceMesh::depth_sort_for_view()`], specifying what changed.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::exhaustive_structs)]
+#[must_use]
+pub struct DepthSortResult {
+    /// If the order actually changed as a result of sorting, contains
+    /// the range of the mesh’s indices which were modified by the depth sort operation.
+    ///
+    /// This may be used to determine, for example, whether the newly sorted indices need to be
+    /// copied to a GPU buffer.
+    pub changed: Option<Range<usize>>,
+
+    /// Performance information about the sorting operation.
+    pub info: DepthSortInfo,
+}
+
+/// Performance information returned by [`SpaceMesh::depth_sort_for_view()`].
+///
+/// Format this with [`fmt::Debug`] to see its information.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct DepthSortInfo {
-    /// Whether the order actually changed as a result of sorting.
-    ///
-    /// This may be used to determine, for example, whether the newly sorted indices need to be
-    /// copied to a GPU buffers.
-    ///
-    /// Note that in the current implementation, this is `true` if the sort was performed even if no
-    /// reordering occurred, unless there is nothing to sort. This may be improved in the future.
-    pub changed: bool,
-
     /// How many quads were in the data to be sorted.
     #[doc(hidden)] // public for benchmark checking whether depth sorting happened as expected
     pub quads_sorted: usize,
@@ -231,25 +240,32 @@ pub struct DepthSortInfo {
     pub(crate) groups_sorted: usize,
 }
 
-#[allow(clippy::derivable_impls)]
+impl DepthSortResult {
+    const NOTHING_CHANGED: Self = Self {
+        changed: None,
+        info: DepthSortInfo::DEFAULT,
+    };
+}
+
+impl DepthSortInfo {
+    const DEFAULT: Self = Self {
+        quads_sorted: 0,
+        groups_sorted: 0,
+    };
+}
+
 impl Default for DepthSortInfo {
     fn default() -> Self {
-        Self {
-            changed: false,
-            quads_sorted: 0,
-            groups_sorted: 0,
-        }
+        Self::DEFAULT
     }
 }
 
 impl ops::AddAssign for DepthSortInfo {
     fn add_assign(&mut self, rhs: Self) {
         let Self {
-            changed,
             quads_sorted,
             groups_sorted,
         } = self;
-        *changed |= rhs.changed;
         *quads_sorted += rhs.quads_sorted;
         *groups_sorted += rhs.groups_sorted;
     }
@@ -448,21 +464,14 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     indices: IndexSliceMut<'_>,
     view_position: Position,
     meta: &mut TransparentMeta,
-) -> DepthSortInfo {
+) -> DepthSortResult {
     if !M::Vertex::WANTS_DEPTH_SORTING {
-        return DepthSortInfo {
-            changed: false,
-            quads_sorted: 0,
-            groups_sorted: 0,
-        };
+        return DepthSortResult::NOTHING_CHANGED;
     }
     if meta.depth_sort_validity.contains(view_position) {
         // Previous dynamic sort is still valid.
-        return DepthSortInfo {
-            changed: false,
-            quads_sorted: 0,
-            groups_sorted: 0,
-        };
+        // TODO: report this vs. other exit cases in info
+        return DepthSortResult::NOTHING_CHANGED;
     }
 
     #[inline(never)] // save our inlining budget for the *contents* of this function
@@ -471,7 +480,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         positions: &[M::Vertex],
         view_position: Position,
         meta: &mut TransparentMeta,
-    ) -> DepthSortInfo {
+    ) -> DepthSortResult {
         let mut quads_sorted = 0;
         let mut groups_sorted = 0;
 
@@ -506,10 +515,15 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
 
         meta.depth_sort_validity = new_validity;
 
-        DepthSortInfo {
-            changed: quads_sorted > 0,
-            quads_sorted,
-            groups_sorted,
+        DepthSortResult {
+            changed: Some(
+                (meta.index_range.start + meta.dynamic_sub_ranges[0].start)
+                    ..(meta.index_range.start + meta.dynamic_sub_ranges.last().unwrap().end),
+            ),
+            info: DepthSortInfo {
+                quads_sorted,
+                groups_sorted,
+            },
         }
     }
 
@@ -694,18 +708,22 @@ mod tests {
         assert_eq!(problems, vec![]);
     }
 
+    /// Tests that the correct [`DepthSortResult`] is produced.
     #[rstest::rstest]
-    fn depth_sort_info_from_space_mesh(#[values(false, true)] transparent: bool) {
+    fn depth_sort_result_from_space_mesh(#[values(false, true)] transparent: bool) {
+        let opaque_block = &block::from_color!(1.0, 0.0, 0.0, 1.0);
         let maybe_transparent_block = if transparent {
-            block::from_color!(1.0, 0.0, 0.0, 0.5)
+            &block::from_color!(1.0, 0.0, 0.0, 0.5)
         } else {
-            block::from_color!(1.0, 0.0, 0.0, 1.0)
+            opaque_block
         };
-        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 1, 1]))
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 1, 1]))
             .build_and_mutate(|m| {
                 // Two blocks that need to be sorted vs. each other, if transparent
-                m.set([0, 0, 0], &maybe_transparent_block)?;
-                m.set([2, 0, 0], &maybe_transparent_block)?;
+                m.set([0, 0, 0], maybe_transparent_block)?;
+                m.set([2, 0, 0], maybe_transparent_block)?;
+                // A third block that is opaque just to exercise having opaque indices present
+                m.set([4, 0, 0], opaque_block)?;
                 Ok(())
             })
             .unwrap();
@@ -713,19 +731,29 @@ mod tests {
 
         let info = space_mesh.depth_sort_for_view(DepthOrdering::WITHIN, point3(0., 0., 0.));
 
+        assert_ne!(
+            space_mesh.opaque_range(),
+            0..0,
+            "if the opaque range is empty then this test is not sufficient"
+        );
         assert_eq!(
             info,
             if transparent {
-                DepthSortInfo {
-                    changed: true,
-                    quads_sorted: 12,
-                    groups_sorted: 1,
+                DepthSortResult {
+                    // other cases might have shorter rather than equal ranges
+                    changed: Some(space_mesh.transparent_range(DepthOrdering::WITHIN)),
+                    info: DepthSortInfo {
+                        quads_sorted: 12,
+                        groups_sorted: 1,
+                    },
                 }
             } else {
-                DepthSortInfo {
-                    changed: false,
-                    quads_sorted: 0,
-                    groups_sorted: 0,
+                DepthSortResult {
+                    changed: None,
+                    info: DepthSortInfo {
+                        quads_sorted: 0,
+                        groups_sorted: 0,
+                    },
                 }
             }
         );
