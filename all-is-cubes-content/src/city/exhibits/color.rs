@@ -269,7 +269,7 @@ fn COLORED_BOUNCE(ctx: Context<'_>) {
             Some(rgba_const!(1.0, 0.0, 0.0, 1.0).into()),
             Some(rgba_const!(0.0, 1.0, 0.0, 1.0).into()),
             Some(rgba_const!(0.0, 0.0, 1.0, 1.0).into()),
-            Some(rgba_const!(0.0, 1.0, 1.0, 1.0).into()),
+            Some(palette::ALMOST_BLACK.into()),
         );
         let rbbounds = GridAab::for_block(R32);
         Block::builder()
