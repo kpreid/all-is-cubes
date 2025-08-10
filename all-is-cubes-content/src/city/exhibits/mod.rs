@@ -55,6 +55,7 @@ pub(crate) static DEMO_CITY_EXHIBITS: &[prelude::Exhibit] = &[
     chunking::CHUNK_CHART,
     color::COLOR_LIGHTS,
     color::COLORED_BOUNCE,
+    color::SPOTLIGHT,
     images::IMAGES,
     smallest::SMALLEST,
     transparency::SWIMMING_POOL,

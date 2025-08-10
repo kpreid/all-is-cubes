@@ -303,9 +303,77 @@ fn COLORED_BOUNCE(ctx: Context<'_>) {
                 &reflecting_block,
             )?;
 
-            // Hole to look in through
+            // Front entrance
             m.fill_uniform(
                 GridAab::from_lower_upper([2, 0, interior_radius + 1], [3, 2, total_radius + 1]),
+                &AIR,
+            )
+            .unwrap();
+            Ok(())
+        })?;
+
+    Ok((space, txn))
+}
+
+// TODO: this is similar to COLORED_BOUNCE and should share some code
+#[macro_rules_attribute::apply(exhibit!)]
+#[exhibit(
+    name: "Spotlight",
+    subtitle: "How sharp can the shadow be?\nNot very.",
+    placement: Placement::Underground,
+)]
+fn SPOTLIGHT(ctx: Context<'_>) {
+    let txn = ExhibitTransaction::default();
+
+    let interior_radius = 3i32;
+    let wall_thickness = 2u32;
+    let total_radius = interior_radius.saturating_add_unsigned(wall_thickness);
+    let brightness = 50.0;
+
+    // --- Blocks ---
+
+    let shadowing_block = Block::builder()
+        .color(palette::ALMOST_BLACK.with_alpha_one())
+        .build();
+
+    let light_block = Block::builder()
+        .color(Rgba::WHITE)
+        .light_emission(Rgb::ONE * brightness)
+        .build();
+
+    let wall_block = block::from_color!(0.25, 0.25, 0.25); // fairly absorbing
+
+    // --- Space ---
+
+    let interior = GridAab::from_lower_upper(
+        GridPoint::new(-interior_radius, 0, -interior_radius),
+        GridPoint::splat(interior_radius + 1),
+    );
+    let space = Space::builder(interior.expand(FaceMap::splat(wall_thickness)))
+        .read_ticket(ctx.universe.read_ticket())
+        .build_and_mutate(|m| {
+            // Thick walls + interior cavity
+            m.fill_all_uniform(&wall_block).unwrap();
+            m.fill_uniform(interior, &AIR).unwrap();
+
+            // Light in a recess
+            let far_end = GridAab::ORIGIN_CUBE.translate(vec3(0, total_radius, 0));
+            m.fill_uniform(GridAab::ORIGIN_CUBE.union_box(far_end), &AIR)
+                .unwrap();
+            m.fill_uniform(far_end, &light_block).unwrap();
+
+            // Central block that casts a shadow
+            m.fill_uniform(
+                GridAab::from_lower_size([0, 1, 0], [1, 1, 1]),
+                &shadowing_block,
+            )?;
+
+            // Front entrance
+            m.fill_uniform(
+                GridAab::from_lower_upper(
+                    [-interior_radius + 1, 0, interior_radius + 1],
+                    [interior_radius, 2, total_radius + 1],
+                ),
                 &AIR,
             )
             .unwrap();
