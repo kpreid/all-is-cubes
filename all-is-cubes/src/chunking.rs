@@ -28,7 +28,7 @@ use num_traits::float::FloatCore as _;
 )]
 use crate::math::Euclid as _;
 use crate::math::{
-    Cube, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, OctantMask,
+    Cube, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, GridSizeCoord, OctantMask,
 };
 
 /// Unit-of-measure type for chunk positions *not* tracking the chunk size in the type.
@@ -94,7 +94,10 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     pub fn min_distance_squared_from(self, origin_chunk: Self) -> GridCoordinate {
         // TODO: change this to return the `Distance` instead of a value derived from it.
         // That'll be less exactly-one-use-case.
-        self.distance(origin_chunk).nearest_approach_squared * CHUNK_SIZE.pow(2)
+        self.distance(origin_chunk)
+            .nearest_approach_squared
+            .cast_signed()
+            * CHUNK_SIZE.pow(2)
     }
 }
 
@@ -136,7 +139,7 @@ pub struct Distance {
     /// As a concrete example, the distance value between any two chunks which touch on a
     /// face, edge, or corner has zero in this field; if they have one chunk separating
     /// them along one axis, then this field would be 1.
-    nearest_approach_squared: GridCoordinate,
+    nearest_approach_squared: u32,
     /// The number of coordinate axes along which the two chunks have coordinates differing
     /// by more than zero.
     ///
@@ -165,7 +168,7 @@ impl fmt::Debug for Distance {
 pub struct ChunkChart<const CHUNK_SIZE: GridCoordinate> {
     /// The maximum view distance which this chart is designed for,
     /// squared, in multiples of a whole chunk.
-    view_distance_in_squared_chunks: GridCoordinate,
+    view_distance_in_squared_chunks: GridSizeCoord,
 
     /// One octant of chunk positions (scaled down by `CHUNK_SIZE`) sorted by distance.
     /// (It could be further reduced to a 64th by mirroring across the diagonal,
@@ -205,7 +208,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         }
     }
 
-    fn sanitize_and_square_distance(view_distance: FreeCoordinate) -> GridCoordinate {
+    fn sanitize_and_square_distance(view_distance: FreeCoordinate) -> GridSizeCoord {
         let sanitized = if view_distance.is_finite() {
             view_distance.max(0.)
         } else {
@@ -213,7 +216,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
         };
         let view_distance_in_chunks = sanitized / FreeCoordinate::from(CHUNK_SIZE);
 
-        view_distance_in_chunks.powi(2).ceil() as GridCoordinate
+        view_distance_in_chunks.powi(2).ceil() as GridSizeCoord
     }
 
     /// Recalculate the chart if the provided distance is different.
@@ -304,7 +307,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
     }
 }
 
-fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[Ccv]> {
+fn get_or_compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[Ccv]> {
     #[cfg(feature = "std")]
     let mut cache = match CHUNK_CHART_CACHE.lock() {
         Ok(cache) => cache,
@@ -354,14 +357,14 @@ pub fn reset_chunk_chart_cache() {
     }
 }
 
-fn compute_chart_octant(view_distance_in_squared_chunks: GridCoordinate) -> Arc<[Ccv]> {
+fn compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[Ccv]> {
     // We're going to compute in the zero-or-positive octant, which means that the chunk origin
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
     // each chunk.
 
     let candidates = GridAab::from_lower_size(
         [0, 0, 0],
-        GridSize::splat(u32::try_from(view_distance_in_squared_chunks).unwrap() + 1),
+        GridSize::splat(view_distance_in_squared_chunks.saturating_add(1)),
     )
     .to_vol()
     .unwrap();
@@ -387,7 +390,7 @@ fn depth_sort_key(&chunk: &Ccv) -> (Distance, [i32; 3]) {
 }
 
 fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
-    let chunk = chunk.map(i32::abs);
+    let chunk = chunk.map(i32::unsigned_abs);
     // By subtracting 1 from all coordinates, we include the chunks intersecting
     // the view sphere centered on the _farthest corner point_ of the
     // viewpoint-containing chunk. The shape formed (after mirroring) is the
@@ -398,10 +401,10 @@ fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
         nearest_approach_squared: chunk
             .map(
                 #[inline(always)]
-                |s| (s - 1).max(0),
+                |s| s.saturating_sub(1),
             )
             .square_length(),
-        off_plane_count: (chunk.x.signum() + chunk.y.signum() + chunk.z.signum()) as u8,
+        off_plane_count: u8::from(chunk.x > 0) + u8::from(chunk.y > 0) + u8::from(chunk.z > 0),
     }
 }
 
@@ -409,7 +412,7 @@ fn chunk_distance_squared_for_view(chunk: Ccv) -> Distance {
 ///
 /// Keys are `view_distance_in_squared_chunks` and values are `octant_chunks`.
 #[cfg(feature = "std")]
-static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridCoordinate, Arc<[Ccv]>>> = Mutex::new(BTreeMap::new());
+static CHUNK_CHART_CACHE: Mutex<BTreeMap<GridSizeCoord, Arc<[Ccv]>>> = Mutex::new(BTreeMap::new());
 
 /// An iterator that returns a vector and its opposite in the specified axis,
 ///
