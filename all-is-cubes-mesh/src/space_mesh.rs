@@ -886,8 +886,10 @@ pub(crate) struct TransparentMeta {
     /// which need to be individually sorted whenever the viewpoint moves out of
     /// `self.depth_sort_validity`.
     ///
-    /// Each range is non-empty. `dynamic_sub_ranges` as whole may be empty, indicating that dynamic
-    /// sorting is never needed (e.g. because there is only one transparent box in the mesh).
+    /// * Each range is non-empty.
+    /// * `dynamic_sub_ranges` as whole may be empty, indicating that dynamic
+    ///   sorting is never needed (e.g. because there is only one transparent box in the mesh).
+    /// * The ranges are non-overlapping and in ascending order.
     pub(crate) dynamic_sub_ranges: SmallVec<[Range<usize>; 1]>,
 }
 
@@ -915,6 +917,8 @@ impl TransparentMeta {
                 range_count = dynamic_sub_ranges.len(),
             );
         }
+
+        assert!(dynamic_sub_ranges.is_sorted_by(|a, b| a.end <= b.start));
     }
 }
 
