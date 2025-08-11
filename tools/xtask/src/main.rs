@@ -429,7 +429,9 @@ fn build_web(
         [wasm_pack_out_dir.join("all_is_cubes_wasm.js")],
     ) {
         let _t = CaptureTime::new(time_log, format!("wasm-pack build --{profile}"));
-        cmd!(config.sh, "wasm-pack build --target web")
+        cmd!(config.sh, "wasm-pack")
+            .args(config.cargo_quiet.then_some("--quiet"))
+            .args(["build", "--target=web"])
             .arg("--out-dir")
             .arg(
                 wasm_pack_out_dir
@@ -678,6 +680,7 @@ fn measure_binary_sizes(config: &Config<'_>) -> Result<(), ActionError> {
             "--bin=all-is-cubes",
             "--bin=aic-server",
         ])
+        .args(config.cargo_build_args())
         .run()?;
     build_web(config, &mut Vec::new(), Profile::Release)?;
 
