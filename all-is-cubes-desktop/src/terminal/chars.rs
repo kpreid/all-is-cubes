@@ -52,12 +52,11 @@ pub(super) fn image_patch_to_character(
                     let avg_lum = lum1.midpoint(lum2).clamp(0.0, 1.0);
 
                     if (lum1 - lum2).abs() < 0.05 {
-                        [" ", "░", "▒", "▓", "█"][(avg_lum * 4.999) as usize]
-                        //[" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"][(avg_lum * 8.999) as usize]
+                        pick_01_from_array(avg_lum, &[" ", "░", "▒", "▓", "█"])
                     } else if lum1 < lum2 {
-                        [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"][(avg_lum * 8.999) as usize]
+                        pick_01_from_array(avg_lum, &[" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"])
                     } else {
-                        [" ", "▔", "▘", "▘", "▀", "▀", "▛", "▛", "█"][(avg_lum * 8.999) as usize]
+                        pick_01_from_array(avg_lum, &[" ", "▔", "▘", "▘", "▀", "▀", "▛", "▛", "█"])
                     }
                 }
             };
@@ -109,8 +108,10 @@ pub(super) fn image_patch_to_character(
             // Shades mode always presents grayscale color
             let [[&(_, color)]] = image.get_patch(char_pos);
             (
-                [" ", "░", "▒", "▓", "█"]
-                    [(color.unwrap_or(Rgba::TRANSPARENT).luminance() * 4.999) as usize],
+                pick_01_from_array(
+                    color.unwrap_or(Rgba::TRANSPARENT).luminance(),
+                    &[" ", "░", "▒", "▓", "█"],
+                ),
                 Colors::new(Color::Reset, Color::Reset),
             )
         }
@@ -169,6 +170,15 @@ pub(super) fn image_patch_to_character(
             )
         }
     }
+}
+
+#[inline]
+fn pick_01_from_array<T: Copy, const N: usize>(position: f32, array: &[T; N]) -> T {
+    #![allow(clippy::cast_sign_loss)]
+
+    // The `as usize` does truncation, but we only care about positive values where it is equivalent
+    // to `floor()`. The `clamp()` then handles out-of-range and the value being exactly 1.0.
+    array[((position * const { N as f32 }) as usize).clamp(0, const { N - 1 })]
 }
 
 /// This is all of the Braille Unicode characters, as individual `&str`s.
