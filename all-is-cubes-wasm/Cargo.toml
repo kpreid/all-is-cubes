@@ -125,7 +125,7 @@ single_match = "allow"
 # clippy::pedantic lints that are set to allow
 cast_possible_truncation = "allow" # we would need an alternative for intentional from-float saturation and to-float precision loss
 cast_precision_loss = "allow" # consider enabling
-cast_sign_loss = "allow" # consider enabling
+cast_sign_loss = "allow" # we would need an alternative for various int→float→int calculations
 default_trait_access = "allow"
 empty_enum = "allow"
 enum_glob_use = "allow"
