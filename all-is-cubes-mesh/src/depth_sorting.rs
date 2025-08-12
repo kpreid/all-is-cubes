@@ -1,6 +1,7 @@
 //! Types and algorithms for depth sorting.
 
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 use core::ops::{self, Deref, Range};
 use smallvec::SmallVec;
 
@@ -363,14 +364,6 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
     let capacity: usize =
         iter_quad_counts.clone().sum::<usize>() - iter_quad_counts.clone().max().unwrap_or(0);
 
-    // Precompute sort keys of all of the transparent quads.
-    // This assumes that the input `BlockMesh`es contain strictly quads and no other polygons,
-    // but that is true of the outputs of the block mesh generator currently, and will likely
-    // continue to be true even once we fix the T-junction problems with opaque geometry.
-    struct OrderedQuad<I> {
-        order: [f32; 3],
-        indices: [I; 6],
-    }
     // Reused in loop to hold the ordering's quads while we sort them.
     let mut sortable_quads: Vec<OrderedQuad<I>> = Vec::with_capacity(capacity);
 
@@ -394,17 +387,7 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
                 .flat_map(|(_, index_vec)| {
                     expect_quads(index_vec.as_chunks::<6>())
                         .iter()
-                        .map(|&indices_of_quad| {
-                            let midpoint = midpoint::<M, I>(vertices, indices_of_quad);
-                            OrderedQuad {
-                                indices: indices_of_quad,
-                                order: [
-                                    basis.x.dot(midpoint.to_vector()),
-                                    basis.y.dot(midpoint.to_vector()),
-                                    basis.z.dot(midpoint.to_vector()),
-                                ],
-                            }
-                        })
+                        .map(|&indices_of_quad| OrderedQuad::new(indices_of_quad, vertices, basis))
                 }),
         );
 
@@ -412,12 +395,7 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         // sort would be wasted.
         if ordering.within_on_axes() < 3 {
             // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
-            sortable_quads.sort_by(|a, b| {
-                assume_no_nan_cmp(a.order[0], b.order[0]).then_with(|| {
-                    assume_no_nan_cmp(a.order[1], b.order[1])
-                        .then_with(|| assume_no_nan_cmp(a.order[2], b.order[2]))
-                })
-            });
+            sortable_quads.sort_by(OrderedQuad::cmp);
         }
 
         // Copy the sorted indices into the main array.
@@ -451,10 +429,9 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
                 debug_assert_ne!(ordering.0[projection.axis()], Rel::Within);
 
                 let mut quad_group = 0..1; // indices into sortable_quads, not single indices!
-                let mut group_upper_bound =
-                    min_max_on_axis::<M, I>(vertices, sortable_quads[0].indices, basis.x).1;
+                let mut group_upper_bound = sortable_quads[0].min_max_on_axis(vertices, basis.x).1;
                 for (i, quad) in sortable_quads[1..].iter().enumerate() {
-                    let (qmin, qmax) = min_max_on_axis::<M, I>(vertices, quad.indices, basis.x);
+                    let (qmin, qmax) = quad.min_max_on_axis(vertices, basis.x);
                     if qmin < group_upper_bound {
                         // Add this quad to the group because it overlaps on the axis
                         quad_group.end = i + 1;
@@ -536,7 +513,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
                 #[inline]
                 |indices| {
                     -OrderedFloat(manhattan_length(
-                        view_position - midpoint::<M, Ix>(positions, *indices),
+                        view_position - midpoint(positions, *indices),
                     ))
                 },
             );
@@ -570,12 +547,77 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+/// Temporary depth-sortable version of a single quad (two triangles) extracted from an
+/// [`IndexVec`].
+///
+/// This is used for “static” sorts which look like “sort on +X then +Z then -Y”, not for
+/// “dynamic” sorts which use distance from a specific view point.
+///
+/// This strategy assumes that the input `BlockMesh`es contain strictly quads and no other polygons,
+/// but that is true of the outputs of the block mesh generator currently, and will likely continue
+/// to be true for transparent geoemtry even once we fix the T-junction problems with opaque
+/// geometry.
+struct OrderedQuad<Ix> {
+    /// Sort key. Derived from the vertices but not actually a point. Never contains NaN.
+    order: [f32; 3],
+    /// Original index data. Not used in ordering.
+    indices: [Ix; 6],
+}
+impl<Ix: IndexInt> OrderedQuad<Ix> {
+    #[inline(always)]
+    fn new<V: Vertex>(
+        indices_of_quad: [Ix; 6],
+        vertices: &[V],
+        basis: Vector3D<Face6, ()>,
+    ) -> Self {
+        let midpoint = midpoint(vertices, indices_of_quad).to_vector();
+        OrderedQuad {
+            indices: indices_of_quad,
+            order: [
+                basis.x.dot(midpoint),
+                basis.y.dot(midpoint),
+                basis.z.dot(midpoint),
+            ],
+        }
+    }
+
+    /// Compare two quads according to the desired sort order.
+    ///
+    /// This is not a [`PartialOrd`] implementation so that we don't have to follow the `Eq`
+    /// consistency rules, which would be either weird (`Eq` ignoring `indices` which are the actual
+    /// data we carry) or inefficient (comparing `indices` even though we don’t need to).
+    #[inline(always)]
+    fn cmp(&self, other: &Self) -> Ordering {
+        assume_no_nan_cmp(self.order[0], other.order[0]).then_with(|| {
+            assume_no_nan_cmp(self.order[1], other.order[1])
+                .then_with(|| assume_no_nan_cmp(self.order[2], other.order[2]))
+        })
+    }
+
+    #[inline(always)]
+    fn min_max_on_axis<V: Vertex>(&self, vertices: &[V], direction: Face6) -> (PosCoord, PosCoord) {
+        // We only need to look at one of the two triangles,
+        // because they have the same bounding rectangle.
+        let [i0, i1, i2, ..] = self.indices;
+        // This is unrolled because map()ing it might end up not inlining it, which would be very bad.
+        let p0 = vertices[i0.to_slice_index()].position();
+        let p1 = vertices[i1.to_slice_index()].position();
+        let p2 = vertices[i2.to_slice_index()].position();
+        let c0 = direction.dot(p0.to_vector());
+        let c1 = direction.dot(p1.to_vector());
+        let c2 = direction.dot(p2.to_vector());
+        (c0.min(c1).min(c2), c0.max(c1).max(c2))
+    }
+}
+
 /// Compute quad midpoint from quad vertices, for depth sorting.
 ///
 /// (The midpoint isn’t actually very meaningful to depth sorting, but it’s cheap to compute and,
 /// AFAIK, correct in all the cases we currently care about.)
 #[inline(always)] // the very hottest of inner loop code
-fn midpoint<M: MeshTypes, Ix: IndexInt>(vertices: &[M::Vertex], indices: [Ix; 6]) -> Position {
+fn midpoint<V: Vertex, Ix: IndexInt>(vertices: &[V], indices: [Ix; 6]) -> Position {
     // We only need to look at one of the two triangles,
     // because they have the same bounding rectangle.
     let [i0, i1, i2, ..] = indices;
@@ -585,25 +627,6 @@ fn midpoint<M: MeshTypes, Ix: IndexInt>(vertices: &[M::Vertex], indices: [Ix; 6]
     let p2 = vertices[i2.to_slice_index()].position();
     // TODO: consider deleting the * 0.5 and scaling the view position by * 2.0 instead
     (p0.max(p1).max(p2) + p0.min(p1).min(p2).to_vector()) * 0.5
-}
-
-#[inline(always)]
-fn min_max_on_axis<M: MeshTypes, Ix: IndexInt>(
-    vertices: &[M::Vertex],
-    indices: [Ix; 6],
-    direction: Face6,
-) -> (PosCoord, PosCoord) {
-    // We only need to look at one of the two triangles,
-    // because they have the same bounding rectangle.
-    let [i0, i1, i2, ..] = indices;
-    // This is unrolled because map()ing it might end up not inlining it, which would be very bad.
-    let p0 = vertices[i0.to_slice_index()].position();
-    let p1 = vertices[i1.to_slice_index()].position();
-    let p2 = vertices[i2.to_slice_index()].position();
-    let c0 = direction.dot(p0.to_vector());
-    let c1 = direction.dot(p1.to_vector());
-    let c2 = direction.dot(p2.to_vector());
-    (c0.min(c1).min(c2), c0.max(c1).max(c2))
 }
 
 /// `storage.extend(items)` plus reporting the added range of items
@@ -621,11 +644,11 @@ where
 }
 
 #[inline]
-fn assume_no_nan_cmp(a: f32, b: f32) -> core::cmp::Ordering {
+fn assume_no_nan_cmp(a: f32, b: f32) -> Ordering {
     // `unwrap_or()` because we expect a complete lack of NaNs, and if there are any, more things
     // are going to be broken than just this sort (so we don't need to detect it here by panicking).
     // Not having any panic branch improves the performance of the sort.
-    PartialOrd::partial_cmp(&a, &b).unwrap_or(core::cmp::Ordering::Equal)
+    PartialOrd::partial_cmp(&a, &b).unwrap_or(Ordering::Equal)
 }
 
 /// This is used for dynamic depth sorting as the “depth” to sort by, because it is more efficient
