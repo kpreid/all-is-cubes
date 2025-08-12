@@ -79,16 +79,23 @@ In order to resolve various design problems interfering with development, the `a
     - `UniverseTemplate::build()` now returns `Box<Universe>` instead of `Universe`.
 
 - `all-is-cubes-mesh` library:
+    - Depth sorting of transparent meshes has been near-completely redesigned to be more correct and more efficient.
+      
+      - All depth sorting is now lazy.
+        This reduces the immediate cost of constructing a `SpaceMesh`, since it does not need to be sorted for a particular view point unless and until that view is needed.
+        You must now call `SpaceMesh::depth_sort_for_view()` for all rendering of transparent triangles, not just those cases where the view point is inside the mesh.
+      - `DepthOrdering` is now a `struct`, and the variants `DepthOrdering::{Any, Within}` have been replaced with constants.
+        Additionally, there are now fewer distinct `DepthOrdering`s, reducing the amount of index data required for transparent meshes.
+      - The return type of `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` has changed from `Option<Aab>` to `Aabbs`.
+      - The return type of `depth_sort_for_view()` functions has changed from `bool` to a new `struct DepthSortResult` (which contains that boolean).
+      - `DepthOrdering::from_view_direction()` is now called `from_view_of_aabb()` and takes a viewpoint and bounding box instead of only a view direction.
+      - `dynamic::RenderDataUpdate`’s `indices_only` field now specifies the range of indices to update, allowing you to copy less data.
+
+
     - Renamed `GfxVertex` to `Vertex`.
     - Vertex position coordinates are now conveyed as `f32` (you may use the new type alias `PosCoord`) instead of `f64`.
       (This will not reduce the precision of any mesh of reasonable size, because vertex positions are relative to the bounds of the individual mesh.)
       Furthermore, their coordinate system marker type is now `MeshRel` instead of `Cube`, indicating that the coordinate system origin for a mesh is not the same as that of the `Space` it was created from.
-    - The return type of `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` has changed from `Option<Aab>` to `Aabbs`.
-    - The return type of `depth_sort_for_view()` functions has changed from `bool` to a new `struct DepthSortInfo` (which contains that boolean).
-    - `DepthOrdering` is now a `struct`, and the variants `DepthOrdering::{Any, Within}` have been replaced with constants.
-      Additionally, there are now fewer distinct `DepthOrdering`s, reducing the amount of index data required for transparent meshes.
-    - `DepthOrdering::from_view_direction()` is now called `from_view_of_aabb()` and takes a viewpoint and bounding box instead of only a view direction.
-    - `dynamic::RenderDataUpdate`’s `indices_only` field now specifies the range of indices to update, allowing you to copy less data.
 
 - `all-is-cubes-render` library:
     - `HeadlessRenderer::update()` is no longer async.

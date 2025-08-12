@@ -289,7 +289,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     pub(crate) fn depth_sort_for_view(
         &mut self,
         ordering: DepthOrdering,
-        view_position: FreePoint,
+        absolute_view_position: FreePoint,
     ) -> crate::DepthSortResult {
         // The mesh coordinates are in chunk-relative coordinates,
         // but the incoming view position is in world coordinates,
@@ -297,7 +297,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         let relative_view_position: Position = self
             .mesh_origin()
             .inverse()
-            .transform_point3d(&view_position)
+            .transform_point3d(&absolute_view_position)
             .to_f32();
         self.mesh
             .depth_sort_for_view(ordering, relative_view_position)

@@ -119,19 +119,6 @@ impl DepthOrdering {
         }))
     }
 
-    /// Returns whether this [`DepthOrdering`] makes use of dynamic sorting.
-    ///
-    /// * `true`: You need to call [`SpaceMesh::depth_sort_for_view()`] when using this ordering.
-    /// * `false`: You do not.
-    //--
-    // From an implementation perspective: this function must return `false` only if
-    // `sort_and_store_transparent_indices()` produces an ordering which is valid for all
-    // viewpoints that fall into this `DepthOrdering`. Otherwise, it returns `true` (but the
-    // specific mesh may not actually have anything to sort in this ordering).
-    pub fn needs_dynamic_sorting(self) -> bool {
-        self.within_on_axes() > 0
-    }
-
     /// Counts how many axes have the viewpoint within the bounding box when projected on that axis.
     pub(crate) fn within_on_axes(self) -> u8 {
         let Self(Vector3D { x, y, z, .. }) = self;
@@ -293,6 +280,11 @@ pub struct DepthSortInfo {
     /// All else being equal, it is better if this number is larger for a given `quads_sorted`,
     /// since the cost of sorting grows faster than linear.
     pub(crate) groups_sorted: usize,
+
+    /// Number of lazy “static” sorting operations performed.
+    /// These use a different comparison function and are only performed once per mesh per
+    /// [`DepthOrdering`].
+    pub(crate) static_groups_sorted: usize,
 }
 
 impl DepthSortResult {
@@ -306,6 +298,7 @@ impl DepthSortInfo {
     const DEFAULT: Self = Self {
         quads_sorted: 0,
         groups_sorted: 0,
+        static_groups_sorted: 0,
     };
 }
 
@@ -320,9 +313,11 @@ impl ops::AddAssign for DepthSortInfo {
         let Self {
             quads_sorted,
             groups_sorted,
+            static_groups_sorted,
         } = self;
         *quads_sorted += rhs.quads_sorted;
         *groups_sorted += rhs.groups_sorted;
+        *static_groups_sorted += rhs.static_groups_sorted;
     }
 }
 
@@ -331,13 +326,12 @@ impl ops::AddAssign for DepthSortInfo {
 // TODO: We have two different implementations of depth sorting, for different purposes,
 // that have gratuitous differences. Bring them closer together for clarity.
 
-/// Called by `SpaceMesh::store_indices_and_finish_compute()` to perform the “static”
-/// depth sorting — that is, the depth sorting which is done once when the mesh is created.
+/// Called by `SpaceMesh::store_indices_and_finish_compute()` to cull and store the indices of
+/// transparent triangles in preparation for depth sorting them later.
 ///
-/// The relevant vertices must have already been stored `vertices`, and this function will
-/// store sorted copies of `transparent_indices` and update `transparent_ranges` to include them.
-pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
-    vertices: &[M::Vertex],
+/// Reads the contents of `transparent_indices`, apppends culled copies to `indices`, and updates
+/// `transparent_meta` to specify where the copies are located.
+pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
     indices: &mut IndexVec,
     transparent_meta: &mut [TransparentMeta; DepthOrdering::COUNT],
     transparent_indices: FaceMap<Vec<I>>,
@@ -363,125 +357,136 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
         return;
     }
 
-    // Copy unsorted indices for the only case where the required ordering is fully dynamic.
-    // and therefore we cannot usefully sort it now. (We don’t just skip the sorting because
-    // that would also waste time computing `sortable_quads`.)
-    {
-        let index_range_for_within =
-            extend_giving_range(indices, transparent_indices.values().flatten().copied());
-        transparent_meta[DepthOrdering::WITHIN.to_index()] = TransparentMeta {
-            dynamic_sub_ranges: SmallVec::from([0..index_range_for_within.len()]),
-            depth_sort_validity: Aabb::EMPTY,
-            index_range: index_range_for_within.clone(),
-        };
-    }
-
-    // Figure capacity for temporary storage. We need to be able to store up to 5 out of 6 faces.
-    let iter_quad_counts = transparent_indices.values().map(|vec| vec.len() / 6);
-    let capacity: usize =
-        iter_quad_counts.clone().sum::<usize>() - iter_quad_counts.clone().max().unwrap_or(0);
-
-    // Reused in loop to hold the ordering's quads while we sort them.
-    let mut sortable_quads: Vec<OrderedQuad<I>> = Vec::with_capacity(capacity);
-
-    // Perform sorting by each possible ordering.
+    // Prepare un-sorted, but culled, indices for each direction.
     for ordering in DepthOrdering::exhaust() {
+        let meta = &mut transparent_meta[ordering.to_index()];
         if ordering == DepthOrdering::WITHIN {
-            // These were already copied and do not benefit from this sorting.
-            continue;
+            // `WITHIN` is slightly different: nothing is culled, and we already know the
+            // dynamic_sub_ranges and don’t have to defer to the lazy `static_sort()`.
+            // TODO: We can improve slightly by culling faces that are on the outside surface
+            // of the bounding box, which can never be visible from within.
+
+            let index_range =
+                extend_giving_range(indices, transparent_indices.values().flatten().copied());
+            *meta = TransparentMeta {
+                // Always dynamically sort everything.
+                dynamic_sub_ranges: SmallVec::from([0..index_range.len()]),
+                // Haven't performed any sorting yet, so there is no region of validity.
+                depth_sort_validity: Aabb::EMPTY,
+                index_range,
+            };
+        } else {
+            // Cull and copy indices into the main array.
+            let index_range = extend_giving_range(
+                indices,
+                transparent_indices
+                    .iter()
+                    .filter(|&(face, _)| ordering.face_visible_from_here(face))
+                    .flat_map(|(_, index_vec)| index_vec.iter().copied()),
+            );
+            *meta = TransparentMeta {
+                // Haven't performed any sorting yet, so there is no region of validity.
+                depth_sort_validity: Aabb::EMPTY,
+                // dynamic_sub_ranges will be computed when the sort is performed.
+                dynamic_sub_ranges: SmallVec::new(),
+                index_range,
+            };
         }
-
-        // This inverse() is because ... TODO: The old explanation was wrong but I'm not sure
-        // what one is right
-        let basis = ordering.sort_key_rotation().inverse().to_basis();
-
-        // Fill sortable_quads with quads -- *only* the ones that might be visible.
-        sortable_quads.clear();
-        sortable_quads.extend(
-            transparent_indices
-                .iter()
-                .filter(|&(face, _)| ordering.face_visible_from_here(face))
-                .flat_map(|(_, index_vec)| {
-                    expect_quads(index_vec.as_chunks::<6>())
-                        .iter()
-                        .map(|&indices_of_quad| OrderedQuad::new(indices_of_quad, vertices, basis))
-                }),
-        );
-
-        // Sort the vertices, unless we are going to do fully dynamic sorting, in which case this
-        // sort would be wasted.
-        if ordering.within_on_axes() < 3 {
-            // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
-            sortable_quads.sort_by(OrderedQuad::cmp);
-        }
-
-        // Copy the sorted indices into the main array.
-        let index_range =
-            extend_giving_range(indices, sortable_quads.iter().flat_map(|tri| tri.indices));
-
-        // Figure out what ranges of this sorting result need to be sorted dynamically,
-        // and store them in `dynamic_sub_ranges`.
-        let mut dynamic_sub_ranges = SmallVec::new();
-        match ordering.within_on_axes() {
-            _ if index_range.is_empty() => {
-                // There are no quads to sort, so don't generate any range (that would be empty).
-                // It is an invariant of `TransparentMeta` that `dynamic_sub_ranges` contains no
-                // empty ranges.
-            }
-            0 => {
-                // The static sort we have already done suffices.
-            }
-            3 => {
-                // Everything must be sorted dynamically.
-                dynamic_sub_ranges.push(0..index_range.len());
-            }
-            1 | 2 => {
-                // Find non-overlapping ranges along the non-within axis, because we only need to.
-                // do dynamic sort of things that overlap in that way.
-                //
-                // TODO: if within_on_axes = 1, then we have *two* non-within axes to work with.
-                // We could take advantage of that by grouping by rectangles instead of on a line.
-
-                let projection = basis.x;
-                debug_assert_ne!(ordering.0[projection.axis()], Rel::Within);
-
-                let mut quad_group = 0..1; // indices into sortable_quads, not single indices!
-                let mut group_upper_bound = sortable_quads[0].min_max_on_axis(vertices, basis.x).1;
-                for (i, quad) in sortable_quads[1..].iter().enumerate() {
-                    let (qmin, qmax) = quad.min_max_on_axis(vertices, basis.x);
-                    if qmin < group_upper_bound {
-                        // Add this quad to the group because it overlaps on the axis
-                        quad_group.end = i + 1;
-                        group_upper_bound = qmax;
-                    } else {
-                        // Quad does not overlap; finish the current group and start a new one.
-                        if quad_group.len() > 1 {
-                            dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
-                        }
-                        quad_group = i..(i + 1);
-                        group_upper_bound = qmax;
-                    }
-                }
-                // Write the last group
-                if quad_group.len() > 1 {
-                    dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
-                }
-            }
-            4.. => unreachable!(),
-        }
-
-        transparent_meta[ordering.to_index()] = TransparentMeta {
-            depth_sort_validity: if ordering.needs_dynamic_sorting() {
-                // Haven't performed any dynamic sorting yet, so there is no region of validity.
-                Aabb::EMPTY
-            } else {
-                // Never need dynamic sorting.
-                Aabb::EVERYWHERE
-            },
-            dynamic_sub_ranges,
-            index_range,
-        };
     }
+}
+
+/// Sort `indices` according to `ordering`, and determine which portions, if any,
+/// need to be “dynamically” sorted later according to the exact view position; then write that
+/// information into `meta`.
+fn static_sort<V: Vertex, Ix: IndexInt>(
+    ordering: DepthOrdering,
+    vertices: &[V],
+    indices: &mut [Ix],
+    meta: &mut TransparentMeta,
+) {
+    debug_assert!(meta.dynamic_sub_ranges.is_empty());
+
+    // This inverse() is because ... TODO: The old explanation was wrong but I'm not sure
+    // what one is right
+    let basis = ordering.sort_key_rotation().inverse().to_basis();
+
+    let mut sortable_quads: Vec<OrderedQuad<Ix>> = Vec::with_capacity(indices.len() / 6);
+    sortable_quads.extend(
+        expect_quads(indices.as_chunks::<6>())
+            .iter()
+            .map(|&indices_of_quad| OrderedQuad::new(indices_of_quad, vertices, basis)),
+    );
+
+    // Sort the vertices.
+    // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
+    sortable_quads.sort_by(OrderedQuad::cmp);
+
+    // Copy the result of the sort back into the index slice.
+    for (src, dst) in itertools::zip_eq(&sortable_quads, expect_quads(indices.as_chunks_mut::<6>()))
+    {
+        *dst = src.indices;
+    }
+
+    // Figure out what ranges of this sorting result need to be sorted dynamically,
+    // store them in `dynamic_sub_ranges`,
+    // and update `depth_sort_validity` to reflect the new state.
+    match ordering.within_on_axes() {
+        _ if indices.is_empty() => {
+            // There are no quads to sort, so don't generate any range (that would be empty).
+            // It is an invariant of `TransparentMeta` that `dynamic_sub_ranges` contains no
+            // empty ranges.
+            meta.depth_sort_validity = Aabb::EVERYWHERE;
+        }
+        0 => {
+            // The static sort we have already done suffices.
+            meta.depth_sort_validity = Aabb::EVERYWHERE;
+        }
+        3 => {
+            // Everything must be sorted dynamically.
+            unreachable!("should have skipped the static sort for WITHIN");
+        }
+        1 | 2 => {
+            // Find non-overlapping ranges along the non-within axis, because we only need to.
+            // do dynamic sort of things that overlap in that way.
+            //
+            // TODO: if within_on_axes = 1, then we have *two* non-within axes to work with.
+            // We could take advantage of that by grouping by rectangles instead of on a line.
+
+            let projection = basis.x;
+            debug_assert_ne!(ordering.0[projection.axis()], Rel::Within);
+
+            let mut quad_group = 0..1; // indices into sortable_quads, not single indices!
+            let mut group_upper_bound = sortable_quads[0].min_max_on_axis(vertices, basis.x).1;
+            for (i, quad) in sortable_quads[1..].iter().enumerate() {
+                let (qmin, qmax) = quad.min_max_on_axis(vertices, basis.x);
+                if qmin < group_upper_bound {
+                    // Add this quad to the group because it overlaps on the axis
+                    quad_group.end = i + 1;
+                    group_upper_bound = qmax;
+                } else {
+                    // Quad does not overlap; finish the current group and start a new one.
+                    if quad_group.len() > 1 {
+                        meta.dynamic_sub_ranges
+                            .push((quad_group.start * 6)..(quad_group.end * 6));
+                    }
+                    quad_group = i..(i + 1);
+                    group_upper_bound = qmax;
+                }
+            }
+            // Write the last group
+            if quad_group.len() > 1 {
+                meta.dynamic_sub_ranges
+                    .push((quad_group.start * 6)..(quad_group.end * 6));
+            }
+
+            // We have computed ranges but we still need to perform a dynamic sort.
+            meta.depth_sort_validity = Aabb::EMPTY;
+        }
+        4.. => unreachable!(),
+    }
+
+    // Ensure we have signaled initialization.
+    debug_assert!(!meta.needs_static_sort());
 }
 
 /// Sort the existing indices of `indices[range]` for exactly the given view position.
@@ -492,7 +497,8 @@ pub(crate) fn sort_and_store_transparent_indices<M: MeshTypes, I: IndexInt>(
 /// Returns information including whether there was any change in ordering.
 pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     vertices: &[M::Vertex],
-    indices: IndexSliceMut<'_>,
+    mut indices: IndexSliceMut<'_>,
+    ordering: DepthOrdering,
     view_position: Position,
     meta: &mut TransparentMeta,
 ) -> DepthSortResult {
@@ -503,6 +509,24 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         // Previous dynamic sort is still valid.
         // TODO: report this vs. other exit cases in info
         return DepthSortResult::NOTHING_CHANGED;
+    }
+
+    // Check if we need to do our initial “static” sort.
+    // If this has not been done, then `depth_sort_validity` is not initialized and we don't
+    // know what to sort.
+    let needs_static_sort = meta.needs_static_sort();
+    if needs_static_sort {
+        // let start_time = Instant::now();
+        match &mut indices {
+            IndexSliceMut::U16(indices) => static_sort(ordering, vertices, indices, meta),
+            IndexSliceMut::U32(indices) => static_sort(ordering, vertices, indices, meta),
+        }
+        // TODO: integrate this into DepthSortInfo instead
+        // log::trace!(
+        //     "static {ordering:?} sort took {time} and produced {ranges} ranges",
+        //     time = start_time.elapsed().refmt(&ConciseDebug),
+        //     ranges = meta.dynamic_sub_ranges.len(),
+        // );
     }
 
     #[inline(never)] // save our inlining budget for the *contents* of this function
@@ -547,21 +571,35 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         meta.depth_sort_validity = new_validity;
 
         DepthSortResult {
-            changed: Some(
-                (meta.index_range.start + meta.dynamic_sub_ranges[0].start)
-                    ..(meta.index_range.start + meta.dynamic_sub_ranges.last().unwrap().end),
-            ),
+            changed: if meta.dynamic_sub_ranges.is_empty() {
+                None
+            } else {
+                Some(
+                    (meta.index_range.start + meta.dynamic_sub_ranges[0].start)
+                        ..(meta.index_range.start + meta.dynamic_sub_ranges.last().unwrap().end),
+                )
+            },
             info: DepthSortInfo {
                 quads_sorted,
                 groups_sorted,
+                static_groups_sorted: 0,
             },
         }
     }
 
-    match indices {
+    let mut result = match indices {
         IndexSliceMut::U16(slice) => generic_sort::<M, u16>(slice, vertices, view_position, meta),
         IndexSliceMut::U32(slice) => generic_sort::<M, u32>(slice, vertices, view_position, meta),
+    };
+    if needs_static_sort {
+        // If we did a static sort, then all indices in the range changed,
+        // not just the ones the dynamic sort touched.
+        result.changed = Some(meta.index_range.clone());
+
+        result.info.quads_sorted += meta.index_range.len();
+        result.info.static_groups_sorted += 1;
     }
+    result
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -833,6 +871,7 @@ mod tests {
                     info: DepthSortInfo {
                         quads_sorted: 12,
                         groups_sorted: 1,
+                        static_groups_sorted: 0,
                     },
                 }
             } else {
@@ -841,6 +880,7 @@ mod tests {
                     info: DepthSortInfo {
                         quads_sorted: 0,
                         groups_sorted: 0,
+                        static_groups_sorted: 0,
                     },
                 }
             }

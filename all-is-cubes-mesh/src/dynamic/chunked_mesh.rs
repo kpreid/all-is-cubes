@@ -421,16 +421,15 @@ where
                 if let Entry::Occupied(chunk_mesh_oe) = &chunk_mesh_entry
                     && let chunk_mesh = chunk_mesh_oe.get()
                     && let lbb = chunk_mesh.mesh_local_bounding_box().transparent
-                    && let depth_ordering = DepthOrdering::from_view_of_aabb(
-                        chunk_mesh
-                            .mesh_origin()
-                            .inverse()
-                            .transform_point3d(&view_point),
-                        lbb,
-                    )
-                    // TODO: needs_dynamic_sorting is an over-approximation here; we should actually
-                    // ask “is the old sort still valid?” but there isn’t a function for that yet.
-                    && depth_ordering.needs_dynamic_sorting()
+                    && let relative_view_point = chunk_mesh
+                        .mesh_origin()
+                        .inverse()
+                        .transform_point3d(&view_point)
+                    && let depth_ordering =
+                        DepthOrdering::from_view_of_aabb(relative_view_point, lbb)
+                    && chunk_mesh
+                        .mesh()
+                        .needs_depth_sorting(depth_ordering, relative_view_point.to_f32())
                 {
                     chunk_todo.needs_depth_sort = Some(depth_ordering);
                 }
@@ -482,10 +481,23 @@ where
                 );
             let compute_end_depth_sort_start = time::Instant::now();
 
+            if actually_changed_mesh {
+                // If we rebuilt the mesh then we need a new depth sort,
+                // whether or not we planned on one.
+                state.chunk_todo.needs_depth_sort = Some(DepthOrdering::from_view_of_aabb(
+                    state
+                        .chunk_mesh
+                        .mesh_origin()
+                        .inverse()
+                        .transform_point3d(&view_point),
+                    state.chunk_mesh.mesh_local_bounding_box().transparent,
+                ));
+            }
+
             // Run depth sort, if needed.
             let mut actually_sorted_indices = None;
             let mut ran_depth_sort = false;
-            if let Some(ordering) = state.chunk_todo.needs_depth_sort.take() {
+            if let Some(ordering) = state.chunk_todo.needs_depth_sort {
                 ran_depth_sort = true;
                 let DepthSortResult { changed, info } =
                     state.chunk_mesh.depth_sort_for_view(ordering, view_point);
@@ -733,6 +745,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                 DepthSortInfo {
                     quads_sorted,
                     groups_sorted,
+                    static_groups_sorted,
                 },
             depth_sort_times,
             block_updates,
@@ -747,7 +760,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                 Chunk scan     {chunk_scan_time}
                       mesh gen {chunk_mesh_generation_times}
                       inst gen {chunk_instance_generation_times}
-                      Z sort   {depth_sort_times} ({quads_sorted:5} quads in {groups_sorted:2} groups)
+                      Z sort   {depth_sort_times} ({quads_sorted:5} quads grouped in {groups_sorted:2} dyn + {static_groups_sorted:2} static)
                       upload   {chunk_mesh_callback_times}
                 Mem: {chunk_mib} MiB for {chunk_count} chunks\
             "},
@@ -760,6 +773,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             chunk_mesh_callback_times = chunk_mesh_callback_times,
             quads_sorted = quads_sorted,
             groups_sorted = groups_sorted,
+            static_groups_sorted = static_groups_sorted,
             depth_sort_times = depth_sort_times,
             chunk_mib = chunk_total_cpu_byte_size / (1024 * 1024),
             chunk_count = chunk_count,

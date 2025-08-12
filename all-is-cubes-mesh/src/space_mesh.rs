@@ -42,7 +42,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// Computes a triangle mesh of a [`Space`].
     ///
     /// Shorthand for
-    /// <code>[SpaceMesh::default()].[compute](SpaceMesh::compute)(space, bounds, block_meshes)</code>.
+    /// <code>[SpaceMesh::default()].[compute][SpaceMesh::compute](space, bounds, options, block_meshes)</code>.
     #[inline]
     pub fn new<'p, P>(
         space: &Space,
@@ -346,8 +346,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 py: IndexVec::U16(py),
                 pz: IndexVec::U16(pz),
             } => {
-                depth_sorting::sort_and_store_transparent_indices::<M, u16>(
-                    &self.vertices.0,
+                depth_sorting::store_transparent_indices::<M, u16>(
                     &mut self.indices,
                     &mut self.meta.transparent,
                     FaceMap { nx, ny, nz, px, py, pz },
@@ -361,8 +360,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 py: IndexVec::U32(py),
                 pz: IndexVec::U32(pz),
             } => {
-                depth_sorting::sort_and_store_transparent_indices::<M, u32>(
-                    &self.vertices.0,
+                depth_sorting::store_transparent_indices::<M, u32>(
                     &mut self.indices,
                     &mut self.meta.transparent,
                     FaceMap { nx, ny, nz, px, py, pz },
@@ -372,8 +370,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 // Mixed type index vectors.
                 // This should only come up in very rare cases where the mesh is just big enough
                 // to have switched to u32 indices while writing the very last transparent block.
-                depth_sorting::sort_and_store_transparent_indices::<M, u32>(
-                    &self.vertices.0,
+                depth_sorting::store_transparent_indices::<M, u32>(
                     &mut self.indices,
                     &mut self.meta.transparent,
                     transparent_indices.map(|_, index_vec| index_vec.into_u32s()),
@@ -387,18 +384,18 @@ impl<M: MeshTypes> SpaceMesh<M> {
 
     /// Sort the existing indices of
     /// [`self.transparent_range(ordering)`][MeshMeta::transparent_range]
-    /// as appropriate for the given `view_position`.
+    /// as appropriate for the given `view_position`, so that transparent surfaces will be properly
+    /// rendered back-to-front.
     ///
     /// `view_position` must be in the same coordinate system as `self`’s vertices ([`MeshRel`]).
-    ///
-    /// The amount of sorting performed, if any, depends on the specific value of `ordering`.
-    /// Some orderings are fully static and do not require any sorting; calling this function
-    /// does nothing in those cases.
-    ///
     /// The resulting ordering is unspecified if `view_position` is not a position for which
     /// [`DepthOrdering::from_view_of_aabb()`] would return `ordering`.
     ///
-    /// This is intended to be cheap enough to do every frame.
+    /// The amount of sorting performed, if any, depends on the specific value of `ordering`.
+    /// Some orderings merely require a single sort that is performed lazily; others must be sorted
+    /// whenever the `view_position` moves.
+    /// You may call [`self.needs_depth_sorting()`][MeshMeta::needs_depth_sorting] to efficiently
+    /// check whether this mesh needs sorting, without needing `&mut` access.
     ///
     /// Returns the changed range of indices, if any, and diagnostic information.
     //---
@@ -413,6 +410,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
         depth_sorting::dynamic_depth_sort_for_view::<M>(
             &self.vertices.0,
             self.indices.as_mut_slice(range),
+            ordering,
             view_position,
             &mut self.meta.transparent[ordering.to_index()],
         )
@@ -775,12 +773,21 @@ impl<M: MeshTypes> MeshMeta<M> {
     /// than 0 and 1 which therefore must be drawn with consideration for ordering.
     ///
     /// There are multiple such ranges providing different orderings depending on the viewpoint.
-    /// Certain orderings additionally require dynamic (viewpoint-dependent, frame-by-frame)
-    /// sorting, which you should perform using [`SpaceMesh::depth_sort_for_view()`] before drawing.
-    /// [`DepthOrdering::needs_dynamic_sorting()`] identifies whether this is necessary.
+    /// Certain orderings require dynamic (viewpoint-dependent, frame-by-frame) sorting, and others
+    /// are sorted lazily when needed.
+    /// In either case, you should call [`SpaceMesh::depth_sort_for_view()`] before drawing.
+    /// [`needs_depth_sorting()`][Self::needs_depth_sorting] reports whether this is necessary.
     #[inline]
     pub fn transparent_range(&self, ordering: DepthOrdering) -> Range<usize> {
         self.transparent[ordering.to_index()].index_range.clone()
+    }
+
+    /// Returns whether [`SpaceMesh::depth_sort_for_view()`] would have anything to do if called
+    /// with the same parameters.
+    #[inline]
+    pub fn needs_depth_sorting(&self, ordering: DepthOrdering, view_position: Position) -> bool {
+        let tm = &self.transparent[ordering.to_index()];
+        tm.needs_static_sort() || !tm.depth_sort_validity.contains(view_position)
     }
 
     /// Overwrite `self` with [`MeshMeta::default()`].
@@ -888,18 +895,26 @@ pub(crate) struct TransparentMeta {
     /// is still valid and does not need to be redone.
     ///
     /// This field is updated by, and used as an early exit within, [`crate::depth_sorting`].
-    /// It ignores the bounds of validity of the [`DepthOrdering`] this [`TransparentMeta`] is for;
+    /// It does not necessarily confine itself within the bounds of validity of the
+    /// [`DepthOrdering`] this [`TransparentMeta`] is for;
     /// those checks are to be done seperately before even looking at this struct.
+    ///
+    /// If this is equal to [`Aabb::EMPTY`] and `dynamic_sub_ranges` is empty,
+    /// then no sorting at all has yet been done;
+    /// in particular, the “static” sort must be performed to set up the coarse ordering and
+    /// initialize `dynamic_sub_ranges`.
     pub(crate) depth_sort_validity: Aabb,
 
     /// Ranges of mesh indices, within (relative to) `self.index_range`,
     /// which need to be individually sorted whenever the viewpoint moves out of
     /// `self.depth_sort_validity`.
     ///
-    /// * Each range is non-empty.
-    /// * `dynamic_sub_ranges` as whole may be empty, indicating that dynamic
-    ///   sorting is never needed (e.g. because there is only one transparent box in the mesh).
-    /// * The ranges are non-overlapping and in ascending order.
+    /// * The ranges are always non-overlapping and in ascending order.
+    /// * Each range is always non-empty.
+    /// * `dynamic_sub_ranges` as a whole may be empty, indicating either:
+    ///   * it has not yet been computed (and `depth_sort_validity == Aabb::EMPTY`), or
+    ///   * dynamic sorting is never needed (e.g. because there is only one transparent box in
+    ///     the mesh).
     pub(crate) dynamic_sub_ranges: SmallVec<[Range<usize>; 1]>,
 }
 
@@ -910,6 +925,10 @@ impl TransparentMeta {
         depth_sort_validity: Aabb::EVERYWHERE,
         dynamic_sub_ranges: SmallVec::new_const(),
     };
+
+    pub(crate) fn needs_static_sort(&self) -> bool {
+        self.depth_sort_validity == Aabb::EMPTY && self.dynamic_sub_ranges.is_empty()
+    }
 
     #[allow(dead_code, reason = "used conditionally")]
     fn consistency_check(&self) {
@@ -941,12 +960,17 @@ impl fmt::Debug for TransparentMeta {
         } = self;
         // Compact formatting that will end up on one line if the validity is trivial
         write!(f, "{index_range:?} ")?;
-        if dynamic_sub_ranges.len() <= 1 {
-            write!(f, "{dynamic_sub_ranges:?}")?;
+
+        if self.needs_static_sort() {
+            write!(f, "unsorted")?;
         } else {
-            write!(f, "{dynamic_sub_ranges:#?}")?;
+            if dynamic_sub_ranges.len() <= 1 {
+                write!(f, "{dynamic_sub_ranges:?}")?;
+            } else {
+                write!(f, "{dynamic_sub_ranges:#?}")?;
+            }
+            write!(f, " sorted for {depth_sort_validity:?}")?;
         }
-        write!(f, " sorted for {depth_sort_validity:?}")?;
         Ok(())
     }
 }
@@ -1131,11 +1155,23 @@ mod tests {
 
     #[test]
     fn debug_transparent() {
-        let (_, _, mesh) = mesh_blocks_and_space(
+        let (_, _, mut mesh) = mesh_blocks_and_space(
             &Space::builder(GridAab::ORIGIN_CUBE)
                 .filled_with(block::from_color!(1.0, 1.0, 1.0, 0.5))
                 .build(),
         );
+        // Make two depth orderings sorted instead of unsorted, to exercise "static" (no subranges)
+        // and "dynamic" (has subranges) cases.
+        for view_point in [Position::splat(-1.), Position::new(-1., -1., 0.5)] {
+            // TODO: this needing cast_unit() is an API deficiency
+            _ = mesh.depth_sort_for_view(
+                DepthOrdering::from_view_of_aabb(
+                    view_point.to_f64().cast_unit(),
+                    mesh.bounding_box.transparent,
+                ),
+                view_point,
+            );
+        }
 
         println!("{mesh:#?}");
 
@@ -1170,73 +1206,73 @@ mod tests {
                         { p: (+1.000, +0.000, +1.000) n: PZ c: Solid(Rgba(1.0, 1.0, 1.0, 0.5)) },
                     ],
                     indices: U16[
-                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11, 
-                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
                          8,  9, 10, 10,  9, 11,    4,  5,  6,  6,  5,  7,    0,  1,  2,  2,  1,  3, 
                          8,  9, 10, 10,  9, 11,   20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7, 
-                         0,  1,  2,  2,  1,  3,   20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7, 
-                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,   16, 17, 18, 18, 17, 19, 
-                         8,  9, 10, 10,  9, 11,    0,  1,  2,  2,  1,  3,    8,  9, 10, 10,  9, 11, 
-                         4,  5,  6,  6,  5,  7,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
-                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,   16, 17, 18, 18, 17, 19, 
-                        20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3,    8,  9, 10, 10,  9, 11, 
-                        16, 17, 18, 18, 17, 19,    0,  1,  2,  2,  1,  3,    8,  9, 10, 10,  9, 11, 
-                        20, 21, 22, 22, 21, 23,   16, 17, 18, 18, 17, 19,    0,  1,  2,  2,  1,  3, 
-                        20, 21, 22, 22, 21, 23,   16, 17, 18, 18, 17, 19,    0,  1,  2,  2,  1,  3, 
-                         0,  1,  2,  2,  1,  3,   12, 13, 14, 14, 13, 15,    8,  9, 10, 10,  9, 11, 
-                         4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11,    0,  1,  2,  2,  1,  3, 
-                        12, 13, 14, 14, 13, 15,   20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7, 
-                         0,  1,  2,  2,  1,  3,   12, 13, 14, 14, 13, 15,   20, 21, 22, 22, 21, 23, 
-                         4,  5,  6,  6,  5,  7,    4,  5,  6,  6,  5,  7,    0,  1,  2,  2,  1,  3, 
-                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,    8,  9, 10, 10,  9, 11, 
-                         4,  5,  6,  6,  5,  7,    0,  1,  2,  2,  1,  3,   12, 13, 14, 14, 13, 15, 
+                         0,  1,  2,  2,  1,  3,    0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7, 
+                        20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7, 
+                         8,  9, 10, 10,  9, 11,   16, 17, 18, 18, 17, 19,    0,  1,  2,  2,  1,  3, 
+                         4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11,   16, 17, 18, 18, 17, 19, 
+                        20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7, 
                         16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3, 
-                        12, 13, 14, 14, 13, 15,    8,  9, 10, 10,  9, 11,   16, 17, 18, 18, 17, 19, 
-                         8,  9, 10, 10,  9, 11,    0,  1,  2,  2,  1,  3,   12, 13, 14, 14, 13, 15, 
-                        20, 21, 22, 22, 21, 23,   16, 17, 18, 18, 17, 19,    0,  1,  2,  2,  1,  3, 
-                        12, 13, 14, 14, 13, 15,   20, 21, 22, 22, 21, 23,   16, 17, 18, 18, 17, 19, 
-                         8,  9, 10, 10,  9, 11,    4,  5,  6,  6,  5,  7,   12, 13, 14, 14, 13, 15, 
-                         8,  9, 10, 10,  9, 11,   20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7, 
-                        12, 13, 14, 14, 13, 15,   20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7, 
-                        12, 13, 14, 14, 13, 15,    4,  5,  6,  6,  5,  7,   16, 17, 18, 18, 17, 19, 
-                         8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15,    8,  9, 10, 10,  9, 11, 
-                         4,  5,  6,  6,  5,  7,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
-                        12, 13, 14, 14, 13, 15,    4,  5,  6,  6,  5,  7,   16, 17, 18, 18, 17, 19, 
-                        20, 21, 22, 22, 21, 23,   12, 13, 14, 14, 13, 15,    8,  9, 10, 10,  9, 11, 
-                        16, 17, 18, 18, 17, 19,   12, 13, 14, 14, 13, 15,    8,  9, 10, 10,  9, 11, 
-                        20, 21, 22, 22, 21, 23,   16, 17, 18, 18, 17, 19,   12, 13, 14, 14, 13, 15, 
-                        20, 21, 22, 22, 21, 23,   16, 17, 18, 18, 17, 19,   12, 13, 14, 14, 13, 15, 
+                         8,  9, 10, 10,  9, 11,   16, 17, 18, 18, 17, 19,    0,  1,  2,  2,  1,  3, 
+                         8,  9, 10, 10,  9, 11,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
+                         0,  1,  2,  2,  1,  3,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11, 
+                        12, 13, 14, 14, 13, 15,    0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7, 
+                         8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15,   20, 21, 22, 22, 21, 23, 
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,   12, 13, 14, 14, 13, 15, 
+                        20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7, 
+                         8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19, 
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
+                         0,  1,  2,  2,  1,  3,    4,  5,  6,  6,  5,  7,   12, 13, 14, 14, 13, 15, 
+                        16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3, 
+                         8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19, 
+                         0,  1,  2,  2,  1,  3,    8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15, 
+                        16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23,    0,  1,  2,  2,  1,  3, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
+                         4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15, 
+                         4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15, 
+                        20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7,   12, 13, 14, 14, 13, 15, 
+                        20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7,    8,  9, 10, 10,  9, 11, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,    4,  5,  6,  6,  5,  7, 
+                         8,  9, 10, 10,  9, 11,   12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19, 
+                        20, 21, 22, 22, 21, 23,    4,  5,  6,  6,  5,  7,   12, 13, 14, 14, 13, 15, 
+                        16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23,    8,  9, 10, 10,  9, 11, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,    8,  9, 10, 10,  9, 11, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
+                        12, 13, 14, 14, 13, 15,   16, 17, 18, 18, 17, 19,   20, 21, 22, 22, 21, 23, 
                     ],
                     meta: MeshMeta {
                         opaque_range: 0..0,
                         transparent: {
-                            −−−: 36..54 [] sorted for EVERYWHERE,
-                            −−W: 54..78 [0..12] sorted for EMPTY,
-                            −−+: 78..96 [] sorted for EVERYWHERE,
-                            −W−: 96..120 [0..12] sorted for EMPTY,
-                            −WW: 120..150 [0..18] sorted for EMPTY,
-                            −W+: 150..174 [0..12] sorted for EMPTY,
-                            −+−: 174..192 [] sorted for EVERYWHERE,
-                            −+W: 192..216 [0..12] sorted for EMPTY,
-                            −++: 216..234 [] sorted for EVERYWHERE,
-                            W−−: 234..258 [0..12] sorted for EMPTY,
-                            W−W: 258..288 [0..18] sorted for EMPTY,
-                            W−+: 288..312 [0..12] sorted for EMPTY,
-                            WW−: 312..342 [0..18] sorted for EMPTY,
-                            WWW: 0..36 [0..36] sorted for EMPTY,
-                            WW+: 342..372 [0..18] sorted for EMPTY,
-                            W+−: 372..396 [0..12] sorted for EMPTY,
-                            W+W: 396..426 [0..18] sorted for EMPTY,
-                            W++: 426..450 [0..12] sorted for EMPTY,
-                            +−−: 450..468 [] sorted for EVERYWHERE,
-                            +−W: 468..492 [0..12] sorted for EMPTY,
-                            +−+: 492..510 [] sorted for EVERYWHERE,
-                            +W−: 510..534 [0..12] sorted for EMPTY,
-                            +WW: 534..564 [0..18] sorted for EMPTY,
-                            +W+: 564..588 [0..12] sorted for EMPTY,
-                            ++−: 588..606 [] sorted for EVERYWHERE,
-                            ++W: 606..630 [0..12] sorted for EMPTY,
-                            +++: 630..648 [] sorted for EVERYWHERE,
+                            −−−: 0..18 [] sorted for EVERYWHERE,
+                            −−W: 18..42 [0..12] sorted for Aabb(-inf..=0.0, -inf..=0.0, 0.0..=1.0),
+                            −−+: 42..60 unsorted,
+                            −W−: 60..84 unsorted,
+                            −WW: 84..114 unsorted,
+                            −W+: 114..138 unsorted,
+                            −+−: 138..156 unsorted,
+                            −+W: 156..180 unsorted,
+                            −++: 180..198 unsorted,
+                            W−−: 198..222 unsorted,
+                            W−W: 222..252 unsorted,
+                            W−+: 252..276 unsorted,
+                            WW−: 276..306 unsorted,
+                            WWW: 306..342 [0..36] sorted for EMPTY,
+                            WW+: 342..372 unsorted,
+                            W+−: 372..396 unsorted,
+                            W+W: 396..426 unsorted,
+                            W++: 426..450 unsorted,
+                            +−−: 450..468 unsorted,
+                            +−W: 468..492 unsorted,
+                            +−+: 492..510 unsorted,
+                            +W−: 510..534 unsorted,
+                            +WW: 534..564 unsorted,
+                            +W+: 564..588 unsorted,
+                            ++−: 588..606 unsorted,
+                            ++W: 606..630 unsorted,
+                            +++: 630..648 unsorted,
                         },
                         textures_used: [],
                         bounding_box: Aabbs {
