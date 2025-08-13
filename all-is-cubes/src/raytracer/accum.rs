@@ -9,9 +9,6 @@ use crate::camera::GraphicsOptions;
 use crate::math::{Cube, Face7, Intensity, Rgb, Rgba, ZeroOne, rgb_const, zo32};
 use crate::space::SpaceBlockData;
 
-#[cfg(doc)]
-use crate::space::Space;
-
 // -------------------------------------------------------------------------------------------------
 
 /// Borrowed data which may be used to customize the result of raytracing.
@@ -90,10 +87,13 @@ pub struct Hit<'d, D> {
     pub position: Option<Position>,
 }
 
+/// Data about where a ray struck a voxel; part of [`Hit`].
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub struct Position {
     /// The cube in the [`Space`] containing the block whose surface was hit.
+    ///
+    /// [`Space`]: crate::space::Space
     pub cube: Cube,
     /// The voxel resolution of the block.
     pub resolution: Resolution,
