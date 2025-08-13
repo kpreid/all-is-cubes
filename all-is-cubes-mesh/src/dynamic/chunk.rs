@@ -7,9 +7,11 @@ use core::ops::{self, Range};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::euclid::{Point3D, Translation3D};
 use all_is_cubes::math::{
-    Aab, Cube, FreeCoordinate, FreePoint, GridCoordinate, LineVertex, Wireframe as _,
+    Aab, Cube, FreeCoordinate, FreePoint, GridCoordinate, LineVertex, Rgba, Wireframe as _,
+    colorize_lines, rgba_const,
 };
 use all_is_cubes::space::{BlockIndex, Space};
+use all_is_cubes_render::camera::Camera;
 
 use crate::dynamic::{self, DynamicMeshTypes};
 use crate::{BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, MeshRel, Position, SpaceMesh};
@@ -313,25 +315,45 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         // but empirically, I tried that and the startup performance is near-identical.
     }
 
-    pub(crate) fn chunk_debug_lines(&self, output: &mut impl Extend<LineVertex>) {
-        // TODO: distinguishing colors or marks for these up-to-3 boxes
+    /// See [`ChunkedSpaceMesh::chunk_debug_lines()`] for documentation.
+    pub(crate) fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<LineVertex>) {
+        const OPAQUE_BOX_COLOR: Rgba = rgba_const!(0.0, 0.0, 1.0, 1.0);
+        const TRANSPARENT_BOX_COLOR: Rgba = rgba_const!(1.0, 0.2, 0.0, 1.0);
+        const TRANSPARENT_ARROW_COLOR: Rgba = rgba_const!(1.0, 0.0, 0.0, 1.0);
+        const INSTANCES_COLOR: Rgba = rgba_const!(0.2, 0.2, 1.0, 1.0);
 
         // loses potential precision if origin is large, but this is only debug info
         let meshbb = self
             .mesh_local_bounding_box()
             .translate(self.mesh_origin().to_f32().to_vector());
-        for aab in [meshbb.opaque, meshbb.transparent]
-            .into_iter()
-            .filter_map(<Option<Aab>>::from)
-        {
-            aab.wireframe_points(output);
+
+        for (aab, color) in [
+            (meshbb.opaque, OPAQUE_BOX_COLOR),
+            (meshbb.transparent, TRANSPARENT_BOX_COLOR),
+        ] {
+            let Some(aab) = <Option<Aab>>::from(aab) else {
+                continue;
+            };
+
+            aab.wireframe_points(&mut colorize_lines(output, color));
 
             // Additional border that wiggles when updates happen.
             aab.expand(if self.update_debug { -0.05 } else { -0.02 })
-                .wireframe_points(output)
+                .wireframe_points(&mut colorize_lines(output, color))
         }
 
-        self.block_instances_bounding_box().wireframe_points(output);
+        // Display the applicable `DepthOrdering`.
+        // (Note this isn't necessarily what the caller actually uses.)
+        if !meshbb.transparent.is_empty() {
+            let depth_ordering = self.depth_ordering_for_view(camera.view_position());
+            depth_ordering.debug_lines(
+                meshbb.transparent,
+                &mut colorize_lines(output, TRANSPARENT_ARROW_COLOR),
+            );
+        }
+
+        self.block_instances_bounding_box()
+            .wireframe_points(&mut colorize_lines(output, INSTANCES_COLOR));
     }
 
     /// Returns the transformation from this chunk’s vertex coordinates to [`Space`] coordinates.

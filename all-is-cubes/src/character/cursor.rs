@@ -8,11 +8,12 @@ use euclid::point3;
 
 use crate::block::{Block, EvaluatedBlock, Evoxel};
 use crate::content::palette;
-use crate::math::{Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, LineVertex};
+use crate::math::{
+    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, LineVertex, colorize_lines,
+};
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::{Handle, HandleError, ReadTicket};
-use crate::util::MapExtend;
 
 /// Find the first selectable block the ray strikes and express the result in a [`Cursor`]
 /// value, or [`None`] if nothing was struck within the distance limit.
@@ -239,10 +240,7 @@ impl crate::math::Wireframe for Cursor {
         // Add wireframe of the block.
         block_aabb
             .expand(offset_from_surface)
-            .wireframe_points(&mut MapExtend::new(output, |mut v: LineVertex| {
-                v.color = Some(palette::CURSOR_OUTLINE);
-                v
-            }));
+            .wireframe_points(&mut colorize_lines(output, palette::CURSOR_OUTLINE));
 
         // Frame the selected face with a square.
         // TODO: Position this frame relative to block_aabb.

@@ -206,3 +206,15 @@ impl From<FreePoint> for LineVertex {
         }
     }
 }
+
+#[doc(hidden)] // very narrow, unclear if good API. Possibly we should replace `Extend` with a friendlier trait.
+#[allow(clippy::missing_inline_in_public_items)]
+pub fn colorize_lines(
+    vertices: &mut impl Extend<LineVertex>,
+    color: Rgba,
+) -> impl Extend<LineVertex> {
+    crate::util::MapExtend::new(vertices, move |mut vertex: LineVertex| {
+        vertex.color.get_or_insert(color);
+        vertex
+    })
+}

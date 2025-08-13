@@ -650,11 +650,16 @@ where
         self.view_chunk
     }
 
-    /// Produces lines that visualize the boundaries of visible nonempty chunks.
+    /// Produces lines that visualize the bounding boxes of the contents of visible nonempty chunks.
+    /// Currently, these consist of three separate bounding boxes per chunk:
+    ///
+    /// * Opaque geometry
+    /// * Transparent geometry
+    /// * Instanced blocks
     #[doc(hidden)] // TODO: good public API?
     pub fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<LineVertex>) {
         for chunk_mesh in self.iter_in_view(camera) {
-            chunk_mesh.chunk.chunk_debug_lines(output);
+            chunk_mesh.chunk.chunk_debug_lines(camera, output);
         }
     }
 

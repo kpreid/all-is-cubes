@@ -8,7 +8,7 @@ use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
 
 use all_is_cubes::euclid::{self, Vector3D, vec3};
-use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation};
+use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation, Wireframe};
 
 use crate::{
     Aabb, IndexInt, IndexSliceMut, IndexVec, MeshRel, MeshTypes, PosCoord, Position,
@@ -188,6 +188,43 @@ impl DepthOrdering {
             } else {
                 Rel::Lower
             }
+    }
+
+    /// Draw a ray pointing towards the applicable corner, edge, or face of `bb`.
+    pub(crate) fn debug_lines(
+        self,
+        bb: Aabb,
+        output: &mut impl Extend<all_is_cubes::math::LineVertex>,
+    ) {
+        if self == Self::WITHIN {
+            // TODO: draw a marker for this case
+            return;
+        }
+
+        let bb = euclid::Box3D::from(bb);
+        let direction = self
+            .0
+            .map(|rel| match rel {
+                Rel::Lower => 1.,
+                Rel::Within => 0.,
+                Rel::Higher => -1.,
+            })
+            .cast_unit::<all_is_cubes::math::Cube>()
+            .normalize()
+            * 5.0;
+        let mut corner = euclid::Point3D::zero();
+        for axis in Axis::ALL {
+            corner[axis] = match self.0[axis] {
+                Rel::Lower => bb.min[axis],
+                Rel::Within => bb.center()[axis],
+                Rel::Higher => bb.max[axis],
+            }
+        }
+        all_is_cubes::raycast::Ray {
+            origin: (corner - direction).to_f64(),
+            direction: direction.to_f64().cast_unit(),
+        }
+        .wireframe_points(output);
     }
 }
 

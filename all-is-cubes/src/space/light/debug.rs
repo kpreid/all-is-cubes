@@ -6,10 +6,9 @@
 
 use alloc::vec::Vec;
 
-use crate::math::{Cube, LineVertex, Rgb, Wireframe};
+use crate::math::{Cube, LineVertex, Rgb, Wireframe, colorize_lines};
 use crate::raycast::Ray;
 use crate::space::PackedLight;
-use crate::util::MapExtend;
 
 /// Trait used to encourage the generation of with-debug-info and without-info versions
 /// of the lighting algorithm.
@@ -97,9 +96,9 @@ impl LightUpdateRayInfo {
         let ray = Ray::new(lit_cube.midpoint(), hit_point - lit_cube.midpoint());
 
         self.value_cube.aab().expand(0.01).wireframe_points(output);
-        ray.wireframe_points(&mut MapExtend::new(output, |mut v: LineVertex| {
-            v.color = Some(self.light_from_struck_face.with_alpha_one());
-            v
-        }))
+        ray.wireframe_points(&mut colorize_lines(
+            output,
+            self.light_from_struck_face.with_alpha_one(),
+        ))
     }
 }
