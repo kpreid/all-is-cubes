@@ -16,8 +16,7 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
-    Aab, Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, Rgb, Rgba, Wireframe as _,
-    ZeroOne,
+    Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, Rgb, Rgba, Wireframe as _, ZeroOne,
 };
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
@@ -25,8 +24,8 @@ use all_is_cubes::space::{Sky, Space, SpaceChange, SpaceFluff};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, HandleError, ReadTicket};
 use all_is_cubes::util::Executor;
+use all_is_cubes_mesh::IndexSlice;
 use all_is_cubes_mesh::dynamic::{self, ChunkedSpaceMesh, RenderDataUpdate};
-use all_is_cubes_mesh::{DepthOrdering, IndexSlice};
 use all_is_cubes_render::camera::Camera;
 use all_is_cubes_render::{Flaws, RenderError};
 
@@ -596,7 +595,9 @@ impl SpaceRenderer {
                         "",
                     );
                     draw_chunk_instance(
-                        chunk.mesh().transparent_range(DepthOrdering::ANY),
+                        chunk.mesh().transparent_range(
+                            chunk.depth_ordering_for_view(camera.view_position()),
+                        ),
                         render_pass,
                         buffers,
                         &mut instance_buffer_writer,
@@ -737,20 +738,10 @@ impl SpaceRenderer {
             {
                 if mesh_in_view {
                     if let Some(buffers) = &chunk.render_data {
-                        let depth_ordering = DepthOrdering::from_view_of_aabb(
-                            // Translate camera to the same chunk-relative coordinates
-                            // as the camera.
-                            camera.view_position()
-                                - chunk.position().bounds().to_free().lower_bounds_v(),
-                            chunk
-                                .mesh()
-                                .bounding_box()
-                                .transparent()
-                                .unwrap_or(Aab::ZERO),
-                        );
-
                         draw_chunk_instance(
-                            chunk.mesh().transparent_range(depth_ordering),
+                            chunk.mesh().transparent_range(
+                                chunk.depth_ordering_for_view(camera.view_position()),
+                            ),
                             render_pass,
                             buffers,
                             &mut instance_buffer_writer,
