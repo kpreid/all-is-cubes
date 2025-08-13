@@ -429,7 +429,7 @@ fn build_web(
         [wasm_pack_out_dir.join("all_is_cubes_wasm.js")],
     ) {
         let _t = CaptureTime::new(time_log, format!("wasm-pack build --{profile}"));
-        cmd!(config.sh, "wasm-pack")
+        let mut cmd = cmd!(config.sh, "wasm-pack")
             .args(config.cargo_quiet.then_some("--quiet"))
             .args(["build", "--target=web"])
             .arg("--out-dir")
@@ -439,8 +439,9 @@ fn build_web(
                     .with_context(|| wasm_pack_out_dir.display().to_string())?,
             )
             .arg(format!("--{profile}"))
-            .arg(wasm_package_dir)
-            .run()?;
+            .arg(wasm_package_dir);
+        cmd.set_quiet(config.cargo_quiet);
+        cmd.run()?;
     }
 
     // Combine the static files and build results in the same way that webpack used to
@@ -674,6 +675,7 @@ fn measure_binary_sizes(config: &Config<'_>) -> Result<(), ActionError> {
     // Build
     config
         .cargo()
+        .quiet()
         .args([
             "build",
             "--release",
