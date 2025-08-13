@@ -225,7 +225,7 @@ pub struct DepthSortResult {
 
 /// Performance information returned by [`SpaceMesh::depth_sort_for_view()`].
 ///
-/// Format this with [`fmt::Debug`] to see its information.
+/// Format this with [`fmt::Debug`][core::fmt::Debug] to see its information.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct DepthSortInfo {

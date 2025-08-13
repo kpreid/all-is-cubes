@@ -22,7 +22,7 @@ pub struct RenderDataUpdate<'a, M: DynamicMeshTypes> {
     /// Destination to update.
     pub render_data: &'a mut M::RenderData,
 
-    /// Whether *only* the specified range of [`self.mesh.indices()`][SpaceMesh::indices]
+    /// Whether *only* the specified range of [`self.mesh.indices()`][crate::SpaceMesh::indices]
     /// need to be copied (and their length and type has not changed).
     pub indices_only: Option<Range<usize>>,
 
