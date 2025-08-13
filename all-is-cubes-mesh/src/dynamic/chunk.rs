@@ -122,6 +122,17 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         self.position
     }
 
+    /// Returns the [`DepthOrdering`] to use when drawing `self.mesh.transparent_range()`,
+    /// for the given view point in [`Space`] coordinates.
+    pub fn depth_ordering_for_view(&self, view_position: FreePoint) -> DepthOrdering {
+        DepthOrdering::from_view_of_aabb(
+            self.mesh_origin()
+                .inverse()
+                .transform_point3d(&view_position),
+            self.mesh().bounding_box().transparent,
+        )
+    }
+
     pub(crate) fn borrow_for_update(
         &mut self,
         indices_only: Option<Range<usize>>,

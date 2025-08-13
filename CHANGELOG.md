@@ -39,6 +39,7 @@ In order to resolve various design problems interfering with development, the `a
     - `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` now return the new type `Aabbs` which provides separate boxes for opaque and transparent geometry. This allows precise culling when rendering in separate opaque and transparent passes.
     - New type aliases `Position` and `PosCoord` for vertex positions.
     - We now use `euclid`’s static coordinate system checking for distinguishing between points in a `Space` and points in a mesh. The new marker type `MeshRel` identifies the coordinates used in a mesh.
+    - `dynamic::ChunkMesh::depth_ordering_for_view()`
 
 - `all-is-cubes-port` library:
     - `export_to_path()` no longer accesses the `Universe` while its future is running, but instead only when initially called. This allows the latter portion of the export operation to run concurrently with other uses of the `Universe`.
