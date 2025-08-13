@@ -25,7 +25,7 @@ use crate::{MeshMeta, SpaceMesh};
 ///
 /// Create this using [`DepthOrdering::from_view_of_aabb()`], then use it in
 /// [`MeshMeta::transparent_range()`].
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub struct DepthOrdering(
     /// Specifies the relationship which the viewpoint has to the viewed mesh’s bounding box,
     /// per axis.
@@ -36,7 +36,7 @@ pub struct DepthOrdering(
 );
 
 /// Relationship of the viewpoint to the mesh on one axis.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, exhaust::Exhaust)]
 #[doc(hidden)] // public-in-private just for convenience in the `Exhaust` implementation.
 #[allow(unnameable_types)]
 pub enum Rel {
@@ -240,6 +240,25 @@ impl exhaust::Exhaust for DepthOrdering {
 
     fn from_factory(factory: Self::Factory) -> Self {
         Self(factory.map(Rel::from_factory).into())
+    }
+}
+
+impl core::fmt::Debug for DepthOrdering {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for axis in Axis::ALL {
+            self.0[axis].fmt(f)?;
+        }
+        Ok(())
+    }
+}
+
+impl core::fmt::Debug for Rel {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.pad(match self {
+            Rel::Lower => "−", // U+2212 MINUS SIGN for best symmetry
+            Rel::Within => "W",
+            Rel::Higher => "+",
+        })
     }
 }
 
@@ -676,6 +695,17 @@ mod tests {
     use all_is_cubes::euclid::point3;
     use all_is_cubes::math::{Aab, GridAab};
     use all_is_cubes::space::Space;
+
+    #[test]
+    fn ordering_debug() {
+        assert_eq!(
+            format!(
+                "{:?}",
+                DepthOrdering(vec3(Rel::Lower, Rel::Within, Rel::Higher))
+            ),
+            "−W+"
+        );
+    }
 
     /// Generic tests for all cases can be confusing and themselves incorrect.
     /// Let's exercise some boring cases “end to end” with explanation.
