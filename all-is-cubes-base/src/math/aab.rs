@@ -425,31 +425,19 @@ impl Wireframe for Aab {
     where
         E: Extend<LineVertex>,
     {
-        let mut vertices = [LineVertex::from(FreePoint::origin()); 24];
-        let l = self.lower_bounds_p();
-        let u = self.upper_bounds_p();
-        for axis_0 in Axis::ALL {
-            let vbase = usize::from(axis_0) * 8;
-            let axis_1 = axis_0.increment();
-            let axis_2 = axis_0.decrement();
-            let mut p = l;
-            // Walk from lower to upper in a helix.
-            vertices[vbase].position = p;
-            p[axis_0] = u[axis_0];
-            vertices[vbase + 1].position = p;
-            vertices[vbase + 2].position = p;
-            p[axis_1] = u[axis_1];
-            vertices[vbase + 3].position = p;
-            vertices[vbase + 4].position = p;
-            p[axis_2] = u[axis_2];
-            vertices[vbase + 5].position = p;
-            // Go back and fill in the remaining bar.
-            p[axis_2] = l[axis_2];
-            vertices[vbase + 6].position = p;
-            p[axis_0] = l[axis_0];
-            vertices[vbase + 7].position = p;
-        }
-        output.extend(vertices);
+        #[rustfmt::skip]
+        const WIREFRAME: &[Octant; 24] = {
+            use Octant::*;
+            &[
+                Nnn, Nnp, Npn, Npp, Pnn, Pnp, Ppn, Ppp,
+                Nnn, Npn, Nnp, Npp, Pnn, Ppn, Pnp, Ppp,
+                Nnn, Pnn, Nnp, Pnp, Npn, Ppn, Npp, Ppp,
+            ]
+        };
+        output.extend(WIREFRAME.iter().map(|&corner| LineVertex {
+            position: self.corner_point(corner),
+            color: None,
+        }));
     }
 }
 
