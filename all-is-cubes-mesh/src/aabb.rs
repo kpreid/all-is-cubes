@@ -1,7 +1,7 @@
 use core::{fmt, ops};
 
 use all_is_cubes::euclid::{Box3D, Point3D, Vector3D};
-use all_is_cubes::math::{Aab, Axis};
+use all_is_cubes::math::{Aab, Axis, lines};
 use ordered_float::NotNan;
 
 #[cfg(doc)]
@@ -233,11 +233,8 @@ impl From<Aabb> for Box3D<f64, MeshRel> {
     }
 }
 
-impl all_is_cubes::math::Wireframe for Aabb {
-    fn wireframe_points<E>(&self, output: &mut E)
-    where
-        E: Extend<all_is_cubes::math::LineVertex>,
-    {
+impl lines::Wireframe for Aabb {
+    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
         <Option<Aab>>::from(*self).wireframe_points(output)
     }
 }

@@ -2,13 +2,13 @@ use alloc::vec::Vec;
 
 use all_is_cubes::character::{Character, Cursor};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{Face7, FreePoint, LineVertex, Rgba, Wireframe};
+use all_is_cubes::math::{Face7, FreePoint, Rgba, lines};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::MapExtend;
 use all_is_cubes_render::camera::GraphicsOptions;
 
-/// TODO: give this trait a better name, especially now that `LineVertex` exists.
+/// TODO: give this trait a better name, especially now that `lines::Vertex` exists.
 pub(crate) trait DebugLineVertex {
     fn from_position_color(position: FreePoint, color: Rgba) -> Self;
 }
@@ -86,7 +86,7 @@ pub(crate) fn wireframe_vertices<V, E, G>(vertices: &mut E, color: Rgba, geometr
 where
     E: Extend<V>,
     V: DebugLineVertex,
-    G: Wireframe,
+    G: lines::Wireframe,
 {
     geometry.wireframe_points(&mut map_line_vertices(vertices, color))
 }
@@ -94,10 +94,10 @@ where
 pub(crate) fn map_line_vertices<'a, V: DebugLineVertex + 'a>(
     vertices: &'a mut impl Extend<V>,
     color: Rgba,
-) -> impl Extend<LineVertex> + 'a {
+) -> impl Extend<lines::Vertex> + 'a {
     MapExtend::new(
         vertices,
-        move |LineVertex {
+        move |lines::Vertex {
                   position,
                   color: vertex_color,
                   ..

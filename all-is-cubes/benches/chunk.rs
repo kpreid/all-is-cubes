@@ -136,7 +136,7 @@ fn cull_bench(c: &mut Criterion) {
 /// does.
 #[cfg(feature = "rerun")]
 fn dump_frustum_culling() {
-    use all_is_cubes::math::Wireframe as _;
+    use all_is_cubes::math::lines::Wireframe as _;
     use all_is_cubes::rerun_glue as rg;
     use itertools::Itertools;
 

@@ -3,13 +3,14 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::ops::{self, Deref, Range};
-use smallvec::SmallVec;
 
 use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
+use smallvec::SmallVec;
 
 use all_is_cubes::euclid::{self, Vector3D, vec3};
-use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation, Wireframe};
+use all_is_cubes::math::lines::Wireframe as _;
+use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation, lines};
 
 use crate::{
     Aabb, IndexInt, IndexSliceMut, IndexVec, MeshRel, MeshTypes, PosCoord, Position,
@@ -192,11 +193,7 @@ impl DepthOrdering {
     }
 
     /// Draw a ray pointing towards the applicable corner, edge, or face of `bb`.
-    pub(crate) fn debug_lines(
-        self,
-        bb: Aabb,
-        output: &mut impl Extend<all_is_cubes::math::LineVertex>,
-    ) {
+    pub(crate) fn debug_lines(self, bb: Aabb, output: &mut impl Extend<lines::Vertex>) {
         if self == Self::WITHIN {
             // TODO: draw a marker for this case
             return;

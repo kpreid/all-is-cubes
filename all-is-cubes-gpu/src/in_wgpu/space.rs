@@ -16,7 +16,8 @@ use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
-    Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, Rgb, Rgba, Wireframe as _, ZeroOne,
+    Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, Rgb, Rgba, ZeroOne,
+    lines::Wireframe as _,
 };
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;

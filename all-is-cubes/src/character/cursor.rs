@@ -8,9 +8,7 @@ use euclid::point3;
 
 use crate::block::{Block, EvaluatedBlock, Evoxel};
 use crate::content::palette;
-use crate::math::{
-    Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, LineVertex, colorize_lines,
-};
+use crate::math::{Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, lines};
 use crate::raycast::Ray;
 use crate::space::{PackedLight, Space};
 use crate::universe::{Handle, HandleError, ReadTicket};
@@ -209,11 +207,8 @@ impl fmt::Display for Cursor {
     }
 }
 
-impl crate::math::Wireframe for Cursor {
-    fn wireframe_points<E>(&self, output: &mut E)
-    where
-        E: Extend<LineVertex>,
-    {
+impl lines::Wireframe for Cursor {
+    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
         let evaluated = &self.hit().evaluated;
 
         // Compute an approximate offset that will prevent Z-fighting.
@@ -240,7 +235,7 @@ impl crate::math::Wireframe for Cursor {
         // Add wireframe of the block.
         block_aabb
             .expand(offset_from_surface)
-            .wireframe_points(&mut colorize_lines(output, palette::CURSOR_OUTLINE));
+            .wireframe_points(&mut lines::colorize(output, palette::CURSOR_OUTLINE));
 
         // Frame the selected face with a square.
         // TODO: Position this frame relative to block_aabb.
@@ -267,7 +262,7 @@ impl crate::math::Wireframe for Cursor {
             .flatten()
             {
                 let position = face_transform_full.transform_point3d(p).unwrap();
-                output.extend([LineVertex {
+                output.extend([lines::Vertex {
                     position,
                     color: Some(palette::CURSOR_OUTLINE),
                 }]);
@@ -288,7 +283,7 @@ impl crate::math::Wireframe for Cursor {
                 let position = self.point_entered
                     + self.face_entered.normal_vector() * offset_from_surface
                     + tip;
-                output.extend([LineVertex {
+                output.extend([lines::Vertex {
                     position,
                     color: Some(palette::CURSOR_OUTLINE),
                 }]);

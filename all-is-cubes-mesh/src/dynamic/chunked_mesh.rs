@@ -8,7 +8,7 @@ use rayon::iter::{ParallelBridge, ParallelIterator as _};
 
 use all_is_cubes::chunking::{ChunkChart, ChunkPos, cube_to_chunk, point_to_chunk};
 use all_is_cubes::listen::{self, Listen as _};
-use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, LineVertex, OctantMask};
+use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, OctantMask, lines};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
@@ -657,7 +657,7 @@ where
     /// * Transparent geometry
     /// * Instanced blocks
     #[doc(hidden)] // TODO: good public API?
-    pub fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<LineVertex>) {
+    pub fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<lines::Vertex>) {
         for chunk_mesh in self.iter_in_view(camera) {
             chunk_mesh.chunk.chunk_debug_lines(camera, output);
         }

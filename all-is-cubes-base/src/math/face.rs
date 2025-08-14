@@ -11,7 +11,7 @@ use manyfmt::formats::Unquote;
 
 use crate::math::{
     Axis, ConciseDebug, Cube, FreeCoordinate, FreeVector, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Gridgid, LineVertex, Zero,
+    GridVector, Gridgid, Zero, lines,
 };
 
 /// Identifies a face of a cube or an orthogonal unit vector.
@@ -1039,12 +1039,9 @@ impl fmt::Debug for CubeFace {
     }
 }
 
-impl crate::math::Wireframe for CubeFace {
+impl lines::Wireframe for CubeFace {
     #[allow(clippy::missing_inline_in_public_items)]
-    fn wireframe_points<E>(&self, output: &mut E)
-    where
-        E: Extend<LineVertex>,
-    {
+    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
         // TODO: How much to offset the lines should be a parameter of the wireframe_points process.
         let expansion = 0.005;
         let aab = self.cube.aab().expand(expansion);
@@ -1062,7 +1059,7 @@ impl crate::math::Wireframe for CubeFace {
             // TODO: this is a messy kludge and really we should be stealing corner points
             // from the AAB instead, but there isn't yet a good way to do that.
             output.extend(X_POINTS.into_iter().map(|p| {
-                LineVertex::from(
+                lines::Vertex::from(
                     (face_transform.transform_point(p))
                         .map(|c| (FreeCoordinate::from(c) - 0.5) * (1. + expansion * 2.) + 0.5)
                         + self.cube.aab().lower_bounds_v(),

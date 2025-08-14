@@ -12,7 +12,7 @@ use hashbrown::HashSet as HbHashSet;
 use num_traits::float::FloatCore as _;
 
 use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolution::R1};
-use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, LineVertex, Vol};
+use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, Vol, lines};
 use crate::physics::POSITION_EPSILON;
 use crate::raycast::{Ray, Raycaster};
 use crate::space::Space;
@@ -125,11 +125,8 @@ impl fmt::Debug for Contact {
     }
 }
 
-impl crate::math::Wireframe for Contact {
-    fn wireframe_points<E>(&self, output: &mut E)
-    where
-        E: Extend<LineVertex>,
-    {
+impl lines::Wireframe for Contact {
+    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
         match self {
             Contact::Block(cube_face) => cube_face.wireframe_points(output),
             Contact::Voxel {
@@ -138,10 +135,13 @@ impl crate::math::Wireframe for Contact {
                 voxel,
             } => {
                 let resolution: FreeCoordinate = (*resolution).into();
-                voxel.wireframe_points(&mut MapExtend::new(output, |mut vert: LineVertex| {
-                    vert.position = vert.position / resolution + cube.aab().lower_bounds_v();
-                    vert
-                }))
+                voxel.wireframe_points(&mut MapExtend::new(
+                    output,
+                    |mut vert: lines::Vertex| {
+                        vert.position = vert.position / resolution + cube.aab().lower_bounds_v();
+                        vert
+                    },
+                ))
             }
         }
     }

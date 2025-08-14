@@ -28,6 +28,7 @@ mod grid_aab;
 pub use grid_aab::*;
 mod grid_iter;
 pub use grid_iter::*;
+pub mod lines;
 mod rigid;
 pub use rigid::*;
 mod restricted_number;
@@ -147,74 +148,4 @@ pub fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
     if *a > *b {
         core::mem::swap(a, b);
     }
-}
-
-/// Geometric objects that can be drawn as wireframes.
-pub trait Wireframe {
-    /// Represent this object as a line drawing, or wireframe.
-    ///
-    /// The generated points should be in pairs, each pair defining a line segment.
-    /// If there are an odd number of vertices, the caller should ignore the last.
-    ///
-    /// Design note: This method accepts a destination to write to, rather than returning an
-    /// iterator, because if it did return an iterator, it would be difficult to compose in
-    /// ways like allocating a temporary `Wireframe` and delegating to that, if it borrowed
-    /// its input, and would risk composing a very large yet unnecessary iterator struct
-    /// if it owned its input.
-    /// This way, composition is simply calling further functions.
-    fn wireframe_points<E>(&self, output: &mut E)
-    where
-        E: Extend<LineVertex>;
-}
-
-impl<T: Wireframe> Wireframe for Option<T> {
-    #[allow(clippy::missing_inline_in_public_items)]
-    fn wireframe_points<E>(&self, output: &mut E)
-    where
-        E: Extend<LineVertex>,
-    {
-        if let Some(value) = self {
-            value.wireframe_points(output)
-        }
-    }
-}
-
-/// One end of a line to be drawn.
-///
-/// These are the output of [`Wireframe::wireframe_points()`].
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[expect(clippy::exhaustive_structs)]
-pub struct LineVertex {
-    /// Position of the vertex.
-    pub position: FreePoint,
-
-    /// Color in which to draw the line.
-    ///
-    /// If [`None`], a color set by the context/parent should be used instead.
-    ///
-    /// If the ends of a line are different colors, color should be interpolated along
-    /// the line.
-    pub color: Option<Rgba>,
-}
-
-impl From<FreePoint> for LineVertex {
-    #[inline]
-    fn from(position: FreePoint) -> Self {
-        Self {
-            position,
-            color: None,
-        }
-    }
-}
-
-#[doc(hidden)] // very narrow, unclear if good API. Possibly we should replace `Extend` with a friendlier trait.
-#[allow(clippy::missing_inline_in_public_items)]
-pub fn colorize_lines(
-    vertices: &mut impl Extend<LineVertex>,
-    color: Rgba,
-) -> impl Extend<LineVertex> {
-    crate::util::MapExtend::new(vertices, move |mut vertex: LineVertex| {
-        vertex.color.get_or_insert(color);
-        vertex
-    })
 }

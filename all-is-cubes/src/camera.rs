@@ -1,6 +1,5 @@
 //! Note: This module is hidden, and its contents re-exported as `all_is_cubes_render::camera`.
 
-use all_is_cubes_base::math::ps64;
 use euclid::{
     Angle, Point2D, Point3D, RigidTransform3D, Rotation3D, Size2D, Transform3D, point3, vec3,
 };
@@ -13,8 +12,8 @@ use num_traits::ConstOne as _;
 use num_traits::float::Float as _;
 
 use crate::math::{
-    self, Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, LineVertex, Octant,
-    OctantMask, PositiveSign, Rgba,
+    Aab, Axis, Cube, FreeCoordinate, FreePoint, FreeVector, GridAab, Octant, OctantMask,
+    PositiveSign, Rgba, lines, ps64,
 };
 use crate::raycast::Ray;
 
@@ -350,7 +349,7 @@ impl Camera {
     }
 
     #[doc(hidden)] // used in other crates debugging; not stable API
-    pub fn view_frustum_geometry(&self) -> &(impl math::Wireframe + '_) {
+    pub fn view_frustum_geometry(&self) -> &(impl lines::Wireframe + '_) {
         &self.view_frustum
     }
 
@@ -674,11 +673,8 @@ impl FrustumPoints {
     }
 }
 
-impl math::Wireframe for FrustumPoints {
-    fn wireframe_points<E>(&self, output: &mut E)
-    where
-        E: Extend<LineVertex>,
-    {
+impl lines::Wireframe for FrustumPoints {
+    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
         output.extend(
             [
                 // far plane box
@@ -699,7 +695,7 @@ impl math::Wireframe for FrustumPoints {
             ]
             .into_iter()
             .flatten()
-            .map(LineVertex::from),
+            .map(lines::Vertex::from),
         );
     }
 }

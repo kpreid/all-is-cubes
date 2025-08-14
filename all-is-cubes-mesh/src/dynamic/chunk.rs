@@ -7,8 +7,8 @@ use core::ops::{self, Range};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::euclid::{Point3D, Translation3D};
 use all_is_cubes::math::{
-    Aab, Cube, FreeCoordinate, FreePoint, GridCoordinate, LineVertex, Rgba, Wireframe as _,
-    colorize_lines, rgba_const,
+    Aab, Cube, FreeCoordinate, FreePoint, GridCoordinate, Rgba, lines, lines::Wireframe as _,
+    rgba_const,
 };
 use all_is_cubes::space::{BlockIndex, Space};
 use all_is_cubes_render::camera::Camera;
@@ -316,7 +316,11 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     }
 
     /// See [`ChunkedSpaceMesh::chunk_debug_lines()`] for documentation.
-    pub(crate) fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<LineVertex>) {
+    pub(crate) fn chunk_debug_lines(
+        &self,
+        camera: &Camera,
+        output: &mut impl Extend<lines::Vertex>,
+    ) {
         const OPAQUE_BOX_COLOR: Rgba = rgba_const!(0.0, 0.0, 1.0, 1.0);
         const TRANSPARENT_BOX_COLOR: Rgba = rgba_const!(1.0, 0.2, 0.0, 1.0);
         const TRANSPARENT_ARROW_COLOR: Rgba = rgba_const!(1.0, 0.0, 0.0, 1.0);
@@ -335,11 +339,11 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
                 continue;
             };
 
-            aab.wireframe_points(&mut colorize_lines(output, color));
+            aab.wireframe_points(&mut lines::colorize(output, color));
 
             // Additional border that wiggles when updates happen.
             aab.expand(if self.update_debug { -0.05 } else { -0.02 })
-                .wireframe_points(&mut colorize_lines(output, color))
+                .wireframe_points(&mut lines::colorize(output, color))
         }
 
         // Display the applicable `DepthOrdering`.
@@ -348,12 +352,12 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
             let depth_ordering = self.depth_ordering_for_view(camera.view_position());
             depth_ordering.debug_lines(
                 meshbb.transparent,
-                &mut colorize_lines(output, TRANSPARENT_ARROW_COLOR),
+                &mut lines::colorize(output, TRANSPARENT_ARROW_COLOR),
             );
         }
 
         self.block_instances_bounding_box()
-            .wireframe_points(&mut colorize_lines(output, INSTANCES_COLOR));
+            .wireframe_points(&mut lines::colorize(output, INSTANCES_COLOR));
     }
 
     /// Returns the transformation from this chunk’s vertex coordinates to [`Space`] coordinates.

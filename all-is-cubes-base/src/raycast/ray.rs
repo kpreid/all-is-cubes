@@ -8,8 +8,7 @@ use euclid::Point3D;
 use num_traits::float::Float as _;
 
 use crate::math::{
-    self, Cube, Face7, FreeCoordinate, FreePoint, FreeVector, GridCoordinate, GridVector,
-    LineVertex,
+    self, Cube, Face7, FreeCoordinate, FreePoint, FreeVector, GridCoordinate, GridVector, lines,
 };
 use crate::raycast::{AxisAlignedRaycaster, Raycaster};
 use crate::resolution::Resolution;
@@ -112,12 +111,9 @@ impl Ray {
     }
 }
 
-impl math::Wireframe for Ray {
+impl lines::Wireframe for Ray {
     #[allow(clippy::missing_inline_in_public_items)]
-    fn wireframe_points<E>(&self, output: &mut E)
-    where
-        E: Extend<LineVertex>,
-    {
+    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
         // Draw line
         let tip = self.unit_endpoint();
         output.extend([self.origin.into(), tip.into()]);

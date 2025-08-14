@@ -6,7 +6,7 @@
 
 use alloc::vec::Vec;
 
-use crate::math::{Cube, LineVertex, Rgb, Wireframe, colorize_lines};
+use crate::math::{Cube, Rgb, lines, lines::Wireframe as _};
 use crate::raycast::Ray;
 use crate::space::PackedLight;
 
@@ -47,11 +47,8 @@ pub struct LightUpdateCubeInfo {
     pub(crate) rays: Vec<LightUpdateRayInfo>,
 }
 
-impl Wireframe for LightUpdateCubeInfo {
-    fn wireframe_points<E>(&self, output: &mut E)
-    where
-        E: Extend<LineVertex>,
-    {
+impl lines::Wireframe for LightUpdateCubeInfo {
+    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
         // Draw output cube
         self.cube.aab().expand(0.1).wireframe_points(output);
         // Draw rays
@@ -81,10 +78,7 @@ pub struct LightUpdateRayInfo {
 }
 
 impl LightUpdateRayInfo {
-    fn wireframe_points<E>(&self, lit_cube: Cube, output: &mut E)
-    where
-        E: Extend<LineVertex>,
-    {
+    fn wireframe_points(&self, lit_cube: Cube, output: &mut impl Extend<lines::Vertex>) {
         // TODO: Visualize trigger_cube and value.
 
         // We used to have precise rays, but we don't have them any more.
@@ -96,7 +90,7 @@ impl LightUpdateRayInfo {
         let ray = Ray::new(lit_cube.midpoint(), hit_point - lit_cube.midpoint());
 
         self.value_cube.aab().expand(0.01).wireframe_points(output);
-        ray.wireframe_points(&mut colorize_lines(
+        ray.wireframe_points(&mut lines::colorize(
             output,
             self.light_from_struck_face.with_alpha_one(),
         ))
