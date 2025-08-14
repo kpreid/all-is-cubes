@@ -114,6 +114,20 @@ impl Octant {
         Self::from_zmaj_index(index)
     }
 
+    // TODO: decide whether to make these public
+    #[inline(always)]
+    pub(crate) fn negative_on_x(self) -> bool {
+        self.to_zmaj_index() & 0b100 == 0
+    }
+    #[inline(always)]
+    pub(crate) fn negative_on_y(self) -> bool {
+        self.to_zmaj_index() & 0b010 == 0
+    }
+    #[inline(always)]
+    pub(crate) fn negative_on_z(self) -> bool {
+        self.to_zmaj_index() & 0b001 == 0
+    }
+
     /// Returns this octant of the volume (0..2)³.
     ///
     /// That is, each coordinate of the returned [`Cube`] is either 0 or 1.
@@ -143,13 +157,13 @@ impl Octant {
     where
         T: ops::Neg<Output = T>,
     {
-        if self.to_zmaj_index() & 0b100 == 0 {
+        if self.negative_on_x() {
             vector.x = -vector.x;
         }
-        if self.to_zmaj_index() & 0b10 == 0 {
+        if self.negative_on_y() {
             vector.y = -vector.y;
         }
-        if self.to_zmaj_index() & 0b1 == 0 {
+        if self.negative_on_z() {
             vector.z = -vector.z;
         }
         vector

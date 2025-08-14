@@ -12,7 +12,7 @@ use num_traits::float::FloatCore as _;
 
 use crate::math::{
     Axis, Cube, Face6, FreeCoordinate, FreePoint, FreeVector, GridAab, GridCoordinate, LineVertex,
-    Wireframe,
+    Octant, Wireframe,
 };
 
 /// Axis-Aligned Box data type.
@@ -161,6 +161,20 @@ impl Aab {
         (self.lower_bounds + self.upper_bounds.to_vector()) * 0.5
     }
 
+    /// Returns one of the eight corner points of the box.
+    ///
+    /// Note that [`Octant`] is used here only to identify the eight distinct positions and does
+    /// not mean that the corner necessarily lies in that octant of the coordinate space.
+    #[inline]
+    #[rustfmt::skip]
+    pub fn corner_point(&self, corner: Octant) -> FreePoint {
+        FreePoint::new(
+            if corner.negative_on_x() { self.lower_bounds.x } else { self.upper_bounds.x },
+            if corner.negative_on_y() { self.lower_bounds.y } else { self.upper_bounds.y },
+            if corner.negative_on_z() { self.lower_bounds.z } else { self.upper_bounds.z },
+        )
+    }
+
     /// Iterates over the eight corner points of the box.
     /// The ordering is deterministic but not currently declared stable.
     #[doc(hidden)]
@@ -170,6 +184,8 @@ impl Aab {
     ) -> impl DoubleEndedIterator<Item = FreePoint> + ExactSizeIterator + FusedIterator {
         let l = self.lower_bounds;
         let u = self.upper_bounds;
+        // TODO: replacing this with iterating Octant + corner_point() produces larger code;
+        // investigate if there is something that's net better instead of net worse
         (0..8).map(move |i| {
             Point3D::new(
                 if i & 1 == 0 { l.x } else { u.x },
