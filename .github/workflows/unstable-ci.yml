@@ -73,7 +73,7 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         ref: unstable-rust
 
@@ -166,7 +166,7 @@ jobs:
       RUSTFLAGS: "-Dwarnings"
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - uses: Swatinem/rust-cache@v2.8.0
       with:
@@ -218,7 +218,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - uses: Swatinem/rust-cache@v2.8.0
       with:

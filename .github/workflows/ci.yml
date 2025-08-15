@@ -109,7 +109,7 @@ jobs:
 
     - run: df -h .
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - run: df -h .
 
@@ -217,7 +217,7 @@ jobs:
 
     steps:
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - uses: Swatinem/rust-cache@v2.8.0
       with:
@@ -292,7 +292,7 @@ jobs:
       RUSTFLAGS: "-Dwarnings"
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - uses: Swatinem/rust-cache@v2.8.0
       with:
@@ -361,7 +361,7 @@ jobs:
         large-packages: false # slow
         swap-storage: false
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Install native libraries
       if: ${{ runner.os == 'Linux' }}
@@ -420,7 +420,7 @@ jobs:
     if: ${{ !startsWith(github.ref, 'refs/heads/next/') }}
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     # Run once on each workspace (hence each lock file) of interest.
     # Our only other workspace is fuzz/, which we aren't interested in checking.
@@ -440,7 +440,7 @@ jobs:
     # Running on push would require more work to determine the base revision
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Needed to ensure `main` branch is needed
           fetch-depth: 0
@@ -484,7 +484,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - uses: Swatinem/rust-cache@v2.8.0
 
@@ -509,7 +509,7 @@ jobs:
     if: false
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     # The build is faster *without* this cache.
     # - uses: Swatinem/rust-cache@v2.7.8
@@ -537,7 +537,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     # Cache both the main workspace (for xtask builds) and the fuzzing workspace
     - uses: Swatinem/rust-cache@v2.8.0
