@@ -674,7 +674,7 @@ impl FrustumPoints {
 }
 
 impl lines::Wireframe for FrustumPoints {
-    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
+    fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
         output.extend(
             [
                 // far plane box
@@ -694,8 +694,7 @@ impl lines::Wireframe for FrustumPoints {
                 [self.ltf, self.ltn],
             ]
             .into_iter()
-            .flatten()
-            .map(lines::Vertex::from),
+            .map(|line| line.map(lines::Vertex::from)),
         );
     }
 }

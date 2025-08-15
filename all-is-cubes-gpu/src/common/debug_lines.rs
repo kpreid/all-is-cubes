@@ -19,7 +19,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
     character: Option<&Character>,
     space: Option<&Space>,
     graphics_options: &GraphicsOptions,
-    v: &mut Vec<V>,
+    v: &mut Vec<[V; 2]>,
     cursor_result: Option<&Cursor>,
 ) {
     if let Some(space) = space {
@@ -84,7 +84,7 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
 /// mode) with the given `color`.
 pub(crate) fn wireframe_vertices<V, E, G>(vertices: &mut E, color: Rgba, geometry: &G)
 where
-    E: Extend<V>,
+    E: Extend<[V; 2]>,
     V: DebugLineVertex,
     G: lines::Wireframe,
 {
@@ -92,15 +92,16 @@ where
 }
 
 pub(crate) fn map_line_vertices<'a, V: DebugLineVertex + 'a>(
-    vertices: &'a mut impl Extend<V>,
+    vertices: &'a mut impl Extend<[V; 2]>,
     color: Rgba,
-) -> impl Extend<lines::Vertex> + 'a {
-    MapExtend::new(
-        vertices,
-        move |lines::Vertex {
-                  position,
-                  color: vertex_color,
-                  ..
-              }| V::from_position_color(position, vertex_color.unwrap_or(color)),
-    )
+) -> impl Extend<[lines::Vertex; 2]> + 'a {
+    MapExtend::new(vertices, move |line: [lines::Vertex; 2]| {
+        line.map(
+            |lines::Vertex {
+                 position,
+                 color: vertex_color,
+                 ..
+             }| V::from_position_color(position, vertex_color.unwrap_or(color)),
+        )
+    })
 }

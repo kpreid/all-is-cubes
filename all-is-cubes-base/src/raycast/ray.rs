@@ -113,10 +113,10 @@ impl Ray {
 
 impl lines::Wireframe for Ray {
     #[allow(clippy::missing_inline_in_public_items)]
-    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
+    fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
         // Draw line
         let tip = self.unit_endpoint();
-        output.extend([self.origin.into(), tip.into()]);
+        output.extend([[self.origin.into(), tip.into()]]);
 
         // If the length is nonzero, draw arrowhead
         let length = self.direction.length();
@@ -150,10 +150,8 @@ impl lines::Wireframe for Ray {
                 + perp1 * head_width * ang(step + 1).sin()
                 + perp2 * head_width * ang(step + 1).cos();
             output.extend([
-                circle_point.into(),
-                tip.into(),
-                circle_point.into(),
-                adj_circle_point.into(),
+                [circle_point.into(), tip.into()],
+                [circle_point.into(), adj_circle_point.into()],
             ]);
         }
     }

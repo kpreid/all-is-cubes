@@ -382,7 +382,7 @@ impl EverythingRenderer {
 
         // Prepare cursor and debug lines.
         {
-            let mut v: Vec<WgpuLinesVertex> = Vec::new();
+            let mut v: Vec<[WgpuLinesVertex; 2]> = Vec::new();
 
             if let Some(cursor) = cursor_result {
                 // Draw cursor only if it's in the world space, because
@@ -427,9 +427,9 @@ impl EverythingRenderer {
                 bwp.reborrow(),
                 &|| "EverythingRenderer::lines_buffer".into(),
                 wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                [bytemuck::must_cast_slice::<WgpuLinesVertex, u8>(&v)],
+                [bytemuck::must_cast_slice::<[WgpuLinesVertex; 2], u8>(&v)],
             );
-            self.lines_vertex_count = v.len() as u32;
+            self.lines_vertex_count = v.len() as u32 * 2;
         };
 
         let lines_to_submit_time = time::Instant::now();

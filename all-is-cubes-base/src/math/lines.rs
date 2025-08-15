@@ -7,10 +7,8 @@ use crate::util::MapExtend;
 
 /// Represent objects as line drawings, or wireframes.
 pub trait Wireframe {
-    /// Represent this object as a line drawing, or wireframe, by producing lines to be drawn.
-    ///
-    /// The generated points should be in pairs, each pair defining a line segment.
-    /// If there are an odd number of vertices generated, the caller should ignore the last.
+    /// Represent this object as a line drawing, or wireframe,
+    /// by producing line segments to be drawn.
     ///
     /// Design note: This method accepts a destination to write to, rather than returning an
     /// iterator, because if it did return an iterator, it would be difficult to compose in
@@ -22,12 +20,12 @@ pub trait Wireframe {
     /// (If Rust gains stable [generator coroutines], we might be able to revisit that decision.)
     ///
     /// [generator coroutines]: https://doc.rust-lang.org/std/iter/macro.iter.html
-    fn wireframe_points<E: Extend<Vertex>>(&self, output: &mut E);
+    fn wireframe_points<E: Extend<[Vertex; 2]>>(&self, output: &mut E);
 }
 
 impl<T: Wireframe> Wireframe for Option<T> {
     #[allow(clippy::missing_inline_in_public_items)]
-    fn wireframe_points<E: Extend<Vertex>>(&self, output: &mut E) {
+    fn wireframe_points<E: Extend<[Vertex; 2]>>(&self, output: &mut E) {
         if let Some(value) = self {
             value.wireframe_points(output)
         }
@@ -65,18 +63,20 @@ impl From<FreePoint> for Vertex {
 // -------------------------------------------------------------------------------------------------
 
 /// Transform an array of vertices to be interpreted as a line loop.
-/// That is, \[a, b, c\] is transformed to \[a, b, b, c, c, a\].
+/// That is, `[a, b, c]` is transformed to `[[a, b], [b, c], [c, a]]`.
 #[doc(hidden)] // for implementors’ use; not sure if good API
 #[allow(clippy::missing_inline_in_public_items)] // already generic
-pub fn line_loop<const N: usize>(vertices: [Vertex; N]) -> impl Iterator<Item = Vertex> {
-    (0..N).flat_map(move |i| [vertices[i], vertices[(i + 1).rem_euclid(N)]])
+pub fn line_loop<const N: usize>(vertices: [Vertex; N]) -> impl Iterator<Item = [Vertex; 2]> {
+    (0..N).map(move |i| [vertices[i], vertices[(i + 1).rem_euclid(N)]])
 }
 
 /// Add color to all vertices that don't have it.
 #[inline]
-pub fn colorize(output: &mut impl Extend<Vertex>, color: Rgba) -> impl Extend<Vertex> {
-    MapExtend::new(output, move |mut vertex: Vertex| {
-        vertex.color.get_or_insert(color);
-        vertex
+pub fn colorize(output: &mut impl Extend<[Vertex; 2]>, color: Rgba) -> impl Extend<[Vertex; 2]> {
+    MapExtend::new(output, move |vertices: [Vertex; 2]| {
+        vertices.map(|mut vertex| {
+            vertex.color.get_or_insert(color);
+            vertex
+        })
     })
 }

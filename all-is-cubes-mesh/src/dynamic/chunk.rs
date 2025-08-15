@@ -319,7 +319,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     pub(crate) fn chunk_debug_lines(
         &self,
         camera: &Camera,
-        output: &mut impl Extend<lines::Vertex>,
+        output: &mut impl Extend<[lines::Vertex; 2]>,
     ) {
         const OPAQUE_BOX_COLOR: Rgba = rgba_const!(0.0, 0.0, 1.0, 1.0);
         const TRANSPARENT_BOX_COLOR: Rgba = rgba_const!(1.0, 0.2, 0.0, 1.0);

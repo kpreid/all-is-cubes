@@ -777,7 +777,7 @@ impl SpaceRenderer {
         }
     }
 
-    pub fn particle_lines(&self) -> impl Iterator<Item = WgpuLinesVertex> + '_ {
+    pub fn particle_lines(&self) -> impl Iterator<Item = [WgpuLinesVertex; 2]> + '_ {
         self.particle_sets.iter().flat_map(|p| p.lines())
     }
 
@@ -799,7 +799,7 @@ impl SpaceRenderer {
 
     /// Generate debug lines for the current state of the renderer, assuming
     /// `draw()` was just called.
-    pub(crate) fn debug_lines(&self, camera: &Camera, v: &mut Vec<WgpuLinesVertex>) {
+    pub(crate) fn debug_lines(&self, camera: &Camera, v: &mut Vec<[WgpuLinesVertex; 2]>) {
         let Some(csm) = &self.csm else {
             return;
         };
@@ -829,17 +829,17 @@ impl SpaceRenderer {
             for face in Face6::ALL {
                 let ft = face.face_transform(CHUNK_SIZE);
                 for i in 1..CHUNK_SIZE {
-                    let mut push = |p| {
-                        v.push(WgpuLinesVertex::from_position_color(
-                            ft.transform_point(p).map(FreeCoordinate::from)
-                                + chunk_origin.to_vector(),
-                            palette::DEBUG_CHUNK_MINOR,
-                        ));
+                    let mut push = |points: [GridPoint; 2]| {
+                        v.push(points.map(|p| {
+                            WgpuLinesVertex::from_position_color(
+                                ft.transform_point(p).map(FreeCoordinate::from)
+                                    + chunk_origin.to_vector(),
+                                palette::DEBUG_CHUNK_MINOR,
+                            )
+                        }));
                     };
-                    push(GridPoint::new(i, 0, 0));
-                    push(GridPoint::new(i, CHUNK_SIZE, 0));
-                    push(GridPoint::new(0, i, 0));
-                    push(GridPoint::new(CHUNK_SIZE, i, 0));
+                    push([GridPoint::new(i, 0, 0), GridPoint::new(i, CHUNK_SIZE, 0)]);
+                    push([GridPoint::new(0, i, 0), GridPoint::new(CHUNK_SIZE, i, 0)]);
                 }
             }
         }
@@ -1026,11 +1026,11 @@ impl ParticleSet {
         }
     }
 
-    fn lines(&self) -> impl Iterator<Item = WgpuLinesVertex> + use<> {
+    fn lines(&self) -> impl Iterator<Item = [WgpuLinesVertex; 2]> + use<> {
         // TODO: this simple wireframe cube is a placeholder for more general mechanisms.
         // (But probably we also want to stop using lines, at some point, and use
         // specially-created block meshes instead.)
-        let mut tmp: Vec<WgpuLinesVertex> = Vec::with_capacity(24); // TODO: inefficient allocation per object
+        let mut tmp: Vec<[WgpuLinesVertex; 2]> = Vec::with_capacity(24); // TODO: inefficient allocation per object
         crate::wireframe_vertices::<WgpuLinesVertex, _, _>(
             &mut tmp,
             Rgb::ONE.with_alpha(

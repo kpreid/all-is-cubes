@@ -136,9 +136,8 @@ fn cull_bench(c: &mut Criterion) {
 /// does.
 #[cfg(feature = "rerun")]
 fn dump_frustum_culling() {
-    use all_is_cubes::math::lines::Wireframe as _;
+    use all_is_cubes::math::lines::{self, Wireframe as _};
     use all_is_cubes::rerun_glue as rg;
-    use itertools::Itertools;
 
     let (chart, camera, chunked_bounds) = config();
 
@@ -148,13 +147,12 @@ fn dump_frustum_culling() {
         .unwrap();
 
     let frustum = camera.view_frustum_geometry();
-    let mut frustum_points = Vec::new();
+    let mut frustum_points: Vec<[lines::Vertex; 2]> = Vec::new();
     frustum.wireframe_points(&mut frustum_points);
     let frustum_lines = frustum_points
         .into_iter()
-        .map(|vertex| rg::convert_vec(vertex.position.to_vector()))
-        .tuples()
-        .map(|(a, b)| rg::components::LineStrip3D(vec![a, b]));
+        .map(|line| line.map(|vertex| rg::convert_vec(vertex.position.to_vector())))
+        .map(|[a, b]| rg::components::LineStrip3D(vec![a, b]));
 
     stream
         .log_static(

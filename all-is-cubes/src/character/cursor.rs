@@ -208,7 +208,7 @@ impl fmt::Display for Cursor {
 }
 
 impl lines::Wireframe for Cursor {
-    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
+    fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
         let evaluated = &self.hit().evaluated;
 
         // Compute an approximate offset that will prevent Z-fighting.

@@ -48,7 +48,7 @@ pub struct LightUpdateCubeInfo {
 }
 
 impl lines::Wireframe for LightUpdateCubeInfo {
-    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
+    fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
         // Draw output cube
         self.cube.aab().expand(0.1).wireframe_points(output);
         // Draw rays
@@ -78,7 +78,7 @@ pub struct LightUpdateRayInfo {
 }
 
 impl LightUpdateRayInfo {
-    fn wireframe_points(&self, lit_cube: Cube, output: &mut impl Extend<lines::Vertex>) {
+    fn wireframe_points(&self, lit_cube: Cube, output: &mut impl Extend<[lines::Vertex; 2]>) {
         // TODO: Visualize trigger_cube and value.
 
         // We used to have precise rays, but we don't have them any more.

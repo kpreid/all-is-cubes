@@ -657,7 +657,7 @@ where
     /// * Transparent geometry
     /// * Instanced blocks
     #[doc(hidden)] // TODO: good public API?
-    pub fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<lines::Vertex>) {
+    pub fn chunk_debug_lines(&self, camera: &Camera, output: &mut impl Extend<[lines::Vertex; 2]>) {
         for chunk_mesh in self.iter_in_view(camera) {
             chunk_mesh.chunk.chunk_debug_lines(camera, output);
         }

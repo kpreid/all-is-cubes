@@ -126,7 +126,7 @@ impl fmt::Debug for Contact {
 }
 
 impl lines::Wireframe for Contact {
-    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
+    fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
         match self {
             Contact::Block(cube_face) => cube_face.wireframe_points(output),
             Contact::Voxel {
@@ -135,13 +135,12 @@ impl lines::Wireframe for Contact {
                 voxel,
             } => {
                 let resolution: FreeCoordinate = (*resolution).into();
-                voxel.wireframe_points(&mut MapExtend::new(
-                    output,
-                    |mut vert: lines::Vertex| {
+                voxel.wireframe_points(&mut MapExtend::new(output, |line: [lines::Vertex; 2]| {
+                    line.map(|mut vert| {
                         vert.position = vert.position / resolution + cube.aab().lower_bounds_v();
                         vert
-                    },
-                ))
+                    })
+                }))
             }
         }
     }

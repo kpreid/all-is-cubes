@@ -421,19 +421,21 @@ impl From<Aab> for euclid::Box3D<FreeCoordinate, Cube> {
 
 impl lines::Wireframe for Aab {
     #[inline(never)]
-    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
+    fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
         #[rustfmt::skip]
-        const WIREFRAME: &[Octant; 24] = {
+        const WIREFRAME: &[[Octant; 2]; 12] = {
             use Octant::*;
             &[
-                Nnn, Nnp, Npn, Npp, Pnn, Pnp, Ppn, Ppp,
-                Nnn, Npn, Nnp, Npp, Pnn, Ppn, Pnp, Ppp,
-                Nnn, Pnn, Nnp, Pnp, Npn, Ppn, Npp, Ppp,
+                [Nnn, Nnp], [Npn, Npp], [Pnn, Pnp], [Ppn, Ppp],
+                [Nnn, Npn], [Nnp, Npp], [Pnn, Ppn], [Pnp, Ppp],
+                [Nnn, Pnn], [Nnp, Pnp], [Npn, Ppn], [Npp, Ppp],
             ]
         };
-        output.extend(WIREFRAME.iter().map(|&corner| lines::Vertex {
-            position: self.corner_point(corner),
-            color: None,
+        output.extend(WIREFRAME.iter().map(|&corners| {
+            corners.map(|corner| lines::Vertex {
+                position: self.corner_point(corner),
+                color: None,
+            })
         }));
     }
 }
@@ -543,9 +545,9 @@ mod tests {
     #[test]
     fn wireframe_smoke_test() {
         let aab: Aab = Cube::new(1, 2, 3).aab();
-        let mut wireframe: Vec<lines::Vertex> = Vec::new();
+        let mut wireframe: Vec<[lines::Vertex; 2]> = Vec::new();
         aab.wireframe_points(&mut wireframe);
-        for lines::Vertex { position, color } in wireframe {
+        for &lines::Vertex { position, color } in wireframe.iter().flatten() {
             assert!(color.is_none());
             assert!(position.x == 1.0 || position.x == 2.0);
             assert!(position.y == 2.0 || position.y == 3.0);

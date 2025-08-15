@@ -234,7 +234,7 @@ impl From<Aabb> for Box3D<f64, MeshRel> {
 }
 
 impl lines::Wireframe for Aabb {
-    fn wireframe_points<E: Extend<lines::Vertex>>(&self, output: &mut E) {
+    fn wireframe_points<E: Extend<[lines::Vertex; 2]>>(&self, output: &mut E) {
         <Option<Aab>>::from(*self).wireframe_points(output)
     }
 }
