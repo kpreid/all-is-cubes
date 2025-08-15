@@ -251,22 +251,18 @@ impl lines::Wireframe for Cursor {
             );
 
             let inset = 1. / 128.;
-            for &p in [
-                point3(inset, inset, -offset_from_surface),
-                point3(inset, 1. - inset, -offset_from_surface),
-                point3(1. - inset, 1. - inset, -offset_from_surface),
-                point3(1. - inset, inset, -offset_from_surface),
-                point3(inset, inset, -offset_from_surface),
-            ]
-            .windows(2)
-            .flatten()
-            {
-                let position = face_transform_full.transform_point3d(p).unwrap();
-                output.extend([lines::Vertex {
-                    position,
+            output.extend(lines::line_loop(
+                [
+                    point3(inset, inset, -offset_from_surface),
+                    point3(inset, 1. - inset, -offset_from_surface),
+                    point3(1. - inset, 1. - inset, -offset_from_surface),
+                    point3(1. - inset, inset, -offset_from_surface),
+                ]
+                .map(|p| lines::Vertex {
+                    position: face_transform_full.transform_point3d(p).unwrap(),
                     color: Some(palette::CURSOR_OUTLINE),
-                }]);
-            }
+                }),
+            ));
         }
 
         // Frame the cursor intersection point with a diamond.
@@ -274,20 +270,19 @@ impl lines::Wireframe for Cursor {
         // For now, it visualizes the intersection and face information.
         if let Ok(face) = Face6::try_from(self.face_entered) {
             let face_transform_axes_only = face.rotation_from_nz().to_rotation_matrix().to_free();
-            for f in [Face7::PX, Face7::PY, Face7::NX, Face7::NY, Face7::PX]
-                .windows(2)
-                .flatten()
-            {
-                let tip: FreeVector = face_transform_axes_only
-                    .transform_vector3d(f.normal_vector::<_, Cube>() * (1.0 / 32.0));
-                let position = self.point_entered
-                    + self.face_entered.normal_vector() * offset_from_surface
-                    + tip;
-                output.extend([lines::Vertex {
-                    position,
-                    color: Some(palette::CURSOR_OUTLINE),
-                }]);
-            }
+            output.extend(lines::line_loop(
+                [Face7::PX, Face7::PY, Face7::NX, Face7::NY].map(|f| {
+                    let tip: FreeVector = face_transform_axes_only
+                        .transform_vector3d(f.normal_vector::<_, Cube>() * (1.0 / 32.0));
+                    let position = self.point_entered
+                        + self.face_entered.normal_vector() * offset_from_surface
+                        + tip;
+                    lines::Vertex {
+                        position,
+                        color: Some(palette::CURSOR_OUTLINE),
+                    }
+                }),
+            ));
         }
     }
 }
