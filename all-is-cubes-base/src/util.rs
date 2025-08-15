@@ -130,29 +130,25 @@ mod error_chain {
     }
 }
 
-/// Equivalent of [`Iterator::map`] but applied to an [`Extend`] instead, transforming
-/// the incoming elements.
+/// Transforms the items entering an [`Extend`] implementation with a provided function.
 ///
 /// TODO: this is only used by the wireframe debug mesh mechanism and should be reconsidered
 #[doc(hidden)] // pub to be used by all-is-cubes-gpu
 #[derive(Debug)]
-pub struct MapExtend<'a, A, B, T, F>
-where
-    T: Extend<B>,
-    F: Fn(A) -> B,
-{
-    target: &'a mut T,
+pub struct MapExtend<'t, In, T, F> {
+    target: &'t mut T,
     function: F,
-    _input: PhantomData<fn(A)>,
+    _input: PhantomData<fn(In)>,
 }
 
-impl<'a, A, B, T, F> MapExtend<'a, A, B, T, F>
+impl<'t, In, Out, T, F> MapExtend<'t, In, T, F>
 where
-    T: Extend<B>,
-    F: Fn(A) -> B,
+    // These bounds are not strictly necessary, but allow better type inference for closures.
+    T: Extend<Out>,
+    F: Fn(In) -> Out,
 {
     #[inline]
-    pub fn new(target: &'a mut T, function: F) -> Self {
+    pub fn new(target: &'t mut T, function: F) -> Self {
         Self {
             target,
             function,
@@ -161,15 +157,15 @@ where
     }
 }
 
-impl<A, B, T, F> Extend<A> for MapExtend<'_, A, B, T, F>
+impl<In, Out, T, F> Extend<In> for MapExtend<'_, In, T, F>
 where
-    T: Extend<B>,
-    F: Fn(A) -> B,
+    T: Extend<Out>,
+    F: Fn(In) -> Out,
 {
     #[inline]
     fn extend<I>(&mut self, iter: I)
     where
-        I: IntoIterator<Item = A>,
+        I: IntoIterator<Item = In>,
     {
         self.target.extend(iter.into_iter().map(&self.function));
     }
