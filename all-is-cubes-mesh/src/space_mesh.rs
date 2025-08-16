@@ -757,14 +757,6 @@ impl<M: MeshTypes> MeshMeta<M> {
         self.flaws
     }
 
-    /// Returns the number of vertex indices in this mesh (three times the number of
-    /// triangles).
-    // TODO(instancing): this exists to match `BlockMesh::count_indices()`.
-    #[allow(unused)]
-    pub(crate) fn count_indices(&self) -> usize {
-        self.opaque_range.len() + self.transparent_range(DepthOrdering::ANY).len()
-    }
-
     /// The range of index data which contains the triangles with only alpha values
     /// of 0 or 1 and therefore may be drawn using a depth buffer rather than sorting.
     #[inline]
@@ -1303,7 +1295,8 @@ mod tests {
         assert!(mesh.is_empty());
         assert_eq!(mesh.vertices(), (&[][..], &[][..]));
         assert_eq!(mesh.indices(), IndexSlice::U16(&[]));
-        assert_eq!(mesh.count_indices(), 0);
+        assert_eq!(mesh.opaque_range(), 0..0);
+        assert_eq!(mesh.transparent_range(DepthOrdering::WITHIN), 0..0);
         assert_eq!(dbg!(mesh.total_byte_size()), size_of::<TestMesh>());
     }
 
@@ -1314,7 +1307,7 @@ mod tests {
             .build();
         let (_, _, mesh) = mesh_blocks_and_space(&space);
 
-        assert_eq!(mesh.count_indices(), 6 /* faces */ * 6 /* vertices */);
+        assert_eq!(mesh.indices().len(), 6 /* faces */ * 6 /* vertices */);
 
         let expected_data_size = size_of_val::<[BlockVertex<TexPoint>]>(mesh.vertices().0)
             + mesh.indices().as_bytes().len();
