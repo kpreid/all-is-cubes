@@ -60,14 +60,15 @@ pub type Position = Point3D<PosCoord, MeshRel>;
 /// Because All is Cubes voxels have side lengths that are powers of 2 down to
 /// 1/128 = 2<sup>-7</sup>, and [`f32`] has 24 bits of significand,
 /// this means that *no* rounding errors will occur until the size of a single mesh is at least
-/// 2<sup>24 - 7</sup> = 2<sup>17</sup> = 131,072 blocks.
+/// 2<sup>24 - 7</sup> = 2<sup>17</sup> = 131,072 blocks on some axis.
 /// You do not need to worry about floating-point inaccuracy unless your mesh is extremely long
 /// and narrow, or you translate the mesh’s coordinates to a global coordinate system.
 pub type PosCoord = f32;
 
-/// Basic vertex data type for a [`BlockMesh`].
-/// Implement <code>[`From`]&lt;[`BlockVertex`]&gt;</code> (and usually [`Vertex`])
-/// to provide a specialized version fit for the target graphics API.
+/// Built-in vertex type for [`BlockMesh`]es.
+///
+/// Meshes can and should contain your choice of vertex type as long as it is convertible
+/// from this type using [`Vertex::from_block_vertex()`].
 ///
 /// `T` is the type of texture-coordinate points being used. That is, one `T` value
 /// should identify one point in the block's 3D texture, such as `T = Point3<f32>`).
@@ -115,7 +116,7 @@ impl<T: Clone> BlockVertex<T> {
     }
 }
 
-/// Describes the two ways a [`BlockVertex`] may be colored; by a solid color or by a texture.
+/// Two ways a [`BlockVertex`] may be colored: by a solid color or by a texture.
 ///
 /// `T` is the type of texture-coordinate points being used. That is, one `T` value
 /// should identify one point in the block's 3D texture, such as `T = Point3<f32>`).

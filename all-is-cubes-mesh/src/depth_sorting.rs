@@ -21,7 +21,7 @@ use crate::{MeshMeta, SpaceMesh};
 
 // -------------------------------------------------------------------------------------------------
 
-/// Identifies a back-to-front order in which to draw triangles (of a [`SpaceMesh`]),
+/// Identifies a back-to-front order in which to draw transparent triangles (of a [`SpaceMesh`]),
 /// based on the direction from which they are being viewed.
 ///
 /// Create this using [`DepthOrdering::from_view_of_aabb()`], then use it in

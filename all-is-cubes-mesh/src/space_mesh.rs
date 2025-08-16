@@ -20,11 +20,13 @@ use crate::{
 
 // -------------------------------------------------------------------------------------------------
 
-/// A triangle mesh representation of a [`Space`] (or part of it) which may
-/// then be rasterized.
+/// A triangle mesh representation of a [`Space`] (or part of it).
 ///
-/// A [`SpaceMesh`] may be used multiple times as a [`Space`] is modified.
-/// Currently, the only benefit of this is avoiding reallocating memory.
+/// [`SpaceMesh`]es are assembled from [`BlockMesh`]es.
+///
+/// A [`SpaceMesh`] may be reused as a [`Space`] is modified by calling [`SpaceMesh::compute()`].
+/// Currently, the only benefit of this is avoiding reallocating memory;
+/// there is not yet any support for patching existing meshes to reflect small changes.
 ///
 /// The type parameter `M` allows generating meshes suitable for the target graphics API by
 /// providing a suitable implementation of [`MeshTypes`].
@@ -646,8 +648,9 @@ impl Snapshot {
 
 /// Source of [`BlockMesh`] values to be assembled into a [`SpaceMesh`].
 ///
-/// This trait allows the caller of [`SpaceMesh::compute`] to provide an implementation
-/// which, for example, lazily computes meshes, or detects which meshes have been used.
+/// This trait allows the caller of [`SpaceMesh::compute()`] to provide an implementation
+/// which, for example, lazily computes meshes, detects which meshes have been used, or
+/// excludes certain blocks from the mesh.
 pub trait GetBlockMesh<'a, M: MeshTypes> {
     /// Returns a mesh which depicts the block which is the `index`-th element of
     /// [`Space::block_data()`] in the relevant [`Space`].

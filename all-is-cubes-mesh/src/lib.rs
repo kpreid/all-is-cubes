@@ -71,6 +71,8 @@ mod tests;
 /// Creating this and comparing it against a previous instance is appropriate for
 /// determining when to invalidate previously computed meshes. This type is also intended
 /// to make the API future-proof against additional configuration being needed.
+///
+/// See also [`MeshTypes`] for statically chosen properties of meshes.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct MeshOptions {

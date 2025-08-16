@@ -32,9 +32,9 @@ mod tests;
 
 /// A triangle mesh for a single [`Block`].
 ///
-/// Get it from [`BlockMesh::new()`] or [`block_meshes_for_space`].
-/// Pass it to [`SpaceMesh::new()`] to assemble
-/// blocks into an entire scene or chunk.
+/// Get it from [`BlockMesh::new()`] or [`block_meshes_for_space()`].
+/// Pass it to [`SpaceMesh::new()`] to assemble blocks into an entire scene or chunk.
+/// You can also convert a single block mesh directly to [`SpaceMesh`] using [`From`].
 ///
 /// The type parameter `M` allows generating meshes suitable for the target graphics API by
 /// providing a suitable implementation of [`MeshTypes`].
