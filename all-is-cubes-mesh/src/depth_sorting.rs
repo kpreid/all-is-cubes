@@ -71,7 +71,8 @@ impl DepthOrdering {
     pub(crate) fn to_index(self) -> usize {
         let [x, y, z] = self.0.into();
 
-        // This is the same ordering as `exhaust()` gives (not that that matters)
+        // This is the same ordering as `exhaust()` gives,
+        // which matters for debug formatting elsewhere but not for functionality.
         (x as usize * 3 + y as usize) * 3 + z as usize
     }
 
