@@ -760,7 +760,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                 Chunk scan     {chunk_scan_time}
                       mesh gen {chunk_mesh_generation_times}
                       inst gen {chunk_instance_generation_times}
-                      Z sort   {depth_sort_times} ({quads_sorted:5} quads grouped in {groups_sorted:2} dyn + {static_groups_sorted:2} static)
+                      Z sort   {depth_sort_times} ({quads_sorted:6} quads grouped in {groups_sorted:3} dyn + {static_groups_sorted:3} static)
                       upload   {chunk_mesh_callback_times}
                 Mem: {chunk_mib} MiB for {chunk_count} chunks\
             "},
