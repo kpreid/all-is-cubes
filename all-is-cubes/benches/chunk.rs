@@ -147,17 +147,13 @@ fn dump_frustum_culling() {
         .unwrap();
 
     let frustum = camera.view_frustum_geometry();
-    let mut frustum_points: Vec<[lines::Vertex; 2]> = Vec::new();
-    frustum.wireframe_points(&mut frustum_points);
-    let frustum_lines = frustum_points
-        .into_iter()
-        .map(|line| line.map(|vertex| rg::convert_vec(vertex.position.to_vector())))
-        .map(|[a, b]| rg::components::LineStrip3D(vec![a, b]));
+    let mut frustum_lines: Vec<[lines::Vertex; 2]> = Vec::new();
+    frustum.wireframe_points(&mut frustum_lines);
 
     stream
         .log_static(
             rg::entity_path!["frustum"],
-            &rg::archetypes::LineStrips3D::new(frustum_lines),
+            &rg::convert_lines(&frustum_lines, None),
         )
         .unwrap();
     stream

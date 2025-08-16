@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use crate::math::{self, Axis, Rgb, rgba_const};
+use crate::math::{self, Axis, Rgb, Rgba, lines, rgba_const};
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
 pub use re_log_types::{EntityPath, entity_path};
@@ -244,6 +244,30 @@ pub fn convert_grid_aabs(aabs: impl IntoIterator<Item = math::GridAab>) -> arche
         math::FreeVector::zero(),
     )
 }
+
+/// Convert [`lines`] to [`archetypes::LineStrips3D`].
+///
+/// If `fallback_color` is given, it will be used to color lines that have no vertex color.
+/// If it is [`None`], then the input colors will be discarded.
+pub fn convert_lines(
+    lines: &[[lines::Vertex; 2]],
+    fallback_color: Option<Rgba>,
+) -> archetypes::LineStrips3D {
+    let mut entity = archetypes::LineStrips3D::new(lines.iter().map(|&[a, b]| {
+        components::LineStrip3D(vec![
+            convert_vec(a.position.to_vector()),
+            convert_vec(b.position.to_vector()),
+        ])
+    }));
+    if let Some(fallback_color) = fallback_color {
+        entity =
+            entity.with_colors(lines.iter().map(|&[a, b]| {
+                components::Color(a.color.or(b.color).unwrap_or(fallback_color).into())
+            }))
+    }
+    entity
+}
+
 pub fn convert_camera_to_pinhole(
     camera: &crate::camera::Camera,
 ) -> (archetypes::Pinhole, archetypes::Transform3D) {
