@@ -368,6 +368,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
 
             let index_range =
                 extend_giving_range(indices, transparent_indices.values().flatten().copied());
+            debug_assert!(!index_range.is_empty());
             *meta = TransparentMeta {
                 // Always dynamically sort everything.
                 dynamic_sub_ranges: SmallVec::from([0..index_range.len()]),
@@ -385,8 +386,13 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
                     .flat_map(|(_, index_vec)| index_vec.iter().copied()),
             );
             *meta = TransparentMeta {
-                // Haven't performed any sorting yet, so there is no region of validity.
-                depth_sort_validity: Aabb::EMPTY,
+                depth_sort_validity: if index_range.is_empty() {
+                    // Everything was culled, so no sorting needed.
+                    Aabb::EVERYWHERE
+                } else {
+                    // Haven't performed any sorting yet, so there is no region of validity.
+                    Aabb::EMPTY
+                },
                 // dynamic_sub_ranges will be computed when the sort is performed.
                 dynamic_sub_ranges: SmallVec::new(),
                 index_range,
@@ -734,7 +740,7 @@ mod tests {
     use super::*;
     use all_is_cubes::block;
     use all_is_cubes::euclid::point3;
-    use all_is_cubes::math::{Aab, GridAab};
+    use all_is_cubes::math::{Aab, Cube, GridAab};
     use all_is_cubes::space::Space;
 
     #[test]
@@ -860,7 +866,7 @@ mod tests {
             .unwrap();
         let (_, _, mut space_mesh) = crate::testing::mesh_blocks_and_space(&space);
 
-        let info = space_mesh.depth_sort_for_view(DepthOrdering::WITHIN, point3(0., 0., 0.));
+        let result = space_mesh.depth_sort_for_view(DepthOrdering::WITHIN, point3(0., 0., 0.));
 
         assert_ne!(
             space_mesh.opaque_range(),
@@ -868,7 +874,7 @@ mod tests {
             "if the opaque range is empty then this test is not sufficient"
         );
         assert_eq!(
-            info,
+            result,
             if transparent {
                 DepthSortResult {
                     // other cases might have shorter rather than equal ranges
@@ -890,5 +896,48 @@ mod tests {
                 }
             }
         );
+    }
+
+    /// Regression test for a bug when an index list turns out to be empty after culling.
+    #[test]
+    fn empty_after_culling() {
+        let opaque_block = &block::from_color!(1.0, 0.0, 0.0, 1.0);
+        let transparent_block = &block::from_color!(1.0, 0.0, 0.0, 0.5);
+        let space = Space::builder(GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]))
+            .build_and_mutate(|m| {
+                let center = Cube::ORIGIN;
+                m.set(center, transparent_block)?;
+                // Cover all but one face of the transparent block,
+                // so the mesh contains only that face.
+                for face in Face6::ALL {
+                    if face != Face6::PZ {
+                        m.set(center + face, opaque_block)?;
+                    }
+                }
+                Ok(())
+            })
+            .unwrap();
+        let (_, _, mut space_mesh) = crate::testing::mesh_blocks_and_space(&space);
+
+        let ordering_with_face = DepthOrdering(vec3(Rel::Within, Rel::Within, Rel::Higher));
+        let ordering_with_nothing = DepthOrdering(vec3(Rel::Within, Rel::Within, Rel::Lower));
+        let position_with_nothing = Position::new(0.5, 0.5, 10.0);
+        assert_eq!(
+            (
+                space_mesh.transparent_range(ordering_with_face).len(),
+                space_mesh.transparent_range(ordering_with_nothing).len()
+            ),
+            (6, 0),
+            "expected culling did not occur; test is invalid"
+        );
+
+        assert!(
+            !space_mesh.needs_depth_sorting(ordering_with_nothing, position_with_nothing),
+            "sorting should be unnecessary since the range is empty; test failed"
+        );
+
+        // this should succeed without tripping any assertions
+        let result = space_mesh.depth_sort_for_view(ordering_with_nothing, position_with_nothing);
+        assert_eq!(result.changed, None);
     }
 }
