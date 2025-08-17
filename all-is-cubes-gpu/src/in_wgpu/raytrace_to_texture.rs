@@ -394,7 +394,8 @@ impl Inner {
         let render_viewport = self.update_strategy.render_viewport();
         let scene = self.rtr.scene::<Split>();
         let camera = &scene.cameras().world;
-        let exposure = camera.exposure().into_inner();
+        let exposure_world = camera.exposure().into_inner();
+        let exposure_ui = scene.cameras().ui.exposure().into_inner();
 
         // Compute the transformation which maps ray distance back to world-space distance.
         //
@@ -434,9 +435,16 @@ impl Inner {
             });
 
             // Note: these are *not* postprocessed colors, because we let the GPU do that.
-            // TODO: We should let the GPU do exposure too (needs rejiggering the uniform buffer).
+            // But exposure is not part of postprocessing.
             let color: [f16; 4] = {
                 let [r, g, b, a]: [f32; 4] = color_buf.into_premultiplied_rgba();
+                // TODO: this is wrong in case of ui transparency, and we should actually
+                // be tracing world and ui separately to combine them properly.
+                let exposure = match layer {
+                    Some(InLayer::Ui) => exposure_ui,
+                    Some(InLayer::World) => exposure_world,
+                    None => 1.0,
+                };
                 [
                     f16::from_f32(r * exposure),
                     f16::from_f32(g * exposure),
