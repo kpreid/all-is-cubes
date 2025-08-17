@@ -430,7 +430,8 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
     // Figure out what ranges of this sorting result need to be sorted dynamically,
     // store them in `dynamic_sub_ranges`,
     // and update `depth_sort_validity` to reflect the new state.
-    match ordering.within_on_axes() {
+    let within_on_axes = ordering.within_on_axes();
+    match within_on_axes {
         _ if indices.is_empty() => {
             // There are no quads to sort, so don't generate any range (that would be empty).
             // It is an invariant of `TransparentMeta` that `dynamic_sub_ranges` contains no
@@ -485,8 +486,12 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
         4.. => unreachable!(),
     }
 
-    // Ensure we have signaled initialization.
-    debug_assert!(!meta.needs_static_sort());
+    // Ensure we have signaled initialization and won't sort again.
+    debug_assert!(
+        !meta.needs_static_sort(),
+        "failed to mark mesh as having completed its static depth sort; \
+        ordering = {ordering:?}, within_on_axes = {within_on_axes}, meta = {meta:#?}"
+    );
 }
 
 /// Sort the existing indices of `indices[range]` for exactly the given view position.
