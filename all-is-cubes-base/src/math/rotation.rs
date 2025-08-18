@@ -469,22 +469,26 @@ impl GridRotation {
     /// applied zero times. The iterator ends when the sequence would repeat itself, i.e.
     /// just before it would produce the identity again.
     ///
+    /// # Example results of iteration
+    ///
     /// ```
     /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::Face6::*;
-    /// use all_is_cubes::math::GridRotation;
+    /// use all_is_cubes::math::{Face6::*, GridRotation};
     ///
+    /// // The identity rotation remains itself when iterated.
     /// assert_eq!(
     ///     GridRotation::IDENTITY.iterate().collect::<Vec<_>>(),
     ///     vec![GridRotation::IDENTITY],
     /// );
     ///
+    /// // Any reflection or 180° rotation will produce itself and the identity.
     /// let x_reflection = GridRotation::from_basis([NX, PY, PZ]);
     /// assert_eq!(
     ///     x_reflection.iterate().collect::<Vec<_>>(),
     ///     vec![GridRotation::IDENTITY, x_reflection],
     /// );
     ///
+    /// // Any 90° rotation produces four distinct rotations.
     /// assert_eq!(
     ///     PY.clockwise().iterate().collect::<Vec<_>>(),
     ///     vec![
