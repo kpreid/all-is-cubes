@@ -501,16 +501,19 @@ impl GridRotation {
     /// ```
     #[allow(clippy::missing_inline_in_public_items)]
     pub fn iterate(self) -> impl Iterator<Item = Self> {
-        let mut item = Self::IDENTITY;
-        core::iter::once(Self::IDENTITY).chain(core::iter::from_fn(move || {
-            item = item * self;
-            if item == Self::IDENTITY {
-                // Cycled back to start; time to stop
-                None
+        let mut state = Some(Self::IDENTITY);
+        core::iter::from_fn(move || {
+            let current = state?;
+            let next = current * self;
+            if next == Self::IDENTITY {
+                // If we would produce the identity *next time*, then we have produced the
+                // complete cycle and should end iteration.
+                state = None;
             } else {
-                Some(item)
+                state = Some(next);
             }
-        }))
+            Some(current)
+        })
     }
 }
 
