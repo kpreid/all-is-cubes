@@ -556,9 +556,70 @@ impl Mul<Self> for GridRotation {
     /// ```
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
-        Self::from_basis(rhs.to_basis().map(|v| self.transform(v)))
+        MULTIPLICATION_TABLE[rhs as usize][self as usize]
     }
 }
+
+/// Indices are the discriminants of the first (RHS) and second (LHS) rotations to be composed.
+/// `tests::regenerate_multiplication_table()` may generate a new version of this table (while
+/// checking the current one).
+/// 
+/// Note that this table *must* be a `static` or we’ll get excess copies of it significantly
+/// increasing the binary size.
+#[rustfmt::skip]
+static MULTIPLICATION_TABLE: [[GridRotation; 48]; 48] = {
+    use GridRotation::*;
+    [
+        [RXYZ,RXYz,RXyZ,RXyz,RxYZ,RxYz,RxyZ,Rxyz,RXZY,RXZy,RXzY,RXzy,RxZY,RxZy,RxzY,Rxzy,RYXZ,RYXz,RYxZ,RYxz,RyXZ,RyXz,RyxZ,Ryxz,RYZX,RYZx,RYzX,RYzx,RyZX,RyZx,RyzX,Ryzx,RZXY,RZXy,RZxY,RZxy,RzXY,RzXy,RzxY,Rzxy,RZYX,RZYx,RZyX,RZyx,RzYX,RzYx,RzyX,Rzyx,],
+        [RXYz,RXYZ,RXyz,RXyZ,RxYz,RxYZ,Rxyz,RxyZ,RXZy,RXZY,RXzy,RXzY,RxZy,RxZY,Rxzy,RxzY,RYXz,RYXZ,RYxz,RYxZ,RyXz,RyXZ,Ryxz,RyxZ,RYZx,RYZX,RYzx,RYzX,RyZx,RyZX,Ryzx,RyzX,RZXy,RZXY,RZxy,RZxY,RzXy,RzXY,Rzxy,RzxY,RZYx,RZYX,RZyx,RZyX,RzYx,RzYX,Rzyx,RzyX,],
+        [RXyZ,RXyz,RXYZ,RXYz,RxyZ,Rxyz,RxYZ,RxYz,RXzY,RXzy,RXZY,RXZy,RxzY,Rxzy,RxZY,RxZy,RYxZ,RYxz,RYXZ,RYXz,RyxZ,Ryxz,RyXZ,RyXz,RYzX,RYzx,RYZX,RYZx,RyzX,Ryzx,RyZX,RyZx,RZxY,RZxy,RZXY,RZXy,RzxY,Rzxy,RzXY,RzXy,RZyX,RZyx,RZYX,RZYx,RzyX,Rzyx,RzYX,RzYx,],
+        [RXyz,RXyZ,RXYz,RXYZ,Rxyz,RxyZ,RxYz,RxYZ,RXzy,RXzY,RXZy,RXZY,Rxzy,RxzY,RxZy,RxZY,RYxz,RYxZ,RYXz,RYXZ,Ryxz,RyxZ,RyXz,RyXZ,RYzx,RYzX,RYZx,RYZX,Ryzx,RyzX,RyZx,RyZX,RZxy,RZxY,RZXy,RZXY,Rzxy,RzxY,RzXy,RzXY,RZyx,RZyX,RZYx,RZYX,Rzyx,RzyX,RzYx,RzYX,],
+        [RxYZ,RxYz,RxyZ,Rxyz,RXYZ,RXYz,RXyZ,RXyz,RxZY,RxZy,RxzY,Rxzy,RXZY,RXZy,RXzY,RXzy,RyXZ,RyXz,RyxZ,Ryxz,RYXZ,RYXz,RYxZ,RYxz,RyZX,RyZx,RyzX,Ryzx,RYZX,RYZx,RYzX,RYzx,RzXY,RzXy,RzxY,Rzxy,RZXY,RZXy,RZxY,RZxy,RzYX,RzYx,RzyX,Rzyx,RZYX,RZYx,RZyX,RZyx,],
+        [RxYz,RxYZ,Rxyz,RxyZ,RXYz,RXYZ,RXyz,RXyZ,RxZy,RxZY,Rxzy,RxzY,RXZy,RXZY,RXzy,RXzY,RyXz,RyXZ,Ryxz,RyxZ,RYXz,RYXZ,RYxz,RYxZ,RyZx,RyZX,Ryzx,RyzX,RYZx,RYZX,RYzx,RYzX,RzXy,RzXY,Rzxy,RzxY,RZXy,RZXY,RZxy,RZxY,RzYx,RzYX,Rzyx,RzyX,RZYx,RZYX,RZyx,RZyX,],
+        [RxyZ,Rxyz,RxYZ,RxYz,RXyZ,RXyz,RXYZ,RXYz,RxzY,Rxzy,RxZY,RxZy,RXzY,RXzy,RXZY,RXZy,RyxZ,Ryxz,RyXZ,RyXz,RYxZ,RYxz,RYXZ,RYXz,RyzX,Ryzx,RyZX,RyZx,RYzX,RYzx,RYZX,RYZx,RzxY,Rzxy,RzXY,RzXy,RZxY,RZxy,RZXY,RZXy,RzyX,Rzyx,RzYX,RzYx,RZyX,RZyx,RZYX,RZYx,],
+        [Rxyz,RxyZ,RxYz,RxYZ,RXyz,RXyZ,RXYz,RXYZ,Rxzy,RxzY,RxZy,RxZY,RXzy,RXzY,RXZy,RXZY,Ryxz,RyxZ,RyXz,RyXZ,RYxz,RYxZ,RYXz,RYXZ,Ryzx,RyzX,RyZx,RyZX,RYzx,RYzX,RYZx,RYZX,Rzxy,RzxY,RzXy,RzXY,RZxy,RZxY,RZXy,RZXY,Rzyx,RzyX,RzYx,RzYX,RZyx,RZyX,RZYx,RZYX,],
+        [RXZY,RXzY,RXZy,RXzy,RxZY,RxzY,RxZy,Rxzy,RXYZ,RXyZ,RXYz,RXyz,RxYZ,RxyZ,RxYz,Rxyz,RYZX,RYzX,RYZx,RYzx,RyZX,RyzX,RyZx,Ryzx,RYXZ,RYxZ,RYXz,RYxz,RyXZ,RyxZ,RyXz,Ryxz,RZYX,RZyX,RZYx,RZyx,RzYX,RzyX,RzYx,Rzyx,RZXY,RZxY,RZXy,RZxy,RzXY,RzxY,RzXy,Rzxy,],
+        [RXZy,RXzy,RXZY,RXzY,RxZy,Rxzy,RxZY,RxzY,RXYz,RXyz,RXYZ,RXyZ,RxYz,Rxyz,RxYZ,RxyZ,RYZx,RYzx,RYZX,RYzX,RyZx,Ryzx,RyZX,RyzX,RYXz,RYxz,RYXZ,RYxZ,RyXz,Ryxz,RyXZ,RyxZ,RZYx,RZyx,RZYX,RZyX,RzYx,Rzyx,RzYX,RzyX,RZXy,RZxy,RZXY,RZxY,RzXy,Rzxy,RzXY,RzxY,],
+        [RXzY,RXZY,RXzy,RXZy,RxzY,RxZY,Rxzy,RxZy,RXyZ,RXYZ,RXyz,RXYz,RxyZ,RxYZ,Rxyz,RxYz,RYzX,RYZX,RYzx,RYZx,RyzX,RyZX,Ryzx,RyZx,RYxZ,RYXZ,RYxz,RYXz,RyxZ,RyXZ,Ryxz,RyXz,RZyX,RZYX,RZyx,RZYx,RzyX,RzYX,Rzyx,RzYx,RZxY,RZXY,RZxy,RZXy,RzxY,RzXY,Rzxy,RzXy,],
+        [RXzy,RXZy,RXzY,RXZY,Rxzy,RxZy,RxzY,RxZY,RXyz,RXYz,RXyZ,RXYZ,Rxyz,RxYz,RxyZ,RxYZ,RYzx,RYZx,RYzX,RYZX,Ryzx,RyZx,RyzX,RyZX,RYxz,RYXz,RYxZ,RYXZ,Ryxz,RyXz,RyxZ,RyXZ,RZyx,RZYx,RZyX,RZYX,Rzyx,RzYx,RzyX,RzYX,RZxy,RZXy,RZxY,RZXY,Rzxy,RzXy,RzxY,RzXY,],
+        [RxZY,RxzY,RxZy,Rxzy,RXZY,RXzY,RXZy,RXzy,RxYZ,RxyZ,RxYz,Rxyz,RXYZ,RXyZ,RXYz,RXyz,RyZX,RyzX,RyZx,Ryzx,RYZX,RYzX,RYZx,RYzx,RyXZ,RyxZ,RyXz,Ryxz,RYXZ,RYxZ,RYXz,RYxz,RzYX,RzyX,RzYx,Rzyx,RZYX,RZyX,RZYx,RZyx,RzXY,RzxY,RzXy,Rzxy,RZXY,RZxY,RZXy,RZxy,],
+        [RxZy,Rxzy,RxZY,RxzY,RXZy,RXzy,RXZY,RXzY,RxYz,Rxyz,RxYZ,RxyZ,RXYz,RXyz,RXYZ,RXyZ,RyZx,Ryzx,RyZX,RyzX,RYZx,RYzx,RYZX,RYzX,RyXz,Ryxz,RyXZ,RyxZ,RYXz,RYxz,RYXZ,RYxZ,RzYx,Rzyx,RzYX,RzyX,RZYx,RZyx,RZYX,RZyX,RzXy,Rzxy,RzXY,RzxY,RZXy,RZxy,RZXY,RZxY,],
+        [RxzY,RxZY,Rxzy,RxZy,RXzY,RXZY,RXzy,RXZy,RxyZ,RxYZ,Rxyz,RxYz,RXyZ,RXYZ,RXyz,RXYz,RyzX,RyZX,Ryzx,RyZx,RYzX,RYZX,RYzx,RYZx,RyxZ,RyXZ,Ryxz,RyXz,RYxZ,RYXZ,RYxz,RYXz,RzyX,RzYX,Rzyx,RzYx,RZyX,RZYX,RZyx,RZYx,RzxY,RzXY,Rzxy,RzXy,RZxY,RZXY,RZxy,RZXy,],
+        [Rxzy,RxZy,RxzY,RxZY,RXzy,RXZy,RXzY,RXZY,Rxyz,RxYz,RxyZ,RxYZ,RXyz,RXYz,RXyZ,RXYZ,Ryzx,RyZx,RyzX,RyZX,RYzx,RYZx,RYzX,RYZX,Ryxz,RyXz,RyxZ,RyXZ,RYxz,RYXz,RYxZ,RYXZ,Rzyx,RzYx,RzyX,RzYX,RZyx,RZYx,RZyX,RZYX,Rzxy,RzXy,RzxY,RzXY,RZxy,RZXy,RZxY,RZXY,],
+        [RYXZ,RYXz,RyXZ,RyXz,RYxZ,RYxz,RyxZ,Ryxz,RZXY,RZXy,RzXY,RzXy,RZxY,RZxy,RzxY,Rzxy,RXYZ,RXYz,RxYZ,RxYz,RXyZ,RXyz,RxyZ,Rxyz,RZYX,RZYx,RzYX,RzYx,RZyX,RZyx,RzyX,Rzyx,RXZY,RXZy,RxZY,RxZy,RXzY,RXzy,RxzY,Rxzy,RYZX,RYZx,RyZX,RyZx,RYzX,RYzx,RyzX,Ryzx,],
+        [RYXz,RYXZ,RyXz,RyXZ,RYxz,RYxZ,Ryxz,RyxZ,RZXy,RZXY,RzXy,RzXY,RZxy,RZxY,Rzxy,RzxY,RXYz,RXYZ,RxYz,RxYZ,RXyz,RXyZ,Rxyz,RxyZ,RZYx,RZYX,RzYx,RzYX,RZyx,RZyX,Rzyx,RzyX,RXZy,RXZY,RxZy,RxZY,RXzy,RXzY,Rxzy,RxzY,RYZx,RYZX,RyZx,RyZX,RYzx,RYzX,Ryzx,RyzX,],
+        [RYxZ,RYxz,RyxZ,Ryxz,RYXZ,RYXz,RyXZ,RyXz,RZxY,RZxy,RzxY,Rzxy,RZXY,RZXy,RzXY,RzXy,RXyZ,RXyz,RxyZ,Rxyz,RXYZ,RXYz,RxYZ,RxYz,RZyX,RZyx,RzyX,Rzyx,RZYX,RZYx,RzYX,RzYx,RXzY,RXzy,RxzY,Rxzy,RXZY,RXZy,RxZY,RxZy,RYzX,RYzx,RyzX,Ryzx,RYZX,RYZx,RyZX,RyZx,],
+        [RYxz,RYxZ,Ryxz,RyxZ,RYXz,RYXZ,RyXz,RyXZ,RZxy,RZxY,Rzxy,RzxY,RZXy,RZXY,RzXy,RzXY,RXyz,RXyZ,Rxyz,RxyZ,RXYz,RXYZ,RxYz,RxYZ,RZyx,RZyX,Rzyx,RzyX,RZYx,RZYX,RzYx,RzYX,RXzy,RXzY,Rxzy,RxzY,RXZy,RXZY,RxZy,RxZY,RYzx,RYzX,Ryzx,RyzX,RYZx,RYZX,RyZx,RyZX,],
+        [RyXZ,RyXz,RYXZ,RYXz,RyxZ,Ryxz,RYxZ,RYxz,RzXY,RzXy,RZXY,RZXy,RzxY,Rzxy,RZxY,RZxy,RxYZ,RxYz,RXYZ,RXYz,RxyZ,Rxyz,RXyZ,RXyz,RzYX,RzYx,RZYX,RZYx,RzyX,Rzyx,RZyX,RZyx,RxZY,RxZy,RXZY,RXZy,RxzY,Rxzy,RXzY,RXzy,RyZX,RyZx,RYZX,RYZx,RyzX,Ryzx,RYzX,RYzx,],
+        [RyXz,RyXZ,RYXz,RYXZ,Ryxz,RyxZ,RYxz,RYxZ,RzXy,RzXY,RZXy,RZXY,Rzxy,RzxY,RZxy,RZxY,RxYz,RxYZ,RXYz,RXYZ,Rxyz,RxyZ,RXyz,RXyZ,RzYx,RzYX,RZYx,RZYX,Rzyx,RzyX,RZyx,RZyX,RxZy,RxZY,RXZy,RXZY,Rxzy,RxzY,RXzy,RXzY,RyZx,RyZX,RYZx,RYZX,Ryzx,RyzX,RYzx,RYzX,],
+        [RyxZ,Ryxz,RYxZ,RYxz,RyXZ,RyXz,RYXZ,RYXz,RzxY,Rzxy,RZxY,RZxy,RzXY,RzXy,RZXY,RZXy,RxyZ,Rxyz,RXyZ,RXyz,RxYZ,RxYz,RXYZ,RXYz,RzyX,Rzyx,RZyX,RZyx,RzYX,RzYx,RZYX,RZYx,RxzY,Rxzy,RXzY,RXzy,RxZY,RxZy,RXZY,RXZy,RyzX,Ryzx,RYzX,RYzx,RyZX,RyZx,RYZX,RYZx,],
+        [Ryxz,RyxZ,RYxz,RYxZ,RyXz,RyXZ,RYXz,RYXZ,Rzxy,RzxY,RZxy,RZxY,RzXy,RzXY,RZXy,RZXY,Rxyz,RxyZ,RXyz,RXyZ,RxYz,RxYZ,RXYz,RXYZ,Rzyx,RzyX,RZyx,RZyX,RzYx,RzYX,RZYx,RZYX,Rxzy,RxzY,RXzy,RXzY,RxZy,RxZY,RXZy,RXZY,Ryzx,RyzX,RYzx,RYzX,RyZx,RyZX,RYZx,RYZX,],
+        [RYZX,RYzX,RyZX,RyzX,RYZx,RYzx,RyZx,Ryzx,RZYX,RZyX,RzYX,RzyX,RZYx,RZyx,RzYx,Rzyx,RXZY,RXzY,RxZY,RxzY,RXZy,RXzy,RxZy,Rxzy,RZXY,RZxY,RzXY,RzxY,RZXy,RZxy,RzXy,Rzxy,RXYZ,RXyZ,RxYZ,RxyZ,RXYz,RXyz,RxYz,Rxyz,RYXZ,RYxZ,RyXZ,RyxZ,RYXz,RYxz,RyXz,Ryxz,],
+        [RYZx,RYzx,RyZx,Ryzx,RYZX,RYzX,RyZX,RyzX,RZYx,RZyx,RzYx,Rzyx,RZYX,RZyX,RzYX,RzyX,RXZy,RXzy,RxZy,Rxzy,RXZY,RXzY,RxZY,RxzY,RZXy,RZxy,RzXy,Rzxy,RZXY,RZxY,RzXY,RzxY,RXYz,RXyz,RxYz,Rxyz,RXYZ,RXyZ,RxYZ,RxyZ,RYXz,RYxz,RyXz,Ryxz,RYXZ,RYxZ,RyXZ,RyxZ,],
+        [RYzX,RYZX,RyzX,RyZX,RYzx,RYZx,Ryzx,RyZx,RZyX,RZYX,RzyX,RzYX,RZyx,RZYx,Rzyx,RzYx,RXzY,RXZY,RxzY,RxZY,RXzy,RXZy,Rxzy,RxZy,RZxY,RZXY,RzxY,RzXY,RZxy,RZXy,Rzxy,RzXy,RXyZ,RXYZ,RxyZ,RxYZ,RXyz,RXYz,Rxyz,RxYz,RYxZ,RYXZ,RyxZ,RyXZ,RYxz,RYXz,Ryxz,RyXz,],
+        [RYzx,RYZx,Ryzx,RyZx,RYzX,RYZX,RyzX,RyZX,RZyx,RZYx,Rzyx,RzYx,RZyX,RZYX,RzyX,RzYX,RXzy,RXZy,Rxzy,RxZy,RXzY,RXZY,RxzY,RxZY,RZxy,RZXy,Rzxy,RzXy,RZxY,RZXY,RzxY,RzXY,RXyz,RXYz,Rxyz,RxYz,RXyZ,RXYZ,RxyZ,RxYZ,RYxz,RYXz,Ryxz,RyXz,RYxZ,RYXZ,RyxZ,RyXZ,],
+        [RyZX,RyzX,RYZX,RYzX,RyZx,Ryzx,RYZx,RYzx,RzYX,RzyX,RZYX,RZyX,RzYx,Rzyx,RZYx,RZyx,RxZY,RxzY,RXZY,RXzY,RxZy,Rxzy,RXZy,RXzy,RzXY,RzxY,RZXY,RZxY,RzXy,Rzxy,RZXy,RZxy,RxYZ,RxyZ,RXYZ,RXyZ,RxYz,Rxyz,RXYz,RXyz,RyXZ,RyxZ,RYXZ,RYxZ,RyXz,Ryxz,RYXz,RYxz,],
+        [RyZx,Ryzx,RYZx,RYzx,RyZX,RyzX,RYZX,RYzX,RzYx,Rzyx,RZYx,RZyx,RzYX,RzyX,RZYX,RZyX,RxZy,Rxzy,RXZy,RXzy,RxZY,RxzY,RXZY,RXzY,RzXy,Rzxy,RZXy,RZxy,RzXY,RzxY,RZXY,RZxY,RxYz,Rxyz,RXYz,RXyz,RxYZ,RxyZ,RXYZ,RXyZ,RyXz,Ryxz,RYXz,RYxz,RyXZ,RyxZ,RYXZ,RYxZ,],
+        [RyzX,RyZX,RYzX,RYZX,Ryzx,RyZx,RYzx,RYZx,RzyX,RzYX,RZyX,RZYX,Rzyx,RzYx,RZyx,RZYx,RxzY,RxZY,RXzY,RXZY,Rxzy,RxZy,RXzy,RXZy,RzxY,RzXY,RZxY,RZXY,Rzxy,RzXy,RZxy,RZXy,RxyZ,RxYZ,RXyZ,RXYZ,Rxyz,RxYz,RXyz,RXYz,RyxZ,RyXZ,RYxZ,RYXZ,Ryxz,RyXz,RYxz,RYXz,],
+        [Ryzx,RyZx,RYzx,RYZx,RyzX,RyZX,RYzX,RYZX,Rzyx,RzYx,RZyx,RZYx,RzyX,RzYX,RZyX,RZYX,Rxzy,RxZy,RXzy,RXZy,RxzY,RxZY,RXzY,RXZY,Rzxy,RzXy,RZxy,RZXy,RzxY,RzXY,RZxY,RZXY,Rxyz,RxYz,RXyz,RXYz,RxyZ,RxYZ,RXyZ,RXYZ,Ryxz,RyXz,RYxz,RYXz,RyxZ,RyXZ,RYxZ,RYXZ,],
+        [RZXY,RzXY,RZXy,RzXy,RZxY,RzxY,RZxy,Rzxy,RYXZ,RyXZ,RYXz,RyXz,RYxZ,RyxZ,RYxz,Ryxz,RZYX,RzYX,RZYx,RzYx,RZyX,RzyX,RZyx,Rzyx,RXYZ,RxYZ,RXYz,RxYz,RXyZ,RxyZ,RXyz,Rxyz,RYZX,RyZX,RYZx,RyZx,RYzX,RyzX,RYzx,Ryzx,RXZY,RxZY,RXZy,RxZy,RXzY,RxzY,RXzy,Rxzy,],
+        [RZXy,RzXy,RZXY,RzXY,RZxy,Rzxy,RZxY,RzxY,RYXz,RyXz,RYXZ,RyXZ,RYxz,Ryxz,RYxZ,RyxZ,RZYx,RzYx,RZYX,RzYX,RZyx,Rzyx,RZyX,RzyX,RXYz,RxYz,RXYZ,RxYZ,RXyz,Rxyz,RXyZ,RxyZ,RYZx,RyZx,RYZX,RyZX,RYzx,Ryzx,RYzX,RyzX,RXZy,RxZy,RXZY,RxZY,RXzy,Rxzy,RXzY,RxzY,],
+        [RZxY,RzxY,RZxy,Rzxy,RZXY,RzXY,RZXy,RzXy,RYxZ,RyxZ,RYxz,Ryxz,RYXZ,RyXZ,RYXz,RyXz,RZyX,RzyX,RZyx,Rzyx,RZYX,RzYX,RZYx,RzYx,RXyZ,RxyZ,RXyz,Rxyz,RXYZ,RxYZ,RXYz,RxYz,RYzX,RyzX,RYzx,Ryzx,RYZX,RyZX,RYZx,RyZx,RXzY,RxzY,RXzy,Rxzy,RXZY,RxZY,RXZy,RxZy,],
+        [RZxy,Rzxy,RZxY,RzxY,RZXy,RzXy,RZXY,RzXY,RYxz,Ryxz,RYxZ,RyxZ,RYXz,RyXz,RYXZ,RyXZ,RZyx,Rzyx,RZyX,RzyX,RZYx,RzYx,RZYX,RzYX,RXyz,Rxyz,RXyZ,RxyZ,RXYz,RxYz,RXYZ,RxYZ,RYzx,Ryzx,RYzX,RyzX,RYZx,RyZx,RYZX,RyZX,RXzy,Rxzy,RXzY,RxzY,RXZy,RxZy,RXZY,RxZY,],
+        [RzXY,RZXY,RzXy,RZXy,RzxY,RZxY,Rzxy,RZxy,RyXZ,RYXZ,RyXz,RYXz,RyxZ,RYxZ,Ryxz,RYxz,RzYX,RZYX,RzYx,RZYx,RzyX,RZyX,Rzyx,RZyx,RxYZ,RXYZ,RxYz,RXYz,RxyZ,RXyZ,Rxyz,RXyz,RyZX,RYZX,RyZx,RYZx,RyzX,RYzX,Ryzx,RYzx,RxZY,RXZY,RxZy,RXZy,RxzY,RXzY,Rxzy,RXzy,],
+        [RzXy,RZXy,RzXY,RZXY,Rzxy,RZxy,RzxY,RZxY,RyXz,RYXz,RyXZ,RYXZ,Ryxz,RYxz,RyxZ,RYxZ,RzYx,RZYx,RzYX,RZYX,Rzyx,RZyx,RzyX,RZyX,RxYz,RXYz,RxYZ,RXYZ,Rxyz,RXyz,RxyZ,RXyZ,RyZx,RYZx,RyZX,RYZX,Ryzx,RYzx,RyzX,RYzX,RxZy,RXZy,RxZY,RXZY,Rxzy,RXzy,RxzY,RXzY,],
+        [RzxY,RZxY,Rzxy,RZxy,RzXY,RZXY,RzXy,RZXy,RyxZ,RYxZ,Ryxz,RYxz,RyXZ,RYXZ,RyXz,RYXz,RzyX,RZyX,Rzyx,RZyx,RzYX,RZYX,RzYx,RZYx,RxyZ,RXyZ,Rxyz,RXyz,RxYZ,RXYZ,RxYz,RXYz,RyzX,RYzX,Ryzx,RYzx,RyZX,RYZX,RyZx,RYZx,RxzY,RXzY,Rxzy,RXzy,RxZY,RXZY,RxZy,RXZy,],
+        [Rzxy,RZxy,RzxY,RZxY,RzXy,RZXy,RzXY,RZXY,Ryxz,RYxz,RyxZ,RYxZ,RyXz,RYXz,RyXZ,RYXZ,Rzyx,RZyx,RzyX,RZyX,RzYx,RZYx,RzYX,RZYX,Rxyz,RXyz,RxyZ,RXyZ,RxYz,RXYz,RxYZ,RXYZ,Ryzx,RYzx,RyzX,RYzX,RyZx,RYZx,RyZX,RYZX,Rxzy,RXzy,RxzY,RXzY,RxZy,RXZy,RxZY,RXZY,],
+        [RZYX,RzYX,RZyX,RzyX,RZYx,RzYx,RZyx,Rzyx,RYZX,RyZX,RYzX,RyzX,RYZx,RyZx,RYzx,Ryzx,RZXY,RzXY,RZxY,RzxY,RZXy,RzXy,RZxy,Rzxy,RXZY,RxZY,RXzY,RxzY,RXZy,RxZy,RXzy,Rxzy,RYXZ,RyXZ,RYxZ,RyxZ,RYXz,RyXz,RYxz,Ryxz,RXYZ,RxYZ,RXyZ,RxyZ,RXYz,RxYz,RXyz,Rxyz,],
+        [RZYx,RzYx,RZyx,Rzyx,RZYX,RzYX,RZyX,RzyX,RYZx,RyZx,RYzx,Ryzx,RYZX,RyZX,RYzX,RyzX,RZXy,RzXy,RZxy,Rzxy,RZXY,RzXY,RZxY,RzxY,RXZy,RxZy,RXzy,Rxzy,RXZY,RxZY,RXzY,RxzY,RYXz,RyXz,RYxz,Ryxz,RYXZ,RyXZ,RYxZ,RyxZ,RXYz,RxYz,RXyz,Rxyz,RXYZ,RxYZ,RXyZ,RxyZ,],
+        [RZyX,RzyX,RZYX,RzYX,RZyx,Rzyx,RZYx,RzYx,RYzX,RyzX,RYZX,RyZX,RYzx,Ryzx,RYZx,RyZx,RZxY,RzxY,RZXY,RzXY,RZxy,Rzxy,RZXy,RzXy,RXzY,RxzY,RXZY,RxZY,RXzy,Rxzy,RXZy,RxZy,RYxZ,RyxZ,RYXZ,RyXZ,RYxz,Ryxz,RYXz,RyXz,RXyZ,RxyZ,RXYZ,RxYZ,RXyz,Rxyz,RXYz,RxYz,],
+        [RZyx,Rzyx,RZYx,RzYx,RZyX,RzyX,RZYX,RzYX,RYzx,Ryzx,RYZx,RyZx,RYzX,RyzX,RYZX,RyZX,RZxy,Rzxy,RZXy,RzXy,RZxY,RzxY,RZXY,RzXY,RXzy,Rxzy,RXZy,RxZy,RXzY,RxzY,RXZY,RxZY,RYxz,Ryxz,RYXz,RyXz,RYxZ,RyxZ,RYXZ,RyXZ,RXyz,Rxyz,RXYz,RxYz,RXyZ,RxyZ,RXYZ,RxYZ,],
+        [RzYX,RZYX,RzyX,RZyX,RzYx,RZYx,Rzyx,RZyx,RyZX,RYZX,RyzX,RYzX,RyZx,RYZx,Ryzx,RYzx,RzXY,RZXY,RzxY,RZxY,RzXy,RZXy,Rzxy,RZxy,RxZY,RXZY,RxzY,RXzY,RxZy,RXZy,Rxzy,RXzy,RyXZ,RYXZ,RyxZ,RYxZ,RyXz,RYXz,Ryxz,RYxz,RxYZ,RXYZ,RxyZ,RXyZ,RxYz,RXYz,Rxyz,RXyz,],
+        [RzYx,RZYx,Rzyx,RZyx,RzYX,RZYX,RzyX,RZyX,RyZx,RYZx,Ryzx,RYzx,RyZX,RYZX,RyzX,RYzX,RzXy,RZXy,Rzxy,RZxy,RzXY,RZXY,RzxY,RZxY,RxZy,RXZy,Rxzy,RXzy,RxZY,RXZY,RxzY,RXzY,RyXz,RYXz,Ryxz,RYxz,RyXZ,RYXZ,RyxZ,RYxZ,RxYz,RXYz,Rxyz,RXyz,RxYZ,RXYZ,RxyZ,RXyZ,],
+        [RzyX,RZyX,RzYX,RZYX,Rzyx,RZyx,RzYx,RZYx,RyzX,RYzX,RyZX,RYZX,Ryzx,RYzx,RyZx,RYZx,RzxY,RZxY,RzXY,RZXY,Rzxy,RZxy,RzXy,RZXy,RxzY,RXzY,RxZY,RXZY,Rxzy,RXzy,RxZy,RXZy,RyxZ,RYxZ,RyXZ,RYXZ,Ryxz,RYxz,RyXz,RYXz,RxyZ,RXyZ,RxYZ,RXYZ,Rxyz,RXyz,RxYz,RXYz,],
+        [Rzyx,RZyx,RzYx,RZYx,RzyX,RZyX,RzYX,RZYX,Ryzx,RYzx,RyZx,RYZx,RyzX,RYzX,RyZX,RYZX,Rzxy,RZxy,RzXy,RZXy,RzxY,RZxY,RzXY,RZXY,Rxzy,RXzy,RxZy,RXZy,RxzY,RXzY,RxZY,RXZY,Ryxz,RYxz,RyXz,RYXz,RyxZ,RYxZ,RyXZ,RYXZ,Rxyz,RXyz,RxYz,RXYz,RxyZ,RXyZ,RxYZ,RXYZ,],
+    ]
+};
 
 #[cfg(test)]
 mod tests {
@@ -738,6 +799,37 @@ mod tests {
                     });
                 }
             }
+        }
+    }
+
+    #[test]
+    fn regenerate_multiplication_table() {
+        let mut failed = false;
+        println!(indoc::indoc! {
+            "
+            #[rustfmt::skip]
+            static MULTIPLICATION_TABLE: [[GridRotation; 48]; 48] = {{
+                use GridRotation::*;
+                ["
+        });
+        for first in GridRotation::ALL {
+            print!("        [");
+            for second in GridRotation::ALL {
+                // Calculate the multiplication via transformation of basis vectors.
+                let result =
+                    GridRotation::from_basis(first.to_basis().map(|v| second.transform(v)));
+
+                print!("{result:?},");
+                // Check whether the current implementation is correct.
+                if result != second * first {
+                    failed = true;
+                }
+            }
+            println!("],");
+        }
+        println!("    ]\n}};");
+        if failed {
+            panic!("multiplication results were not as expected");
         }
     }
 }
