@@ -112,6 +112,7 @@ In order to resolve various design problems interfering with development, the `a
       In general, to make time pass, create a `Universe` and `step()` it instead.
     - `universe::Handle::new_pending()` has been replaced by `UniverseTransaction::insert()`.
       Handles are now always associated with some container, either `Universe` or `UniverseTransaction`, except for those in the “gone” defunct state.
+    - `math::GridRotation::{CLOCKWISE, COUNTERCLOCKWISE}` have been replaced by `Face6::PY.{clockwise, counterclockwise}()`.
 
 - `all-is-cubes-mesh` library:
     - The associated type `GfxVertex::Coordinate` no longer exists.

@@ -85,36 +85,6 @@ impl GridRotation {
     /// The identity rotation, also known as [`RXYZ`](Self::RXYZ).
     pub const IDENTITY: Self = Self::RXYZ;
 
-    /// The rotation that is clockwise in our Y-up right-handed coordinate system.
-    ///
-    /// ```
-    /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{Face6::*, GridRotation};
-    ///
-    /// assert_eq!(GridRotation::CLOCKWISE.transform(PX), PZ);
-    /// assert_eq!(GridRotation::CLOCKWISE.transform(PZ), NX);
-    /// assert_eq!(GridRotation::CLOCKWISE.transform(NX), NZ);
-    /// assert_eq!(GridRotation::CLOCKWISE.transform(NZ), PX);
-    ///
-    /// assert_eq!(GridRotation::CLOCKWISE.transform(PY), PY);
-    /// ```
-    pub const CLOCKWISE: Self = Self::RZYx;
-
-    /// The rotation that is counterclockwise in our Y-up right-handed coordinate system.
-    ///
-    /// ```
-    /// # extern crate all_is_cubes_base as all_is_cubes;
-    /// use all_is_cubes::math::{Face6::*, GridRotation};
-    ///
-    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(PX), NZ);
-    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(NZ), NX);
-    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(NX), PZ);
-    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(PZ), PX);
-    ///
-    /// assert_eq!(GridRotation::COUNTERCLOCKWISE.transform(PY), PY);
-    /// ```
-    pub const COUNTERCLOCKWISE: Self = Self::RzYX;
-
     /// Constructs a rotation from a basis: that is, the returned rotation will
     /// rotate `PX` into `basis[0]`, `PY` into `basis[1]`, and `PZ` into `basis[2]`.
     ///
@@ -599,14 +569,6 @@ mod tests {
         assert_eq!(
             GridRotation::IDENTITY,
             GridRotation::from_basis([PX, PY, PZ])
-        );
-    }
-
-    #[test]
-    fn ccw_cw() {
-        assert_eq!(
-            GridRotation::IDENTITY,
-            GridRotation::COUNTERCLOCKWISE * GridRotation::CLOCKWISE
         );
     }
 
