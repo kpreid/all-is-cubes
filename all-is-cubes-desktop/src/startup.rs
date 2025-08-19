@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
+use futures_channel::oneshot;
 
 use all_is_cubes::arcstr::{self, literal};
 use all_is_cubes::universe::Universe;
@@ -39,7 +40,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
             UniverseTask {
                 future: universe_task_future,
                 progress_notification_handoff_tx: _,
-                mut replace_universe_command_rx,
+                replace_universe_command_rx,
                 replace_universe_command_tx,
             },
         headless,
@@ -165,7 +166,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
 
         // This will eventually generalize to global commands like "exit back to main menu"
         // rather than solely being about replacing the universe.
-        while let Some(source) = replace_universe_command_rx.recv().await {
+        while let Ok(source) = replace_universe_command_rx.recv().await {
             log::trace!("Startup task received request for new universe");
             match source {
                 ReplaceUniverseCommand::New(source) => {
@@ -265,9 +266,9 @@ pub struct InnerMainParams {
     /// Only available with `features = ["record"]`.
     pub recording: Option<std::convert::Infallible>,
     /// Will send a message when the `universe_future` completes and its result has been installed.
-    pub universe_ready_signal: tokio::sync::oneshot::Sender<Result<(), anyhow::Error>>,
+    pub universe_ready_signal: oneshot::Sender<Result<(), anyhow::Error>>,
     /// Will send a message when the main task completes.
-    pub task_done_signal: tokio::sync::oneshot::Sender<()>,
+    pub task_done_signal: oneshot::Sender<()>,
 }
 
 /// An async task that constructs a [`Universe`] that will belong to a [`DesktopSession`],
@@ -275,14 +276,13 @@ pub struct InnerMainParams {
 #[derive(Debug)]
 pub struct UniverseTask {
     future: async_executor::Task<Result<Box<Universe>, anyhow::Error>>,
-    progress_notification_handoff_tx:
-        Option<tokio::sync::oneshot::Sender<notification::Notification>>,
-    replace_universe_command_rx: tokio::sync::mpsc::Receiver<ReplaceUniverseCommand>,
+    progress_notification_handoff_tx: Option<oneshot::Sender<notification::Notification>>,
+    replace_universe_command_rx: async_channel::Receiver<ReplaceUniverseCommand>,
 
     /// This is not used by the future itself (it has its own clone)
     /// but is used by other command sources feeding in to the same channel.
     /// TODO: clean up the overall approach here
-    replace_universe_command_tx: tokio::sync::mpsc::Sender<ReplaceUniverseCommand>,
+    replace_universe_command_tx: async_channel::Sender<ReplaceUniverseCommand>,
 }
 
 enum ReplaceUniverseCommand {
@@ -294,8 +294,8 @@ enum ReplaceUniverseCommand {
 impl UniverseTask {
     pub fn new(executor: &Executor, source: crate::UniverseSource, precompute_light: bool) -> Self {
         // Kick off constructing the universe in the background.
-        let (n_tx, n_rx) = tokio::sync::oneshot::channel();
-        let (r_tx, r_rx) = tokio::sync::mpsc::channel(1);
+        let (n_tx, n_rx) = oneshot::channel();
+        let (r_tx, r_rx) = async_channel::bounded(1);
         let future = executor.inner().spawn(source.create_universe(
             precompute_light,
             n_rx,

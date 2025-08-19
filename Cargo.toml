@@ -73,6 +73,7 @@ anyhow = "1.0.70"
 # Each use should be { optional = true }.
 arbitrary = { version = "1.4.1", features = ["derive"] }
 arrayvec = { version = "0.7.6", default-features = false }
+async-channel = { version = "2.5.0", default-features = false } # part of the `smol` family
 async-executor = { version = "1.13.2", default-features = false } # part of the `smol` family
 async-io = { version = "2.5.0", default-features = false } # part of the `smol` family
 async-lock = { version = "3.4.1", default-features = false } # part of the `smol` family

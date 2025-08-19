@@ -244,7 +244,7 @@ impl Recorder {
                 if let Some(export_set) = export_set.take() {
                     let export_task = all_is_cubes_port::export_to_path(
                         // TODO: hook up a progress bar
-                        crate::glue::tokio_yield_progress().build(),
+                        crate::glue::make_yield_progress().build(),
                         read_ticket,
                         export_format,
                         export_set,
@@ -289,7 +289,7 @@ impl Recorder {
             .unwrap();
 
         // TODO: instead of a full channel, just have some kind of cell for last seen value
-        let (status_tx, mut status_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (status_tx, status_receiver) = async_channel::unbounded();
         self.listen(rmain::ChannelListener::new(status_tx));
 
         let drawing_progress_bar = indicatif::ProgressBar::new(frame_range.clone().count() as u64)
@@ -321,7 +321,7 @@ impl Recorder {
         // We've completed sending frames; now await the inner workings actually finishing
         // processing.
         // TODO: deduplicate receiving logic
-        while let Some(Status {
+        while let Ok(Status {
             frame_number,
             flaws,
         }) = status_receiver.recv().await

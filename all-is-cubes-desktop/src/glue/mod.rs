@@ -50,8 +50,9 @@ impl Renderer for all_is_cubes_gpu::in_wgpu::SurfaceRenderer {
     }
 }
 
-pub(crate) fn tokio_yield_progress() -> yield_progress::Builder {
-    yield_progress::Builder::new().yield_using(|_| tokio::task::yield_now())
+/// If we ever change executors again, this might have a `.yield_using()` other than the default.
+pub(crate) fn make_yield_progress() -> yield_progress::Builder {
+    yield_progress::Builder::new()
 }
 
 /// Implementation of [`all_is_cubes::util::Executor`] for use with a `smol` executor, used by

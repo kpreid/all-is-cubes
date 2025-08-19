@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use futures_channel::oneshot;
 use ratatui::crossterm;
 use ratatui::layout::Rect;
 
@@ -163,12 +164,12 @@ pub fn create_terminal_session(
 /// Run the simulation and interactive UI. Returns after user's quit command.
 pub fn terminal_main_loop(
     mut dsession: DesktopSession<TerminalRenderer, TerminalWindow>,
-    mut universe_ready_rx: tokio::sync::oneshot::Receiver<Result<(), anyhow::Error>>,
+    mut universe_ready_rx: oneshot::Receiver<Result<(), anyhow::Error>>,
 ) -> Result<(), anyhow::Error> {
     // Wait for the universe to be finished before starting the terminal UI, to avoid conflict
     // with the indicatif progress bars.
     // TODO: Instead of this, use ratatui progress bar widgets when in terminal mode!
-    while let Err(tokio::sync::oneshot::error::TryRecvError::Empty) = universe_ready_rx.try_recv() {
+    while let Ok(None) = universe_ready_rx.try_recv() {
         // TODO: this semi-spin-loop is bad; we should be able to just ask the session to poll its
         // main task with appropriate Waker usage, instead.
         std::thread::yield_now();

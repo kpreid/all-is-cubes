@@ -117,15 +117,19 @@ impl universe::VisitHandles for AutoRotate {
     fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {}
 }
 
-/// Adapt [`tokio::sync::mpsc::UnboundedSender`] to `Listener`.
+/// Adapt [`async_channel::Sender`] to [`Listener`][listen::Listener].
+///
+/// The channel *must* be unbounded.
 ///
 /// Caution: If you care about when the channel is closed, check how long this listener
 /// is going to live.
 pub(super) struct ChannelListener<M> {
-    sender: tokio::sync::mpsc::UnboundedSender<M>,
+    sender: async_channel::Sender<M>,
 }
 impl<M: Send + Clone> ChannelListener<M> {
-    pub fn new(sender: tokio::sync::mpsc::UnboundedSender<M>) -> Self {
+    /// Panics if the channel is not unbounded.
+    pub fn new(sender: async_channel::Sender<M>) -> Self {
+        assert_eq!(sender.capacity(), None);
         Self { sender }
     }
 }
@@ -144,10 +148,13 @@ impl<M: Send + Clone> listen::Listener<M> for ChannelListener<M> {
             return !self.sender.is_closed();
         }
         for message in messages {
-            match self.sender.send(message.clone()) {
+            match self.sender.try_send(message.clone()) {
                 Ok(()) => {}
-                Err(tokio::sync::mpsc::error::SendError(_)) => {
+                Err(async_channel::TrySendError::Closed(_)) => {
                     return false;
+                }
+                Err(async_channel::TrySendError::Full(_)) => {
+                    unreachable!();
                 }
             }
         }

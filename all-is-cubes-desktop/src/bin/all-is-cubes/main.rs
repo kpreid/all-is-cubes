@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use anyhow::Context;
 #[allow(unused, reason = "may be unused with some features")]
 use clap::{CommandFactory as _, Parser as _};
+use futures_channel::oneshot;
 
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen;
@@ -124,9 +125,9 @@ fn main() -> Result<(), anyhow::Error> {
     // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over
     // the kind of window system we're using.
     #[cfg_attr(not(feature = "record"), allow(unused_variables, unused_mut))]
-    let (universe_ready_tx, mut universe_ready_rx) = tokio::sync::oneshot::channel();
+    let (universe_ready_tx, mut universe_ready_rx) = oneshot::channel();
     #[cfg_attr(not(feature = "terminal"), allow(unused_variables, unused_mut))]
-    let (task_done_tx, mut task_done_rx) = tokio::sync::oneshot::channel();
+    let (task_done_tx, mut task_done_rx) = oneshot::channel();
     let inner_params = InnerMainParams {
         application_title: title_and_version(),
         executor,
@@ -204,9 +205,7 @@ fn main() -> Result<(), anyhow::Error> {
                 |mut dsession| {
                     // Wait for the universe to be finished before capturing.
                     // TODO: How about we make this a special case of recording instead?
-                    while let Err(tokio::sync::oneshot::error::TryRecvError::Empty) =
-                        universe_ready_rx.try_recv()
-                    {
+                    while let Ok(None) = universe_ready_rx.try_recv() {
                         dsession.advance_time_and_maybe_step();
                     }
 
@@ -222,9 +221,7 @@ fn main() -> Result<(), anyhow::Error> {
                     )?;
 
                     // Wait for any other activities to complete.
-                    while let Err(tokio::sync::oneshot::error::TryRecvError::Empty) =
-                        task_done_rx.try_recv()
-                    {
+                    while let Ok(None) = task_done_rx.try_recv() {
                         dsession.advance_time_and_maybe_step();
                     }
 

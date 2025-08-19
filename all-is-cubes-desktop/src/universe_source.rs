@@ -3,9 +3,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use anyhow::Context as _;
+use futures_channel::oneshot;
 use indicatif::ProgressBar;
 use rand::Rng as _;
-use tokio::sync::oneshot;
 
 use all_is_cubes::arcstr::literal;
 use all_is_cubes::space::{LightUpdatesInfo, Space};
@@ -52,7 +52,7 @@ impl UniverseSource {
         universe_progress_bar.set_position(0);
         let yield_progress = {
             let universe_progress_bar = universe_progress_bar.clone();
-            glue::tokio_yield_progress()
+            glue::make_yield_progress()
                 .progress_using(move |info| {
                     universe_progress_bar.set_position((info.fraction() * 100.0) as u64);
                     universe_progress_bar.set_message(String::from(info.label_str()));
@@ -163,7 +163,10 @@ enum TryRecvKeep {
 impl TryRecvKeep {
     fn try_borrow(&mut self) -> Option<&Notification> {
         if let Self::Rx(rx) = self {
-            *self = Self::Have(rx.try_recv().ok()?)
+            *self = Self::Have(match rx.try_recv() {
+                Ok(Some(n)) => n,
+                Ok(None) | Err(oneshot::Canceled) => return None,
+            })
         }
         if let Self::Have(value) = self {
             Some(value)

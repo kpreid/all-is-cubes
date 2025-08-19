@@ -75,6 +75,7 @@ all-is-cubes-port = { workspace = true, features = ["auto-threads", "import", "n
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 all-is-cubes-ui = { workspace = true, features = ["session"] }
 async_fn_traits = { workspace = true }
+async-channel = { workspace = true }
 async-executor = { workspace = true }
 async-io = { workspace = true }
 anyhow = { workspace = true }
@@ -82,6 +83,7 @@ cfg-if = { workspace = true }
 clap = { workspace = true }
 directories-next = "2.0.0"
 euclid = { workspace = true, optional = true }
+futures-channel = { workspace = true }
 futures-core = { workspace = true }
 gilrs = { workspace = true }
 hashbrown = { workspace = true }
@@ -98,7 +100,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 simplelog = { workspace = true }
 strum = { workspace = true, features = ["derive", "std"] }
-tokio = { workspace = true, features = ["rt-multi-thread", "sync"] } # TODO: remove in favor of smol
 ratatui = { version = "0.29.0", optional = true, default-features = false, features = ["crossterm"] }
 unicode-width = { workspace = true, optional = true }
 # Must enable all wgpu backends we want the desktop binary to support.
@@ -112,7 +113,6 @@ yield-progress = { workspace = true, features = ["log_hiccups"] }
 gltf = "1.4.0" # for round-trip test; must match version of gltf-json
 pretty_assertions = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["macros"] }
 trycmd = { workspace = true }
 
 [lints]
