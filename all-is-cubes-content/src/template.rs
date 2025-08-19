@@ -46,7 +46,7 @@ macro_rules! generate_template_test {
             paste! {
                 $( #[cfg($variant_cfg)] )*
                 #[cfg(test)]
-                #[tokio::test]
+                #[macro_rules_attribute::apply(smol_macros::test)]
                 #[allow(non_snake_case)]
                 async fn [< template_ $variant_name >] () {
                     tests::check_universe_template($enum_name::$variant_name).await;

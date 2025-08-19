@@ -99,14 +99,20 @@ resource = { version = "0.6.0", features = ["force-static"] }
 wgpu = { workspace = true, optional = true }
 
 [dev-dependencies]
-criterion = { workspace = true, features = ["async_tokio"] }
+# Using smol for async test-running.
+async-io = { workspace = true }
+# Provides async OnceCell
+async-lock = { workspace = true, features = ["std"] }
+criterion = { workspace = true }
 # Used in shader tests. TODO: Not really necessary
 image = { workspace = true }
+macro_rules_attribute = { workspace = true }
 rstest = { workspace = true }
 # Used in benchmark
 scopeguard = { workspace = true }
-# Using tokio for async test-running.
-tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync"] }
+# Using smol for async test-running.
+# TODO: Consider defining our own macros and stripping down the dependencies.
+smol-macros = { workspace = true }
 # Enable wgpu backends for tests, by enabling default features.
 wgpu = { workspace = true, default-features = true, features = ["noop"] }
 

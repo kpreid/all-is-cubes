@@ -798,7 +798,7 @@ mod tests {
             .unwrap()
     }
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn icon_activate() {
         let dummy_icons = dummy_icons().await;
         assert_eq!(
@@ -849,7 +849,7 @@ mod tests {
         // TODO: Should have another test with a failing `Operation`, but we can't set that up yet.
     }
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn icon_remove_block() {
         let dummy_icons = dummy_icons().await;
         assert_eq!(
@@ -899,7 +899,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn icon_place_block() {
         let dummy_icons = dummy_icons().await;
         let [block] = make_some_blocks();

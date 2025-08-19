@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use criterion::Criterion;
-use tokio::runtime::Runtime;
+use criterion::async_executor::AsyncExecutor as _;
 
 use all_is_cubes::block;
 use all_is_cubes::character::Character;
@@ -21,27 +21,25 @@ use all_is_cubes_render::camera::{GraphicsOptions, Layers, StandardCameras, View
 use all_is_cubes_gpu::in_wgpu::{LightChunk, LightTexture, headless, init};
 
 fn main() {
-    let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
-
     let mut criterion: Criterion<_> = Criterion::default().configure_from_args();
 
-    let instance = runtime.block_on(init::create_instance_for_test_or_exit(false));
+    let instance = Executor.block_on(init::create_instance_for_test_or_exit(false));
 
-    render_benches(&runtime, &mut criterion, &instance);
-    light_benches(&runtime, &mut criterion, &instance);
+    render_benches(&mut criterion, &instance);
+    light_benches(&mut criterion, &instance);
 
     criterion.final_summary();
 }
 
 #[expect(clippy::await_holding_lock)]
-fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance) {
+fn render_benches(c: &mut Criterion, instance: &wgpu::Instance) {
     let mut g = c.benchmark_group("render");
 
     // Benchmark for running update() only. Insofar as this touches the GPU it will
     // naturally fill up the pipeline as Criterion iterates it.
     g.bench_function("update-only", |b| {
         let (mut universe, space, renderer) =
-            runtime.block_on(create_updated_renderer("update-only", instance));
+            Executor.block_on(create_updated_renderer("update-only", instance));
 
         let [block] = make_some_blocks();
         let txn1 =
@@ -64,9 +62,9 @@ fn render_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instanc
     // improve that.
     g.bench_function("draw-only", |b| {
         let (_universe, _space, renderer) =
-            runtime.block_on(create_updated_renderer("draw-only", instance));
+            Executor.block_on(create_updated_renderer("draw-only", instance));
 
-        b.to_async(runtime).iter_with_large_drop(move || {
+        b.to_async(Executor).iter_with_large_drop(move || {
             let renderer = renderer.clone();
             async move {
                 let image = renderer.lock().unwrap().draw("").await.unwrap();
@@ -125,12 +123,12 @@ async fn create_updated_renderer(
 }
 
 /// Benchmarks for light storage
-fn light_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance) {
+fn light_benches(c: &mut Criterion, instance: &wgpu::Instance) {
     let mut g = c.benchmark_group("light");
     g.sample_size(400); // increase sample size from default 100 to reduce noise
     g.measurement_time(Duration::from_secs(10));
 
-    let (device, queue) = runtime
+    let (device, queue) = Executor
         .block_on(async {
             let adapter = init::create_adapter_for_test(instance).await;
             adapter
@@ -185,4 +183,12 @@ fn light_benches(runtime: &Runtime, c: &mut Criterion, instance: &wgpu::Instance
             })
         });
     });
+}
+
+// We could use the criterion/async_smol feature instead, but that would bring in more than we need.
+struct Executor;
+impl criterion::async_executor::AsyncExecutor for Executor {
+    fn block_on<T>(&self, future: impl Future<Output = T>) -> T {
+        async_io::block_on(future)
+    }
 }

@@ -156,13 +156,16 @@ yield-progress = { workspace = true, features = ["sync"] } # TODO(no_std): make 
 
 [dev-dependencies]
 allocation-counter = { workspace = true }
+# Using smol for async test-running.
+async-io = { workspace = true }
 criterion = { workspace = true }
 futures-util = { workspace = true }
 pretty_assertions = { workspace = true }
 rstest = { workspace = true }
 serde_json = { workspace = true }
-# Using tokio for async test-running.
-tokio = { workspace = true, features = ["macros", "rt", "sync"] }
+# Using smol for async test-running.
+# TODO: Consider defining our own macros and stripping down the dependencies.
+smol-macros = { workspace = true }
 
 [lints]
 workspace = true

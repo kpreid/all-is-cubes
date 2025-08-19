@@ -310,7 +310,7 @@ mod tests {
     use all_is_cubes::universe::{Universe, UniverseTransaction};
     use all_is_cubes::util::yield_progress_for_testing;
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn tooltip_timeout() {
         // TODO: reduce boilerplate
 

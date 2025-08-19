@@ -284,7 +284,7 @@ mod tests {
     /// This function won't compile if `export_to_path`'s future isn't Send
     fn _export_to_path_future_is_send() {
         #![expect(unreachable_code, clippy::diverging_sub_expression)]
-        tokio::spawn(export_to_path(
+        all_is_cubes::util::assert_send_future(export_to_path(
             unreachable!(),
             unreachable!(),
             unreachable!(),

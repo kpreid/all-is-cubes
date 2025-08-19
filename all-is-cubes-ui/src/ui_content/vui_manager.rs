@@ -689,7 +689,7 @@ mod tests {
         (vui, ccrx)
     }
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn back_pause() {
         let (mut vui, control_channel) = new_vui_for_test(false).await;
         vui.back();
@@ -698,7 +698,7 @@ mod tests {
         assert!(control_channel.try_recv().is_err());
     }
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn back_unpause() {
         let (mut vui, control_channel) = new_vui_for_test(true).await;
         vui.set_state(VuiPageState::Paused);

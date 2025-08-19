@@ -49,9 +49,8 @@ indoc = { workspace = true }
 rayon = { workspace = true, optional = true }
 
 [dev-dependencies]
+async-io = { workspace = true }
 criterion = { workspace = true }
-# for async tests
-tokio = { workspace = true, features = ["macros", "rt"] }
 
 [lints]
 workspace = true

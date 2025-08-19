@@ -5,7 +5,7 @@
 
 #![allow(missing_docs)]
 
-use criterion::{Criterion, async_executor::FuturesExecutor, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use std::time::Duration;
 
@@ -26,7 +26,7 @@ fn template_bench(c: &mut Criterion) {
     for template in UniverseTemplate::iter().filter(|t| !matches!(t, UniverseTemplate::Islands)) {
         // TODO: specify a small size for each, where possible
         group.bench_function(format!("{template}"), |b| {
-            b.to_async(FuturesExecutor).iter_with_large_drop(|| {
+            b.to_async(Executor).iter_with_large_drop(|| {
                 template.clone().build(
                     yield_progress_for_testing(),
                     TemplateParameters {
@@ -43,3 +43,11 @@ fn template_bench(c: &mut Criterion) {
 
 criterion_group!(benches, template_bench);
 criterion_main!(benches);
+
+// We could use the criterion/async_smol feature instead, but that would bring in more than we need.
+struct Executor;
+impl criterion::async_executor::AsyncExecutor for Executor {
+    fn block_on<T>(&self, future: impl Future<Output = T>) -> T {
+        async_io::block_on(future)
+    }
+}

@@ -235,7 +235,7 @@ mod tests {
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn progress_output() {
         // TODO: this theme setup logic should be part of a widget test setup helper
         let mut universe = universe::Universe::new();

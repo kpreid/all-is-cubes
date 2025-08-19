@@ -23,7 +23,6 @@ struct TestData {
     character: StrongHandle<Character>,
 }
 impl TestData {
-    #[tokio::main(flavor = "current_thread")]
     async fn new() -> Self {
         let mut universe = Universe::new();
         let space = lighting_bench_space(
@@ -69,7 +68,7 @@ impl TestData {
 }
 
 pub fn raytrace_bench(c: &mut Criterion) {
-    let t = TestData::new();
+    let t = async_io::block_on(TestData::new());
 
     let mut group = c.benchmark_group(if cfg!(feature = "auto-threads") {
         "threaded"

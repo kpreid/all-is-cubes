@@ -10,7 +10,7 @@ use all_is_cubes_render::camera;
 /// We don't share the [`wgpu::Device`] because it can enter failure states,
 /// but we can use just one [`wgpu::Adapter`] to create all of them.
 pub(crate) async fn instance() -> &'static wgpu::Instance {
-    static CELL: tokio::sync::OnceCell<wgpu::Instance> = tokio::sync::OnceCell::const_new();
+    static CELL: async_lock::OnceCell<wgpu::Instance> = async_lock::OnceCell::new();
     CELL.get_or_init(|| async { init::create_instance_for_test_or_exit(false).await })
         .await
 }

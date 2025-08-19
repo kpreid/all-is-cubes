@@ -1,5 +1,5 @@
 #[cfg(all(feature = "import", feature = "export", feature = "native"))]
-#[tokio::test]
+#[macro_rules_attribute::apply(smol_macros::test)]
 async fn port_whence_load_then_save() {
     use std::fs;
     use std::sync::Arc;

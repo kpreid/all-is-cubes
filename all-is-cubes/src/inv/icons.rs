@@ -219,7 +219,7 @@ mod tests {
     use super::*;
     use crate::util::yield_progress_for_testing;
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn icons_smoke_test() {
         Icons::new(
             &mut UniverseTransaction::default(),

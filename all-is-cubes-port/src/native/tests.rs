@@ -8,7 +8,7 @@ use all_is_cubes::util::yield_progress_for_testing;
 
 use crate::{ExportSet, export_to_path, load_universe_from_file};
 
-#[tokio::test]
+#[macro_rules_attribute::apply(smol_macros::test)]
 async fn import_export_native_format() {
     let import_path = PathBuf::from(concat!(
         env!("CARGO_MANIFEST_DIR"),

@@ -12,7 +12,8 @@ pub use manyfmt::{Fmt, Refmt, refmt};
 pub use all_is_cubes_base::util::{ConciseDebug, Executor, TimeStats};
 #[doc(hidden)]
 pub use all_is_cubes_base::util::{
-    ErrorChain, MapExtend, TypeName, assert_conditional_send_sync, assert_send_sync, log,
+    ErrorChain, MapExtend, TypeName, assert_conditional_send_sync, assert_send_future,
+    assert_send_sync, log,
 };
 
 #[doc(hidden)] // public to allow our other crates to match, only

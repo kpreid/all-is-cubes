@@ -642,8 +642,8 @@ mod tests {
     use super::*;
     use all_is_cubes::util::yield_progress_for_testing;
 
-    #[tokio::test]
-    pub async fn install_demo_blocks_test() {
+    #[macro_rules_attribute::apply(smol_macros::test)]
+    async fn install_demo_blocks_test() {
         install_demo_blocks(
             &mut UniverseTransaction::default(),
             yield_progress_for_testing(),

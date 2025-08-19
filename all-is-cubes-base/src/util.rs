@@ -264,6 +264,18 @@ pub fn assert_send_sync<T: Send + Sync>() {
     // compiled is the assertion.
 }
 
+/// Check that the future is Send. This function does not need to be actually run;
+/// a call to it only needs to be compiled, not run.
+///
+/// Strictly, this function does not need a [`Future`] bound, but having it catches the mistake
+/// of passing something other than a future (e.g. the return value of a non-async function).
+#[doc(hidden)] // for use in internal tests only
+#[allow(clippy::missing_inline_in_public_items)]
+pub fn assert_send_future<T: Send + Future>(_: T) {
+    // We don't need to do anything in this function; the call to it having been successfully
+    // compiled is the assertion.
+}
+
 // Assert `Send + Sync` only if the `std` feature is active.
 #[cfg(feature = "std")]
 #[doc(hidden)] // for use in internal tests only

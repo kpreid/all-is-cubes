@@ -135,7 +135,7 @@ mod tests {
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn space_to_stl_smoke_test() {
         let mut u = Universe::new();
         let space = lighting_bench_space(&mut u, yield_progress_for_testing(), size3(54, 16, 54))
@@ -145,7 +145,7 @@ mod tests {
         assert!(mesh.len() > 30_000, "{}", mesh.len());
     }
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn export_multiple() {
         // TODO: dedup this logic with gltf export
         let mut universe = Universe::new();

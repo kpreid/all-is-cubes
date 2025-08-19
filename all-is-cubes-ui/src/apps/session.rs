@@ -1438,7 +1438,7 @@ mod tests {
         assert_send_sync::<Session>();
     }
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn fluff_forwarding_following() {
         // Create universe members
         let mut u = Universe::new();
@@ -1477,7 +1477,7 @@ mod tests {
         assert_eq!(log.drain(), vec![Fluff::Happened]);
     }
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn main_task() {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
@@ -1549,7 +1549,7 @@ mod tests {
         assert_eq!(noticed_step.load(Ordering::Relaxed), 2);
     }
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn input_is_processed_even_without_character() {
         let mut session = Session::builder()
             .ui(listen::constant(Viewport::ARBITRARY))

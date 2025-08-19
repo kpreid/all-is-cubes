@@ -2,6 +2,7 @@
 
 use core::hint::black_box;
 
+use criterion::async_executor::AsyncExecutor;
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 
 use all_is_cubes::content::testing::lighting_bench_space;
@@ -23,10 +24,6 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
         Both,
     }
 
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .unwrap();
-
     let mut group = c.benchmark_group("eval");
     for mode in [EvalMode::Full, EvalMode::Both, EvalMode::Fast] {
         let mode_str = match mode {
@@ -44,7 +41,7 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
             b.iter_batched_ref(
                 || {
                     let mut u = Universe::new();
-                    let space = rt
+                    let space = Executor
                         .block_on(lighting_bench_space(
                             &mut u,
                             yield_progress_for_testing(),
@@ -160,4 +157,12 @@ fn queue_bench(c: &mut Criterion) {
     });
 
     group.finish();
+}
+
+// We could use the criterion/async_smol feature instead, but that would bring in more than we need.
+struct Executor;
+impl AsyncExecutor for Executor {
+    fn block_on<T>(&self, future: impl Future<Output = T>) -> T {
+        async_io::block_on(future)
+    }
 }

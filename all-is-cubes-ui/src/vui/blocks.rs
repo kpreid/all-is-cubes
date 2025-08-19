@@ -173,7 +173,7 @@ mod tests {
     use super::*;
     use all_is_cubes::util::yield_progress_for_testing;
 
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn blocks_smoke_test() {
         UiBlocks::new(
             &mut UniverseTransaction::default(),

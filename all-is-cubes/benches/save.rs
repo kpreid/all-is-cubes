@@ -11,14 +11,19 @@ use all_is_cubes::euclid::size3;
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::yield_progress_for_testing;
 
-#[tokio::main(flavor = "current_thread")]
-async fn save_space(c: &mut Criterion) {
+criterion_main!(benches);
+criterion_group!(benches, save_space);
+
+fn save_space(c: &mut Criterion) {
     // TODO: add significant content beyond the `Space` (or maybe separate benches)
     let universe_to_save = {
         let mut u = Universe::new();
-        let space = lighting_bench_space(&mut u, yield_progress_for_testing(), size3(100, 32, 100))
-            .await
-            .unwrap();
+        let space = async_io::block_on(lighting_bench_space(
+            &mut u,
+            yield_progress_for_testing(),
+            size3(100, 32, 100),
+        ))
+        .unwrap();
         u.insert("space".into(), space).unwrap();
         u
     };
@@ -36,6 +41,3 @@ async fn save_space(c: &mut Criterion) {
         );
     });
 }
-
-criterion_group!(benches, save_space);
-criterion_main!(benches);

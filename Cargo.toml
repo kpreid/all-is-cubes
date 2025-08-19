@@ -73,6 +73,9 @@ anyhow = "1.0.70"
 # Each use should be { optional = true }.
 arbitrary = { version = "1.4.1", features = ["derive"] }
 arrayvec = { version = "0.7.6", default-features = false }
+async-executor = { version = "1.13.2", default-features = false } # part of the `smol` family
+async-io = { version = "2.5.0", default-features = false } # part of the `smol` family
+async-lock = { version = "3.4.1", default-features = false } # part of the `smol` family
 async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bevy_ecs = { version = "0.16.0", default-features = false }
@@ -85,7 +88,7 @@ cfg-if = { version = "1.0.0", default-features = false }
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 # Note: async_tokio feature is not needed globally but is enabled to avoid compiling two versions
 # when benching/testing specific packages
-criterion = { version = "0.7.0", features = ["async_tokio", "cargo_bench_support", "html_reports"] }
+criterion = { version = "0.7.0", features = ["async", "cargo_bench_support", "html_reports"] }
 displaydoc = { version = "0.2.5", default-features = false }
 either = { version = "1.10.0", default-features = false }
 # embedded-graphics and embedded-graphics-core must match
@@ -144,13 +147,15 @@ serde = { version = "1.0.204", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.100", default-features = false, features = ["std"] }
 simplelog = { version = "0.12.0", default-features = false, features = ["local-offset"] }
 smallvec = { version = "1.15.1", default-features = false, features = ["union", "const_generics", "const_new"] }
+smol = { version = "2.0.2" }
+smol-macros = { version = "0.1.1" } # keep in sync with `smol`, `async-*`
 snapbox = "0.6.10" # keep in sync with `trycmd`
 strum = { version = "0.26.3", default-features = false, features = ["derive"] }
 sync_wrapper = { version = "1.0.0", default-features = false }
 tempfile = { version = "3.20.0", default-features = false }
 thiserror = { version = "2.0.11", default-features = false }
 time = { version = "0.3.36", default-features = false }
-# Tokio is used for async test-running and for certain binaries.
+# Tokio is used for certain binaries.
 # The library crates do not require Tokio.
 tokio = { version = "1.44.2", default-features = false }
 trycmd = "0.15.4" # keep in sync with `snapbox`

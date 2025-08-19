@@ -46,7 +46,7 @@ async fn roundtrip(
 }
 
 #[cfg(all(feature = "export", feature = "import"))]
-#[tokio::test]
+#[macro_rules_attribute::apply(smol_macros::test)]
 async fn export_import_space() {
     // Irregular and negative dimensions to check that the coordinate transform worked.
     let bounds = GridAab::from_lower_size([-20, -30, -40], [1, 2, 3]);
@@ -113,7 +113,7 @@ async fn export_import_space() {
 // Import-only tests
 
 #[cfg(feature = "import")]
-#[tokio::test]
+#[macro_rules_attribute::apply(smol_macros::test)]
 async fn invalid_file_error() {
     let error = mv::load_dot_vox(yield_progress_for_testing(), &[])
         .await
@@ -128,7 +128,7 @@ async fn invalid_file_error() {
 }
 
 #[cfg(feature = "import")]
-#[tokio::test]
+#[macro_rules_attribute::apply(smol_macros::test)]
 async fn import_materials() {
     // This file contains one each of the six material types MagicaVoxel creates, in order.
     // (It does not contain each of the "media" types.)
@@ -191,7 +191,7 @@ async fn import_materials() {
 
 /// [`dot_vox`] only supports coordinates from 0-255
 #[cfg(feature = "export")]
-#[tokio::test]
+#[macro_rules_attribute::apply(smol_macros::test)]
 async fn export_too_large_space() {
     let mut universe = Universe::new();
     let space = universe
@@ -208,7 +208,7 @@ async fn export_too_large_space() {
 }
 
 #[cfg(feature = "export")]
-#[tokio::test]
+#[macro_rules_attribute::apply(smol_macros::test)]
 async fn export_block_def() {
     let mut universe = Universe::new();
     universe

@@ -577,7 +577,7 @@ mod tests {
 
     /// Test when the pause menu (or any menu, really) is displayed,
     /// mouselook is ended so the mouse  can interact with the menus.
-    #[tokio::test]
+    #[macro_rules_attribute::apply(smol_macros::test)]
     async fn pause_menu_cancels_mouselook() {
         let paused = listen::Cell::new(false);
         // TODO: This test is both verbose and expensive.
