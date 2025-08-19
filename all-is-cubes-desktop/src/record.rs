@@ -252,17 +252,20 @@ impl Recorder {
                     );
 
                     let status_notifier = status_notifier.clone();
-                    executor.tokio().spawn(async move {
-                        // TODO: need a proper error reporting path so this doesn't just turn into a dropped channel
-                        export_task
-                            .await
-                            .expect("failed to perform export operation");
+                    executor
+                        .inner()
+                        .spawn(async move {
+                            // TODO: need a proper error reporting path so this doesn't just turn into a dropped channel
+                            export_task
+                                .await
+                                .expect("failed to perform export operation");
 
-                        status_notifier.notify(&Status {
-                            frame_number: this_frame_number,
-                            flaws: Flaws::empty(), // TODO: should have a concept of export flaws
-                        });
-                    });
+                            status_notifier.notify(&Status {
+                                frame_number: this_frame_number,
+                                flaws: Flaws::empty(), // TODO: should have a concept of export flaws
+                            });
+                        })
+                        .detach();
                 } else {
                     // Ignore other frames
                 }

@@ -38,8 +38,7 @@ fn title_and_version() -> String {
 }
 
 fn main() -> Result<(), anyhow::Error> {
-    let runtime = tokio::runtime::Builder::new_multi_thread().build().unwrap();
-    let executor = all_is_cubes_desktop::Executor::new(runtime.handle().clone());
+    let executor = all_is_cubes_desktop::Executor::new();
 
     // Parse and transform command-line arguments.
     let options = AicDesktopArgs::parse();
@@ -102,7 +101,7 @@ fn main() -> Result<(), anyhow::Error> {
     ));
 
     let start_session_time = Instant::now();
-    let mut session = runtime.block_on(
+    let mut session = async_io::block_on(
         Session::builder()
             .ui(viewport_cell.as_source())
             .settings_from(settings)
@@ -130,7 +129,7 @@ fn main() -> Result<(), anyhow::Error> {
     let (task_done_tx, mut task_done_rx) = tokio::sync::oneshot::channel();
     let inner_params = InnerMainParams {
         application_title: title_and_version(),
-        runtime,
+        executor,
         before_loop_time: Instant::now(),
         universe_task,
         headless: options.is_headless(),
@@ -154,27 +153,24 @@ fn main() -> Result<(), anyhow::Error> {
     // Note that while its return type is nominally Result<()>, it does not necessarily
     // ever return “successfully”, so no code should follow it.
     match graphics_type {
-        #[expect(clippy::shadow_unrelated)]
         GraphicsType::Window | GraphicsType::WindowRt => {
             winit_main_loop_and_init(
-                Box::new(move |inner_params, elwt| {
+                Box::new(move |_inner_params, elwt| {
                     // TODO: this logic should not be inside main(), really, it should be part
                     // of the winit module — it just has a mess of deps
                     // TODO: don't block_on, be async?
-                    let dsession = inner_params
-                        .runtime
-                        .block_on(create_winit_wgpu_desktop_session(
-                            dsession,
-                            // TODO: turn this inside out and stop having `WinAndState` exposed
-                            aic_winit::WinAndState::new(
-                                elwt,
-                                title_and_version(), // this will be overwritten with more detail later
-                                display_size,
-                                fullscreen,
-                            )
-                            .context("failed to create window")?,
-                        ))
-                        .context("failed to create session")?;
+                    let dsession = async_io::block_on(create_winit_wgpu_desktop_session(
+                        dsession,
+                        // TODO: turn this inside out and stop having `WinAndState` exposed
+                        aic_winit::WinAndState::new(
+                            elwt,
+                            title_and_version(), // this will be overwritten with more detail later
+                            display_size,
+                            fullscreen,
+                        )
+                        .context("failed to create window")?,
+                    ))
+                    .context("failed to create session")?;
                     if graphics_type == GraphicsType::WindowRt {
                         // TODO: improve on this kludge by just having a general cmdline graphics config
                         dsession.session.settings().mutate_graphics_options(|o| {

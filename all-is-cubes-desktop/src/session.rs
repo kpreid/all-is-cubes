@@ -267,13 +267,11 @@ pub(crate) async fn load_new_universe_async(
     + 'static,
 ) {
     ctx.set_universe_async(async move |progress| {
-        // TODO: ideally this would be a cancelled-on-drop task
-        // TODO: hook up proper tokio yield (this will require <https://github.com/kpreid/yield-progress/issues/36>)
-        let loader_task = executor.tokio().spawn(loader(progress));
-
-        loader_task
-            .await
-            .expect("tokio runtime unexpectedly failed")
+        // Note that this spawned task handle is cancel-on-drop, which is good for this application.
+        // If we switch executors to one which is not cancel-on-drop, we should add that
+        // functionality ourselves.
+        let loader_task: async_executor::Task<_> = executor.inner().spawn(loader(progress));
+        loader_task.await
     })
     .await
 }

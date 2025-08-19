@@ -54,43 +54,54 @@ pub(crate) fn tokio_yield_progress() -> yield_progress::Builder {
     yield_progress::Builder::new().yield_using(|_| tokio::task::yield_now())
 }
 
-/// Implementation of [`all_is_cubes::util::Executor`] for use with the [`tokio`] runtime used by
+/// Implementation of [`all_is_cubes::util::Executor`] for use with a `smol` executor, used by
 /// `all-is-cubes-desktop`.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Executor {
-    handle: tokio::runtime::Handle,
+    inner: async_executor::Executor<'static>,
     per_task_parallelism: usize,
 }
 
 impl Executor {
-    /// Note: At this layer, we don't actually need the [`Arc`] but it's useful for type erasure
-    /// to `Arc<dyn Executor>`.
-    #[allow(missing_docs)]
-    pub fn new(handle: tokio::runtime::Handle) -> Arc<Self> {
-        Arc::new(Self {
-            handle,
+    /// Constructs an executor with background threads.
+    ///
+    /// No means exists to shut down the executor.,
+    pub fn new() -> Arc<Self> {
+        let parallelism = std::thread::available_parallelism()
+            .unwrap_or(NonZeroUsize::MIN)
+            .get();
+
+        let new_self = Arc::new(Self {
+            inner: async_executor::Executor::new(),
             // TODO: configurable, linked to runtime config
-            per_task_parallelism: std::thread::available_parallelism()
-                .unwrap_or(NonZeroUsize::MIN)
-                .get(),
-        })
+            per_task_parallelism: parallelism,
+        });
+        for _ in 0..parallelism {
+            std::thread::spawn({
+                let executor: Arc<Executor> = new_self.clone();
+                move || async_io::block_on(executor.inner().run(std::future::pending::<()>()))
+            });
+        }
+        new_self
     }
 
-    pub(crate) fn tokio(&self) -> &tokio::runtime::Handle {
-        &self.handle
+    pub(crate) fn inner(&self) -> &async_executor::Executor<'static> {
+        &self.inner
     }
 }
 
 impl all_is_cubes::util::Executor for Executor {
     fn spawn_background(&self, task_factory: &mut dyn FnMut() -> BoxFuture<'static, ()>) {
-        // TODO: eventually we should be using `switchyard` or some other executor focused on
-        // compute support, and add a notion of job priority to `Executor`.
+        // TODO: eventually we should add a notion of job priority, and also arrange so these
+        // background tasks get spread out to per-executor-thread instead of possibly getting
+        // scheduled on the same thread.
         for _ in 0..self.per_task_parallelism {
-            self.handle.spawn(task_factory());
+            self.inner.spawn(task_factory()).detach();
         }
     }
 
     fn yield_now(&self) -> BoxFuture<'static, ()> {
-        Box::pin(tokio::task::yield_now())
+        // smol offers a yield_now() but it is nearly identical in implementation to this one.
+        Box::pin(yield_progress::basic_yield_now())
     }
 }

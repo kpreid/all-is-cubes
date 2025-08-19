@@ -171,6 +171,8 @@ dependencies = [
  "all-is-cubes-render",
  "all-is-cubes-ui",
  "anyhow",
+ "async-executor",
+ "async-io",
  "async_fn_traits",
  "cfg-if",
  "clap",

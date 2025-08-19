@@ -1,6 +1,5 @@
 //! Creation of a [`DesktopSession`] and main loop.
 
-use std::mem;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -34,7 +33,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
 ) -> Result<(), anyhow::Error> {
     let InnerMainParams {
         application_title,
-        runtime,
+        executor,
         before_loop_time,
         universe_task:
             UniverseTask {
@@ -49,8 +48,6 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         universe_ready_signal,
         task_done_signal,
     } = params;
-
-    let executor = Executor::new(runtime.handle().clone());
 
     // At this point we have just finished whatever the GraphicsType did before calling
     // inner_main().
@@ -93,11 +90,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
     dsession.session.set_main_task(async move |mut ctx| {
         let universe_result: Result<Box<Universe>, anyhow::Error> = match universe_task_future.await
         {
-            // nested Results because one is template failure and the other is tokio JoinHandle failure
-            Ok(Ok(u)) => Ok(u),
-            Ok(Err(e)) => {
-                Err(e).context("failed to create universe from requested template or file")
-            }
+            Ok(u) => Ok(u),
             Err(e) => Err(e).context("failed to create universe from requested template or file"),
         };
         let mut startup_universe =
@@ -179,7 +172,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
                     let mut task = UniverseTask::new(&executor, source, false);
                     task.attach_to_main_task(&mut ctx);
                     // TODO: this should use set_universe_async but the progress reporting is not compatible
-                    ctx.set_universe(*task.future.await.unwrap().unwrap());
+                    ctx.set_universe(*task.future.await.unwrap());
                 }
                 ReplaceUniverseCommand::Reload => {
                     let whence = ctx.with_universe(|u| u.whence.clone());
@@ -190,10 +183,9 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
                     let executor = executor.clone();
                     ctx.set_universe_async(async move |progress| {
                         executor
-                            .tokio()
+                            .inner()
                             .spawn(async move { whence.load(progress).await })
                             .await
-                            .unwrap()
                             .map_err(|error| {
                                 arcstr::format!(
                                     // TODO: have better non-early-stringifying error displaying
@@ -214,10 +206,6 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
     });
 
     log::trace!("Entering event loop.");
-
-    // The runtime should not be dropped even if looper returns.
-    // TODO: Find a better way to handle this, if we care about hypothetically calling inner_main more than once.
-    mem::forget(runtime);
 
     looper(dsession)
 }
@@ -264,7 +252,7 @@ pub fn headless_main_loop(
 #[allow(missing_docs)] // TODO: give this an API-design pass too
 pub struct InnerMainParams {
     pub application_title: String,
-    pub runtime: tokio::runtime::Runtime,
+    pub executor: Arc<Executor>,
     pub before_loop_time: Instant,
     pub universe_task: UniverseTask,
     pub headless: bool,
@@ -286,7 +274,7 @@ pub struct InnerMainParams {
 /// delivered via [`InnerMainParams`].
 #[derive(Debug)]
 pub struct UniverseTask {
-    future: tokio::task::JoinHandle<Result<Box<Universe>, anyhow::Error>>,
+    future: async_executor::Task<Result<Box<Universe>, anyhow::Error>>,
     progress_notification_handoff_tx:
         Option<tokio::sync::oneshot::Sender<notification::Notification>>,
     replace_universe_command_rx: tokio::sync::mpsc::Receiver<ReplaceUniverseCommand>,
@@ -308,7 +296,7 @@ impl UniverseTask {
         // Kick off constructing the universe in the background.
         let (n_tx, n_rx) = tokio::sync::oneshot::channel();
         let (r_tx, r_rx) = tokio::sync::mpsc::channel(1);
-        let future = executor.tokio().spawn(source.create_universe(
+        let future = executor.inner().spawn(source.create_universe(
             precompute_light,
             n_rx,
             Arc::new({
