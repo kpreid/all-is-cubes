@@ -475,6 +475,7 @@ impl Space {
     //
     // In the future, there may also be ways in which the space can be in a temporarily invalid
     // state (e.g. allocating a block index before it is used anywhere).
+    #[inline] // a non-inlined monomorphization of this function will basically never be a benefit
     pub fn mutate<R>(
         &mut self,
         read_ticket: ReadTicket<'_>,
