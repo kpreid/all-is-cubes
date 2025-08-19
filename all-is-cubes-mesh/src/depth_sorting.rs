@@ -181,6 +181,7 @@ impl DepthOrdering {
     }
 
     /// Draw a ray pointing towards the applicable corner, edge, or face of `bb`.
+    #[cfg_attr(not(feature = "dynamic"), expect(dead_code))]
     pub(crate) fn debug_lines(self, bb: Aabb, output: &mut impl Extend<[lines::Vertex; 2]>) {
         if self == Self::WITHIN {
             // TODO: draw a marker for this case
