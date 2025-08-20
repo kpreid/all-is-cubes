@@ -599,12 +599,12 @@ impl Block {
     pub fn evaluate_and_listen(
         &self,
         read_ticket: ReadTicket<'_>,
-        listener: impl listen::IntoDynListener<BlockChange, listen::DynListener<BlockChange>>,
+        listener: impl listen::IntoListener<listen::DynListener<BlockChange>, BlockChange>,
     ) -> Result<EvaluatedBlock, EvalBlockError> {
         self.evaluate2(&EvalFilter {
             read_ticket,
             skip_eval: false,
-            listener: Some(listener.into_dyn_listener()),
+            listener: Some(listener.into_listener()),
             budget: Default::default(),
         })
     }

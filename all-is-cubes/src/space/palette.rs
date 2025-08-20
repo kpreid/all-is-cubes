@@ -6,7 +6,7 @@ use core::fmt;
 use itertools::Itertools as _;
 
 use crate::block::{self, AIR, AIR_EVALUATED, Block, BlockChange, EvaluatedBlock};
-use crate::listen::{self, IntoDynListener as _, Listener as _};
+use crate::listen::{self, IntoListener as _, Listener as _};
 use crate::math::{self, OpacityCategory};
 use crate::space::step::SpacePaletteNextValue;
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
@@ -486,15 +486,13 @@ impl SpaceBlockData {
     fn new<L>(read_ticket: ReadTicket<'_>, block: Block, listener: L) -> Self
     where
         L: listen::Listener<BlockChange>,
-        listen::GateListener<L>: listen::IntoDynListener<
-                BlockChange,
-                <listen::Notifier<BlockChange> as listen::Listen>::Listener,
-            >,
+        listen::GateListener<L>:
+            listen::IntoListener<listen::DynListener<BlockChange>, BlockChange>,
     {
         // Note: Block evaluation also happens in `Space::step()`.
 
-        let (gate, block_listener) = listener.gate();
-        let block_listener: listen::DynListener<BlockChange> = block_listener.into_dyn_listener();
+        let (gate, block_listener) = listen::Listener::gate(listener);
+        let block_listener: listen::DynListener<BlockChange> = block_listener.into_listener();
 
         let original_budget = block::Budget::default();
         let filter = block::EvalFilter {

@@ -4,7 +4,7 @@
 //! Caution: if the `"std"` feature is disabled, they will change in non-additive ways.
 
 pub use ::nosy::{
-    Buffer, Constant, Flag, Gate, GateListener, IntoDynListener, Listen, Listener, Log,
+    Buffer, Constant, Flag, FromListener, Gate, GateListener, IntoListener, Listen, Listener, Log,
     NullListener, Source, Store, StoreLock, future::WakeFlag,
 };
 

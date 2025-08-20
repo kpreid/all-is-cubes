@@ -4,7 +4,7 @@ use core::{fmt, mem, ops};
 use bevy_ecs::prelude as ecs;
 
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
-use crate::listen::{self, Gate, IntoDynListener as _, Listener, Notifier};
+use crate::listen::{self, Gate, IntoListener as _, Listener, Notifier};
 use crate::transaction::{self, Equal, Transaction};
 use crate::universe::{HandleVisitor, ReadTicket, VisitHandles};
 
@@ -152,7 +152,7 @@ impl BlockDefState {
             .evaluate2(&block::EvalFilter {
                 read_ticket,
                 skip_eval: false,
-                listener: Some(block_listener.into_dyn_listener()),
+                listener: Some(block_listener.into_listener()),
                 budget: Default::default(),
             })
             .map(MinEval::from);

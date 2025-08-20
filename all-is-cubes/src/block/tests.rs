@@ -21,13 +21,13 @@ use crate::universe::{HandleError, Name, Universe};
 fn listen(
     universe: &Universe,
     block: &Block,
-    listener: impl listen::IntoDynListener<BlockChange, listen::DynListener<BlockChange>>,
+    listener: impl listen::IntoListener<listen::DynListener<BlockChange>, BlockChange>,
 ) -> Result<(), EvalBlockError> {
     block
         .evaluate2(&block::EvalFilter {
             read_ticket: universe.read_ticket(),
             skip_eval: true,
-            listener: Some(listener.into_dyn_listener()),
+            listener: Some(listener.into_listener()),
             budget: Default::default(),
         })
         .map(|_| ())
