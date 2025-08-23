@@ -1,6 +1,5 @@
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Full Block Transparency",
     subtitle:
@@ -33,7 +32,6 @@ fn TRANSPARENCY_WHOLE_BLOCK(ctx: Context<'_>) {
     Ok((space, ExhibitTransaction::default()))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Smaller Block Transparency",
     subtitle:
@@ -86,7 +84,6 @@ fn TRANSPARENCY_SHRUNKEN_BLOCK(ctx: Context<'_>) {
     Ok((space, txn))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Complex Voxel Transparency",
     subtitle:
@@ -178,7 +175,6 @@ fn TRANSPARENCY_GLASS_AND_WATER(ctx: Context<'_>) {
     Ok((space, txn))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Simple Transparent Voxels",
     subtitle: "",
@@ -213,7 +209,6 @@ fn TRANSPARENCY_VOX(ctx: Context<'_>) {
     Ok((exhibit_space, txn))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Swimming Pool",
     subtitle: "Transparent blocks that can be passed through",

@@ -1,6 +1,5 @@
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "block_from_image()",
     subtitle: "Using rotations XYZ, XyZ, XZY, xYZ",
