@@ -1,6 +1,5 @@
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "World's Smallest Voxel",
     subtitle: "1/128th the length of a standard block",
