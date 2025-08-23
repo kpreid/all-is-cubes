@@ -3,6 +3,8 @@
 #![feature(doc_cfg)]
 #![feature(large_assignments)]
 #![move_size_limit = "5000"]
+#![feature(macro_attr)]
+#![feature(macro_derive)]
 
 //! Demo content for All is Cubes.
 //!
