@@ -40,8 +40,7 @@ impl Placement {
 pub(crate) type ExhibitTransaction = all_is_cubes::universe::UniverseTransaction;
 
 macro_rules! exhibit {
-    (
-        #[exhibit($( $fields:tt )*)]
+    attr($( $fields:tt )*) (
         fn $name:ident($( $args:tt )*) {
             $( $body:tt )*
         }
