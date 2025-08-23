@@ -87,7 +87,6 @@ dependencies = [
  "hashbrown",
  "itertools",
  "log",
- "macro_rules_attribute",
  "noise",
  "paste",
  "petgraph",
