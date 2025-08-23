@@ -2,7 +2,6 @@ use core::f64::consts::FRAC_1_SQRT_2;
 
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Knot",
     subtitle: "Complex voxel shape",
