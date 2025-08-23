@@ -2,7 +2,6 @@ use crate::AnimatedVoxels;
 
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Animation",
     subtitle: "Blocks whose definition is animated",
@@ -92,7 +91,6 @@ fn ANIMATION(ctx: Context<'_>) {
     Ok((space, txn))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Operation::Become",
     subtitle: "",
