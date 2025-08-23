@@ -3,7 +3,6 @@ use itertools::Itertools;
 
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Modifier::Inventory",
     subtitle: "",

@@ -6,7 +6,6 @@ use alloc::sync::Arc;
 use core::error::Error;
 
 use futures_core::future::BoxFuture;
-use macro_rules_attribute::macro_rules_derive;
 use paste::paste;
 
 use all_is_cubes::block::Block;
@@ -30,8 +29,8 @@ use crate::{free_editing_starter_inventory, palette};
 
 /// Generate a `#[test]` function for each element of [`UniverseTemplate`].
 /// This macro is used as a derive macro via [`macro_rules_derive`].
-macro_rules! generate_template_test {
-    (
+macro_rules! template_tests {
+    derive() (
         $(#[$type_meta:meta])*
         $vis:vis enum $enum_name:ident {
             $(
@@ -68,10 +67,10 @@ macro_rules! generate_template_test {
     strum::EnumString,
     strum::EnumIter,
     strum::IntoStaticStr,
+    template_tests,
 )]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
-#[macro_rules_derive(generate_template_test!)]
 pub enum UniverseTemplate {
     /// Provides an interactive menu of other templates.
     Menu,
