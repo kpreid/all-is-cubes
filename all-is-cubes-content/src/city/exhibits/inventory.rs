@@ -1,7 +1,6 @@
 use super::prelude::*;
 use crate::pipe;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Modifier::Inventory",
     subtitle: "",
