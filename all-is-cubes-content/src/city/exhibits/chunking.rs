@@ -1,6 +1,5 @@
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "ChunkChart",
     subtitle: "Volume of world chunks in view at a distance of 4.99",

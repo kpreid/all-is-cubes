@@ -1,6 +1,5 @@
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Rotations",
     subtitle: "Rotated blocks and GridRotation::from_to()",

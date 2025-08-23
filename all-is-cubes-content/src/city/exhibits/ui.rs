@@ -5,7 +5,6 @@ use all_is_cubes_ui::vui::widgets::{self, ToolbarButtonState, WidgetBlocks};
 
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "UI Blocks",
     subtitle:
@@ -75,7 +74,6 @@ fn UI_BLOCKS(ctx: Context<'_>) {
     Ok((space, ExhibitTransaction::default()))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "UI: Progress Bar",
     subtitle: "",
