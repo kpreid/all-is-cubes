@@ -1,6 +1,5 @@
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Modifier::Composite",
     subtitle: "",
@@ -84,7 +83,6 @@ fn COMPOSITE(ctx: Context<'_>) {
     Ok((space, ExhibitTransaction::default()))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Dashed outline boxes",
     subtitle: "",

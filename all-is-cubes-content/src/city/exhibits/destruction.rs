@@ -2,7 +2,6 @@ use crate::alg::voronoi_pattern;
 
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Block Destruction",
     subtitle: "Animation prototype",

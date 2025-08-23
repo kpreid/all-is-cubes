@@ -2,7 +2,6 @@ use crate::make_slab_txn;
 
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Collision",
     subtitle: "Test cases for character/world collision",

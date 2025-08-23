@@ -1,6 +1,5 @@
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Colors",
     subtitle: "RGB cube of 5 linear color steps",
@@ -67,7 +66,6 @@ fn COLORS(ctx: Context<'_>) {
     Ok((space, ExhibitTransaction::default()))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Colored Lights",
     subtitle: "RGBCMY lights in an enclosed room",
@@ -239,7 +237,6 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
     Ok((space, txn))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Colored Reflections",
     subtitle: "Light colored by surface reflections",
@@ -314,7 +311,6 @@ fn COLORED_BOUNCE(ctx: Context<'_>) {
 }
 
 // TODO: this is similar to COLORED_BOUNCE and should share some code
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Spotlight",
     subtitle: "How sharp can the shadow be?\nNot very.",
