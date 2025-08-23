@@ -1,6 +1,5 @@
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Resolutions",
     subtitle:
