@@ -1,6 +1,5 @@
 use super::prelude::*;
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Modifier::Move",
     subtitle: "Stationary but not animated cases.",
@@ -47,7 +46,6 @@ fn MOVED_BLOCKS(ctx: Context<'_>) {
     Ok((space, txn))
 }
 
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Projectile",
     subtitle: "click me to launch",

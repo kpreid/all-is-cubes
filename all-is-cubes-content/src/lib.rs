@@ -2,6 +2,8 @@
 #![feature(impl_restriction)]
 #![feature(large_assignments)]
 #![move_size_limit = "5000"]
+#![feature(macro_attr)]
+#![feature(macro_derive)]
 #![feature(macro_metavar_expr_concat)]
 
 //! Demo content for All is Cubes.
