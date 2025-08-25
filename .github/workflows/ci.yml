@@ -244,7 +244,7 @@ jobs:
 
     # Save wasm build so that we can optionally deploy it without rebuilding
     # (but only for the stablest matrix version)
-    - uses: actions/upload-pages-artifact@v3
+    - uses: actions/upload-pages-artifact@v4
       with:
         path: all-is-cubes-wasm/target/web-app-release
 
