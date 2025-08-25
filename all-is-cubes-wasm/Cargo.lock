@@ -686,9 +686,9 @@ dependencies = [
 
 [[package]]
 name = "exhaust"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ab1f1c32d4fd0a9c039e503d7818ca640682db631f494acca91c3570682949"
+checksum = "30b727ccdc10d28c68e775e7167048866fadcc1c39a31d489922cf9dc496becc"
 dependencies = [
  "exhaust-macros",
  "mutants",
@@ -696,9 +696,9 @@ dependencies = [
 
 [[package]]
 name = "exhaust-macros"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b2b9102b00a5237a5c503c211623652aa22d05de2c6eb227eed331186463d62"
+checksum = "7d9bba791cce787703541f40494aa1e0627394c6382b980850bb521a76ab1b80"
 dependencies = [
  "itertools",
  "proc-macro2",
