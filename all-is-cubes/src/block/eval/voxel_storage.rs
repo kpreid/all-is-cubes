@@ -84,6 +84,10 @@ impl Evoxel {
     ///
     /// This differs from `self.color.opacity_category()` in that it accounts for emission
     /// making a voxel visible.
+    //---
+    // Inlining is beneficial to performance of all-is-cubes-mesh's analyze() phase.
+    // TODO: Further optimizations? Tweak the data layout and even increase density?
+    #[inline]
     pub fn opacity_category(&self) -> OpacityCategory {
         let &Self {
             color,
