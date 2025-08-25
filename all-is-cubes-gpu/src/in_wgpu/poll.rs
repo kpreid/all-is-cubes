@@ -81,7 +81,10 @@ mod inner {
 /// Polls all [`wgpu::Device`]s delivered to it on `POLLING_CHANNEL`,
 /// as long as each device has at least one weak handle to it.
 /// To be run on a thread or async task as the platform permits.
-#[expect(clippy::infinite_loop)]
+#[allow(
+    clippy::infinite_loop,
+    reason = "spawn_local() requires () as return type; allow() for false negative rust-clippy/15541"
+)]
 async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
     // 10 milliseconds is much better than acceptable latency for our applications, which are all
     // non-realtime headless rendering.

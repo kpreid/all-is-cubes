@@ -338,7 +338,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
 
         // Dispatch to the depth sorting algorithm in its u16 or u32 version.
         #[rustfmt::skip]
-        #[expect(clippy::unnecessary_semicolon, reason = "false positive")]
+        #[allow(clippy::unnecessary_semicolon, reason = "<https://github.com/rust-lang/rust-clippy/issues/15426>; remove after Rust 1.91")]
         match transparent_indices {
             FaceMap {
                 nx: IndexVec::U16(nx),
