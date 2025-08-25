@@ -521,13 +521,12 @@ dependencies = [
 
 [[package]]
 name = "exhaust"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "089df14b2fd09b5c76c21eff264603198c480a779d47d1180b1c7849ece5102e"
+checksum = "b9ab1f1c32d4fd0a9c039e503d7818ca640682db631f494acca91c3570682949"
 dependencies = [
  "exhaust-macros",
  "mutants",
- "paste",
 ]
 
 [[package]]
