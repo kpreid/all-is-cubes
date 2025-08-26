@@ -277,6 +277,9 @@ pub(super) fn push_quad<V, Tex>(
         transform.face,
     );
 
+    // Optimization note: I tried filling `bounding_box` using the analysis plane boxes rather than
+    // taking each vertex individually, and it made no difference.
+
     // Compute and push the four vertices.
     match coloring {
         QuadColoring::Solid(color) => {
