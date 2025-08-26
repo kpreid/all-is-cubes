@@ -30,6 +30,7 @@ impl VisualVoxel {
         reflectance: Rgba::TRANSPARENT,
         emission: false,
     };
+    #[inline] // in the hot loop of GreedyMesher
     pub fn visible(&self) -> bool {
         *self != Self::INVISIBLE
     }
