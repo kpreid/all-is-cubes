@@ -81,10 +81,13 @@ impl Aabb {
     /// Expand this box to contain the given point.
     ///
     /// Panics if the point contains NaN.
-    // #[inline]
-    // #[track_caller] // in case of NaN
+    #[inline]
+    #[track_caller] // in case of NaN
     pub fn add_point(&mut self, point: Position) {
-        // TODO: consider switching to NotNan inputs
+        // Optimization note: I tried combining the NaN check with the comparison for min and max,
+        // and the performance was unchanged but the assembly was longer due to lack of
+        // vectorization.
+
         let point = point.try_cast().expect("point must not be NaN");
         self.low = self.low.min(point);
         self.high = self.high.max(point);
