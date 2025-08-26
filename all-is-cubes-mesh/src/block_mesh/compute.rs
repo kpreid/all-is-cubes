@@ -351,6 +351,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
         // Layer 0 is the outside surface of the cube and successive layers are
         // deeper below that surface.
+        // `occupied_planes()` tells us which planes have any actually visible voxel surfaces,
+        // so this loop can skip fully solid or empty volumes.
         for (layer, occupied_rect) in analysis.occupied_planes(face) {
             if !rotated_voxel_range.z_range().contains(&layer) {
                 // TODO: This is a workaround for a bug in the analyzer; it should not be
@@ -369,10 +371,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             }
 
             viz.set_layer_in_progress(face, layer);
-
-            // Becomes true if there is any voxel that is both non-fully-transparent and
-            // not obscured by another voxel on top.
-            let mut layer_is_visible_somewhere = false;
 
             // Contains a color with alpha > 0 for every voxel that _should be drawn_.
             // That is, it excludes all obscured interior volume.
@@ -448,7 +446,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     }
                 };
                 if voxel_is_visible {
-                    layer_is_visible_somewhere = true;
                     visible_image.push(VisualVoxel {
                         reflectance: evoxel.color,
                         emission: evoxel.emission != Rgb::ZERO,
@@ -458,11 +455,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     // generate geometry for them.
                     visible_image.push(VisualVoxel::INVISIBLE);
                 }
-            }
-
-            if !layer_is_visible_somewhere {
-                // No need to analyze further.
-                continue;
             }
 
             // Pick where we're going to store the quads.
