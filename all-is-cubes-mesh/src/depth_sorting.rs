@@ -451,6 +451,8 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
         }
         3 => {
             // Everything must be sorted dynamically.
+            // `store_transparent_indices()` should have marked this case as already eligible for
+            // dynamic sorting, bypassing `static_sort()` entirely.
             unreachable!("should have skipped the static sort for WITHIN");
         }
         1 | 2 => {
@@ -487,8 +489,16 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
                     .push((quad_group.start * 6)..(quad_group.end * 6));
             }
 
-            // We have computed ranges but we still need to perform a dynamic sort.
-            meta.depth_sort_validity = Aabb::EMPTY;
+            if meta.dynamic_sub_ranges.is_empty() {
+                // No sub-ranges requiring dynamic sorting exist.
+                // Therefore, we have determined that our static sort is sufficient, and can mark
+                // it as valid everywhere.
+                meta.depth_sort_validity = Aabb::EVERYWHERE;
+            } else {
+                // We have determined what ranges require dynamic sorting, but
+                // those ranges are not yet sorted, so there is no volume of validity.
+                meta.depth_sort_validity = Aabb::EMPTY;
+            }
         }
         4.. => unreachable!(),
     }
@@ -940,5 +950,49 @@ mod tests {
         // this should succeed without tripping any assertions
         let result = space_mesh.depth_sort_for_view(ordering_with_nothing, position_with_nothing);
         assert_eq!(result.changed, None);
+    }
+
+    /// Regression test for handling the case where, after the static sort completes, there is
+    /// nothing for the dynamic sort to do even though the view direction would, in the general
+    /// case, require dynamic sorting.
+    #[test]
+    fn no_dynamic_remains_after_static() {
+        let opaque_block = block::from_color!(1.0, 0.0, 0.0, 1.0);
+        let transparent_block = block::from_color!(1.0, 0.0, 0.0, 0.5);
+        let space = Space::builder(GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]))
+            .filled_with(opaque_block)
+            .build_and_mutate(|m| {
+                // A line of transparent blocks punching through the opaque volume.
+                // Thus, only their +X and -X faces are visible.
+                m.fill_uniform(
+                    GridAab::from_lower_size([-1, 0, 0], [3, 1, 1]),
+                    &transparent_block,
+                )
+            })
+            .unwrap();
+        let (_, _, mut space_mesh) = crate::testing::mesh_blocks_and_space(&space);
+
+        let ordering = DepthOrdering(vec3(Rel::Lower, Rel::Within, Rel::Within));
+        let position = Position::new(-10.5, 0.5, 0.5);
+        assert_eq!(
+            space_mesh.transparent_range(ordering).len(),
+            6 * 3,
+            "expected 3 quads",
+        );
+        assert_eq!(space_mesh.needs_depth_sorting(ordering, position), true);
+
+        assert!(
+            space_mesh
+                .depth_sort_for_view(ordering, position)
+                .changed
+                .is_some()
+        );
+        assert_eq!(space_mesh.needs_depth_sorting(ordering, position), false);
+
+        // Second sort should do nothing
+        assert_eq!(
+            space_mesh.depth_sort_for_view(ordering, position).changed,
+            None
+        );
     }
 }
