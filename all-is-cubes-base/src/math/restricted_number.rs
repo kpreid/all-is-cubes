@@ -73,6 +73,17 @@ impl<T: FloatCore> PositiveSign<T> {
         self.0 != T::infinity()
     }
 
+    /// Convert to [`ZeroOne`], replacing too-large values with 1.0.
+    #[inline]
+    pub fn clamp_01(self) -> ZeroOne<T> {
+        let one = T::one();
+        if self.0 < one {
+            ZeroOne(self.0)
+        } else {
+            ZeroOne(one)
+        }
+    }
+
     #[cfg(test)]
     #[track_caller]
     pub(crate) fn consistency_check(self)
@@ -99,6 +110,12 @@ impl<T: FloatCore> ZeroOne<T> {
     pub(crate) const fn into_nn(self) -> NotNan<T> {
         // SAFETY: `ZeroOne`’s restrictions are a superset of `NotNan`’s.
         unsafe { NotNan::new_unchecked(self.0) }
+    }
+
+    pub(crate) const fn into_ps(self) -> PositiveSign<T> {
+        // Construction safety:
+        // Valid `PositiveSign` values are a superset of valid `ZeroOne` values.
+        PositiveSign(self.0)
     }
 
     #[cfg(test)]
@@ -308,9 +325,7 @@ macro_rules! non_generic_impls {
         impl From<ZeroOne<$t>> for PositiveSign<$t> {
             #[inline]
             fn from(value: ZeroOne<$t>) -> Self {
-                // Construction safety:
-                // Valid `PositiveSign` values are a superset of valid `ZeroOne` values.
-                PositiveSign(value.0)
+                value.into_ps()
             }
         }
 
@@ -833,6 +848,13 @@ mod tests {
     #[test]
     fn ps_closed_under_multiplication() {
         assert_eq!(ps32(0.0) * PositiveSign::<f32>::INFINITY, ps32(0.0));
+    }
+
+    #[test]
+    fn ps_clamp() {
+        assert_eq!(ps32(0.9).clamp_01(), zo32(0.9));
+        assert_eq!(ps32(1.0).clamp_01(), zo32(1.0));
+        assert_eq!(ps32(1.1).clamp_01(), zo32(1.0));
     }
 
     #[test]

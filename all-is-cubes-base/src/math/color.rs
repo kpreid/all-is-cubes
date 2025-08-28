@@ -12,7 +12,12 @@ use ordered_float::NotNan;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::math::{NotPositiveSign, PositiveSign, ZeroOne};
+use crate::math::{NotPositiveSign, NotZeroOne, PositiveSign, ZeroOne};
+
+// -------------------------------------------------------------------------------------------------
+
+// TODO: Rename these macros to not have `_const` suffixes because the point of having a macro
+// named after a type is to construct it
 
 /// Allows writing a constant [`Rgb`] color value, provided that its components are float
 /// literals.
@@ -49,15 +54,66 @@ macro_rules! rgba_const {
     };
 }
 
-/// A floating-point RGB color value.
+/// Allows writing a constant [`Rgb01`] color value,
+/// provided that its components are float literals.
+///
+/// ```rust
+/// # use all_is_cubes_base::rgb01;
+/// let red = rgb01!(1.0, 0.0, 0.0);
+/// ```
+///
+/// Any invalid value will result in a compilation error.
+///
+/// ```rust,compile_fail
+/// # use all_is_cubes_base::rgb01;
+/// let too_much_red = rgb01!(2.0, 0.0, 0.0);
+/// ```
+#[macro_export]
+macro_rules! rgb01 {
+    ($r:literal, $g:literal, $b:literal) => {
+        // const block ensures all panics are compile-time
+        const {
+            $crate::math::Rgb01::new_zo(
+                $crate::math::ZeroOne::<f32>::new_strict($r),
+                $crate::math::ZeroOne::<f32>::new_strict($g),
+                $crate::math::ZeroOne::<f32>::new_strict($b),
+            )
+        }
+    };
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// A floating-point RGB color value, unbounded.
 ///
 /// * Each color component must have a nonnegative, non-NaN value.
 ///   Depending on the application, they may be considered to have a nominal
 ///   range of 0 to 1, or unbounded.
+// TODO(rgb01): stop saying this once we use Rgb01 everywhere we should
 /// * Color components are linear (gamma = 1), but use the same RGB primaries as sRGB
 ///   (Rec. 709).
+///
+/// For colors whose components do not exceed 1, use [`Rgb01`] instead.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Rgb(Vector3D<PositiveSign<f32>, Intensity>);
+
+/// A floating-point RGB color value, between zero and one.
+///
+/// Represents relative color values such as the reflectance of a surface.
+/// If an unrestricted “HDR” color is required, use [`Rgb`] instead.
+///
+/// * Each color component must have a [`f32`] value between 0.0 and 1.0.
+/// * Color components are linear (gamma = 1), but use the same RGB primaries as sRGB
+///   (Rec. 709).
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct Rgb01(
+    Vector3D<
+        ZeroOne<f32>,
+        // This isn't actually unknown, but *unitless*, but the “unknown” type plays the closest
+        // role availablein [`euclid`].
+        euclid::UnknownUnit,
+    >,
+);
 
 /// A floating-point RGBA color value.
 ///
@@ -72,8 +128,6 @@ pub struct Rgb(Vector3D<PositiveSign<f32>, Intensity>);
 ///   zero and one, respectively, but are preserved rather than clipped.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Rgba {
-    // TODO: Split `Rgba` into two types: one premultiplied with unbounded RGB, and one with
-    // RGB restricted to 0-1 for reflectance-like use cases.
     rgb: Rgb,
     alpha: ZeroOne<f32>,
 }
@@ -85,9 +139,14 @@ pub struct Rgba {
 #[derive(Debug, Eq, PartialEq)]
 pub enum Intensity {}
 
+// -------------------------------------------------------------------------------------------------
+
 // convenience alias
 const PS0: PositiveSign<f32> = <PositiveSign<f32> as num_traits::ConstZero>::ZERO;
 const PS1: PositiveSign<f32> = <PositiveSign<f32> as num_traits::ConstOne>::ONE;
+
+// Note: `Rgb`, `Rgb01`, and `Rgba` each have similar, but not identical, impl blocks, which
+// are all immediately below. They should be kept in sync insofar as that makes sense for each type.
 
 impl Rgb {
     /// Black; the constant equal to `Rgb::new(0., 0., 0.).unwrap()`.
@@ -220,9 +279,9 @@ impl Rgb {
     #[inline]
     pub const fn from_srgb8(rgb: [u8; 3]) -> Self {
         Self(vec3(
-            component_from_srgb8_const(rgb[0]),
-            component_from_srgb8_const(rgb[1]),
-            component_from_srgb8_const(rgb[2]),
+            component_from_srgb8_const(rgb[0]).into_ps(),
+            component_from_srgb8_const(rgb[1]).into_ps(),
+            component_from_srgb8_const(rgb[2]).into_ps(),
         ))
     }
 
@@ -231,6 +290,13 @@ impl Rgb {
     #[must_use]
     pub fn clamp(self, maximum: PositiveSign<f32>) -> Self {
         Self(self.0.map(|c| c.clamp(PS0, maximum)))
+    }
+
+    /// Clamp each component to lie within the range 0 to `maximum`, inclusive.
+    #[inline]
+    #[must_use]
+    pub fn clamp_01(self) -> Rgb01 {
+        Rgb01(self.0.map(PositiveSign::clamp_01).cast_unit())
     }
 
     /// Subtract `other` from `self`; if any component would be negative, it is zero instead.
@@ -244,6 +310,176 @@ impl Rgb {
         ))
     }
 }
+
+impl Rgb01 {
+    /// Black; identical to `Rgb01::new(0.0, 0.0, 0.0)` except for being a constant.
+    pub const BLACK: Self = Self::new_zo(ZeroOne::ZERO, ZeroOne::ZERO, ZeroOne::ZERO);
+    /// White; identical to `Rgb01::new(1.0, 1.0, 1.0)` except for being a constant.
+    pub const WHITE: Self = Self::new_zo(ZeroOne::ONE, ZeroOne::ONE, ZeroOne::ONE);
+
+    /// Pure red that is as bright as it can be,
+    /// while being the same luminance as the other colors in this set.
+    pub const UNIFORM_LUMINANCE_RED: Self = Rgb01::from_srgb8([0x9E, 0x00, 0x00]);
+    /// Pure green that is as bright as it can be,
+    /// while being the same luminance as the other colors in this set.
+    pub const UNIFORM_LUMINANCE_GREEN: Self = Rgb01::from_srgb8([0x00, 0x59, 0x00]);
+    /// Pure blue that is as bright as it can be,
+    /// while being the same luminance as the other colors in this set.
+    /// (That turns out to be 100% blue, `#0000FF`.)
+    pub const UNIFORM_LUMINANCE_BLUE: Self = Rgb01::from_srgb8([0x00, 0x00, 0xFF]);
+
+    /// Constructs a color from components. Panics if any component is NaN, below 0, or above 1.
+    #[inline]
+    #[track_caller]
+    pub const fn new(r: f32, g: f32, b: f32) -> Self {
+        match Self::try_new(vec3(r, g, b)) {
+            Ok(color) => color,
+            Err(_) => panic!("Rgb01 component out of range"),
+        }
+    }
+
+    const fn try_new(value: Vector3D<f32, Rgb01>) -> Result<Self, NotZeroOne<f32>> {
+        match (
+            ZeroOne::<f32>::try_new(value.x),
+            ZeroOne::<f32>::try_new(value.y),
+            ZeroOne::<f32>::try_new(value.z),
+        ) {
+            (Ok(r), Ok(g), Ok(b)) => Ok(Self(vec3(r, g, b))),
+            (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Err(e),
+        }
+    }
+
+    /// Constructs a color from components that have already been checked for not being
+    /// NaN or out of range.
+    ///
+    /// Note: This exists primarily to assist the [`rgb_const!`] macro and may be renamed
+    /// or replaced in future versions.
+    #[inline]
+    pub const fn new_zo(r: ZeroOne<f32>, g: ZeroOne<f32>, b: ZeroOne<f32>) -> Self {
+        Self(vec3(r, g, b))
+    }
+
+    /// Constructs a shade of gray (components all equal) from [relative luminance].
+    /// Panics if any component is NaN. No other range checks are performed.
+    ///
+    /// [relative luminance]: https://en.wikipedia.org/wiki/Relative_luminance
+    #[inline]
+    #[track_caller]
+    pub const fn from_luminance(luminance: ZeroOne<f32>) -> Self {
+        Self::new_zo(luminance, luminance, luminance)
+    }
+
+    /// Converts this color to [`Rgb`] with unrestricted components.
+    #[inline]
+    pub const fn to_rgb(self) -> Rgb {
+        Rgb::new_ps(self.0.x.into_ps(), self.0.y.into_ps(), self.0.z.into_ps())
+    }
+
+    /// Adds an alpha component to produce a [`Rgba`].
+    #[inline]
+    pub const fn with_alpha(self, alpha: ZeroOne<f32>) -> Rgba {
+        Rgba {
+            rgb: self.to_rgb(),
+            alpha,
+        }
+    }
+    /// Adds an alpha component of `1.0` (fully opaque) to produce a [`Rgba`].
+    #[inline]
+    pub const fn with_alpha_one(self) -> Rgba {
+        self.with_alpha(ZeroOne::ONE)
+    }
+
+    /// Adds an alpha component of `1.0` (fully opaque) to produce a [`Rgba`].
+    /// This is for compile-time duck-typed use by the [`block::from_color!`] macro.
+    #[doc(hidden)]
+    #[inline]
+    #[must_use]
+    pub const fn with_alpha_one_if_has_no_alpha(self) -> Rgba {
+        self.with_alpha(ZeroOne::ONE)
+    }
+
+    /// Returns the red color component. Values are linear (gamma = 1).
+    #[inline]
+    pub const fn red(self) -> ZeroOne<f32> {
+        self.0.x
+    }
+    /// Returns the green color component. Values are linear (gamma = 1).
+    #[inline]
+    pub const fn green(self) -> ZeroOne<f32> {
+        self.0.y
+    }
+    /// Returns the blue color component. Values are linear (gamma = 1).
+    #[inline]
+    pub const fn blue(self) -> ZeroOne<f32> {
+        self.0.z
+    }
+
+    /// Combines the red, green, and blue components to obtain a [relative luminance]
+    /// (“grayscale”) value.
+    ///
+    /// If all components are equal, then the result will be approximately equal to that common value.
+    ///
+    /// ### Examples
+    ///
+    /// ```
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Rgb01, zo32};
+    ///
+    /// assert_eq!(0.0, Rgb01::BLACK.luminance());
+    /// assert_eq!(0.5, (Rgb01::WHITE * zo32(0.5)).luminance());
+    /// assert_eq!(1.0, Rgb01::WHITE.luminance());
+    ///
+    /// assert_eq!(0.2126, Rgb01::new(1., 0., 0.).luminance());
+    /// assert_eq!(0.7152, Rgb01::new(0., 1., 0.).luminance());
+    /// assert_eq!(0.0722, Rgb01::new(0., 0., 1.).luminance());
+    /// ```
+    ///
+    /// [relative luminance]: https://en.wikipedia.org/wiki/Relative_luminance
+    #[inline]
+    pub fn luminance(self) -> f32 {
+        // Coefficients as per
+        // https://en.wikipedia.org/wiki/Relative_luminance
+        // Rec. ITU-R BT.709-6 https://www.itu.int/dms_pubrec/itu-r/rec/bt/R-REC-BT.709-6-201506-I!!PDF-E.pdf
+        //
+        // Arithmetic operations ordered for minimum floating point error.
+        // (This probably doesn't matter at all.)
+        self.green().into_inner() * 0.7152
+            + (self.red().into_inner() * 0.2126 + self.blue().into_inner() * 0.0722)
+    }
+
+    /// Converts this color to sRGB 8-bits-per-component color, rounding to the nearest
+    /// representable value.
+    #[inline]
+    pub fn to_srgb8(self) -> [u8; 3] {
+        [
+            component_to_srgb8(self.red().into_ps()),
+            component_to_srgb8(self.green().into_ps()),
+            component_to_srgb8(self.blue().into_ps()),
+        ]
+    }
+
+    /// Converts sRGB 8-bits-per-component color to the corresponding linear [`Rgb01`] value.
+    #[inline]
+    pub const fn from_srgb8(rgb: [u8; 3]) -> Self {
+        Self(vec3(
+            component_from_srgb8_const(rgb[0]),
+            component_from_srgb8_const(rgb[1]),
+            component_from_srgb8_const(rgb[2]),
+        ))
+    }
+
+    /// Multiply `self` by `scale`, clamping out-of-range results to 1.0.
+    #[inline]
+    #[must_use]
+    pub fn saturating_scale(self, scale: PositiveSign<f32>) -> Self {
+        Self(vec3(
+            (self.red() * scale).clamp_01(),
+            (self.green() * scale).clamp_01(),
+            (self.blue() * scale).clamp_01(),
+        ))
+    }
+}
+
 impl Rgba {
     /// Transparent black (all components zero); identical to
     /// `Rgba::new(0.0, 0.0, 0.0, 0.0)` except for being a constant.
@@ -398,9 +634,9 @@ impl Rgba {
     #[inline]
     pub const fn from_srgb8(rgba: [u8; 4]) -> Self {
         Self::new_ps(
-            component_from_srgb8_const(rgba[0]),
-            component_from_srgb8_const(rgba[1]),
-            component_from_srgb8_const(rgba[2]),
+            component_from_srgb8_const(rgba[0]).into_ps(),
+            component_from_srgb8_const(rgba[1]).into_ps(),
+            component_from_srgb8_const(rgba[2]).into_ps(),
             component_from_linear8(rgba[3]),
         )
     }
@@ -429,10 +665,24 @@ impl Rgba {
     }
 }
 
+impl From<Rgb01> for Rgb {
+    #[inline]
+    fn from(value: Rgb01) -> Self {
+        value.to_rgb()
+    }
+}
+
 impl From<Vector3D<PositiveSign<f32>, Intensity>> for Rgb {
     #[inline]
     fn from(value: Vector3D<PositiveSign<f32>, Intensity>) -> Self {
         Self(value)
+    }
+}
+impl<U> From<Vector3D<ZeroOne<f32>, U>> for Rgb01 {
+    #[inline]
+    fn from(value: Vector3D<ZeroOne<f32>, U>) -> Self {
+        // We discard the unit because
+        Self(value.cast_unit())
     }
 }
 
@@ -446,6 +696,12 @@ impl From<[ZeroOne<f32>; 3]> for Rgb {
     #[inline]
     fn from(value: [ZeroOne<f32>; 3]) -> Self {
         Self::from(value.map(PositiveSign::from))
+    }
+}
+impl From<[ZeroOne<f32>; 3]> for Rgb01 {
+    #[inline]
+    fn from(value: [ZeroOne<f32>; 3]) -> Self {
+        Self::from(Vector3D::<_, euclid::UnknownUnit>::from(value))
     }
 }
 impl From<[ZeroOne<f32>; 4]> for Rgba {
@@ -596,6 +852,14 @@ impl Mul<ZeroOne<f32>> for Rgb {
         Self(self.0 * PositiveSign::from(scalar))
     }
 }
+impl Mul<ZeroOne<f32>> for Rgb01 {
+    type Output = Self;
+    /// Multiplies this color value by a scalar.
+    #[inline]
+    fn mul(self, scalar: ZeroOne<f32>) -> Self {
+        Self(self.0 * scalar)
+    }
+}
 /// Multiplies this color value by a scalar.
 ///
 /// Panics if the scalar is NaN. Returns zero if the scalar is negative.
@@ -680,6 +944,22 @@ impl<'a> arbitrary::Arbitrary<'a> for Rgba {
         <[PositiveSign<f32>; 4]>::size_hint(0) // non-recursive, so don't fail
     }
 }
+#[cfg(feature = "arbitrary")]
+#[mutants::skip]
+#[allow(clippy::missing_inline_in_public_items)]
+impl<'a> arbitrary::Arbitrary<'a> for Rgb01 {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Rgb01::new_zo(
+            u.arbitrary()?,
+            u.arbitrary()?,
+            u.arbitrary()?,
+        ))
+    }
+
+    fn size_hint(_depth: usize) -> (usize, Option<usize>) {
+        <[ZeroOne<f32>; 3]>::size_hint(0) // non-recursive, so don't fail
+    }
+}
 
 /// Implementations necessary for `all_is_cubes::drawing` to be able to use these types
 mod eg {
@@ -687,6 +967,9 @@ mod eg {
 
     use super::*;
     impl pixelcolor::PixelColor for Rgb {
+        type Raw = ();
+    }
+    impl pixelcolor::PixelColor for Rgb01 {
         type Raw = ();
     }
     impl pixelcolor::PixelColor for Rgba {
@@ -697,7 +980,13 @@ mod eg {
     impl From<pixelcolor::Rgb888> for Rgb {
         #[inline]
         fn from(color: pixelcolor::Rgb888) -> Rgb {
-            Rgba::from_srgb8([color.r(), color.g(), color.b(), u8::MAX]).to_rgb()
+            Rgb::from_srgb8([color.r(), color.g(), color.b()])
+        }
+    }
+    impl From<pixelcolor::Rgb888> for Rgb01 {
+        #[inline]
+        fn from(color: pixelcolor::Rgb888) -> Rgb01 {
+            Rgb01::from_srgb8([color.r(), color.g(), color.b()])
         }
     }
 }
@@ -721,6 +1010,8 @@ mod rerun {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Apply the sRGB encoding function. Do not use this on alpha values.
 #[inline]
@@ -772,9 +1063,9 @@ fn component_from_srgb8_arithmetic(c: u8) -> f32 {
 
 /// Implements sRGB decoding using a lookup table.
 #[inline]
-const fn component_from_srgb8_const(c: u8) -> PositiveSign<f32> {
+const fn component_from_srgb8_const(c: u8) -> ZeroOne<f32> {
     // Safety: the table may be inspected to contain no negative or NaN values.
-    unsafe { PositiveSign::new_unchecked(CONST_SRGB_LOOKUP_TABLE[c as usize]) }
+    unsafe { ZeroOne::new_unchecked(CONST_SRGB_LOOKUP_TABLE[c as usize]) }
 }
 
 /// Reduces alpha/opacity values to only three possibilities, by conflating all alphas
@@ -847,6 +1138,8 @@ static CONST_SRGB_LOOKUP_TABLE: &[f32; 256] = &[
     0.9215819, 0.9301109, 0.9386858, 0.94730645, 0.9559734, 0.9646863,
     0.9734453, 0.9822504, 0.9911021, 1.0,
 ];
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -962,7 +1255,7 @@ mod tests {
         fn optimize(channel: usize) -> [u8; 4] {
             // Blue is the primary color whose maximum intensity is darkest;
             // therefore it is the standard by which we check the other.
-            let reference_luminance = Rgb::UNIFORM_LUMINANCE_BLUE.luminance();
+            let reference_luminance = Rgb01::UNIFORM_LUMINANCE_BLUE.luminance();
             let (_color, srgb, luminance_difference) = u8::exhaust()
                 .map(|srgb_byte| {
                     let mut srgb = [0, 0, 0, 255];
@@ -978,12 +1271,12 @@ mod tests {
 
         println!("red:");
         assert_eq!(
-            Rgb::UNIFORM_LUMINANCE_RED.with_alpha_one().to_srgb8(),
+            Rgb01::UNIFORM_LUMINANCE_RED.with_alpha_one().to_srgb8(),
             optimize(0)
         );
         println!("green:");
         assert_eq!(
-            Rgb::UNIFORM_LUMINANCE_GREEN.with_alpha_one().to_srgb8(),
+            Rgb01::UNIFORM_LUMINANCE_GREEN.with_alpha_one().to_srgb8(),
             optimize(1)
         );
     }

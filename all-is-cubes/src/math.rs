@@ -12,7 +12,7 @@ pub use all_is_cubes_base::math::*;
 // A crate defining a macro can't export it except at the root,
 // but when we re-export, we can put them in their right place (this module).
 #[doc(inline)]
-pub use all_is_cubes_base::{notnan, rgb_const, rgba_const};
+pub use all_is_cubes_base::{notnan, rgb_const, rgb01, rgba_const};
 
 /// An axis-aligned box with integer coordinates.
 /// [`GridAab`]s are used to specify the coordinate extent of [`Space`](crate::space::Space)s, and

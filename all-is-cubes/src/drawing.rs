@@ -31,7 +31,7 @@ pub use embedded_graphics;
 use crate::block::{Block, Evoxel, text};
 use crate::math::{
     Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb,
-    Rgba, Vol,
+    Rgb01, Rgba, Vol,
 };
 use crate::space::{Mutation, SetCubeError, SpaceTransaction};
 
@@ -285,6 +285,12 @@ impl<'a> VoxelColor<'a> for Rgb {
     }
 }
 
+impl<'a> VoxelColor<'a> for Rgb01 {
+    fn into_blocks(self) -> VoxelBrush<'a> {
+        VoxelBrush::single(Block::from(self))
+    }
+}
+
 impl<'a> VoxelColor<'a> for Rgba {
     fn into_blocks(self) -> VoxelBrush<'a> {
         VoxelBrush::single(Block::from(self))
@@ -298,7 +304,7 @@ impl PixelColor for text::Brush {
 /// Adapt [`embedded_graphics`]'s most general color type to ours.
 impl<'a> VoxelColor<'a> for Rgb888 {
     fn into_blocks(self) -> VoxelBrush<'a> {
-        VoxelBrush::single(Block::from(Rgb::from(self)))
+        VoxelBrush::single(Block::from(Rgb01::from(self)))
     }
 }
 

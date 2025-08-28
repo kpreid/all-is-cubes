@@ -8,7 +8,7 @@ use crate::block::{
     self, AIR, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier, Primitive,
     Resolution,
 };
-use crate::math::{Cube, GridAab, GridPoint, Rgb, Rgba};
+use crate::math::{Cube, GridAab, GridPoint, Rgb, Rgb01, Rgba};
 use crate::space::{SetCubeError, Space};
 use crate::transaction::{self, Merge, Transaction};
 use crate::universe::{Handle, Name, ReadTicket, Universe, UniverseTransaction};
@@ -441,7 +441,16 @@ impl From<Rgba> for Builder<'_, Atom, ()> {
 }
 /// Equivalent to `Block::builder().color(color.with_alpha_one())`.
 impl From<Rgb> for Builder<'_, Atom, ()> {
+    // TODO(rgb01): Remove this impl and replace its uses with `Rgb01`, so we only use
+    // `Rgb` for emissive colors
+
     fn from(color: Rgb) -> Self {
+        Block::builder().color(color.with_alpha_one())
+    }
+}
+/// Equivalent to `Block::builder().color(color.with_alpha_one())`.
+impl From<Rgb01> for Builder<'_, Atom, ()> {
+    fn from(color: Rgb01) -> Self {
         Block::builder().color(color.with_alpha_one())
     }
 }

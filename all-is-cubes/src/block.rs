@@ -13,7 +13,9 @@ use core::fmt;
 
 use crate::inv;
 use crate::listen::{self, Listen as _, Listener};
-use crate::math::{GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgba, Vol};
+use crate::math::{
+    GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Rgb, Rgb01, Rgba, Vol,
+};
 use crate::space::{SetCubeError, Space, SpaceChange};
 use crate::universe::{Handle, HandleVisitor, ReadTicket, VisitHandles};
 
@@ -852,6 +854,16 @@ impl From<Rgb> for Block {
         Block::from(color.with_alpha_one())
     }
 }
+impl From<Rgb01> for Block {
+    /// Constructs a [`Block`] with the given reflectance color, and default attributes.
+    ///
+    /// This operation allocates a new [`Primitive`] value on the heap.
+    /// If the color is a constant, you may use [`block::from_color!`](from_color!)
+    /// instead to avoid allocation.
+    fn from(color: Rgb01) -> Self {
+        Block::from(color.with_alpha_one())
+    }
+}
 impl From<Rgba> for Block {
     /// Construct a [`Block`] with the given reflectance color, and default attributes.
     ///
@@ -1126,8 +1138,17 @@ mod conversions_for_atom {
     }
 
     impl From<Rgb> for Atom {
+        // TODO(rgb01): Remove this impl and replace its uses with `Rgb01`, so we only use
+        // `Rgb` for emissive colors
+
         /// Construct an [`Atom`] with the given reflectance color, and default attributes.
         fn from(color: Rgb) -> Self {
+            Self::from_color(color.with_alpha_one())
+        }
+    }
+    impl From<Rgb01> for Atom {
+        /// Construct an [`Atom`] with the given reflectance color, and default attributes.
+        fn from(color: Rgb01) -> Self {
             Self::from_color(color.with_alpha_one())
         }
     }

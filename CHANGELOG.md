@@ -34,6 +34,7 @@ In order to resolve various design problems interfering with development, the `a
     - `math::BoxPart::centered_on()`
     - `math::Face6::{clockwise, counterclockwise, r180}` for constructing rotations.
     - `math::FaceMap::sum()`
+    - `math::Rgb01` is a float, linear color type that is restricted to the range 0 to 1.
     - `space::Builder::build_and_mutate()`
     - `space::Builder::try_build()` produces recoverable out-of-memory errors where `build()` does not.
     - New universe member type `sound::SoundDef` allows defining synthesized sounds as game content.
