@@ -563,7 +563,7 @@ impl Mul<Self> for GridRotation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::math::GridPoint;
+    use crate::math::{FaceMap, GridPoint};
     use crate::util::MultiFailure;
     use Face6::*;
     use num_traits::One;
@@ -617,6 +617,25 @@ mod tests {
             ok = ok && iter_inv == inv;
         }
         assert!(ok);
+    }
+
+    /// Check that the effect of composing two rotations with the `*` operator is equal to
+    /// the effect of applying both.
+    #[test]
+    fn composition_consistency() {
+        let mut f = MultiFailure::new();
+        for first in GridRotation::ALL {
+            for second in GridRotation::ALL {
+                f.catch(|| {
+                    let composed = second * first;
+                    assert_eq!(
+                        FaceMap::from_fn(|face| { composed.transform(face) }),
+                        FaceMap::from_fn(|face| { second.transform(first.transform(face)) }),
+                        "{second:?} * {first:?}",
+                    );
+                });
+            }
+        }
     }
 
     #[test]
