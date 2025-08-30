@@ -83,9 +83,6 @@ fn compute_fog(world_position: vec3<f32>) -> f32 {
     let eye_vertex_position = camera.view_matrix * vec4<f32>(world_position, 1.0);
     let distance_from_eye: f32 = length(eye_vertex_position.xyz);
 
-    // TODO: When we implement volumetric transparency, that's another use
-    // for the distance_from_eye value, which we will want to pass out (in a struct)
-
     // Distance in range 0 (camera position) to 1 (opaque fog position/far clip position).
     let normalized_distance: f32 = distance_from_eye / camera.fog_distance;
     let fog_mix = clamp(fog_combo(normalized_distance), 0.0, 1.0);

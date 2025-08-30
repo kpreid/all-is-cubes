@@ -433,14 +433,11 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                             // Partially obscured, therefore visible.
                             (Opaque, Partial) => true,
                             // This is the weird one: we count transparency adjacent to
-                            // transparency as if there was nothing to draw. This is
-                            // because:
-                            // (1) If we didn't, we would end up generating large
-                            //     numbers (bad) of intersecting (also bad) quads
-                            //     for any significant volume of transparency.
-                            // (2) TODO: We intend to delegate responsibility for
-                            //     complex transparency to the shader. Until then,
-                            //     this is still better for the first reason.
+                            // transparency as if there was nothing to draw. This is because if
+                            // we didn't, we would end up generating large numbers (bad) of
+                            // intersecting (also bad) quads for any significant volume of
+                            // transparency. Also, when using `TransparencyFormat::BoundingBox`,
+                            // this does not come up.
                             (Partial, Partial) => false,
                         }
                     }
