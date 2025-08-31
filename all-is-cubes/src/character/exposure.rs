@@ -23,7 +23,7 @@ const TARGET_LUMINANCE: f32 = 0.9;
 /// (0.0 = none, 1.0 = perfect adaptation). This is less than 1 so that
 /// dark areas stay dark.
 /// TODO: this should be an adjustable game rule + graphics option.
-const ADJUSTMENT_STRENGTH: f32 = 0.5;
+const ADJUSTMENT_STRENGTH: f32 = 0.375;
 const EXPOSURE_CHANGE_RATE: f32 = 2.0;
 
 #[derive(Clone)]
@@ -132,7 +132,7 @@ impl State {
 /// Compute the target exposure value (which [`State::exposure()`] is moving towards)
 /// from the observed scene luminance.
 fn compute_target_exposure(luminance: f32) -> f32 {
-    let derived_exposure = (TARGET_LUMINANCE / luminance).clamp(0.1, 10.);
+    let derived_exposure = (TARGET_LUMINANCE / luminance).clamp(0.1, 4.);
     // Lerp between full adjustment and no adjustment according to ADJUSTMENT_STRENGTH
     derived_exposure * ADJUSTMENT_STRENGTH + 1. * (1. - ADJUSTMENT_STRENGTH)
 }
@@ -155,7 +155,7 @@ mod tests {
     fn target_exposure() {
         assert_eq!(
             [0.0, 0.01, 0.5, 1.0, 2.0, 100.0, 1000.0].map(compute_target_exposure),
-            [5.5, 5.5, 1.4, 0.95, 0.725, 0.55, 0.55]
+            [2.125, 2.125, 1.3, 0.9625, 0.79375, 0.6625, 0.6625]
         );
     }
 
