@@ -810,8 +810,8 @@ fn texture_clamp_coordinate_ordering() {
 
 /// Test the texture coordinates for volumetric texturing.
 #[test]
-fn texture_coordinates_for_volumetric() {
-    // A simple case: a block with all partially transparent voxels
+fn volumetric_vertices_all_transparent() {
+    // A block with almost all partially transparent voxels
     let mut universe = Universe::new();
     let block = Block::builder()
         .voxels_fn(R4, |cube| {
@@ -826,39 +826,79 @@ fn texture_coordinates_for_volumetric() {
         .unwrap()
         .build_into(&mut universe);
 
-    let mesh = test_block_mesh(&universe, block);
-    dbg!(&mesh);
+    assert_is_using_volumetric_texturing_properly(dbg!(&test_block_mesh(&universe, block)), true);
+}
+/// Test mixed transparent and opaque voxels that share a surface.
+/// This is a regression test for unwanted [`crate::TransparencyFormat::Surfaces`]-style triangles
+/// appearing in [`crate::TransparencyFormat::BoundingBox`].
+#[test]
+fn volumetric_mixed_vertices() {
+    let mut universe = Universe::new();
+    let block = Block::builder()
+        .voxels_fn(R4, |cube| {
+            if cube.lower_bounds().rem_euclid(&Size3D::splat(2)) == point3(0, 0, 0) {
+                if cube.lower_bounds().x == 0 {
+                    // opaque that will have some transparent surface between its occurrences
+                    block::from_color!(1.0, 0.0, 0.0, 1.0)
+                } else {
+                    block::from_color!(1.0, 0.0, 0.0, 0.9)
+                }
+            } else {
+                block::from_color!(1.0, 1.0, 1.0, 0.12)
+            }
+        })
+        .unwrap()
+        .build_into(&mut universe);
 
+    assert_is_using_volumetric_texturing_properly(dbg!(&test_block_mesh(&universe, block)), false);
+}
+/// For a full R4 block using volumetric texturing, check that the texture coordinates and
+/// number of triangles are correct.
+///
+/// If `expect_transparent_only` is false, then opaque *untextured* vertices are allowed.
+/// (This is an approximation of checking to make sure that there are no transparent surfaces
+/// other than the bounding box for the volumetric rendering.)
+fn assert_is_using_volumetric_texturing_properly(
+    mesh: &BlockMesh<TextureMt>,
+    expect_transparent_only: bool,
+) {
     assert!(mesh.texture_used.is_some());
 
     for (face, on_face, sub_mesh) in mesh.all_sub_meshes_keyed() {
         eprintln!("Checking {face:?}...");
-        if !on_face {
-            assert_eq!(sub_mesh.vertices.0.len(), 0);
-        } else {
-            assert_eq!(sub_mesh.vertices.0.len(), 4);
+        if expect_transparent_only {
+            assert_eq!(
+                sub_mesh.vertices.0.len(),
+                if on_face { 4 } else { 0 },
+                "vertex count in {face:?}"
+            );
         }
         for (i, vertex) in sub_mesh.vertices.0.iter().enumerate() {
-            let Coloring::Texture {
-                pos,
-                clamp_min,
-                clamp_max,
-                resolution,
-            } = vertex.coloring
-            else {
-                panic!("not using texture {face:?} {i:?}");
-            };
-            // texture coordinates should be equal to the block's shape
-            assert_eq!(
-                pos,
-                vertex.position.to_f32().cast_unit() * f32::from(resolution),
-                "vertex position {face:?} {i:?}"
-            );
-            assert_eq!(
-                (clamp_min, clamp_max),
-                (point3(0., 0., 0.), point3(4., 4., 4.)),
-                "clamp {face:?} {i:?}"
-            );
+            match vertex.coloring {
+                Coloring::Texture {
+                    pos,
+                    clamp_min,
+                    clamp_max,
+                    resolution,
+                } => {
+                    assert_eq!(
+                        pos,
+                        vertex.position.to_f32().cast_unit() * f32::from(resolution),
+                        "vertex position {face:?} {i:?}"
+                    );
+                    assert_eq!(
+                        (clamp_min, clamp_max),
+                        (point3(0., 0., 0.), point3(4., 4., 4.)),
+                        "clamp {face:?} {i:?}"
+                    );
+                }
+                _ if expect_transparent_only => {
+                    panic!("not using texture {face:?} {i:?}");
+                }
+                Coloring::Solid(color) => {
+                    assert!(color.fully_opaque(), "found transparent face {vertex:?}");
+                }
+            }
         }
     }
 }

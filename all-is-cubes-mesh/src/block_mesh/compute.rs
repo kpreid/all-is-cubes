@@ -550,7 +550,19 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
 fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOptions) -> Evoxel {
     let mut evoxel = *voxels.get(cube).unwrap_or(&Evoxel::AIR);
-    evoxel.color = options.transparency.limit_alpha(evoxel.color);
+    // TODO: this is clunky and might get out of sync
+    evoxel.color = match options.transparency_format() {
+        crate::TransparencyFormat::Surfaces => options.transparency.limit_alpha(evoxel.color),
+        // If we are doing volumetric transparency where there is a special bounding-box mesh,
+        // then when computing the rest of the mesh, ignore everything transparent.
+        crate::TransparencyFormat::BoundingBox => {
+            if evoxel.color.fully_opaque() {
+                evoxel.color
+            } else {
+                Rgba::TRANSPARENT
+            }
+        }
+    };
     evoxel
 }
 
