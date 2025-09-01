@@ -40,14 +40,14 @@ fn raycaster_bench(c: &mut Criterion) {
     group.bench_function("initialization with bounds (inside)", |b| {
         b.iter(|| {
             Raycaster::new(black_box([0.0, -0.25, -0.5]), black_box([1.0, 1.0, 1.0]))
-                .within(GridAab::from_lower_size([-1, -2, -3], [4, 5, 6]))
+                .within(GridAab::from_lower_size([-1, -2, -3], [4, 5, 6]), true)
         })
     });
 
     group.bench_function("initialization with bounds (outside)", |b| {
         b.iter(|| {
             Raycaster::new(black_box([0.0, -0.25, -0.5]), black_box([1.0, 1.0, 1.0]))
-                .within(GridAab::from_lower_size([101, 102, 103], [4, 5, 6]))
+                .within(GridAab::from_lower_size([101, 102, 103], [4, 5, 6]), true)
         })
     });
 
@@ -55,7 +55,7 @@ fn raycaster_bench(c: &mut Criterion) {
         b.iter(|| {
             let mut raycaster =
                 Raycaster::new(black_box([0.5, 0.5, 0.5]), black_box([1.0, 0.3, 0.7]))
-                    .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]));
+                    .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]), true);
             for _ in 1..100 {
                 black_box(raycaster.next());
             }
@@ -66,7 +66,7 @@ fn raycaster_bench(c: &mut Criterion) {
         b.iter(|| {
             let mut raycaster =
                 Raycaster::new(black_box([-50.0, 0.5, 0.5]), black_box([1.0, 0.3, 0.7]))
-                    .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]));
+                    .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]), true);
             for _ in 1..100 {
                 black_box(raycaster.next());
             }
@@ -96,7 +96,7 @@ fn axis_aligned_raycaster_bench(c: &mut Criterion) {
         b.iter(|| {
             black_box(AaRay::new(Cube::new(0, 0, 0), Face7::PX))
                 .cast()
-                .within(GridAab::from_lower_size([-1, -2, -3], [4, 5, 6]))
+                .within(GridAab::from_lower_size([-1, -2, -3], [4, 5, 6]), true)
         })
     });
 
@@ -104,7 +104,7 @@ fn axis_aligned_raycaster_bench(c: &mut Criterion) {
         b.iter(|| {
             black_box(AaRay::new(Cube::new(0, 0, 0), Face7::PX))
                 .cast()
-                .within(GridAab::from_lower_size([101, 102, 103], [4, 5, 6]))
+                .within(GridAab::from_lower_size([101, 102, 103], [4, 5, 6]), true)
         })
     });
 
@@ -112,7 +112,7 @@ fn axis_aligned_raycaster_bench(c: &mut Criterion) {
         b.iter(|| {
             let mut raycaster = black_box(AaRay::new(Cube::new(0, 0, 0), Face7::PX))
                 .cast()
-                .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]));
+                .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]), true);
             for _ in 1..100 {
                 black_box(raycaster.next());
             }
@@ -123,7 +123,7 @@ fn axis_aligned_raycaster_bench(c: &mut Criterion) {
         b.iter(|| {
             let mut raycaster = black_box(AaRay::new(Cube::new(-50, 0, 0), Face7::PX))
                 .cast()
-                .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]));
+                .within(GridAab::from_lower_size([0, 0, 0], [100, 1000, 1000]), true);
             for _ in 1..100 {
                 black_box(raycaster.next());
             }

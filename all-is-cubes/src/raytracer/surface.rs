@@ -2,7 +2,7 @@ use rand_distr::Distribution;
 
 use crate::block::{Evoxel, Resolution};
 use crate::camera::LightingOption;
-use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, Rgb, Rgba, Vol};
+use crate::math::{Cube, Face7, FreeCoordinate, FreePoint, FreeVector, Rgb, Rgba, Vol};
 use crate::raycast::{Ray, RayIsh as _, RaycasterIsh};
 use crate::raytracer::{
     BounceRng, ColorBuf, RaytraceInfo, RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData,
@@ -214,29 +214,20 @@ where
 {
     ray: R::Ray,
     block_raycaster: R,
-    state: SurfaceIterState,
     // TODO: Should `current_block` become part of the state?
     current_block: Option<VoxelSurfaceIter<'a, D, R>>,
     blocks: &'a [TracingBlock<D>],
     array: Vol<&'a [TracingCubeData]>,
 }
 
-#[derive(Clone, Copy, Debug)]
-enum SurfaceIterState {
-    Initial,
-    /// At least one raycast step within the space has been seen.
-    EnteredSpace,
-}
-
 impl<'a, D: RtBlockData, R: RaycasterIsh> SurfaceIter<'a, D, R> {
     #[inline]
     pub(crate) fn new(rt: &'a SpaceRaytracer<D>, ray: R::Ray) -> Self {
         let mut block_raycaster = ray.cast();
-        block_raycaster.add_bounds(rt.cubes.bounds());
+        block_raycaster.add_bounds(rt.cubes.bounds(), true);
         Self {
             ray,
             block_raycaster,
-            state: SurfaceIterState::Initial,
             current_block: None,
             blocks: &rt.blocks,
             array: rt.cubes.as_ref(),
@@ -262,25 +253,9 @@ where
         let rc_step = self.block_raycaster.next()?;
 
         let cube_data: &TracingCubeData = match self.array.get(rc_step.cube_ahead()) {
-            Some(cube_data) => {
-                match &self.state {
-                    SurfaceIterState::Initial => {
-                        // If the ray entered the space, we also want to notice leaving.
-                        // Do this by expanding the raycast bounds by one cube.
-                        self.block_raycaster.remove_bounds();
-                        self.block_raycaster
-                            .add_bounds(self.array.bounds().expand(FaceMap::splat(1)));
-
-                        self.state = SurfaceIterState::EnteredSpace;
-                    }
-                    SurfaceIterState::EnteredSpace => {}
-                }
-
-                cube_data
-            }
+            Some(cube_data) => cube_data,
             None => {
-                // Just exiting the space — we previously set up a 1-block perimeter to ensure
-                // that the exit's t_distance is reported rather than ignored.
+                // Just exiting the space — report t_distance.
                 return Some(TraceStep::Invisible {
                     t_distance: rc_step.t_distance(),
                 });

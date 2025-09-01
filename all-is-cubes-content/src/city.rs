@@ -722,21 +722,22 @@ fn place_roads_and_tunnels(
         let rotations = [other_side_of_road, road_aligned_rotation];
         let raycaster = all_is_cubes::raycast::AaRay::new(Cube::ORIGIN, face.into())
             .cast()
-            .within(m.bounds());
+            .within(m.bounds(), false);
         let curb_y = vec3(0, 1, 0);
         for (i, step) in (0i32..).zip(raycaster) {
+            let cube = step.cube_ahead();
             let road_not_ended = i < planner.city_radius;
 
             if road_not_ended {
                 // Road surface
                 for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
-                    m.set(step.cube_ahead() + perpendicular * p, &demo_blocks[Road])?;
+                    m.set(cube + perpendicular * p, &demo_blocks[Road])?;
                 }
                 // Delete grass (but narrowly so as not to delete previously placed curbs)
                 // TODO: Perhaps a local rule "delete grass that is on road" would work better?
                 let clear_radius = CityPlanner::ROAD_RADIUS - 1;
                 for p in -clear_radius..=clear_radius {
-                    m.set(step.cube_ahead() + perpendicular * p + vec3(0, 1, 0), &AIR)?;
+                    m.set(cube + perpendicular * p + vec3(0, 1, 0), &AIR)?;
                 }
 
                 // Curbs
@@ -745,7 +746,7 @@ fn place_roads_and_tunnels(
                         (1, -CityPlanner::ROAD_RADIUS),
                         (0, CityPlanner::ROAD_RADIUS),
                     ] {
-                        let position = step.cube_ahead() + perpendicular * p + curb_y;
+                        let position = cube + perpendicular * p + curb_y;
 
                         // Place curb and combine it with other curb blocks .
                         let mut to_compose_with = m[position].clone();
@@ -773,7 +774,7 @@ fn place_roads_and_tunnels(
             // Dig underground passages (don't stop when the road does)
             for p in -CityPlanner::ROAD_RADIUS..=CityPlanner::ROAD_RADIUS {
                 for y in CityPlanner::UNDERGROUND_FLOOR_Y..0 {
-                    m.set(step.cube_ahead() + perpendicular * p + vec3(0, y, 0), &AIR)?;
+                    m.set(cube + perpendicular * p + vec3(0, y, 0), &AIR)?;
                 }
             }
 
@@ -785,7 +786,7 @@ fn place_roads_and_tunnels(
                     .enumerate()
                 {
                     m.set(
-                        step.cube_ahead() + GridVector::new(0, -2, 0) + perpendicular * p,
+                        cube + GridVector::new(0, -2, 0) + perpendicular * p,
                         demo_blocks[Sconce(true)]
                             .clone()
                             .rotate(Face6::PY.clockwise() * rotations[side]),

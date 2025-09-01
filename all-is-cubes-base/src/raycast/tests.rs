@@ -269,9 +269,11 @@ fn start_on_cube_edge_perpendicular() {
     );
 }
 
-#[test]
-fn start_just_past_bounds() {
-    assert_no_steps(Raycaster::new([1.5, 0.5, 0.5], [1., 0., 0.]).within(GridAab::ORIGIN_CUBE));
+#[rstest::rstest]
+fn start_just_past_bounds(#[values(false, true)] include_exit: bool) {
+    assert_no_steps(
+        Raycaster::new([1.5, 0.5, 0.5], [1., 0., 0.]).within(GridAab::ORIGIN_CUBE, include_exit),
+    );
 }
 
 #[test]
@@ -296,47 +298,58 @@ fn start_outside_of_integer_range() {
 
 /// Regression test (found by fuzzing) for being outside of integer
 /// range while also using `within()`.
-#[test]
-fn start_outside_of_integer_range_with_bounds() {
+#[rstest::rstest]
+fn start_outside_of_integer_range_with_bounds(#[values(false, true)] include_exit: bool) {
     let bounds = GridAab::from_lower_size([0, 0, 0], [10, 10, 10]);
-    assert_no_steps(Raycaster::new(point3(0., 1e303, 0.), vec3(0., -1e303, 0.)).within(bounds));
+    assert_no_steps(
+        Raycaster::new(point3(0., 1e303, 0.), vec3(0., -1e303, 0.)).within(bounds, include_exit),
+    );
 }
 
 /// If we start inside the range of `GridCoordinate`s and exit, this should
 /// stop (as if we were `within()` the entire space) rather than panicking.
 #[test]
 fn exiting_integer_limit_positive() {
-    // `MAX` is excluded because `Cube::grid_aab()` would panic in that case,
-    // and such a cube exists in zero `GridAab`s, so it is not very useful.
-    let highest = GridCoordinate::MAX - 2;
+    // We don't ever return a step to `MAX`, because it is useful to
+    // not ever return a `cube_ahead()` whose upper bound coordinates would overflow.
+    let highest = GridCoordinate::MAX - 1;
+
     assert_steps_option(
         &mut Raycaster::new(
-            [0.5, 0.5, FreeCoordinate::from(highest) + 0.5],
+            [0.5, 0.5, FreeCoordinate::from(highest) - 0.5],
             [0.0, 0.0, 1.0],
         ),
-        vec![Some(step(0, 0, highest, Face7::Within, 0.0)), None],
-    );
-}
-
-#[test]
-fn exiting_integer_limit_negative() {
-    assert_steps_option(
-        &mut Raycaster::new(
-            [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MIN + 1) + 0.5],
-            [0.0, 0.0, -1.0],
-        ),
         vec![
-            Some(step(0, 0, GridCoordinate::MIN + 1, Face7::Within, 0.0)),
+            Some(step(0, 0, highest - 1, Face7::Within, 0.0)),
+            Some(step(0, 0, highest, Face7::NZ, 0.5)),
             None,
         ],
     );
 }
 
 #[test]
-fn within_bounds() {
+fn exiting_integer_limit_negative() {
+    let lowest = GridCoordinate::MIN;
+    assert_steps_option(
+        &mut Raycaster::new(
+            [0.5, 0.5, FreeCoordinate::from(lowest) + 1.5],
+            [0.0, 0.0, -1.0],
+        ),
+        vec![
+            Some(step(0, 0, lowest + 1, Face7::Within, 0.0)),
+            Some(step(0, 0, lowest, Face7::PZ, 0.5)),
+            None,
+        ],
+    );
+}
+
+#[rstest::rstest]
+fn within_bounds(#[values(false, true)] include_exit: bool) {
     // Ray oriented diagonally on the -X side of bounds that are short on the X axis.
-    let mut r = Raycaster::new(point3(0.0, -0.25, -0.5), vec3(1.0, 1.0, 1.0))
-        .within(GridAab::from_lower_size([2, -10, -10], [2, 20, 20]));
+    let mut r = Raycaster::new(point3(0.0, -0.25, -0.5), vec3(1.0, 1.0, 1.0)).within(
+        GridAab::from_lower_size([2, -10, -10], [2, 20, 20]),
+        include_exit,
+    );
     assert_steps_option(
         &mut r,
         vec![
@@ -346,6 +359,7 @@ fn within_bounds() {
             Some(step(3, 2, 2, Face7::NX, 3.0)),
             Some(step(3, 3, 2, Face7::NY, 3.25)),
             Some(step(3, 3, 3, Face7::NZ, 3.5)),
+            include_exit.then_some(step(4, 3, 3, Face7::NX, 4.0)),
             None,
         ],
     );
@@ -375,15 +389,15 @@ fn regression_test_1() {
 
 /// `within()` wasn't working for axis-aligned rays that don't intersect the world,
 /// which should produce zero steps.
-#[test]
-fn regression_test_2() {
+#[rstest::rstest]
+fn regression_test_2(#[values(false, true)] include_exit: bool) {
     let bounds = GridAab::from_lower_size(GridPoint::new(0, 0, 0), [10, 10, 10]);
     assert_steps_option(
         &mut Raycaster::new(
             point3(18.166666666666668, 4.666666666666666, -3.0),
             vec3(0.0, 0.0, 16.0),
         )
-        .within(bounds),
+        .within(bounds, include_exit),
         vec![None],
     );
 }
@@ -403,7 +417,10 @@ fn regression_long_distance_fast_forward() {
             ),
             vec3(1.1036366354256313e-305, 0.0, 8589152896.000092),
         )
-        .within(GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30])),
+        .within(
+            GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30]),
+            true,
+        ),
         vec![step(0, 0, -30, Face7::NZ, 0.010000000000000002)],
     );
 }
@@ -419,11 +436,12 @@ fn intersection_point_positive_face() {
     assert_eq!(next(), Point3D::new(-1.0, 0.5, 0.5));
 }
 
+/// Tests [`RaycastStep::intersection_point()`]’s properties with random rays.
 #[test]
 fn intersection_point_random_test() {
     // A one-cube box, so that all possible rays should either intersect
     // exactly this cube, or none at all.
-    let bounds = GridAab::from_lower_size([0, 0, 0], [1, 1, 1]);
+    let bounds = GridAab::ORIGIN_CUBE;
     let ray_origins: Aab = bounds.expand(FaceMap::splat(1)).to_free();
 
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
@@ -434,27 +452,31 @@ fn intersection_point_random_test() {
                 .random_point(&mut rng)
                 .to_vector(),
         );
-        let steps: Vec<RaycastStep> = ray.cast().within(bounds).collect();
-        match &steps[..] {
-            [] => {}
-            [step] => {
-                let point = step.intersection_point(ray);
-                let mut surfaces = 0;
-                let mut interiors = 0;
-                for axis in Axis::ALL {
-                    if point[axis] == 0.0 || point[axis] == 1.0 {
-                        surfaces += 1;
-                    } else if point[axis] > 0.0 && point[axis] < 1.0 {
-                        interiors += 1;
+        let steps: Vec<RaycastStep> = ray.cast().within(bounds, true).collect();
+        match steps.len() {
+            0 => {}
+            2 => {
+                for step in steps {
+                    let point = step.intersection_point(ray);
+                    let mut surfaces = 0;
+                    let mut interiors = 0;
+                    for axis in Axis::ALL {
+                        if point[axis] == 0.0 || point[axis] == 1.0 {
+                            surfaces += 1;
+                        } else if point[axis] > 0.0 && point[axis] < 1.0 {
+                            interiors += 1;
+                        }
                     }
+                    assert!(
+                        surfaces + interiors == 3 && (surfaces > 0 || step.face() == Face7::Within),
+                        "case #{case}: ray {ray:?} produced invalid point {point:?} from step {step:#?}",
+                    );
                 }
-                assert!(
-                    surfaces + interiors == 3 && (surfaces > 0 || step.face() == Face7::Within),
-                    "case #{case}: ray {ray:?} produced invalid point {point:?} from step {step:#?}",
-                );
             }
-            steps => {
-                panic!("case #{case}: Raycaster should not have produced multiple steps {steps:?}",);
+            _ => {
+                panic!(
+                    "case #{case}: Raycaster should have produced exactly two steps, not {steps:#?}"
+                );
             }
         }
     }
@@ -475,10 +497,11 @@ fn recursive_simple() {
     assert_steps_option(
         &mut inner_raycaster,
         vec![
-            Some(step(0, 0, 0, Face7::NX, 4.0)),
+            Some(step(0, 0, 0, Face7::NX, 4.0)), // entry step
             Some(step(1, 0, 0, Face7::NX, 5.0)),
             Some(step(2, 0, 0, Face7::NX, 6.0)),
             Some(step(3, 0, 0, Face7::NX, 7.0)),
+            Some(step(4, 0, 0, Face7::NX, 8.0)), // exit step
             None,
         ],
     );

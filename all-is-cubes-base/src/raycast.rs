@@ -58,8 +58,13 @@ pub struct Raycaster {
     /// implementing [`Iterator`].
     state: State,
 
-    /// Have we not yet produced the origin cube itself?
-    emit_current: bool,
+    /// Tracks special cases for the beginning and end of the raycast.
+    first_last: FirstLast,
+
+    /// If true, produce the step which crosses out of the bounds (iff any steps precede it).
+    /// If false, don’t do that, and therefore only produce steps whose
+    /// [`RaycastStep::cube_ahead()`]s lie within the bounds.
+    include_exit: bool,
 }
 
 /// State of the algorithm that is independent of [`Raycaster`]’s public API as an iterator.
@@ -135,6 +140,23 @@ struct Parameters {
     t_delta: Vector3D<FreeCoordinate, Tc>,
 }
 
+/// Additional state controlling [`Raycaster`] and [`AxisAlignedRaycaster`]’s
+/// production of first and last items.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FirstLast {
+    /// The next [`RaycastStep`] to be produced is either the ray's origin point,
+    /// or the first intersection of the ray with the bounds if the origin point
+    /// is not within the bounds.
+    Beginning,
+
+    /// We have produced at least one step already, and therefore know we are in-bounds.
+    InBounds,
+
+    /// We have exited the bounds, or were never valid in the first place,
+    /// and should not produce any more items.
+    Ended,
+}
+
 // -------------------------------------------------------------------------------------------------
 
 impl Raycaster {
@@ -166,7 +188,8 @@ impl Raycaster {
     pub fn new(origin: impl Into<FreePoint>, direction: impl Into<FreeVector>) -> Self {
         Self {
             state: State::from_parameters(Parameters::new(origin.into(), direction.into())),
-            emit_current: true,
+            first_last: FirstLast::Beginning,
+            include_exit: true,
         }
     }
 
@@ -181,25 +204,31 @@ impl Raycaster {
     /// but somewhat less than that. The exact ultimate limits are not guaranteed.
     /// This limitation is intended to ensure that the raycaster will not *misbehave*
     /// when given such extreme inputs; at most, it will terminate the raycast early.
+    ///
+    /// If `include_exit` is true, then the last step will be the step from inside the
+    /// bounds to outside, meaning that its [`RaycastStep::cube_ahead()`] will be outside
+    /// the bounds. If `include_exit` is false, then the last step will be the last one whose
+    /// `cube_ahead()` is within bounds.
     #[must_use]
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     #[inline]
-    pub fn within(mut self, bounds: GridAab) -> Self {
-        self.add_bounds(bounds);
+    pub fn within(mut self, bounds: GridAab, include_exit: bool) -> Self {
+        self.add_bounds(bounds, include_exit);
         self
     }
 
     /// Like [`Self::within`] but not moving self.
     ///
-    /// TODO: This function was added for the needs of the raytracer. Think about API design more.
+    /// TODO: This function was added for the needs of the raytracer, but is no longer needed. Think about API design more.
     #[doc(hidden)]
     #[allow(clippy::missing_inline_in_public_items)]
-    pub fn add_bounds(&mut self, bounds: GridAab) {
+    pub fn add_bounds(&mut self, bounds: GridAab, include_exit: bool) {
         self.state.bounds = self
             .state
             .bounds
             .intersection_cubes(bounds)
             .unwrap_or(GridAab::ORIGIN_EMPTY);
+        self.include_exit = include_exit;
         self.state.fast_forward();
     }
 
@@ -209,7 +238,7 @@ impl Raycaster {
     /// Note: The effect of calling `within()` and then `remove_bound()` without an
     /// intervening `next()` is not currently guaranteed.
     ///
-    /// TODO: This function was added for the needs of the raytracer. Think about API design more.
+    /// TODO: This function was added for the needs of the raytracer, but is no longer needed. Think about API design more.
     #[doc(hidden)]
     #[inline]
     pub fn remove_bounds(&mut self) {
@@ -225,37 +254,44 @@ impl Iterator for Raycaster {
     #[mutants::skip] // thoroughly tested otherwise
     fn next(&mut self) -> Option<RaycastStep> {
         loop {
-            if self.emit_current {
-                self.emit_current = false;
-            } else {
-                if !self.state.valid_for_stepping() {
-                    // Can't make progress, and we already have done emit_current duty, so stop.
+            let (oob_enter, oob_exit) = self.state.is_out_of_bounds_ahead();
+            match (self.first_last, oob_enter, oob_exit) {
+                (FirstLast::InBounds | FirstLast::Beginning, false, false) => {
+                    let item = self.state.current();
+                    if !self.state.valid_for_stepping() {
+                        // Can't make progress, so stop rather than accidentally looping infinitely.
+                        self.first_last = FirstLast::Ended;
+                        return (self.state.last_face == Face7::Within).then_some(item);
+                    }
+                    _ = self.state.step();
+                    // Transition to Normal state if we emitted at least one step
+                    self.first_last = FirstLast::InBounds;
+                    return Some(item);
+                }
+                (FirstLast::Beginning, true, false) => {
+                    // If the current step is not yet in bounds, don't return it;
+                    // step and then loop to reconsider.
+                    self.state.step().ok()?;
+                }
+
+                (FirstLast::InBounds, false, true) => {
+                    // We are just past the bounds.
+                    // Report the exit now, then nothing afterward.
+                    self.first_last = FirstLast::Ended;
+                    return if self.include_exit {
+                        Some(self.state.current())
+                    } else {
+                        None
+                    };
+                }
+                (FirstLast::Ended, _, _) | (_, _, true) => {
                     return None;
                 }
-                self.state.step().ok()?;
-            }
 
-            let (oob_enter, oob_exit) = self.state.is_out_of_bounds();
-            if oob_exit {
-                // We are past the bounds. There will never again be a cube to report.
-                // Prevent extraneous next() calls from doing any stepping that could overflow
-                // by reusing the emit_current logic.
-                self.emit_current = true;
-                return None;
+                (FirstLast::InBounds, true, false) => {
+                    unreachable!("should not be in state Normal while OOB")
+                }
             }
-            if oob_enter {
-                // We have not yet intersected the bounds.
-                continue;
-            }
-
-            return Some(RaycastStep {
-                cube_face: CubeFace {
-                    cube: Cube::from(self.state.cube),
-                    face: self.state.last_face,
-                },
-                t_distance: self.state.last_t_distance,
-                t_max: self.state.t_max,
-            });
         }
     }
 
@@ -445,7 +481,7 @@ impl RaycastStep {
             .to_point(),
             direction: ray.direction,
         };
-        (sub_ray.cast().within(bounds), sub_ray)
+        (sub_ray.cast().within(bounds, true), sub_ray)
     }
 }
 
@@ -508,6 +544,18 @@ impl State {
             last_face: Face7::Within,
             last_t_distance: 0.0,
             bounds: MAXIMUM_BOUNDS,
+        }
+    }
+
+    /// Returns the [`RaycastStep`] describing the step that most recently occurred.
+    fn current(&self) -> RaycastStep {
+        RaycastStep {
+            cube_face: CubeFace {
+                cube: Cube::from(self.cube),
+                face: self.last_face,
+            },
+            t_distance: self.last_t_distance,
+            t_max: self.t_max,
         }
     }
 
@@ -662,7 +710,7 @@ impl State {
     /// The first boolean is if the ray has _not yet entered_ the bounds,
     /// and the second boolean is if it the ray has _left_ the bounds. If the ray does
     /// not intersect the bounds, one or both might be true.
-    fn is_out_of_bounds(&self) -> (bool, bool) {
+    fn is_out_of_bounds_ahead(&self) -> (bool, bool) {
         let mut oob_enter = false;
         let mut oob_exit = false;
         for axis in Axis::ALL {

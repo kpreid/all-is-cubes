@@ -23,7 +23,7 @@ pub fn cursor_raycast(
 ) -> Result<Option<Cursor>, HandleError> {
     ray.direction = ray.direction.normalize();
     let space = space_handle.read(read_ticket)?;
-    for step in ray.cast().within(space.bounds()) {
+    for step in ray.cast().within(space.bounds(), false) {
         if step.t_distance() > maximum_distance {
             break;
         }

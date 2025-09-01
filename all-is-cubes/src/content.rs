@@ -238,9 +238,10 @@ pub fn axes(m: &mut space::Mutation<'_, '_>) -> Result<(), SetCubeError> {
         let direction = face.normal_vector::<GridCoordinate, ()>()[axis];
         let raycaster = crate::raycast::AaRay::new(Cube::ORIGIN, face.into())
             .cast()
-            .within(m.bounds());
+            .within(m.bounds(), false);
         for step in raycaster {
-            let i = step.cube_ahead().lower_bounds()[axis] * direction; // always positive
+            let cube = step.cube_ahead();
+            let i = cube.lower_bounds()[axis] * direction; // always positive
             let (color, display_name): (Rgb, ArcStr) = if i.rem_euclid(2) == 0 {
                 (axis.color(), i.rem_euclid(10).to_string().into())
             } else {
@@ -251,7 +252,7 @@ pub fn axes(m: &mut space::Mutation<'_, '_>) -> Result<(), SetCubeError> {
                 }
             };
             m.set(
-                step.cube_ahead(),
+                cube,
                 Block::builder()
                     .display_name(display_name)
                     .color(color.with_alpha_one())

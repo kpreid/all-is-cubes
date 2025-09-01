@@ -1,6 +1,6 @@
 use crate::math::{self, Cube, Face7, FreeCoordinate, GridAab};
 
-use super::{AaRay, RaycastStep};
+use super::{AaRay, FirstLast, RaycastStep};
 
 #[cfg(doc)]
 use super::Raycaster;
@@ -12,14 +12,23 @@ pub struct AxisAlignedRaycaster {
     /// Next cube to emit.
     /// If it is outside of `self.bounds` then the iterator has ended.
     upcoming: Cube,
+
     /// Faces hit by the raycaster. Opposite of the direction of movement.
     hitting: Face7,
+
     /// Whether `upcoming` is the origin cube and should be emitted as `Within`.
-    is_first: bool,
+    first_last: FirstLast,
+
     /// `t_distance` value for `upcoming`'s step. For the origin cube, may be negative,
     /// in which case it is clamped to zero on output.
     t_distance: FreeCoordinate,
+
     bounds: GridAab,
+
+    /// If true, produce the step which crosses out of the bounds (iff any steps precede it).
+    /// If false, don’t do that, and therefore only produce steps whose
+    /// [`RaycastStep::cube_ahead()`]s lie within the bounds.
+    include_exit: bool,
 }
 
 impl AxisAlignedRaycaster {
@@ -44,8 +53,9 @@ impl AxisAlignedRaycaster {
             } else {
                 0.0
             },
-            is_first: true,
+            first_last: FirstLast::Beginning,
             bounds: super::MAXIMUM_BOUNDS,
+            include_exit: true,
         }
     }
 
@@ -56,8 +66,8 @@ impl AxisAlignedRaycaster {
     #[must_use]
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     #[inline]
-    pub fn within(mut self, bounds: GridAab) -> Self {
-        self.add_bounds(bounds);
+    pub fn within(mut self, bounds: GridAab, include_exit: bool) -> Self {
+        self.add_bounds(bounds, include_exit);
         self
     }
 
@@ -66,11 +76,13 @@ impl AxisAlignedRaycaster {
     /// TODO: This function was added for the needs of the raytracer. Think about API design more.
     #[doc(hidden)]
     #[allow(clippy::missing_inline_in_public_items)]
-    pub fn add_bounds(&mut self, bounds: GridAab) {
+    pub fn add_bounds(&mut self, bounds: GridAab, include_exit: bool) {
         self.bounds = self
             .bounds
             .intersection_cubes(bounds)
             .unwrap_or(GridAab::ORIGIN_EMPTY);
+
+        self.include_exit = include_exit;
 
         // Restore invariant that `upcoming` is within `bounds`.
         self.fast_forward();
@@ -111,7 +123,7 @@ impl AxisAlignedRaycaster {
                 self.t_distance += FreeCoordinate::from(delta.unsigned_abs());
                 if delta != 0 {
                     // If the position was moved at all, then this is not the origin cube any more.
-                    self.is_first = false;
+                    self.first_last = FirstLast::InBounds;
                 }
             }
         }
@@ -124,17 +136,27 @@ impl Iterator for AxisAlignedRaycaster {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if !self.bounds.contains_cube(self.upcoming) {
-            return None;
+            if self.first_last == FirstLast::InBounds {
+                self.first_last = FirstLast::Ended;
+                if self.include_exit {
+                    // Let the bounds-exiting step be produced
+                } else {
+                    return None;
+                }
+            } else {
+                return None;
+            }
         }
 
         let step = RaycastStep {
             cube_face: math::CubeFace {
                 cube: self.upcoming,
-                face: if self.is_first {
-                    self.is_first = false;
-                    Face7::Within
-                } else {
-                    self.hitting
+                face: match self.first_last {
+                    FirstLast::Beginning => {
+                        self.first_last = FirstLast::InBounds;
+                        Face7::Within
+                    }
+                    _ => self.hitting,
                 },
             },
             t_distance: self.t_distance.max(0.0),
@@ -176,12 +198,16 @@ mod tests {
     /// since [`Raycaster`]’s output is considered the source of truth.)
     ///
     /// The number of steps checked is determined by how far this iterator is driven.
-    fn compare_aa_to_regular(ray: AaRay, bounds: Option<GridAab>) -> impl Iterator<Item = Cube> {
+    fn compare_aa_to_regular(
+        ray: AaRay,
+        bounds: Option<GridAab>,
+        include_exit: bool,
+    ) -> impl Iterator<Item = Cube> {
         let mut arb_rc: Raycaster = Ray::from(ray).cast();
         let mut aa_rc: AxisAlignedRaycaster = ray.cast();
         if let Some(bounds) = bounds {
-            arb_rc = arb_rc.within(bounds);
-            aa_rc = aa_rc.within(bounds);
+            arb_rc = arb_rc.within(bounds, include_exit);
+            aa_rc = aa_rc.within(bounds, include_exit);
         }
         itertools::Itertools::zip_longest(arb_rc, aa_rc).map(|steps| match steps {
             itertools::EitherOrBoth::Both(arb_step, aa_step) => {
@@ -199,7 +225,7 @@ mod tests {
     #[test]
     fn unbounded_positive() {
         assert_eq!(
-            compare_aa_to_regular(AaRay::new(Cube::new(1, 2, 3), Face7::PX), None)
+            compare_aa_to_regular(AaRay::new(Cube::new(1, 2, 3), Face7::PX), None, true)
                 .take(10)
                 .count(),
             10
@@ -209,7 +235,7 @@ mod tests {
     #[test]
     fn unbounded_negative() {
         assert_eq!(
-            compare_aa_to_regular(AaRay::new(Cube::new(1, 2, 3), Face7::NX), None)
+            compare_aa_to_regular(AaRay::new(Cube::new(1, 2, 3), Face7::NX), None, true)
                 .take(10)
                 .count(),
             10
@@ -221,11 +247,12 @@ mod tests {
         assert_eq!(
             compare_aa_to_regular(
                 AaRay::new(Cube::new(1, 1, 1), Face7::PX),
-                Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
+                Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3])),
+                true
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![Cube::new(1, 1, 1), Cube::new(2, 1, 1)]
+            vec![Cube::new(1, 1, 1), Cube::new(2, 1, 1), Cube::new(3, 1, 1)]
         );
     }
 
@@ -234,11 +261,17 @@ mod tests {
         assert_eq!(
             compare_aa_to_regular(
                 AaRay::new(Cube::new(-1, 1, 1), Face7::PX),
-                Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
+                Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3])),
+                true
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![Cube::new(0, 1, 1), Cube::new(1, 1, 1), Cube::new(2, 1, 1)]
+            vec![
+                Cube::new(0, 1, 1),
+                Cube::new(1, 1, 1),
+                Cube::new(2, 1, 1),
+                Cube::new(3, 1, 1)
+            ]
         );
     }
 
@@ -247,11 +280,17 @@ mod tests {
         assert_eq!(
             compare_aa_to_regular(
                 AaRay::new(Cube::new(4, 1, 1), Face7::NX),
-                Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
+                Some(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3])),
+                true
             )
             .take(10)
             .collect::<Vec<Cube>>(),
-            vec![Cube::new(2, 1, 1), Cube::new(1, 1, 1), Cube::new(0, 1, 1)]
+            vec![
+                Cube::new(2, 1, 1),
+                Cube::new(1, 1, 1),
+                Cube::new(0, 1, 1),
+                Cube::new(-1, 1, 1)
+            ]
         );
     }
 
@@ -260,14 +299,16 @@ mod tests {
         assert_eq!(
             compare_aa_to_regular(
                 AaRay::new(Cube::new(GridCoordinate::MAX - 3, 10, 20), Face7::PX),
-                None
+                None,
+                true,
             )
             .take(10)
             .collect::<Vec<Cube>>(),
             vec![
                 Cube::new(GridCoordinate::MAX - 3, 10, 20),
                 Cube::new(GridCoordinate::MAX - 2, 10, 20),
-                // ...and we stop here, not producing even the GridCoordinate::MAX - 1 cube.
+                Cube::new(GridCoordinate::MAX - 1, 10, 20),
+                // ...and we stop here to avoid the cube whose upper bound is not in range
             ]
         );
     }
@@ -277,14 +318,15 @@ mod tests {
         assert_eq!(
             compare_aa_to_regular(
                 AaRay::new(Cube::new(GridCoordinate::MIN + 2, 10, 20), Face7::NX),
-                None
+                None,
+                true,
             )
             .take(10)
             .collect::<Vec<Cube>>(),
             vec![
                 Cube::new(GridCoordinate::MIN + 2, 10, 20),
                 Cube::new(GridCoordinate::MIN + 1, 10, 20),
-                // ...and we stop here, not producing even the GridCoordinate::MIN cube.
+                Cube::new(GridCoordinate::MIN, 10, 20),
             ]
         );
     }

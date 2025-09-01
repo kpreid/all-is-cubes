@@ -55,9 +55,7 @@ impl RayIsh for AaRay {
 pub(crate) trait RaycasterIsh: Iterator<Item = RaycastStep> {
     type Ray: RayIsh<Caster = Self>;
 
-    fn add_bounds(&mut self, bounds: GridAab);
-
-    fn remove_bounds(&mut self);
+    fn add_bounds(&mut self, bounds: GridAab, include_exit: bool);
 
     fn recursive_raycast(
         within_step: RaycastStep,
@@ -73,13 +71,8 @@ impl RaycasterIsh for Raycaster {
     type Ray = Ray;
 
     #[inline]
-    fn add_bounds(&mut self, bounds: GridAab) {
-        Raycaster::add_bounds(self, bounds);
-    }
-
-    #[inline]
-    fn remove_bounds(&mut self) {
-        Raycaster::remove_bounds(self);
+    fn add_bounds(&mut self, bounds: GridAab, include_exit: bool) {
+        Raycaster::add_bounds(self, bounds, include_exit);
     }
 
     #[inline]
@@ -97,13 +90,8 @@ impl RaycasterIsh for AxisAlignedRaycaster {
     type Ray = AaRay;
 
     #[inline]
-    fn add_bounds(&mut self, bounds: GridAab) {
-        AxisAlignedRaycaster::add_bounds(self, bounds);
-    }
-
-    #[inline]
-    fn remove_bounds(&mut self) {
-        AxisAlignedRaycaster::remove_bounds(self);
+    fn add_bounds(&mut self, bounds: GridAab, include_exit: bool) {
+        AxisAlignedRaycaster::add_bounds(self, bounds, include_exit);
     }
 
     #[inline]
@@ -114,6 +102,6 @@ impl RaycasterIsh for AxisAlignedRaycaster {
         bounds: GridAab,
     ) -> (Self, AaRay) {
         let sub_ray = ray.zoom_in(step.cube_ahead(), resolution);
-        (sub_ray.cast().within(bounds), sub_ray)
+        (sub_ray.cast().within(bounds, true), sub_ray)
     }
 }

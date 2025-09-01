@@ -92,7 +92,7 @@ impl State {
                 );
                 // TODO: this should be something more like the light-propagation raycast.
                 let bounds = space.bounds();
-                for step in ray.cast().within(bounds).take(max_steps) {
+                for step in ray.cast().within(bounds, false).take(max_steps) {
                     // Require hitting a visible surface and checking behind it, because if we
                     // just take the first valid value, then we'll trivially pick the same cube
                     // every time if our eye is within a cube with valid light.

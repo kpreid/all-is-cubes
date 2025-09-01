@@ -10,6 +10,7 @@ const PRINT: bool = false;
 #[derive(Debug, arbitrary::Arbitrary)]
 struct Input {
     use_bounds: bool,
+    include_exit: bool,
     kind: Kind,
 }
 #[derive(Debug, arbitrary::Arbitrary)]
@@ -29,7 +30,11 @@ fuzz_target!(|input: Input| {
         println!("Inputs: {input:?}");
     }
 
-    let Input { use_bounds, kind } = input;
+    let Input {
+        use_bounds,
+        include_exit,
+        kind,
+    } = input;
 
     let bounds = use_bounds.then(|| GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30]));
 
@@ -37,14 +42,14 @@ fuzz_target!(|input: Input| {
         Kind::General { origin, direction } => {
             let mut raycaster = raycast::Raycaster::new(origin, direction);
             if let Some(bounds) = bounds {
-                raycaster = raycaster.within(bounds)
+                raycaster = raycaster.within(bounds, include_exit)
             }
             exercise(raycaster, bounds)
         }
         Kind::AxisAligned { origin, direction } => {
             let mut raycaster = raycast::AaRay::new(origin, direction).cast();
             if let Some(bounds) = bounds {
-                raycaster = raycaster.within(bounds)
+                raycaster = raycaster.within(bounds, include_exit)
             }
             exercise(raycaster, bounds)
         }

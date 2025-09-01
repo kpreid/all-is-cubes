@@ -34,8 +34,10 @@ fn main() {
 fn show_top_level(destination: rg::Destination, ray: Ray, resolution: Resolution) {
     show(
         destination,
-        ray.cast()
-            .within(GridAab::from_lower_upper([-10, -10, -10], [11, 11, 11])),
+        ray.cast().within(
+            GridAab::from_lower_upper([-10, -10, -10], [11, 11, 11]),
+            true,
+        ),
         ray,
         &mut 0,
         Recurse::Outer { resolution },
