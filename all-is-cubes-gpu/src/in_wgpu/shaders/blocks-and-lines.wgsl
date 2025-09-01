@@ -316,14 +316,6 @@ fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
     }
 }
 
-// Simple directional lighting used to give corners extra definition.
-// Note that this algorithm is also implemented in the Rust code.
-fn fixed_directional_lighting(normal: vec3<f32>) -> f32 {
-    let light_1_direction = vec3<f32>(0.4, -0.1, 0.0);
-    let light_2_direction = vec3<f32>(-0.4, 0.35, 0.25);
-    return (1.0 - 1.0 / 16.0) + 0.25 * (max(0.0, dot(light_1_direction, normal)) + max(0.0, dot(light_2_direction, normal)));
-}
-
 fn valid_light(light: vec4<f32>) -> bool {
     return light.a > 0.5;
 }
@@ -420,13 +412,12 @@ fn lighting(in: BlockFragmentInput) -> vec3<f32> {
         // LightingOption::Flat
         case 1 {
             let origin = in.world_cube + in.normal + vec3<f32>(0.5);
-            let local_light = light_texture_fetch(origin).rgb;
-            return fixed_directional_lighting(in.normal) * local_light;
+            return light_texture_fetch(origin).rgb;
         }
 
         // LightingOption::Smooth
         case 2 {
-            return fixed_directional_lighting(in.normal) * interpolated_space_light(in);
+            return interpolated_space_light(in);
         }
     }
 }

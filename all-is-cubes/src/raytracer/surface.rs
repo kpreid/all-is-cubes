@@ -1,10 +1,8 @@
-use all_is_cubes_base::math::FreeVector;
-use euclid::Vector3D;
 use rand_distr::Distribution;
 
 use crate::block::{Evoxel, Resolution};
 use crate::camera::LightingOption;
-use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, Rgb, Rgba, Vol};
+use crate::math::{Cube, Face7, FaceMap, FreeCoordinate, FreePoint, FreeVector, Rgb, Rgba, Vol};
 use crate::raycast::{Ray, RayIsh as _, RaycasterIsh};
 use crate::raytracer::{
     BounceRng, ColorBuf, RaytraceInfo, RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData,
@@ -156,28 +154,16 @@ impl<D: RtBlockData> Surface<'_, D> {
             (LightingOption::Flat | LightingOption::Bounce, _) => {
                 let light = rt
                     .get_packed_light(self.cube + self.normal.normal_vector())
-                    .value()
-                    * fixed_directional_lighting(self.normal);
+                    .value();
                 (light, RaytraceInfo::default())
             }
 
             (LightingOption::Smooth, _) => {
-                let light = rt.get_interpolated_light(self.intersection_point, self.normal)
-                    * fixed_directional_lighting(self.normal);
+                let light = rt.get_interpolated_light(self.intersection_point, self.normal);
                 (light, RaytraceInfo::default())
             }
         }
     }
-}
-
-/// Simple directional lighting used to give corners extra definition.
-/// Note that this algorithm is also implemented in the fragment shader for GPU rendering.
-#[mutants::skip] // tests are in the test-renderers package
-fn fixed_directional_lighting(face: Face7) -> f32 {
-    const LIGHT_1_DIRECTION: Vector3D<f32, ()> = Vector3D::new(0.4, -0.1, 0.0);
-    const LIGHT_2_DIRECTION: Vector3D<f32, ()> = Vector3D::new(-0.4, 0.35, 0.25);
-    (1.0 - 1.0 / 16.0)
-        + 0.25 * (face.dot(LIGHT_1_DIRECTION).max(0.0) + face.dot(LIGHT_2_DIRECTION).max(0.0))
 }
 
 /// Builds on [`Surface`] to report the depth (length of ray through volume)
