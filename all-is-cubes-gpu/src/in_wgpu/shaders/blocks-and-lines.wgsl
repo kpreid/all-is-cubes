@@ -291,7 +291,13 @@ fn light_texture_fetch(fragment_position: vec3<f32>) -> vec4<f32> {
     // Decode logarithmic representation.
     // Exception: A texel value of exactly 0 is taken as 0, not the lowest power of 2.
     let not_zero: vec3<bool> = packed_light > vec3<i32>(0);
-    let unpacked_light: vec3<f32> = pow(vec3<f32>(2.0), vec3<f32>(packed_light - 128) / 16.0) * vec3<f32>(not_zero);
+    // These constants must match those in `all_is_cubes::space::light::data`.
+    const log_offset: i32 = 144;
+    const log_scale_inverse: f32 = 1.0/10.0;
+    let unpacked_light: vec3<f32> = pow(
+        vec3<f32>(2.0),
+        vec3<f32>(packed_light - log_offset) * log_scale_inverse
+    ) * vec3<f32>(not_zero);
 
     // See all_is_cubes::space::LightStatus for the value this is interpreting.
     // The enum values are grouped into approximately {0, 128, 255}, so multiplying by 2 and

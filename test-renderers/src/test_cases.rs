@@ -927,7 +927,7 @@ async fn light(mut context: RenderTestContext, option: LightingOption) {
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
     context
-        .render_comparison_test(6, scene, Overlays::NONE)
+        .render_comparison_test(7, scene, Overlays::NONE)
         .await;
 }
 

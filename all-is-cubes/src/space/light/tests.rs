@@ -225,12 +225,12 @@ fn light_source_self_illumination_opaque() {
         // Some of the values also differ due to our current choice of discarding
         // light updates with priority 1.
         FaceMap {
-            nx: Rgb::new(0.13631347, 0.27262694, 0.5452539),
-            ny: Rgb::new(0.16928194, 0.3385639, 0.6771278),
-            nz: Rgb::new(0.2102241, 0.4204482, 0.8408964),
-            px: Rgb::new(0.13631347, 0.27262694, 0.5452539),
-            py: Rgb::new(0.16928194, 0.3385639, 0.6771278),
-            pz: Rgb::new(0.2102241, 0.4204482, 0.8408964),
+            nx: Rgb::new(0.13397168, 0.26794338, 0.53588676),
+            ny: Rgb::new(0.1649385, 0.32987696, 0.6597539),
+            nz: Rgb::new(0.21763763, 0.43527526, 0.8705506),
+            px: Rgb::new(0.13397168, 0.26794338, 0.53588676),
+            py: Rgb::new(0.1649385, 0.32987696, 0.6597539),
+            pz: Rgb::new(0.21763763, 0.43527526, 0.8705506),
         },
     );
 }

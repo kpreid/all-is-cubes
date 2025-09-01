@@ -666,9 +666,13 @@ fn space_success() {
 
     space.evaluate_light(0, |_| {});
 
-    const NL: [u8; 4] = [0, 0, 0, 1];
-    const IN: [u8; 4] = [0, 0, 0, 2];
-    const BS: [u8; 4] = [128, 128, 128, 3];
+    // These values are the byte serialization of `PackedLight`.
+    // We’re repeating them here rather than calling `PackedLight` functions to remind ourselves
+    // that changing the value encoding is a breaking serialization change.
+    // (The status byte has its own schema enum.)
+    const NL: [u8; 4] = [0, 0, 0, 1]; // encoding of PackedLight::NO_RAYS
+    const IN: [u8; 4] = [0, 0, 0, 2]; // encoding of PackedLight::OPAQUE
+    const BS: [u8; 4] = [144, 144, 144, 3]; // encoding of Rgb::ONE
 
     assert_serdeser(
         &space,
