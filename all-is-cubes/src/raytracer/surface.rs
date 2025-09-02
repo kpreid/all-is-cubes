@@ -343,13 +343,19 @@ where
     /// This is not an  implementation of `Iterator` because it doesn't need to be — it's
     /// purely internal to [`SurfaceIter`].
     fn next(&mut self) -> Option<TraceStep<'a, D>> {
-        // Fetch data and return None if out of range.
+        // Take a step and exit if the raycaster says we're done.
         let rc_step = self.voxel_raycaster.next()?;
-        let voxel = self.array.get(rc_step.cube_ahead())?;
 
         // Note: The proper scaling here depends on the direction vector scale, that
         // recursive_raycast() _doesn't_ change.
         let t_distance = rc_step.t_distance() * self.antiscale;
+
+        let Some(voxel) = self.array.get(rc_step.cube_ahead()) else {
+            // On exit from the voxel bounds, report the distance.
+            // If we returned None, we might count a transparent volume
+            // as too deep.
+            return Some(TraceStep::Invisible { t_distance });
+        };
 
         if voxel.color.fully_transparent() && voxel.emission == Rgb::ZERO {
             return Some(TraceStep::Invisible { t_distance });
@@ -560,6 +566,9 @@ mod tests {
                 // t_distance of the _exit_ point is known, for the benefit of volumetric
                 // rendering.
                 Invisible { t_distance: 3.5 },
+                // Back face of the final block's cube
+                // (which is also that of the block itself if the block is R1)
+                Invisible { t_distance: 3.5 },
             ]
         );
 
@@ -613,6 +622,7 @@ mod tests {
                     },
                     exit_t_distance: 3.0,
                 }),
+                DepthStep::Invisible,
                 DepthStep::Invisible,
                 DepthStep::Invisible,
             ]
@@ -684,6 +694,92 @@ mod tests {
                     t_distance: 0.5,
                     block_data: &()
                 },
+                DepthStep::Invisible,
+            ]
+        );
+    }
+
+    /// Regression test for processing of the case where a ray exits the voxel volume of a block
+    /// and then traverses no-data space in that block's cube.
+    /// This is similar to [`surface_and_depth_iter_basic`] except without the purposefully added
+    /// *nonempty* space.
+    #[test]
+    fn depth_iter_exiting_block_volume_before_cube() {
+        let slab_test_color = rgba_const!(1., 1., 0., 0.5);
+        let slab_test_color_block = Block::from(slab_test_color);
+
+        let universe = &mut Universe::new();
+        let slab = Block::builder()
+            .voxels_fn(R2, |cube| {
+                if cube.y > 0 {
+                    &AIR
+                } else {
+                    &slab_test_color_block
+                }
+            })
+            .unwrap()
+            .build_into(universe);
+        let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [1, 3, 1]))
+            .read_ticket(universe.read_ticket())
+            .build_and_mutate(|m| {
+                m.set([0, 1, 0], slab).unwrap();
+                Ok(())
+            })
+            .unwrap();
+
+        let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
+        let ray = Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]);
+
+        assert_eq!(
+            SurfaceIterR::new(&rt, ray).collect::<Vec<TraceStep<'_, ()>>>(),
+            vec![
+                Invisible { t_distance: 0.5 }, // Cube [0, 0, 0] is empty
+                EnterBlock {
+                    // Cube [0, 1, 0]
+                    t_distance: 1.5,
+                    block_data: &()
+                },
+                EnterSurface(Surface {
+                    block_data: &(),
+                    diffuse_color: slab_test_color,
+                    emission: Rgb::ZERO,
+                    cube: Cube::new(0, 1, 0),
+                    voxel: (R2, Cube::new(0, 0, 0)),
+                    t_distance: 1.5,
+                    intersection_point: point3(0.25, 1.0, 0.25),
+                    normal: Face7::NY
+                }),
+                Invisible { t_distance: 2.0 }, // exit of slab surface
+                Invisible { t_distance: 2.5 }, // exit of slab's cube
+                Invisible { t_distance: 3.5 }, // exit of space
+            ]
+        );
+
+        // DepthIter is built on SurfaceIter, so it makes sense to test together and second
+        assert_eq!(
+            DepthIter::new(SurfaceIterR::new(&rt, ray)).collect::<Vec<DepthStep<'_, ()>>>(),
+            vec![
+                DepthStep::Invisible,
+                DepthStep::Invisible,
+                DepthStep::EnterBlock {
+                    t_distance: 1.5,
+                    block_data: &(),
+                },
+                DepthStep::Invisible,
+                DepthStep::Span(Span {
+                    surface: Surface {
+                        block_data: &(),
+                        diffuse_color: slab_test_color,
+                        emission: Rgb::ZERO,
+                        cube: Cube::new(0, 1, 0),
+                        voxel: (R2, Cube::new(0, 0, 0)),
+                        t_distance: 1.5,
+                        intersection_point: point3(0.25, 1.0, 0.25),
+                        normal: Face7::NY,
+                    },
+                    exit_t_distance: 2.0,
+                }),
+                DepthStep::Invisible,
                 DepthStep::Invisible,
             ]
         );
