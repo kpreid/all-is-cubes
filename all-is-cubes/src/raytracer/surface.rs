@@ -374,10 +374,12 @@ where
         let rc_step = self.voxel_raycaster.next()?;
         let voxel = self.array.get(rc_step.cube_ahead())?;
 
+        // Note: The proper scaling here depends on the direction vector scale, that
+        // recursive_raycast() _doesn't_ change.
+        let t_distance = rc_step.t_distance() * self.antiscale;
+
         if voxel.color.fully_transparent() && voxel.emission == Rgb::ZERO {
-            return Some(TraceStep::Invisible {
-                t_distance: rc_step.t_distance() * self.antiscale,
-            });
+            return Some(TraceStep::Invisible { t_distance });
         }
 
         Some(TraceStep::EnterSurface(Surface {
@@ -386,9 +388,7 @@ where
             emission: voxel.emission,
             cube: self.block_cube,
             voxel: (self.resolution, rc_step.cube_ahead()),
-            // Note: The proper scaling here depends on the direction vector scale, that
-            // recursive_raycast() _doesn't_ change.
-            t_distance: rc_step.t_distance() * self.antiscale,
+            t_distance,
             intersection_point: rc_step.intersection_point(self.voxel_ray.into()) * self.antiscale
                 + self
                     .block_cube
