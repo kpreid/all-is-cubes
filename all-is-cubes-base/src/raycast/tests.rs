@@ -423,7 +423,7 @@ fn intersection_point_random_test() {
     let ray_origins: Aab = bounds.expand(FaceMap::splat(1)).to_free();
 
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
-    for _ in 0..1000 {
+    for case in 0..1000 {
         let ray = Ray::new(
             ray_origins.random_point(&mut rng),
             Aab::new(-1., 1., -1., 1., -1., 1.)
@@ -446,11 +446,11 @@ fn intersection_point_random_test() {
                 }
                 assert!(
                     surfaces + interiors == 3 && (surfaces > 0 || step.face() == Face7::Within),
-                    "ray {ray:?} produced invalid point {point:?}",
+                    "case #{case}: ray {ray:?} produced invalid point {point:?} from step {step:#?}",
                 );
             }
             steps => {
-                panic!("Raycaster should not have produced multiple steps {steps:?}",);
+                panic!("case #{case}: Raycaster should not have produced multiple steps {steps:?}",);
             }
         }
     }
