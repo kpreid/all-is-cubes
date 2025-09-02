@@ -1,4 +1,4 @@
-use euclid::Vector3D;
+use euclid::{Vector3D, point3};
 
 #[cfg(not(any(feature = "std", test)))]
 #[allow(
@@ -176,6 +176,11 @@ impl Raycaster {
     /// forevermore once there are no more cubes intersecting the bounds to report.
     ///
     /// Calling this multiple times takes the intersection of all bounds.
+    ///
+    /// Note that the bounds cannot be set to the full range of [`GridCoordinate`],
+    /// but somewhat less than that. The exact ultimate limits are not guaranteed.
+    /// This limitation is intended to ensure that the raycaster will not *misbehave*
+    /// when given such extreme inputs; at most, it will terminate the raycast early.
     #[must_use]
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     #[inline]
@@ -208,7 +213,7 @@ impl Raycaster {
     #[doc(hidden)]
     #[inline]
     pub fn remove_bounds(&mut self) {
-        self.state.bounds = GridAab::EVERYWHERE;
+        self.state.bounds = MAXIMUM_BOUNDS;
     }
 }
 
@@ -446,6 +451,26 @@ impl RaycastStep {
 
 // -------------------------------------------------------------------------------------------------
 
+/// The maximum `bounds` that any raycaster will ever have.
+/// The minimum and maximum of this box are set so that, when the raycaster
+/// returns its final step that exits the bounds, that step's `.cube_ahead().grid_aab()`
+/// will never have a numeric overflow on any of its coordinates.
+const MAXIMUM_BOUNDS: GridAab = match GridAab::const_checked_from_lower_upper(
+    point3(
+        GridCoordinate::MIN + 1,
+        GridCoordinate::MIN + 1,
+        GridCoordinate::MIN + 1,
+    ),
+    point3(
+        GridCoordinate::MAX - 1,
+        GridCoordinate::MAX - 1,
+        GridCoordinate::MAX - 1,
+    ),
+) {
+    Ok(b) => b,
+    Err(_) => unreachable!(),
+};
+
 impl State {
     pub const EMPTY: Self = Self {
         param: Parameters::ZERO,
@@ -482,7 +507,7 @@ impl State {
                 .cast_unit(),
             last_face: Face7::Within,
             last_t_distance: 0.0,
-            bounds: GridAab::EVERYWHERE,
+            bounds: MAXIMUM_BOUNDS,
         }
     }
 

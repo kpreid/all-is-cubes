@@ -305,10 +305,10 @@ fn start_outside_of_integer_range_with_bounds() {
 /// If we start inside the range of `GridCoordinate`s and exit, this should
 /// stop (as if we were `within()` the entire space) rather than panicking.
 #[test]
-fn exiting_integer_range() {
+fn exiting_integer_limit_positive() {
     // `MAX` is excluded because `Cube::grid_aab()` would panic in that case,
     // and such a cube exists in zero `GridAab`s, so it is not very useful.
-    let highest = GridCoordinate::MAX - 1;
+    let highest = GridCoordinate::MAX - 2;
     assert_steps_option(
         &mut Raycaster::new(
             [0.5, 0.5, FreeCoordinate::from(highest) + 0.5],
@@ -316,13 +316,17 @@ fn exiting_integer_range() {
         ),
         vec![Some(step(0, 0, highest, Face7::Within, 0.0)), None],
     );
+}
+
+#[test]
+fn exiting_integer_limit_negative() {
     assert_steps_option(
         &mut Raycaster::new(
-            [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MIN) + 0.5],
+            [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MIN + 1) + 0.5],
             [0.0, 0.0, -1.0],
         ),
         vec![
-            Some(step(0, 0, GridCoordinate::MIN, Face7::Within, 0.0)),
+            Some(step(0, 0, GridCoordinate::MIN + 1, Face7::Within, 0.0)),
             None,
         ],
     );

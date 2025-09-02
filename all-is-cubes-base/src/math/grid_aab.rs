@@ -103,30 +103,27 @@ impl GridAab {
         lower_bounds: impl Into<GridPoint>,
         upper_bounds: impl Into<GridPoint>,
     ) -> Result<Self, GridOverflowError> {
-        fn inner(
-            lower_bounds: GridPoint,
-            upper_bounds: GridPoint,
-        ) -> Result<GridAab, GridOverflowError> {
-            // TODO: Test these error cases.
-            // TODO: Replace string error construction with an error enum.
-            for axis in Axis::ALL {
-                let lower = lower_bounds[axis];
-                let upper = upper_bounds[axis];
-                if upper < lower {
-                    return Err(GridOverflowError(OverflowKind::Inverted {
-                        lower_bounds,
-                        upper_bounds,
-                    }));
-                }
-            }
+        Self::const_checked_from_lower_upper(lower_bounds.into(), upper_bounds.into())
+    }
 
-            Ok(GridAab {
+    pub(crate) const fn const_checked_from_lower_upper(
+        lower_bounds: GridPoint,
+        upper_bounds: GridPoint,
+    ) -> Result<GridAab, GridOverflowError> {
+        if upper_bounds.x < lower_bounds.x
+            || upper_bounds.y < lower_bounds.y
+            || upper_bounds.z < lower_bounds.z
+        {
+            return Err(GridOverflowError(OverflowKind::Inverted {
                 lower_bounds,
                 upper_bounds,
-            })
+            }));
         }
 
-        inner(lower_bounds.into(), upper_bounds.into())
+        Ok(GridAab {
+            lower_bounds,
+            upper_bounds,
+        })
     }
 
     /// Constructs a [`GridAab`] from inclusive lower bounds and exclusive upper bounds.

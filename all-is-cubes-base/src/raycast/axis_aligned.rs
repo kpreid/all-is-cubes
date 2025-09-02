@@ -45,7 +45,7 @@ impl AxisAlignedRaycaster {
                 0.0
             },
             is_first: true,
-            bounds: GridAab::EVERYWHERE,
+            bounds: super::MAXIMUM_BOUNDS,
         }
     }
 
@@ -86,7 +86,7 @@ impl AxisAlignedRaycaster {
     #[doc(hidden)]
     #[inline]
     pub fn remove_bounds(&mut self) {
-        self.bounds = GridAab::EVERYWHERE;
+        self.bounds = super::MAXIMUM_BOUNDS;
     }
 
     /// Advance the position until it enters the bounds.
@@ -256,19 +256,35 @@ mod tests {
     }
 
     #[test]
-    fn reach_numeric_bounds() {
+    fn exiting_integer_limit_positive() {
         assert_eq!(
             compare_aa_to_regular(
-                AaRay::new(Cube::new(GridCoordinate::MAX - 2, 10, 20), Face7::PX),
+                AaRay::new(Cube::new(GridCoordinate::MAX - 3, 10, 20), Face7::PX),
                 None
             )
             .take(10)
             .collect::<Vec<Cube>>(),
             vec![
+                Cube::new(GridCoordinate::MAX - 3, 10, 20),
                 Cube::new(GridCoordinate::MAX - 2, 10, 20),
-                Cube::new(GridCoordinate::MAX - 1, 10, 20),
-                // ...and we stop here, not producing GridCoordinate::MAX
-                // because it is problematic.
+                // ...and we stop here, not producing even the GridCoordinate::MAX - 1 cube.
+            ]
+        );
+    }
+
+    #[test]
+    fn exiting_integer_limit_negative() {
+        assert_eq!(
+            compare_aa_to_regular(
+                AaRay::new(Cube::new(GridCoordinate::MIN + 2, 10, 20), Face7::NX),
+                None
+            )
+            .take(10)
+            .collect::<Vec<Cube>>(),
+            vec![
+                Cube::new(GridCoordinate::MIN + 2, 10, 20),
+                Cube::new(GridCoordinate::MIN + 1, 10, 20),
+                // ...and we stop here, not producing even the GridCoordinate::MIN cube.
             ]
         );
     }
