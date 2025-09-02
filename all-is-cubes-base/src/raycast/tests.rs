@@ -270,6 +270,11 @@ fn start_on_cube_edge_perpendicular() {
 }
 
 #[test]
+fn start_just_past_bounds() {
+    assert_no_steps(Raycaster::new([1.5, 0.5, 0.5], [1., 0., 0.]).within(GridAab::ORIGIN_CUBE));
+}
+
+#[test]
 fn start_outside_of_integer_range() {
     assert_no_steps(Raycaster::new(
         [0.5, 0.5, FreeCoordinate::from(GridCoordinate::MAX) + 1.5],
