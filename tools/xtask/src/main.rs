@@ -164,16 +164,6 @@ fn main() -> Result<(), ActionError> {
         XtaskCommand::BinSize => {
             measure_binary_sizes(&config)?;
         }
-        XtaskCommand::RunDev => {
-            // TODO: Replace cargo-watch with our own file watching built into the server
-            // so that we can avoid restarting it.
-            config
-                .cargo()
-                .arg("watch")
-                .arg("-s")
-                .arg("cargo xtask run-game-server -- --client-source=workspace --addr=127.0.0.1:8080")
-                .run()?;
-        }
         XtaskCommand::RunGameServer { server_args } => {
             build_web(&config, &mut time_log, Profile::Dev)?;
 

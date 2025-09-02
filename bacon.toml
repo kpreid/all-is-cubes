@@ -1,0 +1,18 @@
+[jobs.test-all]
+command = [
+    "cargo", "xtask", "test",
+]
+need_stdout = true
+
+[jobs.test-renderers]
+command = [
+    "cargo", "test", "--package=test-renderers", "--no-fail-fast",
+]
+need_stdout = true
+
+[jobs.serve]
+command = [
+    "cargo", "xtask", "run-game-server", "--", "--client-source=workspace", "--addr=127.0.0.1:8080",
+]
+need_stdout = true
+

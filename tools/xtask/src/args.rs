@@ -72,10 +72,10 @@ pub(crate) enum XtaskCommand {
     /// Build binaries with the release profile and report their size on disk.
     BinSize,
 
-    /// Run the game server inside of `cargo watch` (must be installed) and with options
-    /// suitable for development.
-    RunDev,
-
+    /// Run the [`all-is-cubes-server`] HTTP server.
+    ///
+    /// To run this command with automatic rebuilding, use `bacon serve`
+    /// after installing `bacon` from <https://crates.io/crates/bacon>.
     RunGameServer {
         server_args: Vec<String>,
     },
