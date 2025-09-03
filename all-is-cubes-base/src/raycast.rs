@@ -250,6 +250,10 @@ impl Iterator for Raycaster {
                 (FirstLast::Beginning, true, false) => {
                     // If the current step is not yet in bounds, don't return it;
                     // step and then loop to reconsider.
+                    if !self.state.valid_for_stepping() {
+                        self.first_last = FirstLast::Ended;
+                        return None;
+                    }
                     self.state.step().ok()?;
                 }
 

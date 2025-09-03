@@ -425,6 +425,21 @@ fn regression_long_distance_fast_forward() {
     );
 }
 
+/// Found by fuzzing. Produced “step on axis Z which is zero” because we forgot a validity check.
+#[test]
+fn regression_invalid_position_from_beginning() {
+    assert_no_steps(
+        Raycaster::new(
+            point3(10.0, 1.1319598848574732e-72, 2.848094540588472e-306),
+            vec3(-3.39850991e-315, 3.53100099615357e-310, 0.0),
+        )
+        .within(
+            GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30]),
+            false,
+        ),
+    );
+}
+
 #[test]
 fn intersection_point_positive_face() {
     let ray = Ray::new([0.5, 0.5, 0.5], [-1.0, 0.0, 0.0]);
