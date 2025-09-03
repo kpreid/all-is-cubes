@@ -1,4 +1,4 @@
-use crate::math::{self, Cube, Face7, FreeCoordinate, GridAab};
+use crate::math::{self, Axis, Cube, Face7, FreeCoordinate, GridAab};
 
 use super::{AaRay, FirstLast, RaycastStep};
 
@@ -39,7 +39,7 @@ impl AxisAlignedRaycaster {
     #[must_use]
     #[inline]
     pub fn new(ray: AaRay) -> Self {
-        Self {
+        let mut new_self = Self {
             upcoming: ray.origin,
             hitting: ray.direction.opposite(),
             t_distance: if let Some(axis) = ray.direction.axis() {
@@ -56,7 +56,13 @@ impl AxisAlignedRaycaster {
             first_last: FirstLast::Beginning,
             bounds: super::MAXIMUM_BOUNDS,
             include_exit: true,
+        };
+
+        if !new_self.in_bounds_on_orthogonal_axes() {
+            new_self.first_last = FirstLast::Ended;
         }
+
+        new_self
     }
 
     /// Restrict the cubes iterated over to those which lie within the given [`GridAab`].
@@ -71,8 +77,10 @@ impl AxisAlignedRaycaster {
             .bounds
             .intersection_cubes(bounds)
             .unwrap_or(GridAab::ORIGIN_EMPTY);
-        self.first_last = FirstLast::Beginning; // TODO: do we need more nuance here?
-        self.include_exit = include_exit;
+        if self.first_last != FirstLast::Ended {
+            self.first_last = FirstLast::Beginning; // TODO: do we need more nuance here?
+            self.include_exit = include_exit;
+        }
 
         // Restore invariant that `upcoming` is within `bounds`.
         self.fast_forward();
@@ -82,14 +90,13 @@ impl AxisAlignedRaycaster {
 
     /// Advance the position until it enters the bounds.
     fn fast_forward(&mut self) {
-        if let Some(axis) = self.hitting.axis() {
-            // Check the axes that are *not* the one we are moving on.
-            let in_range_on_axis = |a| self.bounds.axis_range(a).contains(&self.upcoming[a]);
-            if !in_range_on_axis(axis.increment()) || !in_range_on_axis(axis.decrement()) {
-                self.first_last = FirstLast::Ended;
-                return;
-            }
+        // Check the axes that are *not* the one we are moving on.
+        if !self.in_bounds_on_orthogonal_axes() {
+            self.first_last = FirstLast::Ended;
+            return;
+        }
 
+        if let Some(axis) = self.hitting.axis() {
             let delta = if self.hitting.is_negative() {
                 // Fast forward in the positive direction to enter the lower bound
                 self.bounds.lower_bounds()[axis]
@@ -114,6 +121,31 @@ impl AxisAlignedRaycaster {
             }
         }
     }
+
+    #[inline]
+    fn in_bounds_on_orthogonal_axes(&self) -> bool {
+        let in_range_on_axis = |a| self.bounds.axis_range(a).contains(&self.upcoming[a]);
+        if let Some(axis) = self.hitting.axis() {
+            in_range_on_axis(axis.increment()) && in_range_on_axis(axis.decrement())
+        } else {
+            in_range_on_axis(Axis::X) && in_range_on_axis(Axis::Y) && in_range_on_axis(Axis::Z)
+        }
+    }
+
+    /// Test whether `self.upcoming` is within the bound it will eventually escape through.
+    /// Does not test the perpendicular axes or the backwards direction.
+    #[inline]
+    fn in_bounds_forward(&self) -> bool {
+        match self.hitting {
+            Face7::Within => true,
+            Face7::NX => self.upcoming.x < self.bounds.upper_bounds().x,
+            Face7::NY => self.upcoming.y < self.bounds.upper_bounds().y,
+            Face7::NZ => self.upcoming.z < self.bounds.upper_bounds().z,
+            Face7::PX => self.upcoming.x >= self.bounds.lower_bounds().x,
+            Face7::PY => self.upcoming.y >= self.bounds.lower_bounds().y,
+            Face7::PZ => self.upcoming.z >= self.bounds.lower_bounds().z,
+        }
+    }
 }
 
 impl Iterator for AxisAlignedRaycaster {
@@ -121,15 +153,21 @@ impl Iterator for AxisAlignedRaycaster {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if !self.bounds.contains_cube(self.upcoming) {
+        if self.first_last == FirstLast::Ended {
+            return None;
+        }
+
+        if !self.in_bounds_forward() {
+            // Out of bounds. Decide what to do about it.
             if self.first_last == FirstLast::InBounds {
-                self.first_last = FirstLast::Ended;
                 if self.include_exit {
                     // Let the bounds-exiting step be produced
+                    self.first_last = FirstLast::Ended;
                 } else {
                     return None;
                 }
             } else {
+                self.first_last = FirstLast::Ended;
                 return None;
             }
         }
@@ -142,7 +180,9 @@ impl Iterator for AxisAlignedRaycaster {
                         self.first_last = FirstLast::InBounds;
                         Face7::Within
                     }
-                    _ => self.hitting,
+                    // If state is Ended, then it only just became Ended and we are producing
+                    // the exit step.
+                    FirstLast::InBounds | FirstLast::Ended => self.hitting,
                 },
             },
             t_distance: self.t_distance.max(0.0),
@@ -160,7 +200,7 @@ impl Iterator for AxisAlignedRaycaster {
                 Some(next) => self.upcoming[axis] = next,
                 None => {
                     // Don't emit any more cubes.
-                    self.bounds = GridAab::ORIGIN_CUBE;
+                    self.first_last = FirstLast::Ended
                 }
             }
         }
