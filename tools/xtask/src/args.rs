@@ -72,7 +72,7 @@ pub(crate) enum XtaskCommand {
     /// Build binaries with the release profile and report their size on disk.
     BinSize,
 
-    /// Run the [`all-is-cubes-server`] HTTP server.
+    /// Run the `all-is-cubes-server` HTTP server.
     ///
     /// To run this command with automatic rebuilding, use `bacon serve`
     /// after installing `bacon` from <https://crates.io/crates/bacon>.
