@@ -83,6 +83,13 @@ impl AxisAlignedRaycaster {
     /// Advance the position until it enters the bounds.
     fn fast_forward(&mut self) {
         if let Some(axis) = self.hitting.axis() {
+            // Check the axes that are *not* the one we are moving on.
+            let in_range_on_axis = |a| self.bounds.axis_range(a).contains(&self.upcoming[a]);
+            if !in_range_on_axis(axis.increment()) || !in_range_on_axis(axis.decrement()) {
+                self.first_last = FirstLast::Ended;
+                return;
+            }
+
             let delta = if self.hitting.is_negative() {
                 // Fast forward in the positive direction to enter the lower bound
                 self.bounds.lower_bounds()[axis]
@@ -270,6 +277,34 @@ mod tests {
                 Cube::new(0, 1, 1),
                 Cube::new(-1, 1, 1)
             ]
+        );
+    }
+
+    /// Test that if the ray is entirely outside the bounds, no spurious steps are produced.
+    #[test]
+    fn ray_misses_bounds_1() {
+        assert_eq!(
+            compare_aa_to_regular(
+                AaRay::new(Cube::new(1000, 0, -1000), Face7::NX),
+                Some(GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30])),
+                true
+            )
+            .take(10)
+            .collect::<Vec<Cube>>(),
+            vec![]
+        );
+    }
+    #[test]
+    fn ray_misses_bounds_2() {
+        assert_eq!(
+            compare_aa_to_regular(
+                AaRay::new(Cube::new(-17, -1, 52), Face7::PX),
+                Some(GridAab::from_lower_upper([-10, -20, -30], [10, 20, 30])),
+                true
+            )
+            .take(10)
+            .collect::<Vec<Cube>>(),
+            vec![]
         );
     }
 
