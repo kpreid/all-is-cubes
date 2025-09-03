@@ -223,11 +223,9 @@ where
 impl<'a, D: RtBlockData, R: RaycasterIsh> SurfaceIter<'a, D, R> {
     #[inline]
     pub(crate) fn new(rt: &'a SpaceRaytracer<D>, ray: R::Ray) -> Self {
-        let mut block_raycaster = ray.cast();
-        block_raycaster.add_bounds(rt.cubes.bounds(), true);
         Self {
             ray,
-            block_raycaster,
+            block_raycaster: ray.cast_within(rt.cubes.bounds(), true),
             current_block: None,
             blocks: &rt.blocks,
             array: rt.cubes.as_ref(),

@@ -23,7 +23,7 @@ pub use all_is_cubes_base::raycast::*;
 pub(crate) trait RayIsh: Copy + Into<Ray> {
     type Caster: RaycasterIsh<Ray = Self>;
 
-    fn cast(self) -> Self::Caster;
+    fn cast_within(self, bounds: GridAab, include_exit: bool) -> Self::Caster;
 
     fn direction(&self) -> FreeVector {
         <Self as Into<Ray>>::into(*self).direction
@@ -33,16 +33,16 @@ pub(crate) trait RayIsh: Copy + Into<Ray> {
 impl RayIsh for Ray {
     type Caster = Raycaster;
 
-    fn cast(self) -> Self::Caster {
-        Ray::cast(&self)
+    fn cast_within(self, bounds: GridAab, include_exit: bool) -> Self::Caster {
+        Ray::cast(&self).within(bounds, include_exit)
     }
 }
 
 impl RayIsh for AaRay {
     type Caster = AxisAlignedRaycaster;
 
-    fn cast(self) -> Self::Caster {
-        self.cast()
+    fn cast_within(self, bounds: GridAab, include_exit: bool) -> Self::Caster {
+        self.cast().within(bounds, include_exit)
     }
 }
 
@@ -54,8 +54,6 @@ impl RayIsh for AaRay {
 /// raycasting” subsystem is going to be.)
 pub(crate) trait RaycasterIsh: Iterator<Item = RaycastStep> {
     type Ray: RayIsh<Caster = Self>;
-
-    fn add_bounds(&mut self, bounds: GridAab, include_exit: bool);
 
     fn recursive_raycast(
         within_step: RaycastStep,
@@ -71,11 +69,6 @@ impl RaycasterIsh for Raycaster {
     type Ray = Ray;
 
     #[inline]
-    fn add_bounds(&mut self, bounds: GridAab, include_exit: bool) {
-        Raycaster::add_bounds(self, bounds, include_exit);
-    }
-
-    #[inline]
     fn recursive_raycast(
         step: RaycastStep,
         ray: Ray,
@@ -88,11 +81,6 @@ impl RaycasterIsh for Raycaster {
 
 impl RaycasterIsh for AxisAlignedRaycaster {
     type Ray = AaRay;
-
-    #[inline]
-    fn add_bounds(&mut self, bounds: GridAab, include_exit: bool) {
-        AxisAlignedRaycaster::add_bounds(self, bounds, include_exit);
-    }
 
     #[inline]
     fn recursive_raycast(

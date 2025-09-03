@@ -213,36 +213,15 @@ impl Raycaster {
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     #[inline]
     pub fn within(mut self, bounds: GridAab, include_exit: bool) -> Self {
-        self.add_bounds(bounds, include_exit);
-        self
-    }
-
-    /// Like [`Self::within`] but not moving self.
-    ///
-    /// TODO: This function was added for the needs of the raytracer, but is no longer needed. Think about API design more.
-    #[doc(hidden)]
-    #[allow(clippy::missing_inline_in_public_items)]
-    pub fn add_bounds(&mut self, bounds: GridAab, include_exit: bool) {
         self.state.bounds = self
             .state
             .bounds
             .intersection_cubes(bounds)
             .unwrap_or(GridAab::ORIGIN_EMPTY);
+        self.first_last = FirstLast::Beginning; // TODO: do we need more nuance here?
         self.include_exit = include_exit;
         self.state.fast_forward();
-    }
-
-    /// Cancels a previous [`Raycaster::within`], allowing the raycast to proceed
-    /// an arbitrary distance (until `GridCoordinate` overflow).
-    ///
-    /// Note: The effect of calling `within()` and then `remove_bound()` without an
-    /// intervening `next()` is not currently guaranteed.
-    ///
-    /// TODO: This function was added for the needs of the raytracer, but is no longer needed. Think about API design more.
-    #[doc(hidden)]
-    #[inline]
-    pub fn remove_bounds(&mut self) {
-        self.state.bounds = MAXIMUM_BOUNDS;
+        self
     }
 }
 
