@@ -1,8 +1,6 @@
 #![no_main]
-use libfuzzer_sys::fuzz_target;
-extern crate all_is_cubes;
 
-use all_is_cubes::math::{Cube, Face7, GridAab};
+use all_is_cubes::math::{Cube, Face7, FaceMap, GridAab};
 use all_is_cubes::raycast;
 
 const PRINT: bool = false;
@@ -25,7 +23,7 @@ enum Kind {
     },
 }
 
-fuzz_target!(|input: Input| {
+libfuzzer_sys::fuzz_target!(|input: Input| {
     if PRINT {
         println!("Inputs: {input:?}");
     }
@@ -44,14 +42,14 @@ fuzz_target!(|input: Input| {
             if let Some(bounds) = bounds {
                 raycaster = raycaster.within(bounds, include_exit)
             }
-            exercise(raycaster, bounds)
+            exercise(raycaster, bounds, include_exit)
         }
         Kind::AxisAligned { origin, direction } => {
             let mut raycaster = raycast::AaRay::new(origin, direction).cast();
             if let Some(bounds) = bounds {
                 raycaster = raycaster.within(bounds, include_exit)
             }
-            exercise(raycaster, bounds)
+            exercise(raycaster, bounds, include_exit)
         }
     }
 });
@@ -59,6 +57,7 @@ fuzz_target!(|input: Input| {
 fn exercise(
     raycaster: impl Iterator<Item = raycast::RaycastStep> + std::fmt::Debug,
     bounds: Option<GridAab>,
+    expect_exit: bool,
 ) {
     if PRINT {
         dbg!(&raycaster);
@@ -83,8 +82,14 @@ fn exercise(
         prev_cube = Some(step.cube_ahead());
 
         // Check that within() is applied correctly.
-        if let Some(bounds) = bounds {
-            assert!(bounds.contains_cube(step.cube_ahead()));
+        if let Some(bounds) = bounds
+            && !bounds.contains_cube(step.cube_ahead())
+            && !(expect_exit
+                && bounds
+                    .expand(FaceMap::splat(1))
+                    .contains_cube(step.cube_ahead()))
+        {
+            panic!("out of bounds {bounds:?}: step {step:#?}");
         }
 
         // TODO: Check that intersection_point() is good (see existing unit test).
