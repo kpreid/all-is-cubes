@@ -56,7 +56,7 @@ fn new_png_writer<'a>(
     );
     png_encoder.set_color(png::ColorType::Rgba);
     png_encoder.set_depth(png::BitDepth::Eight);
-    png_encoder.set_compression(png::Compression::Best);
+    png_encoder.set_compression(png::Compression::Balanced);
     if let Some(anim) = &options.animation {
         png_encoder.set_animated(anim.frame_count.try_into().expect("too many frames"), 0)?;
         // TODO: store more precisely; for that matter we should perhaps stop using Duration and have an explicit divisor of our own
