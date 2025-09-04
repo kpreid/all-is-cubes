@@ -162,6 +162,7 @@ wasm-bindgen-futures = { version = "0.4.50", default-features = false, features 
 web-time = { version = "1.1.0", default-features = false }
 wgpu = { version = "26.0.0", default-features = false, features = ["std", "wgsl"] }
 yield-progress = { version = "0.1.6", default-features = false }
+yoke = { version = "0.8.0", default-features = false, features = ["alloc"] }
 
 # Note: Lints are also necessarily redefined in the workspaces other than this one.
 [workspace.lints.rust]

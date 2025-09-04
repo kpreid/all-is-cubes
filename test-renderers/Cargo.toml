@@ -48,6 +48,7 @@ default = ["auto-threads"]
 auto-threads = [
     "all-is-cubes/auto-threads",
     "all-is-cubes-gpu/auto-threads",
+    "all-is-cubes-port/auto-threads",
     "all-is-cubes-render/auto-threads",
 ]
 gltf = [

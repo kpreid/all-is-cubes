@@ -174,6 +174,7 @@ dependencies = [
  "serde_json",
  "stl_io",
  "thiserror",
+ "yoke",
 ]
 
 [[package]]
@@ -2364,3 +2365,20 @@ dependencies = [
  "log",
  "web-time",
 ]
+
+[[package]]
+name = "yoke"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f41bb01b8226ef4bfd589436a297c53d118f65921786300e427be8d487695cc"
+dependencies = [
+ "serde",
+ "stable_deref_trait",
+ "zerofrom",
+]
+
+[[package]]
+name = "zerofrom"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50cc42e0333e05660c3587f3bf9d0478688e15d870fab3346451ce7f8c9fbea5"

@@ -5,6 +5,8 @@
     allow(unused_imports)
 )]
 
+use std::sync::Arc;
+
 use all_is_cubes::block::{self, Block};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
@@ -20,6 +22,7 @@ use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 #[cfg(feature = "export")]
 use crate::{ExportError, ExportSet, Format};
 
+// TODO: change signature so we can drop the bytes after they are parsed
 #[cfg(feature = "import")]
 pub(crate) async fn load_dot_vox(
     p: YieldProgress,
@@ -27,45 +30,54 @@ pub(crate) async fn load_dot_vox(
 ) -> Result<Box<Universe>, DotVoxConversionError> {
     dot_vox_data_to_universe(
         p,
-        &dot_vox::load_bytes(bytes).map_err(DotVoxConversionError::Parse)?,
+        Arc::new(dot_vox::load_bytes(bytes).map_err(DotVoxConversionError::Parse)?),
     )
     .await
 }
 
 #[cfg(feature = "import")]
 async fn dot_vox_data_to_universe(
-    p: YieldProgress,
-    data: &dot_vox::DotVoxData,
+    progress: YieldProgress,
+    data: Arc<dot_vox::DotVoxData>,
 ) -> Result<Box<Universe>, DotVoxConversionError> {
     let dot_vox::DotVoxData {
         version,
-        models,
+        models: _,
         palette,
         materials,
         scenes,
         layers,
-    } = data;
+    } = &*data;
+    // Use Yoke to make owned field pointers from the Arc
+    let models =
+        yoke::Yoke::<&[dot_vox::Model], _>::attach_to_cart(data.clone(), |data| &data.models);
+
     // TODO: have a better path for reporting this kind of info
     log::info!(
         "Loaded MagicaVoxel .vox format: version {}, {} models, {} ignored materials, {} ignored scenes, {} ignored layers",
         version,
-        models.len(),
+        models.get().len(),
         materials.len(),
         scenes.len(),
         layers.len(),
     );
-    p.progress(0.15).await;
+    progress.progress(0.15).await;
 
     let palette = dot_vox_palette_to_blocks(palette);
-    let p = p.finish_and_cut(0.3).await;
+    let progress = progress.finish_and_cut(0.3).await;
 
     let mut universe = Box::new(Universe::new());
 
-    let models_progress = p.split_evenly(models.len());
-    for ((i, model), model_progress) in models.iter().enumerate().zip(models_progress) {
-        let mut space = dot_vox_model_to_space(&palette, model)?;
-        space.fast_evaluate_light();
+    let spaces: Vec<Result<Space, DotVoxConversionError>> =
+        crate::util::maybe_parallelize(progress, 0..models.get().len(), move |model_index| {
+            let mut space = dot_vox_model_to_space(&palette, &models.get()[model_index])?;
+            space.fast_evaluate_light();
+            Ok(space)
+        })
+        .await;
 
+    for (i, space_result) in spaces.into_iter().enumerate() {
+        let space = space_result?;
         let name = Name::from(format!("model_{i}"));
         let space_handle = universe
             .insert(name, space)
@@ -79,8 +91,6 @@ async fn dot_vox_data_to_universe(
                 )
                 .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
         }
-
-        model_progress.finish().await;
     }
 
     Ok(universe)
@@ -128,7 +138,7 @@ pub(crate) async fn export_to_dot_vox_data(
 }
 
 #[cfg(feature = "import")]
-fn dot_vox_palette_to_blocks(palette: &[dot_vox::Color]) -> Vec<Block> {
+fn dot_vox_palette_to_blocks(palette: &[dot_vox::Color]) -> Arc<[Block]> {
     palette
         .iter()
         .enumerate()
@@ -389,7 +399,7 @@ mod tests {
         )
         .await
         .map_err(Either::Left)?;
-        dot_vox_data_to_universe(yield_progress_for_testing(), &data)
+        dot_vox_data_to_universe(yield_progress_for_testing(), Arc::new(data))
             .await
             .map_err(Either::Right)
     }

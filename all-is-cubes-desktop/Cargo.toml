@@ -70,7 +70,7 @@ all-is-cubes-content = { workspace = true }
 all-is-cubes-gpu = { workspace = true, features = ["auto-threads", "wgpu"] }
 all-is-cubes-mesh = { workspace = true, optional = true, features = ["dynamic"] }
 # TODO: make all file access an optional feature
-all-is-cubes-port = { workspace = true, features = ["import", "native"] }
+all-is-cubes-port = { workspace = true, features = ["auto-threads", "import", "native"] }
 # TODO: make raytracer optional
 all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 all-is-cubes-ui = { workspace = true, features = ["session"] }

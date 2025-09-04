@@ -54,6 +54,10 @@ dot-vox = [
     "dep:all-is-cubes-render",
     "dep:dot_vox",
 ]
+# Adds automatic parallelism to some algorithms (but not all possible uses of concurrency).
+# If disabled, `std::thread` is never used.
+# If enabled, threads may be created and the active `rayon` thread pool may be used.
+auto-threads = ["dep:rayon"]
 
 [dependencies]
 # Non-optional generally required dependencies
@@ -67,7 +71,9 @@ itertools = { workspace = true }
 log = { workspace = true }
 # Used for internal execution of not-publicly-async code
 pollster = { workspace = true }
+rayon = { workspace = true, optional = true }
 thiserror = { workspace = true }
+yoke = { workspace = true }
 
 # Dependencies related to formats
 all-is-cubes-mesh = { workspace = true, optional = true }
