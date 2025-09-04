@@ -15,15 +15,32 @@ criterion_main!(benches);
 criterion_group!(benches, evaluate_light_bench, queue_bench);
 
 pub fn evaluate_light_bench(c: &mut Criterion) {
+    enum EvalMode {
+        Fast,
+        Full,
+        /// We test doing both in sequence because `fast_evaluate_light` is purposefully incomplete
+        /// and so it matters what the overall performance for both steps is.
+        Both,
+    }
+
     let rt = tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap();
 
-    for fast in [false, true] {
-        let mut group = c.benchmark_group(if fast { "fast" } else { "evaluate" });
-        group.sample_size(if fast { 100 } else { 10 });
+    let mut group = c.benchmark_group("eval");
+    for mode in [EvalMode::Full, EvalMode::Both, EvalMode::Fast] {
+        let mode_str = match mode {
+            EvalMode::Fast => "fast",
+            EvalMode::Full => "full",
+            EvalMode::Both => "both",
+        };
+        group.sample_size(if matches!(mode, EvalMode::Fast) {
+            100
+        } else {
+            10
+        });
 
-        group.bench_function("lighting_bench_space", |b| {
+        group.bench_function(format!("{mode_str}/lighting_bench_space"), |b| {
             b.iter_batched_ref(
                 || {
                     let mut u = Universe::new();
@@ -37,18 +54,18 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
                     (u, space)
                 },
                 |(_u, space)| {
-                    if fast {
+                    if matches!(mode, EvalMode::Fast | EvalMode::Both) {
                         space.fast_evaluate_light();
-                    } else {
+                    }
+                    if matches!(mode, EvalMode::Full | EvalMode::Both) {
                         space.evaluate_light(1, |_| {});
                     }
                 },
                 BatchSize::LargeInput,
             )
         });
-
-        group.finish();
     }
+    group.finish();
 }
 
 fn queue_bench(c: &mut Criterion) {
