@@ -43,7 +43,7 @@ libfuzzer_sys::fuzz_target!(|input: ArbitraryWithUniverse<(
 // TODO: coverage for other mesh operations
 
 fn construct_space(sing: SpaceIngredients) -> Space {
-    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 3, 3]))
+    Space::builder(GridAab::from_lower_size([0, 0, 0], [3, 3, 3]))
         .build_and_mutate(|m| {
             let mut pattern_iter = sing.pattern.into_iter();
             m.fill_all(|_cube| {
@@ -53,6 +53,5 @@ fn construct_space(sing: SpaceIngredients) -> Space {
                 )
             })
         })
-        .unwrap();
-    space
+        .unwrap()
 }
