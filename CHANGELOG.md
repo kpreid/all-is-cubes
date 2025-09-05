@@ -20,8 +20,12 @@ In order to resolve various design problems interfering with development, the `a
 
 ### Added
 
-- Functionality:
+- User-visible functionality:
     - In the desktop version, changes to graphics options are now persisted across launches.
+    - `.vox` import (but not export) now supports:
+        - Files containing a scene graph, or just multiple models.
+          Positioning of models is currently flawed.
+        - Light emission and transparency (“Emit”, “Blend”, and “Glass” materials).
 
 - `all-is-cubes` library:
     - `block::Block::find_inventory()`
@@ -44,8 +48,8 @@ In order to resolve various design problems interfering with development, the `a
 
 - `all-is-cubes-port` library:
     - `export_to_path()` no longer accesses the `Universe` while its future is running, but instead only when initially called. This allows the latter portion of the export operation to run concurrently with other uses of the `Universe`.
-    - `.vox` import (but not export) now supports light emission and transparency (“Emit”, “Blend”, and “Glass” materials).
-
+    - `.vox` import now partially supports materials and scenes.
+    
 - `all-is-cubes-render` library:
     - `camera::GraphicsOptions::maximum_intensity` may be used to specify the maximum brightness of the output device and thus properly apply tone mapping to HDR output. It may also be used to choose to restrict output to SDR.
     - `raytracer::Accumulate` is implemented for tuples of up to 2 elements.

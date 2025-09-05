@@ -6,7 +6,7 @@ use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint};
+use all_is_cubes::math::{GridAab, GridPoint, GridVector};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe};
 use all_is_cubes::util::YieldProgress;
@@ -26,6 +26,29 @@ pub(crate) async fn load_dot_vox(
     dot_vox_data_to_universe(progress, Arc::new(data)).await
 }
 
+/// How to treat the models and scene nodes being imported.
+#[derive(Clone, Copy, Debug)]
+enum ImportMode {
+    /// There is only one model and it shall become the [`Space`] where the character is.
+    OneModelAsSpace,
+    /// All models shall be viewed as a collection of blocks.
+    /// The individual blocks do not get light calculation.
+    ManyModelsAsBlocks,
+    /// There is a scene, which shall be imported as a [`Space`] containing the models as blocks.
+    Scene,
+}
+impl ImportMode {
+    /// When importing models, whether to configure their [`Space`]s as appropriate for being
+    /// blocks rather than being the space the character occupies.
+    fn treat_models_as_blocks(self) -> bool {
+        match self {
+            ImportMode::OneModelAsSpace => false,
+            ImportMode::ManyModelsAsBlocks => true,
+            ImportMode::Scene => true,
+        }
+    }
+}
+
 pub(crate) async fn dot_vox_data_to_universe(
     mut progress: YieldProgress,
     data: Arc<dot_vox::DotVoxData>,
@@ -42,22 +65,32 @@ pub(crate) async fn dot_vox_data_to_universe(
     let models_yoked =
         yoke::Yoke::<&[dot_vox::Model], _>::attach_to_cart(data.clone(), |data| &data.models);
 
-    // Whether to import models for use as as block spaces (e.g. LightPhysics::None) rather than the
-    // space occupied by the character.
-    // TODO: this should be a user-selectable option
-    // TODO: when we have scene support, check whether the file has a scene with multiple shapes
-    // even if it only has one model.
-    let import_models_as_blocks = models.len() != 1;
+    // TODO: this should be a user-selectable option, not solely automatic
+    let mode = if !scenes.is_empty() {
+        ImportMode::Scene
+    } else if models.len() == 1 {
+        ImportMode::OneModelAsSpace
+    } else {
+        ImportMode::ManyModelsAsBlocks
+    };
 
-    // TODO: have a better path for reporting this kind of info
+    let model_phase_cost_relative_to_scene_phase = match mode {
+        ImportMode::OneModelAsSpace => 1.0,
+        ImportMode::ManyModelsAsBlocks => 0.5, // even split assumed
+        ImportMode::Scene => {
+            (models.len() as f32) / (models.len() as f32).mul_add(0.5, scenes.len().max(1) as f32)
+        }
+    };
+
+    // TODO: have a better path for reporting this kind of info about the results of the import
     log::info!(
-        "Loaded MagicaVoxel .vox format: version {}, \
-        {} models, {} materials, {} ignored scene nodes, {} ignored layers",
-        version,
-        models.len(),
-        materials.len(),
-        scenes.len(),
-        layers.len(),
+        "Loaded MagicaVoxel .vox format: version {version}, \
+        {models} models, {materials} materials, {scenes} scene nodes, {layers} ignored layers. \
+        Selected import method: {mode:?}.",
+        models = models.len(),
+        materials = materials.len(),
+        scenes = scenes.len(),
+        layers = layers.len(),
     );
 
     // Convert the palette to `Block`s.
@@ -77,7 +110,10 @@ pub(crate) async fn dot_vox_data_to_universe(
 
     // Convert the models to `Space`s.
     let models_progress = progress
-        .start_and_cut(0.9, "Importing {} .vox models")
+        .start_and_cut(
+            model_phase_cost_relative_to_scene_phase,
+            "Importing {} .vox models",
+        )
         .await;
     let model_count = models.len();
     let model_spaces: Vec<Result<Space, DotVoxConversionError>> = crate::util::maybe_parallelize(
@@ -88,7 +124,7 @@ pub(crate) async fn dot_vox_data_to_universe(
             let mut space = mv::model::to_space(
                 &palette,
                 &models_yoked.get()[model_index],
-                import_models_as_blocks,
+                mode.treat_models_as_blocks(),
             )?;
             space.fast_evaluate_light();
             Ok(space)
@@ -107,21 +143,40 @@ pub(crate) async fn dot_vox_data_to_universe(
             .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
         model_space_handles.push(space_handle);
     }
+    let progress = progress.finish_and_cut(0.1).await;
 
-    // TODO: Import the actual scene as blocks.
-    let viewed_space_handle =
-        if import_models_as_blocks && let [space_handle] = model_space_handles.as_slice() {
+    let [mut view_progress, final_progress] = progress.split(0.99);
+    let viewed_space_handle = match mode {
+        ImportMode::OneModelAsSpace => {
+            let [space_handle] = model_space_handles.as_slice() else {
+                todo!("can't happen now, but should have an error")
+            };
+            view_progress.finish().await;
             space_handle.clone()
-        } else {
-            progress.set_label("Creating model preview");
-            progress.progress(0.5).await;
-            universe
-                .insert(
-                    "model_previews".into(),
-                    view_all_models_as_blocks(universe.read_ticket(), models, model_space_handles)?,
+        }
+        ImportMode::Scene => universe
+            .insert(
+                "scene".into(),
+                mv::scene::scene_to_space(
+                    view_progress,
+                    data,
+                    universe.read_ticket(),
+                    model_space_handles,
                 )
+                .await?,
+            )
+            .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?,
+        ImportMode::ManyModelsAsBlocks => {
+            view_progress.set_label("Creating model preview");
+            view_progress.progress(0.0).await;
+            let space =
+                view_all_models_as_blocks(universe.read_ticket(), models, model_space_handles)?;
+            view_progress.finish().await;
+            universe
+                .insert("model_previews".into(), space)
                 .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?
-        };
+        }
+    };
 
     universe
         .insert(
@@ -130,7 +185,7 @@ pub(crate) async fn dot_vox_data_to_universe(
         )
         .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
 
-    progress.finish().await;
+    final_progress.finish().await;
 
     Ok(universe)
 }
@@ -143,16 +198,16 @@ fn view_all_models_as_blocks(
 ) -> Result<Space, DotVoxConversionError> {
     let row_length = space_handles.len().isqrt();
     let row_length_g = i32::try_from(row_length).unwrap();
-    let maximum_size_of_model_in_blocks = 4;
+    let maximum_size_of_model_in_blocks = 4u32;
     let spacing_between_models = 4u8;
     let bounds = GridAab::from_lower_size(
-        [0, 0, 0],
+        GridPoint::splat(-maximum_size_of_model_in_blocks.cast_signed()),
         [
             (row_length * usize::from(spacing_between_models)) as u32
-                + maximum_size_of_model_in_blocks,
-            maximum_size_of_model_in_blocks,
+                + maximum_size_of_model_in_blocks * 2,
+            maximum_size_of_model_in_blocks * 2,
             (space_handles.len().div_ceil(row_length) * usize::from(spacing_between_models)) as u32
-                + maximum_size_of_model_in_blocks,
+                + maximum_size_of_model_in_blocks * 2,
         ],
     );
     Space::builder(bounds)
@@ -175,7 +230,7 @@ fn view_all_models_as_blocks(
                     resolution = d;
                 }
 
-                for (rel_cube, block) in model_space_to_blocks(
+                for (rel_cube, block) in mv::scene::model_space_to_blocks(
                     model,
                     space,
                     {
@@ -184,6 +239,7 @@ fn view_all_models_as_blocks(
                         a
                     },
                     resolution,
+                    GridVector::zero(),
                 ) {
                     m.set(
                         rel_cube
@@ -199,29 +255,4 @@ fn view_all_models_as_blocks(
             Ok(())
         })
         .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))
-}
-
-fn model_space_to_blocks(
-    model: &dot_vox::Model,
-    space: Handle<Space>,
-    attributes: block::BlockAttributes,
-    resolution: Resolution,
-) -> impl Iterator<Item = (Cube, Block)> {
-    // the Space should have this same size; recomputing it just saves us a ReadTicket
-    let model_size = mv::coord::mv_to_aic_size(model.size);
-
-    let bounding_box_in_blocks =
-        GridAab::from_lower_size(GridPoint::zero(), model_size).divide(resolution.into());
-
-    bounding_box_in_blocks.interior_iter().map(move |cube| {
-        (
-            cube,
-            Block::from_primitive(block::Primitive::Recur {
-                space: space.clone(),
-                offset: cube.lower_bounds() * GridCoordinate::from(resolution),
-                resolution,
-            })
-            .with_modifier(attributes.clone()),
-        )
-    })
 }

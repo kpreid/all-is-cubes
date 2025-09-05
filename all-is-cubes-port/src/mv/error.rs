@@ -7,6 +7,10 @@ use all_is_cubes::space::SetCubeError;
 pub(crate) enum DotVoxConversionError {
     #[error("{0}")]
     Parse(&'static str),
+    #[error("file refers to scene node with ID {0} but does not define it")]
+    MissingSceneNode(u32),
+    #[error("file refers to model with ID {0} but does not define it")]
+    MissingModel(u32),
     #[error("palette of {len} colors too short to contain index {index}")]
     PaletteTooShort { len: usize, index: u8 },
     #[error("failed to place block")]
@@ -19,5 +23,21 @@ pub(crate) enum DotVoxConversionError {
 impl From<DotVoxConversionError> for InGenError {
     fn from(error: DotVoxConversionError) -> Self {
         InGenError::other(error)
+    }
+}
+
+pub(crate) fn warn_extra_attributes(
+    thing: core::fmt::Arguments<'_>,
+    attributes: &dot_vox::Dict,
+    expected_attributes: &[&'static str],
+) {
+    let unexpected = Vec::from_iter(
+        attributes
+            .keys()
+            .filter(|key| !expected_attributes.contains(&key.as_str())),
+    );
+    if !unexpected.is_empty() {
+        // TODO: have a better path for reporting this kind of info about the results of the import
+        log::info!("{thing} contains unknown attributes {unexpected:?}");
     }
 }

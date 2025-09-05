@@ -1,4 +1,16 @@
 //! Import and export of MagicaVoxel `.vox` files.
+//!
+//! # Bibliography
+//!
+//! If you want to understand the format, it is underdocumented and some things must be understood
+//! empirically, but see:
+//!
+//! * <https://github.com/ephtracy/voxel-model/blob/master/MagicaVoxel-file-format-vox.txt>
+//!   (describes models and palette)
+//! * <https://github.com/ephtracy/voxel-model/blob/master/MagicaVoxel-file-format-vox-extension.txt>
+//!   (describes materials and scene)
+//! * <https://github.com/dust-engine/dot_vox/blob/master/examples/traverse_graph.rs>
+//!   (how to get transforms out of a scene graph)
 
 #![cfg_attr(
     not(all(feature = "import", feature = "export")),
@@ -14,6 +26,7 @@ mod export;
 mod import;
 mod model;
 mod palette;
+mod scene;
 #[cfg(test)]
 mod tests;
 

@@ -1,4 +1,6 @@
-use all_is_cubes::math::{GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Gridgid};
+use all_is_cubes::math::{
+    Face6, GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Gridgid,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -43,6 +45,14 @@ pub(crate) fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
 #[cfg(feature = "import")]
 pub(crate) fn mv_to_aic_size(size: dot_vox::Size) -> GridSize {
     GridSize::new(size.x, size.z, size.y)
+}
+
+// TODO: this name is now confusing vs. the other functions which are about a *fixed* rotation
+pub(crate) fn mv_to_aic_rotation(rotation: dot_vox::Rotation) -> GridRotation {
+    GridRotation::from_basis(rotation.to_cols_array_2d().map(|col| {
+        let col = GridVector::from(col.map(|el| el as i32));
+        Face6::try_from(col).unwrap()
+    }))
 }
 
 // -------------------------------------------------------------------------------------------------
