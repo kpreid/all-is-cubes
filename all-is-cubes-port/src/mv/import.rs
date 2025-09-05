@@ -15,18 +15,18 @@ use crate::mv::error::DotVoxConversionError;
 
 // TODO: change signature so we can drop the bytes after they are parsed
 pub(crate) async fn load_dot_vox(
-    p: YieldProgress,
+    mut progress: YieldProgress,
     bytes: &[u8],
 ) -> Result<Box<Universe>, DotVoxConversionError> {
-    dot_vox_data_to_universe(
-        p,
-        Arc::new(dot_vox::load_bytes(bytes).map_err(DotVoxConversionError::Parse)?),
-    )
-    .await
+    let parse_bytes_progress = progress.start_and_cut(0.1, "Parsing .vox file").await;
+    let data = dot_vox::load_bytes(bytes).map_err(DotVoxConversionError::Parse)?;
+    parse_bytes_progress.finish().await;
+
+    dot_vox_data_to_universe(progress, Arc::new(data)).await
 }
 
 pub(crate) async fn dot_vox_data_to_universe(
-    progress: YieldProgress,
+    mut progress: YieldProgress,
     data: Arc<dot_vox::DotVoxData>,
 ) -> Result<Box<Universe>, DotVoxConversionError> {
     let dot_vox::DotVoxData {
@@ -43,24 +43,39 @@ pub(crate) async fn dot_vox_data_to_universe(
 
     // TODO: have a better path for reporting this kind of info
     log::info!(
-        "Loaded MagicaVoxel .vox format: version {}, {} models, {} ignored materials, {} ignored scenes, {} ignored layers",
+        "Loaded MagicaVoxel .vox format: version {}, \
+        {} models, {} ignored materials, {} ignored scene nodes, {} ignored layers",
         version,
         models_yoked.get().len(),
         materials.len(),
         scenes.len(),
         layers.len(),
     );
-    progress.progress(0.15).await;
 
-    let palette = mv::palette::dot_vox_palette_to_blocks(palette);
-    let progress = progress.finish_and_cut(0.3).await;
+    // Convert the palette to `Block`s.
+    let palette_progress = {
+        progress.start_and_cut(
+            0.1,
+            format_args!("Importing {} .vox palette entries", palette.len()),
+        )
+    }
+    .await;
+    let palette: Arc<[Block]> = mv::palette::dot_vox_palette_to_blocks(palette);
+    palette_progress.finish().await;
 
+    // Universe is a large struct and boxing it promptly helps us not have large stack usage
+    // and large futures.
     let mut universe = Box::new(Universe::new());
 
-    let [models_progress, build_scene_progress] = progress.split(0.9);
+    // Convert the models to `Space`s.
+    let models_progress = progress
+        .start_and_cut(0.9, "Importing {} .vox models")
+        .await;
+    let model_count = models.len();
     let model_spaces: Vec<Result<Space, DotVoxConversionError>> = crate::util::maybe_parallelize(
         models_progress,
-        0..models_yoked.get().len(),
+        0..model_count,
+        move |model_index| format!("Importing model {model_index}/{model_count}"),
         move |model_index| {
             let mut space = mv::model::to_space(&palette, &models_yoked.get()[model_index])?;
             space.fast_evaluate_light();
@@ -69,6 +84,8 @@ pub(crate) async fn dot_vox_data_to_universe(
     )
     .await;
 
+    progress.set_label("Storing models");
+    progress.progress(0.0).await;
     let mut model_space_handles: Vec<Handle<Space>> = Vec::new();
     for (i, space_result) in model_spaces.into_iter().enumerate() {
         let space = space_result?;
@@ -85,6 +102,8 @@ pub(crate) async fn dot_vox_data_to_universe(
     let viewed_space_handle = if let [space_handle] = model_space_handles.as_slice() {
         space_handle.clone()
     } else {
+        progress.set_label("Creating model preview");
+        progress.progress(0.5).await;
         universe
             .insert(
                 "model_previews".into(),
@@ -100,7 +119,7 @@ pub(crate) async fn dot_vox_data_to_universe(
         )
         .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
 
-    build_scene_progress.finish().await;
+    progress.finish().await;
 
     Ok(universe)
 }

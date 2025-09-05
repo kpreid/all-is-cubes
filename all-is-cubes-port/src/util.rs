@@ -24,7 +24,8 @@ pub(crate) async fn spawn_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Se
 pub(crate) async fn maybe_parallelize<T: Send, U: Send + 'static>(
     progress: YieldProgress,
     items: impl IntoIterator<Item = T, IntoIter: ExactSizeIterator + Send + 'static>,
-    function: impl Fn(T) -> U + Send + Sync + 'static,
+    label_function: impl Fn(&T) -> String + Send + Sync + 'static,
+    work_function: impl Fn(T) -> U + Send + Sync + 'static,
 ) -> Vec<U> {
     let items = items.into_iter();
 
@@ -32,8 +33,10 @@ pub(crate) async fn maybe_parallelize<T: Send, U: Send + 'static>(
     {
         let mut outputs: Vec<U> = Vec::new();
         let split_p = progress.split_evenly(items.len());
-        for (item, p) in items.zip(split_p) {
-            outputs.push(function(item));
+        for (item, mut p) in items.zip(split_p) {
+            p.set_label(label_function(&item));
+            p.progress(0.0).await; // make label visible
+            outputs.push(work_function(item));
             p.finish().await;
         }
         outputs
@@ -45,13 +48,21 @@ pub(crate) async fn maybe_parallelize<T: Send, U: Send + 'static>(
 
         spawn_blocking(move || {
             let split_p = progress.split_evenly_concurrent(items.len());
-            let items_and_progresses = items.into_iter().zip(split_p).collect::<Vec<_>>();
+            let items_and_progresses = items
+                .into_iter()
+                .zip(split_p)
+                .map(|(item, mut p)| {
+                    p.set_label(label_function(&item));
+                    p.progress_without_yield(0.0); // cause label to be published
+                    (item, p)
+                })
+                .collect::<Vec<_>>();
             items_and_progresses
                 .into_par_iter()
                 .map(move |(item, p)| {
                     rayon::yield_now(); // import tasks are possibly long, so allow more interleaving with more realtime tasks -- TODO: have a better plan, like multiple thread pools
-                    let output = function(item);
-                    p.progress_without_yield(1.0); // p.finish() is async
+                    let output = work_function(item);
+                    p.progress_without_yield(1.0); // would be .finish() but we are in a blocking, not async, context
                     output
                 })
                 .collect()
