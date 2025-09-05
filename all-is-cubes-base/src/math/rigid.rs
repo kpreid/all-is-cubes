@@ -1,4 +1,7 @@
+use core::fmt;
+
 use euclid::Vector3D;
+use manyfmt::Refmt;
 
 #[cfg(doc)]
 use crate::math::GridAab;
@@ -15,7 +18,7 @@ use crate::math::{Cube, GridCoordinate, GridMatrix, GridPoint, GridRotation, Gri
 ///
 /// [rigid transformation]: https://en.wikipedia.org/wiki/Rigid_transformation
 #[expect(clippy::exhaustive_structs)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Gridgid {
     /// Rotation component. Applied before the translation.
     pub rotation: GridRotation,
@@ -166,6 +169,32 @@ impl From<Gridgid> for GridMatrix {
     #[inline]
     fn from(value: Gridgid) -> Self {
         value.to_matrix()
+    }
+}
+
+impl fmt::Debug for Gridgid {
+    #[inline(never)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if *self == Self::IDENTITY {
+            f.pad("Gridgid::IDENTITY")
+        } else {
+            let &Self {
+                rotation,
+                translation,
+            } = self;
+
+            let mut ds = f.debug_struct("Gridgid");
+            if rotation != GridRotation::IDENTITY {
+                ds.field("rotation", &rotation);
+            }
+            if translation != GridVector::zero() {
+                ds.field(
+                    "translation",
+                    &translation.refmt(&crate::util::ConciseDebug),
+                );
+            }
+            ds.finish()
+        }
     }
 }
 
