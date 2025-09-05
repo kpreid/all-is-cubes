@@ -409,7 +409,14 @@ pub enum Error {
     Mutate(SetCubeError),
 }
 
-impl core::error::Error for Error {}
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            Error::OutOfMemory {} => None,
+            Error::Mutate(e) => Some(e),
+        }
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 
