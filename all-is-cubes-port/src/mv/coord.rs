@@ -1,4 +1,4 @@
-use all_is_cubes::math::{GridAab, GridCoordinate, GridRotation, GridVector, Gridgid};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Gridgid};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -37,6 +37,12 @@ pub(crate) fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
     };
     mv_to_aic_coordinate_transform(mv_size).inverse()
         * Gridgid::from_translation(-aic_bounds.lower_bounds().to_vector())
+}
+
+/// Convert size types, with [`MV_TO_AIC_ROTATION`] baked in.
+#[cfg(feature = "import")]
+pub(crate) fn mv_to_aic_size(size: dot_vox::Size) -> GridSize {
+    GridSize::new(size.x, size.z, size.y)
 }
 
 // -------------------------------------------------------------------------------------------------

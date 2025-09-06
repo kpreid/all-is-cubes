@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use all_is_cubes::arcstr;
-use all_is_cubes::block::{self, Block};
+use all_is_cubes::block::{self, Block, Resolution};
 use all_is_cubes::character::{Character, Spawn};
 use all_is_cubes::content::free_editing_starter_inventory;
+use all_is_cubes::euclid::vec3;
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::GridAab;
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe};
 use all_is_cubes::util::YieldProgress;
@@ -125,7 +126,6 @@ pub(crate) async fn dot_vox_data_to_universe(
 }
 
 /// Construct a [`Space`] where all models in the file can be seen as independent blocks.
-#[cfg(feature = "import")]
 fn view_all_models_as_blocks(
     read_ticket: ReadTicket<'_>,
     models: &[dot_vox::Model],
@@ -133,12 +133,16 @@ fn view_all_models_as_blocks(
 ) -> Result<Space, DotVoxConversionError> {
     let row_length = space_handles.len().isqrt();
     let row_length_g = i32::try_from(row_length).unwrap();
+    let maximum_size_of_model_in_blocks = 4;
+    let spacing_between_models = 4u8;
     let bounds = GridAab::from_lower_size(
         [0, 0, 0],
         [
-            (row_length * 2 + 1) as u32,
-            1,
-            (space_handles.len().div_ceil(row_length) * 2 + 1) as u32,
+            (row_length * usize::from(spacing_between_models)) as u32
+                + maximum_size_of_model_in_blocks,
+            maximum_size_of_model_in_blocks,
+            (space_handles.len().div_ceil(row_length) * usize::from(spacing_between_models)) as u32
+                + maximum_size_of_model_in_blocks,
         ],
     );
     Space::builder(bounds)
@@ -153,27 +157,61 @@ fn view_all_models_as_blocks(
         .build_and_mutate(|m| {
             for ((i, space), model) in (0i32..).zip(space_handles).zip(models) {
                 let max_size = model.size.x.max(model.size.y).max(model.size.z);
-                let mut resolution = block::Resolution::R1;
+                let mut resolution = Resolution::R1;
                 while u32::from(resolution) < max_size
                     && let Some(d) = resolution.double()
-                    && d <= block::Resolution::R64
+                    && d <= Resolution::R64
                 {
                     resolution = d;
                 }
 
-                m.set(
-                    [
-                        i.rem_euclid(row_length_g) * 2,
-                        0,
-                        i.div_euclid(row_length_g) * 2,
-                    ],
-                    Block::builder()
-                        .voxels_handle(resolution, space)
-                        .display_name(arcstr::format!("Model #{i}"))
-                        .build(),
-                )?;
+                for (rel_cube, block) in model_space_to_blocks(
+                    model,
+                    space,
+                    {
+                        let mut a = block::BlockAttributes::default();
+                        a.display_name = arcstr::format!("Model #{i}");
+                        a
+                    },
+                    resolution,
+                ) {
+                    m.set(
+                        rel_cube
+                            + vec3(
+                                i.rem_euclid(row_length_g) * i32::from(spacing_between_models),
+                                0,
+                                i.div_euclid(row_length_g) * i32::from(spacing_between_models),
+                            ),
+                        block,
+                    )?;
+                }
             }
             Ok(())
         })
         .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))
+}
+
+fn model_space_to_blocks(
+    model: &dot_vox::Model,
+    space: Handle<Space>,
+    attributes: block::BlockAttributes,
+    resolution: Resolution,
+) -> impl Iterator<Item = (Cube, Block)> {
+    // the Space should have this same size; recomputing it just saves us a ReadTicket
+    let model_size = mv::coord::mv_to_aic_size(model.size);
+
+    let bounding_box_in_blocks =
+        GridAab::from_lower_size(GridPoint::zero(), model_size).divide(resolution.into());
+
+    bounding_box_in_blocks.interior_iter().map(move |cube| {
+        (
+            cube,
+            Block::from_primitive(block::Primitive::Recur {
+                space: space.clone(),
+                offset: cube.lower_bounds() * GridCoordinate::from(resolution),
+                resolution,
+            })
+            .with_modifier(attributes.clone()),
+        )
+    })
 }
