@@ -1,14 +1,16 @@
 #![expect(clippy::identity_op)]
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use std::sync::Mutex;
 
+use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, AIR, Block, BlockDef, BlockDefTransaction};
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::content::make_some_blocks;
 use all_is_cubes::euclid::{Point3D, Scale, point3};
 use all_is_cubes::listen::Store as _;
-use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, zo32};
+use all_is_cubes::math::{Cube, GridAab, GridCoordinate, GridPoint, Rgba, Vol, zo32};
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange, SpaceTransaction};
 use all_is_cubes::time;
 use all_is_cubes::universe::{Handle, Universe};
@@ -543,4 +545,40 @@ fn instances_dont_dirty_mesh_when_space_changes() {
     });
 
     assert_eq!(tester.instances(), vec![(index_of_anim, vec![[2, 0, 0]]),]);
+}
+
+#[test]
+fn at_maximum_number_of_blocks() {
+    assert_eq!(
+        BlockIndex::MAX,
+        65535,
+        "this test may need redesign to be feasible"
+    );
+
+    let blocks: Vec<Block> = (0..=BlockIndex::MAX)
+        .map(|i| {
+            // These blocks must all be distinct.
+            // We are not using `make_some_blocks()` because that would construct a large array
+            // on the stack.
+            Block::builder()
+                .color(Rgba::WHITE)
+                .display_name(arcstr::format!("#{i}"))
+                .build()
+        })
+        .collect();
+    let bounds = GridAab::from_lower_size([0, 0, 0], [256, 256, 1]);
+    let space = Space::builder(bounds)
+        .palette_and_contents(
+            blocks,
+            Vol::from_elements(bounds, (0..=BlockIndex::MAX).collect::<Box<[BlockIndex]>>())
+                .unwrap(),
+            None,
+        )
+        .unwrap()
+        .build();
+
+    // All we're checking for, for now, is that this doesn't panic.
+    let mut tester: CsmTester<NO_INSTANCES> =
+        CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
+    tester.update(|_| {});
 }

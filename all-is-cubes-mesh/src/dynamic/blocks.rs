@@ -119,7 +119,12 @@ where
                 fast_options.ignore_voxels = true;
 
                 self.meshes.reserve(new_len);
-                for (index, bd) in ((old_len as BlockIndex)..).zip(&block_data[old_len..new_len]) {
+                // Note that the ..= range is necessary; `(old_len as BlockIndex)..` would overflow
+                // before it produces `BlockIndex::MAX`, as documented in
+                // <https://doc.rust-lang.org/std/ops/struct.RangeFrom.html>.
+                for (index, bd) in
+                    ((old_len as BlockIndex)..=BlockIndex::MAX).zip(&block_data[old_len..new_len])
+                {
                     let evaluated = bd.evaluated();
 
                     // If the block has nontrivial voxels, generate a placeholder mesh,
@@ -154,6 +159,8 @@ where
                     self.meshes.push(vbm);
                 }
             }
+
+            debug_assert_eq!(self.meshes.len(), new_len);
         }
 
         // For each block that the Space has told us is changed, either update the mesh texture

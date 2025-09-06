@@ -319,7 +319,7 @@ where
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
             todo.blocks
-                .extend(0..(space.block_data().len() as BlockIndex));
+                .extend(0..=((space.block_data().len() - 1) as BlockIndex));
             self.block_meshes.clear();
             // We don't need to clear self.chunks because they will automatically be considered
             // stale by the new block versioning value.
