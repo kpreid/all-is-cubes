@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use either::Either;
+use pretty_assertions::assert_eq;
 
 use all_is_cubes::block::{self, Block, BlockDef};
-use all_is_cubes::math::{GridAab, Rgba};
+use all_is_cubes::math::{GridAab, Rgba, rgb_const, rgba_const};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Universe};
 use all_is_cubes::util::yield_progress_for_testing;
@@ -11,6 +12,8 @@ use all_is_cubes_render::raytracer::print_space;
 
 use crate::mv::{self, coord};
 use crate::{ExportError, ExportSet};
+
+// -------------------------------------------------------------------------------------------------
 
 #[test]
 #[ignore = "debug tool, not a test"]
@@ -23,21 +26,6 @@ fn print_many_transforms() {
         println!("{point:?} -> {tmat:?}");
     }
     panic!(); // cause output to be displayed
-}
-
-#[cfg(feature = "import")]
-#[tokio::test]
-async fn invalid_file_error() {
-    let error = mv::load_dot_vox(yield_progress_for_testing(), &[])
-        .await
-        .unwrap_err();
-    assert!(
-        matches!(
-            error,
-            mv::DotVoxConversionError::Parse("Not a valid MagicaVoxel .vox file")
-        ),
-        "{error:?}"
-    );
 }
 
 #[cfg(all(feature = "export", feature = "import"))]
@@ -122,6 +110,86 @@ async fn export_import_space() {
     );
     // TODO: make more assertions about the data?
 }
+
+// -------------------------------------------------------------------------------------------------
+// Import-only tests
+
+#[cfg(feature = "import")]
+#[tokio::test]
+async fn invalid_file_error() {
+    let error = mv::load_dot_vox(yield_progress_for_testing(), &[])
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            error,
+            mv::DotVoxConversionError::Parse("Not a valid MagicaVoxel .vox file")
+        ),
+        "{error:?}"
+    );
+}
+
+#[cfg(feature = "import")]
+#[tokio::test]
+async fn import_materials() {
+    // This file contains one each of the six material types MagicaVoxel creates, in order.
+    // (It does not contain each of the "media" types.)
+    let universe = mv::load_dot_vox(
+        yield_progress_for_testing(),
+        include_bytes!("tests/materials.vox"),
+    )
+    .await
+    .unwrap();
+    let space: Handle<Space> = universe.get(&"model_0".into()).unwrap();
+    let space: &Space = &space.read(universe.read_ticket()).unwrap();
+    let bounds = GridAab::from_lower_size([0, 0, 0], [6, 1, 1]);
+    assert_eq!(space.bounds(), bounds);
+    let blocks = space
+        .extract::<Vec<Block>, _>(bounds, |e| e.block_data().block().clone())
+        .into_elements();
+
+    assert_eq!(
+        blocks,
+        [
+            // Diffuse
+            Block::builder()
+                .display_name("0")
+                .color(rgba_const!(1.0, 0.0, 0.0, 1.0))
+                .build(),
+            // Metal
+            Block::builder()
+                .display_name("1")
+                .color(rgba_const!(0.0, 1.0, 0.0, 1.0))
+                .build(),
+            // Emit
+            Block::builder()
+                .display_name("2")
+                .color(Rgba::BLACK)
+                .light_emission(rgb_const!(0.0, 0.0, 10.0))
+                .build(),
+            // Glass
+            Block::builder()
+                .display_name("3")
+                .color(rgba_const!(0.0, 1.0, 1.0, 0.5))
+                .build(),
+            // Blend
+            Block::builder()
+                .display_name("4")
+                .color(rgba_const!(1.0, 0.0, 1.0, 0.5))
+                .build(),
+            // Cloud
+            Block::builder()
+                .display_name("5")
+                // TODO: The alpha should be much lower than this, but it is not clear what
+                // the appropriate scaling actually is.
+                .color(rgba_const!(1.0, 1.0, 0.0, 1.0))
+                .build(),
+        ]
+    );
+}
+
+// -------------------------------------------------------------------------------------------------
+// Export-only tests
 
 /// [`dot_vox`] only supports coordinates from 0-255
 #[cfg(feature = "export")]

@@ -45,7 +45,7 @@ pub(crate) async fn dot_vox_data_to_universe(
     // TODO: have a better path for reporting this kind of info
     log::info!(
         "Loaded MagicaVoxel .vox format: version {}, \
-        {} models, {} ignored materials, {} ignored scene nodes, {} ignored layers",
+        {} models, {} materials, {} ignored scene nodes, {} ignored layers",
         version,
         models_yoked.get().len(),
         materials.len(),
@@ -61,7 +61,7 @@ pub(crate) async fn dot_vox_data_to_universe(
         )
     }
     .await;
-    let palette: Arc<[Block]> = mv::palette::dot_vox_palette_to_blocks(palette);
+    let palette: Arc<[Block]> = mv::palette::dot_vox_palette_to_blocks(palette, materials);
     palette_progress.finish().await;
 
     // Universe is a large struct and boxing it promptly helps us not have large stack usage
