@@ -77,6 +77,7 @@ impl Palette {
     ///
     /// If the input contains any duplicate entries, then they will be combined, and the
     /// returned [`hashbrown::HashMap`] will contain the required data remapping.
+    /// Any index not requiring remapping will be absent from the map.
     pub(crate) fn from_blocks(
         read_ticket: ReadTicket<'_>,
         blocks: &mut dyn ExactSizeIterator<Item = Block>,
@@ -96,7 +97,7 @@ impl Palette {
         };
 
         let mut remapping = hashbrown::HashMap::new();
-        for (original_index, block) in (0..).zip(blocks) {
+        for (original_index, block) in (0..=BlockIndex::MAX).zip(blocks) {
             let new_index = new_self
                 .ensure_index(read_ticket, &block, dummy_buffer, false)
                 .expect("palette iterator lied about its length");
@@ -166,7 +167,7 @@ impl Palette {
                     }
                 }
             }
-            if high_mark >= BlockIndex::MAX as usize {
+            if high_mark > BlockIndex::MAX as usize {
                 return Err(TooManyBlocks);
             }
             let new_index = high_mark as BlockIndex;
@@ -658,7 +659,7 @@ impl From<TooManyBlocks> for SetCubeError {
 mod tests {
     use super::*;
     use crate::content::make_some_blocks;
-    use crate::math::{GridAab, Vol};
+    use crate::math::{GridAab, Rgba, Vol};
     use crate::space::Space;
     use pretty_assertions::assert_eq;
 
@@ -690,6 +691,23 @@ mod tests {
         assert_eq!(extract(&cloned), extract(&space.palette));
 
         // TODO: also check evaluation and block change tracking
+    }
+
+    #[test]
+    fn with_maximum_number_of_entries() {
+        let expected_len = usize::from(BlockIndex::MAX) + 1;
+        let mut blocks_iter = (0..=BlockIndex::MAX).map(|i| {
+            // These blocks must all be distinct.
+            Block::builder()
+                .color(Rgba::WHITE)
+                .display_name(arcstr::format!("#{i}"))
+                .build()
+        });
+
+        let (palette, remap) = Palette::from_blocks(ReadTicket::stub(), &mut blocks_iter).unwrap();
+
+        assert_eq!(palette.entries().len(), expected_len);
+        assert_eq!(remap, hashbrown::HashMap::default());
     }
 
     // TODO: test Palette::from_blocks(), especially around remapping.
