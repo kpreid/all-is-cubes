@@ -298,7 +298,7 @@ impl From<crate::save::schema::LightSerV1> for PackedLight {
 /// This table is validated and can be regenerated using the test `check_packed_light_table`.
 #[rustfmt::skip]
 #[allow(clippy::approx_constant)]
-const PACKED_LIGHT_SCALAR_LOOKUP_TABLE: [PositiveSign<f32>; 256] = [
+static PACKED_LIGHT_SCALAR_LOOKUP_TABLE: [PositiveSign<f32>; 256] = [
     ps32(0.0), ps32(4.9575945e-5), ps32(5.3134198e-5), ps32(5.69478e-5), ps32(6.1035156e-5),
     ps32(6.541588e-5), ps32(7.0110975e-5), ps32(7.51431e-5), ps32(8.053635e-5), ps32(8.6316744e-5),
     ps32(9.251202e-5), ps32(9.915189e-5), ps32(0.000106268395), ps32(0.0001138956), ps32(0.00012207031),
@@ -411,7 +411,7 @@ mod tests {
         let generated_table: Vec<f32> = (0..=u8::MAX)
             .map(PackedLight::scalar_out_arithmetic)
             .collect();
-        print!("const PACKED_LIGHT_SCALAR_LOOKUP_TABLE: [PositiveSign<f32>; 256] = [");
+        print!("static PACKED_LIGHT_SCALAR_LOOKUP_TABLE: [PositiveSign<f32>; 256] = [");
         for i in 0..=u8::MAX {
             if i.is_multiple_of(5) {
                 print!("\n   ");
