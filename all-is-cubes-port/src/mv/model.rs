@@ -86,7 +86,7 @@ pub(crate) fn to_space(
 pub(crate) fn from_space(
     read_ticket: ReadTicket<'_>,
     space_handle: &Handle<Space>,
-    palette: &mut Vec<dot_vox::Color>,
+    palette: &mut mv::palette::ExportPalette,
 ) -> Result<dot_vox::Model, ExportError> {
     let space = space_handle.read(read_ticket)?;
     let bounds = space.bounds();
@@ -106,13 +106,7 @@ pub(crate) fn from_space(
     let block_index_to_palette_index: Vec<Option<u8>> = space
         .block_data()
         .iter()
-        .map(|data| {
-            if let Some(entry) = mv::palette::block_to_dot_vox_palette_entry(data.evaluated()) {
-                mv::palette::push(palette, entry)
-            } else {
-                None
-            }
-        })
+        .map(|data| palette.get_or_insert(mv::palette::MaterialKey::from_block(data.evaluated())?))
         .collect();
 
     let mut voxels: Vec<dot_vox::Voxel> = Vec::new();
@@ -136,7 +130,7 @@ pub(crate) fn from_space(
 pub(crate) fn from_block(
     name: Name,
     block: &EvaluatedBlock,
-    palette: &mut Vec<dot_vox::Color>,
+    palette: &mut mv::palette::ExportPalette,
     // TODO: Add option to export at higher than native resolution
 ) -> Result<dot_vox::Model, ExportError> {
     let bounds = GridAab::for_block(block.resolution());
@@ -151,9 +145,9 @@ pub(crate) fn from_block(
             if evoxel.opacity_category() == OpacityCategory::Invisible {
                 None
             } else {
-                // TODO: if this returns None then that means we are failing to represent some
+                // TODO: if get_or_insert() returns None then we are failing to represent some
                 // voxels, and should report that incompleteness, rather than treating it as air.
-                mv::palette::push(palette, mv::palette::color_out(evoxel.color))
+                palette.get_or_insert(mv::palette::MaterialKey::from_evoxel(evoxel)?)
             }
         });
 

@@ -7,6 +7,7 @@ use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes::util::YieldProgress;
 
+use crate::mv::palette::ExportPalette;
 use crate::{ExportError, ExportSet, Format, mv};
 
 /// Read the given [`ExportSet`] to produce in-memory [`DotVoxData`].
@@ -46,7 +47,7 @@ pub(crate) async fn export_to_dot_vox_data(
         resolution = maximum_resolution_in_all_spaces.1,
     );
 
-    let mut palette: Vec<dot_vox::Color> = Vec::new();
+    let mut palette = ExportPalette::new();
     let mut models: Vec<dot_vox::Model> =
         Vec::with_capacity(spaces_to_export.len().saturating_add(blocks_to_export.len()));
     #[expect(clippy::shadow_unrelated)]
@@ -86,6 +87,7 @@ pub(crate) async fn export_to_dot_vox_data(
 
     // TODO: When more than one model is exported, create a scene including all the models
 
+    let (palette, materials) = palette.into_parts();
     Ok(dot_vox::DotVoxData {
         version: 150,
         index_map: (1..=255).collect(),
@@ -93,7 +95,7 @@ pub(crate) async fn export_to_dot_vox_data(
         palette,
         scenes: Vec::new(),
         layers: Vec::new(),
-        materials: Vec::new(),
+        materials,
     })
 }
 
@@ -106,7 +108,7 @@ async fn export_space_as_scene(
     space_handle: &Handle<Space>,
     resolution: Resolution,
     models_out: &mut Vec<dot_vox::Model>,
-    palette_out: &mut Vec<dot_vox::Color>,
+    palette_out: &mut ExportPalette,
     scene_out: &mut Vec<dot_vox::SceneNode>,
 ) -> Result<(), ExportError> {
     let space = space_handle.read(read_ticket)?;

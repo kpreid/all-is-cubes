@@ -52,6 +52,12 @@ async fn roundtrip(
 #[cfg(all(feature = "export", feature = "import"))]
 #[macro_rules_attribute::apply(smol_macros::test)]
 async fn export_import_space() {
+    // Data expected to be preserved:
+    // * Voxel reflectance
+    // Data expected not to be preserved (for now):
+    // * Voxel emission (but with discarding reflectance)
+    // * Space's coordinate origin
+
     // Irregular and negative dimensions to check that the coordinate transform worked.
     let bounds = GridAab::from_lower_size([-20, -30, -40], [1, 2, 3]);
     let block1 = Block::builder().color(Rgba::BLACK).display_name("a").build();
@@ -241,8 +247,8 @@ fn exported_space_equals_exported_block() {
         unreachable!();
     };
 
-    let mut palette_from_space = Vec::new();
-    let mut palette_from_block = Vec::new();
+    let mut palette_from_space = mv::palette::ExportPalette::new();
+    let mut palette_from_block = mv::palette::ExportPalette::new();
     let model_from_space = mv::model::from_space(
         universe.read_ticket(),
         space_handle,
