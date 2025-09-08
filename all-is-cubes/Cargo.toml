@@ -122,7 +122,7 @@ displaydoc = { workspace = true }
 euclid = { workspace = true, default-features = false, features = ["libm", "mint"] }
 embedded-graphics = { workspace = true }
 exhaust = { workspace = true, default-features = false }
-flate2 = { version = "1.0.26", optional = true }
+flate2 = { version = "1.0.35", optional = true }
 futures-core = { workspace = true }
 hashbrown = { workspace = true }
 indoc = { workspace = true }
