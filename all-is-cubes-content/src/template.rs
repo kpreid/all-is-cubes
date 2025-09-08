@@ -37,6 +37,7 @@ macro_rules! generate_template_test {
             $(
                 $( #[doc = $doc:literal] )*
                 $( #[cfg($variant_cfg:meta)] )*
+                $( #[default] )*
                 $variant_name:ident
             ),* $(,)?
         }
@@ -61,6 +62,7 @@ macro_rules! generate_template_test {
 #[derive(
     Clone,
     Debug,
+    Default,
     Eq,
     Hash,
     PartialEq,
@@ -83,6 +85,7 @@ pub enum UniverseTemplate {
     Fail,
 
     /// Space with assorted “exhibits” demonstrating or testing various features of All is Cubes.
+    #[default]
     DemoCity,
 
     /// Randomly generated connected rooms.
@@ -230,12 +233,6 @@ impl UniverseTemplate {
         });
 
         Ok(universe)
-    }
-}
-
-impl Default for UniverseTemplate {
-    fn default() -> Self {
-        Self::DemoCity
     }
 }
 
