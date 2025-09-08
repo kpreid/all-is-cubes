@@ -1,5 +1,4 @@
 #![no_main]
-extern crate all_is_cubes;
 
 use std::time::{Duration, Instant};
 

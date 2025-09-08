@@ -1,5 +1,4 @@
 #![no_main]
-extern crate all_is_cubes;
 
 use core::fmt;
 
