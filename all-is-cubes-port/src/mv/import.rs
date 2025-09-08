@@ -42,12 +42,19 @@ pub(crate) async fn dot_vox_data_to_universe(
     let models_yoked =
         yoke::Yoke::<&[dot_vox::Model], _>::attach_to_cart(data.clone(), |data| &data.models);
 
+    // Whether to import models for use as as block spaces (e.g. LightPhysics::None) rather than the
+    // space occupied by the character.
+    // TODO: this should be a user-selectable option
+    // TODO: when we have scene support, check whether the file has a scene with multiple shapes
+    // even if it only has one model.
+    let import_models_as_blocks = models.len() != 1;
+
     // TODO: have a better path for reporting this kind of info
     log::info!(
         "Loaded MagicaVoxel .vox format: version {}, \
         {} models, {} materials, {} ignored scene nodes, {} ignored layers",
         version,
-        models_yoked.get().len(),
+        models.len(),
         materials.len(),
         scenes.len(),
         layers.len(),
@@ -78,7 +85,11 @@ pub(crate) async fn dot_vox_data_to_universe(
         0..model_count,
         move |model_index| format!("Importing model {model_index}/{model_count}"),
         move |model_index| {
-            let mut space = mv::model::to_space(&palette, &models_yoked.get()[model_index])?;
+            let mut space = mv::model::to_space(
+                &palette,
+                &models_yoked.get()[model_index],
+                import_models_as_blocks,
+            )?;
             space.fast_evaluate_light();
             Ok(space)
         },
@@ -97,21 +108,20 @@ pub(crate) async fn dot_vox_data_to_universe(
         model_space_handles.push(space_handle);
     }
 
-    // If there is one model space, put the character in it.
-    // If there is more than one, build blocks from all the models.
     // TODO: Import the actual scene as blocks.
-    let viewed_space_handle = if let [space_handle] = model_space_handles.as_slice() {
-        space_handle.clone()
-    } else {
-        progress.set_label("Creating model preview");
-        progress.progress(0.5).await;
-        universe
-            .insert(
-                "model_previews".into(),
-                view_all_models_as_blocks(universe.read_ticket(), models, model_space_handles)?,
-            )
-            .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?
-    };
+    let viewed_space_handle =
+        if import_models_as_blocks && let [space_handle] = model_space_handles.as_slice() {
+            space_handle.clone()
+        } else {
+            progress.set_label("Creating model preview");
+            progress.progress(0.5).await;
+            universe
+                .insert(
+                    "model_previews".into(),
+                    view_all_models_as_blocks(universe.read_ticket(), models, model_space_handles)?,
+                )
+                .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?
+        };
 
     universe
         .insert(

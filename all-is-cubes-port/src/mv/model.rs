@@ -2,8 +2,8 @@ use all_is_cubes::block::Block;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::{Point3D, vec3};
-use all_is_cubes::math::{Cube, GridAab, Rgb};
-use all_is_cubes::space::{LightPhysics, Space};
+use all_is_cubes::math::{Cube, GridAab};
+use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes::util::{ConciseDebug, Refmt};
 
@@ -20,6 +20,7 @@ use crate::{ExportError, Format};
 pub(crate) fn to_space(
     palette_blocks: &[Block],
     model: &dot_vox::Model,
+    import_as_block: bool,
 ) -> Result<Space, DotVoxConversionError> {
     let transform = mv_to_aic_coordinate_transform(model.size);
     let bounds =
@@ -28,15 +29,20 @@ pub(crate) fn to_space(
             .expect("TODO: return error");
 
     let mut space = Space::builder(bounds)
+        .physics(if import_as_block {
+            space::SpacePhysics::DEFAULT_FOR_BLOCK
+        } else {
+            let mut p = space::SpacePhysics::default();
+            p.light = space::LightPhysics::Rays {
+                maximum_distance: u8::try_from(bounds.y_range().len()).unwrap_or(u8::MAX),
+            };
+            p
+        })
         .spawn({
             let mut spawn = Spawn::looking_at_space(bounds, vec3(-1., 1., 1.));
             spawn.set_inventory(free_editing_starter_inventory(true));
             spawn
         })
-        .light_physics(LightPhysics::Rays {
-            maximum_distance: u8::try_from(bounds.y_range().len()).unwrap_or(u8::MAX),
-        })
-        .sky_color(Rgb::ONE)
         .build();
 
     space.mutate(ReadTicket::stub(), |m| {
