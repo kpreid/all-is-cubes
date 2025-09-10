@@ -358,7 +358,7 @@ impl Inner {
             &rg::archetypes::Points3D::new(
                 voxel_iter
                     .clone()
-                    .map(|(cube, _)| rg::convert_point(cube.midpoint())),
+                    .map(|(cube, _)| rg::convert_point(cube.center())),
             )
             .with_colors(voxel_iter.map(|(_, voxel)| rg::components::Color(voxel.color.into())))
             .with_radii([radius]),

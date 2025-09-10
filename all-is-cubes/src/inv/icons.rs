@@ -187,8 +187,7 @@ impl Icons {
                         .voxels_fn(resolution, |cube| {
                             let (shape_radius, block) =
                                 shape[((GridCoordinate::from(resolution) - 1) - cube.y) as usize];
-                            let centered_p =
-                                cube.midpoint().map(|c| c - f64::from(resolution) / 2.0);
+                            let centered_p = cube.center().map(|c| c - f64::from(resolution) / 2.0);
                             let r4 = centered_p
                                 .to_vector()
                                 .component_mul(vec3(1., 0., 1.))

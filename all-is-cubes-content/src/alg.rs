@@ -63,7 +63,7 @@ pub(crate) fn voronoi_pattern<'a>(
                 continue;
             }
 
-            let test_point: FreePoint = cube.midpoint();
+            let test_point: FreePoint = cube.center();
 
             let offset = test_point - region_point;
             // TODO: add ability to muck with the distance metric in custom ways

@@ -85,9 +85,9 @@ impl LightUpdateRayInfo {
         // Approximate them using the involved cubes.
         let hit_point = self
             .trigger_cube
-            .midpoint()
-            .lerp(self.value_cube.midpoint(), 0.5);
-        let ray = Ray::new(lit_cube.midpoint(), hit_point - lit_cube.midpoint());
+            .center()
+            .lerp(self.value_cube.center(), 0.5);
+        let ray = Ray::new(lit_cube.center(), hit_point - lit_cube.center());
 
         self.value_cube.aab().expand(0.01).wireframe_points(output);
         ray.wireframe_points(&mut lines::colorize(

@@ -18,7 +18,7 @@ pub(crate) fn array_of_noise<O>(
     mut postprocess: impl FnMut(f64) -> O,
 ) -> Vol<Box<[O]>> {
     Vol::from_fn(GridAab::for_block(resolution), |cube| {
-        postprocess(noise_fn.get(cube.midpoint().into()))
+        postprocess(noise_fn.get(cube.center().into()))
     })
 }
 
@@ -43,7 +43,7 @@ where
     where
         Self: Sized,
     {
-        let point = cube.midpoint();
+        let point = cube.center();
         NoiseFn::get(&self, point.into())
     }
 

@@ -439,7 +439,7 @@ impl LightStorage {
             return ray_bundle_weight;
         }
 
-        let distance_squared = (cube_entered.midpoint() - origin_cube.midpoint()).square_length();
+        let distance_squared = (cube_entered.center() - origin_cube.center()).square_length();
         if distance_squared > cube_buffer.maximum_distance_squared {
             cube_buffer.end_of_ray(
                 &ray_state,

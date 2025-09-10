@@ -80,6 +80,7 @@ In order to resolve various design problems interfering with development, the `a
     - Renamed `block::Move::to_paired()` to `into_paired()`.
     - Renamed `block::Text::to_builder()` to `into_builder()`.
     - Renamed `all_is_cubes::color_block!()` to `all_is_cubes::block::from_color!()`.
+    - Renamed `math::Cube::midpoint()` to `center()`.
 
 - `all-is-cubes-content` library:
     - `UniverseTemplate::build()` now returns `Box<Universe>` instead of `Universe`.

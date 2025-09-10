@@ -245,7 +245,7 @@ impl Clock {
         let frame_angle = self.ticks.rem_euclid(4) as f64 / 4.0;
 
         SpaceTransaction::filling(GridAab::from_lower_size([0, 0, 0], [16, 16, 1]), |cube| {
-            let centered_point = (cube - GridVector::new(8, 8, 0)).midpoint();
+            let centered_point = (cube - GridVector::new(8, 8, 0)).center();
             let r = centered_point.to_vector().length();
             let block = {
                 let base_angle = centered_point.x.atan2(centered_point.y) / TAU;

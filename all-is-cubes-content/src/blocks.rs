@@ -140,7 +140,7 @@ pub async fn install_demo_blocks(
                     .display_name("Glass Block")
                     .voxels_fn(resolution, |cube| {
                         let unit_radius_point = cube
-                            .midpoint()
+                            .center()
                             .map(|c| c / (FreeCoordinate::from(resolution_g) / 2.0) - 1.0);
                         let power = 7.;
                         let r = unit_radius_point

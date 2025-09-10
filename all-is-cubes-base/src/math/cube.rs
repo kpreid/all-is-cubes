@@ -125,9 +125,9 @@ impl Cube {
             .lower_bounds()
     }
 
-    /// Returns the midpoint of this cube.
+    /// Returns the center of this cube.
     #[inline] // trivial arithmetic
-    pub fn midpoint(self) -> FreePoint {
+    pub fn center(self) -> FreePoint {
         let Self { x, y, z } = self;
         FreePoint::new(
             FreeCoordinate::from(x) + 0.5,
