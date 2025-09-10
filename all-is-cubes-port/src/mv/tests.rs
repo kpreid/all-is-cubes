@@ -48,9 +48,7 @@ async fn roundtrip(
 #[cfg(all(feature = "export", feature = "import"))]
 #[tokio::test]
 async fn export_import_space() {
-    // Data expected to be preserved:
     // Irregular and negative dimensions to check that the coordinate transform worked.
-
     let bounds = GridAab::from_lower_size([-20, -30, -40], [1, 2, 3]);
     let block1 = Block::builder()
         .color(Rgba::WHITE)
@@ -235,5 +233,3 @@ async fn export_block_def() {
         }
      if name == "x".into()));
 }
-
-// TODO: add tests of loading valid files (we will need to create test data files)
