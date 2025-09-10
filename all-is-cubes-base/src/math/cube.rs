@@ -74,17 +74,34 @@ impl Cube {
     ///
     /// assert_eq!(Cube::containing(FreePoint::new(1.0, 1.5, -2.5)), Some(Cube::new(1, 1, -3)));
     /// ```
+    //---
+    // We'd like this to be a `const fn`, but there is no const no_std `floor()` yet.
     #[inline]
     pub fn containing(point: FreePoint) -> Option<Self> {
-        const RANGE: core::ops::Range<FreeCoordinate> =
-            (GridCoordinate::MIN as FreeCoordinate)..(GridCoordinate::MAX as FreeCoordinate + 1.0);
-
-        if RANGE.contains(&point.x) && RANGE.contains(&point.y) && RANGE.contains(&point.z) {
-            Some(Self::from(
-                point.map(|component| component.floor() as GridCoordinate),
-            ))
-        } else {
+        #[cold]
+        const fn unlikely_none() -> Option<Cube> {
             None
+        }
+        const MIN_INCLUSIVE: FreeCoordinate = GridCoordinate::MIN as FreeCoordinate;
+        const MAX_EXCLUSIVE: FreeCoordinate = GridCoordinate::MAX as FreeCoordinate + 1.0;
+
+        let FreePoint { x, y, z, .. } = point;
+
+        // No short-circuiting because, assuming success is likely, all tests will need to run.
+        if (MIN_INCLUSIVE <= x)
+            & (MIN_INCLUSIVE <= y)
+            & (MIN_INCLUSIVE <= z)
+            & (x < MAX_EXCLUSIVE)
+            & (y < MAX_EXCLUSIVE)
+            & (z < MAX_EXCLUSIVE)
+        {
+            Some(Self {
+                x: x.floor() as GridCoordinate,
+                y: y.floor() as GridCoordinate,
+                z: z.floor() as GridCoordinate,
+            })
+        } else {
+            unlikely_none()
         }
     }
 
