@@ -566,13 +566,13 @@ impl<P: Accumulate> TracingState<P> {
         options: RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>,
     ) -> bool {
         self.primary_cubes_traced += 1;
+        // TODO: Ideally this constant would be configurable.
+        // It can't simply be `view_distance` since it counts voxel steps.
         if self.primary_cubes_traced > 1000 {
             // Abort excessively long traces.
-            self.accumulator = Default::default();
-            // TODO: Should there be a dedicated method for this like hit_nothing()?
             self.accumulator.add(Hit {
                 exception: Some(Exception::Incomplete),
-                surface: Rgba::WHITE.into(),
+                surface: Rgba::TRANSPARENT.into(),
                 t_distance: None,
                 block: &P::BlockData::exception(Exception::Incomplete, options),
                 position: None,
