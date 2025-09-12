@@ -85,7 +85,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             cubes: prepare_cubes(space),
             block_sky: sky.for_blocks(),
             sky,
-            sky_data: D::sky(options),
+            sky_data: D::exception(Exception::Sky, options),
 
             graphics_options,
             custom_options,
@@ -107,7 +107,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             cubes: Vol::from_elements(GridAab::ORIGIN_EMPTY, []).unwrap(),
             block_sky: sky.for_blocks(),
             sky,
-            sky_data: D::sky(options),
+            sky_data: D::exception(Exception::Sky, options),
 
             graphics_options,
             custom_options,
@@ -570,9 +570,10 @@ impl<P: Accumulate> TracingState<P> {
             self.accumulator = Default::default();
             // TODO: Should there be a dedicated method for this like hit_nothing()?
             self.accumulator.add(Hit {
+                exception: Some(Exception::Incomplete),
                 surface: Rgba::WHITE.into(),
                 t_distance: None,
-                block: &P::BlockData::error(options),
+                block: &P::BlockData::exception(Exception::Incomplete, options),
                 position: None,
             });
             true
@@ -598,6 +599,7 @@ impl<P: Accumulate> TracingState<P> {
         // include_sky is true, we *always* give the accumulator this infinite hit even if
         // `sky_color` is transparent via `include_sky` being false.
         self.accumulator.add(Hit {
+            exception: Some(Exception::Sky),
             surface: sky_color.into(),
             t_distance: Some(f64::INFINITY),
             block: sky_data,
@@ -615,6 +617,7 @@ impl<P: Accumulate> TracingState<P> {
                 .unwrap_or(Rgba::BLACK);
 
             self.accumulator.add(Hit {
+                exception: Some(Exception::Paint),
                 surface: (rgb_const!(0.02, 0.002, 0.0) * self.primary_cubes_traced as f32
                     + rgb_const!(0.0, 0.0, 0.2) * original_color.luminance())
                 .with_alpha_one()
@@ -642,6 +645,7 @@ impl<P: Accumulate> TracingState<P> {
     ) {
         if let Some((light, info)) = surface.to_light(rt, self.ray_bounce_rng.as_mut()) {
             self.accumulator.add(Hit {
+                exception: None,
                 surface: light,
                 t_distance: Some(surface.t_distance),
                 block: surface.block_data,
@@ -757,6 +761,7 @@ pub(crate) fn trace_for_eval(
         let (adjusted_color, emission_coeff) = apply_transmittance(voxel.color, thickness);
         emission += Vector3D::from(voxel.emission * emission_coeff) * color_buf.transmittance;
         color_buf.add(Hit {
+            exception: None,
             surface: adjusted_color.into(),
             t_distance: None, // we could compute this but it is not used
             block: &(),
@@ -843,6 +848,7 @@ mod tests {
             let mut color_buf = ColorBuf::default();
             for _ in 0..count {
                 color_buf.add(Hit {
+                    exception: None,
                     surface: modified_color.into(),
                     t_distance: None,
                     block: &(),

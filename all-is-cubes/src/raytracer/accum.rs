@@ -56,6 +56,10 @@ impl<C> Clone for RtOptionsRef<'_, C> {
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Hit<'d, D> {
+    /// If [`Some`], indicates that this hit denotes an exceptional situation rather than
+    /// an ordinary interaction of the ray with a block in the space.
+    pub exception: Option<Exception>,
+
     /// Contains the opacity/transmittance and the light output of the encountered surface,
     /// in the direction towards the camera.
     ///
@@ -87,6 +91,22 @@ pub struct Hit<'d, D> {
     pub position: Option<Position>,
 }
 
+/// Component of [`Hit`] indicating a situation other than an ordinary interaction of the ray
+/// with a block in the space.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum Exception {
+    /// The ray exited the space and is considered to have hit the sky.
+    Sky,
+
+    /// For external reasons such as computational limits,
+    /// the trace is being terminated and the the result will be incomplete.
+    Incomplete,
+
+    /// Result of calling [`Accumulate::paint()`].
+    Paint,
+}
+
 /// Data about where a ray struck a voxel; part of [`Hit`].
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
@@ -108,6 +128,7 @@ pub struct Position {
 impl<'d, D> Hit<'d, D> {
     pub fn map_block_data<D2>(self, f: impl Fn(&D) -> &D2) -> Hit<'d, D2> {
         Hit {
+            exception: self.exception,
             surface: self.surface,
             t_distance: self.t_distance,
             block: f(self.block),
@@ -181,9 +202,10 @@ pub trait Accumulate: Default {
         // TODO: Should give RtBlockData a dedicated method for this, but we haven't
         // yet had a use case where it matters.
         result.add(Hit {
+            exception: Some(Exception::Paint),
             surface: color.into(),
             t_distance: None,
-            block: &Self::BlockData::sky(options),
+            block: &Self::BlockData::exception(Exception::Paint, options),
             position: None,
         });
         result
@@ -218,21 +240,22 @@ pub trait RtBlockData: Send + Sync {
     /// to [`Accumulate::add()`] when that block is traced onto/through.
     fn from_block(options: RtOptionsRef<'_, Self::Options>, block: &SpaceBlockData) -> Self;
 
-    /// Returns what should be passed to [`Accumulate::add()`] when the raytracer
-    /// encounters an error.
-    fn error(options: RtOptionsRef<'_, Self::Options>) -> Self;
-
-    /// Returns what should be passed to [`Accumulate::add()`] when the raytracer
-    /// encounters the sky (background behind all blocks).
-    fn sky(options: RtOptionsRef<'_, Self::Options>) -> Self;
+    /// Returns what should be passed to [`Accumulate::add()`] in an exceptional situation
+    /// (one that is not the ray intersecting a block).
+    ///
+    /// Note that the [`Exception`] value is also passed directly as a field of [`Hit`].
+    ///
+    /// This function should be cheap enough to call once or twice per ray traced.
+    /// If the raytracer has a reason to use this value many times, it is responsible for memoizing
+    /// the result.
+    fn exception(exception: Exception, options: RtOptionsRef<'_, Self::Options>) -> Self;
 }
 
 /// Trivial implementation of [`RtBlockData`] which stores nothing.
 impl RtBlockData for () {
     type Options = ();
     fn from_block(_: RtOptionsRef<'_, Self::Options>, _: &SpaceBlockData) -> Self {}
-    fn error(_: RtOptionsRef<'_, Self::Options>) -> Self {}
-    fn sky(_: RtOptionsRef<'_, Self::Options>) -> Self {}
+    fn exception(_: Exception, _: RtOptionsRef<'_, Self::Options>) -> Self {}
 }
 
 /// Stores the block's resolution.
@@ -243,11 +266,7 @@ impl RtBlockData for Resolution {
         block.evaluated().resolution()
     }
 
-    fn error(_: RtOptionsRef<'_, Self::Options>) -> Self {
-        Resolution::R1
-    }
-
-    fn sky(_: RtOptionsRef<'_, Self::Options>) -> Self {
+    fn exception(_: Exception, _: RtOptionsRef<'_, Self::Options>) -> Self {
         Resolution::R1
     }
 }
@@ -533,6 +552,7 @@ mod tests {
         assert!(!buf.opaque());
 
         buf.add(Hit {
+            exception: None,
             surface: color_1.into(),
             t_distance: None,
             block: &(),
@@ -542,6 +562,7 @@ mod tests {
         assert!(!buf.opaque());
 
         buf.add(Hit {
+            exception: None,
             surface: color_2.into(),
             t_distance: None,
             block: &(),
@@ -556,6 +577,7 @@ mod tests {
         assert!(!buf.opaque());
 
         buf.add(Hit {
+            exception: None,
             surface: color_3.into(),
             t_distance: None,
             block: &(),

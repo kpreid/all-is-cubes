@@ -11,7 +11,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
 use crate::math::FreeVector;
-use crate::raytracer::{Accumulate, RtBlockData, RtOptionsRef, SpaceRaytracer};
+use crate::raytracer::{self, Accumulate, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
 
 /// If you are using [`CharacterBuf`], use this [`RtBlockData`] implementation.
@@ -34,12 +34,12 @@ impl RtBlockData for CharacterRtData {
         Self(char)
     }
 
-    fn error(_: RtOptionsRef<'_, Self::Options>) -> Self {
-        Self(literal_substr!("X"))
-    }
-
-    fn sky(_: RtOptionsRef<'_, Self::Options>) -> Self {
-        Self(literal_substr!(" "))
+    fn exception(exception: raytracer::Exception, _: RtOptionsRef<'_, Self::Options>) -> Self {
+        match exception {
+            raytracer::Exception::Sky => Self(literal_substr!(" ")),
+            raytracer::Exception::Incomplete => Self(literal_substr!("X")),
+            raytracer::Exception::Paint => Self(literal_substr!(" ")), // TODO: what is the best paint behavior for text?
+        }
     }
 }
 

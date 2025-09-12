@@ -727,10 +727,10 @@ impl raytracer::RtBlockData for InLayer {
     ) -> Self {
         *options.custom_options
     }
-    fn error(options: raytracer::RtOptionsRef<'_, Self::Options>) -> Self {
-        *options.custom_options
-    }
-    fn sky(options: raytracer::RtOptionsRef<'_, Self::Options>) -> Self {
+    fn exception(
+        _: raytracer::Exception,
+        options: raytracer::RtOptionsRef<'_, Self::Options>,
+    ) -> Self {
         *options.custom_options
     }
 }

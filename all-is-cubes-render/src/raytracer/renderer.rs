@@ -694,12 +694,10 @@ mod tests {
                     custom_options: options.custom_options,
                 }
             }
-            fn error(options: RtOptionsRef<'_, Self::Options>) -> Self {
-                CatchCustomOptions {
-                    custom_options: options.custom_options,
-                }
-            }
-            fn sky(options: RtOptionsRef<'_, Self::Options>) -> Self {
+            fn exception(
+                _: raytracer::Exception,
+                options: RtOptionsRef<'_, Self::Options>,
+            ) -> Self {
                 CatchCustomOptions {
                     custom_options: options.custom_options,
                 }
