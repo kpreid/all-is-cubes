@@ -159,12 +159,12 @@ impl<D> Copy for Hit<'_, D> {}
 /// and it must represent the transparency so as to be able to signal when to stop
 /// tracing past an opaque surface.
 ///
-/// The implementation of the [`Default`] trait must provide a suitable initial state,
+/// They should, if possible, implement [`Default`] to provide a suitable initial state,
 /// i.e. fully transparent/no light accumulated.
 ///
 /// Each implementation should provide its own conversion to a final output format,
 /// if any (e.g. an inherent method or an [`impl From<...`](From)).
-pub trait Accumulate: Default {
+pub trait Accumulate {
     /// Data precomputed for each distinct block or other type of visible object.
     ///
     /// If no data beyond color is needed, this may be `()`.
@@ -201,7 +201,7 @@ pub trait Accumulate: Default {
         options: RtOptionsRef<'_, <Self::BlockData as RtBlockData>::Options>,
     ) -> Self
     where
-        Self: Sized,
+        Self: Default + Sized,
     {
         let mut result = Self::default();
         // TODO: Should give RtBlockData a dedicated method for this, but we haven't
@@ -218,7 +218,9 @@ pub trait Accumulate: Default {
 
     /// Combine multiple completed buffers into one, such as multiple samples for
     /// antialiasing.
-    fn mean<const N: usize>(items: [Self; N]) -> Self;
+    fn mean<const N: usize>(items: [Self; N]) -> Self
+    where
+        Self: Sized;
 }
 
 // -------------------------------------------------------------------------------------------------

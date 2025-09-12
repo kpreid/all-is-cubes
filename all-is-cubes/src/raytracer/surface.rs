@@ -133,10 +133,8 @@ impl<D: RtBlockData> Surface<'_, D> {
                     // Note that we pass allow_ray_bounce=false so that there will be no further
                     // bounces; the stored light data essentially completely suffices after one
                     // bounce. (This would not be true if we had any mirror reflections.)
-                    let (light_accum_buf, ray_info) = rt
-                        .trace_ray_impl::<super::IgnoreBlockData<D, ColorBuf>, Ray>(
-                            ray, true, false,
-                        );
+                    let mut light_accum_buf = <super::IgnoreBlockData<D, ColorBuf>>::default();
+                    let ray_info = rt.trace_ray_impl(ray, &mut light_accum_buf, true, false);
                     multi_ray_accum += Rgba::from(light_accum_buf.inner).to_rgb();
                     info_accum += ray_info;
                 }

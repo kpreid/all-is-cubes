@@ -114,43 +114,47 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         }
     }
 
-    /// Computes a single image pixel from the given ray.
+    /// Computes a single image pixel from the given ray, adding it to `accumulator`.
     pub fn trace_ray<P: Accumulate<BlockData = D>>(
         &self,
         ray: Ray,
+        accumulator: &mut P,
         include_sky: bool,
-    ) -> (P, RaytraceInfo) {
-        self.trace_ray_impl::<P, Ray>(ray, include_sky, true)
+    ) -> RaytraceInfo {
+        self.trace_ray_impl::<P, Ray>(ray, accumulator, include_sky, true)
     }
 
     /// Computes a single image pixel from the given ray.
     ///
-    /// This is identical to [`Self::trace_ray()`] except that it can be more efficient.
+    /// This is identical to [`Self::trace_ray()`] except that it can be more efficient
+    /// by being restricted to a single axis.
     pub fn trace_axis_aligned_ray<P: Accumulate<BlockData = D>>(
         &self,
         ray: raycast::AaRay,
+        accumulator: &mut P,
         include_sky: bool,
-    ) -> (P, RaytraceInfo) {
-        self.trace_ray_impl::<P, raycast::AaRay>(ray, include_sky, true)
+    ) -> RaytraceInfo {
+        self.trace_ray_impl::<P, raycast::AaRay>(ray, accumulator, include_sky, true)
     }
 
     fn trace_ray_impl<P: Accumulate<BlockData = D>, R: RayIsh>(
         &self,
         ray: R,
+        accumulator: &mut P,
         include_sky: bool,
         allow_ray_bounce: bool,
-    ) -> (P, RaytraceInfo) {
+    ) -> RaytraceInfo {
         let options = RtOptionsRef {
             graphics_options: &self.graphics_options,
             custom_options: &self.custom_options,
         };
         let ray_direction = ray.direction();
 
-        let mut state: TracingState<P> = TracingState {
+        let mut state: TracingState<'_, P> = TracingState {
             t_to_absolute_distance: ray.direction().length(),
             primary_cubes_traced: 0,
             secondary_info: RaytraceInfo::default(),
-            accumulator: P::default(),
+            accumulator,
             ray_bounce_rng: allow_ray_bounce.then(|| {
                 // Computing the random bounces from the ray direction makes the bounce pattern,
                 // and thus the produced image, deterministic. This is useful for the current
@@ -324,7 +328,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         line_ending: &'a str,
     ) -> impl fmt::Display + 'a
     where
-        P: Accumulate<BlockData = D> + Into<String> + 'a,
+        P: Accumulate<BlockData = D> + Into<String> + Default + 'a,
     {
         struct ToText<'a, D: RtBlockData, P> {
             rt: &'a SpaceRaytracer<D>,
@@ -333,7 +337,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             _p: PhantomData<fn() -> P>,
         }
 
-        impl<D: RtBlockData, P: Accumulate<BlockData = D> + Into<String>> fmt::Display
+        impl<D: RtBlockData, P: Accumulate<BlockData = D> + Into<String> + Default> fmt::Display
             for ToText<'_, D, P>
         {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -359,7 +363,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         stream: &mut dyn fmt::Write,
     ) -> Result<RaytraceInfo, fmt::Error>
     where
-        P: Accumulate<BlockData = D> + Into<String>,
+        P: Accumulate<BlockData = D> + Into<String> + Default,
     {
         let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.to_usize();
@@ -371,8 +375,10 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
                     .into_par_iter()
                     .map(move |xch| {
                         let x = viewport.normalize_fb_x(xch);
-                        let (buf, info) = self.trace_ray::<P>(
+                        let mut buf = P::default();
+                        let info = self.trace_ray::<P>(
                             camera.project_ndc_into_world(NdcPoint2::new(x, y)),
+                            &mut buf,
                             true,
                         );
                         (buf.into(), info)
@@ -398,7 +404,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         stream: &mut dyn fmt::Write,
     ) -> Result<RaytraceInfo, fmt::Error>
     where
-        P: Accumulate<BlockData = D> + Into<String>,
+        P: Accumulate<BlockData = D> + Into<String> + Default,
     {
         let mut total_info = RaytraceInfo::default();
 
@@ -408,8 +414,12 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             let y = viewport.normalize_fb_y(ych);
             for xch in 0..viewport_size.width {
                 let x = viewport.normalize_fb_x(xch);
-                let (buf, info) =
-                    self.trace_ray::<P>(camera.project_ndc_into_world(NdcPoint2::new(x, y)), true);
+                let mut buf = P::default();
+                let info = self.trace_ray::<P>(
+                    camera.project_ndc_into_world(NdcPoint2::new(x, y)),
+                    &mut buf,
+                    true,
+                );
                 total_info += info;
                 stream.write_str(buf.into().as_str())?;
             }
@@ -540,8 +550,8 @@ type BounceRng = rand::rngs::SmallRng;
 
 /// Holds an [`Accumulate`] and other per-ray state, and updates it
 /// according to the things it encounters.
-#[derive(Clone, Debug)]
-struct TracingState<P: Accumulate> {
+#[derive(Debug)]
+struct TracingState<'a, P: Accumulate> {
     /// Conversion factor from raycaster `t` values to “true” [`Space`] distance values
     /// where 1 unit = 1 block thickness.
     t_to_absolute_distance: f64,
@@ -553,13 +563,13 @@ struct TracingState<P: Accumulate> {
     /// Diagnostic info from secondary rays.
     secondary_info: RaytraceInfo,
 
-    accumulator: P,
+    accumulator: &'a mut P,
 
     /// *If* we are going to compute ray bounces, this RNG is used to decide which direction they
     /// bounce.
     ray_bounce_rng: Option<BounceRng>,
 }
-impl<P: Accumulate> TracingState<P> {
+impl<P: Accumulate> TracingState<'_, P> {
     #[inline]
     fn count_step_should_stop(
         &mut self,
@@ -584,12 +594,12 @@ impl<P: Accumulate> TracingState<P> {
     }
 
     fn finish(
-        mut self,
+        self,
         sky_color: Rgba,
         sky_data: &P::BlockData,
         debug_steps: bool,
         options: RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>,
-    ) -> (P, RaytraceInfo) {
+    ) -> RaytraceInfo {
         if self.primary_cubes_traced == 0 {
             // Didn't intersect the world at all.
             // Inform the accumulator of this in case it wants to do something different.
@@ -621,12 +631,9 @@ impl<P: Accumulate> TracingState<P> {
             });
         }
 
-        (
-            self.accumulator,
-            RaytraceInfo {
-                cubes_traced: self.primary_cubes_traced,
-            } + self.secondary_info,
-        )
+        RaytraceInfo {
+            cubes_traced: self.primary_cubes_traced,
+        } + self.secondary_info
     }
 
     /// Apply the effect of a given surface color.

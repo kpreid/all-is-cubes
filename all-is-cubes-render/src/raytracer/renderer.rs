@@ -182,7 +182,7 @@ where
     /// [`Universe`]: all_is_cubes::universe::Universe
     pub fn draw<P, E, O, IF>(&self, info_text_fn: IF, encoder: E, output: &mut [O]) -> RaytraceInfo
     where
-        P: Accumulate<BlockData = D>,
+        P: Accumulate<BlockData = D> + Default,
         E: Fn(P) -> O + Send + Sync,
         O: Clone + Send + Sync, // Clone is used in the no-data case
         IF: FnOnce(&RaytraceInfo) -> String,
@@ -385,7 +385,7 @@ impl<P: Accumulate> Clone for RtScene<'_, P> {
     }
 }
 
-impl<P: Accumulate> RtScene<'_, P> {
+impl<P: Accumulate + Default> RtScene<'_, P> {
     /// Constructs [`RtOptionsRef`] referring to the options stored in `self`.
     fn options_refs(&self) -> Layers<RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>> {
         Layers {
@@ -431,7 +431,7 @@ impl<P: Accumulate> RtScene<'_, P> {
     }
 }
 
-fn trace_patch_in_one_space<P: Accumulate>(
+fn trace_patch_in_one_space<P: Accumulate + Default>(
     space: &SpaceRaytracer<<P as Accumulate>::BlockData>,
     camera: &Camera,
     patch: NdcRect,
@@ -447,16 +447,23 @@ fn trace_patch_in_one_space<P: Accumulate>(
         ];
         let mut info = RaytraceInfo::default();
         let samples: [P; N] = core::array::from_fn(|i| {
-            let (p, i) = space.trace_ray(
+            let mut p = P::default();
+            info += space.trace_ray(
                 camera.project_ndc_into_world(point_within_patch(patch, SAMPLE_POINTS[i])),
+                &mut p,
                 include_sky,
             );
-            info += i;
             p
         });
         (P::mean(samples), info)
     } else {
-        space.trace_ray(camera.project_ndc_into_world(patch.center()), include_sky)
+        let mut p = P::default();
+        let info = space.trace_ray(
+            camera.project_ndc_into_world(patch.center()),
+            &mut p,
+            include_sky,
+        );
+        (p, info)
     }
 }
 
@@ -492,7 +499,7 @@ mod trace_image {
         output: &mut [O],
     ) -> RaytraceInfo
     where
-        P: Accumulate,
+        P: Accumulate + Default,
         E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {
@@ -550,7 +557,7 @@ mod trace_image {
         output: &mut [O],
     ) -> RaytraceInfo
     where
-        P: Accumulate,
+        P: Accumulate + Default,
         E: Fn(P) -> O + Send + Sync,
         O: Send + Sync,
     {

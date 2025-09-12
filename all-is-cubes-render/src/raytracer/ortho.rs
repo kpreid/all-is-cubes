@@ -92,7 +92,8 @@ fn trace_one_pixel_with_cache(
             if let Some((_, v)) = cache.pixel.filter(|&(k, _)| k == cache_key) {
                 v
             } else {
-                let (pixel, _): (OrthoBuf, _) = rt.trace_axis_aligned_ray(ray, true);
+                let mut pixel = OrthoBuf::default();
+                rt.trace_axis_aligned_ray(ray, &mut pixel, true);
 
                 let output = Rgba::from(pixel.color);
 

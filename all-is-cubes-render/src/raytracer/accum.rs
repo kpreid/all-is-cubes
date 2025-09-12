@@ -96,7 +96,8 @@ mod tests {
 
         #[track_caller]
         fn assert_depth(rt: &SpaceRaytracer<()>, expected_depth: f64, ray: Ray, label: &str) {
-            let (depth_buf, _) = rt.trace_ray::<DepthBuf>(ray, false);
+            let mut depth_buf = DepthBuf::default();
+            rt.trace_ray(ray, &mut depth_buf, false);
             assert_eq!(depth_buf.depth, expected_depth, "{label}");
         }
 
