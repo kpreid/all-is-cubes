@@ -38,7 +38,7 @@ impl RtBlockData for CharacterRtData {
         match exception {
             raytracer::Exception::Sky => Self(literal_substr!(" ")),
             raytracer::Exception::Incomplete => Self(literal_substr!("X")),
-            raytracer::Exception::Paint => Self(literal_substr!(" ")), // TODO: what is the best paint behavior for text?
+            _ => Self(literal_substr!(" ")), // TODO: what is the best paint behavior for text?
         }
     }
 }

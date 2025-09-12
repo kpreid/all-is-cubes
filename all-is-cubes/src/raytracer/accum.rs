@@ -105,6 +105,11 @@ pub enum Exception {
 
     /// Result of calling [`Accumulate::paint()`].
     Paint,
+
+    /// The hit color contains debug information.
+    /// Its red and green channels should override previous transparent content.
+    #[doc(hidden)] // used for debug purposes and only ColorBuf needs to consult it
+    DebugOverrideRg,
 }
 
 /// Data about where a ray struck a voxel; part of [`Hit`].
@@ -214,12 +219,6 @@ pub trait Accumulate: Default {
     /// Combine multiple completed buffers into one, such as multiple samples for
     /// antialiasing.
     fn mean<const N: usize>(items: [Self; N]) -> Self;
-
-    /// For debugging. Do not implement this method.
-    #[doc(hidden)]
-    fn _unstable_get_original_color(self) -> Option<Rgba> {
-        None
-    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -338,10 +337,19 @@ impl Accumulate for ColorBuf {
 
     #[inline]
     fn add(&mut self, hit: Hit<'_, Self::BlockData>) {
-        // Note that the order of these assignments matters.
-        // surface.transmittance is only applied to surfaces *after* this one.
-        self.light += hit.surface.light * self.transmittance;
-        self.transmittance *= hit.surface.transmittance;
+        if matches!(hit.exception, Some(Exception::DebugOverrideRg)) {
+            self.light = hit
+                .surface
+                .light
+                .xy()
+                .extend(Rgba::from(*self).to_rgb().luminance() * 0.2);
+            self.transmittance = 0.0;
+        } else {
+            // Note that the order of these assignments matters.
+            // surface.transmittance is only applied to surfaces *after* this one.
+            self.light += hit.surface.light * self.transmittance;
+            self.transmittance *= hit.surface.transmittance;
+        }
     }
 
     #[inline]
@@ -354,10 +362,6 @@ impl Accumulate for ColorBuf {
                 / (N as f32),
             transmittance: items.iter().map(|cb| cb.transmittance).sum::<f32>() / (N as f32),
         }
-    }
-
-    fn _unstable_get_original_color(self) -> Option<Rgba> {
-        Some(Rgba::from(self))
     }
 }
 

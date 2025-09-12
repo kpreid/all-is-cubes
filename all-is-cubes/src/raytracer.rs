@@ -4,8 +4,8 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::fmt;
 use core::marker::PhantomData;
-use core::{fmt, mem};
 use rand::SeedableRng;
 
 use euclid::{Vector3D, vec3};
@@ -222,6 +222,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             },
             &self.sky_data,
             self.graphics_options.debug_pixel_cost,
+            options,
         )
     }
 
@@ -587,6 +588,7 @@ impl<P: Accumulate> TracingState<P> {
         sky_color: Rgba,
         sky_data: &P::BlockData,
         debug_steps: bool,
+        options: RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>,
     ) -> (P, RaytraceInfo) {
         if self.primary_cubes_traced == 0 {
             // Didn't intersect the world at all.
@@ -607,23 +609,14 @@ impl<P: Accumulate> TracingState<P> {
         });
 
         // Debug visualization of number of raytracing steps.
-        // TODO: Make this less of a kludge — we'd like to be able to mix with
-        // the regular color view, but Accumulate doesn't make that easy.
         if debug_steps {
-            let original_accum: P = mem::take(&mut self.accumulator);
-            #[allow(clippy::used_underscore_items)]
-            let original_color: Rgba = original_accum
-                ._unstable_get_original_color()
-                .unwrap_or(Rgba::BLACK);
-
             self.accumulator.add(Hit {
-                exception: Some(Exception::Paint),
-                surface: (rgb_const!(0.02, 0.002, 0.0) * self.primary_cubes_traced as f32
-                    + rgb_const!(0.0, 0.0, 0.2) * original_color.luminance())
-                .with_alpha_one()
-                .into(),
-                t_distance: None, // TODO: would be nice to have distance available
-                block: sky_data,
+                exception: Some(Exception::DebugOverrideRg),
+                surface: (rgb_const!(0.02, 0.002, 0.0) * self.primary_cubes_traced as f32)
+                    .with_alpha_one()
+                    .into(),
+                t_distance: None,
+                block: &P::BlockData::exception(Exception::DebugOverrideRg, options),
                 position: None,
             });
         }
