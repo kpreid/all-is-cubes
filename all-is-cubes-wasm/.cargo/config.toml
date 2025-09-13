@@ -1,2 +1,18 @@
 [build]
 target = "wasm32-unknown-unknown"
+
+[target.wasm32-unknown-unknown]
+rustflags = [
+    # Enable additional WebAssembly target features that are supported by all recent browsers.
+    # Candidates for this are feature names in
+    #    <https://doc.rust-lang.org/reference/attributes/codegen.html#wasm32-or-wasm64>
+    # which meet both of these criteria:
+    #
+    # * Listed as adequately supported in <https://webassembly.org/features/>
+    # * Not already enabled for `wasm32-unknown-unknown`, as listed in
+    #   <https://doc.rust-lang.org/rustc/platform-support/wasm32-unknown-unknown.html#enabled-webassembly-features>
+    "-Ctarget-feature=+extended-const",
+    "-Ctarget-feature=+relaxed-simd",
+    "-Ctarget-feature=+simd128",
+    "-Ctarget-feature=+tail-call",
+]

@@ -25,6 +25,7 @@ impl Config<'_> {
         cmd
     }
 
+    #[allow(clippy::unused_self, reason = "we might want to configure this later")]
     pub fn cargo_path(&self) -> std::path::PathBuf {
         std::env::var("CARGO")
             .expect("CARGO environment variable not set")
