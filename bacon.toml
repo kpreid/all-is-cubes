@@ -15,4 +15,5 @@ command = [
     "cargo", "xtask", "run-game-server", "--", "--client-source=workspace", "--addr=127.0.0.1:8080",
 ]
 need_stdout = true
-
+background = false
+on_change_strategy = "kill_then_restart"

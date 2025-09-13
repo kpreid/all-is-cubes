@@ -167,15 +167,25 @@ fn main() -> Result<(), ActionError> {
         XtaskCommand::RunGameServer { server_args } => {
             build_web(&config, &mut time_log, Profile::Dev)?;
 
-            config
-                .cargo()
-                .arg("run")
+            let mut cmd = std::process::Command::new(config.cargo_path());
+            cmd.arg("run")
                 .args(config.cargo_build_args())
                 .arg("--bin=aic-server")
                 .arg("--features=embed")
                 .arg("--")
-                .args(server_args)
-                .run()?;
+                .args(server_args);
+
+            #[cfg(unix)]
+            {
+                // exec instead of spawn cooperates better with bacon.
+                // Though really I think bacon should be defaulting to TERM instead of KILL.
+                let error = std::os::unix::process::CommandExt::exec(&mut cmd);
+                return Err(error.into());
+            }
+            #[cfg(not(unix))]
+            {
+                cmd.run()?;
+            }
         }
         XtaskCommand::BuildWebRelease => {
             // We only generate the license file in release builds, to save time.

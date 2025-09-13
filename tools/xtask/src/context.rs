@@ -20,11 +20,15 @@ impl Config<'_> {
     /// Start a [`Cmd`] with the cargo command we should use.
     /// Currently, this doesn’t actually depend on the configuration, just the Shell
     pub fn cargo(&self) -> Cmd<'_> {
-        let mut cmd = self
-            .sh
-            .cmd(std::env::var("CARGO").expect("CARGO environment variable not set"));
+        let mut cmd = self.sh.cmd(self.cargo_path());
         cmd.set_quiet(self.cargo_quiet); // TODO: should we have a separate quiet flag?
         cmd
+    }
+
+    pub fn cargo_path(&self) -> std::path::PathBuf {
+        std::env::var("CARGO")
+            .expect("CARGO environment variable not set")
+            .into()
     }
 
     /// Arguments that should be passed to any Cargo command that runs a build
