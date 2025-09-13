@@ -736,7 +736,7 @@ impl Pipelines {
                     view_formats: &[],
                 },
                 wgpu::util::TextureDataOrder::MipMajor,
-                image.bytes(),
+                image.pixels().as_flattened(),
             )
         };
 

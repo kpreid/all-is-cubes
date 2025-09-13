@@ -124,7 +124,7 @@ once_cell = { version = "1.21.3", default-features = false }
 ordered-float = { version = "5.0.0", default-features = false }
 paste = {version = "1.0.15", default-features = false }
 petgraph = { version = "0.8.1", default-features = false, features = ["graphmap"] }
-png-decoder = { version = "0.1.1", default-features = false } # used by all-is-cubes for no_std-compatible reading pngs
+png-decoder = { version = "0.2.0", default-features = false } # used by all-is-cubes for no_std-compatible reading pngs
 png = { version = "0.18.0", default-features = false } # used by all-is-cubes-desktop for writing pngs
 pollster = { version = "0.4.0", default-features = false }
 pretty_assertions = { version = "1.2.0" }

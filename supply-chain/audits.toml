@@ -111,6 +111,11 @@ It allocates an amount of memory determined by the input image
 could DoS via excessive memory use (zip bomb attack).
 """
 
+[[audits.png-decoder]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.1.1 -> 0.2.0"
+
 [[audits.pretty_assertions]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"

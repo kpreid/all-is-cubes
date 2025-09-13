@@ -540,22 +540,22 @@ user-login = "hsivonen"
 user-name = "Henri Sivonen"
 
 [[publisher.wgpu]]
-version = "26.0.1"
-when = "2025-07-10"
+version = "27.0.0"
+when = "2025-10-01"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.wgpu-core]]
-version = "26.0.1"
-when = "2025-07-10"
+version = "27.0.0"
+when = "2025-10-01"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.wgpu-hal]]
-version = "26.0.0"
-when = "2025-07-10"
+version = "27.0.0"
+when = "2025-10-01"
 user-id = 53780
 user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"

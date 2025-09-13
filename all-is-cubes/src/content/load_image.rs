@@ -27,7 +27,7 @@ use crate::universe::{ReadTicket, UniverseTransaction};
 #[derive(Clone, Debug, PartialEq)]
 pub struct DecodedPng {
     header: PngHeader,
-    data: Vec<u8>,
+    rgba_image_data: Vec<Srgba>,
 }
 
 /// Pixel type.
@@ -51,8 +51,8 @@ impl DecodedPng {
         size2(self.header.width, self.header.height)
     }
 
-    pub fn bytes(&self) -> &[u8] {
-        &self.data
+    pub fn pixels(&self) -> &[Srgba] {
+        &self.rgba_image_data
     }
 }
 
@@ -65,12 +65,10 @@ impl<'a> PngAdapter<'a> {
         // Note: this could be FnMut, at the price of forcing all callers to write `&mut`
         pixel_function: &dyn Fn(Srgba) -> VoxelBrush<'brush>,
     ) -> Self {
-        let DecodedPng { header, data } = png;
-
-        // Group into whole pixels.
-        let (rgba_image_data, []) = data.as_chunks::<4>() else {
-            panic!("wrong length")
-        };
+        let DecodedPng {
+            header,
+            rgba_image_data,
+        } = png;
 
         let mut color_map: HashMap<Srgba, VoxelBrush<'a>> = HashMap::new();
         let mut max_brush: Option<GridAab> = None;
@@ -259,7 +257,10 @@ impl core::error::Error for BlockFromImageError {
 #[inline(never)]
 pub fn load_png_from_bytes(name: &str, bytes: &'static [u8]) -> DecodedPng {
     match png_decoder::decode(bytes) {
-        Ok((header, data)) => DecodedPng { header, data },
+        Ok((header, data)) => DecodedPng {
+            header,
+            rgba_image_data: data,
+        },
         Err(error) => panic!("Error loading image asset {name:?}: {error:?}",),
     }
 }
@@ -325,11 +326,11 @@ mod tests {
                 filter_method: png_decoder::FilterMethod::Adaptive,
                 interlace_method: png_decoder::InterlaceMethod::None,
             },
-            data: alloc::vec![
-                0, 0, 0, 255, //
-                255, 0, 0, 255, //
-                0, 255, 0, 255, //
-                255, 255, 0, 255, //
+            rgba_image_data: alloc::vec![
+                [0, 0, 0, 255],
+                [255, 0, 0, 255],
+                [0, 255, 0, 255],
+                [255, 255, 0, 255],
             ],
         }
     }
