@@ -184,7 +184,7 @@ fn main() -> Result<(), ActionError> {
             }
             #[cfg(not(unix))]
             {
-                cmd.run()?;
+                cmd.spawn()?.wait()?;
             }
         }
         XtaskCommand::BuildWebRelease => {
