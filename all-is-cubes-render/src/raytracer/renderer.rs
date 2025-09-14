@@ -407,63 +407,61 @@ impl<P: Accumulate + Default> RtScene<'_, P> {
     /// corresponds to that specified by [`Camera::project_ndc_into_world()`].
     #[inline]
     pub fn trace_patch(&self, patch: NdcRect) -> (P, RaytraceInfo) {
+        let mut info = RaytraceInfo::default();
+        let pixel = if self
+            .cameras
+            .world
+            .options()
+            .antialiasing
+            .is_strongly_enabled()
+        {
+            const N: usize = 4;
+            const SAMPLE_POINTS: [euclid::default::Vector2D<f64>; N] = [
+                vec2(1. / 8., 5. / 8.),
+                vec2(3. / 8., 1. / 8.),
+                vec2(5. / 8., 7. / 8.),
+                vec2(7. / 8., 3. / 8.),
+            ];
+
+            let samples: [P; N] = core::array::from_fn(|i| {
+                let mut accum = P::default();
+                self.trace_ray_through_layers(
+                    &mut info,
+                    &mut accum,
+                    point_within_patch(patch, SAMPLE_POINTS[i]),
+                );
+                accum
+            });
+            P::mean(samples)
+        } else {
+            let mut pixel = P::default();
+            self.trace_ray_through_layers(&mut info, &mut pixel, patch.center());
+            pixel
+        };
+        (pixel, info)
+    }
+
+    /// Trace only one ray, regardless of the antialiasing option, through all layers.
+    fn trace_ray_through_layers(&self, info: &mut RaytraceInfo, accum: &mut P, point: NdcPoint2) {
         if let Some(ui) = self.rts.ui {
-            let (pixel, info): (P, RaytraceInfo) =
-                trace_patch_in_one_space(ui, &self.cameras.ui, patch, false);
-            if pixel.opaque() {
-                // TODO: We should be doing alpha blending, but doing that requires
-                // having control over the `Accumulate` that trace_ray starts with.
-                return (pixel, info);
-            }
+            *info += ui.trace_ray(self.cameras.ui.project_ndc_into_world(point), accum, false);
         }
         if let Some(world) = self.rts.world {
-            return trace_patch_in_one_space(world, &self.cameras.world, patch, true);
+            *info += world.trace_ray(
+                self.cameras.world.project_ndc_into_world(point),
+                accum,
+                true,
+            );
         }
-        (
-            P::paint(palette::NO_WORLD_TO_SHOW, self.options_refs().world),
-            RaytraceInfo::default(),
-        )
+        if !accum.opaque() {
+            // TODO: this should be another blending but paint() doesn't present the right interface
+            *accum = P::paint(palette::NO_WORLD_TO_SHOW, self.options_refs().world);
+        }
     }
 
     #[doc(hidden)] // TODO: good public API? Required by raytrace_to_texture.
     pub fn cameras(&self) -> &Layers<Camera> {
         &self.cameras
-    }
-}
-
-fn trace_patch_in_one_space<P: Accumulate + Default>(
-    space: &SpaceRaytracer<<P as Accumulate>::BlockData>,
-    camera: &Camera,
-    patch: NdcRect,
-    include_sky: bool,
-) -> (P, RaytraceInfo) {
-    if camera.options().antialiasing.is_strongly_enabled() {
-        const N: usize = 4;
-        const SAMPLE_POINTS: [euclid::default::Vector2D<f64>; N] = [
-            vec2(1. / 8., 5. / 8.),
-            vec2(3. / 8., 1. / 8.),
-            vec2(5. / 8., 7. / 8.),
-            vec2(7. / 8., 3. / 8.),
-        ];
-        let mut info = RaytraceInfo::default();
-        let samples: [P; N] = core::array::from_fn(|i| {
-            let mut p = P::default();
-            info += space.trace_ray(
-                camera.project_ndc_into_world(point_within_patch(patch, SAMPLE_POINTS[i])),
-                &mut p,
-                include_sky,
-            );
-            p
-        });
-        (P::mean(samples), info)
-    } else {
-        let mut p = P::default();
-        let info = space.trace_ray(
-            camera.project_ndc_into_world(patch.center()),
-            &mut p,
-            include_sky,
-        );
-        (p, info)
     }
 }
 
@@ -713,7 +711,7 @@ mod tests {
         impl Accumulate for CatchCustomOptions {
             type BlockData = CatchCustomOptions;
             fn opaque(&self) -> bool {
-                self.custom_options.is_empty()
+                !self.custom_options.is_empty()
             }
             fn add(&mut self, hit: raytracer::Hit<'_, Self::BlockData>) {
                 if self.custom_options.is_empty() {
