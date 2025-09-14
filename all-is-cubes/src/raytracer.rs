@@ -575,7 +575,18 @@ impl<P: Accumulate> TracingState<'_, P> {
         &mut self,
         options: RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>,
     ) -> bool {
+        if self.primary_cubes_traced == 0 {
+            self.accumulator.add(Hit {
+                exception: Some(Exception::EnterSpace),
+                surface: Rgba::TRANSPARENT.into(),
+                t_distance: None,
+                block: &P::BlockData::exception(Exception::EnterSpace, options),
+                position: None,
+            });
+        }
+
         self.primary_cubes_traced += 1;
+
         // TODO: Ideally this constant would be configurable.
         // It can't simply be `view_distance` since it counts voxel steps.
         if self.primary_cubes_traced > 1000 {
@@ -600,12 +611,6 @@ impl<P: Accumulate> TracingState<'_, P> {
         debug_steps: bool,
         options: RtOptionsRef<'_, <P::BlockData as RtBlockData>::Options>,
     ) -> RaytraceInfo {
-        if self.primary_cubes_traced == 0 {
-            // Didn't intersect the world at all.
-            // Inform the accumulator of this in case it wants to do something different.
-            self.accumulator.hit_nothing();
-        }
-
         // TODO: The Accumulator should probably be allowed to tell the presence of sky.
         // Right now, since finish() (this function) is called regardless of whether
         // include_sky is true, we *always* give the accumulator this infinite hit even if

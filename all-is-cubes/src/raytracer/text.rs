@@ -11,7 +11,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
 use crate::math::FreeVector;
-use crate::raytracer::{self, Accumulate, RtBlockData, RtOptionsRef, SpaceRaytracer};
+use crate::raytracer::{Accumulate, Exception, RtBlockData, RtOptionsRef, SpaceRaytracer};
 use crate::space::{Space, SpaceBlockData};
 
 /// If you are using [`CharacterBuf`], use this [`RtBlockData`] implementation.
@@ -34,10 +34,10 @@ impl RtBlockData for CharacterRtData {
         Self(char)
     }
 
-    fn exception(exception: raytracer::Exception, _: RtOptionsRef<'_, Self::Options>) -> Self {
+    fn exception(exception: Exception, _: RtOptionsRef<'_, Self::Options>) -> Self {
         match exception {
-            raytracer::Exception::Sky => Self(literal_substr!(" ")),
-            raytracer::Exception::Incomplete => Self(literal_substr!("X")),
+            Exception::Sky => Self(literal_substr!(" ")),
+            Exception::Incomplete => Self(literal_substr!("X")),
             _ => Self(literal_substr!(" ")), // TODO: what is the best paint behavior for text?
         }
     }
@@ -46,18 +46,24 @@ impl RtBlockData for CharacterRtData {
 /// Implements [`Accumulate`] for text output: captures the first characters of block names
 /// rather than colors.
 #[derive(Clone, Debug, Default, PartialEq)]
-#[expect(clippy::derive_partial_eq_without_eq)]
-pub struct CharacterBuf {
-    /// Text to draw, if determined yet.
-    hit_text: Option<Substr>,
+pub struct CharacterBuf(State);
+#[derive(Clone, Debug, Default, PartialEq)]
+enum State {
+    #[default]
+    Empty,
+    EnteredSpace,
+    Hit(Substr),
 }
 
 impl CharacterBuf {
     /// Update the state to include the given character if none is already present,
     /// as if [`Accumulate::add()`] was called.
     pub fn add_character_hit(&mut self, character: &Substr) {
-        if self.hit_text.is_none() {
-            self.hit_text = Some(character.clone());
+        match self.0 {
+            State::Hit(_) => {}
+            State::Empty | State::EnteredSpace => {
+                self.0 = State::Hit(character.clone());
+            }
         }
     }
 }
@@ -67,30 +73,46 @@ impl Accumulate for CharacterBuf {
 
     #[inline]
     fn opaque(&self) -> bool {
-        self.hit_text.is_some()
+        match self.0 {
+            State::Hit(_) => true,
+            State::Empty | State::EnteredSpace => false,
+        }
     }
 
     #[inline]
     fn add(&mut self, hit: super::Hit<'_, Self::BlockData>) {
-        self.add_character_hit(&hit.block.0);
-    }
-
-    fn hit_nothing(&mut self) {
-        self.hit_text = Some(literal_substr!("."));
+        match (hit.exception, &self.0) {
+            (Some(Exception::EnterSpace), State::Empty | State::EnteredSpace) => {
+                self.0 = State::EnteredSpace
+            }
+            (Some(Exception::Sky), _) => {}
+            (_, _) => self.add_character_hit(&hit.block.0),
+        }
     }
 
     fn mean<const N: usize>(items: [Self; N]) -> Self {
-        // TODO: we should at least find the mode (or maybe prefer None) instead of the first
-        Self {
-            hit_text: items.into_iter().find_map(|cb| cb.hit_text),
-        }
+        // TODO: pick the mode instead of the first
+        items
+            .into_iter()
+            .reduce(|cb1, cb2| {
+                Self(match (cb1.0, cb2.0) {
+                    (State::Hit(c), _) | (_, State::Hit(c)) => State::Hit(c),
+                    (State::EnteredSpace, State::EnteredSpace) => State::EnteredSpace,
+                    _ => State::Empty,
+                })
+            })
+            .unwrap()
     }
 }
 
 impl From<CharacterBuf> for Substr {
     #[inline]
     fn from(buf: CharacterBuf) -> Substr {
-        buf.hit_text.unwrap_or_else(|| literal_substr!("."))
+        match buf.0 {
+            State::Empty => literal_substr!("."),
+            State::EnteredSpace => literal_substr!(" "),
+            State::Hit(character) => character,
+        }
     }
 }
 impl From<CharacterBuf> for String {

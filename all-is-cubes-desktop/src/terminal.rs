@@ -10,7 +10,6 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent, Mouse
 use ratatui::crossterm;
 use ratatui::layout::Rect;
 
-use all_is_cubes::arcstr::literal_substr;
 use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::listen;
 use all_is_cubes::math::Rgba;
@@ -380,11 +379,6 @@ impl Accumulate for ColorCharacterBuf {
 
         self.color.add(hit.map_block_data(|_| &()));
         self.text.add(hit);
-    }
-
-    fn hit_nothing(&mut self) {
-        self.text.add_character_hit(&literal_substr!(" "));
-        self.override_color = true;
     }
 
     fn mean<const N: usize>(mut items: [Self; N]) -> Self {

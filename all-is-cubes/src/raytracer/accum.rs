@@ -96,6 +96,11 @@ pub struct Hit<'d, D> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Exception {
+    /// The ray entered the bounds of the space (or started inside it).
+    /// This may be used to notice whether or not a ray intersected the space at all,
+    /// even if it hit no blocks.
+    EnterSpace,
+
     /// The ray exited the space and is considered to have hit the sky.
     Sky,
 
@@ -186,11 +191,6 @@ pub trait Accumulate {
     fn enter_block(&mut self, block_data: &Self::BlockData) {
         _ = block_data;
     }
-
-    /// Indicates that the trace did not intersect any space that could have contained
-    /// anything to draw. May be used for special diagnostic drawing. If used, should
-    /// disable the effects of future [`Self::add`] calls.
-    fn hit_nothing(&mut self) {}
 
     /// Creates an accumulator already containing the given color.
     ///

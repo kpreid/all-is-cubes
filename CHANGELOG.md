@@ -54,8 +54,9 @@ In order to resolve various design problems interfering with development, the `a
     - `camera::GraphicsOptions::maximum_intensity` may be used to specify the maximum brightness of the output device and thus properly apply tone mapping to HDR output. It may also be used to choose to restrict output to SDR.
     - `raytracer::Accumulate` is implemented for tuples of up to 2 elements.
     - `raytracer::Accumulate::add()` takes a new struct type `Hit` instead of separate arguments,
-      and `Hit` includes cube position and distance/depth information.
+      and `Hit` includes cube position, distance/depth information, and a new enum `Exception`.
     - `raytracer::DepthBuf` can be used to produce depth images.
+    - `raytracer::Exception`, part of `Hit` which distinguishes special situations such as “hitting” the sky.
     - `raytracer::Hit`, used by `Accumulate` implementors.
 
 - `all-is-cubes-ui` library:
@@ -123,6 +124,10 @@ In order to resolve various design problems interfering with development, the `a
 - `all-is-cubes-mesh` library:
     - The associated type `GfxVertex::Coordinate` no longer exists.
       `GfxVertex` (now `Vertex`) implementors may still use whatever coordinate storage format they wish, but must be able to convert it back to `f32`.
+
+- `all-is-cubes-render` library:
+    - `raytracer::Accumulate::hit_nothing()` no longer exists.
+      Use `Hit::exception` to detect the opposite of this condition instead.
 
 ## 0.9.0 (2025-01-01)
 
