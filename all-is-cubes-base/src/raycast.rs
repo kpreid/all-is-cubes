@@ -278,9 +278,12 @@ impl Iterator for Raycaster {
         }
     }
 
-    // TODO: Implement optional methods:
-    // size_hint (can be determined by finding the far end and summing the offset in each axis)
-    // count, last (requires precise version of size_hint algorithm)
+    // TODO: When it becomes possible to override `try_fold()` (std::ops::Try must be stabilized),
+    // override it for efficiency (so the first/last cases can be outside the main loop).
+    // It’s not worth overriding `fold()` because all use cases of raycasting have their own
+    // early exit conditions besides being out of bounds.
+    //
+    // When this change is possible, apply it to both `Raycaster` and `AxisAlignedRaycaster`.
 }
 
 impl core::iter::FusedIterator for Raycaster {}

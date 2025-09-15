@@ -209,7 +209,12 @@ impl Iterator for AxisAlignedRaycaster {
         Some(step)
     }
 
-    // TODO: Add an `Iterator::fold()` implementation.
+    // TODO: When it becomes possible to override `try_fold()` (std::ops::Try must be stabilized),
+    // override it for efficiency (so the first/last cases can be outside the main loop).
+    // It’s not worth overriding `fold()` because all use cases of raycasting have their own
+    // early exit conditions besides being out of bounds.
+    //
+    // When this change is possible, apply it to both `Raycaster` and `AxisAlignedRaycaster`.
 }
 
 #[cfg(test)]
