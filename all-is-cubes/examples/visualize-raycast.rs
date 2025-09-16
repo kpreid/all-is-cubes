@@ -28,7 +28,7 @@ fn main() {
         show_top_level(destination.clone(), ray, R8);
     }
 
-    destination.stream.flush_blocking();
+    destination.stream.flush_blocking().unwrap();
 }
 
 fn show_top_level(destination: rg::Destination, ray: Ray, resolution: Resolution) {

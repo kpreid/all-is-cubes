@@ -45,7 +45,7 @@ fn main() {
         }
     });
 
-    destination.stream.flush_blocking();
+    destination.stream.flush_blocking().unwrap();
 }
 
 fn show(destination: rg::Destination, x: f32, evaluated: &EvaluatedBlock) {

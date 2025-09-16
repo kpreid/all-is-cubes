@@ -177,7 +177,7 @@ impl log::Log for AicLogger {
         }
         #[cfg(feature = "rerun")]
         if self.rerun_destination.is_enabled() {
-            self.rerun_destination.stream.flush_async();
+            self.rerun_destination.stream.flush_async().unwrap();
         }
     }
 }
