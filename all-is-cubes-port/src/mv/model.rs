@@ -92,6 +92,8 @@ pub(crate) fn from_space(
         .map(|data| {
             if let Some(entry) = block_to_dot_vox_palette_entry(data.evaluated())
                 && let Ok(index) = u8::try_from(palette.len())
+                // MagicaVoxel uses 1-indexing so there is no 256th entry
+                && index != 255
             {
                 palette.push(entry);
                 Some(index)
