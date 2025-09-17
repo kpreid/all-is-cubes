@@ -217,7 +217,7 @@ fn dynamic_benches(c: &mut Criterion) {
                     universe.read_ticket(),
                     &default_camera,
                     time::Deadline::Whenever,
-                    |_| {},
+                    dynamic::noop_render_data_updater,
                 );
                 assert_eq!(info.flaws, Flaws::empty()); // should not be unfinished
             },
@@ -296,7 +296,7 @@ fn dynamic_benches(c: &mut Criterion) {
                     universe.read_ticket(),
                     &camera,
                     time::Deadline::Whenever,
-                    |_| {},
+                    dynamic::noop_render_data_updater,
                 );
                 // Note: this number will change if the number of `DepthOrdering`s changes.
                 assert_eq!(
@@ -330,7 +330,7 @@ fn dynamic_benches(c: &mut Criterion) {
                     self.universe.read_ticket(),
                     &self.camera,
                     time::Deadline::Whenever,
-                    |_| {},
+                    dynamic::noop_render_data_updater,
                 );
                 assert_ne!(info.depth_sort_info.quads_sorted, 0);
             }

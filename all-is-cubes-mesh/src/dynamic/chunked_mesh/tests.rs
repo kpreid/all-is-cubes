@@ -219,7 +219,7 @@ fn basic_chunk_presence() {
         Space::empty_positive(1, 1, 1),
         LARGE_VIEW_DISTANCE,
     );
-    tester.update(|_| {});
+    tester.update(dynamic::noop_render_data_updater);
     assert_ne!(None, tester.csm.chunk(ChunkPos::new(0, 0, 0)));
     // There should not be a chunk where there's no Space
     assert_eq!(None, tester.csm.chunk(ChunkPos::new(1, 0, 0)));
@@ -313,7 +313,7 @@ fn drop_chunks_when_moving() {
     // middle of the first chunk
     tester.move_camera_to([0.5, 0.5, 0.5]);
 
-    tester.update(|_| {});
+    tester.update(dynamic::noop_render_data_updater);
     // Save the chunk count we got after initial update.
     // Note: We don't *actually* care what this is exactly, but we want to compare
     // it to future counts.
@@ -324,7 +324,7 @@ fn drop_chunks_when_moving() {
     for i in 1..30 {
         let position = point3(1.5 + f64::from(i), 0.5, 0.5);
         tester.move_camera_to(position);
-        tester.update(|_| {});
+        tester.update(dynamic::noop_render_data_updater);
         let count = tester.csm.iter_chunks().count();
         println!("{i}: {position:?}, {count} chunks");
     }
@@ -349,7 +349,7 @@ fn did_not_finish_detection() {
             tester.universe.read_ticket(),
             &tester.camera,
             time::Deadline::Asap,
-            |_| {},
+            dynamic::noop_render_data_updater,
         );
 
         // This is the state that should(n't) be affected.
@@ -368,7 +368,7 @@ fn did_not_finish_detection() {
     {
         eprintln!("--- normal update");
         // Now while we're at it, try finishing things and check that state too.
-        let info = tester.update(|_| {});
+        let info = tester.update(dynamic::noop_render_data_updater);
         assert_eq!(
             (
                 info.flaws,
@@ -402,7 +402,7 @@ fn instances_grouped_by_block() {
 
     let mut tester: CsmTester<ALL_INSTANCES> =
         CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
-    tester.update(|_| {});
+    tester.update(dynamic::noop_render_data_updater);
 
     assert_eq!(
         tester.instances(),
@@ -438,7 +438,7 @@ fn instances_for_animated() {
     // separated from the question of "should we use instances always". We care about the former
     // and not the latter here.
     let mut tester: CsmTester<1000> = CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
-    tester.update(|_| {});
+    tester.update(dynamic::noop_render_data_updater);
 
     assert_eq!(tester.instances(), vec![(index_of_anim, vec![[1, 0, 0]])]);
 }
@@ -473,7 +473,7 @@ fn instances_dont_dirty_mesh_when_block_changes() {
         .unwrap();
 
     let mut tester: CsmTester<1000> = CsmTester::new(universe, space, LARGE_VIEW_DISTANCE);
-    tester.update(|_| {});
+    tester.update(dynamic::noop_render_data_updater);
 
     // Make a change to the block defunition...
     tester
@@ -522,7 +522,7 @@ fn instances_dont_dirty_mesh_when_space_changes() {
 
     // Initialize
     let mut tester: CsmTester<1000> = CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
-    tester.update(|_| {});
+    tester.update(dynamic::noop_render_data_updater);
 
     // Check initial state
     assert_eq!(
@@ -580,5 +580,5 @@ fn at_maximum_number_of_blocks() {
     // All we're checking for, for now, is that this doesn't panic.
     let mut tester: CsmTester<NO_INSTANCES> =
         CsmTester::new(Universe::new(), space, LARGE_VIEW_DISTANCE);
-    tester.update(|_| {});
+    tester.update(dynamic::noop_render_data_updater);
 }

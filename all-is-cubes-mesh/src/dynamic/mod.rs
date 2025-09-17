@@ -26,6 +26,8 @@ pub use job::MeshJobQueue;
 
 mod render_data;
 use render_data::MeshIdImpl;
+#[doc(hidden)]
+pub use render_data::noop_render_data_updater;
 pub use render_data::{MeshId, RenderDataUpdate};
 
 // --- Types and traits ---

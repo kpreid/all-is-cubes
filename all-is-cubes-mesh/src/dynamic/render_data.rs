@@ -30,6 +30,10 @@ pub struct RenderDataUpdate<'a, M: DynamicMeshTypes> {
     pub mesh_id: MeshId,
 }
 
+/// Can be passed to [`ChunkedSpaceMesh::update()`]
+#[doc(hidden)]
+pub fn noop_render_data_updater<M: DynamicMeshTypes>(_: RenderDataUpdate<'_, M>) {}
+
 /// Unique identifier for a mesh that is owned by a [`ChunkedSpaceMesh`] and is passing through
 /// [`RenderDataUpdate`].
 ///
