@@ -132,19 +132,7 @@ impl Universe {
 
         // Configure the World state.
         {
-            // "Panics: The ComputeTaskPool is not initialized. If using this from a query that is
-            // being initialized and run from the ECS scheduler, this should never panic."
-            // — <https://docs.rs/bevy_ecs/0.16.0/bevy_ecs/query/struct.QueryState.html#method.par_iter>
-            // We are not properly using the scheduler yet, so create and run a dummy schedule to
-            // trigger the initialization.
-            // TODO(ecs): Remove this when it is definitely no longer necessary.
-            {
-                let mut schedule = ecs::Schedule::default();
-                schedule.add_systems(|q: ecs::Query<'_, '_, Entity>| {
-                    q.par_iter().for_each(|_| {});
-                });
-                schedule.run(&mut world);
-            }
+            world.init_resource::<ecs::Schedules>();
 
             // Register various components and resources which are *not* visible state of the
             // universe, but have data derived from others or are used temporarily.
