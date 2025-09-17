@@ -379,7 +379,7 @@ fn extract() {
 fn extract_out_of_bounds() {
     let space = Space::empty_positive(2, 1, 1);
     let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 2, 1]);
-    let _: Vol<Box<[()]>> = space.extract(extract_bounds, |_| ());
+    let _: Vol<Box<[()]>> = space.extract(extract_bounds, drop);
 }
 
 #[test]

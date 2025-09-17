@@ -811,7 +811,7 @@ async fn icons(mut context: RenderTestContext) {
     let aspect_ratio =
         f64::from(space.bounds().size().height) / f64::from(space.bounds().size().width);
 
-    space.evaluate_light(1, |_| {});
+    space.evaluate_light(1, drop);
     finish_universe_from_space(context.universe_mut(), space);
 
     let mut options = GraphicsOptions::UNALTERED_COLORS;
@@ -1027,7 +1027,7 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
             .clone();
         universe
             .try_modify(&space_handle, |space| {
-                space.evaluate_light(1, |_| {});
+                space.evaluate_light(1, drop);
             })
             .unwrap();
     }
@@ -1354,7 +1354,7 @@ async fn fog_test_universe() -> Arc<Universe> {
         .unwrap();
 
     space.fast_evaluate_light();
-    space.evaluate_light(1, |_| {});
+    space.evaluate_light(1, drop);
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
@@ -1392,7 +1392,7 @@ async fn light_test_universe() -> Arc<Universe> {
         .unwrap();
 
     space.fast_evaluate_light();
-    space.evaluate_light(1, |_| {});
+    space.evaluate_light(1, drop);
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
@@ -1497,7 +1497,7 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
         .unwrap();
 
     space.fast_evaluate_light();
-    space.evaluate_light(1, |_| {});
+    space.evaluate_light(1, drop);
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);

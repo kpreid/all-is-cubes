@@ -107,7 +107,7 @@ impl texture::Allocator for Allocator {
                 }
             })
             .ok()
-            .map(|_| ())?;
+            .map(drop)?;
         Some(Tile { bounds, channels })
     }
 }

@@ -84,7 +84,7 @@ impl RendererFactory for RtFactory {
     fn renderer_from_cameras(&self, cameras: StandardCameras) -> Box<dyn HeadlessRenderer + Send> {
         Box::new(all_is_cubes_render::raytracer::RtRenderer::new(
             cameras,
-            Box::new(|v| v),
+            Box::new(core::convert::identity),
             listen::constant(Default::default()),
         ))
     }

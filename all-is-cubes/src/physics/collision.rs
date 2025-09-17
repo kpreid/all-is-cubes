@@ -562,7 +562,7 @@ impl CollisionSpace for Space {
             &evaluated.voxels().as_vol_ref(),
             voxel_ray,
             voxel_aab,
-            |_| {},
+            drop,
             stop_at,
         );
         result.map(|end| end.wrap_as_voxel(cube, resolution))
@@ -817,7 +817,7 @@ mod tests {
         let aab = Cube::ORIGIN.aab();
         let ray = Ray::new([0.5, initial_y, 0.], [0., -2., 0.]);
 
-        let result = collide_along_ray(&space, ray, aab, |_| {}, StopAt::NotAlreadyColliding);
+        let result = collide_along_ray(&space, ray, aab, drop, StopAt::NotAlreadyColliding);
         assert_eq!(result, expected_end);
     }
 

@@ -30,7 +30,7 @@ fn listen(
             listener: Some(listener.into_listener()),
             budget: Default::default(),
         })
-        .map(|_| ())
+        .map(drop)
 }
 
 #[test]

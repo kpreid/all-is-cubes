@@ -141,7 +141,7 @@ fn falling_collision_partial_block() {
 
     for t in 1..=1000 {
         eprintln!("--- step {t}");
-        body.step(Tick::from_seconds(1.0), Some(&space), |_| {});
+        body.step(Tick::from_seconds(1.0), Some(&space), drop);
         assert!(
             (body.position().y - 1.0).abs() < 1e-6,
             "not touching surface on step {:?}: {:?}",

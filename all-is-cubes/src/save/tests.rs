@@ -664,7 +664,7 @@ fn space_success() {
         })
         .unwrap();
 
-    space.evaluate_light(0, |_| {});
+    space.evaluate_light(0, drop);
 
     // These values are the byte serialization of `PackedLight`.
     // We’re repeating them here rather than calling `PackedLight` functions to remind ourselves

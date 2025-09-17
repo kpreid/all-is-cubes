@@ -309,7 +309,7 @@ impl PageInst {
         universe
             .try_modify(&space, |space| {
                 space.fast_evaluate_light();
-                space.evaluate_light(10, |_| {});
+                space.evaluate_light(10, drop);
             })
             .unwrap();
 

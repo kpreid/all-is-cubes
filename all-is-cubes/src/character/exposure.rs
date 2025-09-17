@@ -188,7 +188,7 @@ mod tests {
             //     .fill_uniform(space.bounds().shrink(FaceMap::splat(1)), AIR)
             //     .unwrap();
 
-            space.evaluate_light(0, |_| {});
+            space.evaluate_light(0, drop);
             space
         });
         let mut character = Character::spawn_default(universe.read_ticket(), space);

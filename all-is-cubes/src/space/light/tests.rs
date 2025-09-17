@@ -136,14 +136,14 @@ fn step() {
 #[test]
 fn evaluate_light() {
     let mut space = Space::empty_positive(3, 1, 1);
-    assert_eq!(0, space.evaluate_light(0, |_| {}));
+    assert_eq!(0, space.evaluate_light(0, drop));
     space
         .mutate(ReadTicket::stub(), |m| {
             m.set([1, 0, 0], block::from_color!(Rgb::ONE))
         })
         .unwrap();
-    assert_eq!(2, space.evaluate_light(0, |_| {}));
-    assert_eq!(0, space.evaluate_light(0, |_| {}));
+    assert_eq!(2, space.evaluate_light(0, drop));
+    assert_eq!(0, space.evaluate_light(0, drop));
     // This is just a smoke test, "is it plausible that it's working".
     // Ideally we'd confirm identical results from repeated step() and single evaluate_light().
 }
@@ -185,7 +185,7 @@ fn light_source_test_space(block: Block) -> Space {
     space
         .mutate(ReadTicket::stub(), |m| m.set([1, 1, 1], block))
         .unwrap();
-    space.evaluate_light(0, |_| ());
+    space.evaluate_light(0, drop);
     space
 }
 
@@ -244,7 +244,7 @@ fn animation_treated_as_visible() {
         space
             .mutate(ReadTicket::stub(), |m| m.set([1, 1, 1], block))
             .unwrap();
-        space.evaluate_light(0, |_| {});
+        space.evaluate_light(0, drop);
         [
             space.get_lighting([1, 1, 1]).status(),
             space.get_lighting([0, 1, 1]).status(),
@@ -282,7 +282,7 @@ fn reflectance_is_clamped() {
             Ok(())
         })
         .unwrap();
-    space.evaluate_light(0, |_| {});
+    space.evaluate_light(0, drop);
 
     let light = space.get_lighting([2, 1, 1]).value();
     dbg!(light);

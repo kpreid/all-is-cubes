@@ -55,7 +55,7 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
                         space.fast_evaluate_light();
                     }
                     if matches!(mode, EvalMode::Full | EvalMode::Both) {
-                        space.evaluate_light(1, |_| {});
+                        space.evaluate_light(1, drop);
                     }
                 },
                 BatchSize::LargeInput,

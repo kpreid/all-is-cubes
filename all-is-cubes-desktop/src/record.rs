@@ -211,7 +211,7 @@ impl Recorder {
                 // TODO: Start reusing renderers instead of recreating them.
                 let mut renderer = RtRenderer::new(
                     rec.cameras.clone_unupdated(),
-                    Box::new(|v| v),
+                    Box::new(core::convert::identity),
                     listen::constant(Default::default()),
                 );
                 renderer
