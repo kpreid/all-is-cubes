@@ -45,44 +45,62 @@ pub(crate) fn voronoi_pattern<'a>(
     // will not. However, this should be good enough for the procedural-generation
     // goals of this function.
 
+    let wrap =
+        |cube: Cube| -> Cube { cube.map(|component| component.rem_euclid(resolution.into())) };
+
+    // Storage of the pattern as computed so far and each such cube's distance to the nearest input
+    // point.
     let mut pattern: Vol<Box<[(FreeCoordinate, &Block)]>> =
         Vol::from_fn(GridAab::for_block(resolution), |_| (f64::INFINITY, &AIR));
-    let mut flood_fill_todo = HashSet::<Cube>::new();
+
+    // Cubes which should be written by the current flood-fill operation.
+    let mut to_fill = HashSet::<Cube>::new();
+
     for &(region_point, ref block) in points {
         let region_point = region_point * FreeCoordinate::from(resolution);
-        let starting_cube: Cube = match Cube::containing(region_point) {
-            Some(p) => p,
-            None => continue, // TODO: panic? this can only happen when the inputs are not in 0 to 1
-        };
-        flood_fill_todo.insert(starting_cube);
-        while let Some(cube) = flood_fill_todo.iter().next().copied() {
-            flood_fill_todo.remove(&cube);
-            let cube_wrapped = cube.map(|component| component.rem_euclid(resolution.into()));
 
-            if !wrapping && cube_wrapped != cube {
-                // If we are not wrapping, then stop filling when out of bounds.
-                continue;
-            }
-
+        let calculate_distance_squared = |cube: Cube| -> FreeCoordinate {
+            // Point with which we are checking the distance to region_point.
             let test_point: FreePoint = cube.center();
-
             let offset = test_point - region_point;
             // TODO: add ability to muck with the distance metric in custom ways
             // instead of this hardcoded one.
             let offset = offset.component_mul(vec3(1.0, 2.0, 1.0));
-            let distance_squared = offset.square_length();
+            offset.square_length()
+        };
 
-            if distance_squared < pattern[cube_wrapped].0 {
-                pattern[cube_wrapped] = (distance_squared, block);
-                for direction in Face6::ALL {
+        let starting_cube: Cube = match Cube::containing(region_point) {
+            Some(p) => p,
+            None => continue, // TODO: panic? this can only happen when the inputs are not in 0 to 1
+        };
+        to_fill.insert(starting_cube);
+
+        while let Some(cube) = to_fill.iter().next().copied() {
+            to_fill.remove(&cube);
+
+            pattern[wrap(cube)] = (calculate_distance_squared(cube), block);
+
+            for direction in Face6::ALL {
+                // The flood fill can escape the cube bounds here,
+                // but is wrapped around at lookup time (so the distance stays true).
+                let neighbor = cube + direction.normal_vector();
+                if !wrapping && wrap(neighbor) != neighbor {
+                    // If we were not asked for wrapping, then don't flood in a way that wraps.
+                    continue;
+                }
+
+                // For each neighbor, add it to to_fill but only if its current value is not
+                // good enough. Doing the test before the insert rather than after the removal
+                // causes some redundant distance calculation, but is cheaper because it requires
+                // fewer insertions.
+                let distance_squared = calculate_distance_squared(neighbor);
+                if distance_squared < pattern[wrap(neighbor)].0 {
                     // TODO: I tried filtering to
                     //    direction.normal_vector().dot(offset) >= 0.0
                     // which should be an optimization but it changed the results.
                     // Investigate with actual well-defined test cases.
-                    let adjacent = cube + direction.normal_vector();
-                    // The flood fill can escape the cube bounds here,
-                    // but is wrapped around at lookup time (so the distance stays true).
-                    flood_fill_todo.insert(adjacent);
+
+                    to_fill.insert(neighbor);
                 }
             }
         }
