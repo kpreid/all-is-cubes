@@ -26,6 +26,7 @@ pub(crate) use noise::*;
 ///
 /// TODO: Once we have better composable tools than `impl Fn(Cube)`, allow
 /// each point to refer to a pattern of its own to delegate to.
+#[cfg_attr(feature = "_special_testing", visibility::make(pub))] // used by benchmark
 pub(crate) fn voronoi_pattern<'a>(
     resolution: Resolution,
     wrapping: bool,

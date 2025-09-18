@@ -159,6 +159,7 @@ dependencies = [
  "smol-macros",
  "strum",
  "tempfile",
+ "visibility",
 ]
 
 [[package]]

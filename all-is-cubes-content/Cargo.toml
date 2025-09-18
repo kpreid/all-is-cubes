@@ -21,6 +21,7 @@ bench = false
 [[bench]]
 name = "gen"
 harness = false
+required-features = ["_special_testing"]
 
 [features]
 # Adds `UniverseTemplate::Random`.
@@ -28,6 +29,11 @@ arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary"]
 # Causes reloading a `UniverseTemplate` to spawn a subprocess to load the template using freshly
 # compiled code, for development purposes. Only takes effect if running using `cargo run`.
 lukewarm-reload = ["dep:tempfile", "all-is-cubes/save", "all-is-cubes-port"]
+# Makes certain internal items public.
+# This feature is intended only for use when developing All is Cubes,
+# to compile certain fuzzing, benchmark, and example targets.
+# It is not necessary to enable this feature to run the complete `cargo test` test suite.
+_special_testing = ["dep:visibility"]
 
 [dependencies]
 # std feature is required because this library does not yet participate in `maybe_sync`.
@@ -49,6 +55,7 @@ rand = { workspace = true }
 rand_xoshiro = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
 tempfile = { workspace = true, optional = true }
+visibility = { workspace = true, optional = true }
 
 
 [dev-dependencies]

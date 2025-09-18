@@ -52,5 +52,8 @@ mod menu;
 pub use menu::template_menu_space;
 mod tree;
 
+#[cfg(feature = "_special_testing")] // used by benchmark
+pub use alg::voronoi_pattern;
+
 // Reexport the content parts that are implemented in the core crate.
 pub use all_is_cubes::content::{BoxPart, BoxStyle, *};
