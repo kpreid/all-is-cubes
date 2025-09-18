@@ -207,29 +207,75 @@ async fn export_too_large_space() {
     assert!(matches!(error, ExportError::NotRepresentable { .. }));
 }
 
+/// Test that `export_to_dot_vox_data` accepts BlockDefs.
+///
+/// [`exported_space_equals_exported_block`] below is a more thorough test of the actual content.
+/// TODO: be more tidy about what we're testing, and also have better behavior for
+/// exporting the whole universe (don't export redundant models).
 #[cfg(feature = "export")]
 #[macro_rules_attribute::apply(smol_macros::test)]
 async fn export_block_def() {
     let mut universe = Universe::new();
-    universe
-        .insert(
-            "x".into(),
-            BlockDef::new(universe.read_ticket(), block::AIR),
-        )
+    let [block] = all_is_cubes::content::make_some_voxel_blocks(&mut universe);
+    let block_def = universe
+        .insert("x".into(), BlockDef::new(universe.read_ticket(), block))
         .unwrap();
 
-    let error = mv::export_to_dot_vox_data(
+    let data = mv::export_to_dot_vox_data(
         yield_progress_for_testing(),
         universe.read_ticket(),
-        ExportSet::all_of_universe(&universe),
+        ExportSet::from_block_defs(vec![block_def]),
     )
     .await
-    .unwrap_err();
-    assert!(matches!(
-        error,
-        ExportError::MemberTypeNotRepresentable {
-            name,
-            ..
-        }
-     if name == "x".into()));
+    .unwrap();
+
+    assert!(
+        matches!(
+            data,
+            dot_vox::DotVoxData { ref models, .. } if models.len() == 1
+        ),
+        "{data:#?}",
+    );
+}
+
+#[cfg(feature = "export")]
+#[test]
+fn exported_space_equals_exported_block() {
+    let mut universe = Universe::new();
+    let [block] = all_is_cubes::content::make_some_voxel_blocks(&mut universe);
+    let block::Primitive::Recur {
+        space: space_handle,
+        ..
+    } = block.primitive()
+    else {
+        unreachable!();
+    };
+
+    let mut palette_from_space = Vec::new();
+    let mut palette_from_block = Vec::new();
+    let model_from_space = mv::model::from_space(
+        universe.read_ticket(),
+        space_handle,
+        &mut palette_from_space,
+    )
+    .unwrap();
+    let model_from_block = mv::model::from_block(
+        &block.evaluate(universe.read_ticket()).unwrap(),
+        &mut palette_from_block,
+    )
+    .unwrap();
+
+    // TODO: write a palette normalizer and compare the actual voxel data.
+    assert_eq!(
+        (
+            model_from_space.size,
+            // palette_from_space.len(),
+            model_from_space.voxels.len()
+        ),
+        (
+            model_from_block.size,
+            // palette_from_block.len(),
+            model_from_space.voxels.len()
+        )
+    );
 }

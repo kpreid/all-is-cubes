@@ -68,9 +68,19 @@ pub(crate) fn block_to_dot_vox_palette_entry(
     if *evaluated == block::AIR_EVALUATED {
         None
     } else {
-        let [r, g, b, a] = evaluated.color().to_srgb8();
-        Some(dot_vox::Color { r, g, b, a })
+        Some(color_out(evaluated.color()))
     }
+}
+
+/// Add to a palette if there is room.
+#[cfg(feature = "export")]
+pub(crate) fn push(palette: &mut Vec<dot_vox::Color>, color: dot_vox::Color) -> Option<u8> {
+    let i = u8::try_from(palette.len()).ok().filter(|&i| {
+        // MagicaVoxel uses 1-indexing so there is no 256th entry
+        i != 255
+    })?;
+    palette.push(color);
+    Some(i)
 }
 
 #[cfg(feature = "import")]
@@ -78,4 +88,10 @@ fn color_in(dot_vox::Color { r, g, b, a: _ }: dot_vox::Color) -> Rgb {
     // Note: Even though the `dot_vox::Color` field carries an alpha, MagicaVoxel itself seems to
     // always ignore it, and use only transparency specified by materials. Therefore, we do too.
     Rgb::from_srgb8([r, g, b])
+}
+
+#[cfg(feature = "export")]
+pub(crate) fn color_out(color: Rgba) -> dot_vox::Color {
+    let [r, g, b, a] = color.to_srgb8();
+    dot_vox::Color { r, g, b, a }
 }

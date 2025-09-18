@@ -1,15 +1,18 @@
-use all_is_cubes::block::Block;
+use std::collections::HashMap;
+
+use all_is_cubes::block::{Block, EvaluatedBlock, Evoxel};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::{Point3D, vec3};
-use all_is_cubes::math::{Cube, GridAab};
+use all_is_cubes::math::{Cube, GridAab, Gridgid, OpacityCategory};
+
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes::util::{ConciseDebug, Refmt};
 
-use crate::mv::DotVoxConversionError;
 use crate::mv::coord::{aic_to_mv_coordinate_transform, mv_to_aic_coordinate_transform};
 use crate::mv::palette::block_to_dot_vox_palette_entry;
+use crate::mv::{self, DotVoxConversionError};
 use crate::{ExportError, Format};
 
 // -------------------------------------------------------------------------------------------------
@@ -90,13 +93,8 @@ pub(crate) fn from_space(
         .block_data()
         .iter()
         .map(|data| {
-            if let Some(entry) = block_to_dot_vox_palette_entry(data.evaluated())
-                && let Ok(index) = u8::try_from(palette.len())
-                // MagicaVoxel uses 1-indexing so there is no 256th entry
-                && index != 255
-            {
-                palette.push(entry);
-                Some(index)
+            if let Some(entry) = block_to_dot_vox_palette_entry(data.evaluated()) {
+                mv::palette::push(palette, entry)
             } else {
                 None
             }
@@ -108,28 +106,78 @@ pub(crate) fn from_space(
         if let Some(i) =
             block_index_to_palette_index[usize::from(space.get_block_index(cube).unwrap())]
         {
-            let transformed_cube = transform.transform_cube(cube);
-            voxels.push(dot_vox::Voxel {
-                // We previously checked that the size is not too big.
-                x: transformed_cube.x as u8,
-                y: transformed_cube.y as u8,
-                z: transformed_cube.z as u8,
-                i,
-            });
+            voxels.push(voxel_out(transform, cube, i));
         } else {
             // Else the cube is empty space and should not be exported explicitly.
         }
     }
 
     Ok(dot_vox::Model {
-        size: {
-            let size = transform.rotation.transform_size(space.bounds().size());
-            dot_vox::Size {
-                x: size.width,
-                y: size.height,
-                z: size.depth,
-            }
-        },
+        size: aic_to_mv_size(transform, bounds.size()),
         voxels,
     })
+}
+
+#[cfg(feature = "export")]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "eventually we should error on unrepresentables"
+)]
+pub(crate) fn from_block(
+    block: &EvaluatedBlock,
+    palette: &mut Vec<dot_vox::Color>,
+    // TODO: Add option to export at higher than native resolution
+) -> Result<dot_vox::Model, ExportError> {
+    let bounds = GridAab::for_block(block.resolution());
+    let transform = aic_to_mv_coordinate_transform(bounds);
+
+    let mut evoxel_to_palette_index: HashMap<Evoxel, Option<u8>> = HashMap::new();
+    let mut voxels: Vec<dot_vox::Voxel> = Vec::new();
+    for (cube, evoxel) in block.voxels().as_vol_ref().iter() {
+        let i = *evoxel_to_palette_index.entry(*evoxel).or_insert_with(|| {
+            if evoxel.opacity_category() == OpacityCategory::Invisible {
+                None
+            } else {
+                mv::palette::push(palette, mv::palette::color_out(evoxel.color))
+            }
+        });
+
+        if let Some(i) = i {
+            voxels.push(voxel_out(transform, cube, i));
+        } else {
+            // Else the cube is empty space and should not be exported explicitly.
+        }
+    }
+
+    Ok(dot_vox::Model {
+        size: aic_to_mv_size(transform, bounds.size()),
+        voxels,
+    })
+}
+
+/// Construct a `dot_vox::Voxel`.
+///
+/// Does not check for coordinate overflow; we assume that the bounds of the input cubes were
+/// already checked.
+#[cfg(feature = "export")]
+fn voxel_out(transform: Gridgid, cube: Cube, i: u8) -> dot_vox::Voxel {
+    let transformed_cube = transform.transform_cube(cube);
+    dot_vox::Voxel {
+        x: transformed_cube.x as u8,
+        y: transformed_cube.y as u8,
+        z: transformed_cube.z as u8,
+        i,
+    }
+}
+
+fn aic_to_mv_size(
+    transform: Gridgid,
+    size: all_is_cubes::euclid::Size3D<u32, Cube>,
+) -> dot_vox::Size {
+    let size = transform.rotation.transform_size(size);
+    dot_vox::Size {
+        x: size.width,
+        y: size.height,
+        z: size.depth,
+    }
 }
