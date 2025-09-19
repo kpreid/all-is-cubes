@@ -1,7 +1,9 @@
+use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::any::Any;
 use core::fmt;
 use core::hash;
+use core::marker::PhantomData;
 use core::mem;
 use core::ops::Deref;
 use core::panic::Location;
@@ -37,12 +39,13 @@ pub struct Handle<T> {
     /// The shared state of all clones of this handle.
     /// These have a 1:1 relationship with `Entity`s except that a pending handle has no
     /// `Entity` yet.
-    inner: Arc<Inner<T>>,
+    inner: Arc<Inner>,
+    _phantom: PhantomData<fn(&Universe) -> &T>,
 }
 
-struct Inner<T> {
+struct Inner {
     /// Shared mutable state defining the current relationship of the handle to a universe.
-    state: Mutex<State<T>>,
+    state: Mutex<State>,
 
     /// The ID of the universe this handle belongs to, if any.
     ///
@@ -68,33 +71,17 @@ struct Inner<T> {
 /// Strongly-referenced mutable state shared by all clones of a [`Handle`].
 /// This is modified by operations such as inserting into a [`Universe`].
 #[derive(Debug)]
-enum State<T> {
+enum State {
     /// Not yet (or never will be) inserted into a [`Universe`].
-    ///
-    /// This state owns the `T` value.
+    /// Always has an associated [`UniverseTransaction`].
+    /// Its value, if it has one, is stored separately in the transaction.
     ///
     /// May transition to [`State::Member`].
     ///
     /// This state should always be accompanied by `Inner::universe_id` having no value.
     /// `Inner::name` may or may not have a value yet; if it does not, that corresponds to
     /// a not-yet-assigned [`Name::Anonym`].
-    ///
-    /// TODO(https://github.com/kpreid/all-is-cubes/issues/633): This value storage needs to go away.
-    Pending {
-        /// Owns the value.
-        ///
-        /// This is used to allow constructing `Handle`s with targets *before* they are
-        /// inserted into a [`Universe`], and thus inserting entire trees into the
-        /// Universe. Upon that insertion, these strong references are dropped by
-        /// changing the state.
-        value_arc: Arc<T>,
-    },
-
-    /// Not yet (or never will be) inserted into a [`Universe`],
-    /// and the value has not yet been supplied.
-    ///
-    /// May transition to [`State::Member`].
-    PendingWithoutValue,
+    Pending,
 
     /// Halfway inserted into a [`Universe`], and has no value yet, because it
     /// is a handle that is being deserialized.
@@ -120,7 +107,7 @@ enum State<T> {
 impl<T: 'static> Handle<T> {
     /// Private helper constructor for the common part.
     #[track_caller]
-    fn new_from_state(name: Name, state: State<T>) -> Self {
+    fn new_from_state(name: Name, state: State) -> Self {
         let permanent_name = match name {
             Name::Pending => None,
             name => Some(name),
@@ -133,39 +120,19 @@ impl<T: 'static> Handle<T> {
                 state: Mutex::new(state),
                 strong_handle_count: atomic::AtomicUsize::new(0),
             }),
+            _phantom: PhantomData,
         }
     }
 
-    /// Constructs a new [`Handle`] that is not yet associated with any [`Universe`],
-    /// and strongly references its value (until inserted into a universe).
+    /// Constructs a new [`Handle`] that is not yet associated with any [`Universe`] or value.
     ///
-    /// This may be used to construct subtrees that are later inserted into a
-    /// [`Universe`]. Caution: creating cyclic structure and never inserting it
-    /// will result in a memory leak.
+    /// This is used internally when constructing [`UniverseTransaction`]s.
     ///
     /// Note that specifying a [`Name::Anonym`] will create a `Handle` which cannot actually
     /// be inserted into another [`Universe`], even if the specified number is free.
     /// This is permitted but not recommended.
-    //---
-    // TODO(ecs): We need to get rid of this in favor of values/members always being stored in
-    // `Universe` or `UniverseTransaction`, so that handles can be simply `Sync` and so that
-    // members can be made of multiple components.
-    pub(crate) fn new_pending(name: Name, initial_value: T) -> Self {
-        Self::new_from_state(
-            name,
-            State::Pending {
-                value_arc: Arc::new(initial_value),
-            },
-        )
-    }
-
-    /// Constructs a [`Handle`] that does not refer to a value, because the value has
-    /// not yet been supplied.
-    ///
-    /// This type of handle is used for constructing cyclic references, and is returned by
-    /// [`UniverseTransaction::insert_without_value()`].
-    pub(crate) fn new_pending_without_value(name: Name) -> Handle<T> {
-        Self::new_from_state(name, State::PendingWithoutValue)
+    pub(in crate::universe) fn new_pending(name: Name) -> Handle<T> {
+        Self::new_from_state(name, State::Pending)
     }
 
     /// Constructs a [`Handle`] that does not refer to a value, as if it used to but
@@ -222,7 +189,7 @@ impl<T: 'static> Handle<T> {
     where
         T: UniverseMember,
     {
-        let mut state_guard: MutexGuard<'_, State<T>> =
+        let mut state_guard: MutexGuard<'_, State> =
             self.inner.state.lock().expect("Handle::state lock error");
 
         let State::Deserializing { entity } = *state_guard else {
@@ -283,14 +250,12 @@ impl<T: 'static> Handle<T> {
             #[cfg(feature = "save")]
             (_, State::Deserializing { .. }) => Err(HandleError::NotReady(self.name())),
             // TODO: WrongUniverse isn't the clearest error for this
-            (_, State::Pending { .. } | State::PendingWithoutValue) => {
-                Err(HandleError::WrongUniverse {
-                    ticket_universe_id: Some(expected_universe),
-                    handle_universe_id,
-                    name: self.name(),
-                    ticket_origin: Location::caller(),
-                })
-            }
+            (_, State::Pending) => Err(HandleError::WrongUniverse {
+                ticket_universe_id: Some(expected_universe),
+                handle_universe_id,
+                name: self.name(),
+                ticket_origin: Location::caller(),
+            }),
         }
     }
 
@@ -322,22 +287,18 @@ impl<T: 'static> Handle<T> {
         /// This intermediate structure is not strictly necessary for lock ordering,
         /// but it makes things a little more clearly OK and slightly shortens the duration
         /// the state mutex is locked.
-        enum Access<T> {
-            Pending(Arc<T>),
+        enum Access {
+            Pending,
             Entity(ecs::Entity),
         }
 
         // Use the state mutex to figure out how to obtain access.
-        let access: Access<T> = match *self.inner.state.lock().expect("Handle::state lock error") {
-            State::Pending { ref value_arc } => {
-                read_ticket
-                    .ensure_has_transaction_access()
-                    .map_err(|e| e.into_handle_error(self))?;
-                Access::Pending(value_arc.clone())
-            }
-            State::PendingWithoutValue => return Err(HandleError::ValueMissing(self.name())),
+        let access: Access = match *self.inner.state.lock().expect("Handle::state lock error") {
+            State::Pending => Access::Pending,
             #[cfg(feature = "save")]
-            State::Deserializing { entity: _ } => return Err(HandleError::NotReady(self.name())),
+            State::Deserializing { entity: _ } => {
+                return Err(HandleError::NotReady(self.name()));
+            }
             State::Member { entity } => {
                 let handle_universe_id = self.inner.universe_id.get(atomic::Ordering::Relaxed);
                 debug_assert!(handle_universe_id.is_some());
@@ -372,15 +333,16 @@ impl<T: 'static> Handle<T> {
 
         // Actually obtain access.
         match access {
-            Access::Pending(value_arc) => {
-                let inner = value_arc.clone();
-                Ok(ReadGuard(ReadGuardKind::Pending(inner)))
-            }
+            Access::Pending => Ok(ReadGuard(
+                read_ticket
+                    .borrow_pending(self)
+                    .map_err(|e| e.into_handle_error(self))?,
+            )),
             Access::Entity(entity) => {
                 let component = read_ticket
                     .get::<T>(entity)
                     .map_err(|e| e.into_handle_error(self))?;
-                Ok(ReadGuard(ReadGuardKind::World(component)))
+                Ok(ReadGuard(component))
             }
         }
     }
@@ -397,7 +359,7 @@ impl<T: 'static> Handle<T> {
         // TODO(ecs): Deduplicate this setup code with read()
         let entity: ecs::Entity = match *self.inner.state.lock().expect("Handle::state lock error")
         {
-            State::Pending { .. } | State::PendingWithoutValue => {
+            State::Pending => {
                 // TODO(ecs): proper error
                 panic!("cannot use query() on pending handles")
             }
@@ -444,9 +406,9 @@ impl<T: 'static> Handle<T> {
     /// Returns whether this [`Handle`] does not yet belong to a universe and can start.
     /// doing so. Used by [`UniverseTransaction`].
     ///
-    /// TODO: There's a TOCTTOU problem here. We should modify the state and return a
-    /// ticket (that resets the state if dropped without use), so that other simultaneous
-    /// attempted `upgrade_pending()`s cannot succeed.
+    /// TODO(ecs): with the new way pending handles work, being always associated with a
+    /// transaction, this check should not be necessary any more, but we do want to keep the
+    /// `visit_handles()` part.
     pub(in crate::universe) fn check_upgrade_pending(
         &self,
         read_ticket_for_self: ReadTicket<'_>,
@@ -466,13 +428,7 @@ impl<T: 'static> Handle<T> {
 
         match self.inner.state.lock() {
             Ok(state_guard) => match &*state_guard {
-                State::Pending { .. } => {}
-                State::PendingWithoutValue => {
-                    return Err(InsertError {
-                        name: self.name(),
-                        kind: InsertErrorKind::ValueMissing,
-                    });
-                }
+                State::Pending => { /* OK */ }
                 State::Member { .. } => {
                     return Err(InsertError {
                         name: self.name(),
@@ -561,14 +517,17 @@ impl<T: 'static> Handle<T> {
     }
 
     /// If this [`Handle`] does not yet belong to a universe, create its association with one.
-    pub(in crate::universe) fn upgrade_pending(
-        &self,
+    ///
+    /// This is normally called via [`AnyPending::insert_pending_into_universe()`].
+    pub(in crate::universe) fn insert_pending_into_universe(
+        self,
         universe: &mut Universe,
+        #[allow(clippy::boxed_local)] value: Box<T>,
     ) -> Result<(), InsertError>
     where
         T: UniverseMember,
     {
-        let mut state_guard: MutexGuard<'_, State<T>> =
+        let mut state_guard: MutexGuard<'_, State> =
             self.inner.state.lock().expect("Handle::state lock error");
 
         self.inner
@@ -591,19 +550,13 @@ impl<T: 'static> Handle<T> {
             reason: GoneReason::Placeholder {},
         };
 
-        let value: T = match mem::replace(&mut *state_guard, placeholder_state) {
+        match mem::replace(&mut *state_guard, placeholder_state) {
+            State::Pending => { /* OK */ }
             state @ State::Gone { .. } => {
                 *state_guard = state;
                 return Err(InsertError {
                     name: pending_name,
                     kind: InsertErrorKind::Gone,
-                });
-            }
-            state @ State::PendingWithoutValue => {
-                *state_guard = state;
-                return Err(InsertError {
-                    name: pending_name,
-                    kind: InsertErrorKind::ValueMissing,
                 });
             }
             state @ State::Member { .. } => {
@@ -621,10 +574,7 @@ impl<T: 'static> Handle<T> {
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
-            State::Pending { value_arc } => Arc::try_unwrap(value_arc).expect(
-                "TODO(ecs): this should become impossible when the values are owned by txn",
-            ),
-        };
+        }
 
         let new_name = universe.allocate_name(&pending_name)?;
         let _ = self.inner.permanent_name.set(new_name.clone()); // already-set error is ignored
@@ -633,9 +583,9 @@ impl<T: 'static> Handle<T> {
             .spawn((
                 Membership {
                     name: new_name,
-                    handle: T::into_any_handle(self.clone()),
+                    handle: T::into_any_handle(self.clone()), // can't move because we are holding the state lock
                 },
-                value,
+                *value, // value was boxed until now
             ))
             .id();
         // We may have created a new archetype.
@@ -653,21 +603,6 @@ impl<T: 'static> Handle<T> {
     pub(in crate::universe) fn set_state_to_gone(&self, reason: GoneReason) {
         let state = &mut *self.inner.state.lock().expect("Handle::state lock error");
         *state = State::Gone { reason };
-    }
-
-    /// For `UniverseTransaction::set_pending_value()`.
-    /// This will go away with <https://github.com/kpreid/all-is-cubes/issues/633>.
-    #[track_caller]
-    pub(crate) fn set_pending_value(&self, value: T) {
-        let state = &mut *self.inner.state.lock().expect("Handle::state lock error");
-        match state {
-            State::PendingWithoutValue => {
-                *state = State::Pending {
-                    value_arc: Arc::new(value),
-                }
-            }
-            _ => panic!("incorrect handle state for set_pending_value()"),
-        }
     }
 
     pub(in crate::universe) fn has_strong_handles(&self) -> bool {
@@ -689,17 +624,7 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
         match self.inner.state.lock() {
             Ok(state_guard) => {
                 match &*state_guard {
-                    State::Pending { value_arc, .. } => {
-                        write!(f, " in no universe")?;
-                        if Arc::strong_count(value_arc) <= 1 {
-                            // Write the contents, but only if there are no other handles and thus
-                            // we cannot possibly cause an infinite recursion of formatting
-                            // TODO: maybe only do it if we are in alternate/prettyprint format.
-                            write!(f, " = ")?;
-                            fmt::Debug::fmt(value_arc, f)?;
-                        }
-                    }
-                    State::PendingWithoutValue => write!(f, ", value not yet provided")?,
+                    State::Pending => write!(f, " in no universe")?,
                     #[cfg(feature = "save")]
                     State::Deserializing { .. } => write!(f, ", not yet deserialized")?,
                     State::Member { .. } => { /* normal condition, no message */ }
@@ -736,6 +661,7 @@ impl<T> Clone for Handle<T> {
     fn clone(&self) -> Self {
         Handle {
             inner: self.inner.clone(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -1110,13 +1036,9 @@ impl<T: UniverseMember> Clone for StrongHandle<T> {
 ///
 /// You can create this by calling [`Handle::read()`], and must drop it before the next time
 /// the handle's referent is mutated.
-pub struct ReadGuard<'ticket, T: 'static>(ReadGuardKind<'ticket, T>);
-enum ReadGuardKind<'ticket, T: 'static> {
-    /// Refcounted, from a pending handle.
-    Pending(Arc<T>),
-    /// Borrowed from an [`ecs::World`].
-    World(&'ticket T),
-}
+//---
+// TODO(ecs): This can become just a reference, now. Do that API change as a separate commit.
+pub struct ReadGuard<'ticket, T: 'static>(&'ticket T);
 
 impl<T: fmt::Debug> fmt::Debug for ReadGuard<'_, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1126,10 +1048,7 @@ impl<T: fmt::Debug> fmt::Debug for ReadGuard<'_, T> {
 impl<T> Deref for ReadGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &T {
-        match self.0 {
-            ReadGuardKind::Pending(ref guard) => guard,
-            ReadGuardKind::World(reference) => reference,
-        }
+        self.0
     }
 }
 impl<T> AsRef<T> for ReadGuard<'_, T> {
@@ -1270,33 +1189,8 @@ mod tests {
                 BlockDef::new(ReadTicket::stub(), block::from_color!(Rgba::WHITE)),
             )
             .unwrap();
-        assert_eq!(
-            format!("{handle:?}"),
-            "Handle('foo' in no universe = BlockDef { \
-                block: Block { primitive: Atom { \
-                    color: Rgba(1.0, 1.0, 1.0, 1.0), \
-                    collision: Hard } }, \
-                cache_dirty: Flag(false), \
-                listeners_ok: true, \
-                notifier: Notifier(0), .. })"
-        );
-        assert_eq!(
-            format!("{handle:#?}"),
-            indoc::indoc! { "\
-            Handle('foo' in no universe = BlockDef {
-                block: Block {
-                    primitive: Atom {
-                        color: Rgba(1.0, 1.0, 1.0, 1.0),
-                        collision: Hard,
-                    },
-                },
-                cache_dirty: Flag(false),
-                listeners_ok: true,
-                notifier: Notifier(0),
-                ..
-            })"
-            }
-        );
+        assert_eq!(format!("{handle:?}"), "Handle('foo' in no universe)");
+        assert_eq!(format!("{handle:#?}"), "Handle('foo' in no universe)");
     }
 
     #[test]

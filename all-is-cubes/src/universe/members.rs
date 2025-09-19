@@ -28,21 +28,27 @@ use crate::universe::{
 /// that, it also cannot mention anything we don't also want to make public or
 /// public-in-private.
 #[doc(hidden)]
-#[expect(unnameable_types)]
+#[expect(unnameable_types, private_interfaces)]
 // TODO(ecs): make Component not publicly a supertrait, once we figure out what components typed members actually have
 pub trait UniverseMember:
     Sized + 'static + fmt::Debug + ecs::Component<Mutability = bevy_ecs::component::Mutable>
 {
     /// Generic constructor for [`AnyHandle`].
-    fn into_any_handle(r: Handle<Self>) -> AnyHandle;
+    fn into_any_handle(handle: Handle<Self>) -> AnyHandle;
+    /// Generic constructor for [`AnyPending`].
+    fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending;
 }
 
 /// Generates impls for a specific Universe member type.
 macro_rules! impl_universe_for_member {
     ($member_type:ident, $table:ident) => {
         impl UniverseMember for $member_type {
-            fn into_any_handle(handle: Handle<$member_type>) -> AnyHandle {
+            fn into_any_handle(handle: Handle<Self>) -> AnyHandle {
                 AnyHandle::$member_type(handle)
+            }
+            #[expect(private_interfaces)]
+            fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending {
+                AnyPending::$member_type { handle, value }
             }
         }
 
@@ -98,36 +104,6 @@ macro_rules! member_enums_and_impls {
         }
 
         impl AnyHandle {
-            /// Returns whether this [`Handle`] does not yet belong to a universe and can start
-            /// doing so. Used by [`MemberTxn::check`].
-            ///
-            /// See [`Handle::check_upgrade_pending`] for more information.
-            pub(crate) fn check_upgrade_pending(
-                &self,
-                read_ticket_for_self: $crate::universe::ReadTicket<'_>,
-                universe_id: $crate::universe::UniverseId,
-            ) -> Result<(), $crate::universe::InsertError> {
-                match self {
-                    $(
-                        Self::$member_type(handle) => {
-                            handle.check_upgrade_pending(read_ticket_for_self, universe_id)
-                        }
-                    )*
-                }
-            }
-
-            /// Used by [`MemberTxn::commit()`] to perform inserts.
-            pub(crate) fn insert_and_upgrade_pending(
-                &self,
-                universe: &mut Universe,
-            ) -> Result<(), InsertError> {
-                match self {
-                    $( AnyHandle::$member_type(pending_handle) => {
-                        pending_handle.upgrade_pending(universe)
-                    } )*
-                }
-            }
-
             /// For debugging — not guaranteed to be stable.
             #[doc(hidden)] // TODO: not great API, but used by all-is-cubes-port
             pub fn member_type_name(&self) -> &'static str {
@@ -335,6 +311,127 @@ macro_rules! member_enums_and_impls {
                 }
             }
         }
+
+        /// Holds a pending handle and its value, to be inserted into a universe.
+        ///
+        /// There is no validation that the handle is in fact pending.
+        /// This type is used only within [`crate::universe::universe_txn::MemberTxn`].
+        pub(in crate::universe) enum AnyPending {
+            $(
+                $member_type {
+                    handle: Handle<$member_type>,
+
+                    /// Handle’s value, if it has been provided yet.
+                    /// Insertion always fails if `None`.
+                    ///
+                    /// Boxed so that the size of the enum isn't the size of the largest member type
+                    value: Option<Box<$member_type>>,
+                },
+            )*
+        }
+
+        impl AnyPending {
+            pub(crate) fn handle(&self) -> &dyn ErasedHandle {
+                match self {
+                    $( AnyPending::$member_type { handle, .. } => handle, )*
+                }
+            }
+
+            /// Returns whether this does not yet belong to a universe and can start
+            /// doing so. Used by [`MemberTxn::check()`].
+            ///
+            /// See [`Handle::check_upgrade_pending()`] for more information.
+            pub(crate) fn check_upgrade_pending(
+                &self,
+                read_ticket_for_self: $crate::universe::ReadTicket<'_>,
+                universe_id: $crate::universe::UniverseId,
+            ) -> Result<(), $crate::universe::InsertError> {
+                match self {
+                    $(
+                        Self::$member_type { handle, value: _ } => {
+                            handle.check_upgrade_pending(read_ticket_for_self, universe_id)
+                        }
+                    )*
+                }
+            }
+
+            /// Returns a reference to a `dyn Any` whose underlying type is the owned
+            /// `Option<Box<T>>`.
+            pub(crate) fn value_as_any_option_box(&self) -> &dyn Any {
+                match self {
+                    $(
+                        Self::$member_type { handle: _, value } => value,
+                    )*
+                }
+            }
+            /// Returns a reference to a `dyn Any` whose underlying type is the owned
+            /// `Option<Box<T>>`.
+            pub(crate) fn value_as_mut_any_option_box(&mut self) -> &mut dyn Any {
+                match self {
+                    $(
+                        Self::$member_type { handle: _, value } => value,
+                    )*
+                }
+            }
+
+            /// Used by [`MemberTxn::commit()`] to perform inserts.
+            pub(crate) fn insert_pending_into_universe(
+                self,
+                universe: &mut Universe
+            ) -> Result<(), InsertError> {
+                match self {
+                    $(
+                        AnyPending::$member_type { handle, value } => {
+                            if let Some(value) = value {
+                                handle.insert_pending_into_universe(universe, value)
+                            } else {
+                                Err(InsertError {
+                                    name: handle.name(),
+                                    kind: $crate::universe::InsertErrorKind::ValueMissing,
+                                })
+                            }
+
+                        }
+                    )*
+                }
+            }
+        }
+
+        impl fmt::Debug for AnyPending {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{:?} = ", self.handle())?;
+                match self {
+                    $(
+                        Self::$member_type { handle: _, value: Some(value) } => {
+                            value.fmt(f)?;
+                        },
+                    )*
+                    $( Self::$member_type { handle: _, value: None } )|* => {
+                        write!(f, "<value not set>")?;
+                    }
+                }
+                Ok(())
+            }
+        }
+
+        impl PartialEq for AnyPending {
+            fn eq(&self, rhs: &Self) -> bool {
+                match (self, rhs) {
+                    $(
+                        (
+                            AnyPending::$member_type { handle: h1, value: _ },
+                            AnyPending::$member_type { handle: h2, value: _ },
+                        ) => {
+                            // It should be impossible for two `AnyPending`s with the same handle
+                            // to exist, and the value may not implement `PartialEq`, so we don't.
+                            h1 == h2
+                        }
+                    )*
+                    (_, _) => false,
+                }
+            }
+        }
+        impl Eq for AnyPending {}
     }
 }
 
@@ -420,13 +517,29 @@ impl hash::Hash for AnyHandle {
     }
 }
 
-impl<T: UniverseMember> PartialEq<Handle<T>> for AnyHandle {
-    fn eq(&self, other: &Handle<T>) -> bool {
+impl PartialEq<dyn ErasedHandle> for AnyHandle {
+    fn eq(&self, other: &dyn ErasedHandle) -> bool {
+        self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
+    }
+}
+impl hashbrown::Equivalent<AnyHandle> for dyn ErasedHandle {
+    fn equivalent(&self, other: &AnyHandle) -> bool {
         self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
     }
 }
 
-impl<T: UniverseMember> PartialEq<AnyHandle> for Handle<T> {
+impl<T> PartialEq<Handle<T>> for AnyHandle
+where
+    Handle<T>: HandlePtr,
+{
+    fn eq(&self, other: &Handle<T>) -> bool {
+        self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
+    }
+}
+impl<T> PartialEq<AnyHandle> for Handle<T>
+where
+    Handle<T>: HandlePtr,
+{
     fn eq(&self, other: &AnyHandle) -> bool {
         *other == *self
     }

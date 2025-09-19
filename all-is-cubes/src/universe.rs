@@ -1,5 +1,6 @@
 //! [`Universe`], the top-level game-world container.
 
+use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -67,7 +68,7 @@ mod tests;
 /// A collection of named objects which can refer to each other via [`Handle`],
 /// and which are simulated at the same time steps.
 ///
-/// A `Universe` consists of:
+/// A [`Universe`] consists of:
 ///
 /// * _members_ of various types, which may be identified using [`Name`]s or [`Handle`]s.
 /// * [`Behavior`](behavior::Behavior)s that modify the [`Universe`] itself.
@@ -75,8 +76,8 @@ mod tests;
 /// * A [`WhenceUniverse`] defining where its data is persisted, if anywhere.
 /// * A [`UniverseId`] unique within this process.
 ///
-/// `Universe` is a quite large data structure, so it may be desirable to keep it in a
-/// [`Box`][alloc::boxed::Box], especially when being passed through `async` blocks.
+/// [`Universe`] is a quite large data structure, so it may be desirable to keep it in a
+/// [`Box`], especially when being passed through `async` blocks.
 ///
 #[doc = include_str!("save/serde-warning.md")]
 pub struct Universe {
@@ -482,8 +483,9 @@ impl Universe {
     where
         T: UniverseMember,
     {
-        let handle = Handle::new_pending(name, value);
-        handle.to_any_handle().insert_and_upgrade_pending(self)?;
+        let handle = Handle::new_pending(name);
+        UniverseMember::into_any_pending(handle.clone(), Some(Box::new(value)))
+            .insert_pending_into_universe(self)?;
         Ok(handle)
     }
 

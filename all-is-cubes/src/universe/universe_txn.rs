@@ -11,14 +11,14 @@ use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transacti
 #[cfg(doc)]
 use crate::universe::HandleError;
 use crate::universe::{
-    AnyHandle, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadTicket, Universe,
+    AnyPending, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadTicket, Universe,
     UniverseId, UniverseMember,
 };
 
 // Reëxports for macro-generated types
 #[doc(inline)]
 pub(in crate::universe) use crate::universe::members::{
-    AnyTransaction, AnyTransactionConflict, AnyTransactionMismatch,
+    AnyHandle, AnyTransaction, AnyTransactionConflict, AnyTransactionMismatch,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -416,8 +416,9 @@ impl UniverseTransaction {
         name: Name,
         value: T,
     ) -> Result<Handle<T>, InsertError> {
-        let handle = Handle::new_pending(name, value);
+        let handle = Handle::new_pending(name);
         self.insert_named_handle_inner(handle.clone())?;
+        self.set_pending_value(&handle, value);
         Ok(handle)
     }
 
@@ -428,10 +429,13 @@ impl UniverseTransaction {
     /// fail to merge with the current state of the transaction, and it is a commonly needed
     /// operation.
     pub fn insert_anonymous<T: UniverseMember>(&mut self, value: T) -> Handle<T> {
-        let handle = Handle::new_pending(Name::Pending, value);
+        let handle = Handle::new_pending(Name::Pending);
         self.anonymous_insertions.insert(
             T::into_any_handle(handle.clone()),
-            MemberTxn::Insert(UniverseMember::into_any_handle(handle.clone())),
+            MemberTxn::Insert(UniverseMember::into_any_pending(
+                handle.clone(),
+                Some(Box::new(value)),
+            )),
         );
         handle
     }
@@ -449,7 +453,7 @@ impl UniverseTransaction {
         &mut self,
         name: Name,
     ) -> Result<Handle<T>, InsertError> {
-        let handle = Handle::new_pending_without_value(name);
+        let handle = Handle::new_pending(name);
         self.insert_named_handle_inner(handle.clone())?;
         Ok(handle)
     }
@@ -463,18 +467,10 @@ impl UniverseTransaction {
     /// or the value has already been set.
     #[track_caller]
     pub fn set_pending_value<T: UniverseMember>(&mut self, handle: &Handle<T>, value: T) {
-        let name = handle.name();
-        let member_txn = self.members.get_mut(&name).expect("handle not present");
-        match member_txn {
-            MemberTxn::Insert(our_handle) => {
-                assert_eq!(
-                    handle, our_handle,
-                    "handle is a different handle with the same name"
-                );
-                handle.set_pending_value(value);
-            }
-            _ => panic!("transaction is not inserting handle {name}"),
-        }
+        let value_option: &mut Option<Box<T>> = self
+            .get_pending_mut(handle)
+            .expect("handle not present in this transaction");
+        *value_option = Some(Box::new(value));
     }
 
     /// Given a handle that is newly created, add it to this transaction's set of handles to insert,
@@ -486,7 +482,7 @@ impl UniverseTransaction {
         handle: Handle<T>,
     ) -> Result<(), InsertError> {
         let name = handle.name();
-        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle.clone()));
+        let insertion = MemberTxn::Insert(UniverseMember::into_any_pending(handle.clone(), None));
         match name {
             name @ (Name::Specific(_) | Name::Anonym(_)) => {
                 match self.members.entry(name.clone()) {
@@ -548,6 +544,74 @@ impl UniverseTransaction {
     #[track_caller]
     pub fn read_ticket(&self) -> ReadTicket<'_> {
         ReadTicket::stub().with_transaction(self)
+    }
+
+    /// Given a handle which would be inserted by this transaction, get access to its value.
+    ///
+    /// Returns [`None`] if the handle does not belong to this transaction.
+    /// Returns `Some(None)` if the value is not yet set.
+    pub(in crate::universe) fn get_pending<T: UniverseMember>(
+        &self,
+        handle: &Handle<T>,
+    ) -> Option<&Option<Box<T>>> {
+        let member_txn: &MemberTxn = match handle.name() {
+            name @ (Name::Specific(_) | Name::Anonym(_)) => self.members.get(&name),
+            Name::Pending => {
+                let handle: &dyn ErasedHandle = handle;
+                self.anonymous_insertions.get(handle)
+            }
+        }?;
+        match member_txn {
+            MemberTxn::Insert(any_pending) => {
+                if any_pending.handle() != handle {
+                    // Handle with same name but wrong universe/txn
+                    return None;
+                }
+                Some(
+                    any_pending
+                        .value_as_any_option_box()
+                        .downcast_ref()
+                        .expect("impossible handle type mismatch"),
+                )
+            }
+            // The handle is not pending, but  already inserted and being modified by this
+            // transaction.
+            _ => None,
+        }
+    }
+
+    /// Given a handle which would be inserted by this transaction, get access to its value.
+    ///
+    /// Returns [`None`] if the handle does not belong to this transaction.
+    /// Returns `Some(None)` if the value is not yet set.
+    pub(in crate::universe) fn get_pending_mut<T: UniverseMember>(
+        &mut self,
+        handle: &Handle<T>,
+    ) -> Option<&mut Option<Box<T>>> {
+        let member_txn: &mut MemberTxn = match handle.name() {
+            name @ (Name::Specific(_) | Name::Anonym(_)) => self.members.get_mut(&name),
+            Name::Pending => {
+                let handle: &dyn ErasedHandle = handle;
+                self.anonymous_insertions.get_mut(handle)
+            }
+        }?;
+        match member_txn {
+            MemberTxn::Insert(any_pending) => {
+                if any_pending.handle() != handle {
+                    // Handle with same name but wrong universe/txn
+                    return None;
+                }
+                Some(
+                    any_pending
+                        .value_as_mut_any_option_box()
+                        .downcast_mut()
+                        .expect("impossible handle type mismatch"),
+                )
+            }
+            // The handle is not pending, but  already inserted and being modified by this
+            // transaction.
+            _ => None,
+        }
     }
 }
 
@@ -760,7 +824,7 @@ enum MemberTxn {
     ///
     /// Note: This transaction can only succeed once, since after the first time it will
     /// no longer be pending.
-    Insert(AnyHandle),
+    Insert(AnyPending),
     /// Delete this member from the universe.
     ///
     /// See [`UniverseTransaction::delete()`] for full documentation.
@@ -787,9 +851,9 @@ impl MemberTxn {
                 txn.check(universe)
                     .map_err(|e| MemberMismatch::Modify(ModifyMemberMismatch(e)))?,
             ))),
-            MemberTxn::Insert(pending_handle) => {
+            MemberTxn::Insert(pending) => {
                 {
-                    if pending_handle.name() != *name {
+                    if pending.handle().name() != *name {
                         return Err(MemberMismatch::Insert(InsertError {
                             name: name.clone(),
                             kind: InsertErrorKind::AlreadyInserted,
@@ -814,9 +878,7 @@ impl MemberTxn {
                         kind: InsertErrorKind::AlreadyExists,
                     }));
                 }
-                // TODO: This has a TOCTTOU problem because it doesn't ensure another thread
-                // couldn't insert the ref in the mean time.
-                pending_handle
+                pending
                     .check_upgrade_pending(whole_transaction.read_ticket(), universe.id)
                     .map_err(MemberMismatch::Insert)?;
                 Ok(MemberCommitCheck(None))
@@ -850,9 +912,9 @@ impl MemberTxn {
             MemberTxn::Modify(txn) => {
                 txn.commit(universe, (), check.expect("missing check value"), outputs)
             }
-            MemberTxn::Insert(pending_handle) => {
-                pending_handle
-                    .insert_and_upgrade_pending(universe)
+            MemberTxn::Insert(pending) => {
+                pending
+                    .insert_pending_into_universe(universe)
                     .map_err(CommitError::catch::<UniverseTransaction, InsertError>)?;
                 Ok(())
             }
@@ -1140,17 +1202,15 @@ mod tests {
                     },
                 },
                 [anonymous pending]: Insert(
-                    BlockDef(
-                        Handle([pending anonymous] in no universe = BlockDef {
-                            block: Block {
-                                primitive: Air,
-                            },
-                            cache_dirty: Flag(false),
-                            listeners_ok: true,
-                            notifier: Notifier(0),
-                            ..
-                        }),
-                    ),
+                    Handle([pending anonymous] in no universe) = BlockDef {
+                        block: Block {
+                            primitive: Air,
+                        },
+                        cache_dirty: Flag(false),
+                        listeners_ok: true,
+                        notifier: Notifier(0),
+                        ..
+                    },
                 ),
                 behaviors: BehaviorSetTransaction {
                     replace: {},

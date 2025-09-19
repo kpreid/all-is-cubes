@@ -9,10 +9,10 @@ use core::panic::Location;
 use bevy_ecs::prelude as ecs;
 use bevy_ecs::world::unsafe_world_cell::UnsafeWorldCell;
 
-use crate::universe::{self, GoneReason, HandleError, Universe, UniverseId};
+use crate::universe::{self, GoneReason, Handle, HandleError, Universe, UniverseId};
 
 #[cfg(doc)]
-use crate::{block::Block, universe::Handle};
+use crate::block::Block;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -227,18 +227,29 @@ impl<'universe> ReadTicket<'universe> {
         self
     }
 
-    /// Succeeds only if this ticket allows access to a transaction.
-    ///
-    /// TODO: This is a placeholder for the access actually being made through the transaction
-    /// reference.
-    pub(crate) fn ensure_has_transaction_access(&self) -> Result<(), ReadTicketError> {
-        match self.transaction_access {
-            Some(_) => Ok(()),
-            None => Err(ReadTicketError {
+    /// Given a handle that is a pending handle in this transaction, get read access to the value.
+    pub(crate) fn borrow_pending<T: universe::UniverseMember>(
+        &self,
+        handle: &Handle<T>,
+    ) -> Result<&'universe T, ReadTicketError> {
+        let Some(txn) = self.transaction_access else {
+            return Err(ReadTicketError {
                 kind: TicketErrorKind::Transaction,
                 ticket_origin: self.origin,
-            }),
-        }
+            });
+        };
+        let value: &T = txn
+            .get_pending(handle)
+            .ok_or(ReadTicketError {
+                ticket_origin: self.origin,
+                kind: TicketErrorKind::NotTransaction,
+            })?
+            .as_ref()
+            .ok_or(ReadTicketError {
+                ticket_origin: self.origin,
+                kind: TicketErrorKind::ValueMissing,
+            })?;
+        Ok(value)
     }
 }
 
@@ -303,9 +314,15 @@ pub(crate) enum TicketErrorKind {
     /// The ticket does not allow access to the entity because the entity is being mutated.
     #[displaydoc("this entity is being mutated")]
     BeingMutated,
-    /// The ticket does not allow access to this universe or any other.
+    /// The ticket is for a transaction, but the handle belongs to a universe.
     #[displaydoc("ticket is for a transaction, not a universe")]
     Transaction,
+    /// The ticket is for a universe or the wrong transaction, but the handle belongs to a
+    /// transaction.
+    #[displaydoc("handle is pending, but ticket is not for that handle's insertion transaction")]
+    NotTransaction,
+    #[displaydoc("pending handle does not have a value, and therefore cannot be read")]
+    ValueMissing,
     /// The ticket does not allow access to this universe or any other.
     #[displaydoc("ticket is a stub")]
     Stub,
@@ -337,6 +354,14 @@ impl ReadTicketError {
                 name: handle.name(),
                 ticket_origin: self.ticket_origin,
             },
+            TicketErrorKind::NotTransaction => HandleError::WrongUniverse {
+                // TODO: details are missing here
+                ticket_universe_id: None,
+                handle_universe_id: None,
+                name: handle.name(),
+                ticket_origin: self.ticket_origin,
+            },
+            TicketErrorKind::ValueMissing => HandleError::ValueMissing(handle.name()),
             TicketErrorKind::Stub => unreachable!("universe ID should already have been checked"),
         }
     }
