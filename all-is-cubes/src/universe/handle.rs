@@ -471,7 +471,7 @@ impl<T: 'static> Handle<T> {
     pub fn execute_on_pending<'ticket>(
         &self,
         read_ticket: ReadTicket<'ticket>,
-        transaction: &<T as Transactional>::Transaction,
+        transaction: <T as Transactional>::Transaction,
     ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
     where
         T: Transactional,

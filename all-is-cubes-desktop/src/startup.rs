@@ -118,7 +118,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
                     &record_options,
                 )
             });
-            if let Err(e) = ctx.execute(&record_setup_transaction) {
+            if let Err(e) = ctx.execute(record_setup_transaction) {
                 report_error_and_exit(
                     &ctx,
                     anyhow::Error::from(e).context("failed to configure session for recording"),

@@ -103,7 +103,7 @@ fn listen_indirect_atom() {
     universe
         .execute_1(
             &block_def_handle,
-            &BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
+            BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
         )
         .unwrap();
     assert_eq!(log.drain().len(), 1);
@@ -141,7 +141,7 @@ fn listen_indirect_double() {
     universe
         .execute_1(
             &block_def_handle1,
-            &BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
+            BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
         )
         .unwrap();
     assert_eq!([log1.drain().len(), log2.drain().len()], [1, 0]);
@@ -154,7 +154,7 @@ fn listen_indirect_double() {
     universe
         .execute_1(
             &block_def_handle2,
-            &BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
+            BlockDefTransaction::overwrite(block::from_color!(Rgba::BLACK)),
         )
         .unwrap();
     assert_eq!(log2.drain().len(), 1);
@@ -162,7 +162,7 @@ fn listen_indirect_double() {
     universe
         .execute_1(
             &block_def_handle1,
-            &BlockDefTransaction::overwrite(block::from_color!(Rgba::WHITE)),
+            BlockDefTransaction::overwrite(block::from_color!(Rgba::WHITE)),
         )
         .unwrap();
     assert_eq!(log2.drain(), vec![]);
@@ -185,7 +185,7 @@ fn listen_recur() {
     universe
         .execute_1(
             &space_handle,
-            &SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)),
+            SpaceTransaction::set_cube([0, 0, 0], None, Some(block_0)),
         )
         .unwrap();
     assert_eq!(log.drain().len(), 1);
@@ -196,7 +196,7 @@ fn listen_recur() {
     universe
         .execute_1(
             &space_handle,
-            &SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)),
+            SpaceTransaction::set_cube([1, 0, 0], None, Some(block_1)),
         )
         .unwrap();
     assert_eq!(log.drain(), vec![]);
@@ -269,10 +269,7 @@ fn self_referential_block(universe: &mut Universe) -> Block {
         .unwrap();
     let indirect = Block::from(block_def.clone());
     universe
-        .execute_1(
-            &block_def,
-            &BlockDefTransaction::overwrite(indirect.clone()),
-        )
+        .execute_1(&block_def, BlockDefTransaction::overwrite(indirect.clone()))
         .unwrap();
     indirect
 }
@@ -316,7 +313,7 @@ mod txn {
 
         // Now mutate it and we should see a notification.
         universe
-            .execute_1(&block_def_handle, &BlockDefTransaction::overwrite(b2))
+            .execute_1(&block_def_handle, BlockDefTransaction::overwrite(b2))
             .unwrap();
         assert_eq!(log.drain().len(), 1);
     }

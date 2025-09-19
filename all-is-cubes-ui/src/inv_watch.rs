@@ -309,7 +309,7 @@ mod tests {
         t.universe
             .execute_1(
                 &t.character,
-                &CharacterTransaction::inventory(inv::InventoryTransaction::insert([
+                CharacterTransaction::inventory(inv::InventoryTransaction::insert([
                     inv::Tool::Activate,
                 ])),
             )
@@ -330,7 +330,7 @@ mod tests {
         t.universe
             .execute_1(
                 &new_character,
-                &CharacterTransaction::inventory(inv::InventoryTransaction::insert([
+                CharacterTransaction::inventory(inv::InventoryTransaction::insert([
                     inv::Tool::Activate,
                 ])),
             )

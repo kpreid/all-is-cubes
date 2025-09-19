@@ -633,7 +633,7 @@ fn modify_def(indirect: &Block, f: impl FnOnce(&mut Block)) {
         .clone();
     f(&mut block);
     block_def_handle
-        .execute_on_pending(ReadTicket::stub(), &BlockDefTransaction::overwrite(block))
+        .execute_on_pending(ReadTicket::stub(), BlockDefTransaction::overwrite(block))
         .expect("BlockDef mutation transaction failed");
 }
 

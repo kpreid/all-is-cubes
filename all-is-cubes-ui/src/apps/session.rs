@@ -1215,7 +1215,7 @@ impl MainTaskContext {
     /// Executes a transaction on the game universe of this session..
     pub fn execute(
         &mut self,
-        transaction: &UniverseTransaction,
+        transaction: UniverseTransaction,
     ) -> Result<(), transaction::ExecuteError> {
         self.with_mut(|shuttle| {
             transaction.execute(&mut shuttle.game_universe, (), &mut transaction::no_outputs)
@@ -1457,7 +1457,10 @@ mod tests {
         session.listen_fluff(log.listener());
 
         // Try some fluff with the initial state (we haven't even stepped the session)
-        session.universe_mut().execute_1(&space1, &st).unwrap();
+        session
+            .universe_mut()
+            .execute_1(&space1, st.clone())
+            .unwrap();
         assert_eq!(log.drain(), vec![Fluff::Happened]);
 
         // Change spaces
@@ -1465,15 +1468,18 @@ mod tests {
             .universe_mut()
             .execute_1(
                 &character,
-                &CharacterTransaction::move_to_space(space2.clone()),
+                CharacterTransaction::move_to_space(space2.clone()),
             )
             .unwrap();
         session.maybe_step_universe();
 
         // Check we're now listening to the new space only
-        session.universe_mut().execute_1(&space1, &st).unwrap();
+        session
+            .universe_mut()
+            .execute_1(&space1, st.clone())
+            .unwrap();
         assert_eq!(log.drain(), vec![]);
-        session.universe_mut().execute_1(&space2, &st).unwrap();
+        session.universe_mut().execute_1(&space2, st).unwrap();
         assert_eq!(log.drain(), vec![Fluff::Happened]);
     }
 

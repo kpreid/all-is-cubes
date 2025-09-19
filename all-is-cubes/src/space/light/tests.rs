@@ -103,7 +103,7 @@ fn step() {
     universe
         .execute_1(
             &space,
-            &CubeTransaction::replacing(None, Some(block::from_color!(Rgb::ONE))).at(Cube::ORIGIN),
+            CubeTransaction::replacing(None, Some(block::from_color!(Rgb::ONE))).at(Cube::ORIGIN),
         )
         .unwrap();
     // Not changed yet... except for the now-opaque block

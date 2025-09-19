@@ -99,7 +99,7 @@ pub trait Transaction: Merge {
     /// wrong components, signaling an error partway through the transaction, or merely
     /// committing the transaction while its preconditions do not hold.
     fn commit(
-        &self,
+        self,
         target: &mut Self::Target,
         context: Self::Context<'_>,
         check: Self::CommitCheck,
@@ -123,7 +123,7 @@ pub trait Transaction: Merge {
     ///
     /// See also: [`Transactional::transact()`], for building a transaction through mutations.
     fn execute(
-        &self,
+        self,
         target: &mut Self::Target,
         context: Self::Context<'_>,
         outputs: &mut dyn FnMut(Self::Output),

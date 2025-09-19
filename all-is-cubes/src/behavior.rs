@@ -633,16 +633,16 @@ impl<H: Host> Transaction for BehaviorSetTransaction<H> {
     }
 
     fn commit(
-        &self,
+        self,
         target: &mut BehaviorSet<H>,
         (): Self::Context<'_>,
         _: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        for (key, replacement) in &self.replace {
-            match &replacement.new {
+        for (key, replacement) in self.replace {
+            match replacement.new {
                 Some(new) => {
-                    let Some(entry) = target.members.get_mut(key) else {
+                    let Some(entry) = target.members.get_mut(&key) else {
                         return Err(transaction::CommitError::message::<Self>(format!(
                             "behavior set does not contain key {key}"
                         )));
@@ -651,7 +651,7 @@ impl<H: Host> Transaction for BehaviorSetTransaction<H> {
                         attachment,
                         behavior,
                         waker,
-                    } = new.clone();
+                    } = new;
                     assert!(
                         waker.is_none(),
                         "transaction entries should not have wakers"
@@ -660,7 +660,7 @@ impl<H: Host> Transaction for BehaviorSetTransaction<H> {
                     entry.behavior = behavior;
                 }
                 None => {
-                    let Some(_) = target.members.remove(key) else {
+                    let Some(_) = target.members.remove(&key) else {
                         return Err(transaction::CommitError::message::<Self>(format!(
                             "behavior set does not contain key {key}"
                         )));

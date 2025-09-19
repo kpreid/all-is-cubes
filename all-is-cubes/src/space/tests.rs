@@ -483,10 +483,7 @@ fn listens_to_block_changes() {
     // Now mutate the block def.
     let new_block = block::from_color!(Rgba::BLACK);
     universe
-        .execute_1(
-            &block_def_handle,
-            &BlockDefTransaction::overwrite(new_block),
-        )
+        .execute_1(&block_def_handle, BlockDefTransaction::overwrite(new_block))
         .unwrap();
     let new_evaluated = Block::from(block_def_handle)
         .evaluate(universe.read_ticket())
@@ -537,7 +534,7 @@ fn indirect_becomes_evaluation_error() {
     universe
         .execute_1(
             &block_def_ref,
-            &BlockDefTransaction::overwrite(block.clone()),
+            BlockDefTransaction::overwrite(block.clone()),
         )
         .unwrap();
 
@@ -825,7 +822,7 @@ fn block_tick_action_conflict() {
     universe
         .execute_1(
             &space,
-            &CubeTransaction::replacing(Some(modifies_nx_neighbor), Some(AIR)).at(right),
+            CubeTransaction::replacing(Some(modifies_nx_neighbor), Some(AIR)).at(right),
         )
         .unwrap();
 

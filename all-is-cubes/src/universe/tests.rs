@@ -152,9 +152,9 @@ fn insert_anonymous_makes_distinct_names() {
     let mut u = Universe::new();
     let handle_a = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     let handle_b = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
-    u.execute_1(&handle_a, &BlockDefTransaction::overwrite(block_0))
+    u.execute_1(&handle_a, BlockDefTransaction::overwrite(block_0))
         .unwrap();
-    u.execute_1(&handle_b, &BlockDefTransaction::overwrite(block_1))
+    u.execute_1(&handle_b, BlockDefTransaction::overwrite(block_1))
         .unwrap();
     assert_ne!(handle_a, handle_b, "not equal");
     assert_ne!(
@@ -344,7 +344,7 @@ fn delete_twice_fails() {
     let txn = UniverseTransaction::delete(handle);
 
     // Deletion should succeed...
-    txn.execute(&mut u, (), &mut drop).unwrap();
+    txn.clone().execute(&mut u, (), &mut drop).unwrap();
     // ...but not trying to delete the same thing again.
     txn.execute(&mut u, (), &mut drop).unwrap_err();
 }

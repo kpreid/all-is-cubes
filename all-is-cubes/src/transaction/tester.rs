@@ -82,7 +82,7 @@ where
                     let output_callback = &mut |_| {
                         // TODO: allow assertions about the output
                     };
-                    match tap.transaction.commit(
+                    match tap.transaction.clone().commit(
                         &mut target,
                         context.clone(),
                         check,

@@ -45,7 +45,7 @@ pub(in crate::universe) fn check_transaction_in_universe<O: UniverseMember + Tra
 pub(in crate::universe) fn commit_transaction_in_universe<O>(
     universe: &mut Universe,
     target: &Handle<O>,
-    transaction: &<O as Transactional>::Transaction,
+    transaction: <O as Transactional>::Transaction,
     check: <O::Transaction as Transaction>::CommitCheck,
 ) -> Result<(), CommitError>
 where
@@ -112,13 +112,13 @@ where
     }
 
     fn commit(
-        &self,
+        self,
         universe: &mut Universe,
         (): Self::Context<'_>,
         tu_check: Self::CommitCheck,
         _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        commit_transaction_in_universe(universe, &self.target, &self.transaction, tu_check)
+        commit_transaction_in_universe(universe, &self.target, self.transaction, tu_check)
     }
 }
 
@@ -201,7 +201,7 @@ pub(in crate::universe) fn anytxn_merge_helper<O>(
 
 /// Called from `impl Transaction for AnyTransaction`
 pub(in crate::universe) fn anytxn_commit_helper<'c, O>(
-    transaction: &TransactionInUniverse<O>,
+    transaction: TransactionInUniverse<O>,
     universe: &mut Universe,
     check: AnyTransactionCheck,
     outputs: &mut dyn FnMut(<TransactionInUniverse<O> as Transaction>::Output),
@@ -559,14 +559,14 @@ impl Transaction for UniverseTransaction {
     }
 
     fn commit(
-        &self,
+        self,
         target: &mut Universe,
         (): Self::Context<'_>,
         checks: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
         let Self {
-            members,
+            mut members,
             anonymous_insertions,
             behaviors,
             universe_id,
@@ -587,7 +587,9 @@ impl Transaction for UniverseTransaction {
         }
 
         for (name, check) in check_members {
-            members[&name]
+            members
+                .remove(&name)
+                .expect("invalid check value")
                 .commit(target, &name, check, outputs)
                 .map_err(|e| e.context(format!("universe member {name}")))?;
         }
@@ -759,7 +761,7 @@ impl MemberTxn {
     }
 
     fn commit(
-        &self,
+        self,
         universe: &mut Universe,
         name: &Name,
         MemberCommitCheck(check): MemberCommitCheck,
@@ -1231,7 +1233,7 @@ mod tests {
         let mut u2 = Universe::new();
         let (_, txn) = UniverseTransaction::insert("foo".into(), Space::empty_positive(1, 1, 1));
 
-        txn.execute(&mut u1, (), &mut drop).unwrap();
+        txn.clone().execute(&mut u1, (), &mut drop).unwrap();
         let e = txn.execute(&mut u2, (), &mut drop).unwrap_err();
 
         assert_eq!(
@@ -1253,7 +1255,7 @@ mod tests {
         let mut txn = UniverseTransaction::default();
         txn.insert_anonymous(Space::empty_positive(1, 1, 1));
 
-        txn.execute(&mut u1, (), &mut drop).unwrap();
+        txn.clone().execute(&mut u1, (), &mut drop).unwrap();
         let e = txn.execute(&mut u2, (), &mut drop).unwrap_err();
 
         assert_eq!(
@@ -1271,7 +1273,7 @@ mod tests {
     #[test]
     fn handle_error_from_handle_execute() {
         let e = Handle::<Space>::new_gone("foo".into())
-            .execute_on_pending(ReadTicket::stub(), &SpaceTransaction::default())
+            .execute_on_pending(ReadTicket::stub(), SpaceTransaction::default())
             .unwrap_err();
 
         assert_eq!(

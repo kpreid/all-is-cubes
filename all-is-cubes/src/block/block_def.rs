@@ -296,14 +296,14 @@ impl Transaction for BlockDefTransaction {
     }
 
     fn commit(
-        &self,
+        self,
         target: &mut BlockDef,
         read_ticket: Self::Context<'_>,
         (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        if let Equal(Some(new)) = &self.new {
-            target.state = BlockDefState::new(new.clone(), read_ticket);
+        if let Equal(Some(new)) = self.new {
+            target.state = BlockDefState::new(new, read_ticket);
             target.notifier.notify(&BlockChange::new());
         }
         Ok(())

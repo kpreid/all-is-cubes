@@ -223,14 +223,14 @@ impl SpaceTransaction {
     }
 
     fn commit_common(
-        &self,
+        self,
         m: &mut Mutation<'_, '_>,
         check: behavior::CommitCheck,
     ) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
 
         for (
-            &cube,
+            cube,
             CubeTransaction {
                 old: _,
                 new,
@@ -238,12 +238,12 @@ impl SpaceTransaction {
                 activate_behavior: activate,
                 fluff,
             },
-        ) in &self.cubes
+        ) in self.cubes
         {
             let cube = Cube::from(cube);
 
             if let Equal(Some(new)) = new {
-                match Space::set_impl(m, cube, new) {
+                match Space::set_impl(m, cube, &new) {
                     Ok(_) => Ok(()),
                     Err(SetCubeError::OutOfBounds { .. }) if !conserved => {
                         // ignore
@@ -253,7 +253,7 @@ impl SpaceTransaction {
                 }?;
             }
 
-            if *activate {
+            if activate {
                 // Deferred for slightly more consistency
                 to_activate.push(cube);
             }
@@ -292,7 +292,7 @@ impl SpaceTransaction {
 
     /// As [`Transaction::execute()`], but taking a [`Mutation`] instead of a [`Space`].
     // TODO: better name
-    pub fn execute_m(&self, target: &mut Mutation<'_, '_>) -> Result<(), ExecuteError<Self>> {
+    pub fn execute_m(self, target: &mut Mutation<'_, '_>) -> Result<(), ExecuteError<Self>> {
         let check = self
             .check_common(target.palette, target.contents.as_ref(), target.behaviors)
             .map_err(ExecuteError::Check)?;
@@ -313,7 +313,7 @@ impl Transaction for SpaceTransaction {
     }
 
     fn commit(
-        &self,
+        self,
         space: &mut Space,
         context: Self::Context<'_>,
         check: Self::CommitCheck,

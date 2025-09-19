@@ -155,7 +155,9 @@ fn space_bulk_mutation(c: &mut Criterion) {
             BenchmarkId::new("transaction entire", &size_description),
             |b| {
                 // Arguably, creating the transaction is part of the cost of the operation,
-                // but it's not the part we're trying to measure.
+                // but it's debatably not the part we're trying to measure.
+                // (We still have to clone the transaction. We could fix that by
+                // `impl Transaction for &SpaceTransaction`, if we wanted.)
                 let [block] = make_some_blocks();
                 let txn = SpaceTransaction::filling(bounds, |_| {
                     CubeTransaction::replacing(None, Some(block.clone()))
@@ -163,7 +165,8 @@ fn space_bulk_mutation(c: &mut Criterion) {
                 b.iter_batched_ref(
                     || Space::empty(bounds),
                     |space: &mut Space| {
-                        txn.execute(space, ReadTicket::stub(), &mut transaction::no_outputs)
+                        txn.clone()
+                            .execute(space, ReadTicket::stub(), &mut transaction::no_outputs)
                             .unwrap();
                     },
                     BatchSize::SmallInput,

@@ -225,7 +225,7 @@ macro_rules! member_enums_and_impls {
             }
 
             fn commit(
-                &self,
+                self,
                 universe: &mut Universe,
                 (): Self::Context<'_>,
                 check: Self::CommitCheck,

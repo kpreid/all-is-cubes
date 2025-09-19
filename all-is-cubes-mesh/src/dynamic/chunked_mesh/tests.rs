@@ -245,7 +245,7 @@ fn no_render_data_updates_after_completion() {
         .universe
         .execute_1(
             &tester.space,
-            &SpaceTransaction::set_cube(
+            SpaceTransaction::set_cube(
                 [0, 0, 0],
                 None,
                 Some(block::from_color!(1.0, 1.0, 1.0, 0.5)),
@@ -480,7 +480,7 @@ fn instances_dont_dirty_mesh_when_block_changes() {
         .universe
         .execute_1(
             &anim_def,
-            &BlockDefTransaction::overwrite(
+            BlockDefTransaction::overwrite(
                 Block::builder()
                     .display_name("replaced")
                     .color(will_be_anim.color())
@@ -535,7 +535,7 @@ fn instances_dont_dirty_mesh_when_space_changes() {
         .universe
         .execute_1(
             &tester.space,
-            &SpaceTransaction::set_cube([1, 0, 0], Some(anim.clone()), Some(AIR)),
+            SpaceTransaction::set_cube([1, 0, 0], Some(anim.clone()), Some(AIR)),
         )
         .unwrap();
 

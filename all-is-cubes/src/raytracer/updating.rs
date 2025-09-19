@@ -323,7 +323,7 @@ mod tests {
         universe
             .execute_1(
                 &space,
-                &CubeTransaction::replacing(None, Some(block2)).at(Cube::new(1, 0, 0)),
+                CubeTransaction::replacing(None, Some(block2)).at(Cube::new(1, 0, 0)),
             )
             .unwrap();
         tester.update_and_assert(universe.read_ticket()).unwrap();
@@ -332,7 +332,7 @@ mod tests {
         universe
             .execute_1(
                 &space,
-                &CubeTransaction::replacing(None, Some(AIR)).at(Cube::new(0, 0, 0)),
+                CubeTransaction::replacing(None, Some(AIR)).at(Cube::new(0, 0, 0)),
             )
             .unwrap();
         tester.update_and_assert(universe.read_ticket()).unwrap();

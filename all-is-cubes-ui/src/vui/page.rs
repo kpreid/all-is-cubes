@@ -302,7 +302,7 @@ impl PageInst {
             universe.read_ticket(),
         )?;
         universe
-            .execute_1(&space, &txn)
+            .execute_1(&space, txn)
             .map_err(|error| InstallVuiError::ExecuteInstallation { error })?;
 
         // Initialize lighting

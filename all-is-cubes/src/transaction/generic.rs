@@ -209,7 +209,7 @@ macro_rules! impl_transaction_for_tuple {
                 }
 
                 fn commit(
-                    &self,
+                    self,
                     #[allow(unused_variables, reason = "empty tuple case")]
                     target: &mut ($( [<Tr $name>]::Target, )*),
                     context: ($( [<Tr $name>]::Context<'_>, )*),
@@ -339,7 +339,7 @@ impl Transaction for () {
     }
 
     fn commit(
-        &self,
+        self,
         (): &mut (),
         (): Self::Context<'_>,
         (): Self::CommitCheck,

@@ -464,7 +464,7 @@ impl Transaction for InventoryTransaction {
     }
 
     fn commit(
-        &self,
+        self,
         inventory: &mut Inventory,
         (): Self::Context<'_>,
         check: Self::CommitCheck,

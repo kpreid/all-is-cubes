@@ -707,7 +707,7 @@ impl Transaction for CharacterTransaction {
     }
 
     fn commit(
-        &self,
+        self,
         target: &mut Character,
         _read_ticket: Self::Context<'_>,
         (body_check, inventory_check, behaviors_check): Self::CommitCheck,

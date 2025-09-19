@@ -747,7 +747,7 @@ mod tests {
                 stack.into(),
             ));
             self.universe
-                .execute_1(&self.character_handle, &insert_txn)
+                .execute_1(&self.character_handle, insert_txn)
                 .unwrap();
 
             // Invoke Inventory::use_tool, which knows how to assemble the answer into a
@@ -1134,7 +1134,7 @@ mod tests {
             .universe
             .execute_1(
                 &space_handle,
-                &SpaceTransaction::set_cube([0, 0, 0], None, Some(obstacle.clone())),
+                SpaceTransaction::set_cube([0, 0, 0], None, Some(obstacle.clone())),
             )
             .unwrap();
         assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));

@@ -118,12 +118,12 @@ impl transaction::Transaction for DefTransaction {
     }
 
     fn commit(
-        &self,
+        self,
         _: &mut Self::Target,
         _: Self::Context<'_>,
         (): Self::CommitCheck,
         _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        match *self {}
+        match self {}
     }
 }

@@ -91,7 +91,7 @@ fn inventory_transaction() {
     universe
         .execute_1(
             &character_handle,
-            &CharacterTransaction::inventory(InventoryTransaction::insert([item.clone()])),
+            CharacterTransaction::inventory(InventoryTransaction::insert([item.clone()])),
         )
         .unwrap();
 

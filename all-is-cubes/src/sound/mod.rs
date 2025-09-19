@@ -123,14 +123,14 @@ impl Transaction for DefTransaction {
     }
 
     fn commit(
-        &self,
+        self,
         target: &mut SoundDef,
         _: Self::Context<'_>,
         (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        if let Equal(Some(new)) = &self.new {
-            *target = new.clone();
+        if let Equal(Some(new)) = self.new {
+            *target = new;
             // Note there is no change notification.
             // It would be nice if we could arrange such notification to happen via the containing
             // Handle instead of implementing it anew -- but for now, this should not be too bad

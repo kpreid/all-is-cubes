@@ -975,7 +975,7 @@ impl Transaction for BodyTransaction {
     }
 
     fn commit(
-        &self,
+        self,
         body: &mut Body,
         (): Self::Context<'_>,
         (): Self::CommitCheck,
@@ -985,10 +985,10 @@ impl Transaction for BodyTransaction {
             set_position,
             set_look_direction,
         } = self;
-        if let &Equal(Some(position)) = set_position {
+        if let Equal(Some(position)) = set_position {
             body.set_position(position);
         }
-        if let &Equal(Some(direction)) = set_look_direction {
+        if let Equal(Some(direction)) = set_look_direction {
             body.set_look_direction(direction);
         }
         Ok(())

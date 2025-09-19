@@ -223,14 +223,14 @@ impl Universe {
     pub fn execute_1<T>(
         &mut self,
         handle: &Handle<T>,
-        transaction: &<T as Transactional>::Transaction,
+        transaction: <T as Transactional>::Transaction,
     ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
     where
         T::Transaction:
             for<'u> Transaction<Output = transaction::NoOutput, Context<'u> = ReadTicket<'u>>,
         T: UniverseMember + Transactional,
     {
-        let check = check_transaction_in_universe(self, handle, transaction)
+        let check = check_transaction_in_universe(self, handle, &transaction)
             .map_err(ExecuteError::Check)?;
         commit_transaction_in_universe(self, handle, transaction, check)
             .map_err(ExecuteError::Commit)
