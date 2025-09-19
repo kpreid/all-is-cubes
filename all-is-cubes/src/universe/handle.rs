@@ -1155,9 +1155,16 @@ pub struct ReadTicket<'universe> {
 
 #[derive(Clone, Copy)]
 enum TicketAccess<'u> {
+    /// Full access to a universe.
     World(&'u ecs::World),
+
+    /// Access only to things required for [`Block::evaluate()`].
     BlockDataSources(QueryBlockDataSources<'u, 'u>),
+
+    /// Access to all but one entity.
     EverythingBut(UnsafeWorldCell<'u>, ecs::Entity),
+
+    /// No access.
     Stub,
 }
 
