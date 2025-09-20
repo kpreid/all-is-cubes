@@ -22,6 +22,8 @@ use crate::{behavior, time};
 #[cfg(feature = "rerun")]
 use crate::rerun_glue as rg;
 
+// -------------------------------------------------------------------------------------------------
+
 // Note: Most things in `members` are either an impl, private, or intentionally public-in-private.
 // Therefore, no glob reexport.
 mod members;
@@ -52,11 +54,17 @@ pub use name::Name;
 
 mod owning_guard;
 
+mod ticket;
+pub(crate) use ticket::QueryBlockDataSources;
+pub use ticket::{ReadTicket, ReadTicketError};
+
 mod visit;
 pub use visit::*;
 
 #[cfg(test)]
 mod tests;
+
+// -------------------------------------------------------------------------------------------------
 
 /// A collection of named objects which can refer to each other via [`Handle`],
 /// and which are simulated at the same time steps.
