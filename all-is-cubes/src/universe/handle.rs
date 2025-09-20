@@ -1246,8 +1246,9 @@ impl<'universe> ReadTicket<'universe> {
     pub(crate) fn get<T: ecs::Component>(
         &self,
         entity: ecs::Entity,
-    ) -> Result<&'universe T, TicketErrorKind> {
-        match self.access {
+    ) -> Result<&'universe T, ReadTicketError> {
+        // inner function returns TicketErrorKind
+        let inner = || match self.access {
             TicketAccess::World(world) => world.get(entity).ok_or_else(|| {
                 if world.get_entity(entity).is_ok() {
                     TicketErrorKind::MissingComponent {
@@ -1296,7 +1297,12 @@ impl<'universe> ReadTicket<'universe> {
                 }
             }
             TicketAccess::Stub => Err(TicketErrorKind::Stub),
-        }
+        };
+
+        inner().map_err(|kind: TicketErrorKind| ReadTicketError {
+            kind,
+            ticket_origin: self.origin,
+        })
     }
 
     /// Returns the ID of the universe this ticket allows access to, if there is exactly one
@@ -1354,7 +1360,11 @@ impl<'u> fmt::Debug for TicketAccess<'u> {
 // Design note: This type exists solely to hide the variants of `TicketErrorKind` so that they are
 // not stable public API. We could also consider adding the entity ID, though.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ReadTicketError(TicketErrorKind);
+pub struct ReadTicketError {
+    kind: TicketErrorKind,
+    /// Code location which constructed the unsuitable ticket.
+    ticket_origin: &'static Location<'static>,
+}
 
 /// Low-level errors that can result from attempting to use a [`ReadTicket`] to fetch a component.
 ///
@@ -1381,13 +1391,13 @@ pub(crate) enum TicketErrorKind {
     Stub,
 }
 
-impl TicketErrorKind {
+impl ReadTicketError {
     /// Convert to the corresponding high-level error,
     /// or panic if the error “can’t happen”.
     ///
     /// Depending on the specific case, the resulting [`HandleError`]
     pub(crate) fn into_handle_error(self, name: Name) -> HandleError {
-        match self {
+        match self.kind {
             TicketErrorKind::MissingEntity => HandleError::Gone {
                 name,
                 // TODO(ecs): we don't know that this is the true reason.
@@ -1395,10 +1405,9 @@ impl TicketErrorKind {
                 reason: GoneReason::Deleted {},
             },
             TicketErrorKind::MissingComponent { type_name: _ } => panic!("{self:?}"), // TODO: improve
-            TicketErrorKind::ComponentNotAllowed { type_name: _ } => HandleError::InvalidTicket {
-                name,
-                error: ReadTicketError(self),
-            },
+            TicketErrorKind::ComponentNotAllowed { type_name: _ } => {
+                HandleError::InvalidTicket { name, error: self }
+            }
             TicketErrorKind::BeingMutated => HandleError::InUse(name),
             TicketErrorKind::Stub => unreachable!("universe ID should already have been checked"),
         }
@@ -1408,7 +1417,7 @@ impl TicketErrorKind {
 impl core::error::Error for ReadTicketError {}
 impl fmt::Display for ReadTicketError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        self.kind.fmt(f)
     }
 }
 
