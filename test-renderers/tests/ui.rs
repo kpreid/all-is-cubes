@@ -11,7 +11,7 @@ use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
 use all_is_cubes::math::Face6;
 use all_is_cubes::transaction::Transaction as _;
-use all_is_cubes::universe::{ReadTicket, Universe, UniverseTransaction};
+use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt, YieldProgress};
 use all_is_cubes::{space, transaction};
 use all_is_cubes_render::Rendering;
@@ -233,7 +233,7 @@ fn render_widget(
             .unwrap(),
     );
     let space_to_render_time = Instant::now();
-    let rendering = render_orthographic(ReadTicket::stub(), &space_handle);
+    let rendering = render_orthographic(txn.read_ticket(), &space_handle);
     let end_time = Instant::now();
     log::trace!(
         "render_widget: {} to_space, {} render",

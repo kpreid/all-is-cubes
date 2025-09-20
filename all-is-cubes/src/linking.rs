@@ -128,6 +128,9 @@ impl<E: BlockModule> Provider<E, Block> {
     /// Add the block definitions stored in this [`BlockProvider`] into `universe` as
     /// [`BlockDef`]s, returning a new [`BlockProvider`] whose blocks refer to those
     /// definitions (via [`Primitive::Indirect`]).
+    ///
+    /// The given `read_ticket` should be sufficient for evaluating the blocks
+    /// in `self`.
     pub fn install(
         &self,
         read_ticket: ReadTicket<'_>,
@@ -141,8 +144,8 @@ impl<E: BlockModule> Provider<E, Block> {
             name: Name,
             block: &Block,
         ) -> Result<Block, InsertError> {
-            let block_def_handle =
-                txn.insert_mut(name, BlockDef::new(read_ticket, block.clone()))?;
+            let value = BlockDef::new(read_ticket.with_transaction(txn), block.clone());
+            let block_def_handle = txn.insert_mut(name, value)?;
             let indirect_block = Block::from(block_def_handle);
             Ok(indirect_block)
         }

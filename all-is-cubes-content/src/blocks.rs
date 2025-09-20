@@ -528,90 +528,98 @@ pub async fn install_demo_blocks(
 
     // Join up blinker blocks
     for state in bool::exhaust() {
-        modify_def(&provider_for_patch[BecomeBlinker(state)], |block| {
-            block
-                .freezing_get_attributes_mut(ReadTicket::stub())
-                .tick_action = Some(TickAction {
-                operation: Operation::Become(provider_for_patch[BecomeBlinker(!state)].clone()),
-                schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
-            });
-        });
+        modify_def(
+            txn,
+            &provider_for_patch[BecomeBlinker(state)],
+            |read_ticket, block| {
+                block.freezing_get_attributes_mut(read_ticket).tick_action = Some(TickAction {
+                    operation: Operation::Become(provider_for_patch[BecomeBlinker(!state)].clone()),
+                    schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
+                });
+            },
+        );
     }
 
     // Join up lamp blocks as toggleable on/off
     for state in bool::exhaust() {
         for ctor in [Lamp, Sconce] {
-            modify_def(&provider_for_patch[ctor(state)], |block| {
-                block
-                    .freezing_get_attributes_mut(ReadTicket::stub())
-                    .activation_action =
-                    Some(Operation::Become(provider_for_patch[ctor(!state)].clone()));
-            });
+            modify_def(
+                txn,
+                &provider_for_patch[ctor(state)],
+                |read_ticket, block| {
+                    block
+                        .freezing_get_attributes_mut(read_ticket)
+                        .activation_action =
+                        Some(Operation::Become(provider_for_patch[ctor(!state)].clone()));
+                },
+            );
         }
     }
 
     // Join up explosion blocks
     for i in i8::exhaust() {
-        modify_def(&provider_for_patch[Explosion(i)], |block| {
-            let neighbor_ops: Arc<[(Cube, Operation)]> = if i > 22 {
-                // Expire because we're invisible by now
-                [(Cube::ORIGIN, Operation::Become(AIR))].into()
-            } else {
-                let next = Operation::DestroyTo(provider_for_patch[Explosion(i + 1)].clone());
-                if i > 0 && i < 10 {
-                    // Expand at first out to ~5 blocks
-                    if i.rem_euclid(2) == 0 {
-                        if i.rem_euclid(4) == 0 {
-                            const {
-                                [
-                                    Cube::new(0, 0, 0),
-                                    Cube::new(1, 0, 0),
-                                    Cube::new(-1, 0, 0),
-                                    Cube::new(0, 1, 0),
-                                    Cube::new(0, -1, 0),
-                                    Cube::new(0, 0, 1),
-                                    Cube::new(0, 0, -1),
-                                ]
+        modify_def(
+            txn,
+            &provider_for_patch[Explosion(i)],
+            |read_ticket, block| {
+                let neighbor_ops: Arc<[(Cube, Operation)]> = if i > 22 {
+                    // Expire because we're invisible by now
+                    [(Cube::ORIGIN, Operation::Become(AIR))].into()
+                } else {
+                    let next = Operation::DestroyTo(provider_for_patch[Explosion(i + 1)].clone());
+                    if i > 0 && i < 10 {
+                        // Expand at first out to ~5 blocks
+                        if i.rem_euclid(2) == 0 {
+                            if i.rem_euclid(4) == 0 {
+                                const {
+                                    [
+                                        Cube::new(0, 0, 0),
+                                        Cube::new(1, 0, 0),
+                                        Cube::new(-1, 0, 0),
+                                        Cube::new(0, 1, 0),
+                                        Cube::new(0, -1, 0),
+                                        Cube::new(0, 0, 1),
+                                        Cube::new(0, 0, -1),
+                                    ]
+                                }
+                                .as_slice()
+                            } else {
+                                const {
+                                    [
+                                        Cube::new(0, 0, 0),
+                                        Cube::new(1, 1, 0),
+                                        Cube::new(-1, 1, 0),
+                                        Cube::new(0, 1, 1),
+                                        Cube::new(0, -1, 1),
+                                        Cube::new(1, 0, 1),
+                                        Cube::new(1, 0, -1),
+                                        Cube::new(1, -1, 0),
+                                        Cube::new(-1, -1, 0),
+                                        Cube::new(0, 1, -1),
+                                        Cube::new(0, -1, -1),
+                                        Cube::new(-1, 0, 1),
+                                        Cube::new(-1, 0, -1),
+                                    ]
+                                }
+                                .as_slice()
                             }
-                            .as_slice()
                         } else {
-                            const {
-                                [
-                                    Cube::new(0, 0, 0),
-                                    Cube::new(1, 1, 0),
-                                    Cube::new(-1, 1, 0),
-                                    Cube::new(0, 1, 1),
-                                    Cube::new(0, -1, 1),
-                                    Cube::new(1, 0, 1),
-                                    Cube::new(1, 0, -1),
-                                    Cube::new(1, -1, 0),
-                                    Cube::new(-1, -1, 0),
-                                    Cube::new(0, 1, -1),
-                                    Cube::new(0, -1, -1),
-                                    Cube::new(-1, 0, 1),
-                                    Cube::new(-1, 0, -1),
-                                ]
-                            }
-                            .as_slice()
+                            [Cube::ORIGIN].as_slice()
                         }
                     } else {
+                        // Just tick or fade
                         [Cube::ORIGIN].as_slice()
                     }
-                } else {
-                    // Just tick or fade
-                    [Cube::ORIGIN].as_slice()
-                }
-                .iter()
-                .map(|&cube| (cube, next.clone()))
-                .collect()
-            };
-            block
-                .freezing_get_attributes_mut(ReadTicket::stub())
-                .tick_action = Some(TickAction {
-                operation: Operation::Neighbors(neighbor_ops),
-                schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
-            });
-        });
+                    .iter()
+                    .map(|&cube| (cube, next.clone()))
+                    .collect()
+                };
+                block.freezing_get_attributes_mut(read_ticket).tick_action = Some(TickAction {
+                    operation: Operation::Neighbors(neighbor_ops),
+                    schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
+                });
+            },
+        );
     }
 
     Ok(())
@@ -620,20 +628,25 @@ pub async fn install_demo_blocks(
 /// Given a block using [`Primitive::Indirect`], apply the function to replace the referenced
 /// [`BlockDef`]'s attributes.
 #[track_caller]
-fn modify_def(indirect: &Block, f: impl FnOnce(&mut Block)) {
+fn modify_def(
+    transaction: &mut UniverseTransaction,
+    indirect: &Block,
+    f: impl FnOnce(ReadTicket<'_>, &mut Block),
+) {
     let Primitive::Indirect(block_def_handle) = indirect.primitive() else {
         panic!("block not indirect, but {indirect:?}");
     };
     let mut block: Block = block_def_handle
-        // It's OK to use the stub ticket because this handle is not yet in a universe.
-        // If that ever changes, the impact will be larger than just passing one here.
-        .read(ReadTicket::stub())
+        .read(transaction.read_ticket())
         .expect("could not read BlockDef")
         .block()
         .clone();
-    f(&mut block);
+    f(transaction.read_ticket(), &mut block);
     block_def_handle
-        .execute_on_pending(ReadTicket::stub(), BlockDefTransaction::overwrite(block))
+        .execute_on_pending(
+            transaction.read_ticket(),
+            BlockDefTransaction::overwrite(block),
+        )
         .expect("BlockDef mutation transaction failed");
 }
 

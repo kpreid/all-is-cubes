@@ -1200,9 +1200,9 @@ impl BlockChange {
 //---
 // TODO: This is only used once ... is it really a good public API?
 pub fn space_to_blocks(
+    space_handle: Handle<Space>,
     read_ticket: ReadTicket<'_>,
     resolution: Resolution,
-    space_handle: Handle<Space>,
     block_transform: &mut dyn FnMut(Block) -> Block,
 ) -> Result<Space, SetCubeError> {
     let resolution_g: GridCoordinate = resolution.into();

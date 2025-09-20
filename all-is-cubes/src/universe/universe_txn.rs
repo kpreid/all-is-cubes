@@ -483,6 +483,15 @@ impl UniverseTransaction {
     pub fn universe_id(&self) -> Option<UniverseId> {
         self.universe_id.0
     }
+
+    /// Returns a [`ReadTicket`] that may be used for reading handles that were created by
+    /// [`UniverseTransaction::insert()`] and have not yet been committed.
+    ///
+    /// This is equivalent to `ReadTicket::stub().with_transaction(self)`.
+    #[track_caller]
+    pub fn read_ticket(&self) -> ReadTicket<'_> {
+        ReadTicket::stub().with_transaction(self)
+    }
 }
 
 impl From<AnyTransaction> for UniverseTransaction {
@@ -525,7 +534,7 @@ impl Transaction for UniverseTransaction {
 
             member_checks.insert(
                 name.clone(),
-                member.check(target, name).map_err(|e| {
+                member.check(self, target, name).map_err(|e| {
                     UniverseMismatch::Member(transaction::MapMismatch {
                         key: name.clone(),
                         mismatch: e,
@@ -536,16 +545,14 @@ impl Transaction for UniverseTransaction {
 
         let mut insert_checks = Vec::with_capacity(self.anonymous_insertions.len());
         for insert_txn in self.anonymous_insertions.iter() {
-            insert_checks.push(
-                insert_txn
-                    .check(target, &Name::Pending)
-                    .map_err(|mismatch| {
-                        UniverseMismatch::Member(transaction::MapMismatch {
-                            key: Name::Pending,
-                            mismatch,
-                        })
-                    })?,
-            );
+            insert_checks.push(insert_txn.check(self, target, &Name::Pending).map_err(
+                |mismatch| {
+                    UniverseMismatch::Member(transaction::MapMismatch {
+                        key: Name::Pending,
+                        mismatch,
+                    })
+                },
+            )?);
         }
 
         Ok(UniverseCommitCheck {
@@ -703,7 +710,12 @@ struct MemberMergeCheck(Option<AnyTransactionCheck>);
 struct MemberCommitCheck(Option<AnyTransactionCheck>);
 
 impl MemberTxn {
-    fn check(&self, universe: &Universe, name: &Name) -> Result<MemberCommitCheck, MemberMismatch> {
+    fn check(
+        &self,
+        whole_transaction: &UniverseTransaction, // Note: we could avoid this with another ReadTicket variant for MemberTxn. Should we?
+        universe: &Universe,
+        name: &Name,
+    ) -> Result<MemberCommitCheck, MemberMismatch> {
         match self {
             MemberTxn::Noop => Ok(MemberCommitCheck(None)),
             // Kludge: The individual `AnyTransaction`s embed the `Handle<T>` they operate on --
@@ -742,7 +754,7 @@ impl MemberTxn {
                 // TODO: This has a TOCTTOU problem because it doesn't ensure another thread
                 // couldn't insert the ref in the mean time.
                 pending_handle
-                    .check_upgrade_pending(universe.id)
+                    .check_upgrade_pending(whole_transaction.read_ticket(), universe.id)
                     .map_err(MemberMismatch::Insert)?;
                 Ok(MemberCommitCheck(None))
             }

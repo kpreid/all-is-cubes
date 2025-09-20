@@ -31,6 +31,9 @@ use crate::{block::Block, universe::Handle};
 pub struct ReadTicket<'universe> {
     access: TicketAccess<'universe>,
 
+    /// If present, allows access to pending handles from the given transaction.
+    transaction_access: Option<&'universe super::UniverseTransaction>,
+
     universe_id: Option<UniverseId>,
 
     /// Where this ticket was created.
@@ -73,10 +76,20 @@ impl<'universe> ReadTicket<'universe> {
     pub(crate) fn from_universe(universe: &'universe Universe) -> Self {
         Self {
             access: TicketAccess::World(&universe.world),
+            transaction_access: None,
             universe_id: Some(universe.universe_id()),
             origin: Location::caller(),
             expect_may_fail: false,
         }
+    }
+
+    /// Adds to this ticket the ability to read from a not-yet-committed transaction.
+    // TODO: decide what repeated calls should do
+    #[track_caller]
+    #[must_use]
+    pub fn with_transaction(mut self, transaction: &'universe super::UniverseTransaction) -> Self {
+        self.transaction_access = Some(transaction);
+        self
     }
 
     /// Create a [`ReadTicket`] which does not guarantee access to anything.
@@ -86,6 +99,7 @@ impl<'universe> ReadTicket<'universe> {
     pub const fn stub() -> Self {
         Self {
             access: TicketAccess::Stub,
+            transaction_access: None,
             universe_id: None,
             origin: Location::caller(),
             expect_may_fail: false,
@@ -98,6 +112,7 @@ impl<'universe> ReadTicket<'universe> {
     ) -> Self {
         ReadTicket {
             access: TicketAccess::BlockDataSources(data_sources),
+            transaction_access: None,
             universe_id: Some(data_sources.universe_id),
             origin: Location::caller(),
             expect_may_fail: false,
@@ -118,6 +133,7 @@ impl<'universe> ReadTicket<'universe> {
     ) -> ReadTicket<'u> {
         ReadTicket {
             access: TicketAccess::EverythingBut(world, entity),
+            transaction_access: None,
             universe_id: Some(universe_id),
             origin: Location::caller(),
             expect_may_fail: false,
@@ -210,6 +226,20 @@ impl<'universe> ReadTicket<'universe> {
         self.expect_may_fail = true;
         self
     }
+
+    /// Succeeds only if this ticket allows access to a transaction.
+    ///
+    /// TODO: This is a placeholder for the access actually being made through the transaction
+    /// reference.
+    pub(crate) fn ensure_has_transaction_access(&self) -> Result<(), ReadTicketError> {
+        match self.transaction_access {
+            Some(_) => Ok(()),
+            None => Err(ReadTicketError {
+                kind: TicketErrorKind::Transaction,
+                ticket_origin: self.origin,
+            }),
+        }
+    }
 }
 
 impl<'a, 'b> PartialEq<ReadTicket<'b>> for ReadTicket<'a> {
@@ -274,6 +304,9 @@ pub(crate) enum TicketErrorKind {
     #[displaydoc("this entity is being mutated")]
     BeingMutated,
     /// The ticket does not allow access to this universe or any other.
+    #[displaydoc("ticket is for a transaction, not a universe")]
+    Transaction,
+    /// The ticket does not allow access to this universe or any other.
     #[displaydoc("ticket is a stub")]
     Stub,
 }
@@ -298,6 +331,12 @@ impl ReadTicketError {
                 error: self,
             },
             TicketErrorKind::BeingMutated => HandleError::InUse(handle.name()),
+            TicketErrorKind::Transaction => HandleError::WrongUniverse {
+                ticket_universe_id: None,
+                handle_universe_id: handle.universe_id(),
+                name: handle.name(),
+                ticket_origin: self.ticket_origin,
+            },
             TicketErrorKind::Stub => unreachable!("universe ID should already have been checked"),
         }
     }
@@ -356,8 +395,13 @@ mod tests {
         assert_eq!(
             format!("{ticket:?}"),
             format!(
-                "ReadTicket {{ access: World(..), universe_id: Some({id:?}), \
-                origin: {origin:?}, expect_may_fail: false }}"
+                "ReadTicket {{ \
+                    access: World(..), \
+                    transaction_access: None, \
+                    universe_id: Some({id:?}), \
+                    origin: {origin:?}, \
+                    expect_may_fail: false \
+                }}"
             ),
         );
     }
@@ -369,8 +413,13 @@ mod tests {
         assert_eq!(
             format!("{ticket:?}"),
             format!(
-                "ReadTicket {{ access: Stub, universe_id: None, \
-                origin: {origin:?}, expect_may_fail: false }}"
+                "ReadTicket {{ \
+                    access: Stub, \
+                    transaction_access: None, \
+                    universe_id: None, \
+                    origin: {origin:?}, \
+                    expect_may_fail: false \
+                }}"
             ),
         );
     }

@@ -103,10 +103,15 @@ macro_rules! member_enums_and_impls {
             /// See [`Handle::check_upgrade_pending`] for more information.
             pub(crate) fn check_upgrade_pending(
                 &self,
+                read_ticket_for_self: $crate::universe::ReadTicket<'_>,
                 universe_id: $crate::universe::UniverseId,
             ) -> Result<(), $crate::universe::InsertError> {
                 match self {
-                    $( Self::$member_type(handle) => handle.check_upgrade_pending(universe_id), )*
+                    $(
+                        Self::$member_type(handle) => {
+                            handle.check_upgrade_pending(read_ticket_for_self, universe_id)
+                        }
+                    )*
                 }
             }
 

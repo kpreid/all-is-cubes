@@ -313,7 +313,12 @@ impl<T: 'static> Handle<T> {
 
         // Use the state mutex to figure out how to obtain access.
         let access: Access<T> = match *self.inner.state.lock().expect("Handle::state lock error") {
-            State::Pending { ref value_arc } => Access::Pending(value_arc.clone()),
+            State::Pending { ref value_arc } => {
+                read_ticket
+                    .ensure_has_transaction_access()
+                    .map_err(|e| e.into_handle_error(self))?;
+                Access::Pending(value_arc.clone())
+            }
             #[cfg(feature = "save")]
             State::Deserializing { entity: _ } => return Err(HandleError::NotReady(self.name())),
             State::Member { entity } => {
@@ -499,6 +504,7 @@ impl<T: 'static> Handle<T> {
     /// attempted `upgrade_pending()`s cannot succeed.
     pub(in crate::universe) fn check_upgrade_pending(
         &self,
+        read_ticket_for_self: ReadTicket<'_>,
         future_universe_id: UniverseId,
     ) -> Result<(), InsertError>
     where
@@ -547,7 +553,7 @@ impl<T: 'static> Handle<T> {
         // TODO: This check (which also doesn't do anything yet)
         // should be applied to *both* transaction-based insertion and
         // direct `&mut self` insertions, but isn't.
-        match self.read(ReadTicket::stub()) {
+        match self.read(read_ticket_for_self) {
             Ok(data_guard) => {
                 // TODO: We need to enforce rules about not referring to items from another
                 // universe, but also to be able to opt out for the UI containing world elements.
