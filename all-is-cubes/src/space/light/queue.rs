@@ -1,5 +1,6 @@
 //! [`LightUpdateQueue`] and other types pertaining to the scheduling of light updates.
 
+use alloc::boxed::Box;
 use core::fmt;
 
 use crate::math::{Cube, GridAab, GridIter};
@@ -57,7 +58,7 @@ impl fmt::Debug for Priority {
 /// A priority queue for [`LightUpdateRequest`]s which contains cubes
 /// at most once, even when added with different priorities.
 pub struct LightUpdateQueue {
-    queue: priority_queue::PriorityQueue<Cube, Priority, rustc_hash::FxBuildHasher>,
+    queue: queue_impl::Queue,
 
     /// If not `None`, then we are performing an update of **every** cube of the space,
     /// and this iterator returns the next cube to update at `sweep_priority`.
@@ -73,7 +74,7 @@ pub struct LightUpdateQueue {
 impl LightUpdateQueue {
     pub fn new() -> Self {
         Self {
-            queue: Default::default(),
+            queue: queue_impl::Queue::new(),
             sweep: None,
             sweep_priority: Priority::MIN,
             sweep_again: false,
@@ -82,7 +83,7 @@ impl LightUpdateQueue {
 
     #[inline]
     pub fn contains(&self, cube: Cube) -> bool {
-        self.queue.contains(&cube)
+        self.queue.contains(cube)
             || self
                 .sweep
                 .as_ref()
@@ -92,7 +93,7 @@ impl LightUpdateQueue {
     /// Inserts a queue entry or increases the priority of an existing one.
     #[inline]
     pub fn insert(&mut self, request: LightUpdateRequest) {
-        self.queue.push_increase(request.cube, request.priority);
+        self.queue.insert(request.cube, request.priority);
     }
 
     /// Requests that the queue should produce every cube in `bounds` at `priority`,
@@ -122,7 +123,7 @@ impl LightUpdateQueue {
     ///
     /// Sweeps do not count as present entries.
     pub fn remove(&mut self, cube: Cube) -> bool {
-        self.queue.remove(&cube).is_some()
+        self.queue.remove(cube)
     }
 
     /// Removes and returns the highest priority queue entry.
@@ -130,7 +131,11 @@ impl LightUpdateQueue {
     #[mutants::skip] // if it fails to pop, causes hangs
     pub fn pop(&mut self) -> Option<LightUpdateRequest> {
         if let Some(sweep) = &mut self.sweep {
-            if peek_priority(&self.queue).is_none_or(|p| self.sweep_priority > p) {
+            if self
+                .queue
+                .peek_priority()
+                .is_none_or(|p| self.sweep_priority > p)
+            {
                 if let Some(cube) = sweep.next() {
                     return Some(LightUpdateRequest {
                         cube,
@@ -144,9 +149,7 @@ impl LightUpdateQueue {
             }
         }
 
-        self.queue
-            .pop()
-            .map(|(cube, priority)| LightUpdateRequest { priority, cube })
+        self.queue.pop()
     }
 
     pub fn clear(&mut self) {
@@ -176,15 +179,159 @@ impl LightUpdateQueue {
 
     #[inline]
     pub fn peek_priority(&self) -> Priority {
-        peek_priority(&self.queue).unwrap_or(Priority::MIN)
+        self.queue.peek_priority().unwrap_or(Priority::MIN)
     }
 }
 
-#[inline]
-fn peek_priority(
-    queue: &priority_queue::PriorityQueue<Cube, Priority, rustc_hash::FxBuildHasher>,
-) -> Option<Priority> {
-    queue.peek().map(|(_, &priority)| priority)
+mod queue_impl {
+    use super::*;
+    use hashbrown::hash_table::Entry;
+
+    /// Priority queue with 256 priorities implemented by 256 hash tables.
+    ///
+    /// This is a simple, though not compact, data structure that
+    /// can handle redundant insertions and increases of priority.
+    ///
+    /// By using [`hashbrown::HashTable`], we avoid ever computing the hash value more than once,
+    /// even though each mutation requires accessing two tables.
+    #[derive(Debug)]
+    pub(super) struct Queue {
+        highest_nonempty: Option<Priority>,
+        by_priority: Box<[hashbrown::HashTable<Cube>; 256]>,
+        by_cube: hashbrown::HashTable<(Cube, Priority)>,
+    }
+
+    impl Queue {
+        pub fn new() -> Self {
+            Self {
+                highest_nonempty: None,
+                by_priority: vec![hashbrown::HashTable::new(); 256].try_into().unwrap(),
+                by_cube: hashbrown::HashTable::new(),
+            }
+        }
+
+        pub fn len(&self) -> usize {
+            self.by_cube.len()
+        }
+
+        pub fn peek_priority(&self) -> Option<Priority> {
+            self.highest_nonempty
+        }
+
+        pub fn contains(&self, cube: Cube) -> bool {
+            self.by_cube
+                .find(hash_cube(&cube), tuple_eq_predicate(cube))
+                .is_some()
+        }
+
+        pub fn pop(&mut self) -> Option<LightUpdateRequest> {
+            let priority = self.highest_nonempty?;
+            let set = &mut self.by_priority[index(priority)];
+            // using extract_if() as a way to remove an arbitrary element
+            // TODO: it would be more efficient for the API to allow popping multiple items
+            // at once, so as to reuse this iterator state.
+            let cube = set.extract_if(|_| true).next().unwrap();
+
+            self.by_cube
+                .find_entry(hash_cube(&cube), tuple_eq_predicate(cube))
+                .unwrap()
+                .remove();
+
+            if set.is_empty() {
+                self.decrease_highest();
+            }
+
+            Some(LightUpdateRequest { priority, cube })
+        }
+
+        pub(crate) fn insert(&mut self, cube: Cube, priority: Priority) {
+            let hash = hash_cube(&cube);
+            match self
+                .by_cube
+                .entry(hash, tuple_eq_predicate(cube), |(cube, _)| hash_cube(cube))
+            {
+                Entry::Occupied(mut oe) => {
+                    let old_priority: Priority = oe.get().1;
+                    if old_priority >= priority {
+                        // Existing priority is higher. No change.
+                        return;
+                    } else {
+                        // Existing priority is lower. Remove records of the old priority.
+                        oe.get_mut().1 = priority;
+                        self.by_priority[index(old_priority)]
+                            .find_entry(hash, cube_eq_predicate(cube))
+                            .unwrap()
+                            .remove();
+                    }
+                }
+                Entry::Vacant(ve) => {
+                    ve.insert((cube, priority));
+                }
+            }
+            self.by_priority[index(priority)].insert_unique(hash, cube, hash_cube);
+            if self.highest_nonempty.is_none_or(|h| h < priority) {
+                self.highest_nonempty = Some(priority);
+            }
+        }
+
+        pub fn remove(&mut self, cube: Cube) -> bool {
+            let hash = hash_cube(&cube);
+            let Ok(by_cube_entry) = self.by_cube.find_entry(hash, tuple_eq_predicate(cube)) else {
+                return false;
+            };
+            let ((_, priority), _) = by_cube_entry.remove();
+            let set = &mut self.by_priority[index(priority)];
+            set.find_entry(hash, cube_eq_predicate(cube))
+                .unwrap()
+                .remove();
+            if set.is_empty() {
+                self.decrease_highest()
+            }
+            true
+        }
+
+        pub fn clear(&mut self) {
+            let Self {
+                by_priority,
+                by_cube,
+                highest_nonempty,
+            } = self;
+            for set in by_priority.as_mut_slice() {
+                set.clear();
+            }
+            by_cube.clear();
+            *highest_nonempty = None;
+        }
+
+        fn decrease_highest(&mut self) {
+            let mut priority = self.highest_nonempty.unwrap();
+            self.highest_nonempty = loop {
+                let Some(lower_value) = priority.0.checked_sub(1) else {
+                    break None;
+                };
+                priority = Priority(lower_value);
+                if !self.by_priority[index(priority)].is_empty() {
+                    break Some(priority);
+                }
+            }
+        }
+    }
+
+    fn hash_cube(cube: &Cube) -> u64 {
+        use core::hash::BuildHasher as _;
+        rustc_hash::FxBuildHasher.hash_one(cube)
+    }
+
+    fn cube_eq_predicate(cube_to_find: Cube) -> impl Fn(&Cube) -> bool {
+        move |&cube| cube == cube_to_find
+    }
+    fn tuple_eq_predicate(cube_to_find: Cube) -> impl Fn(&(Cube, Priority)) -> bool {
+        move |&(cube, _)| cube == cube_to_find
+    }
+
+    fn index(priority: Priority) -> usize {
+        usize::from(priority.0)
+    }
 }
 
 #[cfg(test)]
