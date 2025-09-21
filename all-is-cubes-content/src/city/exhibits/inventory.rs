@@ -60,7 +60,7 @@ fn INVENTORY(ctx: Context<'_>) {
         },
     ]);
 
-    space.mutate(txn.read_ticket(), |m| {
+    space.mutate(ctx.universe.read_ticket().with_transaction(&txn), |m| {
         stack(
             m,
             [0, 0, 0],
