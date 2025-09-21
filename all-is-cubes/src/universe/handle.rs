@@ -4,6 +4,7 @@ use core::fmt;
 use core::hash;
 use core::mem;
 use core::ops::Deref;
+use core::panic::Location;
 use core::sync::atomic;
 
 use bevy_ecs::prelude as ecs;
@@ -242,6 +243,7 @@ impl<T: 'static> Handle<T> {
     ///
     /// May fail if the handle is not ready, belongs to a different universe, or was deleted.
     #[doc(hidden)] // hidden because we have not yet decided to make our use of ECS, let alone bevy_ecs, public
+    #[track_caller]
     pub fn as_entity(&self, expected_universe: UniverseId) -> Result<ecs::Entity, HandleError> {
         let handle_universe_id = self.universe_id();
         let is_expected_universe = handle_universe_id == Some(expected_universe);
@@ -262,6 +264,7 @@ impl<T: 'static> Handle<T> {
                 name: self.name(),
                 ticket_universe_id: Some(expected_universe),
                 handle_universe_id: self.universe_id(),
+                ticket_origin: Location::caller(),
             }),
             #[cfg(feature = "save")]
             (_, State::Deserializing { .. }) => Err(HandleError::NotReady(self.name())),
@@ -270,6 +273,7 @@ impl<T: 'static> Handle<T> {
                 ticket_universe_id: Some(expected_universe),
                 handle_universe_id,
                 name: self.name(),
+                ticket_origin: Location::caller(),
             }),
         }
     }
@@ -330,6 +334,7 @@ impl<T: 'static> Handle<T> {
                         ticket_universe_id,
                         handle_universe_id,
                         name,
+                        ticket_origin: read_ticket.origin,
                     });
                 }
 
@@ -353,7 +358,7 @@ impl<T: 'static> Handle<T> {
             Access::Entity(entity) => {
                 let component = read_ticket
                     .get::<T>(entity)
-                    .map_err(|e| e.into_handle_error(self.name()))?;
+                    .map_err(|e| e.into_handle_error(self))?;
                 Ok(ReadGuard(ReadGuardKind::World(component)))
             }
         }
@@ -392,6 +397,7 @@ impl<T: 'static> Handle<T> {
                         ticket_universe_id,
                         handle_universe_id,
                         name,
+                        ticket_origin: read_ticket.origin,
                     });
                 }
 
@@ -407,7 +413,7 @@ impl<T: 'static> Handle<T> {
 
         let component = read_ticket
             .get::<C>(entity)
-            .map_err(|e| e.into_handle_error(self.name()))?;
+            .map_err(|e| e.into_handle_error(self))?;
         Ok(component)
     }
 
@@ -956,6 +962,9 @@ pub enum HandleError {
         handle_universe_id: Option<UniverseId>,
         /// Name of the member which was being accessed.
         name: Name,
+        // TODO: make this a properly hidden field. fold this error into InvalidTicket?
+        #[doc(hidden)]
+        ticket_origin: &'static Location<'static>,
     },
 
     /// The presented [`ReadTicket`] does not have sufficient access for the requested data.
@@ -1121,8 +1130,6 @@ impl<T: UniverseMember> Clone for StrongHandle<T> {
         Self::new(self.0.clone())
     }
 }
-
-// -------------------------------------------------------------------------------------------------
 
 // -------------------------------------------------------------------------------------------------
 

@@ -9,7 +9,7 @@ use core::panic::Location;
 use bevy_ecs::prelude as ecs;
 use bevy_ecs::world::unsafe_world_cell::UnsafeWorldCell;
 
-use crate::universe::{GoneReason, HandleError, Name, Universe, UniverseId};
+use crate::universe::{self, GoneReason, HandleError, Universe, UniverseId};
 
 #[cfg(doc)]
 use crate::{block::Block, universe::Handle};
@@ -34,7 +34,7 @@ pub struct ReadTicket<'universe> {
     universe_id: Option<UniverseId>,
 
     /// Where this ticket was created.
-    origin: &'static Location<'static>,
+    pub(in crate::universe) origin: &'static Location<'static>,
 
     /// If true, don't log failures.
     pub(in crate::universe) expect_may_fail: bool,
@@ -283,19 +283,21 @@ impl ReadTicketError {
     /// or panic if the error “can’t happen”.
     ///
     /// Depending on the specific case, the resulting [`HandleError`]
-    pub(crate) fn into_handle_error(self, name: Name) -> HandleError {
+    /// may be a [`HandleError::InvalidTicket`] or something more specific.
+    pub(crate) fn into_handle_error(self, handle: &dyn universe::ErasedHandle) -> HandleError {
         match self.kind {
             TicketErrorKind::MissingEntity => HandleError::Gone {
-                name,
+                name: handle.name(),
                 // TODO(ecs): we don't know that this is the true reason.
                 // Should this be panicking instead?
                 reason: GoneReason::Deleted {},
             },
             TicketErrorKind::MissingComponent { type_name: _ } => panic!("{self:?}"), // TODO: improve
-            TicketErrorKind::ComponentNotAllowed { type_name: _ } => {
-                HandleError::InvalidTicket { name, error: self }
-            }
-            TicketErrorKind::BeingMutated => HandleError::InUse(name),
+            TicketErrorKind::ComponentNotAllowed { type_name: _ } => HandleError::InvalidTicket {
+                name: handle.name(),
+                error: self,
+            },
+            TicketErrorKind::BeingMutated => HandleError::InUse(handle.name()),
             TicketErrorKind::Stub => unreachable!("universe ID should already have been checked"),
         }
     }
