@@ -19,7 +19,7 @@ use web_time::{Duration, Instant};
 use all_is_cubes::character::Cursor;
 use all_is_cubes::euclid::{Box2D, point2, point3, vec2, vec3};
 use all_is_cubes::listen;
-use all_is_cubes::math::VectorOps as _;
+use all_is_cubes::math::{OpacityCategory, VectorOps as _};
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes_render::camera::{Camera, ImagePixel, Layers, StandardCameras, Viewport};
 use all_is_cubes_render::raytracer::{self, RtRenderer};
@@ -745,7 +745,9 @@ impl raytracer::Accumulate for Split {
     fn add(&mut self, hit: raytracer::Hit<'_, Self::BlockData>) {
         self.color.add(hit.map_block_data(|_| &()));
         self.depth.add(hit.map_block_data(|_| &()));
-        self.layer = self.layer.or(Some(*hit.block));
+        if self.color.opacity_category() != OpacityCategory::Invisible {
+            self.layer = self.layer.or(Some(*hit.block));
+        }
     }
 
     fn mean<const N: usize>(items: [Self; N]) -> Self {

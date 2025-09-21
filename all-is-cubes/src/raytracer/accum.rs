@@ -6,7 +6,7 @@ use euclid::Vector3D;
 
 use crate::block::Resolution;
 use crate::camera::GraphicsOptions;
-use crate::math::{Cube, Face7, Intensity, Rgb, Rgba, ZeroOne, rgb_const, zo32};
+use crate::math::{Cube, Face7, Intensity, OpacityCategory, Rgb, Rgba, ZeroOne, rgb_const, zo32};
 use crate::space::SpaceBlockData;
 
 // -------------------------------------------------------------------------------------------------
@@ -303,6 +303,15 @@ impl ColorBuf {
         Self {
             light: light.into(),
             transmittance,
+        }
+    }
+
+    /// Returns the opacity of the contents of this buffer.
+    pub fn opacity_category(self) -> OpacityCategory {
+        match self.transmittance {
+            0.0 => OpacityCategory::Opaque,
+            1.0 => OpacityCategory::Invisible,
+            _ => OpacityCategory::Partial,
         }
     }
 
