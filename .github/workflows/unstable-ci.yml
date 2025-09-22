@@ -78,7 +78,7 @@ jobs:
         ref: unstable-rust
 
     # Load cache before doing any Rust builds
-    - uses: Swatinem/rust-cache@v2.8.0
+    - uses: Swatinem/rust-cache@v2.8.1
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-${{ matrix.os }}-${{ matrix.depversions }}"
@@ -168,7 +168,7 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - uses: Swatinem/rust-cache@v2.8.0
+    - uses: Swatinem/rust-cache@v2.8.1
       with:
         # We cannot reuse the cache from the `build` job, because `RUSTFLAGS=-Dwarnings`
         # would invalidate all cached artifacts anyway.
@@ -220,7 +220,7 @@ jobs:
     steps:
     - uses: actions/checkout@v5
 
-    - uses: Swatinem/rust-cache@v2.8.0
+    - uses: Swatinem/rust-cache@v2.8.1
       with:
         # This is not necessary for keying, but makes the GHA cache viewing page more helpful.
         prefix-key: "v1-rust-unstablefeatures-ubuntu-locked"
