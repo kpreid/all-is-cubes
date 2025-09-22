@@ -37,7 +37,7 @@ use crate::util::ConciseDebug;
 /// * To provide convenient methods for operations on cubes that aren't natural operations
 ///   on points.
 /// * To reduce our dependence on external math libraries as part of our API.
-#[derive(Clone, Copy, Eq, Hash, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Eq, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs, clippy::exhaustive_structs)]
 #[repr(C)]
@@ -45,6 +45,17 @@ pub struct Cube {
     pub x: i32,
     pub y: i32,
     pub z: i32,
+}
+
+impl core::hash::Hash for Cube {
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        // Hashers work on 64-bit quantities.
+        // Therefore, it may be more efficient to provide fewer inputs by packing the data into
+        // chunks of at most 64 bits.
+        (u64::from(self.x.cast_unsigned()) ^ (u64::from(self.y.cast_unsigned()) << 32)).hash(state);
+        self.z.hash(state);
+    }
 }
 
 impl Cube {
@@ -294,18 +305,6 @@ mod conversion {
     impl AsMut<[GridCoordinate; 3]> for Cube {
         #[inline]
         fn as_mut(&mut self) -> &mut [GridCoordinate; 3] {
-            bytemuck::must_cast_mut(self)
-        }
-    }
-    impl core::borrow::Borrow<[GridCoordinate; 3]> for Cube {
-        #[inline]
-        fn borrow(&self) -> &[GridCoordinate; 3] {
-            bytemuck::must_cast_ref(self)
-        }
-    }
-    impl core::borrow::BorrowMut<[GridCoordinate; 3]> for Cube {
-        #[inline]
-        fn borrow_mut(&mut self) -> &mut [GridCoordinate; 3] {
             bytemuck::must_cast_mut(self)
         }
     }
