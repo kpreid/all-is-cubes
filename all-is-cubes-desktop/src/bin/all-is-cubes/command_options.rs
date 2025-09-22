@@ -14,7 +14,6 @@ use strum::IntoEnumIterator;
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::math::{GridSize, GridSizeCoord};
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
-use all_is_cubes_desktop::logging::LoggingArgs;
 use all_is_cubes_render::camera;
 
 use all_is_cubes_desktop::UniverseSource;
@@ -134,11 +133,7 @@ pub(crate) struct AicDesktopArgs {
     pub(crate) duration: Option<f64>,
 
     #[command(flatten)]
-    pub(crate) logging: LoggingArgs,
-
-    /// Ignore all configuration files, using only defaults and command-line options.
-    #[arg(long = "no-config-files")]
-    pub(crate) no_config_files: bool,
+    pub(crate) logging: all_is_cubes_desktop::logging::LoggingArgs,
 
     /// Existing save/document file to load. If not specified, a template will be used
     /// instead.
@@ -153,6 +148,9 @@ pub(crate) struct AicDesktopArgs {
         value_name = "FILE"
     )]
     pub(crate) input_file: Option<PathBuf>,
+
+    #[command(flatten)]
+    pub(crate) settings: all_is_cubes_desktop::SettingsArgs,
 }
 
 impl AicDesktopArgs {

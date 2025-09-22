@@ -63,6 +63,16 @@ Options:
       --precompute-light
           Fully calculate light before starting the game
 
+  -S, --set <NAME=JSON>
+          Override the value of a setting for this session, instead of taking it from files or
+          defaults.
+          
+          The value is specified as a key-value pair where the key is an unquoted string, the
+          separator is “=”, and the value is a JSON value (which, if a string, must be quoted); for
+          example: -Slighting_display='"None"'
+          
+          Using this option disables writing settings back to disk.
+
       --save-all
           Whether to record/export everything, rather than just the displayed scene
 

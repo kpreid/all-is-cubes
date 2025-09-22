@@ -4,13 +4,18 @@ use std::io::BufReader;
 use std::path::Path;
 use std::sync::Arc;
 
-use all_is_cubes_ui::apps::Settings;
+use anyhow::Context as _;
 use directories_next::ProjectDirs;
 use serde::{Serialize, de::DeserializeOwned};
 
 use all_is_cubes_render::camera::GraphicsOptions;
+use all_is_cubes_ui::apps::Settings;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Load preferences/settings/config files from a platform-appropriate read/write location.
+///
+/// This does not respect command-line options. Use [`SettingsArgs`] for that.
 pub fn load_config() -> Result<Settings, anyhow::Error> {
     // TODO: make testable
     // TODO: allow users of this library function to pick their own config dir
@@ -43,6 +48,75 @@ pub fn load_config() -> Result<Settings, anyhow::Error> {
         }),
     ))
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// [`clap::Args`] argument group struct for args that affect what settings are used.
+#[derive(Clone, Debug, clap::Args)]
+pub struct SettingsArgs {
+    /// Ignore all configuration files, using only defaults and command-line options.
+    #[arg(long = "no-config-files")]
+    pub(crate) no_config_files: bool,
+
+    #[expect(clippy::doc_markdown, reason = "will be displayed in --help")]
+    /// Override the value of a setting for this session, instead of taking it from files
+    /// or defaults.
+    ///
+    /// The value is specified as a key-value pair where the key is an unquoted string, the
+    /// separator is “=”, and the value is a JSON value (which, if a string, must be quoted);
+    /// for example: -Slighting_display='"None"'
+    ///
+    /// Using this option disables writing settings back to disk.
+    #[arg(long = "set", short = 'S', value_parser = parse_configure, value_name="NAME=JSON")]
+    pub(crate) set: Vec<(String, serde_json::Value)>,
+}
+
+impl SettingsArgs {
+    /// Constructs the [`Settings`] a session with these args should use.
+    pub fn build_settings(self) -> Result<Settings, anyhow::Error> {
+        let Self {
+            no_config_files,
+            set: to_override,
+        } = self;
+
+        let settings = if no_config_files {
+            Settings::new(Arc::new(GraphicsOptions::default()))
+        } else {
+            load_config().context("Error loading configuration files")?
+        };
+
+        if !to_override.is_empty() {
+            settings.disinherit();
+            // TODO: this is weirdly specific because right now, graphics options are the *only*
+            // settings. This code *should* change when we have more settings and the data model
+            // is more like a generic key-value store.
+            let Ok(serde_json::Value::Object(mut current_settings)) =
+                serde_json::to_value(settings.get_graphics_options())
+            else {
+                unreachable!("graphis options should appear as a json object");
+            };
+            for (key, value) in to_override {
+                current_settings.insert(key, value);
+            }
+            settings.set_graphics_options(
+                serde_json::from_value(serde_json::Value::Object(current_settings))
+                    .context("--set did not produce valid settings")?,
+            );
+        }
+
+        Ok(settings)
+    }
+}
+
+fn parse_configure(arg: &str) -> Result<(String, serde_json::Value), anyhow::Error> {
+    let (key, value) = arg
+        .split_once('=')
+        .ok_or_else(|| anyhow::anyhow!("missing '='"))?;
+    let value = serde_json::from_str(value)?;
+    Ok((key.to_owned(), value))
+}
+
+// -------------------------------------------------------------------------------------------------
 
 fn read_or_create_default_json_file<V: DeserializeOwned + Serialize>(
     description: &str,

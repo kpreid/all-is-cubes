@@ -13,8 +13,7 @@ use futures_channel::oneshot;
 
 use all_is_cubes::euclid::Size2D;
 use all_is_cubes::listen;
-use all_is_cubes_render::camera::{GraphicsOptions, Viewport};
-use all_is_cubes_ui::apps::Settings;
+use all_is_cubes_render::camera::Viewport;
 
 #[cfg(feature = "record")]
 use all_is_cubes_desktop::record;
@@ -26,7 +25,7 @@ use all_is_cubes_desktop::winit::{
     self as aic_winit, create_winit_wgpu_desktop_session, winit_main_loop_and_init,
 };
 use all_is_cubes_desktop::{
-    DesktopSession, InnerMainParams, Session, UniverseTask, inner_main, load_config, logging,
+    DesktopSession, InnerMainParams, Session, UniverseTask, inner_main, logging,
 };
 
 mod command_options;
@@ -60,7 +59,7 @@ fn main() -> Result<(), anyhow::Error> {
             save_all: _, // used in RecordOptions
         duration,
         logging: logging_args,
-        no_config_files,
+        settings: settings_args,
     } = options.clone();
 
     // Initialize logging -- telling it to suppress actual output in terminal mode.
@@ -82,11 +81,7 @@ fn main() -> Result<(), anyhow::Error> {
             }
         })?;
 
-    let settings = if no_config_files {
-        Settings::new(Arc::new(GraphicsOptions::default()))
-    } else {
-        load_config().context("Error loading configuration files")?
-    };
+    let settings = settings_args.build_settings()?;
 
     // Done with options; now start creating the session.
 

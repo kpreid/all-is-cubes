@@ -19,6 +19,8 @@ Options:
                                options
   -o, --output <FILE>          Output file name for 'record' mode.
       --precompute-light       Fully calculate light before starting the game
+  -S, --set <NAME=JSON>        Override the value of a setting for this session, instead of taking
+                               it from files or defaults
       --save-all               Whether to record/export everything, rather than just the displayed
                                scene
       --seed <SEED>            Seed value for randomized components of the world template

@@ -19,6 +19,7 @@ use all_is_cubes_render::camera;
 #[cfg(feature = "audio")]
 mod audio;
 mod config_files;
+pub use config_files::SettingsArgs;
 mod glue;
 pub mod logging;
 #[cfg(feature = "record")]
