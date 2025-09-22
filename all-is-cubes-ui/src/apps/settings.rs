@@ -123,12 +123,11 @@ impl Settings {
 
     /// If this `Settings` was constructed to share another’s state using
     /// [`inherit()`](Self::inherit), make it stop.
-    /// This means future changes will not be persisted.
+    /// Current values will be kept, but future changes will not affect the parent.
     pub fn disinherit(&self) {
         // TODO: this should be an atomic transaction but is not
-        self.0
-            .state
-            .set(Some(self.0.state.get().unwrap_or_default()));
+        // TODO: We should also drop `self.inherit` since it will no longer be used
+        self.0.state.set(Some(self.as_source().get()));
     }
 
     fn set_state(&self, state: Data) {
@@ -203,8 +202,16 @@ mod tests {
             "parent and child mutated"
         );
 
-        // Then it doesn't any more
         child.disinherit();
+
+        // After disinheriting, child still has values from parent
+        assert_eq!(
+            child.get_graphics_options().fov_y,
+            ps64(20.0),
+            "inherited value after disinherit"
+        );
+
+        // After disinheriting, child doesn't mutate parent
         child.mutate_graphics_options(|g| g.fov_y = ps64(10.0));
         assert_eq!(
             (
@@ -212,7 +219,7 @@ mod tests {
                 child.get_graphics_options().fov_y
             ),
             (ps64(20.0), ps64(10.0)),
-            "after disinherit"
+            "mutated values after disinherit"
         );
     }
 }
