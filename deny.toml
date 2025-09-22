@@ -1,5 +1,9 @@
 # Configuration file for <https://crates.io/crates/cargo-deny>.
-# When updating this, also review all-is-cubes-wasm/deny.toml.
+#
+# When updating this, also review and update:
+#    all-is-cubes-wasm/deny.toml
+#    tools/about.toml
+# especially ensuring that the list of licenses is consistent.
 
 [graph]
 # This list of features excludes the "rerun" and "gltf" features
@@ -9,15 +13,15 @@ features = ["std", "arbitrary", "auto-threads", "save", "wgpu"]
 
 [licenses]
 allow = [
-    "MIT",
     "Apache-2.0",
-    "MPL-2.0",
     "BSD-3-Clause",
     "BSL-1.0",
+    "CC0-1.0",
     "ISC",
+    "MIT",
+    "MPL-2.0", # TODO: remove
     "Unicode-3.0",
     "Zlib",
-    "CC0-1.0",
 ]
 private = { ignore = true }
 

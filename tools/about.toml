@@ -1,12 +1,19 @@
+# Configuration file for <https://crates.io/crates/cargo-about>.
+#
+# When updating this, also review and update:
+#    ../deny.toml
+#    ../all-is-cubes-wasm/deny.toml
+# especially ensuring that the list of licenses is aligned.
+
 accepted = [
     "Apache-2.0",
-    "MIT",
     "BSD-3-Clause",
-    "BSD-2-Clause",
-    "ISC",
-    "Zlib",
+    "BSL-1.0",
     "CC0-1.0",
-    "Unicode-DFS-2016",
+    "ISC",
+    "MIT",
+    "Unicode-3.0",
+    "Zlib",
 ]
 
 private = { ignore = true }

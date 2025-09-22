@@ -1,19 +1,23 @@
 # Configuration file for <https://crates.io/crates/cargo-deny>.
+#
+# When updating this, also review and update:
+#    ../deny.toml
+#    ../tools/about.toml
+# especially ensuring that the list of licenses is aligned.
 
 [graph]
 features = []
 
 [licenses]
 allow = [
-    "MIT",
     "Apache-2.0",
-    # "MPL-2.0", # does not occur currently
     "BSD-3-Clause",
     "BSL-1.0",
+    "CC0-1.0",
     "ISC",
+    "MIT",
     "Unicode-3.0",
     "Zlib",
-    "CC0-1.0",
 ]
 private = { ignore = true }
 
@@ -33,6 +37,7 @@ allow-wildcard-paths = true
 # external-default-features = "warn"
 
 skip = [
+    { name = "rustc-hash" }, # lightweight, used by naga
     { name = "syn", version = "1" },
     { name = "miniz_oxide" },
     { name = "bitflags", version = "1" } # via `png`; will be updated next release
