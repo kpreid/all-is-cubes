@@ -115,6 +115,10 @@ fn queue_bench(c: &mut Criterion) {
         b.iter_batched_ref(
             || {
                 let mut q = light::LightUpdateQueue::new();
+                // Preload at both priorities so even if the queue stores different priorities
+                // in different memory, it isn't allocating.
+                insert_requests(&mut q, high);
+                q.clear();
                 insert_requests(&mut q, low);
                 q
             },
@@ -140,7 +144,7 @@ fn queue_bench(c: &mut Criterion) {
         )
     });
 
-    group.bench_function("pop", |b| {
+    group.bench_function("pop-all", |b| {
         b.iter_batched_ref(
             || {
                 let mut q = light::LightUpdateQueue::new();
