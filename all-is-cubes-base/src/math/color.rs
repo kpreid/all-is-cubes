@@ -156,17 +156,6 @@ impl Rgb {
     /// Note that brighter values may exist; the color system “supports HDR”.
     pub const ONE: Rgb = Rgb(vec3(PS1, PS1, PS1));
 
-    /// Pure red that is as bright as it can be,
-    /// while being a sRGB color that is the same luminance as the other colors in this set.
-    pub const UNIFORM_LUMINANCE_RED: Rgb = Rgb::from_srgb8([0x9E, 0x00, 0x00]);
-    /// Pure green that is as bright as it can be,
-    /// while being a sRGB color that is the same luminance as the other colors in this set.
-    pub const UNIFORM_LUMINANCE_GREEN: Rgb = Rgb::from_srgb8([0x00, 0x59, 0x00]);
-    /// Pure blue that is as bright as it can be,
-    /// while being a sRGB color that is the same luminance as the other colors in this set.
-    /// (That turns out to be 100% blue, `#0000FF`.)
-    pub const UNIFORM_LUMINANCE_BLUE: Rgb = Rgb::from_srgb8([0x00, 0x00, 0xFF]);
-
     /// Constructs a color from components.
     ///
     /// Panics if any component is NaN.
