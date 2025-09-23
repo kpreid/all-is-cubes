@@ -11,7 +11,7 @@ use all_is_cubes::euclid::{point3, vec3};
 use all_is_cubes::inv;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgba,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgba, zo32,
 };
 use all_is_cubes::op;
 use all_is_cubes::space::{Space, SpaceTransaction};
@@ -96,7 +96,7 @@ pub(crate) async fn install_dungeon_blocks(
                 .display_name("Brazier")
                 .voxels_handle(resolution, {
                     // Use a darker color to dampen the effect of interior light
-                    let body_block = Block::from(palette::STEEL * 0.2);
+                    let body_block = Block::from(palette::STEEL * zo32(0.2));
                     let space = Space::for_block(resolution).build_and_mutate(|m| {
                         m.fill(
                             GridAab::from_lower_upper(

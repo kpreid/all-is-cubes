@@ -16,7 +16,7 @@ use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSizeCoord, GridVector, Rgb, Rgb01,
-    Rgba, rgb_const, rgba_const,
+    Rgba, ps32, rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
@@ -119,7 +119,7 @@ pub async fn install_demo_blocks(
     let lamppost_metal = Block::builder()
         .color(palette::ALMOST_BLACK.with_alpha_one())
         .build();
-    let lamppost_edge = Block::from(palette::ALMOST_BLACK * 1.12);
+    let lamppost_edge = Block::from(palette::ALMOST_BLACK.saturating_scale(ps32(1.12)));
 
     let pedestal_voxel = block::from_color!(palette::STONE);
 

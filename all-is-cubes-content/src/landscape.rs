@@ -10,11 +10,12 @@ use all_is_cubes::block::{
     AIR, Block, BlockAttributes, BlockCollision, Primitive,
     Resolution::{self, R16},
 };
-use all_is_cubes::euclid::Point2D;
-use all_is_cubes::euclid::point2;
+use all_is_cubes::euclid::{Point2D, point2};
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
-use all_is_cubes::math::GridRotation;
-use all_is_cubes::math::{Cube, FreeCoordinate, GridAab, GridCoordinate, GridVector, Rgb, zo32};
+use all_is_cubes::math::{
+    Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgb01, ZeroOne,
+    zo32,
+};
 use all_is_cubes::space::{self, SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -163,7 +164,7 @@ impl BlockModule for LandscapeBlocks {
 /// Provides a bland instance of [`LandscapeBlocks`] with single color blocks.
 impl DefaultProvision<Block> for LandscapeBlocks {
     fn module_default(self) -> Block {
-        fn color_and_name(color: Rgb, name: &'static str) -> Block {
+        fn color_and_name(color: Rgb01, name: &'static str) -> Block {
             Block::builder()
                 .display_name(name)
                 .color(color.with_alpha_one())
@@ -185,7 +186,8 @@ impl DefaultProvision<Block> for LandscapeBlocks {
             Dirt => color_and_name(palette::DIRT, "Dirt"),
             Stone => color_and_name(palette::STONE, "Stone"),
             Log(g) => color_and_name(
-                palette::TREE_BARK * (0.8 + (8. - g.radius() as f32) * 0.1),
+                palette::TREE_BARK
+                    * ZeroOne::<f32>::new_clamped(0.8 + (8. - g.radius() as f32) * 0.1),
                 "Wood",
             ),
 

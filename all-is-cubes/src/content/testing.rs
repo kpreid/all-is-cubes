@@ -122,7 +122,7 @@ pub async fn lighting_bench_space(
             maximum_distance: space.bounds().size().width.max(space.bounds().size().depth) as _,
         },
         sky: {
-            let sky_ground = palette::ALMOST_BLACK;
+            let sky_ground = palette::ALMOST_BLACK.to_rgb();
             let sky_bright = palette::DAY_SKY_COLOR * 2.0;
             let sky_dim = palette::DAY_SKY_COLOR * 0.5;
             crate::space::Sky::Octants([

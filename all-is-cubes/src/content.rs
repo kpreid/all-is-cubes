@@ -10,7 +10,7 @@ use crate::arcstr::{ArcStr, literal};
 use crate::block::{self, Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::inv::{Slot, Tool};
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb01, Rgba, rgb01,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb01, Rgba, ps32, rgb01,
 };
 use crate::space::{self, SetCubeError, Space};
 use crate::transaction::Transactional as _;
@@ -177,7 +177,7 @@ pub fn make_slab_txn(
 
     let voxel_palette = [
         block::from_color!(palette::PLANK),
-        Block::from(palette::PLANK * 1.06),
+        Block::from(palette::PLANK.saturating_scale(ps32(1.06))),
     ];
     let bounds = GridAab::from_lower_size(
         [0, 0, 0],

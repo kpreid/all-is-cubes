@@ -15,7 +15,7 @@ use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridSizeCoord, GridVector, Gridgid, Rgb, Rgb01, Rgba, Vol, rgb_const,
+    GridSizeCoord, GridVector, Gridgid, Rgb, Rgb01, Rgba, Vol, rgb_const, zo32,
 };
 use all_is_cubes::space::{self, SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time;
@@ -816,7 +816,7 @@ async fn install_atrium_blocks(
                 ))
                 .voxels_handle(resolution, {
                     // Use a darker color to dampen the effect of interior light
-                    let body_block = Block::from(palette::STEEL * 0.2);
+                    let body_block = Block::from(palette::STEEL * zo32(0.2));
                     let space = Space::for_block(resolution).build_and_mutate(|m| {
                         m.fill(
                             GridAab::from_lower_upper(
