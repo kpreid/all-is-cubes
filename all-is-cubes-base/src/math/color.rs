@@ -86,25 +86,44 @@ macro_rules! rgb01 {
 
 /// A floating-point RGB color value, unbounded.
 ///
-/// * Each color component must have a nonnegative, non-NaN value.
-///   Depending on the application, they may be considered to have a nominal
-///   range of 0 to 1, or unbounded.
-// TODO(rgb01): stop saying this once we use Rgb01 everywhere we should
+/// * Represents a light intensity in unspecified units.
+/// * Each color component must have a nonnegative, non-NaN [`f32`] value.
 /// * Color components are linear (gamma = 1), but use the same RGB primaries as sRGB
 ///   (Rec. 709).
 ///
 /// For colors whose components do not exceed 1, use [`Rgb01`] instead.
+///
+/// # Suitability
+///
+/// The primary purpose of this color type and its relatives, and the reason for its enforced
+/// value restrictions, is to be able to be stored in game state data structures,
+/// with reliable comparison and serialization.
+/// It is not necessarily appropriate for storing the intermediate results of computations
+/// (though the operations do take care to avoid unnecessary re-validation).
+///
+/// Future versions of All is Cubes may choose to reduce the precision of this type to `f16`
+/// when Rust has built-in support for that data type.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Rgb(Vector3D<PositiveSign<f32>, Intensity>);
 
 /// A floating-point RGB color value, between zero and one.
 ///
-/// Represents relative color values such as the reflectance of a surface.
-/// If an unrestricted “HDR” color is required, use [`Rgb`] instead.
-///
+/// * Represents relative color values such as the reflectance of a surface.
+///   If an unrestricted “HDR” color is required, use [`Rgb`] instead.
 /// * Each color component must have a [`f32`] value between 0.0 and 1.0.
 /// * Color components are linear (gamma = 1), but use the same RGB primaries as sRGB
 ///   (Rec. 709).
+///
+/// # Suitability
+///
+/// The primary purpose of this color type and its relatives, and the reason for its enforced
+/// value restrictions, is to be able to be stored in game state data structures,
+/// with reliable comparison and serialization.
+/// It is not necessarily appropriate for storing the intermediate results of computations
+/// (though the operations do take care to avoid unnecessary re-validation).
+///
+/// Future versions of All is Cubes may choose to reduce the precision of this type to `f16`
+/// when Rust has built-in support for that data type.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Rgb01(
     Vector3D<
@@ -119,13 +138,24 @@ pub struct Rgb01(
 ///
 /// * Each color component must have a nonnegative, non-NaN value.
 ///   Depending on the application, they may be considered to have a nominal
-///   range of 0 to 1, or unbounded.
+///   range of 0 to 1, or unbounded. (TODO: Split these use cases into different types.)
 /// * The alpha must have a non-NaN value.
 /// * Color components are linear (gamma = 1), but use the same RGB primaries as sRGB
 ///   (Rec. 709).
 /// * The alpha is not premultiplied.
 /// * Alpha values less than zero and greater than one will usually be treated equivalently to
 ///   zero and one, respectively, but are preserved rather than clipped.
+///
+/// # Suitability
+///
+/// The primary purpose of this color type and its relatives, and the reason for its enforced
+/// value restrictions, is to be able to be stored in game state data structures,
+/// with reliable comparison and serialization.
+/// It is not necessarily appropriate for storing the intermediate results of computations
+/// (though the operations do take care to avoid unnecessary re-validation).
+///
+/// Future versions of All is Cubes may choose to reduce the precision of this type to `f16`
+/// when Rust has built-in support for that data type.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Rgba {
     rgb: Rgb,
