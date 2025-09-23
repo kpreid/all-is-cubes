@@ -844,19 +844,6 @@ impl<'a> From<&'a Block> for Cow<'a, Block> {
 }
 
 // Converting colors to blocks.
-impl From<Rgb> for Block {
-    // TODO(rgb01): Remove this impl and replace its uses with `Rgb01`, so we only use
-    // `Rgb` for emissive colors
-
-    /// Constructs a [`Block`] with the given reflectance color, and default attributes.
-    ///
-    /// This operation allocates a new [`Primitive`] value on the heap.
-    /// If the color is a constant, you may use [`block::from_color!`](from_color!)
-    /// instead to avoid allocation.
-    fn from(color: Rgb) -> Self {
-        Block::from(color.with_alpha_one())
-    }
-}
 impl From<Rgb01> for Block {
     /// Constructs a [`Block`] with the given reflectance color, and default attributes.
     ///
@@ -1141,15 +1128,6 @@ mod conversions_for_atom {
         }
     }
 
-    impl From<Rgb> for Atom {
-        // TODO(rgb01): Remove this impl and replace its uses with `Rgb01`, so we only use
-        // `Rgb` for emissive colors
-
-        /// Construct an [`Atom`] with the given reflectance color, and default attributes.
-        fn from(color: Rgb) -> Self {
-            Self::from_color(color.with_alpha_one())
-        }
-    }
     impl From<Rgb01> for Atom {
         /// Construct an [`Atom`] with the given reflectance color, and default attributes.
         fn from(color: Rgb01) -> Self {

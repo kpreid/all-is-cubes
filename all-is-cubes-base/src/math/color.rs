@@ -955,9 +955,6 @@ mod eg {
     use embedded_graphics_core::pixelcolor::{self, RgbColor as _};
 
     use super::*;
-    impl pixelcolor::PixelColor for Rgb {
-        type Raw = ();
-    }
     impl pixelcolor::PixelColor for Rgb01 {
         type Raw = ();
     }
@@ -966,12 +963,6 @@ mod eg {
     }
     /// Adapt `embedded_graphics`'s most general color type to ours.
     // ^ can't be doc link because we don't depend on it
-    impl From<pixelcolor::Rgb888> for Rgb {
-        #[inline]
-        fn from(color: pixelcolor::Rgb888) -> Rgb {
-            Rgb::from_srgb8([color.r(), color.g(), color.b()])
-        }
-    }
     impl From<pixelcolor::Rgb888> for Rgb01 {
         #[inline]
         fn from(color: pixelcolor::Rgb888) -> Rgb01 {

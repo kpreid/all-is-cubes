@@ -123,6 +123,8 @@ In order to resolve various design problems interfering with development, the `a
       Handles are now always associated with some container, either `Universe` or `UniverseTransaction`, except for those in the “gone” defunct state.
     - `math::GridRotation::{CLOCKWISE, COUNTERCLOCKWISE}` have been replaced by `Face6::PY.{clockwise, counterclockwise}()`.
     - `math::Rgb::UNIFORM_LUMINANCE_*` have been replaced by constants on `Rgb01`.
+    - `math::Rgb` can no longer be converted to `Block`, `Primitive`, or `Atom`.
+      Use `Rgb01` instead.
 
 - `all-is-cubes-mesh` library:
     - The associated type `GfxVertex::Coordinate` no longer exists.

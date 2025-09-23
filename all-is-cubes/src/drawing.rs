@@ -279,12 +279,6 @@ impl<'a> VoxelColor<'a> for &'a Block {
     }
 }
 
-impl<'a> VoxelColor<'a> for Rgb {
-    fn into_blocks(self) -> VoxelBrush<'a> {
-        VoxelBrush::single(Block::from(self))
-    }
-}
-
 impl<'a> VoxelColor<'a> for Rgb01 {
     fn into_blocks(self) -> VoxelBrush<'a> {
         VoxelBrush::single(Block::from(self))
