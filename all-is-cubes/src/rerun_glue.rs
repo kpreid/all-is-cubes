@@ -144,7 +144,7 @@ fn annotation_context() -> archetypes::AnnotationContext {
     use ClassId as C;
 
     #[rustfmt::skip]
-    let descs = [
+    let descs: [(ClassId, &str, Rgba); _] = [
         (C::BodyCollisionBox, "body box", p::DEBUG_COLLISION_BOX),
         (C::CollisionContactWithin, "within", p::DEBUG_COLLISION_CUBE_WITHIN),
         (C::CollisionContactAgainst, "against", p::DEBUG_COLLISION_CUBE_AGAINST),
@@ -159,9 +159,9 @@ fn annotation_context() -> archetypes::AnnotationContext {
         (C::MeshVizEdgeNx, "", Axis::X.color().with_alpha_one()),
         (C::MeshVizEdgeNy, "", Axis::Y.color().with_alpha_one()),
         (C::MeshVizEdgeNz, "", Axis::Z.color().with_alpha_one()),
-        (C::MeshVizEdgePx, "", (Rgb::ONE * 0.2).saturating_sub(Axis::X.color()).with_alpha_one()),
-        (C::MeshVizEdgePy, "", (Rgb::ONE * 0.2).saturating_sub(Axis::Y.color()).with_alpha_one()),
-        (C::MeshVizEdgePz, "", (Rgb::ONE * 0.2).saturating_sub(Axis::Z.color()).with_alpha_one()),
+        (C::MeshVizEdgePx, "", (Rgb::ONE * 0.2).saturating_sub(Axis::X.color().to_rgb()).with_alpha_one()),
+        (C::MeshVizEdgePy, "", (Rgb::ONE * 0.2).saturating_sub(Axis::Y.color().to_rgb()).with_alpha_one()),
+        (C::MeshVizEdgePz, "", (Rgb::ONE * 0.2).saturating_sub(Axis::Z.color().to_rgb()).with_alpha_one()),
     ];
 
     archetypes::AnnotationContext::new(descs.into_iter().map(|(id, label, color)| {

@@ -74,6 +74,7 @@ In order to resolve various design problems interfering with development, the `a
     - Inventories are now indexed using the new type `inv::Ix`.
     - `inv::Inventory` no longer has public fields. Use the new accessor functions `slots()` or `get()` instead.
 
+    - `math::Axis::color()` now returns `Rgb01` instead of `Rgb`.
     - `math::Rgb::clamp()` now takes a parameter for the upper bound.
 
     - `universe::UniverseTransaction::{insert, insert_mut}` now take a name and value rather than a `Handle`.

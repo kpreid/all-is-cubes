@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::math::{Face6, Rgb};
+use crate::math::{Face6, Rgb01};
 
 /// Enumeration of the axes of three-dimensional space.
 ///
@@ -33,11 +33,11 @@ impl Axis {
     /// * Z = blue
     #[mutants::skip]
     #[inline]
-    pub fn color(self) -> Rgb {
+    pub fn color(self) -> Rgb01 {
         match self {
-            Axis::X => Rgb::UNIFORM_LUMINANCE_RED,
-            Axis::Y => Rgb::UNIFORM_LUMINANCE_GREEN,
-            Axis::Z => Rgb::UNIFORM_LUMINANCE_BLUE,
+            Axis::X => Rgb01::UNIFORM_LUMINANCE_RED,
+            Axis::Y => Rgb01::UNIFORM_LUMINANCE_GREEN,
+            Axis::Z => Rgb01::UNIFORM_LUMINANCE_BLUE,
         }
     }
 

@@ -10,7 +10,7 @@ use crate::arcstr::{ArcStr, literal};
 use crate::block::{self, Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::inv::{Slot, Tool};
 use crate::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb, Rgba, rgb_const,
+    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridVector, Rgb01, Rgba, rgb01,
 };
 use crate::space::{self, SetCubeError, Space};
 use crate::transaction::Transactional as _;
@@ -242,13 +242,13 @@ pub fn axes(m: &mut space::Mutation<'_, '_>) -> Result<(), SetCubeError> {
         for step in raycaster {
             let cube = step.cube_ahead();
             let i = cube.lower_bounds()[axis] * direction; // always positive
-            let (color, display_name): (Rgb, ArcStr) = if i.rem_euclid(2) == 0 {
+            let (color, display_name): (Rgb01, ArcStr) = if i.rem_euclid(2) == 0 {
                 (axis.color(), i.rem_euclid(10).to_string().into())
             } else {
                 if direction > 0 {
-                    (rgb_const!(1.0, 1.0, 1.0), DIR_NAMES[face].clone())
+                    (rgb01!(1.0, 1.0, 1.0), DIR_NAMES[face].clone())
                 } else {
-                    (rgb_const!(0.0, 0.0, 0.0), DIR_NAMES[face].clone())
+                    (rgb01!(0.0, 0.0, 0.0), DIR_NAMES[face].clone())
                 }
             };
             m.set(
@@ -256,7 +256,7 @@ pub fn axes(m: &mut space::Mutation<'_, '_>) -> Result<(), SetCubeError> {
                 Block::builder()
                     .display_name(display_name)
                     .color(color.with_alpha_one())
-                    .light_emission(axis.color() * 3.0)
+                    .light_emission(axis.color().to_rgb() * 3.0)
                     .build(),
             )?;
         }
@@ -280,6 +280,7 @@ pub fn free_editing_starter_inventory(flying: bool) -> Vec<Slot> {
 mod tests {
     use super::*;
     use crate::block::{Atom, BlockAttributes, BlockCollision};
+    use crate::math::Rgb;
 
     #[test]
     fn make_some_blocks_0() {
