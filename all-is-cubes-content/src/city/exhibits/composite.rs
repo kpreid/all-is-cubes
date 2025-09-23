@@ -93,9 +93,9 @@ fn COMPOSITE(ctx: Context<'_>) {
 fn DASHED_BOXES(_: Context<'_>) {
     let mut txn = ExhibitTransaction::default();
 
-    let color = Rgb::new(1.0, 0.5, 0.5);
+    let color = Rgb01::new(1.0, 0.5, 0.5);
     let brush = Block::from(color);
-    let corner_brush = Block::from(color * 0.6);
+    let corner_brush = Block::from(color * zo32(0.6));
     let line_segment = Block::builder()
         .display_name("Dashed Box Segment")
         .voxels_fn(R16, |p| {

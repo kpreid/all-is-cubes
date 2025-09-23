@@ -10,10 +10,10 @@ use super::prelude::*;
 )]
 fn TRANSPARENCY_WHOLE_BLOCK(ctx: Context<'_>) {
     let colors = [
-        Rgb::new(1.0, 0.5, 0.5),
-        Rgb::new(0.5, 1.0, 0.5),
-        Rgb::new(0.5, 0.5, 1.0),
-        Rgb::new(0.9, 0.9, 0.9),
+        rgb01!(1.0, 0.5, 0.5),
+        rgb01!(0.5, 1.0, 0.5),
+        rgb01!(0.5, 0.5, 1.0),
+        rgb01!(0.9, 0.9, 0.9),
     ];
     let alphas = [0.25, 0.5, 0.75, 0.95].map(zo32);
     let windowpane = GridAab::from_lower_upper([-1, 0, 3], [2, alphas.len() as GridCoordinate, 4]);

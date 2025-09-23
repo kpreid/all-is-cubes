@@ -25,17 +25,12 @@ fn RESOLUTIONS(ctx: Context<'_>) {
                         return AIR.clone();
                     }
                     let rescale = if resolution > R8 { 4 } else { 1 };
-                    let color = Rgb::from(
-                        p.lower_bounds()
-                            .to_vector()
-                            .map(|s| {
-                                ps32(
-                                    (s / GridCoordinate::from(rescale)) as f32
-                                        / f32::from(u16::from(resolution) / rescale - 1).max(1.),
-                                )
-                            })
-                            .cast_unit(),
-                    );
+                    let color = Rgb01::from(p.lower_bounds().to_vector().map(|s| {
+                        zo32(
+                            (s / GridCoordinate::from(rescale)) as f32
+                                / f32::from(u16::from(resolution) / rescale - 1).max(1.),
+                        )
+                    }));
                     Block::from(color)
                 })?
                 .build_txn(&mut txn);

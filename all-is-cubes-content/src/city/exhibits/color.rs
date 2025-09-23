@@ -24,14 +24,10 @@ fn COLORS(ctx: Context<'_>) {
             let color_point = p.lower_bounds() / 2;
             let part_of_grid: [GridCoordinate; 3] =
                 p.lower_bounds().to_vector().map(|s| s.rem_euclid(2)).into();
-            let color = Rgb::from(
-                color_point
-                    .to_vector()
-                    .map(|s| {
-                        PositiveSign::<f32>::new_strict(s as f32 / (gradient_resolution - 1) as f32)
-                    })
-                    .cast_unit(),
-            );
+            let color =
+                Rgb01::from(color_point.to_vector().map(|s| {
+                    ZeroOne::<f32>::new_strict(s as f32 / (gradient_resolution - 1) as f32)
+                }));
             let color_srgb = color.with_alpha_one().to_srgb8();
             let description = arcstr::format!(
                 "Linear\n  {:0.2}\n  {:0.2}\n  {:0.2}\nsRGB\n  #{:02x}{:02x}{:02x}",
@@ -105,15 +101,15 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
         rgb_const!(1.0, 0.0, 1.0),
     ];
     let surface_colors = [
-        rgb_const!(1.0, 0.0, 0.0),
-        rgb_const!(1.0, 1.0, 0.0),
-        rgb_const!(0.0, 1.0, 0.0),
-        rgb_const!(0.0, 1.0, 1.0),
-        rgb_const!(0.0, 0.0, 1.0),
-        rgb_const!(1.0, 0.0, 1.0),
-        rgb_const!(0.25, 0.25, 0.25),
-        rgb_const!(0.75, 0.75, 0.75),
-        rgb_const!(1.0, 1.0, 1.0),
+        rgb01!(1.0, 0.0, 0.0),
+        rgb01!(1.0, 1.0, 0.0),
+        rgb01!(0.0, 1.0, 0.0),
+        rgb01!(0.0, 1.0, 1.0),
+        rgb01!(0.0, 0.0, 1.0),
+        rgb01!(1.0, 0.0, 1.0),
+        rgb01!(0.25, 0.25, 0.25),
+        rgb01!(0.75, 0.75, 0.75),
+        rgb01!(1.0, 1.0, 1.0),
     ];
 
     // Room wall block with test card

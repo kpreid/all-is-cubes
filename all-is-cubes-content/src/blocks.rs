@@ -15,8 +15,8 @@ use all_is_cubes::block::{
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSizeCoord, GridVector, Rgb, Rgba,
-    rgb_const, rgba_const,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSizeCoord, GridVector, Rgb, Rgb01,
+    Rgba, rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
@@ -304,7 +304,7 @@ pub async fn install_demo_blocks(
                         };
                         if r < body_radius {
                             // Shade the body with an axis-indicating color.
-                            Some(Block::from(Rgb::new(
+                            Some(Block::from(Rgb01::new(
                                 base_body_color.red().into_inner()
                                     + (p2.x as f32 / resolution_g as f32),
                                 base_body_color.green().into_inner()

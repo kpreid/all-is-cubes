@@ -1,7 +1,7 @@
 //! Cloud generation.
 
 use all_is_cubes::block::{AIR, Block, BlockCollision};
-use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, Rgb, zo32};
+use all_is_cubes::math::{GridAab, GridCoordinate, GridPoint, Rgb01, zo32};
 use all_is_cubes::space::{self, SetCubeError};
 
 use crate::alg::NoiseFnExt as _;
@@ -29,7 +29,7 @@ pub fn clouds(
         let alpha = alpha * 0.2;
         Block::builder()
             .display_name("Cloud")
-            .color(Rgb::ONE.with_alpha(zo32(alpha)))
+            .color(Rgb01::WHITE.with_alpha(zo32(alpha)))
             .collision(if alpha >= 1.0 {
                 BlockCollision::Hard
             } else {

@@ -67,7 +67,7 @@ fn ANIMATION(ctx: Context<'_>) {
                 let fire_bounds = GridAab::for_block(fire_resolution);
                 let mut fire_space = Space::for_block(fire_resolution).build();
                 fire_space.mutate(ctx.universe.read_ticket(), |m| {
-                    m.set([0, 0, 0], block::from_color!(Rgb::ONE))?; // placeholder for not fully transparent so first pass lighting is better
+                    m.set([0, 0, 0], block::from_color!(Rgb01::WHITE))?; // placeholder for not fully transparent so first pass lighting is better
                     SpaceTransaction::add_behavior(fire_bounds, Fire::new(fire_bounds))
                         .execute_m(m)?;
                     Ok::<(), InGenError>(())

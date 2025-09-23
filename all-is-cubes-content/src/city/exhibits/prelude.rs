@@ -25,7 +25,7 @@ pub(super) use all_is_cubes::linking::{BlockProvider, InGenError};
 pub(super) use all_is_cubes::listen;
 pub(super) use all_is_cubes::math::{
     Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridSize, GridSizeCoord, GridVector, Gridgid, PositiveSign, Rgb, Rgb01, Rgba, ps32, rgb_const,
+    GridSize, GridSizeCoord, GridVector, Gridgid, Rgb, Rgb01, Rgba, ZeroOne, rgb_const, rgb01,
     rgba_const, zo32,
 };
 pub(super) use all_is_cubes::op::Operation;
