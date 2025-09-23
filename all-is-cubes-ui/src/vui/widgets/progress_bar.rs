@@ -7,7 +7,7 @@ use alloc::sync::Arc;
 use num_traits::float::FloatCore as _;
 
 use all_is_cubes::block::{self, AIR, Block, Composite, CompositeOperator};
-use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, Rgb, ZeroOne};
+use all_is_cubes::math::{Face6, GridAab, GridCoordinate, GridSize, Rgb01, ZeroOne};
 use all_is_cubes::space::SpaceTransaction;
 use all_is_cubes::{listen, universe};
 
@@ -145,7 +145,7 @@ impl ProgressBarController {
                 let partial_fill = state.sixteenths - lb_in_sixteenths;
                 assert!((0..16).contains(&partial_fill));
 
-                let mask_substance = block::from_color!(Rgb::ONE);
+                let mask_substance = block::from_color!(Rgb01::WHITE);
                 let fill_mask = mask_substance.clone().with_modifier(block::Move::new(
                     Face6::NX,
                     u16::try_from((16 - partial_fill) * 16).unwrap(),

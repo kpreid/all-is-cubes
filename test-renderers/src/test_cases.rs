@@ -201,12 +201,12 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
                     i32::from(i.div_euclid(16)) * 2,
                     0,
                 );
-                m.set(p, Block::from(Rgb::from_srgb8([i, i, i]))).unwrap();
-                m.set(p + dr, Block::from(Rgb::from_srgb8([i, 0, 0])))
+                m.set(p, Block::from(Rgb01::from_srgb8([i, i, i]))).unwrap();
+                m.set(p + dr, Block::from(Rgb01::from_srgb8([i, 0, 0])))
                     .unwrap();
-                m.set(p + dg, Block::from(Rgb::from_srgb8([0, i, 0])))
+                m.set(p + dg, Block::from(Rgb01::from_srgb8([0, i, 0])))
                     .unwrap();
-                m.set(p + db, Block::from(Rgb::from_srgb8([0, 0, i])))
+                m.set(p + db, Block::from(Rgb01::from_srgb8([0, 0, i])))
                     .unwrap();
             }
             Ok(())

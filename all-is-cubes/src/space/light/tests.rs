@@ -5,7 +5,7 @@ use pretty_assertions::assert_eq;
 use super::{LightUpdatesInfo, PackedLight, Priority, data::LightStatus};
 use crate::block::{self, AIR, Block};
 use crate::listen::{Listen as _, Listener, Log};
-use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgba, rgb_const};
+use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgb01, Rgba, rgb_const};
 use crate::space::{CubeTransaction, GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
 use crate::time;
 use crate::universe::{ReadTicket, Universe};
@@ -103,7 +103,8 @@ fn step() {
     universe
         .execute_1(
             &space,
-            CubeTransaction::replacing(None, Some(block::from_color!(Rgb::ONE))).at(Cube::ORIGIN),
+            CubeTransaction::replacing(None, Some(block::from_color!(Rgb01::WHITE)))
+                .at(Cube::ORIGIN),
         )
         .unwrap();
     // Not changed yet... except for the now-opaque block
@@ -139,7 +140,7 @@ fn evaluate_light() {
     assert_eq!(0, space.evaluate_light(0, drop));
     space
         .mutate(ReadTicket::stub(), |m| {
-            m.set([1, 0, 0], block::from_color!(Rgb::ONE))
+            m.set([1, 0, 0], block::from_color!(Rgb01::WHITE))
         })
         .unwrap();
     assert_eq!(2, space.evaluate_light(0, drop));
@@ -165,7 +166,7 @@ fn set_cube_opaque_notification() {
 
     space
         .mutate(ReadTicket::stub(), |m| {
-            m.set([0, 0, 0], block::from_color!(Rgb::ONE))
+            m.set([0, 0, 0], block::from_color!(Rgb01::WHITE))
         })
         .unwrap();
 

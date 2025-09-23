@@ -915,18 +915,19 @@ macro_rules! _block_from_color {
 ///
 /// ```
 /// use all_is_cubes::block::{self, Block};
-/// use all_is_cubes::math::{Rgb, rgb_const};
+/// use all_is_cubes::math::{Rgb01, rgb01};
 ///
 /// assert_eq!(
-///     block::from_color!(rgb_const!(1.0, 0.5, 0.0)),
-///     Block::from(Rgb::new(1.0, 0.5, 0.0)),
+///     block::from_color!(rgb01!(1.0, 0.5, 0.0)),
+///     Block::from(rgb01!(1.0, 0.5, 0.0)),
 /// );
 ///
 /// assert_eq!(
-///     block::from_color!(rgb_const!(1.0, 0.5, 0.0)),
+///     block::from_color!(rgb01!(1.0, 0.5, 0.0)),
 ///     block::from_color!(1.0, 0.5, 0.0),
 /// );
 ///
+/// // Alpha equals 1.0 if not specified.
 /// assert_eq!(
 ///     block::from_color!(1.0, 0.5, 0.0),
 ///     block::from_color!(1.0, 0.5, 0.0, 1.0),

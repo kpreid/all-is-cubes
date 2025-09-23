@@ -4,7 +4,7 @@ use itertools::{EitherOrBoth, Itertools};
 
 use all_is_cubes::arcstr;
 use all_is_cubes::block::{self, Block};
-use all_is_cubes::math::{Rgb, Rgba, ZeroOne};
+use all_is_cubes::math::{Rgb, Rgb01, Rgba, ZeroOne};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -35,7 +35,7 @@ pub(crate) fn dot_vox_palette_to_blocks(
                             // Empirically, radiant_flux scales the emission by powers of 10.
                             let emission_scale = material.emission().unwrap_or(0.0)
                                 * 10.0f32.powf(material.radiant_flux().unwrap_or(0.0));
-                            (Rgba::BLACK, palette_color * emission_scale)
+                            (Rgba::BLACK, Rgb::from(palette_color) * emission_scale)
                         }
                         None | Some("_diffuse") => (palette_color.with_alpha_one(), Rgb::ZERO),
                         _ => {
@@ -84,10 +84,10 @@ pub(crate) fn push(palette: &mut Vec<dot_vox::Color>, color: dot_vox::Color) -> 
 }
 
 #[cfg(feature = "import")]
-fn color_in(dot_vox::Color { r, g, b, a: _ }: dot_vox::Color) -> Rgb {
+fn color_in(dot_vox::Color { r, g, b, a: _ }: dot_vox::Color) -> Rgb01 {
     // Note: Even though the `dot_vox::Color` field carries an alpha, MagicaVoxel itself seems to
     // always ignore it, and use only transparency specified by materials. Therefore, we do too.
-    Rgb::from_srgb8([r, g, b])
+    Rgb01::from_srgb8([r, g, b])
 }
 
 #[cfg(feature = "export")]

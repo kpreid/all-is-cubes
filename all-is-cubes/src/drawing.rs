@@ -30,8 +30,8 @@ pub use embedded_graphics;
 
 use crate::block::{Block, Evoxel, text};
 use crate::math::{
-    Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb,
-    Rgb01, Rgba, Vol,
+    Cube, FaceMap, GridAab, GridCoordinate, GridPoint, GridRotation, GridVector, Gridgid, Rgb01,
+    Rgba, Vol,
 };
 use crate::space::{Mutation, SetCubeError, SpaceTransaction};
 
@@ -680,7 +680,7 @@ mod tests {
 
     #[test]
     fn draw_with_our_rgb() {
-        let color = Rgb::new(0.73, 0.27, 0.11);
+        let color = Rgb01::new(0.73, 0.27, 0.11);
         test_color_drawing(color, &color.into());
     }
 

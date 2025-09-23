@@ -6,7 +6,7 @@ use crate::block::{self, AIR};
 use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn, cursor_raycast};
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listen as _, Log};
-use crate::math::{Face6, GridAab, Rgb};
+use crate::math::{Face6, GridAab, Rgb01};
 use crate::physics::BodyTransaction;
 use crate::raycast::Ray;
 use crate::space::Space;
@@ -209,7 +209,7 @@ fn no_superjumping() {
     let space = universe.insert_anonymous(
         Space::builder(GridAab::ORIGIN_CUBE)
             .read_ticket(universe.read_ticket())
-            .filled_with(block::from_color!(Rgb::ONE))
+            .filled_with(block::from_color!(Rgb01::WHITE))
             .build(),
     );
     let mut character = Character::spawn_default(universe.read_ticket(), space);
@@ -254,7 +254,7 @@ fn click_wrong_space_or_correct_space() {
         universe.insert_anonymous(
             Space::builder(GridAab::ORIGIN_CUBE)
                 .read_ticket(universe.read_ticket())
-                .filled_with(block::from_color!(Rgb::ONE))
+                .filled_with(block::from_color!(Rgb01::WHITE))
                 .build(),
         )
     };
