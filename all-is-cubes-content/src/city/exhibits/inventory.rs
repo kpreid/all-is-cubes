@@ -68,9 +68,9 @@ fn INVENTORY(ctx: Context<'_>) {
                 pedestal,
                 &tray.evaluate(txn.read_ticket()).unwrap().with_inventory([
                     inv::Tool::Block(demo_blocks[DemoBlocks::ExhibitBackground].clone()).into(),
-                    inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
-                    inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_GREEN)).into(),
-                    inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_BLUE)).into(),
+                    inv::Tool::Block(block::from_color!(Rgb01::UNIFORM_LUMINANCE_RED)).into(),
+                    inv::Tool::Block(block::from_color!(Rgb01::UNIFORM_LUMINANCE_GREEN)).into(),
+                    inv::Tool::Block(block::from_color!(Rgb01::UNIFORM_LUMINANCE_BLUE)).into(),
                     inv::Tool::Block(demo_blocks[DemoBlocks::Lamp(true)].clone()).into(),
                 ]),
             ],
@@ -115,14 +115,15 @@ fn INVENTORY(ctx: Context<'_>) {
             let pipe_with_item_1 = straight_pipe_block
                 .evaluate(txn.read_ticket())
                 .unwrap()
-                .with_inventory([
-                    inv::Tool::Block(block::from_color!(Rgb::UNIFORM_LUMINANCE_RED)).into(),
-                ]);
+                .with_inventory([inv::Tool::Block(block::from_color!(
+                    Rgb01::UNIFORM_LUMINANCE_RED
+                ))
+                .into()]);
             let pipe_with_item_2 = straight_pipe_block
                 .evaluate(txn.read_ticket())
                 .unwrap()
                 .with_inventory([inv::Tool::Block(block::from_color!(
-                    Rgb::UNIFORM_LUMINANCE_BLUE
+                    Rgb01::UNIFORM_LUMINANCE_BLUE
                 ))
                 .into()]);
             m.set([2, 1, 0], pipe_with_item_1.rotate(GridRotation::RXzY))?;

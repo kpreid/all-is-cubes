@@ -14,7 +14,7 @@ use all_is_cubes::euclid::{Point2D, Size2D, Size3D, Vector3D, point3, size2, siz
 use all_is_cubes::listen;
 use all_is_cubes::math::{
     Axis, Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridVector, Rgb, Rgba, Vol, ps32, ps64, rgb_const, rgba_const, zo32,
+    GridVector, Rgb, Rgb01, Rgba, Vol, ps32, ps64, rgb_const, rgba_const, zo32,
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
@@ -959,10 +959,11 @@ async fn sky(mut context: RenderTestContext, face: Face6) {
     let [block] = make_some_voxel_blocks(context.universe_mut());
 
     let [r, g, b] = [
-        Rgb::UNIFORM_LUMINANCE_RED,
-        Rgb::UNIFORM_LUMINANCE_GREEN,
-        Rgb::UNIFORM_LUMINANCE_BLUE,
-    ];
+        Rgb01::UNIFORM_LUMINANCE_RED,
+        Rgb01::UNIFORM_LUMINANCE_GREEN,
+        Rgb01::UNIFORM_LUMINANCE_BLUE,
+    ]
+    .map(Rgb::from);
     // axis-colored sky (+x has red and -x has no red, and so on) to disambiguate
     // all directions
     let sky = space::Sky::Octants([Rgb::ZERO, b, g, g + b, r, r + b, r + g, r + g + b]);

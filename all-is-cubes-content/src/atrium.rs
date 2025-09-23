@@ -15,7 +15,7 @@ use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridSizeCoord, GridVector, Gridgid, Rgb, Rgba, Vol, rgb_const,
+    GridSizeCoord, GridVector, Gridgid, Rgb, Rgb01, Rgba, Vol, rgb_const,
 };
 use all_is_cubes::space::{self, SetCubeError, Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time;
@@ -554,11 +554,11 @@ impl fmt::Display for BannerColor {
 }
 
 impl BannerColor {
-    fn color(self) -> Rgb {
+    fn color(self) -> Rgb01 {
         match self {
-            BannerColor::Red => Rgb::UNIFORM_LUMINANCE_RED,
-            BannerColor::Green => Rgb::UNIFORM_LUMINANCE_GREEN,
-            BannerColor::Blue => Rgb::UNIFORM_LUMINANCE_BLUE,
+            BannerColor::Red => Rgb01::UNIFORM_LUMINANCE_RED,
+            BannerColor::Green => Rgb01::UNIFORM_LUMINANCE_GREEN,
+            BannerColor::Blue => Rgb01::UNIFORM_LUMINANCE_BLUE,
         }
     }
 }

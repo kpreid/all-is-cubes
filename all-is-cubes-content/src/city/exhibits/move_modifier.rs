@@ -98,7 +98,7 @@ fn PROJECTILE(ctx: Context<'_>) {
 
     let launcher = Block::builder()
         .display_name(literal!("Launcher"))
-        .color(Rgb::UNIFORM_LUMINANCE_RED.with_alpha(zo32(1.0)))
+        .color(Rgb01::UNIFORM_LUMINANCE_RED.with_alpha(zo32(1.0)))
         .animation_hint(block::AnimationHint::replacement(
             block::AnimationChange::Shape,
         ))

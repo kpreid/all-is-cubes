@@ -845,6 +845,9 @@ impl<'a> From<&'a Block> for Cow<'a, Block> {
 
 // Converting colors to blocks.
 impl From<Rgb> for Block {
+    // TODO(rgb01): Remove this impl and replace its uses with `Rgb01`, so we only use
+    // `Rgb` for emissive colors
+
     /// Constructs a [`Block`] with the given reflectance color, and default attributes.
     ///
     /// This operation allocates a new [`Primitive`] value on the heap.
