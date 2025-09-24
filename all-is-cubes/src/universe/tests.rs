@@ -341,12 +341,14 @@ fn delete_twice_fails() {
         .insert(name.clone(), BlockDef::new(u.read_ticket(), block))
         .unwrap();
 
-    let txn = UniverseTransaction::delete(handle);
-
     // Deletion should succeed...
-    txn.clone().execute(&mut u, (), &mut drop).unwrap();
+    UniverseTransaction::delete(handle.clone())
+        .execute(&mut u, (), &mut drop)
+        .unwrap();
     // ...but not trying to delete the same thing again.
-    txn.execute(&mut u, (), &mut drop).unwrap_err();
+    UniverseTransaction::delete(handle)
+        .execute(&mut u, (), &mut drop)
+        .unwrap_err();
 }
 
 #[test]

@@ -222,7 +222,7 @@ where
 ///
 /// Construct this by calling [`Transaction::bind`] on other transaction types
 /// and combine them into larger transactions with [`Merge::merge`].
-#[derive(Clone, Default, PartialEq)]
+#[derive(Default, PartialEq)]
 #[must_use]
 pub struct UniverseTransaction {
     /// Transactions on existing members or named insertions.
@@ -990,7 +990,7 @@ mod tests {
     use crate::space::Space;
     use crate::space::SpaceTransaction;
     use crate::space::SpaceTransactionConflict;
-    use crate::transaction::{ExecuteError, MapConflict, TransactionTester};
+    use crate::transaction::{ExecuteError, MapConflict};
     use crate::universe::GoneReason;
     use crate::universe::{self, HandleError};
     use alloc::sync::Arc;
@@ -1198,7 +1198,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "TODO: figure out how to get this to work w/ insert transactions"]
+    #[cfg(false)] // TODO: figure out how to write a systematic test for `UniverseTransaction`s.`
     fn systematic() {
         TransactionTester::new()
             // TODO: more transactions of all kinds
@@ -1239,48 +1239,8 @@ mod tests {
         t1.merge(t2).unwrap_err();
     }
 
-    #[test]
-    fn insert_named_already_in_different_universe() {
-        let mut u1 = Universe::new();
-        let mut u2 = Universe::new();
-        let (_, txn) = UniverseTransaction::insert("foo".into(), Space::empty_positive(1, 1, 1));
-
-        txn.clone().execute(&mut u1, (), &mut drop).unwrap();
-        let e = txn.execute(&mut u2, (), &mut drop).unwrap_err();
-
-        assert_eq!(
-            dbg!(e),
-            ExecuteError::Check(UniverseMismatch::Member(transaction::MapMismatch {
-                key: "foo".into(),
-                mismatch: MemberMismatch::Insert(InsertError {
-                    name: "foo".into(),
-                    kind: InsertErrorKind::AlreadyInserted
-                })
-            }))
-        );
-    }
-
-    #[test]
-    fn insert_anonymous_already_in_different_universe() {
-        let mut u1 = Universe::new();
-        let mut u2 = Universe::new();
-        let mut txn = UniverseTransaction::default();
-        txn.insert_anonymous(Space::empty_positive(1, 1, 1));
-
-        txn.clone().execute(&mut u1, (), &mut drop).unwrap();
-        let e = txn.execute(&mut u2, (), &mut drop).unwrap_err();
-
-        assert_eq!(
-            dbg!(e),
-            ExecuteError::Check(UniverseMismatch::Member(transaction::MapMismatch {
-                key: Name::Pending,
-                mismatch: MemberMismatch::Insert(InsertError {
-                    name: Name::Pending,
-                    kind: InsertErrorKind::AlreadyInserted
-                })
-            }))
-        );
-    }
+    // TODO(ecs): Write tests for all the variants of `InsertError` that aren’t now impossible.
+    // Remove the cases that are now impossible.
 
     #[test]
     fn handle_error_from_handle_execute() {

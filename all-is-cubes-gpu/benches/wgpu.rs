@@ -42,13 +42,16 @@ fn render_benches(c: &mut Criterion, instance: &wgpu::Instance) {
             Executor.block_on(create_updated_renderer("update-only", instance));
 
         let [block] = make_some_blocks();
-        let txn1 =
-            SpaceTransaction::set_cube([0, 0, 0], None, Some(block::AIR)).bind(space.clone());
-        let txn2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
+        let txn1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block::AIR));
+        let txn2 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block));
 
         b.iter_with_large_drop(move || {
-            txn1.clone().execute(&mut universe, (), &mut drop).unwrap();
-            txn2.clone().execute(&mut universe, (), &mut drop).unwrap();
+            for txn in [&txn1, &txn2] {
+                txn.clone()
+                    .bind(space.clone())
+                    .execute(&mut universe, (), &mut drop)
+                    .unwrap();
+            }
             renderer
                 .lock()
                 .unwrap()

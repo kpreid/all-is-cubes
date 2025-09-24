@@ -826,6 +826,10 @@ pub struct InsertError {
 
 /// Specific problems with attempting to insert an object in a [`Universe`].
 /// A component of [`InsertError`].
+//---
+// TODO(ecs): Many of these errors should be impossible now that there is always exactly one,
+// non-clonable, UniverseTransaction that can insert any given handle, but the code that generates
+// these errors is not yet in a position to acknowledge that.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum InsertErrorKind {
@@ -840,7 +844,7 @@ pub enum InsertErrorKind {
     /// The provided [`Handle`]’s value is being mutated and cannot
     /// be checked.
     InUse,
-    /// The provided [`Handle`] was already inserted into some universe.
+    /// The provided [`Handle`] was already inserted into some universe.)
     AlreadyInserted,
     #[doc(hidden)] // should be unreachable
     /// The provided [`Handle`] is being used in the deserialization process
