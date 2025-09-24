@@ -601,7 +601,7 @@ impl Transaction for UniverseTransaction {
                 .map_err(|e| e.context(format!("universe member {name}")))?;
         }
 
-        for (new_member, check) in anonymous_insertions.iter().cloned().zip(check_anon) {
+        for (new_member, check) in anonymous_insertions.into_iter().zip(check_anon) {
             new_member.commit(target, &Name::Pending, check, outputs)?;
         }
 
@@ -685,7 +685,7 @@ impl fmt::Debug for UniverseTransaction {
 /// Note: This does not implement [`Transaction`] because it needs to refer to an
 /// _entry_ in a Universe. We could kludge around that by having it take the Universe
 /// and embed the Name, but that's unnecessary.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 enum MemberTxn {
     /// Mergeable types are required to have a no-operation [`Default`] value,
     /// though this shouldn't come up much.
