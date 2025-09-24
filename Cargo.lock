@@ -1483,7 +1483,7 @@ checksum = "fe6d2e5af09e8c8ad56c969f2157a3d4238cebc7c55f0a517728c38f7b200f81"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.2.0",
+ "unicode-width 0.1.14",
 ]
 
 [[package]]
@@ -3455,7 +3455,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07033963ba89ebaf1584d767badaa2e8fcec21aedea6b8c0346d487d49c28667"
 dependencies = [
  "cfg-if",
- "windows-targets 0.53.3",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -4939,9 +4939,9 @@ dependencies = [
 
 [[package]]
 name = "re_arrow_util"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff56505df1133d09ec241e21715d0196ff5344e75a7ddd6ee23a0a34a4ddbb60"
+checksum = "010d84f951dd203cae2baa1ba2c89ddf45b48cf849fc9b46aa190eb2a7cb7f98"
 dependencies = [
  "anyhow",
  "arrow",
@@ -4953,9 +4953,9 @@ dependencies = [
 
 [[package]]
 name = "re_build_info"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "741f6ca7a4fb9b1c9ed10f9557ccae73782c9bbc014814c78ec8c23acdfe1fdc"
+checksum = "0455079c2ae78eac6f23d59204d688479228472943401c03dc70aa7d43d4110e"
 dependencies = [
  "re_byte_size",
  "serde",
@@ -4963,9 +4963,9 @@ dependencies = [
 
 [[package]]
 name = "re_build_tools"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5856d2b39c66281b5304d9a882e7d4ff5ec0f706989f9291974dc2aeea2da315"
+checksum = "cf6f0a48cd2c5b74723af1efb3bbf27710dea509ce677b5c4b7cd462a512e413"
 dependencies = [
  "anyhow",
  "cargo_metadata 0.18.1",
@@ -4978,9 +4978,9 @@ dependencies = [
 
 [[package]]
 name = "re_byte_size"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83b9410462a416316a54bc3759f484d5cde25e54f33cc0d5339b942c90c7ba8a"
+checksum = "959c12fc819b07b797088545c88e7bd66f6380eeec7523d31dc9236048118690"
 dependencies = [
  "arrow",
  "half",
@@ -4989,18 +4989,18 @@ dependencies = [
 
 [[package]]
 name = "re_case"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5211701abdfd3adf51765865ffffcaf819eaf7fd29e77b784cff47215aa5d49e"
+checksum = "8be3af744b9f72e3c105548e3df373535cf83dff8957462376dedcfc0cc9e882"
 dependencies = [
  "convert_case",
 ]
 
 [[package]]
 name = "re_chunk"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a0f380d51a8bc0a5810b5403b868fd754bc815c98098b9a9a2f36f82f1b82a2"
+checksum = "398bd2a509ba863fe8799b08882ca449c3f9ec0472f5e65f9f4ad0c46c6c7f2d"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5030,15 +5030,15 @@ dependencies = [
 
 [[package]]
 name = "re_error"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "268d52a5ff3ce525b0be8e24c94547c5ecc9a100cbe69c897c0088b997602de7"
+checksum = "825f498f0df8e68cc7563ac4bd78da05718d9659cd6648d22ed515ae33fda511"
 
 [[package]]
 name = "re_format"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e74699d8d84e3f71bac417f35b0029ab5623ab844ff1e49db9036e03c2d71fe8"
+checksum = "a9ef9e831b47e90a64a610cf3ea41a679ee37536830c2a0cde2fa6e549dcc346"
 dependencies = [
  "half",
  "num-traits",
@@ -5046,9 +5046,9 @@ dependencies = [
 
 [[package]]
 name = "re_format_arrow"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e574c0213ceff480fdf1b1492c2bd2a5d0d69123ac5ef7200cb6a380ceee9dee"
+checksum = "f5631b92a287355155bd411bed0ed42ec2a0a526a1ec0764e8a836333011e887"
 dependencies = [
  "arrow",
  "comfy-table",
@@ -5061,9 +5061,9 @@ dependencies = [
 
 [[package]]
 name = "re_grpc_client"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ab55d9e5785f0a64f65f8b0af9415ead666bb1dd58f07946f99aac8e5dc9d26"
+checksum = "122a42fc4ddd1201d8e620364cc1990ef7124c8b93df09dc99df79ba0744436c"
 dependencies = [
  "async-stream",
  "crossbeam",
@@ -5087,9 +5087,9 @@ dependencies = [
 
 [[package]]
 name = "re_grpc_server"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c761ebf13d8ce049944da3e468387211636f3301b261468283f2d56c60a8b771"
+checksum = "d93ced3f2a5605615741e12b2ca18ea3bc11518db6f1f6cf78b858f7493a4160"
 dependencies = [
  "anyhow",
  "crossbeam",
@@ -5119,9 +5119,9 @@ dependencies = [
 
 [[package]]
 name = "re_log"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d432b81681f236aa5ded362d1c89bbbff0f76322289e5480f3d791abd162879e"
+checksum = "6fc1211f5b656a37d3a19f014a371eb198489fd82923c637a37f679aac4de7ec"
 dependencies = [
  "env_filter",
  "env_logger",
@@ -5135,9 +5135,9 @@ dependencies = [
 
 [[package]]
 name = "re_log_encoding"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26fdf90044cb9f9c43aba44d78ad97bf20a57fe801d4052f6c26eb10fded3519"
+checksum = "ce9309eb64eb6238ec8a143a0a9254992364ed8cbf92460ea373f6ff82b257da"
 dependencies = [
  "arrow",
  "bytes",
@@ -5159,9 +5159,9 @@ dependencies = [
 
 [[package]]
 name = "re_log_types"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5c399fbdc5613d07743d7e8319ede6f3f88db6283c75e0710075aecb12aa0bb"
+checksum = "bc2474a9cabc5d880d8405936e9666fae3233f567489998fdee5c376b6d9ae99"
 dependencies = [
  "ahash",
  "arrow",
@@ -5195,9 +5195,9 @@ dependencies = [
 
 [[package]]
 name = "re_memory"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a55b42eb887694027f4b5297c4df09057ca9e4931b710f8fc8b2a3783d3c39c8"
+checksum = "3d6ee886449e70071c618b0edb21bc01b9cfd7cf8652ee3c5f9cafd8a7faa3c1"
 dependencies = [
  "ahash",
  "backtrace",
@@ -5216,9 +5216,9 @@ dependencies = [
 
 [[package]]
 name = "re_protos"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "002fd6600ae08fe4494bbca890e2ef7d1ae7bc829f02c8a7cd94a7359ae03a5d"
+checksum = "38ca873aa1a93675f5a6f0714e4a688fca84659b5e8e17fdb828273210dcd95c"
 dependencies = [
  "arrow",
  "jiff",
@@ -5239,9 +5239,9 @@ dependencies = [
 
 [[package]]
 name = "re_sdk"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49187bca62426ca828722f6e2f1835ce0700372015a54e403561e09dde7dcacc"
+checksum = "f9de98307a1134fd95f28c0bed47b7950cd53cd1c187768d3714a5f8a290a79a"
 dependencies = [
  "ahash",
  "const_format",
@@ -5270,9 +5270,9 @@ dependencies = [
 
 [[package]]
 name = "re_smart_channel"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "899cca912a53b0615973a82ac05c7741212b5c46df92ced72e64d63fc61bbf13"
+checksum = "a04173284aa484c31a9f704fb4857e3cb0bc68c999b7fdfa656c60880439e4ec"
 dependencies = [
  "crossbeam",
  "parking_lot",
@@ -5285,9 +5285,9 @@ dependencies = [
 
 [[package]]
 name = "re_sorbet"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6e3f5f154e3e2f0c78c8d26daeb958103f37b48061fdcd7071c3929ae31f485"
+checksum = "2e9e1a06fdbce99036349898544846e2dbfa1359b3be1eb54052188ab3a9bf8a"
 dependencies = [
  "arrow",
  "itertools 0.14.0",
@@ -5307,18 +5307,18 @@ dependencies = [
 
 [[package]]
 name = "re_span"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9128efcef638fe5738c89af2bd2aef67fd91cd2e49246f3dcbfa3d0f36f226db"
+checksum = "c8d510f9e3295e0e84723a03d1dccd1e0970cf97620da47de99b6d62857918cd"
 dependencies = [
  "num-traits",
 ]
 
 [[package]]
 name = "re_string_interner"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e84336fdc7da5eb2f341ba680077e58cfae9ef7f8c7498af827258656ca7921"
+checksum = "b3fc117db59c49f046edb7582f6b7306e60f68eb6a5bb518e047fe6b0c98bdb4"
 dependencies = [
  "ahash",
  "nohash-hasher",
@@ -5329,18 +5329,18 @@ dependencies = [
 
 [[package]]
 name = "re_tracing"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f829053426e04888b94c9f6351ec21611cbb7860831be5ed3c70cd2089988651"
+checksum = "10911babff25daeffc64f01aa33465fee46174067905ebf58ee2411dc1b5f29d"
 dependencies = [
  "puffin",
 ]
 
 [[package]]
 name = "re_tuid"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a2272411713cbbf7e0a1780ae33e9e6204e9f2c53529a35c13bf3b346646670"
+checksum = "8b5e66d8992f0e2efa9c862e463700df2724a8904e20c1714c7bd34f641e9b05"
 dependencies = [
  "bytemuck",
  "document-features",
@@ -5352,9 +5352,9 @@ dependencies = [
 
 [[package]]
 name = "re_types"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8351c3230309e92ae8bbbc108851a842b16c595b556f932e8a9c7bd5066a2a6b"
+checksum = "41eb2cf4807dfbd3eb8ba195e7bd8b9dc720cd394c477c64e77fa9602f936692"
 dependencies = [
  "anyhow",
  "array-init",
@@ -5388,9 +5388,9 @@ dependencies = [
 
 [[package]]
 name = "re_types_builder"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52c7ed3a3bda3ad89aedb68de2a09d7606af5988e05fa66dff2f7c5d823da478"
+checksum = "090920f78dd766f56eee4da48c75520f89e04864815630cb3604a323af9fb0e9"
 dependencies = [
  "anyhow",
  "camino",
@@ -5419,9 +5419,9 @@ dependencies = [
 
 [[package]]
 name = "re_types_core"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9324004ba439faabf8285d09ff79dbb5a42f997c2c0b3e6e69a7b72474b8531a"
+checksum = "9cc98e52a0b853f7cf3715a344fd6a8eda3b3afbd27028fccdcde38da746c51f"
 dependencies = [
  "anyhow",
  "arrow",
@@ -5444,9 +5444,9 @@ dependencies = [
 
 [[package]]
 name = "re_uri"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22e95a8847d4c048830d1a66f15c497ac5a2d7c9eeac1c1179de6a1b357c7ddc"
+checksum = "f702a72fc9df214e08ada3b637fa3d37e09a7b24726a667934e5fb60bb526329"
 dependencies = [
  "re_log",
  "re_log_types",
