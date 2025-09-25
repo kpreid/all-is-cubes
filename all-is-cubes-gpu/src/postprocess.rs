@@ -263,7 +263,7 @@ pub(crate) fn create_postprocess_pipeline(
 ) -> wgpu::RenderPipeline {
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("PostprocessResources::pipeline_layout"),
-        bind_group_layouts: &[postprocess_bind_group_layout],
+        bind_group_layouts: &[Some(postprocess_bind_group_layout)],
         immediate_size: 0,
     });
 
