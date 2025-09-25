@@ -129,7 +129,7 @@ pub(crate) struct BeltWritingParts<'a> {
     pub encoder: &'a mut wgpu::CommandEncoder,
 }
 
-impl<'a> BeltWritingParts<'a> {
+impl BeltWritingParts<'_> {
     /// Borrow `self` to produce another `BeltWritingParts` that can be consumed (moved)
     /// without losing this one.
     pub fn reborrow(&mut self) -> BeltWritingParts<'_> {
@@ -145,7 +145,7 @@ impl<'a> BeltWritingParts<'a> {
         target: &wgpu::Buffer,
         offset: wgpu::BufferAddress,
         size: wgpu::BufferSize,
-    ) -> wgpu::BufferViewMut<'a> {
+    ) -> wgpu::BufferViewMut {
         self.belt
             .write_buffer(self.encoder, target, offset, size, self.device)
     }
@@ -235,10 +235,10 @@ impl ResizingBuffer {
         addresses
     }
 
-    pub(crate) fn map_without_resizing<'belt>(
+    pub(crate) fn map_without_resizing(
         &self,
-        bwp: BeltWritingParts<'belt>,
-    ) -> Option<wgpu::BufferViewMut<'belt>> {
+        bwp: BeltWritingParts<'_>,
+    ) -> Option<wgpu::BufferViewMut> {
         self.get()
             .and_then(|b| Some((b, wgpu::BufferSize::new(b.size())?)))
             .map(move |(b, size)| bwp.write_buffer(b, 0, size))

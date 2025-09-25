@@ -133,6 +133,7 @@ impl EverythingRenderer {
             },
             memory_hints: wgpu::MemoryHints::default(), // TODO: consider setting
             trace: wgpu::Trace::Off,
+            experimental_features: wgpu::ExperimentalFeatures::default(),
         }
     }
 

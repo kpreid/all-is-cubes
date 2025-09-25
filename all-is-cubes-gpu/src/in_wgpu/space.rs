@@ -501,7 +501,7 @@ impl SpaceRenderer {
         // Note: If we find more uses for the belt during drawing, we will need to not have this
         // long-lived mapping, use multiple belts, or use a manually managed staging buffer for
         // instances (which might be a good idea itself).
-        let mut instance_buffer_view: Option<wgpu::BufferViewMut<'_>> =
+        let mut instance_buffer_view: Option<wgpu::BufferViewMut> =
             self.instance_buffer.map_without_resizing(bwp);
         let mut instance_buffer_writer: MapVec<'_, WgpuInstanceData> = match instance_buffer_view {
             Some(ref mut view) => MapVec::new(view),
