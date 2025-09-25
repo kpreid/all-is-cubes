@@ -65,6 +65,7 @@ where
             &wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 format: wgpu::TextureFormat::Rgba16Float,
+                color_space: wgpu::SurfaceColorSpace::Auto,
                 view_formats: vec![],
                 width: output_viewport.framebuffer_size.width,
                 height: output_viewport.framebuffer_size.height,
@@ -100,9 +101,9 @@ where
             entry_point: Some("block_vertex_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: &[
-                vertex::BPosition::LAYOUT,
-                vertex::BColor::LAYOUT,
-                vertex::WgpuInstanceData::LAYOUT,
+                Some(vertex::BPosition::LAYOUT),
+                Some(vertex::BColor::LAYOUT),
+                Some(vertex::WgpuInstanceData::LAYOUT),
             ],
         },
         fragment: Some(wgpu::FragmentState {

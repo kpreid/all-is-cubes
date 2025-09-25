@@ -144,8 +144,9 @@ impl Queries {
                 match result {
                     Ok(()) => {
                         let mut data = [0u64; Query::COUNT];
-                        bytemuck::bytes_of_mut(&mut data)
-                            .copy_from_slice(&read_buffer.get_mapped_range(0..QUERY_BUFFER_SIZE));
+                        bytemuck::bytes_of_mut(&mut data).copy_from_slice(
+                            &read_buffer.get_mapped_range(0..QUERY_BUFFER_SIZE).unwrap(),
+                        );
                         read_buffer.unmap();
 
                         // Send data to be collected for display later
