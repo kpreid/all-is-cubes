@@ -232,9 +232,9 @@ impl Pipelines {
             conservative: false,
         };
         let block_vertex_buffers = &[
-            vertex::BPosition::LAYOUT,
-            vertex::BColor::LAYOUT,
-            vertex::WgpuInstanceData::LAYOUT,
+            Some(vertex::BPosition::LAYOUT),
+            Some(vertex::BColor::LAYOUT),
+            Some(vertex::WgpuInstanceData::LAYOUT),
         ];
 
         let multisample = fb.linear_scene_multisample_state();
@@ -462,7 +462,7 @@ impl Pipelines {
                     module: shaders.blocks_and_lines.get(),
                     entry_point: Some("lines_vertex"),
                     compilation_options: wgpu::PipelineCompilationOptions::default(),
-                    buffers: &[vertex::WgpuLinesVertex::LAYOUT],
+                    buffers: &[Some(vertex::WgpuLinesVertex::LAYOUT)],
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: shaders.blocks_and_lines.get(),

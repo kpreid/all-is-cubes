@@ -277,7 +277,7 @@ impl ResizingBuffer {
             if buffer.size() > 0 {
                 // We could do multiple get_mapped_range() but that would not be particularly useful
                 // since there is no sparseness to them.
-                let mut mapped = buffer.get_mapped_range_mut(..);
+                let mut mapped = buffer.get_mapped_range_mut(..).unwrap();
                 for (address, data) in addresses.into_iter().zip(contents) {
                     mapped.slice(address as usize..).slice(..data.len()).copy_from_slice(data);
                 }
@@ -463,7 +463,7 @@ mod tests {
             // Check the actual buffer contents have been written in the right places.
             let buffer_to_read = rb.get().unwrap();
             block_on(map_really_async(device.clone(), buffer_to_read.slice(..))).unwrap();
-            let mapped_view = buffer_to_read.get_mapped_range(..);
+            let mapped_view = buffer_to_read.get_mapped_range(..).unwrap();
             for (&address, expected_data) in addresses.iter().zip(test_data_to_write) {
                 assert_eq!(
                     mapped_view[address as usize..][..expected_data.len()],
@@ -491,7 +491,10 @@ mod tests {
         });
 
         // Initial contents not using write_part_of_slice_to_part_of_buffer().
-        destination_buffer.get_mapped_range_mut(..).copy_from_slice(&source_data);
+        destination_buffer
+            .get_mapped_range_mut(..)
+            .unwrap()
+            .copy_from_slice(&source_data);
         destination_buffer.unmap();
 
         for (value, range) in [
@@ -530,7 +533,10 @@ mod tests {
                 destination_buffer.slice(..),
             ))
             .unwrap();
-            assert_eq!(destination_buffer.get_mapped_range(..)[..], source_data);
+            assert_eq!(
+                destination_buffer.get_mapped_range(..).unwrap()[..],
+                source_data
+            );
             destination_buffer.unmap();
         }
     }
