@@ -131,7 +131,7 @@ where
             bias: wgpu::DepthBiasState::default(),
         }),
         multisample: wgpu::MultisampleState::default(), // default = off
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     });
 

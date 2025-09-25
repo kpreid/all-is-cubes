@@ -36,7 +36,7 @@ pub async fn create_instance_for_test_or_exit(allow_noop: bool) -> wgpu::Instanc
             stderr,
             "Available adapters (backend filter = {backends:?}):"
         );
-        for adapter in instance.enumerate_adapters(wgpu::Backends::all()) {
+        for adapter in instance.enumerate_adapters(wgpu::Backends::all()).await {
             _ = writeln!(stderr, "  {}", shortened_adapter_info(&adapter.get_info()));
         }
     }
@@ -92,10 +92,10 @@ pub async fn try_create_adapter_for_test(
 
     // Pick an adapter.
     // TODO: Replace this with
-    //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None)
+    //   wgpu::util::initialize_adapter_from_env_or_default(&instance, wgpu::Backends::all(), None).await
     // (which defaults to low-power) or even better, test on *all* available adapters?
     let mut adapter: Result<wgpu::Adapter, wgpu::RequestAdapterError> =
-        wgpu::util::initialize_adapter_from_env(instance, surface.as_ref());
+        wgpu::util::initialize_adapter_from_env(instance, surface.as_ref()).await;
     if let Err(wgpu::RequestAdapterError::EnvNotSet) = adapter {
         log(format_args!(
             "No adapter specified via WGPU_ADAPTER_NAME; picking automatically."

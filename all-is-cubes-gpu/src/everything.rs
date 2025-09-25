@@ -184,6 +184,7 @@ impl EverythingRenderer {
 
         let mut new_self = EverythingRenderer {
             staging_belt: wgpu::util::StagingBelt::new(
+                device.clone(),
                 // Empirically chosen belt chunk size based on tests with
                 // UniverseTemplate::DemoCity.
                 //
@@ -222,7 +223,7 @@ impl EverythingRenderer {
                 address_mode_w: wgpu::AddressMode::ClampToEdge,
                 mag_filter: wgpu::FilterMode::Nearest,
                 min_filter: wgpu::FilterMode::Nearest,
-                mipmap_filter: wgpu::FilterMode::Nearest,
+                mipmap_filter: wgpu::MipmapFilterMode::Nearest,
                 ..Default::default()
             }),
 

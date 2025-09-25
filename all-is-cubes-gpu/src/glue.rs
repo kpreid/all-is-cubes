@@ -174,6 +174,8 @@ pub fn write_part_of_slice_to_part_of_buffer(
 
 /// The ingredients to make use of a [`wgpu::util::StagingBelt`].
 pub(crate) struct BeltWritingParts<'a> {
+    /// This used to be necessary to use a [`StagingBelt`], but is no longer.
+    /// We keep it around anyway to help with [`ResizingBuffer`] too.
     pub device: &'a wgpu::Device,
     pub belt: &'a mut wgpu::util::StagingBelt,
     pub encoder: &'a mut wgpu::CommandEncoder,
@@ -196,7 +198,7 @@ impl BeltWritingParts<'_> {
         offset: wgpu::BufferAddress,
         size: wgpu::BufferSize,
     ) -> wgpu::BufferViewMut {
-        self.belt.write_buffer(self.encoder, target, offset, size, self.device)
+        self.belt.write_buffer(self.encoder, target, offset, size)
     }
 }
 
@@ -421,7 +423,7 @@ mod tests {
 
         let (device, queue) = wgpu::Device::noop(&wgpu::DeviceDescriptor::default());
         let mut rb = ResizingBuffer::default();
-        let mut belt = wgpu::util::StagingBelt::new(128);
+        let mut belt = wgpu::util::StagingBelt::new(device.clone(), 128);
 
         // Run the operation twice, to exercise both growth/allocation and writing without growth
         for i in 0..2 {
@@ -472,7 +474,7 @@ mod tests {
     #[test]
     fn write_part_of_slice() {
         let (device, queue) = wgpu::Device::noop(&wgpu::DeviceDescriptor::default());
-        let mut belt = wgpu::util::StagingBelt::new(128);
+        let mut belt = wgpu::util::StagingBelt::new(device.clone(), 128);
 
         // Starting with initialization with 1, not 0, because 0s easily appear incorrectly.
         let mut source_data: Vec<u8> = vec![1; 128];

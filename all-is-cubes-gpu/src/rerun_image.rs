@@ -202,6 +202,7 @@ impl RerunImageExport {
                     depth_stencil_attachment: None,
                     timestamp_writes: None,
                     occlusion_query_set: None,
+                    multiview_mask: None,
                 });
                 render_pass.set_pipeline(&pipelines.rerun_copy_pipeline);
                 render_pass.set_bind_group(0, copy_bind_group, &[]);
