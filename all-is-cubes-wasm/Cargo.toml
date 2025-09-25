@@ -239,4 +239,4 @@ overflow-checks = true
 # Here are some patches we might want to apply for development:
 #
 # exhaust = { git = "https://github.com/kpreid/exhaust/", branch = "main" }
-# wgpu = { git = "https://github.com/gfx-rs/wgpu/", branch = "trunk" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu/", branch = "trunk" }

@@ -1154,7 +1154,16 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09ec2f926cc3060f09db9ebc5b52823d85268d24bb917e472c0c4bea35780a7d"
 dependencies = [
- "bit-vec",
+ "bit-vec 0.9.1",
+]
+
+[[package]]
+name = "bit-set"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56d87354e4229f54a44f7bf2435906a4656dba36026ab6eaca629a2c436a691c"
+dependencies = [
+ "bit-vec 0.10.1",
 ]
 
 [[package]]
@@ -1162,6 +1171,12 @@ name = "bit-vec"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b71798fca2c1fe1086445a7258a4bc81e6e49dcd24c8d0dd9a1e57395b603f51"
+
+[[package]]
+name = "bit-vec"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5727b15fa97d4f4fee0a3b7c3d550ed0269f54329207b86388de918604e31269"
 
 [[package]]
 name = "bitflags"
@@ -2595,9 +2610,9 @@ dependencies = [
 
 [[package]]
 name = "glow"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29038e1c483364cc6bb3cf78feee1816002e127c331a1eec55a4d202b9e1adb5"
+checksum = "263218b0ba2b0715c3370fb04674f5f8aa331594b521c94ff0a8e4a8472d1386"
 dependencies = [
  "js-sys",
  "slotmap",
@@ -3334,13 +3349,12 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.95"
+version = "0.3.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2964e92d1d9dc3364cae4d718d93f227e3abb088e747d92e0395bfdedf1c12ca"
+checksum = "53b44bfcdb3f8d5837a46dae1ca9660a837176eee74a28b229bc626816589102"
 dependencies = [
  "cfg-if",
  "futures-util",
- "once_cell",
  "wasm-bindgen",
 ]
 
@@ -3760,7 +3774,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23bf0a141a9ab6f07dbb492db53245e464bc9db42f407772d9ae03d83a2c1033"
 dependencies = [
  "arrayvec",
- "bit-set",
+ "bit-set 0.10.0",
  "bitflags 2.13.1",
  "cfg-if",
  "cfg_aliases",
@@ -3770,7 +3784,31 @@ dependencies = [
  "indexmap",
  "libm",
  "log",
- "naga-types",
+ "naga-types 30.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits",
+ "once_cell",
+ "rustc-hash 1.1.0",
+ "thiserror 2.0.18",
+ "unicode-ident",
+]
+
+[[package]]
+name = "naga"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
+dependencies = [
+ "arrayvec",
+ "bit-set 0.11.1",
+ "bitflags 2.13.1",
+ "cfg-if",
+ "cfg_aliases",
+ "codespan-reporting",
+ "half",
+ "hashbrown 0.17.0",
+ "indexmap",
+ "libm",
+ "log",
+ "naga-types 30.0.0 (git+https://github.com/gfx-rs/wgpu/?branch=trunk)",
  "num-traits",
  "once_cell",
  "rustc-hash 1.1.0",
@@ -3789,7 +3827,7 @@ dependencies = [
  "bitflags 2.13.1",
  "half",
  "mutants 0.0.4",
- "naga",
+ "naga 30.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "once_cell",
  "proc-macro2",
 ]
@@ -3811,7 +3849,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46485380f5b1e387149bc6f0784c7dc123db71f770c62a49f73ae944fbb31060"
 dependencies = [
  "litrs",
- "naga",
+ "naga 30.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "naga-rust-back",
  "proc-macro2",
 ]
@@ -3833,6 +3871,17 @@ name = "naga-types"
 version = "30.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "658200ddc25c6c7b860747516d132d1b284c0fafb7a380233acee9a72fb30e11"
+dependencies = [
+ "hashbrown 0.17.0",
+ "indexmap",
+ "rustc-hash 1.1.0",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "naga-types"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
 dependencies = [
  "hashbrown 0.17.0",
  "indexmap",
@@ -7293,9 +7342,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.118"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bf938a0bacb0469e83c1e148908bd7d5a6010354cf4fb73279b7447422e3a89"
+checksum = "4b067c0c11094aef6b7a801c1e34a26affafdf3d051dba08456b868789aaf9a4"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -7306,9 +7355,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.68"
+version = "0.4.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f371d383f2fb139252e0bfac3b81b265689bf45b6874af544ffa4c975ac1ebf8"
+checksum = "c62df1340f32221cb9c54d6a27b030e3dba64361d4a95bed55f9aacb44da291d"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -7316,9 +7365,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.118"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eeff24f84126c0ec2db7a449f0c2ec963c6a49efe0698c4242929da037ca28ed"
+checksum = "167ce5e579f6bcf889c4f7175a8a5a585de84e8ff93976ce393efa5f2837aab1"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -7326,9 +7375,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.118"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d08065faf983b2b80a79fd87d8254c409281cf7de75fc4b773019824196c904"
+checksum = "f3997c7839262f4ef12cf90b818d6340c18e80f263f1a94bf157d0ec4420380e"
 dependencies = [
  "bumpalo",
  "proc-macro2",
@@ -7339,9 +7388,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.118"
+version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fd04d9e306f1907bd13c6361b5c6bfc7b3b3c095ed3f8a9246390f8dbdee129"
+checksum = "dc1b4cb0cc549fcf58d7dfc081778139b3d283a081644e833e84682ad71cea24"
 dependencies = [
  "unicode-ident",
 ]
@@ -7407,9 +7456,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.95"
+version = "0.3.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f2dfbb17949fa2088e5d39408c48368947b86f7834484e87b73de55bc14d97d"
+checksum = "8622dcb61c0bcc9fffa6938bed81210af2da9a7e4a1a834b2e37a59b6dfb6141"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -7440,8 +7489,7 @@ dependencies = [
 [[package]]
 name = "wgpu"
 version = "30.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d8f4bd44d92da5270f03409dba9f952dab24f128e05d6a554926101d1bf9114"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
 dependencies = [
  "arrayvec",
  "bitflags 2.13.1",
@@ -7452,7 +7500,7 @@ dependencies = [
  "hashbrown 0.17.0",
  "js-sys",
  "log",
- "naga",
+ "naga 30.0.0 (git+https://github.com/gfx-rs/wgpu/?branch=trunk)",
  "parking_lot",
  "portable-atomic",
  "profiling",
@@ -7470,12 +7518,11 @@ dependencies = [
 [[package]]
 name = "wgpu-core"
 version = "30.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08763620e76fc980bca7bf84de82568614487a53172dd968d89187282eb87fa2"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
 dependencies = [
  "arrayvec",
- "bit-set",
- "bit-vec",
+ "bit-set 0.11.1",
+ "bit-vec 0.10.1",
  "bitflags 2.13.1",
  "bytemuck",
  "cfg_aliases",
@@ -7483,8 +7530,8 @@ dependencies = [
  "hashbrown 0.17.0",
  "indexmap",
  "log",
- "naga",
- "naga-types",
+ "naga 30.0.0 (git+https://github.com/gfx-rs/wgpu/?branch=trunk)",
+ "naga-types 30.0.0 (git+https://github.com/gfx-rs/wgpu/?branch=trunk)",
  "once_cell",
  "parking_lot",
  "portable-atomic",
@@ -7495,7 +7542,8 @@ dependencies = [
  "thiserror 2.0.18",
  "wgpu-core-deps-apple",
  "wgpu-core-deps-emscripten",
- "wgpu-core-deps-windows-linux-android",
+ "wgpu-core-deps-linux-android-bsd",
+ "wgpu-core-deps-windows",
  "wgpu-hal",
  "wgpu-naga-bridge",
  "wgpu-types 30.0.0",
@@ -7504,8 +7552,7 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-apple"
 version = "30.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3283b6da70d7fc892de95840215aa36381b5d0cbc479e88ee2b173c7b992b225"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
 dependencies = [
  "wgpu-hal",
 ]
@@ -7513,17 +7560,23 @@ dependencies = [
 [[package]]
 name = "wgpu-core-deps-emscripten"
 version = "30.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85dcf2b2e5c2afb9eda64c570a87a4e570304bf39e52eddbaaf222d655b656ad"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
 dependencies = [
  "wgpu-hal",
 ]
 
 [[package]]
-name = "wgpu-core-deps-windows-linux-android"
+name = "wgpu-core-deps-linux-android-bsd"
 version = "30.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f76bc9c1c186ff3d9054e0d224c93c8c1c79d6653907c5249a5c1ea1a2cb1e43"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
+dependencies = [
+ "wgpu-hal",
+]
+
+[[package]]
+name = "wgpu-core-deps-windows"
+version = "30.0.0"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
 dependencies = [
  "wgpu-hal",
 ]
@@ -7531,13 +7584,12 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "30.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf765132d8d5f50e192e7880464890c13f4e7457aafe8e5466e8174586e9f101"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
 dependencies = [
  "android_system_properties",
  "arrayvec",
  "ash",
- "bit-set",
+ "bit-set 0.11.1",
  "bitflags 2.13.1",
  "block2 0.6.2",
  "bytemuck",
@@ -7552,8 +7604,8 @@ dependencies = [
  "libc",
  "libloading",
  "log",
- "naga",
- "naga-types",
+ "naga 30.0.0 (git+https://github.com/gfx-rs/wgpu/?branch=trunk)",
+ "naga-types 30.0.0 (git+https://github.com/gfx-rs/wgpu/?branch=trunk)",
  "ndk-sys",
  "objc2 0.6.4",
  "objc2-core-foundation",
@@ -7587,10 +7639,9 @@ dependencies = [
 [[package]]
 name = "wgpu-naga-bridge"
 version = "30.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9eaac644e5008925c78567d272b9d66ef83da55a53cc17fc7daade7bb6e66e5"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
 dependencies = [
- "naga",
+ "naga 30.0.0 (git+https://github.com/gfx-rs/wgpu/?branch=trunk)",
  "wgpu-types 30.0.0",
 ]
 
@@ -7612,14 +7663,13 @@ dependencies = [
 [[package]]
 name = "wgpu-types"
 version = "30.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a9c93c2b35edde326df60ffdee4c0f5864eac3011d6768b70d43f028ad93565"
+source = "git+https://github.com/gfx-rs/wgpu/?branch=trunk#22c5a7020b8c99f14c61d6d9d72358b2bd8f28bd"
 dependencies = [
  "bitflags 2.13.1",
  "bytemuck",
  "js-sys",
  "log",
- "naga-types",
+ "naga-types 30.0.0 (git+https://github.com/gfx-rs/wgpu/?branch=trunk)",
  "raw-window-handle",
  "static_assertions",
  "web-sys",
