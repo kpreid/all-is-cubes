@@ -271,7 +271,7 @@ impl Pipelines {
                 primitive: block_primitive_state,
                 depth_stencil: Some(depth_state_for_opaque.clone()),
                 multisample,
-                multiview: None,
+                multiview_mask: None,
                 cache,
             });
 
@@ -310,7 +310,7 @@ impl Pipelines {
                 primitive: block_primitive_state,
                 depth_stencil: Some(depth_state_for_transparent.clone()),
                 multisample,
-                multiview: None,
+                multiview_mask: None,
                 cache,
             });
 
@@ -342,7 +342,7 @@ impl Pipelines {
                 primitive: block_primitive_state,
                 depth_stencil: Some(depth_state_for_opaque),
                 multisample,
-                multiview: None,
+                multiview_mask: None,
                 cache,
             });
         let transparent_overdraw_render_pipeline =
@@ -364,7 +364,7 @@ impl Pipelines {
                 primitive: block_primitive_state,
                 depth_stencil: Some(depth_state_for_transparent),
                 multisample,
-                multiview: None,
+                multiview_mask: None,
                 cache,
             });
         // Rendering without the depth buffer tells us how many fragments had to be depth tested.
@@ -394,7 +394,7 @@ impl Pipelines {
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample,
-                multiview: None,
+                multiview_mask: None,
                 cache,
             });
 
@@ -430,7 +430,7 @@ impl Pipelines {
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample,
-                multiview: None,
+                multiview_mask: None,
                 cache,
             });
 
@@ -473,7 +473,7 @@ impl Pipelines {
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample,
-                multiview: None,
+                multiview_mask: None,
                 cache,
             });
 
@@ -561,7 +561,7 @@ impl Pipelines {
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample,
-                multiview: None,
+                multiview_mask: None,
                 cache,
             });
 
@@ -604,7 +604,7 @@ impl Pipelines {
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample,
-                multiview: None,
+                multiview_mask: None,
                 cache,
             });
 
@@ -706,7 +706,7 @@ impl Pipelines {
             depth_stencil: None,
             // we're writing *to* a non-multisampled texture
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache,
         });
 
@@ -718,7 +718,7 @@ impl Pipelines {
             address_mode_w: wgpu::AddressMode::MirrorRepeat,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         });
 

@@ -266,7 +266,7 @@ pub(crate) fn create_postprocess_pipeline(
         depth_stencil: None,
         // default = off. No need for multisampling since we are not drawing triangles here.
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     })
 }

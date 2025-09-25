@@ -125,7 +125,7 @@ impl Pipelines {
             depth_stencil: None,
             // default = off. No need for multisampling since we are not drawing triangles here.
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
         let upsample_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -151,7 +151,7 @@ impl Pipelines {
             depth_stencil: None,
             // default = off. No need for multisampling since we are not drawing triangles here.
             multisample: wgpu::MultisampleState::default(),
-            multiview: None,
+            multiview_mask: None,
             cache: None,
         });
 
