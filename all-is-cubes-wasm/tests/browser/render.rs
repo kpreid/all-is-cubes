@@ -20,7 +20,7 @@ use all_is_cubes_render::camera::{GraphicsOptions, Layers, StandardCameras, View
 async fn renderer_test() {
     console_error_panic_hook::set_once();
 
-    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
     let adapter = init::try_create_adapter_for_test(&instance, |msg| {
         web_sys::console::log_1(&JsValue::from_str(&format!("{msg}")))
     })

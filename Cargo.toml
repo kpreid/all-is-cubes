@@ -318,4 +318,4 @@ overflow-checks = true
 #
 # exhaust = { git = "https://github.com/kpreid/exhaust/", branch = "main" }
 # rendiff = { git = "https://github.com/kpreid/rendiff/", branch = "main" }
-# wgpu = { git = "https://github.com/gfx-rs/wgpu/", branch = "trunk" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu/", branch = "trunk" }
