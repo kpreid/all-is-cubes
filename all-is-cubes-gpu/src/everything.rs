@@ -180,6 +180,8 @@ impl EverythingRenderer {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
+            // TODO: add support for output in non-sRGBish color spaces.
+            color_space: wgpu::SurfaceColorSpace::Auto,
             view_formats: vec![surface_view_format(surface_format)],
             // wgpu operations will fail if the size is zero; set a minimum of 1 so we can
             // successfully initialize and get a working renderer later.

@@ -200,6 +200,7 @@ async fn init_wgpu(
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
+            apply_limit_buckets: false,
         });
         (surface, request_adapter_future)
     };
