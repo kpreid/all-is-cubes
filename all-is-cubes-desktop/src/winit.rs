@@ -220,6 +220,7 @@ pub async fn create_winit_wgpu_desktop_session(
                 .unwrap_or(wgpu::PowerPreference::HighPerformance),
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
+            apply_limit_buckets: false,
         });
         adapter = request_adapter_future.await;
     }

@@ -100,9 +100,9 @@ where
             entry_point: Some("block_vertex_main"),
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: &[
-                vertex::BPosition::LAYOUT,
-                vertex::BColor::LAYOUT,
-                vertex::WgpuInstanceData::LAYOUT,
+                Some(vertex::BPosition::LAYOUT),
+                Some(vertex::BColor::LAYOUT),
+                Some(vertex::WgpuInstanceData::LAYOUT),
             ],
         },
         fragment: Some(wgpu::FragmentState {

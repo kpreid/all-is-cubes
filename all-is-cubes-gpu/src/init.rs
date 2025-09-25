@@ -24,7 +24,10 @@ pub async fn create_instance_for_test_or_exit(allow_noop: bool) -> wgpu::Instanc
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends,
         backend_options: wgpu::BackendOptions {
-            noop: wgpu::NoopBackendOptions { enable: allow_noop },
+            noop: wgpu::NoopBackendOptions {
+                enable: allow_noop,
+                ..Default::default()
+            },
             ..Default::default()
         },
         ..wgpu::InstanceDescriptor::new_without_display_handle_from_env()
@@ -109,6 +112,7 @@ pub async fn try_create_adapter_for_test(
                     .unwrap_or(wgpu::PowerPreference::HighPerformance),
                 compatible_surface: surface.as_ref(),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await;
     }
@@ -345,7 +349,7 @@ impl TextureCopyParameters {
         // by copying it one row at a time.
         let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
         {
-            let mapped: &[u8] = &buffer.get_mapped_range();
+            let mapped: &[u8] = &buffer.get_mapped_range().unwrap();
             for row in 0..self.row_count() {
                 let byte_start_of_row = (self.padded_bytes_per_row()) as usize * row;
                 // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.
