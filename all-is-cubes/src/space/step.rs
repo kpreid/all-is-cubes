@@ -56,7 +56,7 @@ pub(crate) fn update_palette_phase_1(
     mut spaces: ecs::Query<'_, '_, (&Space, &mut SpacePaletteNextValue)>,
     data_sources: crate::universe::QueryBlockDataSources<'_, '_>,
 ) {
-    let read_ticket = ReadTicket::from_block_data_sources(data_sources);
+    let read_ticket = ReadTicket::from_block_data_sources(&data_sources);
 
     // TODO: parallel iter, + pipe out update info
     for (space, mut next_palette) in spaces.iter_mut() {

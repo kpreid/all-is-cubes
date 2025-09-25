@@ -49,7 +49,7 @@ enum TicketAccess<'u> {
     World(&'u ecs::World),
 
     /// Access only to things required for [`Block::evaluate()`].
-    BlockDataSources(QueryBlockDataSources<'u, 'u>),
+    BlockDataSources(&'u QueryBlockDataSources<'u, 'u>),
 
     /// Access to all but one entity.
     EverythingBut(UnsafeWorldCell<'u>, ecs::Entity),
@@ -58,9 +58,9 @@ enum TicketAccess<'u> {
     Stub,
 }
 
-#[derive(Clone, Copy, Debug, bevy_ecs::system::SystemParam)]
+#[derive(Debug, bevy_ecs::system::SystemParam)]
 pub(crate) struct QueryBlockDataSources<'w, 's> {
-    universe_id: UniverseId,
+    universe_id: ecs::Res<'w, UniverseId>,
     query: ecs::Query<
         'w,
         's,
@@ -108,12 +108,12 @@ impl<'universe> ReadTicket<'universe> {
 
     #[track_caller]
     pub(crate) fn from_block_data_sources(
-        data_sources: QueryBlockDataSources<'universe, 'universe>,
+        data_sources: &'universe QueryBlockDataSources<'universe, 'universe>,
     ) -> Self {
         ReadTicket {
             access: TicketAccess::BlockDataSources(data_sources),
             transaction_access: None,
-            universe_id: Some(data_sources.universe_id),
+            universe_id: Some(*data_sources.universe_id),
             origin: Location::caller(),
             expect_may_fail: false,
         }

@@ -372,7 +372,7 @@ impl Universe {
                     for (membership, mut ch) in characters {
                         let (transaction, character_info, _body_info) = ch.step(
                             // TODO(ecs): using QueryBlockDataSources as an approximation of what is actually needed here
-                            ReadTicket::from_block_data_sources(data_sources),
+                            ReadTicket::from_block_data_sources(&data_sources),
                             membership.handle.downcast_ref(),
                             tick,
                         );

@@ -110,13 +110,14 @@ fn step_eye_position(
 }
 
 fn step_exposure(
-    universe_id: UniverseId,
+    universe_id: ecs::Res<'_, UniverseId>,
     tick: ecs::Res<'_, time::CurrentTick>,
     characters: ecs::Query<'_, '_, (&Character, &mut CharacterEye)>,
     spaces: ecs::Query<'_, '_, &Space>,
 ) -> ecs::Result {
     let tick = tick.get()?;
     let dt = tick.delta_t().as_secs_f64();
+    let universe_id = *universe_id;
 
     // TODO(ecs): This'll be a good candidate for parallel execution *if* we have many characters.
     // In any case, maybe hold off until we have reconciled Bevy and Rayon’s thread pools, or

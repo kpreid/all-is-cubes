@@ -445,6 +445,7 @@ pub(crate) enum BlockDefNextValue {
 
 /// ECS system function that looks for `BlockDef`s needing reevaluation, then writes the new
 /// evaluations into `BlockDefNextValue`.
+#[allow(clippy::needless_pass_by_value)]
 pub(crate) fn update_phase_1(
     mut info: ecs::InMut<'_, BlockDefStepInfo>,
     mut defs: ecs::Query<'_, '_, (&BlockDef, &mut BlockDefNextValue)>,
@@ -457,7 +458,7 @@ pub(crate) fn update_phase_1(
             "BlockDefNextValue should have been cleared",
         );
 
-        let read_ticket = ReadTicket::from_block_data_sources(data_sources);
+        let read_ticket = ReadTicket::from_block_data_sources(&data_sources);
 
         if !def.state.listeners_ok {
             info.attempted += 1;

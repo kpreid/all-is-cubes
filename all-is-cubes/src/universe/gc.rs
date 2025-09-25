@@ -36,8 +36,9 @@ pub(in crate::universe) fn add_gc(world: &mut ecs::World) {
 
 /// ECS system function that performs mark-and-sweep garbage collection on universe members.
 /// See [`Universe::gc()`].
+#[allow(clippy::needless_pass_by_value)]
 fn gc_system(
-    universe_id: UniverseId,
+    universe_id: ecs::Res<'_, UniverseId>,
     world: &ecs::World,
     // Used for the initial scan for roots and final scan for garbage.
     scan_query: ecs::Query<'_, '_, (ecs::Entity, &Membership, &GcState)>,
@@ -47,6 +48,8 @@ fn gc_system(
     gc_state_query: ecs::Query<'_, '_, &GcState>,
     mut commands: ecs::Commands<'_, '_>,
 ) -> ecs::Result {
+    let universe_id = *universe_id;
+
     // Mark all GC roots (named members) and unmark all non-roots (anonymous members).
     let mut to_visit: bevy_ecs::entity::EntityHashSet = scan_query
         .iter()

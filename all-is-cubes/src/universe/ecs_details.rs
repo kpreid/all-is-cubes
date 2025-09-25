@@ -1,7 +1,6 @@
 use alloc::collections::BTreeMap;
 
 use bevy_ecs::prelude as ecs;
-use bevy_ecs::system::SystemParam;
 
 use crate::universe::{AnyHandle, Name, ReadTicket, UniverseId};
 
@@ -53,42 +52,6 @@ fn remove_membership_hook(
         .clone();
     world.resource_mut::<NameMap>().map.remove(&name);
 }
-
-// -------------------------------------------------------------------------------------------------
-
-// SAFETY: This delegates fully to [`ecs::Res`], just copying the output data so that `Self: Copy`
-// TODO(ecs): Figure out if we can do this safely instead
-unsafe impl SystemParam for UniverseId {
-    type State = <ecs::Res<'static, UniverseId> as SystemParam>::State;
-
-    type Item<'world, 'state> = UniverseId;
-
-    fn init_state(
-        world: &mut ecs::World,
-        system_meta: &mut bevy_ecs::system::SystemMeta,
-    ) -> Self::State {
-        <ecs::Res<'static, UniverseId> as SystemParam>::init_state(world, system_meta)
-    }
-
-    unsafe fn get_param<'world, 'state>(
-        state: &'state mut Self::State,
-        system_meta: &bevy_ecs::system::SystemMeta,
-        world: bevy_ecs::world::unsafe_world_cell::UnsafeWorldCell<'world>,
-        change_tick: bevy_ecs::component::Tick,
-    ) -> Self::Item<'world, 'state> {
-        // SAFETY: we are delegating fully to `Res`
-        *unsafe {
-            <ecs::Res<'world, UniverseId> as SystemParam>::get_param(
-                state,
-                system_meta,
-                world,
-                change_tick,
-            )
-        }
-    }
-}
-// SAFETY: We delegate to `Res` and it is read-only too.
-unsafe impl bevy_ecs::system::ReadOnlySystemParam for UniverseId {}
 
 // -------------------------------------------------------------------------------------------------
 
