@@ -155,7 +155,7 @@ snapbox = "0.6.10" # keep in sync with `trycmd`
 strum = { version = "0.26.3", default-features = false, features = ["derive"] }
 sync_wrapper = { version = "1.0.0", default-features = false }
 tempfile = { version = "3.20.0", default-features = false }
-thiserror = { version = "2.0.11", default-features = false }
+thiserror = { version = "2.0.12", default-features = false }
 time = { version = "0.3.36", default-features = false }
 # Tokio is used for certain binaries.
 # The library crates do not require Tokio.
@@ -167,7 +167,7 @@ visibility = { version = "0.1.1", default-features = false }
 # explicitly enabling "std" needed for <https://github.com/rustwasm/wasm-bindgen/issues/4303>
 wasm-bindgen-futures = { version = "0.4.50", default-features = false, features = ["std"] }
 web-time = { version = "1.1.0", default-features = false }
-wgpu = { version = "26.0.0", default-features = false, features = ["std", "wgsl"] }
+wgpu = { version = "27.0.0", default-features = false, features = ["std", "wgsl"] }
 yield-progress = { version = "0.1.6", default-features = false }
 yoke = { version = "0.8.0", default-features = false, features = ["alloc"] }
 
