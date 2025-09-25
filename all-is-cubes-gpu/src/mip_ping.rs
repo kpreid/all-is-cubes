@@ -319,14 +319,15 @@ impl<const N: usize> Texture<N> {
                     stage_input_texture_views.each_ref(),
                 );
 
-                let mut encoder =
-                    device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
+                let mut encoder = device
+                    .create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
                         label: None,
                         color_formats,
                         depth_stencil: None,
                         sample_count: 1,
                         multiview: None,
-                    });
+                    })
+                    .expect("TODO: https://github.com/gfx-rs/wgpu/issues/10174");
                 encoder.set_pipeline(&pipelines.downsample_pipeline);
                 encoder.set_bind_group(0, &input_bind_group, &[]);
                 encoder.draw(0..3, pack_instance_index(output_mip, false));
@@ -363,14 +364,15 @@ impl<const N: usize> Texture<N> {
                         .each_ref(),
                 );
 
-                let mut encoder =
-                    device.create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
+                let mut encoder = device
+                    .create_render_bundle_encoder(&wgpu::RenderBundleEncoderDescriptor {
                         label: None,
                         color_formats,
                         depth_stencil: None,
                         sample_count: 1,
                         multiview: None,
-                    });
+                    })
+                    .expect("TODO: https://github.com/gfx-rs/wgpu/issues/10174");
                 encoder.set_pipeline(&pipelines.upsample_pipeline);
                 encoder.set_bind_group(0, &input_bind_group, &[]);
                 encoder.draw(0..3, pack_instance_index(output_mip, true));
