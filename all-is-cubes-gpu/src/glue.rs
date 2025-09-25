@@ -168,7 +168,8 @@ pub fn write_part_of_slice_to_part_of_buffer(
     // Note that we must not overrun the end of `source`, so we can't just use `mapping_range`;
     // we have to slice both `source` and `staging` so that they match.
     let copy_end = mapping_range.end.min(source.len());
-    staging[..(copy_end - mapping_range.start)]
+    staging
+        .slice(..(copy_end - mapping_range.start))
         .copy_from_slice(&source[mapping_range.start..copy_end]);
 }
 
@@ -246,7 +247,9 @@ impl ResizingBuffer {
                     u64::try_from(data.len().next_multiple_of(Self::BUFFER_AND_MAPPING_SIZE_MULT))
                         .unwrap(),
                 ) {
-                    bwp.reborrow().write_buffer(buffer, address, data_size)[..data.len()] // trim off the padding
+                    bwp.reborrow()
+                        .write_buffer(buffer, address, data_size)
+                        .slice(..data.len()) // trim off the padding
                         .copy_from_slice(data);
                 } else {
                     // zero bytes to write
@@ -276,7 +279,7 @@ impl ResizingBuffer {
                 // since there is no sparseness to them.
                 let mut mapped = buffer.get_mapped_range_mut(..);
                 for (address, data) in addresses.into_iter().zip(contents) {
-                    mapped[address as usize..][..data.len()].copy_from_slice(data);
+                    mapped.slice(address as usize..).slice(..data.len()).copy_from_slice(data);
                 }
             }
             buffer.unmap();
@@ -364,13 +367,13 @@ impl ResizingBuffer {
 /// Wraps a byte slice to present a `Vec::push()`-like interface.
 #[derive(Debug)]
 pub(crate) struct MapVec<'buf, T> {
-    unwritten: &'buf mut [u8],
+    unwritten: wgpu::WriteOnly<'buf, [u8]>,
     len: usize,
     _phantom: PhantomData<fn(&T)>,
 }
 
 impl<'buf, T: bytemuck::NoUninit> MapVec<'buf, T> {
-    pub fn new(buffer: &'buf mut [u8]) -> Self {
+    pub fn new(buffer: wgpu::WriteOnly<'buf, [u8]>) -> Self {
         Self {
             unwritten: buffer,
             len: 0,
@@ -386,7 +389,7 @@ impl<'buf, T: bytemuck::NoUninit> MapVec<'buf, T> {
     /// Push an element if possible, and return whether there was room to do so.
     #[must_use]
     pub fn push(&mut self, value: &T) -> bool {
-        let Some(to_write) = self.unwritten.split_off_mut(..size_of::<T>()) else {
+        let Some(mut to_write) = self.unwritten.split_off(..size_of::<T>()) else {
             return false;
         };
         to_write.copy_from_slice(bytemuck::bytes_of(value));

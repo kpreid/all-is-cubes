@@ -200,9 +200,11 @@ pub async fn create_winit_wgpu_desktop_session(
         window.window.inner_size(),
     ));
 
-    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::from_env().unwrap_or_else(wgpu::Backends::all),
-        ..Default::default()
+        ..wgpu::InstanceDescriptor::new_with_display_handle_from_env(Box::new(Arc::clone(
+            &window.window,
+        )))
     });
 
     let surface = instance

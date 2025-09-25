@@ -129,8 +129,17 @@ impl SurfaceRenderer {
         let before_get = time::Instant::now();
         let output = match self.surface.get_current_texture() {
             Ok(t) => t,
+            Err(wgpu::SurfaceError::Occluded) => {
+                // Window system doesn’t want us to draw.
+                // This may happen on macOS.
+                return Ok(RenderInfo {
+                    flaws: Flaws::UNFINISHED,
+                    ..RenderInfo::default()
+                });
+            }
             Err(e @ wgpu::SurfaceError::Timeout) => {
                 // Nothing to do but try again next frame.
+                // Log it because this might help diagnose a performance problem.
                 log::error!(
                     "Error from wgpu::Surface::get_current_texture(): {e:?}. Skipping this frame."
                 );
@@ -151,7 +160,7 @@ impl SurfaceRenderer {
                     ..RenderInfo::default()
                 });
             }
-            Err(e) => {
+            Err(e @ (wgpu::SurfaceError::OutOfMemory | wgpu::SurfaceError::Other)) => {
                 panic!(
                     "error from wgpu::Surface::get_current_texture(): {e:?}; \
                     error recovery not implemented"

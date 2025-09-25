@@ -21,13 +21,13 @@ pub async fn create_instance_for_test_or_exit(allow_noop: bool) -> wgpu::Instanc
     let stderr = &mut std::io::stderr();
     let backends = wgpu::Backends::from_env().unwrap_or_else(wgpu::Backends::all);
 
-    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends,
         backend_options: wgpu::BackendOptions {
             noop: wgpu::NoopBackendOptions { enable: allow_noop },
             ..Default::default()
         },
-        ..Default::default()
+        ..wgpu::InstanceDescriptor::new_without_display_handle_from_env()
     });
 
     // Report adapters that we *could* pick

@@ -105,7 +105,7 @@ impl<const N: usize> Pipelines<N> {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some(&format!("{label} mip_ping::Pipelines::pipeline_layout")),
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[Some(&bind_group_layout)],
             immediate_size: 0,
         });
 

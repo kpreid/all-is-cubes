@@ -148,7 +148,7 @@ impl EverythingRenderer {
                         .union(wgpu::Features::TIMESTAMP_QUERY_INSIDE_PASSES)
                 },
             required_limits: wgpu::Limits {
-                max_inter_stage_shader_components: 37, // number used by blocks-and-lines shader
+                max_inter_stage_shader_variables: 13, // number used by blocks-and-lines shader
                 ..wgpu::Limits::downlevel_webgl2_defaults().using_resolution(available_limits)
             },
             memory_hints: wgpu::MemoryHints::default(), // TODO: consider setting
