@@ -502,7 +502,7 @@ impl SpaceRenderer {
         let mut instance_buffer_view: Option<wgpu::BufferViewMut> =
             self.instance_buffer.map_without_resizing(bwp);
         let mut instance_buffer_writer: MapVec<'_, WgpuInstanceData> = match instance_buffer_view {
-            Some(ref mut view) => MapVec::new(view),
+            Some(ref mut view) => MapVec::new(view.slice(..)),
             None => MapVec::default(),
         };
 

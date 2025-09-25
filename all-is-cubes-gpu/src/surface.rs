@@ -32,7 +32,7 @@ pub struct SurfaceRenderer {
     everything: EverythingRenderer,
 
     /// True if we need to reconfigure the surface.
-    viewport_dirty: listen::Flag,
+    need_surface_reconfiguration: listen::Flag,
 }
 
 impl SurfaceRenderer {
@@ -67,7 +67,7 @@ impl SurfaceRenderer {
         );
 
         Ok(Self {
-            viewport_dirty: listen::Flag::listening(true, &viewport_source),
+            need_surface_reconfiguration: listen::Flag::listening(true, &viewport_source),
             everything,
             surface,
             device,
@@ -115,7 +115,7 @@ impl SurfaceRenderer {
         let update_info =
             self.everything.update(read_tickets, &self.queue, cursor_result, frame_budget)?;
 
-        if self.viewport_dirty.get_and_clear() {
+        if self.need_surface_reconfiguration.get_and_clear() {
             // Test because wgpu insists on nonzero values -- we'd rather be inconsistent
             // than crash.
             let config = &self.everything.config();
@@ -127,36 +127,48 @@ impl SurfaceRenderer {
         // If the GPU is busy, `get_current_texture()` blocks until a previous texture
         // is no longer in use (except on wasm, in which case submit() seems to take the time).
         let before_get = time::Instant::now();
+        let skip = Ok(RenderInfo {
+            flaws: Flaws::UNFINISHED,
+            ..RenderInfo::default()
+        });
         let output = match self.surface.get_current_texture() {
-            Ok(t) => t,
-            Err(e @ wgpu::SurfaceError::Timeout) => {
-                // Nothing to do but try again next frame.
-                log::error!(
-                    "Error from wgpu::Surface::get_current_texture(): {e:?}. Skipping this frame."
-                );
-                return Ok(RenderInfo {
-                    flaws: Flaws::UNFINISHED,
-                    ..RenderInfo::default()
-                });
+            wgpu::CurrentSurfaceTexture::Success(t) => t,
+
+            wgpu::CurrentSurfaceTexture::Suboptimal(t) => {
+                self.need_surface_reconfiguration.set();
+                t
             }
-            Err(e @ (wgpu::SurfaceError::Outdated | wgpu::SurfaceError::Lost)) => {
+
+            wgpu::CurrentSurfaceTexture::Occluded => {
+                // Window system doesn’t want us to draw.
+                // This may happen on macOS.
+                return skip;
+            }
+            wgpu::CurrentSurfaceTexture::Timeout => {
+                // Nothing to do but try again next frame.
+                // Log it because this might help diagnose a performance problem.
+                log::error!(
+                    "Timeout from wgpu::Surface::get_current_texture(). Skipping this frame."
+                );
+                return skip;
+            }
+            e @ (wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost) => {
                 // Reconfigure and try again next frame.
-                // NOTE: wgpu::SurfaceError::Outdated is very common with tiling window manager.
+                // wgpu::SurfaceError::Outdated is very common with tiling window managers.
                 log::error!(
                     "Error from wgpu::Surface::get_current_texture(): {e:?}. Skipping this frame."
                 );
                 self.surface.configure(&self.device, self.everything.config());
-                return Ok(RenderInfo {
-                    flaws: Flaws::UNFINISHED,
-                    ..RenderInfo::default()
-                });
+                return skip;
             }
             #[allow(clippy::missing_panics_doc)] // TODO: reconfigure/retry on other errors?
-            Err(e) => {
-                panic!(
-                    "error from wgpu::Surface::get_current_texture(): {e:?}; \
-                    error recovery not implemented"
+            wgpu::CurrentSurfaceTexture::Validation => {
+                // TODO We should encounter the validation error in the future, hopefully?
+                log::error!(
+                    "Validation error from wgpu::Surface::get_current_texture(). \
+                    Skipping this frame."
                 );
+                return skip;
             }
         };
         let after_get = time::Instant::now();
