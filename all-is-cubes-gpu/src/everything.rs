@@ -159,6 +159,7 @@ impl EverythingRenderer {
                 max_inter_stage_shader_variables: 13, // number used by blocks-and-lines shader
                 ..wgpu::Limits::downlevel_webgl2_defaults().using_resolution(available_limits)
             },
+            default_queue: wgpu::QueueDescriptor { label: Some(label) },
             memory_hints: wgpu::MemoryHints::default(), // TODO: consider setting
             trace: wgpu::Trace::Off,
             experimental_features: wgpu::ExperimentalFeatures::default(),
