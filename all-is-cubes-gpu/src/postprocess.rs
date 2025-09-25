@@ -236,7 +236,7 @@ pub(crate) fn create_postprocess_pipeline(
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("PostprocessResources::pipeline_layout"),
         bind_group_layouts: &[postprocess_bind_group_layout],
-        push_constant_ranges: &[],
+        immediate_size: 0,
     });
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -270,7 +270,7 @@ pub(crate) fn create_postprocess_pipeline(
         depth_stencil: None,
         // default = off. No need for multisampling since we are not drawing triangles here.
         multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        multiview_mask: None,
         cache: None,
     })
 }

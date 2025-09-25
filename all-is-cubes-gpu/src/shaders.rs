@@ -135,12 +135,12 @@ impl ReloadableShader {
     /// Returns `true` if the current module changed.
     fn update(&mut self, device: &wgpu::Device) -> bool {
         if self.dirty.get_and_clear() {
-            device.push_error_scope(wgpu::ErrorFilter::Validation);
+            let error_scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
             let new_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some(&self.label),
                 source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&*self.source.get())),
             });
-            let error_future = device.pop_error_scope();
+            let error_future = error_scope.pop();
 
             let module_future = async {
                 match error_future.await {

@@ -211,7 +211,7 @@ pub async fn create_winit_wgpu_desktop_session(
 
     // Pick an adapter.
     let mut adapter: Result<wgpu::Adapter, _> =
-        wgpu::util::initialize_adapter_from_env(&instance, Some(&surface));
+        wgpu::util::initialize_adapter_from_env(&instance, Some(&surface)).await;
     if adapter.is_err() {
         let request_adapter_future = instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::from_env()

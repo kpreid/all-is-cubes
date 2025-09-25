@@ -20,7 +20,7 @@ pub fn create_bloom_pipelines(
         address_mode_w: wgpu::AddressMode::MirrorRepeat,
         mag_filter: wgpu::FilterMode::Linear,
         min_filter: wgpu::FilterMode::Linear,
-        mipmap_filter: wgpu::FilterMode::Nearest,
+        mipmap_filter: wgpu::MipmapFilterMode::Nearest,
         ..Default::default()
     });
 
