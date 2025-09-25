@@ -207,7 +207,7 @@ impl SurfaceRenderer {
         info.flaws |= post_flaws;
         self.queue.submit([post_cmd]);
         about_to_present();
-        output.present();
+        self.queue.present(output);
         Ok(info)
     }
 
