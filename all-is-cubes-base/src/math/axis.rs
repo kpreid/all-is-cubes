@@ -11,6 +11,7 @@ use crate::math::{Face6, Rgb01};
 /// * [`Face6`] specifies an axis and a direction on the axis.
 #[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
+#[exhaust(factory_is_self)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 // do after tests:#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]

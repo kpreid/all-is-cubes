@@ -31,6 +31,7 @@ use crate::{palette, tree};
 /// TODO: This is probably too specific to be useful in the long term; call it a
 /// placeholder.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum LandscapeBlocks {
@@ -46,6 +47,7 @@ pub enum LandscapeBlocks {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust, strum::IntoStaticStr)]
+#[exhaust(factory_is_self)]
 #[non_exhaustive]
 #[allow(missing_docs)]
 #[repr(u8)]
@@ -63,6 +65,7 @@ pub enum GrassHeight {
 /// Combines a [`GrassHeight`] with eight rotations/reflections to add more variety
 /// in the same number of block definitions.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 pub(crate) struct GrassHeightAndRot {
     height: GrassHeight,
     /// This should only be a rotation that doesn't affect the Y axis.
@@ -71,6 +74,7 @@ pub(crate) struct GrassHeightAndRot {
 
 /// Subset of [`GridRotation`] that doesn't affect the Y axis.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 #[allow(clippy::upper_case_acronyms)]
 pub(crate) enum GrassRotation {
     RXYZ,
@@ -88,6 +92,7 @@ pub(crate) enum GrassRotation {
 /// In the future this might include other pre-composed blocks, like perhaps
 /// “this grass with this flower in it” or something.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 pub(crate) enum LandscapeBlocksAndVariants {
     Base(LandscapeBlocks),
     Grass(GrassHeightAndRot),

@@ -79,6 +79,7 @@ impl WidgetTheme {
 /// Blocks that are used by [`widgets`] to make up the shapes of the
 /// generic UI elements themselves, not anything that gives them meaning.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 #[doc(hidden)] // public for testing only — TODO: should be public for real?
 #[non_exhaustive]
 pub enum WidgetBlocks {
@@ -254,6 +255,7 @@ impl WidgetBlocks {
 
 /// The state of a mouse button's relationship to a toolbar slot.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 #[doc(hidden)] // public only because WidgetBlocks is
 #[expect(clippy::exhaustive_enums)]
 pub enum ToolbarButtonState {

@@ -18,6 +18,7 @@ use crate::LandscapeBlocks::{self, Leaves, Log};
 ///
 /// TODO: make the public version of this a struct with private contents
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
+#[exhaust(factory_is_self)]
 #[expect(
     unnameable_types,
     reason = "TODO: this should be public with an opaque struct wrapper"

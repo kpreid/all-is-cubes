@@ -214,6 +214,7 @@ impl<D> universe::VisitHandles for ToggleButton<D> {
 /// naming blocks depicting this state; the [`Exhaust`] implementation allows iterating
 /// over all possible states.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 #[non_exhaustive]
 pub struct ButtonVisualState {
     // TODO: Add hover, disabled
@@ -238,6 +239,7 @@ impl universe::VisitHandles for ButtonVisualState {
 /// naming blocks depicting this state; the [`Exhaust`] implementation allows iterating
 /// over all possible states.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 #[non_exhaustive]
 pub struct ToggleButtonVisualState {
     pub(crate) common: ButtonVisualState,

@@ -2,6 +2,7 @@ use core::ops;
 
 // Note: Public documentation for this is in its re-export from `all_is_cubes::block`.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, exhaust::Exhaust)]
+#[exhaust(factory_is_self)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[allow(missing_docs)]
 #[repr(u8)]

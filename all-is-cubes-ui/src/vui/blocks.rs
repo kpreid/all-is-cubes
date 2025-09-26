@@ -18,6 +18,7 @@ use crate::vui::widgets::{ButtonIcon, make_button_label_block};
 
 /// Blocks that are used as part of the UI content.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 #[doc(hidden)] // public for testing only
 #[allow(clippy::enum_variant_names)]
 #[non_exhaustive]

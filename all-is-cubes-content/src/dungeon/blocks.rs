@@ -21,6 +21,7 @@ use all_is_cubes::util::YieldProgress;
 // -------------------------------------------------------------------------------------------------
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::Display, exhaust::Exhaust)]
+#[exhaust(factory_is_self)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 pub(crate) enum DungeonBlocks {

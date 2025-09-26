@@ -608,6 +608,7 @@ mod tests {
     use crate::util::assert_conditional_send_sync;
 
     #[derive(Exhaust, Clone, Debug, Eq, Hash, PartialEq)]
+    #[exhaust(factory_is_self)]
     enum Key {
         A,
         B,

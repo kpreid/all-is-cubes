@@ -15,6 +15,7 @@ use crate::math::{Cube, Face6, FreeVector, GridCoordinate, GridPoint};
 // TODO: Replace this with an enum.
 #[expect(clippy::exhaustive_enums)]
 #[derive(Clone, Copy, Eq, Hash, PartialEq, exhaust::Exhaust)]
+#[exhaust(factory_is_self)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(u8)]
 pub enum Octant {
@@ -218,6 +219,7 @@ impl fmt::Debug for Octant {
 /// This type may be used for culling or other calculations relating to the axis-aligned volumes
 /// surrounding a point. If more data than `bool` is needed, use [`OctantMap`].
 #[derive(Clone, Copy, Eq, Hash, PartialEq, exhaust::Exhaust)]
+#[exhaust(factory_is_self)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct OctantMask {
     /// A bit-mask of octants, where the bit positions are, LSB first, [-X-Y-Z, -X-Y+Z, ..., +X+Y+Z]

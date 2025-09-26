@@ -484,6 +484,7 @@ fn fill_space_transformed(
 // -------------------------------------------------------------------------------------------------
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 #[non_exhaustive]
 enum AtriumBlocks {
     Sun,
@@ -515,6 +516,7 @@ enum AtriumBlocks {
     Brazier,
 }
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 enum BannerColor {
     Red,
     Green,

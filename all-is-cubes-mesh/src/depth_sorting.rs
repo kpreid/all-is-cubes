@@ -38,6 +38,7 @@ pub struct DepthOrdering(
 
 /// Relationship of the viewpoint to the mesh on one axis.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, exhaust::Exhaust)]
+#[exhaust(factory_is_self)]
 #[doc(hidden)] // public-in-private just for convenience in the `Exhaust` implementation.
 #[allow(unnameable_types)]
 pub enum Rel {

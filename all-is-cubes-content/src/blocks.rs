@@ -35,6 +35,7 @@ use crate::load_image::{block_from_image, default_srgb, include_image};
 use crate::palette;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::IntoStaticStr /* kludge */, Exhaust)]
+#[exhaust(factory_is_self)]
 #[strum(serialize_all = "kebab-case")]
 #[non_exhaustive]
 #[allow(missing_docs)]

@@ -1,3 +1,8 @@
+#![expect(
+    unnameable_types,
+    reason = "false positive on derive(Exhaust) due to complex macro"
+)]
+
 use alloc::borrow::Cow;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -22,19 +27,25 @@ use {crate::settings::Settings, all_is_cubes::behavior::Behavior, all_is_cubes::
 // -------------------------------------------------------------------------------------------------
 
 macro_rules! derive_settings_schema_from_keys {
-    ($(#[$enum_meta:meta])* pub enum Key {
-        $(
-            $(#[doc = $field_doc:literal])*
-            #[custom(
-                key = $key_string:literal,
-                type = $value_type:ty,
-                display_name = $display_name:literal,
-                default = $default_expr:expr $(,)?
-            )]
-            $variant:ident,
-        )*
-    }) => {
-        $(#[$enum_meta])*
+    (
+        $(#[doc = $enum_doc:literal])*
+        pub enum Key {
+            $(
+                $(#[doc = $field_doc:literal])*
+                #[custom(
+                    key = $key_string:literal,
+                    type = $value_type:ty,
+                    display_name = $display_name:literal,
+                    default = $default_expr:expr $(,)?
+                )]
+                $variant:ident,
+            )*
+        }
+    ) => {
+        $(#[doc = $enum_doc])*
+        #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
+        #[exhaust(factory_is_self)]
+        #[non_exhaustive]
         pub enum Key {
         $(
             $(#[doc = $field_doc])*
@@ -139,8 +150,7 @@ macro_rules! derive_settings_schema_from_keys {
 ///
 /// TODO: This will eventually be replaced with a more extensible mechanism, possibly involving
 /// multiple enums.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
-#[non_exhaustive]
+// Note: attributes for the enum are applied from inside the macro, except for docs.
 #[macro_rules_attribute::apply(derive_settings_schema_from_keys!)]
 pub enum Key {
     /// Overall rendering technique to use.

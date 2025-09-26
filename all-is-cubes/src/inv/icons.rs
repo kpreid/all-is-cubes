@@ -26,6 +26,7 @@ use crate::util::YieldProgress;
 /// If so, then [`Tool::icon()`] needs to go away, and the UI will need to either contain
 /// these icons or accept them as configuration.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
+#[exhaust(factory_is_self)]
 #[non_exhaustive]
 pub enum Icons {
     /// Icon for an empty toolbar slot.
