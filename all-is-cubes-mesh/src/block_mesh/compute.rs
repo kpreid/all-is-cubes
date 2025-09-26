@@ -443,10 +443,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     }
                 };
                 if voxel_is_visible {
-                    visible_image.push(VisualVoxel {
-                        reflectance: evoxel.color,
-                        emission: evoxel.emission != Rgb::ZERO,
-                    });
+                    visible_image.push(VisualVoxel::from(&evoxel));
                 } else {
                     // All obscured voxels are treated as transparent ones, in that we don't
                     // generate geometry for them.

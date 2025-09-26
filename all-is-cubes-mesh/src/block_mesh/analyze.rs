@@ -8,6 +8,7 @@ use all_is_cubes::math::{
 };
 
 use crate::TransparencyFormat;
+use crate::block_mesh::planar::VisualVoxel;
 use crate::block_mesh::viz::Viz;
 
 /// Maximum number of occupied planes/layers in any block.
@@ -227,13 +228,14 @@ fn analyze_one_window(
     if opaque != NONE && opaque != ALL || semitransparent != NONE && semitransparent != ALL {
         let resolution_coord = GridCoordinate::from(analysis.resolution);
 
-        // TODO: false positives — look only at visible cubes on each axis, instead of all cubes
+        // TODO: this comparison has false positives — instead, it should look only at visible
+        // voxels that could form a plane on some axis, not all 8 voxels together.
         analysis.needs_texture = analysis.needs_texture
             || !window
                 .values()
+                .copied()
                 .filter(|voxel| voxel.opacity_category() != OpacityCategory::Invisible)
-                // TODO: this is fragile if we expose more visual properties
-                .map(|voxel| (voxel.color, voxel.emission))
+                .map(VisualVoxel::from)
                 .all_equal();
 
         // Bitmask of which axes are going to have a visible surface

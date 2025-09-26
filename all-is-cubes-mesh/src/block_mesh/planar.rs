@@ -3,26 +3,34 @@
 use alloc::vec::Vec;
 use core::ops::Range;
 
-use all_is_cubes::block::Resolution;
+use all_is_cubes::block::{Evoxel, Resolution};
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D, vec3};
-use all_is_cubes::math::{Axis, Face6, GridCoordinate, Rgba, rgba_const};
+use all_is_cubes::math::{Axis, Face6, GridCoordinate, Rgb, Rgba, rgba_const};
 
 use crate::texture::{self, TexelUnit, TextureCoordinate, TilePoint};
 use crate::{Aabb, BlockVertex, Coloring, IndexVec, MeshRel, PosCoord, Position, Viz};
 
-/// This is the subset of `Evoxel` which is processed by the [`greedy_mesh()`] planar mesh
-/// generator. It does not distinguish emission other than “has some”, because we always
-/// send emission to textures rather than vertex attributes.
+// -------------------------------------------------------------------------------------------------
+
+/// Subset of `Evoxel` data which include only properties relevant to mesh creation.
 ///
-/// The important property of this type is that it contains every property that might determine
-/// *whether* we generate a mesh surface for a given voxel.
+/// Specifically, this contains all of the data needed to determine:
 ///
-/// TODO: It would probably be better if we could just stop copying out the voxels and have all
-/// phases of mesh generation consult `Evoxels` directly.
-#[derive(Clone, Copy, PartialEq)]
+/// * Whether the voxel should have a corresponding mesh surface at all
+///   (whether it is visible or invisible).
+/// * Whether the voxel’s data can be solely described by vertex coloring, [`Coloring::Solid`],
+///   or whether it requires the use of a texture.
+/// * If it can use vertex coloring, then what color it should have.
+///   (Thus, two may be compared for being the same color or not.)
+///
+/// The [`PartialEq`] implementation has a special (but well-defined) behavior:
+/// two `VisualVoxel`s are equal if and only if a triangle containing both can use vertex coloring,
+/// and unequal if a texture is required for that triangle.
+/// (Thus “has emission” is kind of like NaN for floats.)
+#[derive(Clone, Copy)]
 pub(super) struct VisualVoxel {
-    pub reflectance: Rgba,
-    pub emission: bool,
+    reflectance: Rgba,
+    emission: bool,
 }
 
 impl VisualVoxel {
@@ -32,7 +40,7 @@ impl VisualVoxel {
     };
     #[inline] // in the hot loop of GreedyMesher
     pub fn visible(&self) -> bool {
-        *self != Self::INVISIBLE
+        (self.reflectance != Rgba::TRANSPARENT) | self.emission
     }
     pub fn to_reflectance_only(self) -> Option<Rgba> {
         if !self.emission {
@@ -42,6 +50,26 @@ impl VisualVoxel {
         }
     }
 }
+
+#[expect(clippy::needless_bitwise_bool)]
+impl PartialEq for VisualVoxel {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        (self.reflectance == other.reflectance) & !self.emission & !other.emission
+    }
+}
+
+impl From<&Evoxel> for VisualVoxel {
+    #[inline]
+    fn from(value: &Evoxel) -> Self {
+        Self {
+            reflectance: value.color,
+            emission: value.emission != Rgb::ZERO,
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 pub(super) fn greedy_mesh(
     visible_image: Vec<VisualVoxel>,

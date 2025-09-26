@@ -124,6 +124,8 @@ impl<T: Clone> BlockVertex<T> {
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Coloring<T> {
     /// Solid color.
+    ///
+    /// All vertices/voxels colored this way have zero light emission, only reflectance.
     Solid(Rgba),
     /// Texture coordinates provided by the [`Allocator`](super::texture::Allocator)
     /// for this vertex.
