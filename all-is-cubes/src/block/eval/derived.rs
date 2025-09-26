@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use core::ops;
+use core::{fmt, ops};
 
 use euclid::Vector3D;
 use itertools::Itertools;
@@ -402,8 +402,8 @@ impl VoxelOpacityMask {
     }
 }
 
-impl core::fmt::Debug for VoxelOpacityMask {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for VoxelOpacityMask {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             MaskInner::Uniform(resolution, bounds, opacity) => f
                 .debug_struct("VoxelOpacityMask")

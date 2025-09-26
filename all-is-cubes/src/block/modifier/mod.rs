@@ -1,3 +1,5 @@
+use core::fmt;
+
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -95,8 +97,8 @@ pub enum Modifier {
     Inventory(inv::Inventory),
 }
 
-impl core::fmt::Debug for Modifier {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for Modifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Print most modifiers’ data without the enum variant, because their struct names
         // are identifying enough.
         match self {

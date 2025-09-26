@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 use core::cmp::Ordering;
+use core::fmt;
 use core::ops::{self, Deref, Range};
 
 use exhaust::Exhaust as _;
@@ -229,8 +230,8 @@ impl exhaust::Exhaust for DepthOrdering {
     }
 }
 
-impl core::fmt::Debug for DepthOrdering {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for DepthOrdering {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for axis in Axis::ALL {
             self.0[axis].fmt(f)?;
         }
@@ -238,8 +239,8 @@ impl core::fmt::Debug for DepthOrdering {
     }
 }
 
-impl core::fmt::Debug for Rel {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for Rel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.pad(match self {
             Rel::Lower => "−", // U+2212 MINUS SIGN for best symmetry
             Rel::Within => "W",
@@ -268,7 +269,7 @@ pub struct DepthSortResult {
 
 /// Performance information returned by [`SpaceMesh::depth_sort_for_view()`].
 ///
-/// Format this with [`fmt::Debug`][core::fmt::Debug] to see its information.
+/// Format this with [`fmt::Debug`] to see its information.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct DepthSortInfo {
