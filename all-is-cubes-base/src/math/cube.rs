@@ -187,6 +187,17 @@ impl Cube {
         })
     }
 
+    /// Componentwise [`GridCoordinate::wrapping_add()`].
+    #[must_use]
+    #[inline]
+    pub fn wrapping_add(self, v: GridVector) -> Self {
+        Self {
+            x: self.x.wrapping_add(v.x),
+            y: self.y.wrapping_add(v.y),
+            z: self.z.wrapping_add(v.z),
+        }
+    }
+
     /// Apply a function to each coordinate independently.
     ///
     /// If a different return type is desired, use `.lower_bounds().map(f)` instead.

@@ -1,10 +1,10 @@
 use itertools::Itertools;
 
 use all_is_cubes::block::{Evoxel, Resolution};
-use all_is_cubes::euclid::{Point2D, point3};
+use all_is_cubes::euclid::{Point2D, point3, vec3};
 use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, GridAab, GridCoordinate, GridPoint, Octant, OctantMap, OctantMask,
-    OpacityCategory, Vol,
+    OpacityCategory, Vol, ZMaj,
 };
 
 use crate::TransparencyFormat;
@@ -168,11 +168,11 @@ pub(crate) fn analyze(
     // and then avoid scanning the interior volume. EvaluatedBlock.opaque
     // is not quite that because it is defined to allow concavities.
 
-    for (center, window_voxels) in windows(voxels) {
+    for_each_window(voxels, |(center, window_voxels)| {
         viz.window(center, voxels);
         analyze_one_window(&mut analysis, center, window_voxels, transparency, viz);
         viz.analysis_in_progress(&analysis);
-    }
+    });
     viz.clear_window();
 
     analysis
@@ -293,18 +293,20 @@ fn uncovered(mask: OctantMask, face: Face6) -> bool {
     mask & OctantMask::ALL.shift(face) & !mask.shift(face) != OctantMask::NONE
 }
 
-/// Iterates over all 2×2×2 windows that intersect at least one voxel, and returns their center
-/// points and their colors.
+/// Iterates over all 2×2×2 windows that intersect at least one voxel, and calls `f` with
+/// the center point of the window and the voxel data.
 ///
-/// The colors are ordered in Z-major fashion; that is,
-///
-/// * `colors[0b000] = voxels[[low, low, low]]`
-/// * `colors[0b001] = voxels[[low, low, high]]`
-/// * `colors[0b010] = voxels[[low, high, low]]`
-/// * ...
-fn windows<'a>(
-    voxels: Vol<&'a [Evoxel]>,
-) -> impl Iterator<Item = (GridPoint, OctantMap<&'a Evoxel>)> + 'a {
+/// This is expressed as internal iteration (a callback rather than `-> impl Iterator`) for ease
+/// of implementing caching across steps.
+fn for_each_window<'a>(
+    voxels: Vol<&'a [Evoxel], ZMaj>,
+    mut f: impl FnMut((GridPoint, OctantMap<&'a Evoxel>)),
+) {
+    if voxels.bounds().is_empty() {
+        // exit early so the rest of the logic can assume our ranges contain at least 1 element
+        return;
+    }
+
     // For 2³ windows that spill 1 voxel outside, expand by 1 to get the lower cubes.
     let window_lb_bounds = voxels.bounds().expand(FaceMap {
         nx: 1,
@@ -315,16 +317,43 @@ fn windows<'a>(
         pz: 0,
     });
 
-    window_lb_bounds
-        .interior_iter()
-        .map(move |window_lb| -> (GridPoint, OctantMap<&'a Evoxel>) {
-            let oct_voxels: OctantMap<&'a Evoxel> = OctantMap::from_fn(|octant| {
-                voxels
-                    .get_ref(window_lb + octant.to_positive_cube().lower_bounds().to_vector())
-                    .unwrap_or(const { &Evoxel::AIR })
-            });
-            (window_lb.upper_bounds(), oct_voxels)
-        })
+    // TODO: try using explicitly computed linear indices instead of passing a Cube every time
+    // (might not be a win given needing to handle the out-of-bounds cases).
+    let get_voxel = |cube: Cube| voxels.get_ref(cube).unwrap_or(const { &Evoxel::AIR });
+
+    for x in window_lb_bounds.x_range() {
+        for y in window_lb_bounds.y_range() {
+            // For each contiguous row (z axis, according to ZMaj ordering),
+            // we cache 4 of the 8 voxels that make up the window.
+            // We don't need to actually look them up for the first iteration because
+            // the first window in every axis is always hanging out-of-bounds except
+            // on the side that'll be written to.
+
+            let mut oct_voxels: OctantMap<&'a Evoxel> = OctantMap::repeat(&Evoxel::AIR);
+
+            for z in window_lb_bounds.z_range() {
+                // wrapping_add() used because we know the starting values are far too small for
+                // adding 1 to overflow, so overflow checks are never useful.
+
+                let new_quad_lb = Cube::new(x, y, z.wrapping_add(1));
+
+                // Shift previously fetched voxels
+                oct_voxels[Octant::Nnn] = oct_voxels[Octant::Nnp];
+                oct_voxels[Octant::Npn] = oct_voxels[Octant::Npp];
+                oct_voxels[Octant::Pnn] = oct_voxels[Octant::Pnp];
+                oct_voxels[Octant::Ppn] = oct_voxels[Octant::Ppp];
+                // Fetch voxels newly within the window
+                let uppermost_cube = new_quad_lb.wrapping_add(vec3(1, 1, 0));
+                let center = uppermost_cube.lower_bounds();
+                oct_voxels[Octant::Nnp] = get_voxel(new_quad_lb);
+                oct_voxels[Octant::Npp] = get_voxel(new_quad_lb.wrapping_add(vec3(0, 1, 0)));
+                oct_voxels[Octant::Pnp] = get_voxel(new_quad_lb.wrapping_add(vec3(1, 0, 0)));
+                oct_voxels[Octant::Ppp] = get_voxel(uppermost_cube);
+
+                f((center, oct_voxels))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -346,10 +375,12 @@ mod tests {
         // need to change the coordinates if we change the ordering.
         let vol: Vol<Arc<[Evoxel]>, ZMaj> =
             Vol::from_elements(GridAab::ORIGIN_CUBE, vec![Evoxel::from_color(red)]).unwrap();
+        let mut results: Vec<(GridPoint, [Rgba; 8])> = Vec::new();
+        for_each_window(vol.as_ref(), |(point, colors)| {
+            results.push((point, colors.into_zmaj_array().map(|voxel| voxel.color)))
+        });
         assert_eq!(
-            windows(vol.as_ref())
-                .map(|(point, colors)| (point, colors.into_zmaj_array().map(|voxel| voxel.color)))
-                .collect::<Vec<(GridPoint, [Rgba; 8])>>(),
+            results,
             vec![
                 (GridPoint::new(0, 0, 0), [tr, tr, tr, tr, tr, tr, tr, red]),
                 (GridPoint::new(0, 0, 1), [tr, tr, tr, tr, tr, tr, red, tr]),
