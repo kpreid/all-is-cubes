@@ -93,13 +93,14 @@ features = [
 [dev-dependencies]
 wasm-bindgen-test = "0.3.50"
 
-[lints.rust]
+[workspace.lints.rust]
 # rustc lints that are set to deny
-rust_2018_idioms = { level = "deny", priority = -1 }
+elided_lifetimes_in_paths = "deny" # Consider replacing this with hidden_lifetimes_in_output_paths when that lint is available.
 unsafe_op_in_unsafe_fn = "deny"
 
 # rustc lints that are set to warn
 explicit_outlives_requirements = "warn"
+mismatched_lifetime_syntaxes = "warn"
 missing_debug_implementations = "warn"
 missing_docs = "warn"
 noop_method_call = "warn"
@@ -111,7 +112,7 @@ unused_extern_crates = "warn"
 unused_lifetimes = "warn"
 unused_qualifications = "warn"
 # This lint has false positives on dev-dependencies. Occasionally turn it on to audit non-dev deps.
-# rust.unused_crate_dependencies = "warn"
+# unused_crate_dependencies = "warn"
 
 [lints.clippy]
 # clippy default lints that are set to allow
