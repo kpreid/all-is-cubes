@@ -1424,7 +1424,7 @@ mod tests {
     use all_is_cubes::character::CharacterTransaction;
     use all_is_cubes::math::Cube;
     use all_is_cubes::universe::Name;
-    use all_is_cubes::util::assert_send_sync;
+    use all_is_cubes::util::{assert_send_sync, async_test};
     use core::sync::atomic::{AtomicUsize, Ordering};
     use futures_channel::oneshot;
 
@@ -1441,7 +1441,7 @@ mod tests {
         assert_send_sync::<Session>();
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn fluff_forwarding_following() {
         // Create universe members
         let mut u = Universe::new();
@@ -1486,7 +1486,7 @@ mod tests {
         assert_eq!(log.drain(), vec![Fluff::Happened]);
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn main_task() {
         let old_marker = Name::from("old");
         let new_marker = Name::from("new");
@@ -1558,7 +1558,7 @@ mod tests {
         assert_eq!(noticed_step.load(Ordering::Relaxed), 2);
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn input_is_processed_even_without_character() {
         let mut session = Session::builder()
             .ui(listen::constant(Viewport::ARBITRARY))

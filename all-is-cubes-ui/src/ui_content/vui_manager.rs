@@ -671,6 +671,7 @@ impl fmt::Debug for Command {
 mod tests {
     use super::*;
     use std::assert_matches::assert_matches;
+use all_is_cubes::util::async_test;
 
     async fn new_vui_for_test(paused: bool) -> (Vui, flume::Receiver<ControlMessage>) {
         let (cctx, ccrx) = flume::bounded(1);
@@ -690,7 +691,7 @@ mod tests {
         (vui, ccrx)
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn back_pause() {
         let (mut vui, control_channel) = new_vui_for_test(false).await;
         vui.back();
@@ -699,7 +700,7 @@ mod tests {
         assert!(control_channel.try_recv().is_err());
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn back_unpause() {
         let (mut vui, control_channel) = new_vui_for_test(true).await;
         vui.set_state(VuiPageState::Paused);
