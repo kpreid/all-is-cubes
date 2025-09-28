@@ -6,13 +6,13 @@ use all_is_cubes::block::Block;
 use all_is_cubes::math::{GridAab, Rgba, rgb_const, rgba_const};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::Handle;
-use all_is_cubes::util::yield_progress_for_testing;
+use all_is_cubes::util::{async_test, yield_progress_for_testing};
 
 // -------------------------------------------------------------------------------------------------
 // Import-only tests
 
 #[cfg(feature = "import")]
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn import_materials() {
     // This file contains one each of the six material types MagicaVoxel creates, in order.
     // (It does not contain each of the "media" types.)
