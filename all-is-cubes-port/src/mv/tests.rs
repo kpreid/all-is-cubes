@@ -8,7 +8,7 @@ use all_is_cubes::block::{self, Block, BlockDef};
 use all_is_cubes::math::{GridAab, Rgba, rgb_const, rgba_const};
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Universe};
-use all_is_cubes::util::yield_progress_for_testing;
+use all_is_cubes::util::{async_test, yield_progress_for_testing};
 use all_is_cubes_render::raytracer::print_space;
 
 use crate::mv::{self, coord};
@@ -47,7 +47,7 @@ async fn roundtrip(
 }
 
 #[cfg(all(feature = "export", feature = "import"))]
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn export_import_space() {
     // Irregular and negative dimensions to check that the coordinate transform worked.
     let bounds = GridAab::from_lower_size([-20, -30, -40], [1, 2, 3]);
@@ -114,7 +114,7 @@ async fn export_import_space() {
 // Import-only tests
 
 #[cfg(feature = "import")]
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn invalid_file_error() {
     let error = mv::load_dot_vox(yield_progress_for_testing(), &[])
         .await
@@ -129,7 +129,7 @@ async fn invalid_file_error() {
 }
 
 #[cfg(feature = "import")]
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn import_materials() {
     // This file contains one each of the six material types MagicaVoxel creates, in order.
     // (It does not contain each of the "media" types.)
@@ -192,7 +192,7 @@ async fn import_materials() {
 
 /// [`dot_vox`] only supports coordinates from 0-255
 #[cfg(feature = "export")]
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn export_too_large_space() {
     let mut universe = Universe::new();
     let space = universe
@@ -214,7 +214,7 @@ async fn export_too_large_space() {
 /// TODO: be more tidy about what we're testing, and also have better behavior for
 /// exporting the whole universe (don't export redundant models).
 #[cfg(feature = "export")]
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn export_block_def() {
     let mut universe = Universe::new();
     let [block] = all_is_cubes::content::make_some_voxel_blocks(&mut universe);
