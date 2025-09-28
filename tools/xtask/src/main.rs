@@ -397,11 +397,14 @@ fn build_web(
     // and we want to do modification time checks instead.
     {
         let _t = CaptureTime::new(time_log, format!("wasm cargo build --{profile}"));
+
+        // Change directory so the `.cargo/config.toml` file takes effect
+        // (--manifest-path is not sufficient).
+        let _d = config.sh.push_dir(wasm_package_dir);
+
         config
             .cargo()
             .arg("build")
-            .arg("--manifest-path")
-            .arg(wasm_package_dir.join("Cargo.toml"))
             .arg("--profile")
             .arg(<&str>::from(profile))
             .arg(TARGET_WASM)
@@ -429,6 +432,11 @@ fn build_web(
         [wasm_pack_out_dir.join("all_is_cubes_wasm.js")],
     ) {
         let _t = CaptureTime::new(time_log, format!("wasm-pack build --{profile}"));
+
+        // Change directory so the `.cargo/config.toml` file takes effect
+        // (--manifest-path is not sufficient).
+        let _d = config.sh.push_dir(wasm_package_dir);
+
         let mut cmd = cmd!(config.sh, "wasm-pack")
             .args(config.cargo_quiet.then_some("--quiet"))
             .args(["build", "--target=web"])
@@ -438,8 +446,7 @@ fn build_web(
                     .canonicalize()
                     .with_context(|| wasm_pack_out_dir.display().to_string())?,
             )
-            .arg(format!("--{profile}"))
-            .arg(wasm_package_dir);
+            .arg(format!("--{profile}"));
         cmd.set_quiet(config.cargo_quiet);
         cmd.run()?;
     }
