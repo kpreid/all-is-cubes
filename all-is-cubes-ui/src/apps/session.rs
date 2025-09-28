@@ -843,8 +843,6 @@ impl SessionBuilder {
         } = self;
 
         let settings = settings.unwrap_or_else(|| Settings::new(Default::default()));
-
-        let game_universe = Universe::new();
         let game_character = listen::CellWithLocal::new(None);
         let input_processor = InputProcessor::new();
         let paused = listen::Cell::new(false);
@@ -856,29 +854,34 @@ impl SessionBuilder {
             ui: SpaceWatchState::empty(),
         };
 
+        let ui = match viewport_for_ui {
+            Some(viewport) => Some(
+                Vui::new(crate::ui_content::UiTargets {
+                    mouselook_mode: input_processor.mouselook_mode(),
+                    character_source: game_character.as_source(),
+                    paused: paused.as_source(),
+                    graphics_options: settings.as_source(),
+                    app_control_channel: control_send.clone(),
+                    viewport_source: viewport,
+                    fullscreen_mode: fullscreen_state,
+                    set_fullscreen,
+                    quit: quit_fn.clone(),
+                    custom_commands: custom_commands.as_source(),
+                })
+                .await,
+            ),
+            None => None,
+        };
+
+        // Note: Putting this after the last .await avoids the future needing to be big enough to
+        // own the `Universe` (which is quite a large struct).
+        let game_universe = Universe::new();
+
         Session {
             frame_clock: FrameClock::new(game_universe.clock().schedule()),
 
             shuttle: Some(Box::new(Shuttle {
-                ui: match viewport_for_ui {
-                    Some(viewport) => Some(
-                        Vui::new(crate::ui_content::UiTargets {
-                            mouselook_mode: input_processor.mouselook_mode(),
-                            character_source: game_character.as_source(),
-                            paused: paused.as_source(),
-                            graphics_options: settings.as_source(),
-                            app_control_channel: control_send.clone(),
-                            viewport_source: viewport,
-                            fullscreen_mode: fullscreen_state,
-                            set_fullscreen,
-                            quit: quit_fn.clone(),
-                            custom_commands: custom_commands.as_source(),
-                        })
-                        .await,
-                    ),
-                    None => None,
-                },
-
+                ui,
                 settings,
                 game_character,
                 game_universe_info: listen::Cell::new(SessionUniverseInfo {
