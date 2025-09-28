@@ -215,9 +215,9 @@ impl Icons {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::yield_progress_for_testing;
+    use crate::util::{async_test, yield_progress_for_testing};
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn icons_smoke_test() {
         Icons::new(
             &mut UniverseTransaction::default(),
