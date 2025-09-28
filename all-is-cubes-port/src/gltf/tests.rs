@@ -11,7 +11,7 @@ use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe};
-use all_is_cubes::util::yield_progress_for_testing;
+use all_is_cubes::util::{async_test, yield_progress_for_testing};
 use all_is_cubes_mesh::{MeshOptions, SpaceMesh, block_meshes_for_space};
 use all_is_cubes_render::camera::GraphicsOptions;
 
@@ -101,7 +101,7 @@ async fn export_snapshot_test(
     );
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn export_block_defs() {
     let mut universe = Universe::new();
     let blocks1: [Block; 2] = make_some_blocks();
@@ -129,7 +129,7 @@ async fn export_block_defs() {
     .await;
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn export_space() {
     // TODO: Add make_some_voxel_blocks() so that this test exercises both
     // textured and untextured blocks occurring in the same chunk mesh.
@@ -155,7 +155,7 @@ async fn export_space() {
     .await;
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn export_character_not_supported() {
     let mut universe = Universe::new();
     let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));

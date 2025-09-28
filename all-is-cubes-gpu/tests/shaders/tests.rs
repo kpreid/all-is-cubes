@@ -3,6 +3,7 @@ use std::sync::Arc;
 use all_is_cubes::math::{GridAab, GridSize, Rgb, Vol, ps64};
 use all_is_cubes::raycast::scale_to_integer_step;
 use all_is_cubes::space::{PackedLight, Space};
+use all_is_cubes::util::async_test;
 
 use all_is_cubes_gpu::{LightChunk, LightTexture, init};
 
@@ -12,7 +13,7 @@ use crate::wgsl::{frag_expr, to_wgsl};
 // -------------------------------------------------------------------------------------------------
 
 /// Test that our test framework does what we want.
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn meta_smoke_test() {
     let image = run_shader_test(
         "meta_smoke_test",
@@ -27,7 +28,7 @@ async fn meta_smoke_test() {
     assert_eq!(image.get_pixel(0, 0), &image::Rgba([4., 3., 2., 1.]));
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn modulo() {
     assert_eq!(
         run_shader_test(
@@ -49,7 +50,7 @@ async fn modulo() {
     )
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn scale_to_integer_step_test() {
     for case @ (s, ds) in [(0.5f32, 0.25), (0.0, 0.25), (0.5, -0.125)] {
         dbg!(case);
