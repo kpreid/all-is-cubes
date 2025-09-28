@@ -667,12 +667,13 @@ mod tests {
     use crate::character::cursor_raycast;
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
     use crate::inv::Slot;
-    use crate::math::{FreeCoordinate, rgba_const};
+    use crate::math::{FreeCoordinate, Rgba, rgba_const};
     use crate::raycast::Ray;
     use crate::raytracer::print_space;
+    use crate::space;
+    use crate::transaction;
     use crate::universe::Universe;
-    use crate::util::yield_progress_for_testing;
-    use crate::{space, transaction};
+    use crate::util::{async_test, yield_progress_for_testing};
     use all_is_cubes_base::math::Rgba;
     use alloc::boxed::Box;
     use arcstr::literal;
@@ -781,7 +782,7 @@ mod tests {
             .unwrap()
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn icon_activate() {
         let dummy_icons = dummy_icons().await;
         assert_eq!(
@@ -829,7 +830,7 @@ mod tests {
         // TODO: Should have another test with a failing `Operation`, but we can't set that up yet.
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn icon_remove_block() {
         let dummy_icons = dummy_icons().await;
         assert_eq!(
@@ -875,7 +876,7 @@ mod tests {
         );
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn icon_place_block() {
         let dummy_icons = dummy_icons().await;
         let [block] = make_some_blocks();
