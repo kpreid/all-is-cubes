@@ -460,6 +460,16 @@ impl AnyHandle {
         let handle: &dyn Any = handle;
         handle.downcast_ref()
     }
+
+    /// Downcast to a specific `Handle<T>` type.
+    pub fn downcast<T: 'static>(self) -> Result<Handle<T>, AnyHandle> {
+        // TODO: implement this more efficiently, without the clone
+        // (note that `Box`ing to use `Box<dyn Any>` downcasting is *not* more efficient)
+        match self.downcast_ref() {
+            Some(handle) => Ok(handle.clone()),
+            None => Err(self),
+        }
+    }
 }
 
 impl AsRef<dyn ErasedHandle> for AnyHandle {
