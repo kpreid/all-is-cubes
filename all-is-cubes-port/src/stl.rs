@@ -132,11 +132,11 @@ mod tests {
     use all_is_cubes::content::testing::lighting_bench_space;
     use all_is_cubes::euclid::size3;
     use all_is_cubes::universe::{Handle, Name, Universe};
-    use all_is_cubes::util::yield_progress_for_testing;
+    use all_is_cubes::util::{async_test, yield_progress_for_testing};
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn space_to_stl_smoke_test() {
         let mut u = Universe::new();
         let space = lighting_bench_space(&mut u, yield_progress_for_testing(), size3(54, 16, 54))
@@ -146,7 +146,7 @@ mod tests {
         assert!(mesh.len() > 30_000, "{}", mesh.len());
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn export_multiple() {
         // TODO: dedup this logic with gltf export
         let mut universe = Universe::new();
