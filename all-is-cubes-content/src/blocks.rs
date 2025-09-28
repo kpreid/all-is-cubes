@@ -822,9 +822,9 @@ pub(crate) fn compose_block_from_faces(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use all_is_cubes::util::yield_progress_for_testing;
+    use all_is_cubes::util::{async_test, yield_progress_for_testing};
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn install_demo_blocks_test() {
         install_demo_blocks(
             &mut UniverseTransaction::default(),
