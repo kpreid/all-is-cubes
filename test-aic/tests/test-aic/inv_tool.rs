@@ -14,7 +14,7 @@ use all_is_cubes::raycast::Ray;
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::transaction::{Merge as _, Transaction as _};
 use all_is_cubes::universe::{Handle, Universe, UniverseTransaction};
-use all_is_cubes::util::yield_progress_for_testing;
+use all_is_cubes::util::{async_test, yield_progress_for_testing};
 use all_is_cubes::{space, transaction};
 use all_is_cubes_render::raytracer::print_space;
 
@@ -120,7 +120,7 @@ async fn dummy_icons() -> BlockProvider<Icons> {
         .unwrap()
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn icon_activate() {
     let dummy_icons = dummy_icons().await;
     assert_eq!(
@@ -168,7 +168,7 @@ fn use_activate_on_block_action() {
     // TODO: Should have another test with a failing `Operation`, but we can't set that up yet.
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn icon_remove_block() {
     let dummy_icons = dummy_icons().await;
     assert_eq!(
@@ -216,7 +216,7 @@ fn use_remove_block_without_target() {
     );
 }
 
-#[macro_rules_attribute::apply(smol_macros::test)]
+#[async_test]
 async fn icon_place_block() {
     let dummy_icons = dummy_icons().await;
     let [block] = make_some_blocks();

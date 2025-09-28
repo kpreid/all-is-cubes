@@ -374,12 +374,12 @@ mod tests {
     use all_is_cubes::math::Face;
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::{Universe, UniverseTransaction};
-    use all_is_cubes::util::yield_progress_for_testing;
+    use all_is_cubes::util::{async_test, yield_progress_for_testing};
     use all_is_cubes::{inv, space, time};
 
     /// Test that [`Toolbar`] will not panic if given inventory slot ranges exceeding the size of
     /// the inventory.
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn inventory_too_short() {
         // Create test setup with a character with inventory with only 1 slot.
         let mut universe = Universe::new();
