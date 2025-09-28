@@ -15,4 +15,7 @@ rustflags = [
     "-Ctarget-feature=+relaxed-simd",
     "-Ctarget-feature=+simd128",
     "-Ctarget-feature=+tail-call",
+
+    # Configures getrandom 0.3
+    '--cfg=getrandom_backend="wasm_js"',
 ]

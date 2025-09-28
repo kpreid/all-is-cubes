@@ -227,6 +227,7 @@ dependencies = [
  "form_urlencoded",
  "futures-channel",
  "futures-core",
+ "getrandom",
  "js-sys",
  "log",
  "send_wrapper",
