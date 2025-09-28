@@ -4,7 +4,7 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::any::Any;
-use core::{fmt, mem};
+use core::fmt;
 
 use bevy_ecs::entity::Entity;
 use bevy_ecs::prelude as ecs;
@@ -992,15 +992,9 @@ impl HandleSet {
 
     /// Removes every `Handle<T>` from this set and returns them.
     pub fn extract_type<T: UniverseMember>(&mut self) -> Vec<Handle<T>> {
-        // This can be replaced with a wrapper around `BTreeSet::extract_if` when that function is
-        // stabilized. (It's not a big deal because HandleSets are rarely used and small.)
-        let (extract, keep) = mem::take(&mut self.handles)
-            .into_iter()
-            .partition(|(_, handle)| handle.downcast_ref::<T>().is_some());
-        self.handles = keep;
-        extract
-            .into_values()
-            .map(|handle| handle.downcast_ref::<T>().unwrap().clone())
+        self.handles
+            .extract_if(.., |_, handle| handle.downcast_ref::<T>().is_some())
+            .map(|(_, handle)| handle.downcast::<T>().unwrap())
             .collect()
     }
 }
