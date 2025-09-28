@@ -5,6 +5,7 @@
 #![feature(doc_cfg)]
 #![feature(large_assignments)]
 #![move_size_limit = "5000"]
+#![feature(macro_attr)]
 #![feature(never_type)]
 
 //! Data import and export between [`all_is_cubes`] types and other data formats.

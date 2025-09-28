@@ -7,6 +7,7 @@
 #![feature(impl_trait_in_assoc_type)]
 #![feature(large_assignments)]
 #![move_size_limit = "2000"]
+#![feature(macro_attr)]
 #![feature(negative_impls)]
 #![feature(never_type)]
 #![feature(try_blocks)]

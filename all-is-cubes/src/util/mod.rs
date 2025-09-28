@@ -53,3 +53,20 @@ pub(crate) fn ignore_poison<T>(result: Result<T, bevy_platform::sync::PoisonErro
         Err(poison_error) => poison_error.into_inner(),
     }
 }
+
+// This macro does nothing more but wrap smol's test macro with the unstable macro_attr feature
+// to enable using it as an attribute.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! async_test {
+    attr() (
+        $( $item:tt )*
+    ) => {
+        smol_macros::test! {
+            $( $item )*
+        }
+    }
+}
+
+#[doc(hidden)]
+pub use async_test;
