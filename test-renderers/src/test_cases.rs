@@ -1,5 +1,6 @@
 //! Graphical test cases that can be run in any renderer.
 
+#![allow(clippy::large_futures)]
 #![expect(clippy::unused_async)]
 #![expect(clippy::cast_possible_wrap)]
 

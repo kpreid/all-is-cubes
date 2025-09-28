@@ -129,6 +129,7 @@ pub struct Universe {
 
 struct WorldRegistrations {
     all_members_query: ecs::QueryState<(Entity, &'static Membership)>,
+    all_entities_query: ecs::QueryState<ecs::EntityRef<'static>>,
 }
 
 impl Universe {
@@ -170,7 +171,8 @@ impl Universe {
         }
 
         let regs = WorldRegistrations {
-            all_members_query: world.query::<(Entity, &Membership)>(),
+            all_members_query: world.query(),
+            all_entities_query: world.query(),
         };
 
         Universe {
@@ -319,12 +321,12 @@ impl Universe {
                 .collect();
 
             if !paused {
-                self.world
+                let _: usize = self
+                    .world
                     .run_system_cached_with(
                         space::step::execute_tick_actions_system,
                         spaces.clone(),
                     )
-                    .unwrap()
                     .unwrap();
             }
 
@@ -700,8 +702,12 @@ impl Universe {
     ///
     /// TODO(ecs): Is it possible and needful to avoid doing this if no changes were made?
     fn update_archetypes(&mut self) {
-        let WorldRegistrations { all_members_query } = &mut self.regs;
+        let WorldRegistrations {
+            all_members_query,
+            all_entities_query,
+        } = &mut self.regs;
         all_members_query.update_archetypes(&self.world);
+        all_entities_query.update_archetypes(&self.world);
     }
 
     /// Activate logging this universe's time to a Rerun stream.
@@ -771,13 +777,16 @@ impl fmt::Debug for Universe {
             // A more “raw” dump of the ECS world which doesn't depend for correctness on
             // all_members_query having been updated, and can see non-"member" entities.
             // TODO(ecs): Decide whether to keep or discard this.
-            let raw_entities: Vec<(Option<Name>, Vec<&str>)> = world
-                .iter_entities()
+            let raw_entities: Vec<(Option<Name>, Vec<_>)> = self
+                .regs
+                .all_entities_query
+                .iter_manual(world)
                 .map(|er| {
                     let components = er
                         .archetype()
                         .components()
-                        .map(|cid| world.components().get_info(cid).unwrap().name())
+                        .iter()
+                        .map(|&cid| world.components().get_info(cid).unwrap().name())
                         .collect();
                     let name = er.get::<Membership>().map(|m| m.name.clone());
                     (name, components)

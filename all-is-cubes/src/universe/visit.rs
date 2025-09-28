@@ -124,7 +124,7 @@ impl VisitableComponents {
 
     pub(in crate::universe) fn visit_handles_in_entity<'w>(
         &self,
-        entity: bevy_ecs::world::EntityRefExcept<'w, impl ecs::Bundle>,
+        entity: bevy_ecs::world::EntityRefExcept<'w, '_, impl ecs::Bundle>,
     ) -> impl Iterator<Item = &'w dyn VisitHandles> {
         // TODO: should this accept a visitor instead as its name suggest,
         // or is this version with less code near the unsafe{} preferable?
