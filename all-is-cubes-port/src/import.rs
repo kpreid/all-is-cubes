@@ -220,7 +220,7 @@ pub enum ImportErrorKind {
 mod tests {
     use super::*;
     use crate::file::NonDiskFile;
-    use all_is_cubes::util::yield_progress_for_testing;
+    use all_is_cubes::util::{async_test, yield_progress_for_testing};
     use std::error::Error as _;
 
     #[test]
@@ -237,7 +237,7 @@ mod tests {
         ));
     }
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn import_unknown_format() {
         let error = load_universe_from_file(
             yield_progress_for_testing(),
