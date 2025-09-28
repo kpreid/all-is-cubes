@@ -538,6 +538,7 @@ mod tests {
     use all_is_cubes::space::Space;
     use all_is_cubes::time;
     use all_is_cubes::universe::{Handle, ReadTicket};
+    use all_is_cubes::util::async_test;
 
     fn apply_input_helper(
         input: &mut InputProcessor,
@@ -590,7 +591,7 @@ mod tests {
 
     /// Test when the pause menu (or any menu, really) is displayed,
     /// mouselook is ended so the mouse  can interact with the menus.
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn pause_menu_cancels_mouselook() {
         let paused = listen::Cell::new(false);
         // TODO: This test is both verbose and expensive.
