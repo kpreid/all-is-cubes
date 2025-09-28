@@ -230,12 +230,12 @@ mod tests {
     use super::*;
     use all_is_cubes::space::{self, SpacePhysics};
     use all_is_cubes::transaction::Transaction as _;
-    use all_is_cubes::util::yield_progress_for_testing;
+    use all_is_cubes::util::{async_test, yield_progress_for_testing};
     use all_is_cubes::{transaction, universe};
     use alloc::string::String;
     use alloc::vec::Vec;
 
-    #[macro_rules_attribute::apply(smol_macros::test)]
+    #[async_test]
     async fn progress_output() {
         // TODO: this theme setup logic should be part of a widget test setup helper
         let mut universe = universe::Universe::new();
