@@ -153,42 +153,7 @@ impl Modifier {
 
             Modifier::Quote(ref quote) => quote.evaluate(value, filter)?,
 
-            Modifier::Rotate(rotation) => {
-                if filter.skip_eval
-                    || rotation == GridRotation::IDENTITY
-                    || value.rotationally_symmetric()
-                {
-                    // Skip computation of transforms
-                    value
-                } else {
-                    let (attributes, voxels) = value.into_parts();
-                    block::Budget::decrement_voxels(&filter.budget, voxels.count())?;
-
-                    // It'd be nice if this rotation operation were in-place, but I've read that
-                    // it's actually quite difficult to implement a 3D array rotation in-place.
-                    // (But another possible improvement would be to have a spare buffer to reuse
-                    // across multiple evaluations/steps.)
-                    // TODO: But check if we can make the arithmetic simpler by using incrementing
-                    // instead of running a general transform on every Cube.
-
-                    let resolution = voxels.resolution();
-                    let inner_to_outer = rotation.to_positive_octant_transform(resolution.into());
-                    let outer_to_inner = rotation
-                        .inverse()
-                        .to_positive_octant_transform(resolution.into());
-
-                    MinEval::new(
-                        attributes.rotate(rotation),
-                        Evoxels::from_many(
-                            resolution,
-                            Vol::from_fn(
-                                voxels.bounds().transform(inner_to_outer).unwrap(),
-                                |cube| voxels.get(outer_to_inner.transform_cube(cube)).unwrap(),
-                            ),
-                        ),
-                    )
-                }
-            }
+            Modifier::Rotate(rotation) => evaluate_rotate(value, filter, rotation)?,
 
             Modifier::Composite(ref c) => c.evaluate(block, this_modifier_index, value, filter)?,
 
@@ -311,6 +276,48 @@ pub(crate) enum ModifierUnspecialize {
     /// Replace with a different set of blocks.
     /// `unspecialize()` will be called on each of those automatically.
     Replace(Vec<Block>),
+}
+
+/// Implementation of [`Modifier::Rotate`].
+#[inline(never)] // this function exists largely to have a named function for profiling
+fn evaluate_rotate(
+    value: MinEval,
+    filter: &block::EvalFilter<'_>,
+    rotation: GridRotation,
+) -> Result<MinEval, block::InEvalError> {
+    Ok(
+        if filter.skip_eval || rotation == GridRotation::IDENTITY || value.rotationally_symmetric()
+        {
+            // Skip computation of transforms
+            value
+        } else {
+            let (attributes, voxels) = value.into_parts();
+            block::Budget::decrement_voxels(&filter.budget, voxels.count())?;
+
+            // It'd be nice if this rotation operation were in-place, but I've read that
+            // it's actually quite difficult to implement a 3D array rotation in-place.
+            // (But another possible improvement would be to have a spare buffer to reuse
+            // across multiple evaluations/steps.)
+            // TODO: But check if we can make the arithmetic simpler by using incrementing
+            // instead of running a general transform on every Cube.
+
+            let resolution = voxels.resolution();
+            let inner_to_outer = rotation.to_positive_octant_transform(resolution.into());
+            let outer_to_inner = rotation
+                .inverse()
+                .to_positive_octant_transform(resolution.into());
+
+            MinEval::new(
+                attributes.rotate(rotation),
+                Evoxels::from_many(
+                    resolution,
+                    Vol::from_fn(voxels.bounds().transform(inner_to_outer).unwrap(), |cube| {
+                        voxels.get(outer_to_inner.transform_cube(cube)).unwrap()
+                    }),
+                ),
+            )
+        },
+    )
 }
 
 #[cfg(test)]
