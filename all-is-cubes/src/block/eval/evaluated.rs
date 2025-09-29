@@ -629,6 +629,7 @@ mod tests {
     use crate::universe::{ReadTicket, Universe};
     use indoc::indoc;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn evaluated_block_debug_simple() {
         let ev = block::from_color!(Rgba::WHITE).evaluate(ReadTicket::stub()).unwrap();
@@ -670,6 +671,7 @@ mod tests {
         );
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn evaluated_block_debug_complex() {
         let mut universe = Universe::new();

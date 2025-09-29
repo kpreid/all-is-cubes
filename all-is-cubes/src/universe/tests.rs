@@ -26,6 +26,7 @@ fn thread_safety() {
     assert_conditional_send_sync::<Universe>();
 }
 
+#[cfg(fmt_debug = "full")]
 #[test]
 fn universe_debug_empty() {
     assert_eq!(
@@ -51,6 +52,7 @@ fn universe_debug_empty() {
 }
 
 /// Universe does not print contents of members, on the assumption this would be too verbose.
+#[cfg(fmt_debug = "full")]
 #[test]
 fn universe_debug_elements() {
     let mut u = Universe::new();

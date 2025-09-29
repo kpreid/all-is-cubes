@@ -674,7 +674,6 @@ mod tests {
     use crate::transaction;
     use crate::universe::Universe;
     use crate::util::{async_test, yield_progress_for_testing};
-    use all_is_cubes_base::math::Rgba;
     use alloc::boxed::Box;
     use arcstr::literal;
     use pretty_assertions::assert_eq;
