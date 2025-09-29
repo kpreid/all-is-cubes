@@ -949,6 +949,7 @@ mod tests {
     use crate::universe::Universe;
     use euclid::point3;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn behavior_set_debug() {
         use pretty_assertions::assert_eq;

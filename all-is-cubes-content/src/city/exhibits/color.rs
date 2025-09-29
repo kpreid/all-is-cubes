@@ -313,7 +313,6 @@ fn COLORED_BOUNCE(ctx: Context<'_>) {
 }
 
 // TODO: this is similar to COLORED_BOUNCE and should share some code
-#[macro_rules_attribute::apply(exhibit!)]
 #[exhibit(
     name: "Spotlight",
     subtitle: "How sharp can the shadow be?\nNot very.",
