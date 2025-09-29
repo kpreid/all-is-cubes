@@ -43,6 +43,7 @@ allow-wildcard-paths = true
 skip-tree = [
     { name = "criterion" }, # criterion is rarely updated but only used for benching
     { name = "bitflags", version = "=1.3.2", depth = 1 },
+    { name = "hashbrown", version = "0.15", depth = 2 }, # waiting for bevy, ratatui, wgpu to catch up
     { name = "num_enum", version = "=0.5.11", depth = 2 },
     { name = "ndk", depth = 3 }, # winit and wgpu use different versions
     { name = "windows", depth = 3 },
