@@ -564,7 +564,8 @@ mod tests {
     use crate::math::{OpacityCategory, rgba_const, zo32};
     use pretty_assertions::assert_eq;
 
-    #[test]
+        #[cfg(fmt_debug = "full")]
+#[test]
     fn debug() {
         let options = GraphicsOptions::default();
         assert_eq!(

@@ -633,6 +633,7 @@ mod tests {
         );
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug() {
         let default = BlockAttributes::default;

@@ -408,7 +408,8 @@ mod tests {
         );
     }
 
-    #[test]
+        #[cfg(fmt_debug = "full")]
+#[test]
     fn debug() {
         let universe = Universe::new();
         let ticket = universe.read_ticket();
@@ -431,7 +432,8 @@ mod tests {
         );
     }
 
-    #[test]
+        #[cfg(fmt_debug = "full")]
+#[test]
     fn debug_stub() {
         let ticket = ReadTicket::stub();
         let origin = ticket.origin;
