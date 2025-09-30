@@ -114,7 +114,7 @@ pub(in crate::block::eval) fn compute_derived(
 
     // Compute color sum from voxels.
     // This is actually a sort of mini-raytracer, in that it computes the appearance
-    // of all six faces by tracing in from the edges, and then averages them.
+    // of all six faces by tracing in from the edges, and then averages all pixels.
     let (color, face_colors, emission): (Rgba, FaceMap<Rgba>, Rgb) = {
         let mut all_faces_sum = VoxSum::default();
         let mut face_colors = FaceMap::splat(Rgba::TRANSPARENT);
@@ -122,26 +122,28 @@ pub(in crate::block::eval) fn compute_derived(
         // Loop over all face voxels.
         // (This is a similar structure to the algorithm we use for mesh generation.)
         for face in Face6::ALL {
-            let mut face_sum = VoxSum::default();
             let transform = face.face_transform(resolution.into());
             let rotated_voxel_range = data_bounds.transform(transform.inverse()).unwrap();
 
-            for v in rotated_voxel_range.y_range() {
-                for u in rotated_voxel_range.x_range() {
-                    let cube: Cube = transform.transform_cube(Cube::new(
-                        u,
-                        v,
-                        rotated_voxel_range.z_range().start,
-                    ));
-                    debug_assert!(
-                        data_bounds.contains_cube(cube) || data_bounds.is_empty(),
-                        "bad transform; bounds {data_bounds:?} cube {cube:?}",
-                    );
+            let face_sum: VoxSum = Itertools::cartesian_product(
+                rotated_voxel_range.y_range(),
+                rotated_voxel_range.x_range(),
+            )
+            .map(|(v, u)| {
+                let cube: Cube =
+                    transform.transform_cube(Cube::new(u, v, rotated_voxel_range.z_range().start));
+                debug_assert!(
+                    data_bounds.contains_cube(cube) || data_bounds.is_empty(),
+                    "bad transform; bounds {data_bounds:?} cube {cube:?}",
+                );
+                cube
+            })
+            .map(|cube| raytracer::trace_for_eval(voxels, cube, face.opposite(), resolution))
+            .fold(VoxSum::default(), |mut sum, trace| {
+                sum += trace;
+                sum
+            });
 
-                    face_sum +=
-                        raytracer::trace_for_eval(voxels, cube, face.opposite(), resolution);
-                }
-            }
             all_faces_sum += face_sum;
             face_colors[face] = face_sum.color(f32::from(resolution).powi(2))
         }
