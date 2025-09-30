@@ -2,9 +2,9 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use all_is_cubes::block::{EvaluatedBlock, Modifier};
+use all_is_cubes::block::{Block, EvaluatedBlock, Modifier, Resolution::R32};
 use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
-use all_is_cubes::math::Face6;
+use all_is_cubes::math::{Face6, Rgba};
 use all_is_cubes::universe::Universe;
 
 pub fn evaluate_bench(c: &mut Criterion) {
@@ -26,6 +26,24 @@ pub fn evaluate_bench(c: &mut Criterion) {
         const N: usize = 10;
         let mut universe = Universe::new();
         let blocks = make_some_voxel_blocks::<N>(&mut universe);
+
+        b.iter_with_large_drop(|| -> [EvaluatedBlock; N] {
+            core::array::from_fn(|i| blocks[i].evaluate(universe.read_ticket()).unwrap())
+        })
+    });
+
+    // Evaluate some transparent blocks (has a cost of ray tracing for derived properties)
+    group.bench_function("transparent", |b| {
+        const N: usize = 10;
+        let mut universe = Universe::new();
+        let blocks: [Block; N] = core::array::from_fn(|i| {
+            Block::builder()
+                .voxels_fn(R32, |_cube| {
+                    Block::from(Rgba::new(1.0, 0.5, i as f32 / N as f32, 0.25))
+                })
+                .unwrap()
+                .build_into(&mut universe)
+        });
 
         b.iter_with_large_drop(|| -> [EvaluatedBlock; N] {
             core::array::from_fn(|i| blocks[i].evaluate(universe.read_ticket()).unwrap())
