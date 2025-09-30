@@ -13,6 +13,10 @@ use web_time::{Duration, Instant};
 // -------------------------------------------------------------------------------------------------
 
 /// Generate a uniform random [`u64`] (without incurring a `getrandom` dependency).
+//
+// Note: this was originally done to avoid `getrandom` 0.3 which requires a custom `--cfg` on wasm,
+// but we have now gotten stuck with that cfg anyway, so this code *could* be replaced with
+// `getrandom` again.
 pub fn pseudorandom_u64() -> u64 {
     // Math::random() will get us 56 random bits per call, but we want 64, so call it twice.
     let [high, low]: [u64; 2] =
