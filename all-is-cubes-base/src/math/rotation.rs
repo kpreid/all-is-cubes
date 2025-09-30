@@ -5,8 +5,9 @@
     clippy::large_stack_arrays,
     reason = "effectively-false positive on Arbitrary derive"
 )]
-use core::marker::PhantomData;
 use core::ops::Mul;
+
+use euclid::vec3;
 
 use crate::math::{Face6, GridCoordinate, GridMatrix, GridSize, GridVector, Gridgid, Vector3D};
 
@@ -198,69 +199,84 @@ impl GridRotation {
 
     /// Returns the basis vectors for the unrotated coordinate system in
     /// the rotated coordinate system.
-    // TODO: public? do we want this to be our API?
+    // TODO: properly public API? It’s very useful for building operations but kind of wacky.
     #[doc(hidden)]
     #[inline]
-    #[rustfmt::skip] // dense data layout
     pub const fn to_basis(self) -> Vector3D<Face6, ()> {
-        use {Face6::*, GridRotation::*};
-        match self {
-            RXYZ => Vector3D { x: PX, y: PY, z: PZ, _unit: PhantomData },
-            RXZY => Vector3D { x: PX, y: PZ, z: PY, _unit: PhantomData },
-            RYXZ => Vector3D { x: PY, y: PX, z: PZ, _unit: PhantomData },
-            RYZX => Vector3D { x: PY, y: PZ, z: PX, _unit: PhantomData },
-            RZXY => Vector3D { x: PZ, y: PX, z: PY, _unit: PhantomData },
-            RZYX => Vector3D { x: PZ, y: PY, z: PX, _unit: PhantomData },
+        // Compute an explicit lookup table to ensure the program uses a nice dense 144 bytes of
+        // data instead of a switch table with separate machine code to load each value.
+        // (Yes, that actually happened.)
+        static TABLE: [Vector3D<Face6, ()>; 48] = {
+            let mut table = [Vector3D::new(Face6::PX, Face6::PX, Face6::PX); 48];
+            let mut i = 0;
+            while i < table.len() {
+                use {Face6::*, GridRotation::*};
+                let rot = GridRotation::ALL[i];
+                table[rot as usize] = match rot {
+                    // Note that each entry in this table is just reiterating the name of the
+                    // variant as its components.
+                    RXYZ => vec3(PX, PY, PZ),
+                    RXZY => vec3(PX, PZ, PY),
+                    RYXZ => vec3(PY, PX, PZ),
+                    RYZX => vec3(PY, PZ, PX),
+                    RZXY => vec3(PZ, PX, PY),
+                    RZYX => vec3(PZ, PY, PX),
 
-            RXYz => Vector3D { x: PX, y: PY, z: NZ, _unit: PhantomData },
-            RXZy => Vector3D { x: PX, y: PZ, z: NY, _unit: PhantomData },
-            RYXz => Vector3D { x: PY, y: PX, z: NZ, _unit: PhantomData },
-            RYZx => Vector3D { x: PY, y: PZ, z: NX, _unit: PhantomData },
-            RZXy => Vector3D { x: PZ, y: PX, z: NY, _unit: PhantomData },
-            RZYx => Vector3D { x: PZ, y: PY, z: NX, _unit: PhantomData },
+                    RXYz => vec3(PX, PY, NZ),
+                    RXZy => vec3(PX, PZ, NY),
+                    RYXz => vec3(PY, PX, NZ),
+                    RYZx => vec3(PY, PZ, NX),
+                    RZXy => vec3(PZ, PX, NY),
+                    RZYx => vec3(PZ, PY, NX),
 
-            RXyZ => Vector3D { x: PX, y: NY, z: PZ, _unit: PhantomData },
-            RXzY => Vector3D { x: PX, y: NZ, z: PY, _unit: PhantomData },
-            RYxZ => Vector3D { x: PY, y: NX, z: PZ, _unit: PhantomData },
-            RYzX => Vector3D { x: PY, y: NZ, z: PX, _unit: PhantomData },
-            RZxY => Vector3D { x: PZ, y: NX, z: PY, _unit: PhantomData },
-            RZyX => Vector3D { x: PZ, y: NY, z: PX, _unit: PhantomData },
+                    RXyZ => vec3(PX, NY, PZ),
+                    RXzY => vec3(PX, NZ, PY),
+                    RYxZ => vec3(PY, NX, PZ),
+                    RYzX => vec3(PY, NZ, PX),
+                    RZxY => vec3(PZ, NX, PY),
+                    RZyX => vec3(PZ, NY, PX),
 
-            RXyz => Vector3D { x: PX, y: NY, z: NZ, _unit: PhantomData },
-            RXzy => Vector3D { x: PX, y: NZ, z: NY, _unit: PhantomData },
-            RYxz => Vector3D { x: PY, y: NX, z: NZ, _unit: PhantomData },
-            RYzx => Vector3D { x: PY, y: NZ, z: NX, _unit: PhantomData },
-            RZxy => Vector3D { x: PZ, y: NX, z: NY, _unit: PhantomData },
-            RZyx => Vector3D { x: PZ, y: NY, z: NX, _unit: PhantomData },
+                    RXyz => vec3(PX, NY, NZ),
+                    RXzy => vec3(PX, NZ, NY),
+                    RYxz => vec3(PY, NX, NZ),
+                    RYzx => vec3(PY, NZ, NX),
+                    RZxy => vec3(PZ, NX, NY),
+                    RZyx => vec3(PZ, NY, NX),
 
-            RxYZ => Vector3D { x: NX, y: PY, z: PZ, _unit: PhantomData },
-            RxZY => Vector3D { x: NX, y: PZ, z: PY, _unit: PhantomData },
-            RyXZ => Vector3D { x: NY, y: PX, z: PZ, _unit: PhantomData },
-            RyZX => Vector3D { x: NY, y: PZ, z: PX, _unit: PhantomData },
-            RzXY => Vector3D { x: NZ, y: PX, z: PY, _unit: PhantomData },
-            RzYX => Vector3D { x: NZ, y: PY, z: PX, _unit: PhantomData },
+                    RxYZ => vec3(NX, PY, PZ),
+                    RxZY => vec3(NX, PZ, PY),
+                    RyXZ => vec3(NY, PX, PZ),
+                    RyZX => vec3(NY, PZ, PX),
+                    RzXY => vec3(NZ, PX, PY),
+                    RzYX => vec3(NZ, PY, PX),
 
-            RxYz => Vector3D { x: NX, y: PY, z: NZ, _unit: PhantomData },
-            RxZy => Vector3D { x: NX, y: PZ, z: NY, _unit: PhantomData },
-            RyXz => Vector3D { x: NY, y: PX, z: NZ, _unit: PhantomData },
-            RyZx => Vector3D { x: NY, y: PZ, z: NX, _unit: PhantomData },
-            RzXy => Vector3D { x: NZ, y: PX, z: NY, _unit: PhantomData },
-            RzYx => Vector3D { x: NZ, y: PY, z: NX, _unit: PhantomData },
+                    RxYz => vec3(NX, PY, NZ),
+                    RxZy => vec3(NX, PZ, NY),
+                    RyXz => vec3(NY, PX, NZ),
+                    RyZx => vec3(NY, PZ, NX),
+                    RzXy => vec3(NZ, PX, NY),
+                    RzYx => vec3(NZ, PY, NX),
 
-            RxyZ => Vector3D { x: NX, y: NY, z: PZ, _unit: PhantomData },
-            RxzY => Vector3D { x: NX, y: NZ, z: PY, _unit: PhantomData },
-            RyxZ => Vector3D { x: NY, y: NX, z: PZ, _unit: PhantomData },
-            RyzX => Vector3D { x: NY, y: NZ, z: PX, _unit: PhantomData },
-            RzxY => Vector3D { x: NZ, y: NX, z: PY, _unit: PhantomData },
-            RzyX => Vector3D { x: NZ, y: NY, z: PX, _unit: PhantomData },
+                    RxyZ => vec3(NX, NY, PZ),
+                    RxzY => vec3(NX, NZ, PY),
+                    RyxZ => vec3(NY, NX, PZ),
+                    RyzX => vec3(NY, NZ, PX),
+                    RzxY => vec3(NZ, NX, PY),
+                    RzyX => vec3(NZ, NY, PX),
 
-            Rxyz => Vector3D { x: NX, y: NY, z: NZ, _unit: PhantomData },
-            Rxzy => Vector3D { x: NX, y: NZ, z: NY, _unit: PhantomData },
-            Ryxz => Vector3D { x: NY, y: NX, z: NZ, _unit: PhantomData },
-            Ryzx => Vector3D { x: NY, y: NZ, z: NX, _unit: PhantomData },
-            Rzxy => Vector3D { x: NZ, y: NX, z: NY, _unit: PhantomData },
-            Rzyx => Vector3D { x: NZ, y: NY, z: NX, _unit: PhantomData },
-        }
+                    Rxyz => vec3(NX, NY, NZ),
+                    Rxzy => vec3(NX, NZ, NY),
+                    Ryxz => vec3(NY, NX, NZ),
+                    Ryzx => vec3(NY, NZ, NX),
+                    Rzxy => vec3(NZ, NX, NY),
+                    Rzyx => vec3(NZ, NY, NX),
+                };
+                i += 1;
+            }
+            table
+        };
+
+        TABLE[self as usize]
     }
 
     /// Expresses this rotation as a [`Gridgid`] transform which rotates “in place” the
