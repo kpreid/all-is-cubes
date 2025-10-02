@@ -80,7 +80,7 @@ async-lock = { version = "3.4.1", default-features = false } # part of the `smol
 async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bevy_ecs = { version = "0.16.0", default-features = false }
-bevy_platform = { version = "0.16.0", default-features = false, features = ["alloc", "web"] }
+bevy_platform = { version = "0.17.0", default-features = false, features = ["alloc", "web"] }
 bitflags = { version = "2.9.0", default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
 bytemuck = { version = "1.22.0", default-features = false, features = ["derive", "must_cast"] }
