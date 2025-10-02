@@ -11,6 +11,8 @@ use manyfmt::Refmt as _;
 
 use crate::math::{Axis, Cube, GridAab, GridCoordinate, GridIter, GridPoint, GridVector};
 
+// -------------------------------------------------------------------------------------------------
+
 // #[derive(Clone, Copy, Debug)]
 // pub struct XMaj;
 
@@ -46,6 +48,9 @@ pub struct Vol<C, O = ZMaj> {
     /// Invariant: `contents.deref().len()`, if it exists, equals `bounds.volume()`.
     contents: C,
 }
+
+// -------------------------------------------------------------------------------------------------
+// `impl Vol<...> {` with various bounds
 
 impl<O> Vol<(), O> {
     /// Use `GridAab::to_vol()` to call this.
@@ -371,44 +376,7 @@ impl<C> Vol<C, ZMaj> {
     /// TODO: more example, less unit-test
     #[inline(always)] // very hot code
     pub fn index(&self, cube: Cube) -> Option<usize> {
-        let sizes = self.bounds.size();
-
-        // This might overflow and wrap, but if it does, the result will still be out
-        // of bounds, just in the other direction, because wrapping subtraction is an
-        // injective mapping of integers, and every in-bounds maps to in-bounds, so
-        // every out-of-bounds must also map to out-of-bounds.
-        let deoffsetted: GridPoint = GridPoint::from(cube)
-            .zip(self.bounds.lower_bounds(), GridCoordinate::wrapping_sub)
-            .to_point();
-
-        // Bounds check, expressed as a single unsigned comparison.
-        if (deoffsetted.x as u32 >= sizes.width)
-            | (deoffsetted.y as u32 >= sizes.height)
-            | (deoffsetted.z as u32 >= sizes.depth)
-        {
-            return None;
-        }
-
-        // Convert to usize for indexing.
-        // This cannot overflow because:
-        // * We just checked it is not negative
-        // * We just checked it is not greater than `self.sizes[i]`, which is an `i32`
-        // * We don't support platforms with `usize` smaller than 32 bits
-        // We use `as usize` rather than `deoffsetted.to_usize()` because the latter has an
-        // overflow check.
-        let ixvec: Point3D<usize, _> = deoffsetted.map(|s| s as usize);
-
-        // Compute index.
-        // Always use wrapping (rather than maybe-checked) arithmetic, because we
-        // checked the criteria for it to not overflow.
-        Some(
-            (ixvec
-                .x
-                .wrapping_mul(sizes.height as usize)
-                .wrapping_add(ixvec.y))
-            .wrapping_mul(sizes.depth as usize)
-            .wrapping_add(ixvec.z),
-        )
+        index_into_aab_zmaj(self.bounds, cube)
     }
 }
 
@@ -608,6 +576,10 @@ impl<V, O> Vol<Box<[V]>, O> {
         }
     }
 }
+
+// end of `impl Vol<...> {`
+// -------------------------------------------------------------------------------------------------
+// `impl Trait for Vol<...>`
 
 #[allow(clippy::missing_inline_in_public_items, reason = "is generic already")]
 impl<C: fmt::Debug, O: fmt::Debug> fmt::Debug for Vol<C, O> {
@@ -847,6 +819,56 @@ impl fmt::Display for VolLengthError {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Algorithms and helper functions not part of `Vol` impls
+
+/// Computes a linear index into a [`GridAab`], without checking whether it is big enough to
+/// overflow [`usize`].
+///
+/// This function can only be called through [`Vol`] which does check; it is the implementation
+/// of [`Vol::index()`].
+#[inline(always)] // very hot code
+fn index_into_aab_zmaj(bounds: GridAab, cube: Cube) -> Option<usize> {
+    let sizes = bounds.size();
+
+    // This might overflow and wrap, but if it does, the result will still be out
+    // of bounds, just in the other direction, because wrapping subtraction is an
+    // injective mapping of integers, and every in-bounds maps to in-bounds, so
+    // every out-of-bounds must also map to out-of-bounds.
+    let deoffsetted: GridPoint = GridPoint::from(cube)
+        .zip(bounds.lower_bounds(), GridCoordinate::wrapping_sub)
+        .to_point();
+
+    // Bounds check, expressed as a single unsigned comparison.
+    if (deoffsetted.x as u32 >= sizes.width)
+        | (deoffsetted.y as u32 >= sizes.height)
+        | (deoffsetted.z as u32 >= sizes.depth)
+    {
+        return None;
+    }
+
+    // Convert to usize for indexing.
+    // This cannot overflow because:
+    // * We just checked it is not negative
+    // * We just checked it is not greater than `self.sizes[i]`, which is an `i32`
+    // * We don't support platforms with `usize` smaller than 32 bits
+    // We use `as usize` rather than `deoffsetted.to_usize()` because the latter has an
+    // overflow check.
+    let ixvec: Point3D<usize, _> = deoffsetted.map(|s| s as usize);
+
+    // Compute index.
+    // Always use wrapping (rather than maybe-checked) arithmetic, because we
+    // checked the criteria for it to not overflow.
+    Some(
+        (ixvec
+            .x
+            .wrapping_mul(sizes.height as usize)
+            .wrapping_add(ixvec.y))
+        .wrapping_mul(sizes.depth as usize)
+        .wrapping_add(ixvec.z),
+    )
+}
+
 /// Find a way to split the bounds of a `Vol` which results in two adjacent volumes
 /// whose linear elements are also adjacent.
 /// Returns the two boxes and the linear split point.
@@ -887,6 +909,8 @@ fn find_zmaj_subdivision(vol: Vol<()>) -> Option<(Vol<()>, Vol<()>, usize)> {
 fn unreachable_wrong_size<T>(error: VolLengthError) -> T {
     panic!("impossible size mismatch: {error}")
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
