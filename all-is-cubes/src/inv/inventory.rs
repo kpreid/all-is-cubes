@@ -198,7 +198,7 @@ impl Slot {
         }
     }
 
-    /// Temporary const version of [`<Slot as From<Tool>>::from`].
+    /// Temporary const version of `<Slot as From<Tool>>::from`.
     #[doc(hidden)]
     pub const fn one(tool: Tool) -> Self {
         Self::Stack(Self::COUNT_ONE, tool)

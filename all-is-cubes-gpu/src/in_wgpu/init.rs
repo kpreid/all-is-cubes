@@ -70,7 +70,7 @@ pub async fn create_adapter_for_test(instance: &wgpu::Instance) -> wgpu::Adapter
 /// and print information about the decision made.
 ///
 /// `log` receives whole lines with no trailing newlines, as suitable for logging or
-/// printing using [`println!()`].
+/// printing using [`std::println!()`].
 #[doc(hidden)]
 pub async fn try_create_adapter_for_test(
     instance: &wgpu::Instance,

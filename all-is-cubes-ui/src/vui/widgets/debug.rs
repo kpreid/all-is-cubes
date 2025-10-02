@@ -6,7 +6,7 @@ use all_is_cubes::space::{CubeTransaction, SpaceTransaction};
 use all_is_cubes::util::{ConciseDebug, Refmt};
 
 use crate::vui::widgets::WidgetTheme;
-use crate::vui::{self, Layoutable as _};
+use crate::vui::{self, Layoutable};
 
 /// Widget that uses another widget's [`Layoutable`] parameters, but instead of displaying that
 /// widget, displays a bounding box of the area it's granted, and data as text.
@@ -23,7 +23,7 @@ impl LayoutDebugFrame {
     }
 }
 
-impl vui::Layoutable for LayoutDebugFrame {
+impl Layoutable for LayoutDebugFrame {
     fn requirements(&self) -> vui::LayoutRequest {
         self.widget.requirements()
     }

@@ -251,8 +251,8 @@ impl OctantMask {
 
     /// Returns the first octant included in the mask.
     ///
-    /// Here “first” means the arbitrary ordering [`ChunkChart`] uses, which corresponds
-    /// to the binary-counting ordering with X as MSB and Z as LSB:
+    /// “First” is in an arbitrary ordering which corresponds to the binary-counting ordering
+    /// which has X as most significant bit and Z as least significant bit:
     ///
     /// ```text
     /// -X -Y -Z

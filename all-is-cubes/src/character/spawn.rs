@@ -7,8 +7,10 @@ use crate::inv::Slot;
 use crate::math::{Cube, Face6, FreeCoordinate, FreePoint, FreeVector, GridAab, NotNan};
 #[cfg(feature = "save")]
 use crate::save::schema;
-
 use crate::universe::{HandleVisitor, VisitHandles};
+
+#[cfg(doc)]
+use crate::space::Space;
 
 /// Defines the initial state of a [`Character`] that is being created or moved into a [`Space`].
 ///
@@ -17,7 +19,6 @@ use crate::universe::{HandleVisitor, VisitHandles};
 #[doc = include_str!("../save/serde-warning.md")]
 ///
 /// [`Character`]: super::Character
-/// [`Space`]: crate::space::Space
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Spawn {

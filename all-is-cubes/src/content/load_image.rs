@@ -176,7 +176,7 @@ pub fn space_from_image<'b>(
         })
 }
 
-/// Convert a decoded PNG image into a [`BlockBuilder`] with voxels (which can then create a
+/// Convert a decoded PNG image into a [`block::Builder`] with voxels (which can then create a
 /// [`Block`]).
 #[doc(hidden)] // still experimental API
 pub fn block_from_image<'b, 'ticket>(

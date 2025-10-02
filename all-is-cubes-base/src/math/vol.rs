@@ -225,8 +225,9 @@ where
         Self::from_elements(GridAab::ORIGIN_CUBE, core::iter::once(value).collect::<C>()).unwrap()
     }
 
-    /// Constructs a [`Vol<Box<[V]>>`] from nested Rust arrays in [Z][Y][X] order with the Y axis
-    /// mirrored. The result's bounds's lower bounds are zero.
+    /// Constructs a [`Vol<Box<[V]>>`] from nested Rust arrays in \[Z\]\[Y\]\[X\] order
+    /// with the Y axis mirrored.
+    /// The result's bounds's lower bounds are zero.
     ///
     /// Note: The current implementation requires that `V` implement [`Clone`], and will
     /// clone each element once, but this may be improved in the future.

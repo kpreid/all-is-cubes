@@ -61,8 +61,7 @@ enum RecorderInner {
 /// Per-frame status reports from [`Recorder`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
-#[doc(hidden)] // TODO: shouldn't need to be public
-pub struct Status {
+pub(crate) struct Status {
     pub frame_number: FrameNumber,
 
     /// Flaws detected during the recording process for this frame.

@@ -27,11 +27,14 @@ use {
 ///
 /// Encapsulates all the stuff we want to *not* do if recording is disabled, and in particular,
 /// compiles to nothing if the "rerun" feature is not enabled.
-#[doc(hidden)]
-#[expect(missing_debug_implementations)]
-#[allow(clippy::large_enum_variant, unnameable_types)]
+#[allow(clippy::large_enum_variant)]
 #[non_exhaustive]
-pub enum Viz {
+#[cfg_attr(
+    feature = "_special_testing",
+    visibility::make(pub),
+    expect(missing_docs, missing_debug_implementations)
+)]
+pub(crate) enum Viz {
     Disabled,
     // If this variant is absent, then `Viz` is a zero-sized type.
     #[cfg(feature = "rerun")]
@@ -86,6 +89,7 @@ cfg_if::cfg_if! {
 }
 
 impl Viz {
+    /// Creates an [`Viz`] that writes what it is given to the given Rerun stream.
     #[cfg(feature = "rerun")]
     pub fn new(destination: rg::Destination) -> Self {
         if !destination.is_enabled() {
@@ -115,6 +119,7 @@ impl Viz {
         }
     }
 
+    /// Creates an [`Viz`] that discards all its input.
     pub fn disabled() -> Self {
         Self::Disabled
     }

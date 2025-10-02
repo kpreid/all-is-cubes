@@ -289,8 +289,8 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         self.consistency_check();
     }
 
-    /// As [`Self::compute()`], but writes details of the algorithm execution to [`viz`].
-    #[doc(hidden)]
+    /// As [`Self::compute()`], but writes details of the algorithm execution to [`Viz`].
+    #[cfg(feature = "_special_testing")]
     pub fn compute_with_viz(
         &mut self,
         block: &EvaluatedBlock,

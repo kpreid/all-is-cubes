@@ -125,7 +125,7 @@ impl LightChunk {
 /// determined by the most recent update commands. This may be used to move about a larger space,
 /// updating only the edges as needed.
 ///
-/// The texels are in [`PackedLight::as_texel()`] form.
+/// The texels are in [`PackedLight::as_texel()`][all_is_cubes::space::PackedLight::as_texel] form.
 #[derive(Debug)]
 #[doc(hidden)] // public for tests and benchmarks only
 pub struct LightTexture {

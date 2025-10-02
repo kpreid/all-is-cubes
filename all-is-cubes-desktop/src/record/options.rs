@@ -6,6 +6,11 @@ use std::time::Duration;
 
 use all_is_cubes_render::camera::{self, Viewport};
 
+#[cfg(doc)]
+use all_is_cubes::space::Space;
+
+// -------------------------------------------------------------------------------------------------
+
 /// Specifies a destination and format to write a recording.
 ///
 /// Part of [`InnerMainParams`](crate::InnerMainParams).
