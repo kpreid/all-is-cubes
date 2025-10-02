@@ -451,7 +451,7 @@ impl LightStorage {
         }
 
         cube_buffer.cost += 1;
-        if !self.contents.bounds().contains_cube(cube_entered) {
+        let Some(cube_entered_index) = self.contents.index(cube_entered) else {
             // Stop (and display the sky) if we exit the space bounds.
 
             // Rays that didn't hit anything close enough will be treated
@@ -464,7 +464,7 @@ impl LightStorage {
                 node.weight(),
             );
             return ray_bundle_weight;
-        }
+        };
 
         let mut light_ahead_cache = None;
         cube_buffer.traverse::<D>(
@@ -475,7 +475,7 @@ impl LightStorage {
                 cube: cube_entered,
                 face: face_entered,
             },
-            uc.get_evaluated(cube_entered),
+            uc.get_evaluated_by_index(cube_entered_index),
             &mut light_ahead_cache,
             light_from_previous_cube,
             node.weight(),
