@@ -1,9 +1,10 @@
+use alloc::vec::Vec;
 use core::fmt;
 
 use itertools::Itertools as _;
 use petgraph::visit::EdgeRef as _;
 use rand::Rng as _;
-use rand::seq::IndexedRandom as _;
+use rand::seq::{IndexedRandom as _, SliceRandom};
 
 use all_is_cubes::block::{self, AIR, Block};
 use all_is_cubes::linking::BlockProvider;
@@ -131,6 +132,7 @@ pub(crate) fn make_tree(
     let leaves_height = rng.random_range(1..=max_leaves_height_for_size);
 
     // Generate foliage (before the branches that lead to it)
+    let mut leaves_missing_branches = Vec::new();
     for cube in bounds
         .abut(Face6::PY, -leaves_height)
         .unwrap()
@@ -153,64 +155,66 @@ pub(crate) fn make_tree(
             *l = Some(TreeGrowth::from_radius(
                 rng.random_range(min_growth..=8.5).floor() as i32,
             ));
+            leaves_missing_branches.push(cube);
         }
     }
 
+    // Shuffle the order in which we connect the leaves, so it is not biased.
+    leaves_missing_branches.shuffle(rng);
+
     // Generate branches.
     // This is done by using A* pathfinding to find paths from the root to all leaves.
-    let mut paths = 0;
     const MAX_STEP_COST: i32 = 30;
     const BASE_DISTANCE_COST: i32 = 10;
-    while let Some((_, path)) = petgraph::algo::astar(
-        &graph,
-        root,
-        |cube| {
-            // Find a leaf block that is not already connected.
-            cube != root
-                && matches!(graph.leaves(cube), Some(Some(_)))
-                && graph.neighbor_edges(cube) == FaceMap::default()
-        },
-        // Edge cost.
-        |edge_ref| {
-            let relative_y = ((f64::from(edge_ref.target().y - bounds.lower_bounds().y) + 0.5)
-                / f64::from(bounds.size().height))
-            .clamp(0.0, 1.0);
-            let is_currently_on_existing_branch =
-                graph.neighbor_edges(edge_ref.source()) != FaceMap::default();
-            let would_enter_branch = graph.neighbor_edges(edge_ref.target()) != FaceMap::default();
+    const MIN_STEP_COST: i32 = BASE_DISTANCE_COST / 2;
+    while let Some(destination_leaf_cube) = leaves_missing_branches.pop() {
+        if let Some((_, path)) = petgraph::algo::astar(
+            &graph,
+            root,
+            |cube| cube == destination_leaf_cube,
+            // Edge cost.
+            |edge_ref| {
+                // TODO: this used to randomly influence how likely branching to the side is.
+                // Add it back but in a well-behaved deterministic-per-call way.
+                // let relative_y = ((f64::from(edge_ref.target().y - bounds.lower_bounds().y) + 0.5)
+                //     / f64::from(bounds.size().height))
+                // .clamp(0.0, 1.0);
 
-            if !is_currently_on_existing_branch && would_enter_branch {
-                // Highly penalize making a cyclic structure (branches splitting then rejoining).
-                MAX_STEP_COST
-            } else if edge_ref.growth.is_some() && rng.random_bool(1.0 - relative_y) {
-                // Reusing existing branches is cheaper.
-                // TODO: RNG in the cost function is probably a bad idea ...
-                BASE_DISTANCE_COST / 2
-            } else {
-                BASE_DISTANCE_COST
+                let is_currently_on_existing_branch =
+                    graph.neighbor_edges(edge_ref.source()) != FaceMap::default();
+                let would_enter_branch =
+                    graph.neighbor_edges(edge_ref.target()) != FaceMap::default();
+
+                if !is_currently_on_existing_branch && would_enter_branch {
+                    // Highly penalize making a cyclic structure (branches splitting then rejoining).
+                    MAX_STEP_COST
+                } else if edge_ref.growth.is_some() {
+                    // Reusing existing branches is cheaper.
+                    // TODO: RNG in the cost function is probably a bad idea ...
+                    MIN_STEP_COST
+                } else {
+                    BASE_DISTANCE_COST
+                }
+            },
+            // Heuristic; must never return an overestimate of cost.
+            |node| {
+                let distance = node - destination_leaf_cube;
+                (distance.x.abs() + distance.y.abs() + distance.z.abs()) * MIN_STEP_COST
+            },
+        ) {
+            for (a, b) in path.into_iter().tuple_windows() {
+                let face = Face6::try_from(b - a).unwrap();
+                // TODO: cleverer algorithm (at least don't overwrite)
+                *graph.edge_mut(a, face).unwrap() = Some(TreeGrowth::Sapling);
+
+                // Count how many paths are through this branch
+                // This will later be used to decide the growth size.
+                // Note that we only update a, the rootward element of the path,
+                // to avoid double-counting (and leaf nodes stay at zero harmlessly)
+                graph.data[a].flow = graph.data[a].flow.saturating_add(1);
             }
-        },
-        // Heuristic; must never return an underestimate of cost.
-        |node| {
-            let distance = node - root;
-            (distance.x.abs() + distance.y.abs() + distance.z.abs()) * MAX_STEP_COST
-        },
-    ) {
-        for (a, b) in path.into_iter().tuple_windows() {
-            let face = Face6::try_from(b - a).unwrap();
-            // TODO: cleverer algorithm (at least don't overwrite)
-            *graph.edge_mut(a, face).unwrap() = Some(TreeGrowth::Sapling);
-
-            // Count how many paths are through this branch
-            // This will later be used to decide the growth size.
-            // Note that we only update a, the rootward element of the path,
-            // to avoid double-counting (and leaf nodes stay at zero harmlessly)
-            graph.data[a].flow = graph.data[a].flow.saturating_add(1);
-        }
-        paths += 1;
-        if paths > 50 {
-            log::warn!("aborting branch building");
-            break;
+        } else {
+            log::warn!("failed to connect leaves to root");
         }
     }
 
