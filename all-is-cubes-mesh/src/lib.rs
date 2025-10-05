@@ -29,8 +29,12 @@
 
 extern crate alloc;
 
-#[cfg(any(test, feature = "dynamic"))]
-#[macro_use]
+#[cfg(any(
+    test,
+    feature = "arbitrary", // derive uses std paths 
+    feature = "dynamic", // uses std::sync
+))]
+#[cfg_attr(test, macro_use)]
 extern crate std;
 
 use core::fmt;
