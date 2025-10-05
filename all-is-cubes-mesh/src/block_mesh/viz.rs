@@ -16,7 +16,7 @@ use {
     all_is_cubes::euclid::Vector3D,
     all_is_cubes::math::{Cube, GridAab, GridVector},
     all_is_cubes::rerun_glue as rg,
-    alloc::vec::Vec,
+    alloc::{vec, vec::Vec},
     core::iter,
     core::mem,
     itertools::Itertools as _,
@@ -38,14 +38,14 @@ pub(crate) enum Viz {
     Disabled,
     // If this variant is absent, then `Viz` is a zero-sized type.
     #[cfg(feature = "rerun")]
+    #[cfg_attr(not(feature = "_special_testing"), allow(dead_code))]
     Enabled(Inner),
 }
 
 /// Use [`Viz::new()`] instead of constructing this directly.
 #[cfg(feature = "rerun")]
 #[doc(hidden)]
-#[expect(unnameable_types)]
-#[expect(missing_debug_implementations)]
+#[allow(missing_debug_implementations, unnameable_types)]
 pub struct Inner {
     // Info captured from the `Evoxels` to give context to later data
     resolution: Option<Resolution>,
@@ -91,6 +91,7 @@ cfg_if::cfg_if! {
 impl Viz {
     /// Creates an [`Viz`] that writes what it is given to the given Rerun stream.
     #[cfg(feature = "rerun")]
+    #[cfg_attr(not(feature = "_special_testing"), expect(dead_code))]
     pub fn new(destination: rg::Destination) -> Self {
         if !destination.is_enabled() {
             Self::disabled()
