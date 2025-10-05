@@ -28,7 +28,7 @@ required-features = ["_special_testing"]
 arbitrary = ["dep:arbitrary", "all-is-cubes/arbitrary"]
 # Causes reloading a `UniverseTemplate` to spawn a subprocess to load the template using freshly
 # compiled code, for development purposes. Only takes effect if running using `cargo run`.
-lukewarm-reload = ["dep:tempfile", "all-is-cubes/save", "all-is-cubes-port"]
+lukewarm-reload = ["dep:tempfile", "all-is-cubes/save", "dep:all-is-cubes-port"]
 # Makes certain internal items public.
 # This feature is intended only for use when developing All is Cubes,
 # to compile certain fuzzing, benchmark, and example targets.
