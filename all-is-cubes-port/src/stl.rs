@@ -19,6 +19,7 @@ use all_is_cubes_mesh::{
 use all_is_cubes_render::camera::GraphicsOptions;
 
 // The funny return type is to work with [`crate::export_to_path`].
+#[cfg(feature = "export")]
 pub(crate) fn export_stl(
     progress: YieldProgress,
     read_ticket: universe::ReadTicket<'_>,

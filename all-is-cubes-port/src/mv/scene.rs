@@ -12,7 +12,6 @@ use all_is_cubes::util::YieldProgress;
 
 use crate::mv;
 use crate::mv::coord::MV_TO_AIC_ROTATION;
-use crate::mv::error::{DotVoxConversionError, warn_extra_attributes};
 
 #[cfg(feature = "import")]
 pub(crate) async fn scene_to_space(
@@ -20,7 +19,7 @@ pub(crate) async fn scene_to_space(
     data: Arc<dot_vox::DotVoxData>,
     read_ticket: ReadTicket<'_>,
     imported_models: Vec<Handle<Space>>,
-) -> Result<Space, DotVoxConversionError> {
+) -> Result<Space, mv::DotVoxConversionError> {
     progress.set_label("Processing scene graph");
     progress.progress(0.0).await;
 
@@ -45,7 +44,7 @@ pub(crate) async fn scene_to_space(
             spawn
         })
         .try_build()
-        .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
+        .map_err(|e| mv::DotVoxConversionError::Unexpected(InGenError::from(e)))?;
 
     for (leaf_index, (leaf, mut leaf_progress)) in leaves
         .iter()
@@ -78,7 +77,7 @@ pub(crate) async fn scene_to_space(
                 }
                 Ok(())
             })
-            .map_err(DotVoxConversionError::Unexpected)?
+            .map_err(mv::DotVoxConversionError::Unexpected)?
     }
 
     Ok(space)
@@ -130,11 +129,11 @@ fn walk_scene_graph<'data>(
     scene_index: u32,
     parent_transform: Gridgid,
     output: &mut Vec<SceneElement<'data>>,
-) -> Result<(), DotVoxConversionError> {
+) -> Result<(), mv::DotVoxConversionError> {
     match data
         .scenes
         .get(usize::try_from(scene_index).unwrap())
-        .ok_or_else(|| DotVoxConversionError::MissingSceneNode(scene_index))?
+        .ok_or_else(|| mv::DotVoxConversionError::MissingSceneNode(scene_index))?
     {
         &dot_vox::SceneNode::Transform {
             ref attributes,
@@ -142,7 +141,7 @@ fn walk_scene_graph<'data>(
             child,
             layer_id: _,
         } => {
-            warn_extra_attributes(
+            mv::error::warn_extra_attributes(
                 format_args!("transform node #{scene_index}"),
                 attributes,
                 &["_name"],
@@ -150,7 +149,7 @@ fn walk_scene_graph<'data>(
 
             // TODO: cleanup how we access the frame repeatedly
             if let Some(frame) = frames.first() {
-                warn_extra_attributes(
+                mv::error::warn_extra_attributes(
                     format_args!("first frame of transform node #{scene_index}"),
                     &frame.attributes,
                     &["_t", "_r"],
@@ -195,15 +194,23 @@ fn walk_scene_graph<'data>(
             attributes,
             children,
         } => {
-            warn_extra_attributes(format_args!("group node #{scene_index}"), attributes, &[]);
+            mv::error::warn_extra_attributes(
+                format_args!("group node #{scene_index}"),
+                attributes,
+                &[],
+            );
             for &child in children {
                 walk_scene_graph(data, child, parent_transform, output)?;
             }
         }
         dot_vox::SceneNode::Shape { attributes, models } => {
-            warn_extra_attributes(format_args!("shape node #{scene_index}"), attributes, &[]);
+            mv::error::warn_extra_attributes(
+                format_args!("shape node #{scene_index}"),
+                attributes,
+                &[],
+            );
             for (sm_index, shape_model) in models.iter().enumerate() {
-                warn_extra_attributes(
+                mv::error::warn_extra_attributes(
                     format_args!("shape model #{sm_index} in node #{scene_index}"),
                     &shape_model.attributes,
                     &[],
@@ -213,7 +220,9 @@ fn walk_scene_graph<'data>(
                     model: data
                         .models
                         .get(usize::try_from(shape_model.model_id).unwrap())
-                        .ok_or_else(|| DotVoxConversionError::MissingModel(shape_model.model_id))?,
+                        .ok_or_else(|| {
+                            mv::DotVoxConversionError::MissingModel(shape_model.model_id)
+                        })?,
                     shape_model,
                 })
             }
@@ -224,6 +233,7 @@ fn walk_scene_graph<'data>(
 
 /// Results of processing the [`dot_vox::Scene`] graph.
 /// Each specifies one model to put into the scene, which to us is a block or multi-block structure.
+#[cfg(feature = "import")]
 struct SceneElement<'data> {
     /// This transform is *not* mapped to the All is Cubes coordinate system,
     /// but only flattens the data in the file.
@@ -232,6 +242,7 @@ struct SceneElement<'data> {
     model: &'data dot_vox::Model,
 }
 
+#[cfg(feature = "import")]
 impl SceneElement<'_> {
     fn transform_in_aic_scene_coordinates(&self) -> Gridgid {
         Gridgid::from(MV_TO_AIC_ROTATION)
@@ -267,6 +278,7 @@ impl SceneElement<'_> {
 
 /// Translation of the voxels of this model (presuming they are positioned in the positive
 /// octant) to what should be considered the origin for purposes of a scene node’s transform.
+#[cfg(feature = "import")]
 fn model_origin_translation(model: &dot_vox::Model) -> GridVector {
     let size = mv::coord::mv_to_aic_size(model.size);
     // TODO: this translation to center-point was determined *empirically* to be the right

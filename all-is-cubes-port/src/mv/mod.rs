@@ -30,6 +30,7 @@ mod scene;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use {
-    error::DotVoxConversionError, export::export_to_dot_vox_data, import::load_dot_vox,
-};
+#[cfg(feature = "export")]
+pub(crate) use export::export_to_dot_vox_data;
+#[cfg(feature = "import")]
+pub(crate) use {error::DotVoxConversionError, import::load_dot_vox};

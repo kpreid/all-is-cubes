@@ -11,6 +11,7 @@ use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_render::raytracer::print_space;
 
 use crate::mv::{self, coord};
+#[cfg(feature = "export")]
 use crate::{ExportError, ExportSet};
 
 // -------------------------------------------------------------------------------------------------

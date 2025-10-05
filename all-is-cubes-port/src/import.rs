@@ -10,8 +10,10 @@ use crate::Format;
 use crate::file;
 
 /// Load a [`Universe`] described by the given file (of guessed format).
-///
-/// TODO: Make a from-bytes version of this.
+#[cfg_attr(
+    not(any(feature = "native", feature = "dot-vox")),
+    allow(unreachable_code, unused_variables)
+)]
 pub async fn load_universe_from_file(
     progress: YieldProgress,
     file: Arc<dyn file::Fileish>,
@@ -137,6 +139,11 @@ impl all_is_cubes::save::WhenceUniverse for PortWhence {
                 }
 
                 _ => {
+                    // silence unused warnings in case no formats are enabled
+                    _ = file;
+                    _ = progress;
+                    _ = source;
+
                     // TODO: support other formats
                     Err(format!(
                         "saving {format} via `WhenceUniverse` is not yet implemented, or the format was disabled",

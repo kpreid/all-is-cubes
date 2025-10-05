@@ -1,3 +1,8 @@
+#![cfg_attr(
+    not(all(feature = "import", feature = "export")),
+    allow(dead_code, unused_imports)
+)]
+
 use all_is_cubes::math::{
     Face6, GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Gridgid,
 };
@@ -27,7 +32,6 @@ pub(crate) fn mv_to_aic_coordinate_transform(mv_size: dot_vox::Size) -> Gridgid 
 ///
 /// Also translates coordinates so that the lower bounds are zero, since the dot-vox format
 /// does not support arbitrary lower bounds.
-#[cfg(feature = "export")]
 pub(crate) fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
     let rotated_size = MV_TO_AIC_ROTATION
         .inverse()
@@ -42,7 +46,6 @@ pub(crate) fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
 }
 
 /// Convert size types, with [`MV_TO_AIC_ROTATION`] baked in.
-#[cfg(feature = "import")]
 pub(crate) fn mv_to_aic_size(size: dot_vox::Size) -> GridSize {
     GridSize::new(size.x, size.z, size.y)
 }
