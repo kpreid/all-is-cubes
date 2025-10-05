@@ -47,6 +47,10 @@ use reporting::*;
 fn main() -> Result<(), ActionError> {
     let sh = &Shell::new()?;
 
+    let main_metadata = cargo_metadata::MetadataCommand::new()
+        .manifest_path(PROJECT_DIR.join("Cargo.toml"))
+        .exec()?;
+
     let (config, command) = {
         let XtaskArgs {
             command,
@@ -59,6 +63,7 @@ fn main() -> Result<(), ActionError> {
             cargo_timings: timings,
             cargo_quiet: quiet,
             scope,
+            main_metadata,
         };
         (config, command)
     };
@@ -105,6 +110,17 @@ fn main() -> Result<(), ActionError> {
             if config.scope.includes_main_workspace() {
                 build_documentation(&config, &mut time_log)?;
             }
+        }
+        XtaskCommand::CheckFeatures => {
+            do_for_all_packages(
+                &config,
+                // no Clippy for better throughput; pragmatically we care about "does it build"
+                // much more than the more pedantic lints, and this will still give us dead code
+                // and unused imports warnings
+                TestOrCheck::Check,
+                Features::Powerset,
+                &mut time_log,
+            )?;
         }
         XtaskCommand::Doc => {
             assert!(config.scope.includes_main_workspace());
@@ -528,7 +544,7 @@ fn do_for_all_packages(
 
     // Test everything we can with default features and target.
     // But if we're linting, then the below --all-targets run will handle that.
-    if op != TestOrCheck::Lint && config.scope.includes_main_workspace() {
+    if config.scope.includes_main_workspace() {
         match features {
             Features::Default => {
                 {
@@ -586,6 +602,43 @@ fn do_for_all_packages(
                         .run()?;
                 }
             }
+
+            Features::Powerset => {
+                // Note: this skips the wasm and fuzz workspaces.
+                // Those currently have no feature combinations to test.
+                for package in &config.main_metadata.workspace_packages() {
+                    // TODO: This could be more efficient if it looked at feature dependencies
+                    // and skipped equivalent sets.
+                    for feature_set in itertools::Itertools::powerset(
+                        package
+                            .features
+                            .keys()
+                            .map(String::as_str)
+                            .filter(|&feature_name| {
+                                feature_name != "default" // should not enable anything itself
+                                 && feature_name != "_special_testing" // not for public use, so we care less if it breaks funny
+                            }),
+                    ) {
+                        let package_name: &str = &package.name;
+                        let feature_set_commas: String = feature_set.join(",");
+
+                        let _t = CaptureTime::new(
+                            time_log,
+                            format!(
+                                "{op:?} --package={package_name} --features={feature_set_commas}"
+                            ),
+                        );
+                        op.cargo_cmd(config)
+                            .args([
+                                &format!("--package={package_name}"),
+                                "--all-targets",
+                                "--no-default-features",
+                                &format!("--features={feature_set_commas}"),
+                            ])
+                            .run()?;
+                    }
+                }
+            }
         }
     }
 
@@ -622,7 +675,7 @@ fn do_for_all_packages(
                     .arg("all-is-cubes-wasm/")
                     .run()?;
             }
-            TestOrCheck::BuildTests | TestOrCheck::Lint => {
+            TestOrCheck::BuildTests | TestOrCheck::Lint | TestOrCheck::Check => {
                 let _pushd = config.sh.push_dir("all-is-cubes-wasm");
                 // Build the tests that `wasm-pack test` will test.
                 op.cargo_cmd(config).arg(TARGET_WASM).run()?;
@@ -631,6 +684,7 @@ fn do_for_all_packages(
     }
 
     // Check everything else in the workspace, so non-test targets are checked for compile errors.
+    // TODO: may be redundant now
     if config.scope.includes_main_workspace() {
         let _t = CaptureTime::new(time_log, "check --all-targets");
         config

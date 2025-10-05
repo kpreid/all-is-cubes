@@ -52,6 +52,9 @@ pub(crate) enum XtaskCommand {
     /// <https://github.com/rust-lang/rust-clippy/issues/1209>
     Lint,
 
+    /// Check every feature combination builds (but do not test them).
+    CheckFeatures,
+
     /// Build documentation.
     ///
     /// This is approximately the same as `cargo doc` but uses the same options as `xtask lint`
