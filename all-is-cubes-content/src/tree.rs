@@ -190,7 +190,6 @@ pub(crate) fn make_tree(
                     MAX_STEP_COST
                 } else if edge_ref.growth.is_some() {
                     // Reusing existing branches is cheaper.
-                    // TODO: RNG in the cost function is probably a bad idea ...
                     MIN_STEP_COST
                 } else {
                     BASE_DISTANCE_COST
