@@ -119,7 +119,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over
     // the kind of window system we're using.
-    #[cfg_attr(not(feature = "record"), allow(unused_variables, unused_mut))]
+    #[cfg_attr(not(feature = "terminal"), allow(unused_variables, unused_mut))]
     let (universe_ready_tx, mut universe_ready_rx) = oneshot::channel();
     #[cfg_attr(not(feature = "terminal"), allow(unused_variables, unused_mut))]
     let (task_done_tx, mut task_done_rx) = oneshot::channel();
