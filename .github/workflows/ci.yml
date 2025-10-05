@@ -346,8 +346,71 @@ jobs:
         path: |
           target/cargo-timings/cargo-timing-*.html
 
-  # Run `xtask test-more` to look for broken `features`.
-  features:
+  # Run `xtask check-features` to look for broken `features` builds.
+  # This job runs no tests, only builds.
+  check-features:
+    # Don't spend time on this if the normal builds failed.
+    # Also, we reuse the cache from it.
+    needs: build
+    runs-on: ubuntu-latest
+    continue-on-error: false
+
+    steps:
+    # Free some disk space so our largest builds can complete reliably.
+    - uses: jlumbroso/free-disk-space@v1.3.1
+      with:
+        large-packages: false # slow
+        swap-storage: false
+
+    - uses: actions/checkout@v5
+
+    - name: Install native libraries
+      if: ${{ runner.os == 'Linux' }}
+      run: |
+          sudo apt update
+          sudo apt-get -y install libxrandr-dev xorg-dev libx11-xcb-dev libwayland-dev libasound2-dev libudev-dev
+
+    # Load cache before doing any Rust builds
+    - uses: Swatinem/rust-cache@v2.8.1
+      with:
+        # Reuse the cache from the normal `build` job instead of creating an independent one,
+        # to reduce redundant work and save disk space — but don't *write* to that cache, so
+        # we don't bloat it or conflict.
+        prefix-key: "v1-rust-ubuntu-stable-locked"
+        shared-key: "build"
+        save-if: false
+        workspaces: |
+          ./
+          all-is-cubes-wasm/
+
+    # break this out as a separate non-silenced build step
+    - name: Compile xtask
+      run: cargo build --package xtask
+
+    - name: Install tools
+      # These should already be installed but we might have a cache miss, so don't fail in that case.
+      run: |
+        cargo install --locked wasm-pack@0.13.1 cargo-about@0.8.2
+
+    - run: df -h .
+
+    - run: cargo xtask check-features --timings
+
+    - run: df -h .
+
+    # Save timing reports so we can download and view them
+    # (for understanding build performance in CI)
+    - name: Save cargo --timings output
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: cargo-timings check-features
+        path: |
+          target/cargo-timings/cargo-timing-*.html
+
+  # Run `xtask test-more` to run tests under feature combinations.
+  # This is less exhaustive than `check-features` but more thorough per case.
+  test-more:
     # Don't spend time on this if the normal builds failed.
     # Also, we reuse the cache from it.
     needs: build
@@ -394,8 +457,7 @@ jobs:
     - run: df -h .
 
     # Run tests in `test-more` mode which exercises each library's features.
-    - name: Run exhaustive tests
-      run: cargo xtask --scope=only-normal test-more --timings
+    - run: cargo xtask --scope=only-normal test-more --timings
 
     - run: df -h .
 
@@ -405,7 +467,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: cargo-timings features
+        name: cargo-timings test-more
         path: |
           target/cargo-timings/cargo-timing-*.html
 
