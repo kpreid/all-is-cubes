@@ -10,10 +10,12 @@ use crate::args::Scope;
 /// Configuration which is passed down through everything.
 #[derive(Debug)]
 pub struct Config<'a> {
+    /// For executing commands.
     pub sh: &'a Shell,
     pub cargo_timings: bool,
     pub cargo_quiet: bool,
     pub scope: Scope,
+    pub main_metadata: cargo_metadata::Metadata,
 }
 
 impl Config<'_> {
@@ -73,14 +75,18 @@ impl Config<'_> {
 
 // -------------------------------------------------------------------------------------------------
 
-const CHECK_SUBCMD: &str = "clippy";
-
 /// What to do to a set of packages.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum TestOrCheck {
+    /// `cargo test`
     Test,
+    /// `cargo test --no-run`
     BuildTests,
+    /// `cargo clippy`
     Lint,
+    /// Really `cargo check`, not `cargo clippy`, for efficiency when all we care about is
+    /// "does it build?"
+    Check,
 }
 
 impl TestOrCheck {
@@ -90,7 +96,8 @@ impl TestOrCheck {
             .args(match self {
                 Self::Test => vec!["test"],
                 Self::BuildTests => vec!["test", "--no-run"],
-                Self::Lint => vec![CHECK_SUBCMD],
+                Self::Lint => vec!["clippy"],
+                Self::Check => vec!["check"],
             })
             .args(config.cargo_build_args())
     }
@@ -106,7 +113,8 @@ impl TestOrCheck {
             // `cargo test` doesn't run clippy.
             TestOrCheck::Test => "check",
             TestOrCheck::BuildTests => "check",
-            TestOrCheck::Lint => CHECK_SUBCMD,
+            TestOrCheck::Lint => "clippy",
+            TestOrCheck::Check => "check",
         }
     }
 }
@@ -116,9 +124,13 @@ impl TestOrCheck {
 /// Which features we want to test building with.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Features {
-    /// Test with default features only
+    /// Fefault features only
     Default,
 
-    /// Test each package with all features enabled and with all features disabled.
+    /// Each package with all features enabled and with all features disabled.
+    /// This is a compromise.
     AllAndNothing,
+
+    /// Each package with every possible combination of features.
+    Powerset,
 }

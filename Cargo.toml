@@ -144,9 +144,9 @@ rustc-hash = { version = "2.1.1", default-features = false }
 scopeguard = { version = "1.2.0", default-features = false }
 # "futures" feature is used by all-is-cubes-gpu, but it's small so we enable it everywhere 
 send_wrapper = { version = "0.6.0", default-features = false, features = ["futures"] }
-serde = { version = "1.0.204", default-features = false, features = ["derive"] }
+serde = { version = "1.0.219", default-features = false, features = ["derive"] }
 # TODO: currently all crates that use serde_json also need std, but that should change
-serde_json = { version = "1.0.100", default-features = false, features = ["std"] }
+serde_json = { version = "1.0.142", default-features = false, features = ["std"] }
 simplelog = { version = "0.12.0", default-features = false, features = ["local-offset"] }
 smallvec = { version = "1.15.1", default-features = false, features = ["union", "const_generics", "const_new"] }
 smol = { version = "2.0.2" }
