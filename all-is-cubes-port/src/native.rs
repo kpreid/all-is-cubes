@@ -1,13 +1,14 @@
+#![cfg_attr(
+    not(all(feature = "import", feature = "export")),
+    allow(unused_imports)
+)]
+
 use std::io;
 
 use all_is_cubes::universe::{self, Universe};
 use all_is_cubes::util::YieldProgress;
 
 use crate::file::Fileish;
-#[cfg(feature = "export")]
-use crate::{ExportError, ExportSet};
-#[cfg(feature = "import")]
-use crate::{ImportError, ImportErrorKind};
 
 #[cfg(test)]
 mod tests;
@@ -17,17 +18,17 @@ pub(crate) fn import_native_json(
     progress: YieldProgress,
     bytes: &[u8],
     file: &dyn Fileish,
-) -> Result<Box<Universe>, ImportError> {
+) -> Result<Box<Universe>, crate::ImportError> {
     let reader = ReadProgressAdapter::new(progress, bytes);
-    serde_json::from_reader(reader).map_err(|error| ImportError {
+    serde_json::from_reader(reader).map_err(|error| crate::ImportError {
         source_path: file.display_full_path(),
         detail: if error.is_eof() || error.is_io() {
-            ImportErrorKind::Read {
+            crate::ImportErrorKind::Read {
                 path: None,
                 error: io::Error::other(error),
             }
         } else {
-            ImportErrorKind::Parse(Box::new(error))
+            crate::ImportErrorKind::Parse(Box::new(error))
         },
     })
 }
@@ -36,9 +37,9 @@ pub(crate) fn import_native_json(
 #[cfg(feature = "export")]
 pub(crate) fn export_native_json(
     read_ticket: universe::ReadTicket<'_>,
-    source: ExportSet,
+    source: crate::ExportSet,
     destination: &mut (dyn io::Write + Send),
-) -> Result<(), ExportError> {
+) -> Result<(), crate::ExportError> {
     serde_json::to_writer(
         destination,
         &universe::PartialUniverse {
@@ -48,7 +49,7 @@ pub(crate) fn export_native_json(
     )
     .map_err(|error| {
         // TODO: report non-IO errors distinctly
-        ExportError::Write(io::Error::other(error))
+        crate::ExportError::Write(io::Error::other(error))
     })
 }
 

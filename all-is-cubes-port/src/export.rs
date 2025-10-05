@@ -60,7 +60,10 @@ pub fn export_to_path(
                 // TODO: the file IO should be done in a separate thread
                 let mut writer = io::BufWriter::new(fs::File::create(destination)?);
                 crate::native::export_native_json(read_ticket, source, &mut writer)?;
-                Box::pin(ready(Ok(())))
+                Box::pin(async {
+                    progress.finish().await;
+                    Ok(())
+                })
             }
             #[cfg(feature = "dot-vox")]
             Format::DotVox => {
@@ -93,7 +96,14 @@ pub fn export_to_path(
             #[allow(unreachable_patterns)]
             // TODO: distinguish between disabled and unsupported
             // (not currently necessary because we have no import-only formats)
-            _ => Box::pin(ready(Err(ExportError::FormatDisabled { format }))),
+            _ => {
+                _ = destination;
+                _ = progress;
+                _ = read_ticket;
+                _ = source;
+
+                Box::pin(ready(Err(ExportError::FormatDisabled { format })))
+            }
         })
     }
 
@@ -156,7 +166,7 @@ impl ExportSet {
     /// TODO: This is incompatible with the "extract" approach to handling what to export.
     /// Fix that by separately tracking whether the set *started* with multiple items
     /// that need suffixing.
-    #[cfg(feature = "stl")] // stl is the only exporter that does multi-file
+    #[cfg_attr(not(feature = "stl"), allow(dead_code))]
     pub(crate) fn member_export_path(
         &self,
         base_path: &Path,
@@ -186,6 +196,13 @@ impl ExportSet {
     #[allow(
         clippy::needless_pass_by_value,
         reason = "convenient given how it is used"
+    )]
+    #[cfg_attr(
+        not(all(
+            feature = "export",
+            any(feature = "dot-vox", feature = "gltf", feature = "stl")
+        )),
+        allow(dead_code, reason = "may be unused if no exporters are enabled")
     )]
     pub(crate) fn reject_unsupported(&self, format: Format) -> Result<(), ExportError> {
         if let Some(handle) = self.contents.iter().next() {

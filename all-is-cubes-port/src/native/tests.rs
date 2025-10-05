@@ -1,3 +1,7 @@
+#![cfg_attr(
+    not(all(feature = "import", feature = "export")),
+    allow(unused_imports)
+)]
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -6,8 +10,12 @@ use all_is_cubes::block;
 use all_is_cubes::universe::{Handle, Name};
 use all_is_cubes::util::yield_progress_for_testing;
 
-use crate::{ExportSet, export_to_path, load_universe_from_file};
+#[cfg(feature = "import")]
+use crate::load_universe_from_file;
+#[cfg(feature = "export")]
+use crate::{ExportSet, export_to_path};
 
+#[cfg(all(feature = "export", feature = "import"))]
 #[macro_rules_attribute::apply(smol_macros::test)]
 async fn import_export_native_format() {
     let import_path = PathBuf::from(concat!(

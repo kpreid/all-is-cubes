@@ -10,9 +10,9 @@ use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes::util::{ConciseDebug, Refmt};
 
+use crate::mv;
 use crate::mv::coord::{aic_to_mv_coordinate_transform, mv_to_aic_coordinate_transform};
-use crate::mv::palette::block_to_dot_vox_palette_entry;
-use crate::mv::{self, DotVoxConversionError};
+#[cfg(feature = "export")]
 use crate::{ExportError, Format};
 
 // -------------------------------------------------------------------------------------------------
@@ -24,7 +24,7 @@ pub(crate) fn to_space(
     palette_blocks: &[Block],
     model: &dot_vox::Model,
     import_as_block: bool,
-) -> Result<Space, DotVoxConversionError> {
+) -> Result<Space, mv::DotVoxConversionError> {
     let transform = mv_to_aic_coordinate_transform(model.size);
     let bounds =
         GridAab::from_lower_size([0, 0, 0], vec3(model.size.x, model.size.y, model.size.z))
@@ -54,16 +54,16 @@ pub(crate) fn to_space(
             let transformed_cube = transform.transform_cube(converted_cube);
 
             let block = palette_blocks.get(v.i as usize).ok_or_else(|| {
-                DotVoxConversionError::PaletteTooShort {
+                mv::DotVoxConversionError::PaletteTooShort {
                     len: palette_blocks.len(),
                     index: v.i,
                 }
             })?;
 
             m.set(transformed_cube, block)
-                .map_err(DotVoxConversionError::SetCube)?;
+                .map_err(mv::DotVoxConversionError::SetCube)?;
         }
-        Ok::<(), DotVoxConversionError>(())
+        Ok::<(), mv::DotVoxConversionError>(())
     })?;
 
     Ok(space)
@@ -93,7 +93,7 @@ pub(crate) fn from_space(
         .block_data()
         .iter()
         .map(|data| {
-            if let Some(entry) = block_to_dot_vox_palette_entry(data.evaluated()) {
+            if let Some(entry) = mv::palette::block_to_dot_vox_palette_entry(data.evaluated()) {
                 mv::palette::push(palette, entry)
             } else {
                 None
@@ -170,6 +170,7 @@ fn voxel_out(transform: Gridgid, cube: Cube, i: u8) -> dot_vox::Voxel {
     }
 }
 
+#[cfg(feature = "export")]
 fn aic_to_mv_size(
     transform: Gridgid,
     size: all_is_cubes::euclid::Size3D<u32, Cube>,
