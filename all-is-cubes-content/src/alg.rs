@@ -4,8 +4,7 @@
 //! near-duplicate code.
 
 use alloc::boxed::Box;
-
-use hashbrown::HashSet;
+use alloc::vec::Vec;
 
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution};
 use all_is_cubes::euclid::vec3;
@@ -65,17 +64,24 @@ pub(crate) fn voronoi_pattern<'a>(
 
     // Storage of the pattern as computed so far and each such cube's distance to the nearest input
     // point.
-    let mut pattern: Vol<Box<[(FreeCoordinate, &Block)]>> = {
+    struct PatternCell<'a> {
+        block: &'a Block,
+        nearest: FreeCoordinate,
+        is_enqueued: bool,
+    }
+    let mut pattern: Vol<Box<[PatternCell<'_>]>> = {
         // The first point is used to initialize the whole volume, saving a lot of flood-fill work.
         let &(first_point, ref first_block) = points.next().expect("must be at least one point");
 
-        Vol::from_fn(GridAab::for_block(resolution), |cube| {
-            (calculate_distance_squared(first_point, cube), first_block)
+        Vol::from_fn(GridAab::for_block(resolution), |cube| PatternCell {
+            nearest: calculate_distance_squared(first_point, cube),
+            block: first_block,
+            is_enqueued: false,
         })
     };
 
     // Cubes which should be written by the current flood-fill operation.
-    let mut to_fill = HashSet::<Cube>::new();
+    let mut to_fill = Vec::<Cube>::new();
 
     for &(region_point, ref block) in points {
         let region_point = region_point * FreeCoordinate::from(resolution);
@@ -84,12 +90,14 @@ pub(crate) fn voronoi_pattern<'a>(
             Some(p) => p,
             None => continue, // TODO: panic? this can only happen when the inputs are not in 0 to 1
         };
-        to_fill.insert(starting_cube);
+        to_fill.push(starting_cube);
 
-        while let Some(cube) = to_fill.iter().next().copied() {
-            to_fill.remove(&cube);
-
-            pattern[wrap(cube)] = (calculate_distance_squared(region_point, cube), block);
+        while let Some(cube) = to_fill.pop() {
+            pattern[wrap(cube)] = PatternCell {
+                nearest: calculate_distance_squared(region_point, cube),
+                block,
+                is_enqueued: false,
+            };
 
             for direction in Face6::ALL {
                 // The flood fill can escape the cube bounds here,
@@ -105,19 +113,21 @@ pub(crate) fn voronoi_pattern<'a>(
                 // causes some redundant distance calculation, but is cheaper because it requires
                 // fewer insertions.
                 let distance_squared = calculate_distance_squared(region_point, neighbor);
-                if distance_squared < pattern[wrap(neighbor)].0 {
+                let neighbor_cell = &mut pattern[wrap(neighbor)];
+                if distance_squared < neighbor_cell.nearest && !neighbor_cell.is_enqueued {
                     // TODO: I tried filtering to
                     //    direction.normal_vector().dot(offset) >= 0.0
                     // which should be an optimization but it changed the results.
                     // Investigate with actual well-defined test cases.
 
-                    to_fill.insert(neighbor);
+                    to_fill.push(neighbor);
+                    neighbor_cell.is_enqueued = true;
                 }
             }
         }
     }
 
-    move |cube| pattern[cube.map(|component| component.rem_euclid(resolution.into()))].1
+    move |cube| pattern[cube.map(|component| component.rem_euclid(resolution.into()))].block
 }
 
 /// Given a room's exterior bounding box, act on its four walls.
