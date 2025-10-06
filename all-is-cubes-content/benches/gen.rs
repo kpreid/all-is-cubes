@@ -5,6 +5,7 @@
 
 #![allow(missing_docs)]
 
+use std::hint::black_box;
 use std::time::Duration;
 
 use rand::SeedableRng as _;
@@ -79,24 +80,32 @@ fn component_benches(c: &mut criterion::Criterion) {
 
     // voronoi_pattern isn't a particularly important function, but it's a particularly slow
     // function, so benchmark it separately.
-    c.bench_function("voronoi_pattern", |b| {
-        let points: [_; 32] = {
-            let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
-            core::array::from_fn(|_| {
-                let free_point = Cube::ORIGIN.aab().random_point(&mut rng);
-                (
-                    free_point,
-                    if free_point.y > 0.5 {
-                        block::AIR
-                    } else {
-                        block::from_color!(1.0, 1.0, 1.0)
-                    },
-                )
-            })
-        };
+    for wrap in [false, true] {
+        c.bench_function(&format!("voronoi_pattern(wrap={wrap})"), |b| {
+            let points: [_; 32] = {
+                let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(3887829);
+                core::array::from_fn(|_| {
+                    let free_point = Cube::ORIGIN.aab().random_point(&mut rng);
+                    (
+                        free_point,
+                        if free_point.y > 0.5 {
+                            block::AIR
+                        } else {
+                            block::from_color!(1.0, 1.0, 1.0)
+                        },
+                    )
+                })
+            };
 
-        b.iter_with_large_drop(|| content::voronoi_pattern(block::Resolution::R16, true, &points));
-    });
+            b.iter_with_large_drop(|| {
+                content::voronoi_pattern(
+                    black_box(block::Resolution::R16),
+                    black_box(wrap),
+                    black_box(&points),
+                )
+            });
+        });
+    }
 }
 
 // We could use the criterion/async_smol feature instead, but that would bring in more than we need.
