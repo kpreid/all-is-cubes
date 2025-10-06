@@ -27,12 +27,13 @@ pub(crate) use noise::*;
 /// TODO: Once we have better composable tools than `impl Fn(Cube)`, allow
 /// each point to refer to a pattern of its own to delegate to.
 #[cfg_attr(feature = "_special_testing", visibility::make(pub))] // used by benchmark
+#[inline(never)] // slow and not greatly useful to specialize
 pub(crate) fn voronoi_pattern<'a>(
     resolution: Resolution,
     wrapping: bool,
-    // TODO: not a well-founded choice of iterator type, just convenient
-    points: impl IntoIterator<Item = &'a (FreePoint, Block)> + Clone,
-) -> impl Fn(Cube) -> &'a Block {
+    // This could be more general but fits all of its current uses
+    points: &'a [(FreePoint, Block)],
+) -> impl Fn(Cube) -> &'a Block + use<'a> {
     // We use the strategy of flood-filling each point up front, because for
     // large numbers of points that's much cheaper than evaluating every cube
     // against every point. (An alternative would be to build a spatial index
@@ -45,7 +46,7 @@ pub(crate) fn voronoi_pattern<'a>(
     // will not. However, this should be good enough for the procedural-generation
     // goals of this function.
 
-    let mut points = points.into_iter();
+    let mut points = points.iter();
 
     let wrap =
         |cube: Cube| -> Cube { cube.map(|component| component.rem_euclid(resolution.into())) };

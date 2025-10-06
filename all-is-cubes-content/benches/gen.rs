@@ -101,7 +101,7 @@ fn component_benches(c: &mut criterion::Criterion) {
                 content::voronoi_pattern(
                     black_box(block::Resolution::R16),
                     black_box(wrap),
-                    black_box(&points),
+                    black_box(points.as_slice()),
                 )
             });
         });
