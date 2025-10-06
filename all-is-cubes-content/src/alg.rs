@@ -7,7 +7,7 @@ use alloc::boxed::Box;
 
 use hashbrown::HashSet;
 
-use all_is_cubes::block::{AIR, Atom, Block, Primitive, Resolution};
+use all_is_cubes::block::{Atom, Block, Primitive, Resolution};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
     Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
@@ -23,6 +23,7 @@ pub(crate) use noise::*;
 /// seamless tiling.
 ///
 /// The points' coordinates should be in the range 0 to 1.
+/// There must be at least one point.
 ///
 /// TODO: Once we have better composable tools than `impl Fn(Cube)`, allow
 /// each point to refer to a pattern of its own to delegate to.
@@ -45,29 +46,39 @@ pub(crate) fn voronoi_pattern<'a>(
     // will not. However, this should be good enough for the procedural-generation
     // goals of this function.
 
+    let mut points = points.into_iter();
+
     let wrap =
         |cube: Cube| -> Cube { cube.map(|component| component.rem_euclid(resolution.into())) };
 
+    let calculate_distance_squared = |region_point: FreePoint, cube: Cube| -> FreeCoordinate {
+        // Point with which we are checking the distance to region_point.
+        let test_point: FreePoint = cube.center();
+        let offset = test_point - region_point;
+        // TODO: add ability to muck with the distance metric in custom ways
+        // instead of this hardcoded one.
+        let offset = offset.component_mul(vec3(1.0, 2.0, 1.0));
+        offset.square_length()
+    };
+
+    // Take first point specially because it will always fill the whole volume.
+
     // Storage of the pattern as computed so far and each such cube's distance to the nearest input
     // point.
-    let mut pattern: Vol<Box<[(FreeCoordinate, &Block)]>> =
-        Vol::from_fn(GridAab::for_block(resolution), |_| (f64::INFINITY, &AIR));
+    let mut pattern: Vol<Box<[(FreeCoordinate, &Block)]>> = {
+        // The first point is used to initialize the whole volume, saving a lot of flood-fill work.
+        let &(first_point, ref first_block) = points.next().expect("must be at least one point");
+
+        Vol::from_fn(GridAab::for_block(resolution), |cube| {
+            (calculate_distance_squared(first_point, cube), first_block)
+        })
+    };
 
     // Cubes which should be written by the current flood-fill operation.
     let mut to_fill = HashSet::<Cube>::new();
 
     for &(region_point, ref block) in points {
         let region_point = region_point * FreeCoordinate::from(resolution);
-
-        let calculate_distance_squared = |cube: Cube| -> FreeCoordinate {
-            // Point with which we are checking the distance to region_point.
-            let test_point: FreePoint = cube.center();
-            let offset = test_point - region_point;
-            // TODO: add ability to muck with the distance metric in custom ways
-            // instead of this hardcoded one.
-            let offset = offset.component_mul(vec3(1.0, 2.0, 1.0));
-            offset.square_length()
-        };
 
         let starting_cube: Cube = match Cube::containing(region_point) {
             Some(p) => p,
@@ -78,7 +89,7 @@ pub(crate) fn voronoi_pattern<'a>(
         while let Some(cube) = to_fill.iter().next().copied() {
             to_fill.remove(&cube);
 
-            pattern[wrap(cube)] = (calculate_distance_squared(cube), block);
+            pattern[wrap(cube)] = (calculate_distance_squared(region_point, cube), block);
 
             for direction in Face6::ALL {
                 // The flood fill can escape the cube bounds here,
@@ -93,7 +104,7 @@ pub(crate) fn voronoi_pattern<'a>(
                 // good enough. Doing the test before the insert rather than after the removal
                 // causes some redundant distance calculation, but is cheaper because it requires
                 // fewer insertions.
-                let distance_squared = calculate_distance_squared(neighbor);
+                let distance_squared = calculate_distance_squared(region_point, neighbor);
                 if distance_squared < pattern[wrap(neighbor)].0 {
                     // TODO: I tried filtering to
                     //    direction.normal_vector().dot(offset) >= 0.0
