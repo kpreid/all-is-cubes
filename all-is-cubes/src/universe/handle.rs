@@ -17,6 +17,9 @@ use crate::universe::{
 };
 use crate::util::maybe_sync::{Mutex, MutexGuard, RwLock};
 
+#[cfg(doc)]
+use crate::universe::UniverseTransaction;
+
 // -------------------------------------------------------------------------------------------------
 
 /// Identifies a member of a [`Universe`] of type `T`.
@@ -77,6 +80,8 @@ enum State<T> {
     /// This state should always be accompanied by `Inner::universe_id` having no value.
     /// `Inner::name` may or may not have a value yet; if it does not, that corresponds to
     /// a not-yet-assigned [`Name::Anonym`].
+    ///
+    /// TODO(https://github.com/kpreid/all-is-cubes/issues/633): This value storage needs to go away.
     Pending {
         /// Owns the value.
         ///
@@ -90,6 +95,12 @@ enum State<T> {
         /// TODO(ecs): See if this can be changed once the ECS migration is complete.
         value_arc: Arc<RwLock<T>>,
     },
+
+    /// Not yet (or never will be) inserted into a [`Universe`],
+    /// and the value has not yet been supplied.
+    ///
+    /// May transition to [`State::Member`].
+    PendingWithoutValue,
 
     /// Halfway inserted into a [`Universe`], and has no value yet, because it
     /// is a handle that is being deserialized.
@@ -152,6 +163,15 @@ impl<T: 'static> Handle<T> {
                 value_arc: Arc::new(RwLock::new(initial_value)),
             },
         )
+    }
+
+    /// Constructs a [`Handle`] that does not refer to a value, because the value has
+    /// not yet been supplied.
+    ///
+    /// This type of handle is used for constructing cyclic references, and is returned by
+    /// [`UniverseTransaction::insert_without_value()`].
+    pub(crate) fn new_pending_without_value(name: Name) -> Handle<T> {
+        Self::new_from_state(name, State::PendingWithoutValue)
     }
 
     /// Constructs a [`Handle`] that does not refer to a value, as if it used to but
@@ -269,12 +289,14 @@ impl<T: 'static> Handle<T> {
             #[cfg(feature = "save")]
             (_, State::Deserializing { .. }) => Err(HandleError::NotReady(self.name())),
             // TODO: WrongUniverse isn't the clearest error for this
-            (_, State::Pending { .. }) => Err(HandleError::WrongUniverse {
-                ticket_universe_id: Some(expected_universe),
-                handle_universe_id,
-                name: self.name(),
-                ticket_origin: Location::caller(),
-            }),
+            (_, State::Pending { .. } | State::PendingWithoutValue) => {
+                Err(HandleError::WrongUniverse {
+                    ticket_universe_id: Some(expected_universe),
+                    handle_universe_id,
+                    name: self.name(),
+                    ticket_origin: Location::caller(),
+                })
+            }
         }
     }
 
@@ -319,6 +341,7 @@ impl<T: 'static> Handle<T> {
                     .map_err(|e| e.into_handle_error(self))?;
                 Access::Pending(value_arc.clone())
             }
+            State::PendingWithoutValue => return Err(HandleError::ValueMissing(self.name())),
             #[cfg(feature = "save")]
             State::Deserializing { entity: _ } => return Err(HandleError::NotReady(self.name())),
             State::Member { entity } => {
@@ -381,7 +404,10 @@ impl<T: 'static> Handle<T> {
         // TODO(ecs): Deduplicate this setup code with read()
         let entity: ecs::Entity = match *self.inner.state.lock().expect("Handle::state lock error")
         {
-            State::Pending { .. } => panic!("cannot use query() on pending handles"), // TODO: proper error
+            State::Pending { .. } | State::PendingWithoutValue => {
+                // TODO(ecs): proper error
+                panic!("cannot use query() on pending handles")
+            }
             #[cfg(feature = "save")]
             State::Deserializing { entity: _ } => return Err(HandleError::NotReady(self.name())),
             State::Member { entity } => {
@@ -443,6 +469,9 @@ impl<T: 'static> Handle<T> {
         let value_arc: Arc<RwLock<T>> =
             match *self.inner.state.lock().expect("Handle::state lock error") {
                 State::Pending { ref value_arc, .. } => value_arc.clone(),
+                State::PendingWithoutValue => {
+                    return Err(HandleError::NotPending { name: self.name() });
+                }
                 #[cfg(feature = "save")]
                 State::Deserializing { .. } => {
                     // TODO: not really the right error variant (but this should be unreachable)
@@ -522,6 +551,12 @@ impl<T: 'static> Handle<T> {
         match self.inner.state.lock() {
             Ok(state_guard) => match &*state_guard {
                 State::Pending { .. } => {}
+                State::PendingWithoutValue => {
+                    return Err(InsertError {
+                        name: self.name(),
+                        kind: InsertErrorKind::ValueMissing,
+                    });
+                }
                 State::Member { .. } => {
                     return Err(InsertError {
                         name: self.name(),
@@ -585,6 +620,12 @@ impl<T: 'static> Handle<T> {
             }
             Err(HandleError::NotReady(_)) => {
                 unreachable!("tried to insert a Handle from deserialization via transaction")
+            }
+            Err(HandleError::ValueMissing(name)) => {
+                return Err(InsertError {
+                    name,
+                    kind: InsertErrorKind::ValueMissing,
+                });
             }
             Err(HandleError::Gone {
                 name,
@@ -652,6 +693,13 @@ impl<T: 'static> Handle<T> {
                     kind: InsertErrorKind::Gone,
                 });
             }
+            state @ State::PendingWithoutValue => {
+                *state_guard = state;
+                return Err(InsertError {
+                    name: pending_name,
+                    kind: InsertErrorKind::ValueMissing,
+                });
+            }
             state @ State::Member { .. } => {
                 *state_guard = state;
                 return Err(InsertError {
@@ -702,6 +750,21 @@ impl<T: 'static> Handle<T> {
         *state = State::Gone { reason };
     }
 
+    /// For `UniverseTransaction::set_pending_value()`.
+    /// This will go away with <https://github.com/kpreid/all-is-cubes/issues/633>.
+    #[track_caller]
+    pub(crate) fn set_pending_value(&self, value: T) {
+        let state = &mut *self.inner.state.lock().expect("Handle::state lock error");
+        match state {
+            State::PendingWithoutValue => {
+                *state = State::Pending {
+                    value_arc: Arc::new(RwLock::new(value)),
+                }
+            }
+            _ => panic!("incorrect handle state for set_pending_value()"),
+        }
+    }
+
     pub(in crate::universe) fn has_strong_handles(&self) -> bool {
         self.inner
             .strong_handle_count
@@ -734,6 +797,7 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
                             }
                         }
                     }
+                    State::PendingWithoutValue => write!(f, ", value not yet provided")?,
                     #[cfg(feature = "save")]
                     State::Deserializing { .. } => write!(f, ", not yet deserialized")?,
                     State::Member { .. } => { /* normal condition, no message */ }
@@ -952,6 +1016,11 @@ pub enum HandleError {
     #[displaydoc("object was referenced but not defined: {0}")]
     NotReady(Name),
 
+    /// The handle has no value because [`UniverseTransaction::set_pending_value()`] has not yet
+    /// been called.
+    #[displaydoc("handle {0} has no value yet")]
+    ValueMissing(Name),
+
     /// The given [`ReadTicket`] is for a different universe,
     /// or a mutation function was called on a [`Universe`] which does not contain the given handle.
     #[displaydoc(
@@ -996,6 +1065,7 @@ impl core::error::Error for HandleError {
             HandleError::Gone { .. } => None,
             HandleError::InUse(..) => None,
             HandleError::NotReady(..) => None,
+            HandleError::ValueMissing(..) => None,
             HandleError::WrongUniverse { .. } => None,
             HandleError::InvalidTicket { name: _, error } => Some(error),
             HandleError::NotPending { .. } => None,

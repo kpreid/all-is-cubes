@@ -362,6 +362,7 @@ impl EvalBlockError {
         match self.kind {
             ErrorKind::Handle(HandleError::InUse { .. }) => true,
             ErrorKind::Handle(HandleError::InvalidTicket { .. }) => true,
+            ErrorKind::Handle(HandleError::ValueMissing { .. }) => true,
 
             ErrorKind::BudgetExceeded => false,
             ErrorKind::PriorBudgetExceeded { .. } => false,

@@ -835,21 +835,31 @@ pub struct InsertError {
 pub enum InsertErrorKind {
     /// An object already exists with the proposed name.
     AlreadyExists,
+
     /// The proposed name may not be used.
     ///
     /// In particular, a [`Name::Anonym`] may not be inserted explicitly.
     InvalidName,
-    /// The provided [`Handle`] does not have a value.
+
+    /// The provided [`Handle`] was created by [`Handle::new_gone()`] and is intentionally useless.
     Gone,
+
+    /// A value has not been associated with the handle.
+    /// This can occur when using [`UniverseTransaction::insert_without_value()`].
+    ValueMissing,
+
     /// The provided [`Handle`]’s value is being mutated and cannot
     /// be checked.
     InUse,
+
     /// The provided [`Handle`] was already inserted into some universe.)
     AlreadyInserted,
+
     #[doc(hidden)] // should be unreachable
     /// The provided [`Handle`] is being used in the deserialization process
     /// and cannot be inserted otherwise.
     Deserializing,
+
     #[doc(hidden)]
     /// The provided [`Handle`] experienced an error during a previous operation and
     /// cannot be used.
@@ -868,7 +878,11 @@ impl fmt::Display for InsertError {
             InsertErrorKind::InvalidName => {
                 write!(f, "the name {name} may not be used in an insert operation")
             }
-            InsertErrorKind::Gone => write!(f, "the Handle {name} was already dead"),
+            InsertErrorKind::Gone => write!(
+                f,
+                "cannot insert handle {name} created by Handle::new_gone()"
+            ),
+            InsertErrorKind::ValueMissing => write!(f, "value has not been provided for {name}"),
             InsertErrorKind::InUse => write!(
                 f,
                 "the object {name} is being mutated during this insertion attempt"
