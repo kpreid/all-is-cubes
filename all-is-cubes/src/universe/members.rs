@@ -398,3 +398,15 @@ impl ErasedHandle for AnyHandle {
         self.clone()
     }
 }
+
+impl<T: 'static> PartialEq<Handle<T>> for AnyHandle {
+    fn eq(&self, other: &Handle<T>) -> bool {
+        self.downcast_ref::<T>().is_some_and(|down| down == other)
+    }
+}
+
+impl<T: 'static> PartialEq<AnyHandle> for Handle<T> {
+    fn eq(&self, other: &AnyHandle) -> bool {
+        *other == *self
+    }
+}

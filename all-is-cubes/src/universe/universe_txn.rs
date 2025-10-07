@@ -412,31 +412,9 @@ impl UniverseTransaction {
         name: Name,
         value: T,
     ) -> Result<Handle<T>, InsertError> {
-        let handle = Handle::new_pending(name.clone(), value);
-        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle.clone()));
-
-        // TODO: fail right away if the ref is already in a universe or if it is Anonym?
-        match name {
-            name @ (Name::Specific(_) | Name::Anonym(_)) => {
-                match self.members.entry(name.clone()) {
-                    hashbrown::hash_map::Entry::Occupied(_) => {
-                        // Equivalent to how transaction merge would fail
-                        Err(InsertError {
-                            name,
-                            kind: InsertErrorKind::AlreadyExists,
-                        })
-                    }
-                    hashbrown::hash_map::Entry::Vacant(ve) => {
-                        ve.insert(insertion);
-                        Ok(handle)
-                    }
-                }
-            }
-            Name::Pending => {
-                self.anonymous_insertions.push(insertion);
-                Ok(handle)
-            }
-        }
+        let handle = Handle::new_pending(name, value);
+        self.insert_named_handle_inner(handle.clone())?;
+        Ok(handle)
     }
 
     /// Adds an insertion of an anonymous universe member to the transaction, and returns the
@@ -452,6 +430,80 @@ impl UniverseTransaction {
                 handle.clone(),
             )));
         handle
+    }
+
+    /// Adds an insertion of an anonymous universe member to the transaction, and returns the
+    /// pending handle to that member.
+    ///
+    /// Using this operation makes the transaction incomplete and unable to be committed.
+    /// It must then be completed using [`UniverseTransaction::set_pending_value()`].
+    ///
+    /// This allows the construction of cyclic structures.
+    ///
+    ///
+    pub fn insert_without_value<T: UniverseMember>(
+        &mut self,
+        name: Name,
+    ) -> Result<Handle<T>, InsertError> {
+        let handle = Handle::new_pending_without_value(name);
+        self.insert_named_handle_inner(handle.clone())?;
+        Ok(handle)
+    }
+
+    /// Supplies the value for a previous [`insert_without_value()`][Self::insert_without_value].
+    ///
+    /// # Panics
+    ///
+    /// Panics if
+    /// the handle is not one that was created by this transaction’s `insert_without_value()`,
+    /// or the value has already been set.
+    #[track_caller]
+    pub fn set_pending_value<T: UniverseMember>(&mut self, handle: &Handle<T>, value: T) {
+        let name = handle.name();
+        let member_txn = self.members.get_mut(&name).expect("handle not present");
+        match member_txn {
+            MemberTxn::Insert(our_handle) => {
+                assert_eq!(
+                    handle, our_handle,
+                    "handle is a different handle with the same name"
+                );
+                handle.set_pending_value(value);
+            }
+            _ => panic!("transaction is not inserting handle {name}"),
+        }
+    }
+
+    /// Given a handle that is newly created, add it to this transaction's set of handles to insert,
+    /// after validating the name.
+    ///
+    /// Public functions do not allow passing arbitrary handles to this.
+    fn insert_named_handle_inner<T: UniverseMember>(
+        &mut self,
+        handle: Handle<T>,
+    ) -> Result<(), InsertError> {
+        let name = handle.name();
+        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle));
+        match name {
+            name @ (Name::Specific(_) | Name::Anonym(_)) => {
+                match self.members.entry(name.clone()) {
+                    hashbrown::hash_map::Entry::Occupied(_) => {
+                        // Equivalent to how transaction merge would fail
+                        Err(InsertError {
+                            name,
+                            kind: InsertErrorKind::AlreadyExists,
+                        })
+                    }
+                    hashbrown::hash_map::Entry::Vacant(ve) => {
+                        ve.insert(insertion);
+                        Ok(())
+                    }
+                }
+            }
+            Name::Pending => {
+                self.anonymous_insertions.push(insertion);
+                Ok(())
+            }
+        }
     }
 
     /// Delete this member from the universe.
@@ -1198,6 +1250,32 @@ mod tests {
     }
 
     #[test]
+    fn insert_without_value() {
+        let mut u = Universe::new();
+        let mut txn = UniverseTransaction::default();
+        let name = Name::from("foo");
+        let [block] = make_some_blocks();
+
+        let handle = txn.insert_without_value::<BlockDef>(name).unwrap();
+
+        // Without a value, the transaction is temporarily invalid.
+        assert_eq!(
+            txn.check(&u)
+                .expect_err("should not succeed without value")
+                .to_string(),
+            // TODO: this is a lazy incomplete check of the full error
+            "transaction precondition not met in member 'foo'",
+        );
+
+        txn.set_pending_value(&handle, BlockDef::new(ReadTicket::stub(), block.clone()));
+
+        // Without a value, the transaction succeeds.
+        txn.execute(&mut u, (), &mut transaction::no_outputs)
+            .expect("should succeed when value given");
+        assert_eq!(handle.read(u.read_ticket()).unwrap().block(), &block);
+    }
+
+    #[test]
     #[cfg(false)] // TODO: figure out how to write a systematic test for `UniverseTransaction`s.`
     fn systematic() {
         TransactionTester::new()
@@ -1221,7 +1299,9 @@ mod tests {
         let s1 = u1.insert_anonymous(Space::empty_positive(1, 1, 1));
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(s1);
 
-        let e = t1.execute(&mut u2, (), &mut drop).unwrap_err();
+        let e = t1
+            .execute(&mut u2, (), &mut transaction::no_outputs)
+            .unwrap_err();
         assert!(matches!(e, ExecuteError::Check(_)));
     }
 
