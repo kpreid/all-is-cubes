@@ -18,7 +18,7 @@ use core::ops::Index;
 use exhaust::Exhaust;
 use hashbrown::HashMap as HbHashMap;
 
-use crate::block::{Block, BlockDef};
+use crate::block::{self, Block, BlockDef};
 use crate::space::{self, SetCubeError, SpaceTransaction};
 use crate::transaction::ExecuteError;
 use crate::universe::{
@@ -125,6 +125,59 @@ where
 
 // TODO: Generalize these to non-blocks however makes sense
 impl<E: BlockModule> Provider<E, Block> {
+    /// Constructs a [`BlockProvider`] with [`BlockDef`]s whose block values are computed by the
+    /// given function.
+    ///
+    /// The module itself is passed to `definer`, which may be used to create
+    /// relationships among the blocks (e.g. one having the behavior of turning into another).
+    /// Attempting to read those handles will necessarily fail.
+    //---
+    // TODO: This has to exist, but is an awkward shape and block-specific.
+    // Figure out what the actually good API looks like.
+    pub async fn new_installed_cyclic<F>(
+        progress: YieldProgress,
+        txn: &mut UniverseTransaction,
+        mut definer: F,
+    ) -> Result<Self, GenError>
+    where
+        F: FnMut(&Provider<E, Block>, E) -> Result<Block, InGenError>,
+    {
+        let module: Self = Self::new_sync(|key| {
+            let block_def_handle: Handle<BlockDef> = txn
+                .insert_without_value(name_in_module(&key))
+                .expect("module failed to produce distinct keys");
+            Block::from(block_def_handle)
+        });
+
+        let count = module.map.len();
+        #[expect(
+            clippy::shadow_unrelated,
+            reason = "https://github.com/rust-lang/rust-clippy/issues/11827"
+        )]
+        for (key, progress) in E::exhaust().zip(progress.split_evenly(count)) {
+            match definer(&module, key.clone()) {
+                Ok(block_value) => {
+                    let block_def_handle =
+                        if let block::Primitive::Indirect(handle) = module[key].primitive() {
+                            handle
+                        } else {
+                            unreachable!()
+                        };
+                    txn.set_pending_value(
+                        block_def_handle,
+                        BlockDef::new(
+                            txn.read_ticket().expect_may_fail(), // TODO: should caller provide ticket to rest of universe which we merge somehow? or should we stop expecting successful evaluations while building modules/txns, entirely
+                            block_value,
+                        ),
+                    );
+                    progress.finish().await;
+                }
+                Err(e) => return Err(GenError::failure(e, name_in_module(&key))),
+            }
+        }
+        Ok(module)
+    }
+
     /// Add the block definitions stored in this [`BlockProvider`] into `universe` as
     /// [`BlockDef`]s, returning a new [`BlockProvider`] whose blocks refer to those
     /// definitions (via [`Primitive::Indirect`]).
