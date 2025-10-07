@@ -12,9 +12,8 @@ use bevy_ecs::prelude as ecs;
 use crate::universe::{
     AnyHandle, InsertError, InsertErrorKind, Membership, Name, ReadTicket, ReadTicketError,
     Universe, UniverseId, UniverseMember, VisitHandles, id::OnceUniverseId, name::OnceName,
-    owning_guard,
 };
-use crate::util::maybe_sync::{Mutex, MutexGuard, RwLock};
+use crate::util::maybe_sync::{Mutex, MutexGuard};
 
 #[cfg(doc)]
 use crate::universe::UniverseTransaction;
@@ -88,11 +87,7 @@ enum State<T> {
         /// inserted into a [`Universe`], and thus inserting entire trees into the
         /// Universe. Upon that insertion, these strong references are dropped by
         /// changing the state.
-        ///
-        /// We use a `RwLock` here because we need to support `read()` and `try_modify()`
-        /// operations even before the handle is inserted.
-        /// TODO(ecs): See if this can be changed once the ECS migration is complete.
-        value_arc: Arc<RwLock<T>>,
+        value_arc: Arc<T>,
     },
 
     /// Not yet (or never will be) inserted into a [`Universe`],
@@ -159,7 +154,7 @@ impl<T: 'static> Handle<T> {
         Self::new_from_state(
             name,
             State::Pending {
-                value_arc: Arc::new(RwLock::new(initial_value)),
+                value_arc: Arc::new(initial_value),
             },
         )
     }
@@ -328,7 +323,7 @@ impl<T: 'static> Handle<T> {
         /// but it makes things a little more clearly OK and slightly shortens the duration
         /// the state mutex is locked.
         enum Access<T> {
-            Pending(Arc<RwLock<T>>),
+            Pending(Arc<T>),
             Entity(ecs::Entity),
         }
 
@@ -378,8 +373,7 @@ impl<T: 'static> Handle<T> {
         // Actually obtain access.
         match access {
             Access::Pending(value_arc) => {
-                let inner = owning_guard::ReadGuardImpl::new(value_arc)
-                    .map_err(|_| HandleError::InUse(self.name()))?;
+                let inner = value_arc.clone();
                 Ok(ReadGuard(ReadGuardKind::Pending(inner)))
             }
             Access::Entity(entity) => {
@@ -633,10 +627,9 @@ impl<T: 'static> Handle<T> {
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
-            State::Pending { value_arc } => Arc::try_unwrap(value_arc)
-                .expect("TODO(ecs): handle error from handle being inserted while also modified")
-                .into_inner()
-                .expect("TODO(ecs): handle poisoning (return error?)"),
+            State::Pending { value_arc } => Arc::try_unwrap(value_arc).expect(
+                "TODO(ecs): this should become impossible when the values are owned by txn",
+            ),
         };
 
         let new_name = universe.allocate_name(&pending_name)?;
@@ -676,7 +669,7 @@ impl<T: 'static> Handle<T> {
         match state {
             State::PendingWithoutValue => {
                 *state = State::Pending {
-                    value_arc: Arc::new(RwLock::new(value)),
+                    value_arc: Arc::new(value),
                 }
             }
             _ => panic!("incorrect handle state for set_pending_value()"),
@@ -709,10 +702,7 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
                             // we cannot possibly cause an infinite recursion of formatting
                             // TODO: maybe only do it if we are in alternate/prettyprint format.
                             write!(f, " = ")?;
-                            match value_arc.try_read() {
-                                Ok(guard) => fmt::Debug::fmt(&*guard, f)?,
-                                Err(e) => write!(f, "<data lock error: {e}>")?,
-                            }
+                            fmt::Debug::fmt(value_arc, f)?;
                         }
                     }
                     State::PendingWithoutValue => write!(f, ", value not yet provided")?,
@@ -1125,8 +1115,8 @@ impl<T: UniverseMember> Clone for StrongHandle<T> {
 /// the handle's referent is mutated.
 pub struct ReadGuard<'ticket, T: 'static>(ReadGuardKind<'ticket, T>);
 enum ReadGuardKind<'ticket, T: 'static> {
-    /// Lock guard for a standalone `RwLock`.
-    Pending(owning_guard::ReadGuardImpl<T>),
+    /// Refcounted, from a pending handle.
+    Pending(Arc<T>),
     /// Borrowed from an [`ecs::World`].
     World(&'ticket T),
 }

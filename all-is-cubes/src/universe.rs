@@ -52,8 +52,6 @@ pub use id::UniverseId;
 mod name;
 pub use name::Name;
 
-mod owning_guard;
-
 mod ticket;
 pub(crate) use ticket::QueryBlockDataSources;
 pub use ticket::{ReadTicket, ReadTicketError};

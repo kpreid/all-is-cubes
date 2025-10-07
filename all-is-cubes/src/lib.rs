@@ -138,8 +138,7 @@
 #![no_std]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 // * This crate contains some unsafe code and therefore does not `forbid(unsafe_code)`.
-//   The majority of it is trivial unchecked constructors that are run at compile time;
-//   `universe::owning_guard` contains the scary part.
+//   All of it is located in the `universe` module and pertains to ECS extensions.
 #![cfg_attr(
     not(any(test, feature = "arbitrary")),
     warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)
