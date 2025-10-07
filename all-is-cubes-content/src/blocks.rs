@@ -9,8 +9,8 @@ use exhaust::Exhaust;
 use rand::{Rng as _, SeedableRng as _};
 
 use all_is_cubes::block::{
-    self, AIR, AnimationHint, Block, BlockCollision, BlockDefTransaction, Primitive, Resolution::*,
-    RotationPlacementRule, TickAction,
+    self, AIR, AnimationHint, Block, BlockCollision, Resolution::*, RotationPlacementRule,
+    TickAction,
 };
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
@@ -124,7 +124,8 @@ pub async fn install_demo_blocks(
     let pedestal_voxel = block::from_color!(palette::STONE);
 
     use DemoBlocks::*;
-    let provider_for_patch = BlockProvider::<DemoBlocks>::new(p, |key| {
+
+    BlockProvider::<DemoBlocks>::new_installed_cyclic(p, txn, |provider, txn, key| {
         Ok(match key {
             GlassBlock => {
                 let glass_densities = [
@@ -193,6 +194,7 @@ pub async fn install_demo_blocks(
                             &AIR
                         }
                     })?
+                    .activation_action(Operation::Become(provider[Lamp(!on)].clone()))
                     .build_txn(txn)
             }
 
@@ -273,6 +275,7 @@ pub async fn install_demo_blocks(
                             &AIR
                         }
                     })?
+                    .activation_action(Operation::Become(provider[Sconce(!on)].clone()))
                     .build_txn(txn)
             }
 
@@ -456,6 +459,10 @@ pub async fn install_demo_blocks(
                 .animation_hint(AnimationHint::replacement(
                     block::AnimationChange::ColorSameCategory,
                 ))
+                .tick_action(Some(TickAction {
+                    operation: Operation::Become(provider[BecomeBlinker(!state)].clone()),
+                    schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
+                }))
                 .build(),
 
             Explosion(timer) => {
@@ -465,112 +472,15 @@ pub async fn install_demo_blocks(
                     (f64::from(timer) * -0.1).exp()
                 };
 
-                let atom = Block::builder()
-                    .display_name(format!("Explosion {timer} particle"))
-                    .color(rgba_const!(0.014, 0.01, 0.01, 1.0))
-                    .collision(BlockCollision::None)
-                    .light_emission(if timer < 0 {
-                        if timer.rem_euclid(4) < 2 {
-                            Rgb::ZERO
-                        } else {
-                            rgb_const!(0.8, 0.0, 0.0)
-                        }
-                    } else {
-                        rgb_const!(1.0, 0.77, 0.40) * 10.0 * decay.powf(3.) as f32
-                    })
-                    .build();
-
-                let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
-                Block::builder()
-                    .display_name(format!("Explosion {timer}"))
-                    .animation_hint(AnimationHint::replacement(if timer == i8::MAX {
-                        block::AnimationChange::Shape
-                    } else {
-                        block::AnimationChange::ColorSameCategory
-                    }))
-                    .voxels_fn(if timer <= 0 { R1 } else { R8 }, |_| {
-                        if rng.random_bool(decay.powf(3.)) {
-                            &atom
-                        } else {
-                            &AIR
-                        }
-                    })?
-                    .build_txn(txn)
-            }
-
-            Projectile => Block::builder()
-                .display_name("Projectile")
-                .voxels_fn(resolution, |cube| {
-                    let [r, _] = square_radius(resolution, cube);
-                    if r * 4 < resolution_g {
-                        &lamppost_metal
-                    } else {
-                        &AIR
-                    }
-                })?
-                .animation_hint(AnimationHint::replacement(block::AnimationChange::Shape))
-                .tick_action(TickAction {
-                    operation: Operation::Alt(
-                        [
-                            Operation::StartMove(block::Move::new(Face6::PY, 32, 32)),
-                            // if we can't move, vanish
-                            Operation::Become(AIR),
-                        ]
-                        .into(),
-                    ),
-                    schedule: time::Schedule::EVERY_TICK,
-                })
-                .build_txn(txn),
-        })
-    })
-    .await?
-    .install(ReadTicket::stub(), txn)?;
-
-    // Join up blinker blocks
-    for state in bool::exhaust() {
-        modify_def(
-            txn,
-            &provider_for_patch[BecomeBlinker(state)],
-            |read_ticket, block| {
-                block.freezing_get_attributes_mut(read_ticket).tick_action = Some(TickAction {
-                    operation: Operation::Become(provider_for_patch[BecomeBlinker(!state)].clone()),
-                    schedule: time::Schedule::from_period(NonZeroU16::new(60).unwrap()),
-                });
-            },
-        );
-    }
-
-    // Join up lamp blocks as toggleable on/off
-    for state in bool::exhaust() {
-        for ctor in [Lamp, Sconce] {
-            modify_def(
-                txn,
-                &provider_for_patch[ctor(state)],
-                |read_ticket, block| {
-                    block
-                        .freezing_get_attributes_mut(read_ticket)
-                        .activation_action =
-                        Some(Operation::Become(provider_for_patch[ctor(!state)].clone()));
-                },
-            );
-        }
-    }
-
-    // Join up explosion blocks
-    for i in i8::exhaust() {
-        modify_def(
-            txn,
-            &provider_for_patch[Explosion(i)],
-            |read_ticket, block| {
-                let neighbor_ops: Arc<[(Cube, Operation)]> = if i > 22 {
+                let neighbor_ops: Arc<[(Cube, Operation)]> = if timer > 22 {
                     // Expire because we're invisible by now
                     [(Cube::ORIGIN, Operation::Become(AIR))].into()
                 } else {
-                    let next = Operation::DestroyTo(provider_for_patch[Explosion(i + 1)].clone());
-                    if i > 0 && i < 10 {
+                    let next = Operation::DestroyTo(provider[Explosion(timer + 1)].clone());
+                    if timer > 0 && timer < 10 {
                         // Expand at first out to ~5 blocks
-                        if i.rem_euclid(2) == 0 {
-                            if i.rem_euclid(4) == 0 {
+                        if timer.rem_euclid(2) == 0 {
+                            if timer.rem_euclid(4) == 0 {
                                 const {
                                     [
                                         Cube::new(0, 0, 0),
@@ -614,40 +524,72 @@ pub async fn install_demo_blocks(
                     .map(|&cube| (cube, next.clone()))
                     .collect()
                 };
-                block.freezing_get_attributes_mut(read_ticket).tick_action = Some(TickAction {
-                    operation: Operation::Neighbors(neighbor_ops),
-                    schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
-                });
-            },
-        );
-    }
+
+                let atom = Block::builder()
+                    .display_name(format!("Explosion {timer} particle"))
+                    .color(rgba_const!(0.014, 0.01, 0.01, 1.0))
+                    .collision(BlockCollision::None)
+                    .light_emission(if timer < 0 {
+                        if timer.rem_euclid(4) < 2 {
+                            Rgb::ZERO
+                        } else {
+                            rgb_const!(0.8, 0.0, 0.0)
+                        }
+                    } else {
+                        rgb_const!(1.0, 0.77, 0.40) * 10.0 * decay.powf(3.) as f32
+                    })
+                    .build();
+
+                let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
+                Block::builder()
+                    .display_name(format!("Explosion {timer}"))
+                    .animation_hint(AnimationHint::replacement(if timer == i8::MAX {
+                        block::AnimationChange::Shape
+                    } else {
+                        block::AnimationChange::ColorSameCategory
+                    }))
+                    .voxels_fn(if timer <= 0 { R1 } else { R8 }, |_| {
+                        if rng.random_bool(decay.powf(3.)) {
+                            &atom
+                        } else {
+                            &AIR
+                        }
+                    })?
+                    .tick_action(TickAction {
+                        operation: Operation::Neighbors(neighbor_ops),
+                        schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
+                    })
+                    .build_txn(txn)
+            }
+
+            Projectile => Block::builder()
+                .display_name("Projectile")
+                .voxels_fn(resolution, |cube| {
+                    let [r, _] = square_radius(resolution, cube);
+                    if r * 4 < resolution_g {
+                        &lamppost_metal
+                    } else {
+                        &AIR
+                    }
+                })?
+                .animation_hint(AnimationHint::replacement(block::AnimationChange::Shape))
+                .tick_action(TickAction {
+                    operation: Operation::Alt(
+                        [
+                            Operation::StartMove(block::Move::new(Face6::PY, 32, 32)),
+                            // if we can't move, vanish
+                            Operation::Become(AIR),
+                        ]
+                        .into(),
+                    ),
+                    schedule: time::Schedule::EVERY_TICK,
+                })
+                .build_txn(txn),
+        })
+    })
+    .await?;
 
     Ok(())
-}
-
-/// Given a block using [`Primitive::Indirect`], apply the function to replace the referenced
-/// [`BlockDef`]'s attributes.
-#[track_caller]
-fn modify_def(
-    transaction: &mut UniverseTransaction,
-    indirect: &Block,
-    f: impl FnOnce(ReadTicket<'_>, &mut Block),
-) {
-    let Primitive::Indirect(block_def_handle) = indirect.primitive() else {
-        panic!("block not indirect, but {indirect:?}");
-    };
-    let mut block: Block = block_def_handle
-        .read(transaction.read_ticket())
-        .expect("could not read BlockDef")
-        .block()
-        .clone();
-    f(transaction.read_ticket(), &mut block);
-    block_def_handle
-        .execute_on_pending(
-            transaction.read_ticket(),
-            BlockDefTransaction::overwrite(block),
-        )
-        .expect("BlockDef mutation transaction failed");
 }
 
 #[cfg(test)]

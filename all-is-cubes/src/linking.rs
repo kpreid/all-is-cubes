@@ -140,7 +140,7 @@ impl<E: BlockModule> Provider<E, Block> {
         mut definer: F,
     ) -> Result<Self, GenError>
     where
-        F: FnMut(&Provider<E, Block>, E) -> Result<Block, InGenError>,
+        F: FnMut(&Provider<E, Block>, &mut UniverseTransaction, E) -> Result<Block, InGenError>,
     {
         let module: Self = Self::new_sync(|key| {
             let block_def_handle: Handle<BlockDef> = txn
@@ -155,14 +155,12 @@ impl<E: BlockModule> Provider<E, Block> {
             reason = "https://github.com/rust-lang/rust-clippy/issues/11827"
         )]
         for (key, progress) in E::exhaust().zip(progress.split_evenly(count)) {
-            match definer(&module, key.clone()) {
+            match definer(&module, txn, key.clone()) {
                 Ok(block_value) => {
-                    let block_def_handle =
-                        if let block::Primitive::Indirect(handle) = module[key].primitive() {
-                            handle
-                        } else {
-                            unreachable!()
-                        };
+                    let block::Primitive::Indirect(block_def_handle) = module[key].primitive()
+                    else {
+                        unreachable!()
+                    };
                     txn.set_pending_value(
                         block_def_handle,
                         BlockDef::new(
