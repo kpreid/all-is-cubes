@@ -9,7 +9,6 @@ use core::sync::atomic;
 
 use bevy_ecs::prelude as ecs;
 
-use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::universe::{
     AnyHandle, InsertError, InsertErrorKind, Membership, Name, ReadTicket, ReadTicketError,
     Universe, UniverseId, UniverseMember, VisitHandles, id::OnceUniverseId, name::OnceName,
@@ -448,83 +447,6 @@ impl<T: 'static> Handle<T> {
         Ok(component)
     }
 
-    /// Apply the given function to the `T` inside.
-    ///
-    /// This handle must not have been inserted into a [`Universe`] yet.
-    /// Use [`Universe::try_modify`] otherwise.
-    ///
-    /// **Warning:** Misusing this operation can disrupt relationships;
-    /// prefer [`Handle::execute_on_pending()`] if the desired mutation can be
-    /// expressed as a [`Transaction`]. If you must use this, the requirement for
-    /// correctness is that you must not replace the referent with a different value;
-    /// only use the mutation operations provided by `T`.
-    ///
-    /// Returns an error if the value is currently being accessed, or does not exist.
-    ///
-    /// TODO: If possible, completely replace this operation with transactions.
-    pub fn try_modify_pending<F, Out>(&self, function: F) -> Result<Out, HandleError>
-    where
-        F: FnOnce(&mut T) -> Out,
-    {
-        let value_arc: Arc<RwLock<T>> =
-            match *self.inner.state.lock().expect("Handle::state lock error") {
-                State::Pending { ref value_arc, .. } => value_arc.clone(),
-                State::PendingWithoutValue => {
-                    return Err(HandleError::NotPending { name: self.name() });
-                }
-                #[cfg(feature = "save")]
-                State::Deserializing { .. } => {
-                    // TODO: not really the right error variant (but this should be unreachable)
-                    return Err(HandleError::InUse(self.name()));
-                }
-                State::Member { .. } => {
-                    return Err(HandleError::NotPending { name: self.name() });
-                }
-                State::Gone { reason } => {
-                    return Err(HandleError::Gone {
-                        name: self.name(),
-                        reason,
-                    });
-                }
-            };
-        let mut guard = value_arc
-            .try_write()
-            .map_err(|_| HandleError::InUse(self.name()))?;
-        Ok(function(&mut *guard))
-    }
-
-    /// Execute the given transaction on the `T` inside.
-    ///
-    /// This handle must not have been inserted into a [`Universe`] yet.
-    /// Use [`Universe::execute_1()`] otherwise.
-    ///
-    /// Returns an error if the transaction's preconditions are not met,
-    /// if the transaction encountered an internal error, or if the referent
-    /// was already being read or written (which is expressed as an
-    /// [`ExecuteError::Commit`], because it is a shouldn’t-happen kind of error).
-    #[inline(never)]
-    pub fn execute_on_pending<'ticket>(
-        &self,
-        read_ticket: ReadTicket<'ticket>,
-        transaction: <T as Transactional>::Transaction,
-    ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
-    where
-        T: Transactional,
-        // `Output = NoOutput` is required because, if there *were* outputs,
-        // they would need to be directed to some destination in the `Universe`,
-        // not the caller.
-        T::Transaction:
-            Transaction<Output = transaction::NoOutput, Context<'ticket> = ReadTicket<'ticket>>,
-    {
-        let outcome: Result<
-            Result<(), ExecuteError<<T as Transactional>::Transaction>>,
-            HandleError,
-        > = self.try_modify_pending(|data| {
-            transaction.execute(data, read_ticket, &mut transaction::no_outputs)
-        });
-        outcome.map_err(ExecuteError::Handle)?
-    }
-
     /// Returns whether this [`Handle`] does not yet belong to a universe and can start.
     /// doing so. Used by [`UniverseTransaction`].
     ///
@@ -642,11 +564,7 @@ impl<T: 'static> Handle<T> {
                     kind: InsertErrorKind::AlreadyInserted,
                 });
             }
-            Err(
-                e @ (HandleError::InvalidTicket { .. }
-                | HandleError::NotPending { .. }
-                | HandleError::Gone { .. }),
-            ) => {
+            Err(e @ (HandleError::InvalidTicket { .. } | HandleError::Gone { .. })) => {
                 unreachable!("unexpected handle error while deserializing: {e:?}")
             }
         }
@@ -1050,13 +968,6 @@ pub enum HandleError {
         /// Opaque description of the exact restriction.
         error: ReadTicketError,
     },
-
-    /// The handle is not pending and cannot be used with [`Handle::try_modify_pending()`].
-    #[displaydoc("handle {name} is not pending and cannot be accessed with try_modify_pending()")]
-    NotPending {
-        /// Name of the member which was being accessed.
-        name: Name,
-    },
 }
 
 impl core::error::Error for HandleError {
@@ -1068,7 +979,6 @@ impl core::error::Error for HandleError {
             HandleError::ValueMissing(..) => None,
             HandleError::WrongUniverse { .. } => None,
             HandleError::InvalidTicket { name: _, error } => Some(error),
-            HandleError::NotPending { .. } => None,
         }
     }
 }
@@ -1298,6 +1208,7 @@ mod tests {
     use crate::block::{self, BlockDef};
     use crate::math::Rgba;
     use crate::space::Space;
+    use crate::transaction::{self, Transaction as _};
     use crate::universe::{ReadTicket, UniverseTransaction};
     use alloc::string::ToString;
     use pretty_assertions::assert_eq;
@@ -1370,13 +1281,6 @@ mod tests {
                 name: name.clone(),
                 reason: GoneReason::CreatedGone {}
             }
-        );
-        assert_eq!(
-            handle.try_modify_pending(|_| {}),
-            Err(HandleError::Gone {
-                name: name.clone(),
-                reason: GoneReason::CreatedGone {}
-            }),
         );
         assert_eq!(
             handle.as_entity(UniverseId::new()),

@@ -1043,8 +1043,7 @@ mod tests {
     use crate::space::SpaceTransaction;
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict};
-    use crate::universe::GoneReason;
-    use crate::universe::{self, HandleError};
+    use crate::universe;
     use alloc::sync::Arc;
     use indoc::indoc;
 
@@ -1321,21 +1320,6 @@ mod tests {
 
     // TODO(ecs): Write tests for all the variants of `InsertError` that aren’t now impossible.
     // Remove the cases that are now impossible.
-
-    #[test]
-    fn handle_error_from_handle_execute() {
-        let e = Handle::<Space>::new_gone("foo".into())
-            .execute_on_pending(ReadTicket::stub(), SpaceTransaction::default())
-            .unwrap_err();
-
-        assert_eq!(
-            e,
-            ExecuteError::Handle(HandleError::Gone {
-                name: "foo".into(),
-                reason: GoneReason::CreatedGone {}
-            })
-        );
-    }
 
     // This panic is not specifically desirable, but more work will be needed to avoid it.
     #[test]
