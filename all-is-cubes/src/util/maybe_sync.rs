@@ -165,6 +165,10 @@ impl<T: ?Sized> RwLock<T> {
         result.map(RwLockReadGuard)
     }
 
+    #[expect(
+        dead_code,
+        reason = "part of a complete wrapper, but happens to be unused"
+    )]
     pub fn try_write(
         &self,
     ) -> Result<RwLockWriteGuard<'_, T>, TryLockError<RwLockWriteGuard<'_, T>>> {
