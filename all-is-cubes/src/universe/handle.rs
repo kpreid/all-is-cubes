@@ -501,31 +501,25 @@ impl<T: 'static> Handle<T> {
             }
         }
 
-        // TODO: This check (which also doesn't do anything yet)
-        // should be applied to *both* transaction-based insertion and
-        // direct `&mut self` insertions, but isn't.
         match self.read(read_ticket_for_self) {
             Ok(data_guard) => {
-                // TODO: We need to enforce rules about not referring to items from another
-                // universe, but also to be able to opt out for the UI containing world elements.
-                // This should become a universe-wide setting.
-                if false {
-                    let mut ok = true;
-                    (*data_guard).visit_handles(
-                        &mut |r: &dyn ErasedHandle| match r.universe_id() {
-                            Some(id) if id == future_universe_id => {}
-                            None => {}
-                            Some(_) => ok = false,
-                        },
-                    );
-                    if !ok {
-                        // TODO:
-                        // return Err(PreconditionFailed {
-                        //     location: "UniverseTransaction",
-                        //     problem: "insert(): the Handle contains another ref \
-                        //     which belongs to a different universe",
-                        // });
-                    }
+                // Check for contained handles belonging to the wrong universe.
+                //
+                // TODO: This check should be applied to *both* transaction-based insertion and
+                // direct `&mut self` insertions, but isn't.
+                // There should also be similar checks for transactions inserting
+                // handle-containing data into existing members.
+                let mut ok = true;
+                (*data_guard).visit_handles(&mut |r: &dyn ErasedHandle| match r.universe_id() {
+                    Some(id) if id == future_universe_id => {}
+                    None => {}
+                    Some(_) => ok = false,
+                });
+                if !ok {
+                    return Err(InsertError {
+                        name: self.name(),
+                        kind: InsertErrorKind::CrossUniverse,
+                    });
                 }
             }
             Err(HandleError::InUse(name)) => {

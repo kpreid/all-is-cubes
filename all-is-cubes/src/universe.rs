@@ -850,8 +850,11 @@ pub enum InsertErrorKind {
     /// be checked.
     InUse,
 
-    /// The provided [`Handle`] was already inserted into some universe.)
+    /// The provided [`Handle`] was already inserted into some universe.
     AlreadyInserted,
+
+    /// The provided value contains handles to a different universe.
+    CrossUniverse,
 
     #[doc(hidden)] // should be unreachable
     /// The provided [`Handle`] is being used in the deserialization process
@@ -886,6 +889,9 @@ impl fmt::Display for InsertError {
                 "the object {name} is being mutated during this insertion attempt"
             ),
             InsertErrorKind::AlreadyInserted => write!(f, "the object {name} is already inserted"),
+            InsertErrorKind::CrossUniverse => {
+                write!(f, "the object {name} contains handles to another universe")
+            }
             InsertErrorKind::Deserializing => write!(
                 f,
                 "the object {name} is already in a universe being deserialized"
