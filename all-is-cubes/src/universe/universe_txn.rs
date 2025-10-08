@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
 use alloc::string::ToString;
-use alloc::vec::Vec;
 use core::any::Any;
 use core::fmt;
 
@@ -236,8 +235,13 @@ pub struct UniverseTransaction {
     /// vector might turn out to have been given names. In that case, the transaction
     /// should fail. (TODO: Write test verifying that.)
     ///
-    /// Invariant: Every element of this vector is a `MemberTxn::Insert`.
-    anonymous_insertions: Vec<MemberTxn>,
+    /// Invariant: Every key has [`Name::Pending`]. Every value is a [`MemberTxn::Insert`].
+    /// The key handles match the value handles.
+    ///
+    /// TODO: This is currently a redundant data structure because the `MemberTxn` just contains
+    /// the handle again. That will change with <https://github.com/kpreid/all-is-cubes/issues/633>
+    /// when values are stored in `MemberTxn` outside the handle.
+    anonymous_insertions: HbHashMap<AnyHandle, MemberTxn>,
 
     behaviors: behavior::BehaviorSetTransaction<Universe>,
 
@@ -256,7 +260,7 @@ pub struct UniverseMergeCheck {
 #[derive(Debug)]
 pub struct UniverseCommitCheck {
     members: HbHashMap<Name, MemberCommitCheck>,
-    anonymous_insertions: Vec<MemberCommitCheck>,
+    anonymous_insertions: HbHashMap<AnyHandle, MemberCommitCheck>,
     behaviors: behavior::CommitCheck,
 }
 
@@ -381,7 +385,7 @@ impl UniverseTransaction {
         UniverseTransaction {
             universe_id: Equal(transaction.universe_id()),
             members: HbHashMap::from([(name, transaction)]),
-            anonymous_insertions: Vec::new(),
+            anonymous_insertions: HbHashMap::new(),
             behaviors: Default::default(),
         }
     }
@@ -425,10 +429,10 @@ impl UniverseTransaction {
     /// operation.
     pub fn insert_anonymous<T: UniverseMember>(&mut self, value: T) -> Handle<T> {
         let handle = Handle::new_pending(Name::Pending, value);
-        self.anonymous_insertions
-            .push(MemberTxn::Insert(UniverseMember::into_any_handle(
-                handle.clone(),
-            )));
+        self.anonymous_insertions.insert(
+            T::into_any_handle(handle.clone()),
+            MemberTxn::Insert(UniverseMember::into_any_handle(handle.clone())),
+        );
         handle
     }
 
@@ -482,7 +486,7 @@ impl UniverseTransaction {
         handle: Handle<T>,
     ) -> Result<(), InsertError> {
         let name = handle.name();
-        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle));
+        let insertion = MemberTxn::Insert(UniverseMember::into_any_handle(handle.clone()));
         match name {
             name @ (Name::Specific(_) | Name::Anonym(_)) => {
                 match self.members.entry(name.clone()) {
@@ -500,7 +504,8 @@ impl UniverseTransaction {
                 }
             }
             Name::Pending => {
-                self.anonymous_insertions.push(insertion);
+                self.anonymous_insertions
+                    .insert(UniverseMember::into_any_handle(handle), insertion);
                 Ok(())
             }
         }
@@ -524,7 +529,7 @@ impl UniverseTransaction {
         Self {
             behaviors: t,
             members: HbHashMap::new(),
-            anonymous_insertions: Vec::new(),
+            anonymous_insertions: HbHashMap::new(),
             universe_id: Equal(None),
         }
     }
@@ -595,16 +600,19 @@ impl Transaction for UniverseTransaction {
             );
         }
 
-        let mut insert_checks = Vec::with_capacity(self.anonymous_insertions.len());
-        for insert_txn in self.anonymous_insertions.iter() {
-            insert_checks.push(insert_txn.check(self, target, &Name::Pending).map_err(
-                |mismatch| {
-                    UniverseMismatch::Member(transaction::MapMismatch {
-                        key: Name::Pending,
-                        mismatch,
-                    })
-                },
-            )?);
+        let mut insert_checks = HbHashMap::with_capacity(self.anonymous_insertions.len());
+        for (handle, insert_txn) in &self.anonymous_insertions {
+            insert_checks.insert(
+                handle.clone(),
+                insert_txn
+                    .check(self, target, &Name::Pending)
+                    .map_err(|mismatch| {
+                        UniverseMismatch::Member(transaction::MapMismatch {
+                            key: Name::Pending,
+                            mismatch,
+                        })
+                    })?,
+            );
         }
 
         Ok(UniverseCommitCheck {
@@ -626,7 +634,7 @@ impl Transaction for UniverseTransaction {
     ) -> Result<(), CommitError> {
         let Self {
             mut members,
-            anonymous_insertions,
+            mut anonymous_insertions,
             behaviors,
             universe_id,
         } = self;
@@ -653,8 +661,11 @@ impl Transaction for UniverseTransaction {
                 .map_err(|e| e.context(format!("universe member {name}")))?;
         }
 
-        for (new_member, check) in anonymous_insertions.into_iter().zip(check_anon) {
-            new_member.commit(target, &Name::Pending, check, outputs)?;
+        for (handle, check) in check_anon {
+            anonymous_insertions
+                .remove(&handle)
+                .expect("invalid check value")
+                .commit(target, &Name::Pending, check, outputs)?;
         }
 
         behaviors.commit(
@@ -722,7 +733,7 @@ impl fmt::Debug for UniverseTransaction {
             // TransactionInUniverse wrapper
             ds.field(&name.to_string(), txn.transaction_as_debug());
         }
-        for txn in anonymous_insertions {
+        for txn in anonymous_insertions.values() {
             ds.field("[anonymous pending]", txn.transaction_as_debug());
         }
         if !behaviors.is_empty() {
@@ -1053,7 +1064,7 @@ mod tests {
             UniverseTransaction::default(),
             UniverseTransaction {
                 members: HbHashMap::new(),
-                anonymous_insertions: Vec::new(),
+                anonymous_insertions: HbHashMap::new(),
                 universe_id: Equal(None),
                 behaviors: behavior::BehaviorSetTransaction::default()
             }
