@@ -718,18 +718,16 @@ impl<T: fmt::Debug + 'static> fmt::Debug for Handle<T> {
 
 /// `Handle`s are compared by "pointer" identity: they are equal only if they refer to
 /// the same mutable cell, one way or another.
-impl<T> PartialEq for Handle<T> {
+impl<T: 'static> PartialEq for Handle<T> {
     fn eq(&self, other: &Self) -> bool {
-        // Note: Comparing the shared state pointer causes `Handle::new_gone()` to produce distinct
-        // instances. This seems better to me than comparing them by name and type only.
-        Arc::ptr_eq(&self.inner, &other.inner)
+        self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
     }
 }
 /// `Handle`s are compared by pointer equality.
-impl<T> Eq for Handle<T> {}
-impl<T> hash::Hash for Handle<T> {
+impl<T: 'static> Eq for Handle<T> {}
+impl<T: 'static> hash::Hash for Handle<T> {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        Arc::as_ptr(&self.inner).hash(state);
+        self.as_erased_shared_pointer().hash(state);
     }
 }
 
@@ -1094,6 +1092,11 @@ impl<T: UniverseMember> PartialEq<StrongHandle<T>> for Handle<T> {
         *self == other.0
     }
 }
+impl<T: UniverseMember> hash::Hash for StrongHandle<T> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
 
 impl<T: UniverseMember> Clone for StrongHandle<T> {
     fn clone(&self) -> Self {
@@ -1142,9 +1145,24 @@ impl<T> core::borrow::Borrow<T> for ReadGuard<'_, T> {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Object-safe trait implemented for [`Handle`], to allow code to operate on `Handle<T>`
+/// Returns a type-erased pointer which may be used for comparing and hashing handle identities
+/// regardless of their type and state, without downcasting.
+///
+/// All [`PartialEq`] and [`hash::Hash`] implementations which wish to agree with [`Handle`] or
+/// [`ErasedHandle`] should delegate to (or effectively delegate to) this value.
+pub(in crate::universe) trait HandlePtr {
+    fn as_erased_shared_pointer(&self) -> *const ();
+}
+
+/// `dyn` compatible trait implemented for [`Handle`], to allow code to operate on `Handle<T>`
 /// regardless of `T`.
-pub trait ErasedHandle: Any + fmt::Debug {
+///
+/// Do not implement this trait.
+#[allow(
+    private_bounds,
+    reason = "trait not meant for implementation outside the crate"
+)]
+pub trait ErasedHandle: HandlePtr + Any + fmt::Debug {
     /// Same as [`Handle::name()`].
     fn name(&self) -> Name;
 
@@ -1156,6 +1174,12 @@ pub trait ErasedHandle: Any + fmt::Debug {
 
     /// Clone this into an owned `Handle<T>` wrapped in the [`AnyHandle`] enum.
     fn to_any_handle(&self) -> AnyHandle;
+}
+
+impl<T> HandlePtr for Handle<T> {
+    fn as_erased_shared_pointer(&self) -> *const () {
+        Arc::as_ptr(&self.inner).cast::<()>()
+    }
 }
 
 impl<T: UniverseMember> ErasedHandle for Handle<T> {
@@ -1184,6 +1208,28 @@ impl alloc::borrow::ToOwned for dyn ErasedHandle {
     }
 }
 
+impl PartialEq for dyn ErasedHandle {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
+    }
+}
+impl hash::Hash for dyn ErasedHandle {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.as_erased_shared_pointer().hash(state);
+    }
+}
+
+impl<T> PartialEq<Handle<T>> for dyn ErasedHandle {
+    fn eq(&self, other: &Handle<T>) -> bool {
+        self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
+    }
+}
+impl<T> PartialEq<dyn ErasedHandle> for Handle<T> {
+    fn eq(&self, other: &dyn ErasedHandle) -> bool {
+        self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -1192,9 +1238,9 @@ mod tests {
     use crate::block::{self, BlockDef};
     use crate::math::Rgba;
     use crate::space::Space;
-    use crate::transaction::{self, Transaction as _};
     use crate::universe::{ReadTicket, UniverseTransaction};
     use alloc::string::ToString;
+    use core::hash::BuildHasher as _;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -1311,35 +1357,30 @@ mod tests {
         );
     }
 
-    /// Handles are compared by [`ecs::Entity`] or pointer (each pending handle is a new identity),
+    /// Handles are compared by pointer (each pending handle is a new identity),
     /// not by name or member-value.
     #[test]
     fn handle_equality_is_pointer_equality() {
-        let (handle_a_1, insert_a) =
+        let (handle_a_1, _insert_a) =
             UniverseTransaction::insert("space".into(), Space::empty_positive(1, 1, 1));
         let handle_a_2 = handle_a_1.clone();
-        let (handle_b_1, insert_b) =
+        let handle_a_dyn: &dyn ErasedHandle = &handle_a_1;
+        let handle_a_any: AnyHandle = UniverseMember::into_any_handle(handle_a_1.clone());
+        let handle_a_strong = StrongHandle::new(handle_a_1.clone());
+        let (handle_b_1, _insert_b) =
             UniverseTransaction::insert("space".into(), Space::empty_positive(1, 1, 1));
 
         assert_eq!(handle_a_1, handle_a_1, "reflexive eq");
         assert_eq!(handle_a_1, handle_a_2, "clones are equal");
-        assert!(handle_a_1 != handle_b_1, "not equal");
+        assert_ne!(handle_a_1, handle_b_1, "not equal");
+        assert_eq!(handle_a_1, *handle_a_dyn, "eq to dyn");
+        assert_eq!(handle_a_1, handle_a_any, "eq to any");
+        assert_eq!(handle_a_1, handle_a_strong, "eq to strong");
 
-        // Try again but with the handles having been inserted into a universe --
-        // consecutively, because they have the same name and would conflict.
-        let mut universe = Universe::new();
-        for txn in [
-            insert_a,
-            UniverseTransaction::delete(handle_a_1.clone()),
-            insert_b,
-            UniverseTransaction::delete(handle_b_1.clone()),
-        ] {
-            txn.execute(&mut universe, (), &mut transaction::no_outputs)
-                .unwrap()
-        }
-
-        assert_eq!(handle_a_1, handle_a_1, "reflexive eq");
-        assert_eq!(handle_a_1, handle_a_2, "clones are equal");
-        assert!(handle_a_1 != handle_b_1, "not equal");
+        // Check that all hashes are equal, as required to correctly implement `Borrow`.
+        let bh = rustc_hash::FxBuildHasher;
+        assert_eq!(bh.hash_one(&handle_a_1), bh.hash_one(handle_a_dyn));
+        assert_eq!(bh.hash_one(&handle_a_1), bh.hash_one(&handle_a_any));
+        assert_eq!(bh.hash_one(&handle_a_1), bh.hash_one(&handle_a_strong));
     }
 }

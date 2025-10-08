@@ -6,7 +6,7 @@
 
 use alloc::boxed::Box;
 use core::any::Any;
-use core::fmt;
+use core::{fmt, hash};
 
 use bevy_ecs::prelude as ecs;
 
@@ -17,7 +17,8 @@ use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
-    ErasedHandle, Handle, InsertError, Name, Universe, VisitableComponents, universe_txn as ut,
+    ErasedHandle, Handle, InsertError, Name, Universe, VisitableComponents, handle::HandlePtr,
+    universe_txn as ut,
 };
 
 /// Trait for every type which can be a named member of a universe.
@@ -89,7 +90,7 @@ macro_rules! member_enums_and_impls {
         /// See also [`ErasedHandle`], which is implemented by `Handle`s rather than owning one.
         /// This type dereferences to `dyn ErasedHandle` to provide all the operations that
         /// trait does.
-        #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+        #[derive(Clone, Debug)]
         #[non_exhaustive]
         #[allow(missing_docs, reason = "variant meanings are obvious from name")]
         pub enum AnyHandle {
@@ -375,6 +376,13 @@ impl core::borrow::Borrow<dyn ErasedHandle> for AnyHandle {
     }
 }
 
+impl HandlePtr for AnyHandle {
+    fn as_erased_shared_pointer(&self) -> *const () {
+        let r: &dyn ErasedHandle = &**self;
+        r.as_erased_shared_pointer()
+    }
+}
+
 impl ErasedHandle for AnyHandle {
     fn name(&self) -> Name {
         let r: &dyn ErasedHandle = &**self;
@@ -399,13 +407,26 @@ impl ErasedHandle for AnyHandle {
     }
 }
 
-impl<T: 'static> PartialEq<Handle<T>> for AnyHandle {
-    fn eq(&self, other: &Handle<T>) -> bool {
-        self.downcast_ref::<T>().is_some_and(|down| down == other)
+impl PartialEq for AnyHandle {
+    fn eq(&self, other: &AnyHandle) -> bool {
+        self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
+    }
+}
+impl Eq for AnyHandle {}
+impl hash::Hash for AnyHandle {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        // Must agree with `Hash for Handle` and `Hash for dyn ErasedHandle`
+        self.as_erased_shared_pointer().hash(state);
     }
 }
 
-impl<T: 'static> PartialEq<AnyHandle> for Handle<T> {
+impl<T: UniverseMember> PartialEq<Handle<T>> for AnyHandle {
+    fn eq(&self, other: &Handle<T>) -> bool {
+        self.as_erased_shared_pointer() == other.as_erased_shared_pointer()
+    }
+}
+
+impl<T: UniverseMember> PartialEq<AnyHandle> for Handle<T> {
     fn eq(&self, other: &AnyHandle) -> bool {
         *other == *self
     }
