@@ -2,14 +2,19 @@
 //!
 //! This module is a re-export and parameterization of selected items from [`nosy`].
 
+use core::fmt;
+use core::mem;
+
+use bevy_platform::sync as bsync;
+
 // -------------------------------------------------------------------------------------------------
 
 pub use ::nosy::{
-    Buffer, Constant, Flag, FromListener, Gate, GateListener, IntoListener, Listen, Listener, Log,
+    Buffer, Flag, FromListener, Gate, GateListener, IntoListener, Listen, Listener, Log,
     NullListener, Source, Store, StoreLock, future::WakeFlag,
 };
 
-pub use ::nosy::sync::{DynListener, DynSource, Notifier, constant};
+pub use ::nosy::sync::{Constant, DynListener, DynSource, Notifier, constant};
 
 mod listeners;
 pub use listeners::FnListener;
@@ -23,15 +28,16 @@ pub type CellWithLocal<T> = nosy::Cell<mutex::Mutex<T>, DynListener<()>>;
 
 /// Module for public-in-private hidden type.
 mod mutex {
-    use core::{fmt, mem};
+    use super::*;
 
     /// Mutex type for use with [`nosy::LoadStore`].
     ///
     /// This is a wrapper type which exists in order to effectively
     /// `impl nosy::LoadStore for bevy_platform::sync::Mutex`
+    /// `impl nosy::StoreRef for bevy_platform::sync::Mutex`
     /// without violating trait implementation coherence rules.
     #[allow(unnameable_types)]
-    pub struct Mutex<T: ?Sized>(bevy_platform::sync::Mutex<T>);
+    pub struct Mutex<T: ?Sized>(bsync::Mutex<T>);
 
     impl<T: Clone> nosy::LoadStore for Mutex<T> {
         type Value = T;
@@ -40,7 +46,7 @@ mod mutex {
         where
             Self: Sized,
         {
-            Mutex(bevy_platform::sync::Mutex::new(value))
+            Mutex(bsync::Mutex::new(value))
         }
 
         fn get(&self) -> T {
@@ -53,11 +59,19 @@ mod mutex {
         where
             Self::Value: PartialEq,
         {
-            let mut guard: bevy_platform::sync::MutexGuard<'_, T> = unpoison(self.0.lock());
+            let mut guard: bsync::MutexGuard<'_, T> = unpoison(self.0.lock());
             if new_value == *guard {
                 Err(new_value)
             } else {
                 Ok(mem::replace(&mut *guard, new_value))
+            }
+        }
+    }
+
+    impl<T: ?Sized + Store<M> + fmt::Debug, M> nosy::StoreRef<M> for Mutex<T> {
+        fn receive(&self, messages: &[M]) {
+            if let Ok(mut guard) = self.0.lock() {
+                guard.receive(messages)
             }
         }
     }
