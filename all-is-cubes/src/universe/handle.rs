@@ -15,6 +15,7 @@ use crate::universe::{
     AnyHandle, InsertError, InsertErrorKind, Membership, Name, ReadTicket, ReadTicketError,
     Universe, UniverseId, UniverseMember, VisitHandles, id::OnceUniverseId, name::OnceName,
 };
+#[cfg_attr(not(feature = "save"), allow(unused_imports))]
 use crate::util::maybe_sync::{Mutex, MutexGuard};
 
 #[cfg(doc)]
@@ -518,7 +519,13 @@ impl<T: 'static> Handle<T> {
 
     /// If this [`Handle`] does not yet belong to a universe, create its association with one.
     ///
-    /// This is normally called via [`AnyPending::insert_pending_into_universe()`].
+    /// This is normally called via [`AnyPending::insert_pending_into_universe()`],
+    /// via a unique [`UniverseTransaction`] owning this handle.
+    ///
+    /// Even though it accesses interior-mutable state that is visible from multiple threads,
+    /// we do not need to worry about race conditions due to that uniqueness; however, we do
+    /// need to consider what order different parts of the state become visible in, in case
+    /// another thread is viewing the handle.
     pub(in crate::universe) fn insert_pending_into_universe(
         self,
         universe: &mut Universe,
@@ -527,74 +534,52 @@ impl<T: 'static> Handle<T> {
     where
         T: UniverseMember,
     {
-        let mut state_guard: MutexGuard<'_, State> =
-            self.inner.state.lock().expect("Handle::state lock error");
-
-        self.inner
-            .universe_id
-            .set(universe.universe_id())
-            .map_err(|_| InsertError {
-                name: self.name(),
-                kind: InsertErrorKind::AlreadyInserted,
-            })?;
-
         let pending_name = self
             .inner
             .permanent_name
             .get()
             .unwrap_or(&Name::Pending)
             .clone();
-
-        // This state should never be observed.
-        let placeholder_state = State::Gone {
-            reason: GoneReason::Placeholder {},
-        };
-
-        match mem::replace(&mut *state_guard, placeholder_state) {
-            State::Pending => { /* OK */ }
-            state @ State::Gone { .. } => {
-                *state_guard = state;
-                return Err(InsertError {
-                    name: pending_name,
-                    kind: InsertErrorKind::Gone,
-                });
-            }
-            state @ State::Member { .. } => {
-                *state_guard = state;
-                return Err(InsertError {
-                    name: pending_name.clone(),
-                    kind: InsertErrorKind::AlreadyInserted,
-                });
-            }
-            #[cfg(feature = "save")]
-            state @ State::Deserializing { .. } => {
-                *state_guard = state;
-                return Err(InsertError {
-                    name: pending_name.clone(),
-                    kind: InsertErrorKind::AlreadyInserted,
-                });
-            }
-        }
-
         let new_name = universe.allocate_name(&pending_name)?;
+
+        // We have now completed all checks that could fail under reasonable circumstances, and can
+        // commence making permanent changes.
+
+        // Set handle’s permanent name.
         let _ = self.inner.permanent_name.set(new_name.clone()); // already-set error is ignored
+
+        // Set handle’s universe ID.
+        self.inner
+            .universe_id
+            .set(universe.universe_id())
+            .expect("can't happen: universe ID already set");
+
+        // Create handle’s corresponding entity in the universe.
         let entity = universe
             .world
             .spawn((
                 Membership {
                     name: new_name,
-                    handle: T::into_any_handle(self.clone()), // can't move because we are holding the state lock
+                    handle: T::into_any_handle(self.clone()),
                 },
-                *value, // value was boxed until now
+                *value, // value was boxed until just now
             ))
             .id();
         // We may have created a new archetype.
         universe.update_archetypes();
 
+        // Set handle state.
+        let old_state = mem::replace(
+            &mut *self.inner.state.lock().expect("Handle::state lock error"),
+            State::Member { entity },
+        );
+        assert!(
+            matches!(old_state, State::Pending),
+            "old handle state not pending as expected: {old_state:?}"
+        );
+
         // Inserting new members is a good time to check if there are old ones to remove.
         universe.wants_gc = true;
-
-        *state_guard = State::Member { entity };
 
         Ok(())
     }
