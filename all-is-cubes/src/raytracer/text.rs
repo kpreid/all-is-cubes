@@ -12,7 +12,6 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
 use crate::math::FreeVector;
 use crate::raytracer::{Accumulate, Exception, RtBlockData, RtOptionsRef, SpaceRaytracer};
-#[cfg(any(feature = "std", test))]
 use crate::space::{self, SpaceBlockData};
 
 /// If you are using [`CharacterBuf`], use this [`RtBlockData`] implementation.

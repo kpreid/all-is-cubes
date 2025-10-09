@@ -60,16 +60,16 @@ default = ["std"]
 # Improves performance under multithreading.
 # Uses `std` provided floating-point functions instead of `libm` ones.
 std = [
-    # TODO(no_std): make these dep features conditional on our std feature again when possible
-    # "all-is-cubes-base/std",
+    "all-is-cubes-base/std",
     "arcstr/std", # not required but nicer behavior
     "bevy_platform/std", # selects use of blocking locks instead of spinlocks
-    # "once_cell/std", # used conditionally as more efficient than once_cell::race
-    # "nosy/sync",
-    # "yield-progress/sync",
+    "once_cell/std", # used conditionally as more efficient than once_cell::race
+    "nosy/std-sync", # selects use of blocking locks instead of spinlocks
+    "yield-progress/sync",
 ]
 # Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = [
+    "std", # TODO: remove this when <https://github.com/rust-fuzz/arbitrary/issues/208> is fixed
     "dep:arbitrary",
     "all-is-cubes-base/arbitrary",
     "euclid/arbitrary",
@@ -111,7 +111,7 @@ auto-threads = [
 _special_testing = ["all-is-cubes-base/_special_testing", "dep:visibility"]
 
 [dependencies]
-all-is-cubes-base = { workspace = true, features = ["std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
+all-is-cubes-base = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 arcstr = { version = "1.2.0", default-features = false, features = ["serde", "substr"] }
 arrayvec = { workspace = true }
@@ -137,9 +137,9 @@ log = { workspace = true }
 macro_rules_attribute = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
-nosy = { workspace = true, features = ["async", "std-sync"] } # TODO(no_std): make "std-sync" conditional on our std feature again when possible
+nosy = { workspace = true, features = ["async", "spin-sync"] }
 num-traits = { workspace = true }
-once_cell = { workspace = true, features = ["alloc", "race", "std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
+once_cell = { workspace = true, features = ["alloc", "race"] }
 ordered-float = { workspace = true }
 paste = { workspace = true }
 png-decoder = { workspace = true }
