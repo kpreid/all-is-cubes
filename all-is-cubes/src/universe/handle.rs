@@ -10,13 +10,15 @@ use core::panic::Location;
 use core::sync::atomic;
 
 use bevy_ecs::prelude as ecs;
+// Note: If depending on bevy_platform becomes undesirable, then in general, a spinlock suffices;
+// this mutex is never held for a long time. We only require that it is always `Sync`.
+#[cfg_attr(not(feature = "save"), allow(unused_imports))]
+use bevy_platform::sync::{Mutex, MutexGuard};
 
 use crate::universe::{
     AnyHandle, InsertError, InsertErrorKind, Membership, Name, ReadTicket, ReadTicketError,
     Universe, UniverseId, UniverseMember, VisitHandles, id::OnceUniverseId, name::OnceName,
 };
-#[cfg_attr(not(feature = "save"), allow(unused_imports))]
-use crate::util::maybe_sync::{Mutex, MutexGuard};
 
 #[cfg(doc)]
 use crate::universe::UniverseTransaction;
@@ -191,11 +193,15 @@ impl<T: 'static> Handle<T> {
     where
         T: UniverseMember,
     {
-        let mut state_guard: MutexGuard<'_, State> =
-            self.inner.state.lock().expect("Handle::state lock error");
+        let entity = {
+            let mut state_guard: MutexGuard<'_, State> =
+                self.inner.state.lock().expect("Handle::state lock error");
 
-        let State::Deserializing { entity } = *state_guard else {
-            panic!("incorrect state {:?}", *state_guard);
+            let State::Deserializing { entity } = *state_guard else {
+                panic!("incorrect state {:?}", *state_guard);
+            };
+            *state_guard = State::Member { entity };
+            entity
         };
 
         universe
@@ -205,8 +211,6 @@ impl<T: 'static> Handle<T> {
             .insert(value);
         // We may have created a new archetype.
         universe.update_archetypes();
-
-        *state_guard = State::Member { entity };
     }
 
     /// Name by which the [`Universe`] knows this handle.

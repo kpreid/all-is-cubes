@@ -17,6 +17,7 @@ dependencies = [
  "arcstr",
  "arrayvec",
  "bevy_ecs",
+ "bevy_platform",
  "bitflags",
  "bytemuck",
  "cfg-if",

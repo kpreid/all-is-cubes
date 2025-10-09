@@ -52,6 +52,7 @@ dependencies = [
  "async-io",
  "base64 0.22.1",
  "bevy_ecs",
+ "bevy_platform",
  "bitflags 2.9.1",
  "bytemuck",
  "cfg-if",
