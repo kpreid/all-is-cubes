@@ -201,16 +201,16 @@ pub(crate) fn make_tree(
                 (distance.x.abs() + distance.y.abs() + distance.z.abs()) * MIN_STEP_COST
             },
         ) {
-            for (a, b) in path.into_iter().tuple_windows() {
-                let face = Face6::try_from(b - a).unwrap();
+            for (rootward, leafward) in path.into_iter().tuple_windows() {
+                let face = Face6::try_from(leafward - rootward).unwrap();
                 // TODO: cleverer algorithm (at least don't overwrite)
-                *graph.edge_mut(a, face).unwrap() = Some(TreeGrowth::Sapling);
+                *graph.edge_mut(rootward, face).unwrap() = Some(TreeGrowth::Sapling);
 
                 // Count how many paths are through this branch
                 // This will later be used to decide the growth size.
-                // Note that we only update a, the rootward element of the path,
+                // Note that we only update the rootward element of the path,
                 // to avoid double-counting (and leaf nodes stay at zero harmlessly)
-                graph.data[a].flow = graph.data[a].flow.saturating_add(1);
+                graph.data[rootward].flow = graph.data[rootward].flow.saturating_add(1);
             }
         } else {
             log::warn!("failed to connect leaves to root");
