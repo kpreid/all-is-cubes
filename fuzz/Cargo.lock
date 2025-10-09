@@ -1164,6 +1164,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "mutants",
+ "spin",
 ]
 
 [[package]]

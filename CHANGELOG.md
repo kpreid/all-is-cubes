@@ -6,9 +6,6 @@
 
 In order to resolve various design problems interfering with development, the `all-is-cubes` core crate has been substantially revised to use ECS (Entity-Component-System) data storage and execution. Specifically, it is now built on top of [`bevy_ecs`](https://docs.rs/bevy_ecs/0.16.1/bevy_ecs/). (This is largely an implementation detail, though currently leaks in some places. There are no current plans to make All is Cubes into a Bevy plugin.) This, and further related changes, have resulted in some significant API changes.
 
-* `no_std` support has been lost.
-  This is intended to be a temporary situation which will be resolved in a later version.
-
 * It is no longer possible to read from a `universe::Handle` without providing a `universe::ReadTicket` — a new type that denotes read access to a `Universe` (or, in some cases, part of it).
 
 * Methods such as `Character::step()` and `Space::step()` no longer exist; stepping must be performed on a whole `Universe`.
