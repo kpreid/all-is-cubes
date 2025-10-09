@@ -50,8 +50,9 @@ struct Inner {
 
     /// The ID of the universe this handle belongs to, if any.
     ///
-    /// This field is interior mutable and, when it is updated, is updated only while `state`
-    /// is locked (but this may change in the future).
+    /// This field is interior mutable and can be written only once.
+    /// It is only updated when a handle is inserted into a universe;
+    /// there is always a unique “owner” that can perform that task, even if the handle is shared.
     universe_id: OnceUniverseId,
 
     /// The permanent name of this handle in the universe.
@@ -61,8 +62,8 @@ struct Inner {
     ///
     /// It is never equal to [`Name::Pending`].
     ///
-    /// This field is interior mutable and, when it is updated, is updated only while `state`
-    /// is locked (but this may change in the future).
+    /// This field is interior mutable and can be written only once,
+    /// which happens either at construction time or when this handle is inserted into a universe.
     permanent_name: OnceName,
 
     /// Number of [`StrongHandle`]s that exist.
