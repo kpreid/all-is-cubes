@@ -7,11 +7,19 @@ use crate::math::{Cube, GridAab, GridIter};
 use crate::space::light::PackedLightScalar;
 
 /// An entry in a [`LightUpdateQueue`], specifying a cube that needs its stored light updated.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 #[allow(clippy::exhaustive_structs)]
 pub struct LightUpdateRequest {
     pub priority: Priority,
     pub cube: Cube,
+}
+
+impl fmt::Debug for LightUpdateRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { priority, cube } = self;
+        // always single-line formatting
+        write!(f, "{cube:?} at priority {priority:?}")
+    }
 }
 
 /// Priority of a [`LightUpdateRequest`] in a [`LightUpdateQueue`].
@@ -339,6 +347,7 @@ mod tests {
     use super::*;
     use crate::math::GridCoordinate;
     use alloc::vec::Vec;
+    use pretty_assertions::assert_eq;
 
     fn drain(queue: &mut LightUpdateQueue) -> Vec<LightUpdateRequest> {
         Vec::from_iter(std::iter::from_fn(|| queue.pop()))
