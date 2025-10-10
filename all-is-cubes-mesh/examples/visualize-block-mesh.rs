@@ -133,6 +133,7 @@ fn make_example_blocks(universe: &mut Universe) -> Vec<Block> {
         demo_blocks[DemoBlocks::LamppostBase].clone(),
         demo_blocks[DemoBlocks::Arrow].clone(),
         demo_blocks[DemoBlocks::Pedestal].clone(),
+        demo_blocks[DemoBlocks::Greebly].clone(),
         make_transparent_boxes(universe),
         make_transparent_window(universe),
     ];
