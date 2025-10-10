@@ -55,11 +55,15 @@ required-features = ["rerun"]
 # See src/lib.rs documentation for more details on features.
 [features]
 default = ["std"]
-# Adds std-dependent functionality such as thread safety.
+# Adds some trait impls for `std` types.
+# Adds caching of some calculations.
+# Improves performance under multithreading.
+# Uses `std` provided floating-point functions instead of `libm` ones.
 std = [
     # TODO(no_std): make these dep features conditional on our std feature again when possible
     # "all-is-cubes-base/std",
     "arcstr/std", # not required but nicer behavior
+    "bevy_platform/std", # selects use of blocking locks instead of spinlocks
     # "once_cell/std", # used conditionally as more efficient than once_cell::race
     # "nosy/sync",
     # "yield-progress/sync",

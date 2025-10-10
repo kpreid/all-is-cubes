@@ -25,7 +25,6 @@ use crate::universe::{
     self, Handle, InsertError, Name, ReadTicket, Universe, UniverseTransaction, VisitHandles,
 };
 use crate::util::YieldProgress;
-use crate::util::maybe_sync;
 
 #[cfg(doc)]
 use crate::block::Primitive;
@@ -473,7 +472,7 @@ impl From<ExecuteError<UniverseTransaction>> for GenError {
 #[non_exhaustive]
 pub enum InGenError {
     /// Generic error container for unusual situations.
-    Other(maybe_sync::BoxError),
+    Other(Box<dyn Error + Send + Sync>),
 
     /// Something else needed to be generated and that failed.
     Gen(Box<GenError>), // boxed due to being a recursive type
@@ -501,7 +500,7 @@ pub enum InGenError {
 impl InGenError {
     /// Convert an arbitrary error to `InGenError`.
     #[cfg_attr(not(feature = "std"), doc(hidden))]
-    pub fn other<E: Error + maybe_sync::SendSyncIfStd + 'static>(error: E) -> Self {
+    pub fn other<E: Error + Send + Sync + 'static>(error: E) -> Self {
         Self::Other(Box::new(error))
     }
 }

@@ -6,8 +6,7 @@ use core::marker::PhantomData;
 use core::ops::AddAssign;
 use core::time::Duration;
 
-// Note that this is not the `maybe_sync::BoxFuture`!
-use futures_core::future::BoxFuture as SyncBoxFuture;
+use futures_core::future::BoxFuture;
 use manyfmt::Refmt as _;
 
 // -------------------------------------------------------------------------------------------------
@@ -49,7 +48,7 @@ pub trait Executor: fmt::Debug + Send + Sync {
     ///
     /// The tasks are responsible for terminating on their own when they are no longer needed,
     /// such as by a channel receiver being closed.
-    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>);
+    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> BoxFuture<'static, ()>);
 
     /// Grants an opportunity for other tasks to execute instead of the current one.
     ///
@@ -58,31 +57,31 @@ pub trait Executor: fmt::Debug + Send + Sync {
     /// effects on task scheduling.
     //---
     // If Rust ever gets object-safe async fn in trait without boxing, use it here.
-    fn yield_now(&self) -> SyncBoxFuture<'static, ()>;
+    fn yield_now(&self) -> BoxFuture<'static, ()>;
 }
 #[allow(clippy::missing_inline_in_public_items)]
 impl<T: ?Sized + Executor> Executor for &T {
-    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {
+    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> BoxFuture<'static, ()>) {
         (**self).spawn_background(task_factory)
     }
-    fn yield_now(&self) -> futures_util::future::BoxFuture<'static, ()> {
+    fn yield_now(&self) -> BoxFuture<'static, ()> {
         (**self).yield_now()
     }
 }
 #[allow(clippy::missing_inline_in_public_items)]
 impl<T: ?Sized + Executor> Executor for Arc<T> {
-    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {
+    fn spawn_background(&self, task_factory: &mut dyn FnMut() -> BoxFuture<'static, ()>) {
         (**self).spawn_background(task_factory)
     }
-    fn yield_now(&self) -> futures_util::future::BoxFuture<'static, ()> {
+    fn yield_now(&self) -> BoxFuture<'static, ()> {
         (**self).yield_now()
     }
 }
 /// No-op executor for applications which cannot provide one.
 #[allow(clippy::missing_inline_in_public_items)]
 impl Executor for () {
-    fn spawn_background(&self, _: &mut dyn FnMut() -> SyncBoxFuture<'static, ()>) {}
-    fn yield_now(&self) -> futures_util::future::BoxFuture<'static, ()> {
+    fn spawn_background(&self, _: &mut dyn FnMut() -> BoxFuture<'static, ()>) {}
+    fn yield_now(&self) -> BoxFuture<'static, ()> {
         unreachable!(
             "yield_now() should only be called from a task, \
             and this executor does not support tasks"

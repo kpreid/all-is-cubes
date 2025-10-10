@@ -16,7 +16,7 @@ bench = false
 
 [features]
 std = [
-    "bevy_platform/std",
+    "bevy_platform/std", # selects use of blocking locks instead of spinlocks
 ]
 # Adds `impl arbitrary::Arbitrary for ...`
 arbitrary = [

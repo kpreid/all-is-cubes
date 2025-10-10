@@ -4,9 +4,10 @@ use core::any::Any;
 use core::error::Error;
 use core::fmt;
 
+use futures_core::future::BoxFuture;
+
 use crate::universe::Universe;
 use crate::util::YieldProgress;
-use crate::util::maybe_sync::MaybeLocalBoxFuture;
 
 /// Specifies a file or other data storage a [`Universe`] can be read from or written to.
 ///
@@ -44,7 +45,7 @@ pub trait WhenceUniverse: fmt::Debug + Send + Sync + Any + 'static {
     fn load(
         &self,
         progress: YieldProgress,
-    ) -> MaybeLocalBoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>>;
+    ) -> BoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>>;
 
     /// Write the current state of the given universe into the storage denoted by `self`.
     ///
@@ -61,7 +62,7 @@ pub trait WhenceUniverse: fmt::Debug + Send + Sync + Any + 'static {
         &self,
         universe: &'u Universe,
         progress: YieldProgress,
-    ) -> MaybeLocalBoxFuture<'u, Result<(), Box<dyn Error + Send + Sync>>>;
+    ) -> BoxFuture<'u, Result<(), Box<dyn Error + Send + Sync>>>;
 }
 
 /// Implementation of [`WhenceUniverse`] used by [`Universe`]s freshly created.
@@ -83,7 +84,7 @@ impl WhenceUniverse for () {
     fn load(
         &self,
         _: YieldProgress,
-    ) -> MaybeLocalBoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>> {
+    ) -> BoxFuture<'static, Result<Box<Universe>, Box<dyn Error + Send + Sync>>> {
         Box::pin(core::future::ready(Err(
             "this universe cannot be reloaded because it has no source".into(),
         )))
@@ -93,7 +94,7 @@ impl WhenceUniverse for () {
         &self,
         _universe: &Universe,
         _progress: YieldProgress,
-    ) -> MaybeLocalBoxFuture<'static, Result<(), Box<dyn Error + Send + Sync>>> {
+    ) -> BoxFuture<'static, Result<(), Box<dyn Error + Send + Sync>>> {
         Box::pin(core::future::ready(Err(
             "this universe cannot be saved because a destination has not been specified".into(),
         )))
