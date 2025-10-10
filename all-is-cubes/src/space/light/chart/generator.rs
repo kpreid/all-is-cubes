@@ -7,12 +7,12 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::num::NonZero;
-use std::collections::HashMap;
 
 use euclid::{Point3D, Vector3D};
+use hashbrown::HashMap;
 
-use all_is_cubes_base::math::{Cube, Face6, FaceMap, FreePoint, FreeVector};
-use all_is_cubes_base::raycast::Ray;
+use crate::math::{Cube, Face6, FaceMap, FreePoint, FreeVector};
+use crate::raycast::Ray;
 
 use super::{FlatNode, Weight};
 
