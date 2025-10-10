@@ -12,11 +12,12 @@ use all_is_cubes::block::{
     self, AIR, AnimationHint, Block, BlockCollision, Resolution::*, RotationPlacementRule,
     TickAction,
 };
+use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridSizeCoord, GridVector, Rgb, Rgb01,
-    Rgba, ps32, rgb_const, rgba_const,
+    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
+    Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
@@ -27,6 +28,7 @@ use all_is_cubes::util::YieldProgress;
 
 use crate::alg::{NoiseFnExt as _, gradient_lookup, scale_color, square_radius};
 use crate::landscape::install_landscape_blocks;
+use crate::load_image::{block_from_image, default_srgb, include_image};
 use crate::palette;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, strum::IntoStaticStr /* kludge */, Exhaust)]
@@ -51,6 +53,9 @@ pub enum DemoBlocks {
     BecomeBlinker(bool),
     Explosion(i8),
     Projectile,
+    // TOOD: Greebly is not actually used anywhere in the demo content but only in visualize-block-mesh for now.
+    // That should change but the rest of the art/content plan this fits into doesn’t exist yet.
+    Greebly,
 }
 impl BlockModule for DemoBlocks {
     fn namespace() -> &'static str {
@@ -585,6 +590,50 @@ pub async fn install_demo_blocks(
                     schedule: time::Schedule::EVERY_TICK,
                 })
                 .build_txn(txn),
+
+            Greebly => {
+                let image = include_image!("blocks/greeble.png");
+                let carve_block = block_from_image(
+                    ReadTicket::stub(),
+                    image,
+                    GridRotation::IDENTITY,
+                    // cover the entire bounds of the image, ignoring color
+                    &|_| VoxelBrush::single(block::from_color!(Rgba::WHITE)),
+                )?
+                .build_txn(txn);
+                let image_block = block_from_image(
+                    ReadTicket::stub(),
+                    image,
+                    GridRotation::IDENTITY,
+                    &default_srgb,
+                )?
+                .build_txn(txn);
+
+                block::Composite::stack(
+                    Block::builder()
+                        .color(rgba_const!(1.0, 0.0, 0.5, 1.0))
+                        .display_name("Greebled")
+                        .build(),
+                    Face6::ALL
+                        .iter()
+                        .map(|face| carve_block.clone().rotate(face.rotation_from_nz()))
+                        .map(|carve_face_block| {
+                            block::Composite::new(carve_face_block, block::CompositeOperator::Out)
+                                .reversed()
+                        })
+                        .chain(
+                            Face6::ALL
+                                .iter()
+                                .map(|face| image_block.clone().rotate(face.rotation_from_nz()))
+                                .map(|face_block| {
+                                    block::Composite::new(
+                                        face_block,
+                                        block::CompositeOperator::Over,
+                                    )
+                                }),
+                        ),
+                )
+            }
         })
     })
     .await?;
