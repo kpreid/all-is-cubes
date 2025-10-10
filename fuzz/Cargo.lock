@@ -889,9 +889,8 @@ checksum = "610a5acd306ec67f907abe5567859a3c693fb9886eb1f012ab8f2a47bef3db51"
 
 [[package]]
 name = "nosy"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f6dd5ffdfed7ff89d8e4789efa813fa2af81433335d7b6a6353ce7d7e4fa832"
+version = "0.3.0-alpha"
+source = "git+https://github.com/kpreid/nosy/#e853dcc6af366ee940d561fb41ac8682638c0203"
 dependencies = [
  "arrayvec",
  "cfg-if",
@@ -1504,3 +1503,7 @@ name = "yield-progress"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6a42dba597da5dc59841799b16dda7c254ad91a497aab4c594ba7a785eef688"
+
+[[patch.unused]]
+name = "nosy"
+version = "0.3.0-alpha"
