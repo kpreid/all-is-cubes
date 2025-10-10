@@ -91,9 +91,10 @@
 //!   fuzzing / property testing on types defined by this crate.
 //! * `"std"` (enabled by default):
 //!   If disabled, the library becomes `no_std` compatible, at this cost:
-//!   * Many types are no longer [`Send`] or [`Sync`].
-//!   * [`Listener`](crate::listen::Listener) callbacks are no longer required to be `Send + Sync`,
-//!     **which makes this feature non-additive**. Proceed with care.
+//!   * Some trait implementations for [`std`] types are removed.
+//!   * Floating-point functions are provided by [`libm`] instead of [`std`].
+//!   * Spinlocks may be used in cases where that is a poor choice, reducing
+//!     multithreaded performance.
 //!   * Certain data calculations are not memoized.
 //!
 //! ## Platform compatibility

@@ -5,7 +5,6 @@ use manyfmt::Refmt as _;
 use manyfmt::formats::Unquote;
 
 use crate::listen::Listener;
-use crate::util::maybe_sync::SendSyncIfStd;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -40,8 +39,8 @@ impl<F, T> fmt::Debug for FnListener<F, T> {
 
 impl<M, F, T> Listener<M> for FnListener<F, T>
 where
-    F: Fn(&T, &M) + SendSyncIfStd,
-    T: SendSyncIfStd,
+    F: Fn(&T, &M) + Send + Sync,
+    T: Send + Sync,
 {
     fn receive(&self, messages: &[M]) -> bool {
         if let Some(strong_target) = self.weak_target.upgrade() {

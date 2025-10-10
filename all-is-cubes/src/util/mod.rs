@@ -16,9 +16,6 @@ pub use all_is_cubes_base::util::{
     assert_send_sync, log,
 };
 
-#[doc(hidden)] // public to allow our other crates to match, only
-pub mod maybe_sync;
-
 mod status_text;
 pub use status_text::*;
 

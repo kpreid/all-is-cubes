@@ -36,6 +36,7 @@ session = [
 all-is-cubes = { workspace = true, default-features = false }
 all-is-cubes-render = { workspace = true, default-features = false }
 async_fn_traits = { workspace = true, optional = true }
+bevy_platform = { workspace = true }
 displaydoc = { workspace = true }
 exhaust = { workspace = true }
 flume = { workspace = true, optional = true }

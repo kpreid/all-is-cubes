@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 use core::fmt;
 
+use bevy_platform::sync::Mutex;
 use itertools::Itertools as _;
 
 use crate::block::{self, AIR, AIR_EVALUATED, Block, BlockChange, EvaluatedBlock};
@@ -11,7 +12,6 @@ use crate::math::{self, OpacityCategory};
 use crate::space::step::SpacePaletteNextValue;
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::universe::ReadTicket;
-use crate::util::maybe_sync::Mutex;
 
 #[cfg(doc)]
 use crate::space;

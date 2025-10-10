@@ -1,17 +1,18 @@
 //! UI [`Widget`] trait and related glue.
 
-use all_is_cubes::time::Tick;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::error::Error;
 use core::fmt::Debug;
 
+use bevy_platform::sync::Mutex;
+
 use all_is_cubes::behavior::{self, Behavior};
 use all_is_cubes::math::GridAab;
 use all_is_cubes::space::{self, Space, SpaceTransaction};
+use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::{self, Merge as _};
 use all_is_cubes::universe::{HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles};
-use all_is_cubes::util::maybe_sync::{self, SendSyncIfStd};
 
 // reused for WidgetController
 pub use all_is_cubes::behavior::Then;
@@ -51,7 +52,7 @@ pub type WidgetTransaction = SpaceTransaction;
 ///
 /// [`LayoutTree`]: crate::vui::LayoutTree
 /// [`controller()`]: Self::controller
-pub trait Widget: Layoutable + Debug + SendSyncIfStd {
+pub trait Widget: Layoutable + Debug + Send + Sync {
     /// Create a [`WidgetController`] to manage the widget's existence in a particular
     /// region of a particular [`Space`].
     ///
@@ -82,7 +83,7 @@ pub trait Widget: Layoutable + Debug + SendSyncIfStd {
 /// their assigned regions of space and therefore will not experience transaction conflicts.
 ///
 /// [`OneshotController`]: crate::vui::widgets::OneshotController
-pub trait WidgetController: Debug + VisitHandles + SendSyncIfStd + 'static {
+pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     /// Write the initial state of the widget to the space.
     /// This is called at most once.
     fn initialize(
@@ -127,9 +128,7 @@ pub type StepSuccess = (WidgetTransaction, Then);
 /// Error return of [`WidgetController::step()`].
 ///
 /// TODO: This should become a more specific error type.
-//---
-// This is a type alias to cope with the maybe-Sync kludge without exposing that everywhere.
-pub type StepError = maybe_sync::BoxError;
+pub type StepError = Box<dyn Error + Send + Sync>;
 
 impl WidgetController for Box<dyn WidgetController> {
     fn synchronize(&mut self, world_read_ticket: ReadTicket<'_>, ui_read_ticket: ReadTicket<'_>) {
@@ -157,7 +156,7 @@ impl WidgetController for Box<dyn WidgetController> {
 pub(super) struct WidgetBehavior {
     /// Original widget -- not used directly but for error reporting
     widget: Positioned<Arc<dyn Widget>>,
-    controller: maybe_sync::Mutex<Box<dyn WidgetController>>,
+    controller: Mutex<Box<dyn WidgetController>>,
 }
 
 impl WidgetBehavior {
@@ -186,7 +185,7 @@ impl WidgetBehavior {
             space::SpaceBehaviorAttachment::new(widget.position.bounds),
             Arc::new(WidgetBehavior {
                 widget,
-                controller: maybe_sync::Mutex::new(controller),
+                controller: Mutex::new(controller),
             }),
         );
         init_txn
