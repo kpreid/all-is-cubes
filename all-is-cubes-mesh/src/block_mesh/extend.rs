@@ -293,7 +293,7 @@ const QUAD_VERTICES: &[Vector2D<PosCoord, TexelUnit>; 4] = &[
 
 const QUAD_INDICES: &[u32; 6] = &[0, 1, 2, 2, 1, 3];
 
-fn transform_clamp_box<Tex: texture::Plane>(
+pub(crate) fn transform_clamp_box<Tex: texture::Plane>(
     plane: &Tex,
     transform: &QuadTransform,
     min: TilePoint,
@@ -412,7 +412,7 @@ fn reserve_vertices<T, U>((v0, v1): &mut (Vec<T>, Vec<U>), n: usize) {
 ///
 /// Does not attempt to reserve space based on the iterator’s size hint.
 /// The caller should do that on their own if desired.
-fn push_vertices_from_iter<V: crate::Vertex>(
+pub(crate) fn push_vertices_from_iter<V: crate::Vertex>(
     output: &mut (Vec<V>, Vec<V::SecondaryData>),
     input: impl Iterator<Item = (V, V::SecondaryData)>,
 ) {

@@ -87,6 +87,18 @@ pub struct MeshOptions {
     ///
     /// [`voxels`]: all_is_cubes::block::EvaluatedBlock::voxels
     ignore_voxels: bool,
+
+    /// Selects the algorithm to use for triangulating the faces of block meshes.
+    ///
+    /// * If [`false`], use the old algorithm, the well-known “greedy meshing” algorithm.
+    ///   This algorithm unavoidably constructs “T-junctions”,
+    ///   meaning that rendering the mesh will in most cases have random single-pixel gaps.
+    /// * If [`true`], use the new algorithm.
+    ///   This algorithm avoids T-junctions, but has several bugs and may panic or produce incorrect
+    ///   results in complex cases.
+    // TODO(planar_new): Make this default true, then delete the old code and the condition.
+    #[doc(hidden)] // exposed for testing purposes
+    pub use_new_block_triangulator: bool,
 }
 
 impl MeshOptions {
@@ -95,6 +107,7 @@ impl MeshOptions {
         Self {
             transparency: graphics_options.transparency.clone(),
             ignore_voxels: false,
+            use_new_block_triangulator: false,
         }
     }
 
@@ -105,6 +118,7 @@ impl MeshOptions {
         Self {
             transparency: TransparencyOption::Volumetric,
             ignore_voxels: false,
+            use_new_block_triangulator: false,
         }
     }
 

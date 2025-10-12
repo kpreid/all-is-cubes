@@ -57,6 +57,11 @@ pub(crate) struct Analysis {
 
     /// Whether there are any adjacent visible voxels that have different colors, and therefore
     /// probably need a texture rather than vertex colors.
+    ///
+    /// Note: Currently, this is strictly an overestimate in that it will be true even for,
+    /// say, diagonally adjacent voxels. However, this simplifies the job of the mesh builder,
+    /// which can always use one mesh vertex per [`AnalysisVertex`] per face, rather than needing
+    /// to split vertices by color.
     pub needs_texture: bool,
 
     /// Each point that is a vertex; that is, each point which
@@ -260,8 +265,11 @@ fn analyze_one_window(
     if opaque != NONE && opaque != ALL || semitransparent != NONE && semitransparent != ALL {
         let resolution_coord = GridCoordinate::from(analysis.resolution);
 
-        // TODO: this comparison has false positives — instead, it should look only at visible
-        // voxels that could form a plane on some axis, not all 8 voxels together.
+        // Note: this comparison has false positives, in that it will return true for some
+        // cases that *could* be meshed without any textures. However, some of these false
+        // positives — in particular, those for voxels that share an edge, i.e. are diagonally
+        // adjacent from a 2D perspective — simplify the job of the mesh builder.
+        // See comments on the `needs_texture` field.
         analysis.needs_texture = analysis.needs_texture
             || !window
                 .values()

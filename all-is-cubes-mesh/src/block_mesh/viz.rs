@@ -4,11 +4,14 @@
 
 #![cfg_attr(not(feature = "rerun"), expect(clippy::unused_self))]
 
+use alloc::collections::VecDeque;
+
 use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::math::{Face6, GridCoordinate, GridPoint, Rgba, Vol};
 
 use crate::Position;
 use crate::block_mesh::analyze::Analysis;
+use crate::block_mesh::planar_new::FrontierVertex;
 
 #[cfg(feature = "rerun")]
 use {
@@ -62,6 +65,9 @@ pub struct Inner {
     mesh_edges_path: rg::EntityPath,
     analysis_vertices_path: rg::EntityPath,
     analysis_transparent_box_path: rg::EntityPath,
+    triangulator_old_frontier_points_path: rg::EntityPath,
+    triangulator_new_frontier_points_path: rg::EntityPath,
+    triangulator_current_vertex_path: rg::EntityPath,
 
     // These two together make up the mesh edge display entity's data
     mesh_edge_positions: Vec<rg::components::LineStrip3D>,
@@ -102,6 +108,15 @@ impl Viz {
                 mesh_edges_path: rg::entity_path!["mesh", "edges"],
                 analysis_vertices_path: rg::entity_path!["analysis", "vertices"],
                 analysis_transparent_box_path: rg::entity_path!["analysis", "transparent_box"],
+                triangulator_old_frontier_points_path: rg::entity_path![
+                    "triangulate",
+                    "old_frontier"
+                ],
+                triangulator_new_frontier_points_path: rg::entity_path![
+                    "triangulate",
+                    "new_frontier"
+                ],
+                triangulator_current_vertex_path: rg::entity_path!["progress", "vertex"],
                 resolution: None,
                 data_bounds: None,
                 analysis: Analysis::EMPTY,
@@ -184,10 +199,14 @@ impl Viz {
         }
     }
 
-    pub(crate) fn clear_layer_in_progress(&self) {
+    pub(crate) fn clear_in_progress_markers(&self) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
-            state.destination.clear_recursive(&state.layer_path);
+            let d = &state.destination;
+            d.clear_recursive(&state.layer_path);
+            d.clear_recursive(&state.triangulator_current_vertex_path);
+            d.clear_recursive(&state.triangulator_old_frontier_points_path);
+            d.clear_recursive(&state.triangulator_new_frontier_points_path);
         }
     }
 
@@ -212,6 +231,47 @@ impl Viz {
         }
     }
 
+    pub(crate) fn set_frontier(
+        &mut self,
+        #[allow(unused)] old_frontier: &VecDeque<FrontierVertex>,
+        #[allow(unused)] new_frontier: &VecDeque<FrontierVertex>,
+    ) {
+        #[cfg(feature = "rerun")]
+        if let Self::Enabled(state) = self {
+            state.destination.log(
+                &state.triangulator_old_frontier_points_path,
+                &convert_frontier_vertices(
+                    &mut old_frontier.iter(),
+                    rg::components::Color::from_rgb(100, 0, 0),
+                ),
+            );
+            state.destination.log(
+                &state.triangulator_new_frontier_points_path,
+                &convert_frontier_vertices(
+                    &mut new_frontier.iter(),
+                    rg::components::Color::from_rgb(255, 100, 100),
+                ),
+            );
+        }
+    }
+
+    pub(crate) fn set_current_triangulation_vertex(
+        &mut self,
+        #[allow(unused)] vertex: &FrontierVertex,
+    ) {
+        #[cfg(feature = "rerun")]
+        if let Self::Enabled(state) = self {
+            state.destination.log(
+                &state.triangulator_current_vertex_path,
+                &convert_frontier_vertices(
+                    &mut [vertex].into_iter(),
+                    rg::components::Color::from_rgb(255, 255, 100),
+                ),
+            );
+        }
+    }
+
+    /// Add more triangles to the final output mesh
     pub(crate) fn extend_vertices(
         &mut self,
         #[allow(unused)] mut vertex_position_iter: impl Iterator<Item = Position> + Clone,
@@ -397,4 +457,29 @@ fn convert_vertices(
     )
     .with_colors([color])
     .with_fill_mode(rg::components::FillMode::Solid)
+}
+
+#[cfg(feature = "rerun")]
+fn convert_frontier_vertices(
+    vertices: &mut dyn ExactSizeIterator<Item = &FrontierVertex>,
+    color: rg::components::Color,
+) -> rg::archetypes::Ellipsoids3D {
+    #[allow(
+        clippy::len_zero,
+        reason = "false positive https://github.com/rust-lang/rust-clippy/issues/15890"
+    )]
+    let empty = vertices.len() == 0;
+    // Frontier vertices are always copies (ish) of the original analysis vertices, so don't
+    // try to visualize their octants; just add markers for them
+    let radius = 0.45; // needs to be bigger than the solid octant boxes from convert_vertices()
+    rg::archetypes::Ellipsoids3D::from_centers_and_radii(
+        vertices.map(|fv| rg::convert_vec(fv.v.position.to_vector())),
+        if empty {
+            None // avoids a quirk where we get one placed at the origin
+        } else {
+            Some(radius)
+        },
+    )
+    .with_colors([color])
+    .with_fill_mode(rg::components::FillMode::MajorWireframe)
 }

@@ -6,6 +6,7 @@
 use pollster::block_on;
 
 use all_is_cubes::block::{self, Block, EvaluatedBlock, Resolution};
+use all_is_cubes::euclid::{Point3D, point3};
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::math::{Face6, FaceMap, GridAab, Rgb, Rgba};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -46,16 +47,15 @@ fn main() {
         let mut next_x = 0.;
         for (i, block) in blocks.iter().enumerate() {
             let evaluated = block.evaluate(universe.read_ticket()).unwrap();
-
-            let name = &evaluated.attributes().display_name;
-            let entity_path = if name.is_empty() {
-                rg::entity_path![format_args!("{i}")]
+            let block_name = &evaluated.attributes().display_name;
+            let block_name_part = if block_name.is_empty() {
+                rg::EntityPathPart::from(i.to_string())
             } else {
-                rg::entity_path![name]
+                rg::EntityPathPart::from(block_name.to_string())
             };
 
             if let Some(filter) = filter
-                && !entity_path.last().unwrap().unescaped_str().contains(filter)
+                && !block_name_part.unescaped_str().contains(filter)
             {
                 continue;
             }
@@ -63,25 +63,49 @@ fn main() {
             let x = next_x;
             next_x += f32::from(evaluated.resolution()) + 4.0;
 
-            let destination = destination.child(&entity_path);
-            scope.spawn(move || show(destination, x, &evaluated));
+            for use_new_triangulator in [false, true] {
+                let entity_path = rg::EntityPath::from_iter([
+                    block_name_part.clone(),
+                    rg::EntityPathPart::new(use_new_triangulator.to_string()),
+                ]);
+
+                let destination = destination.child(&entity_path);
+                let evaluated = evaluated.clone();
+                scope.spawn(move || {
+                    show(
+                        destination,
+                        point3(x, f32::from(use_new_triangulator) * 32., 0.),
+                        &evaluated,
+                        &{
+                            let mut options = mesh::MeshOptions::new(&GraphicsOptions::default());
+                            options.use_new_block_triangulator = use_new_triangulator;
+                            options
+                        },
+                    )
+                });
+            }
         }
     });
 
     destination.stream.flush_blocking().unwrap();
 }
 
-fn show(destination: rg::Destination, x: f32, evaluated: &EvaluatedBlock) {
+fn show(
+    destination: rg::Destination,
+    position: Point3D<f32, ()>,
+    evaluated: &EvaluatedBlock,
+    options: &mesh::MeshOptions,
+) {
     destination.log(
         &rg::entity_path![],
-        &rg::archetypes::Transform3D::from_translation(rg::datatypes::Vec3D::new(x, 1., 1.)),
+        &rg::archetypes::Transform3D::from_translation(rg::convert_vec(position.to_vector())),
     );
 
     let mut mesh = mesh::BlockMesh::<mesh::testing::NoTextureMt>::default();
     mesh.compute_with_viz(
         evaluated,
         &mesh::texture::NoTextures,
-        &mesh::MeshOptions::new(&GraphicsOptions::default()),
+        options,
         mesh::Viz::new(destination),
     );
 }
