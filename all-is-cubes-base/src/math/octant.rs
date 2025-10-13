@@ -4,6 +4,8 @@ use euclid::{Vector3D, vec3};
 
 use crate::math::{Cube, Face6, FreeVector, GridCoordinate, GridPoint};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Identifies one of eight octants, or elements of a 2×2×2 cube.
 ///
 /// Used with [`OctantMask`] and [`OctantMap`].
@@ -186,6 +188,8 @@ impl fmt::Debug for Octant {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// A set of [`Octant`]s (or equivalently, one [`bool`] for each cube of a 2×2×2 volume).
 ///
 /// Internally represented as a `u8` bit-set.
@@ -358,13 +362,24 @@ impl ops::Not for OctantMask {
 impl FromIterator<Octant> for OctantMask {
     #[inline]
     fn from_iter<T: IntoIterator<Item = Octant>>(iter: T) -> Self {
-        let mut this = OctantMask::NONE;
+        let mut new_self = OctantMask::NONE;
         iter.into_iter().for_each(|octant| {
-            this.set(octant);
+            new_self.set(octant);
         });
-        this
+        new_self
     }
 }
+
+impl From<Octant> for OctantMask {
+    #[inline]
+    fn from(octant: Octant) -> Self {
+        let mut new_self = OctantMask::NONE;
+        new_self.set(octant);
+        new_self
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Collection of 8 values keyed by [`Octant`]s.
 ///
@@ -478,6 +493,8 @@ impl<T> ops::IndexMut<Octant> for OctantMap<T> {
         &mut self.0[octant.to_zmaj_index() as usize]
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
