@@ -317,7 +317,8 @@ impl OctantMask {
 impl fmt::Debug for OctantMask {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "OctantMask[")?;
+        // Not using f.debug_set() because we want never-multiline output.
+        write!(f, "{{")?;
         let mut first = true;
         for octant in Octant::ALL {
             if self.get(octant) {
@@ -328,7 +329,7 @@ impl fmt::Debug for OctantMask {
                 write!(f, "{octant:?}")?;
             }
         }
-        write!(f, "]")?;
+        write!(f, "}}")?;
         Ok(())
     }
 }
@@ -517,15 +518,15 @@ mod tests {
     fn mask_debug() {
         let none = OctantMask::NONE;
 
-        assert_eq!(format!("{none:?}"), "OctantMask[]");
-        assert_eq!(format!("{none:#?}"), "OctantMask[]");
+        assert_eq!(format!("{none:?}"), "{}");
+        assert_eq!(format!("{none:#?}"), "{}");
 
         let mut some = OctantMask::NONE;
         some.set(Octant::Pnn);
         some.set(Octant::Ppn);
 
-        assert_eq!(format!("{some:?}"), "OctantMask[+X−Y−Z, +X+Y−Z]");
-        assert_eq!(format!("{some:#?}"), "OctantMask[+X−Y−Z, +X+Y−Z]");
+        assert_eq!(format!("{some:?}"), "{+X−Y−Z, +X+Y−Z}");
+        assert_eq!(format!("{some:#?}"), "{+X−Y−Z, +X+Y−Z}");
     }
 
     #[test]
