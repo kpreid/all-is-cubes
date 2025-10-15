@@ -17,9 +17,19 @@ use all_is_cubes_render::camera::GraphicsOptions;
 use content::DemoBlocks;
 
 /// Private — do not use.
-use all_is_cubes::rerun_glue as rg;
+use all_is_cubes::{arcstr, rerun_glue as rg};
 
 fn main() {
+    let args = std::env::args().collect::<Vec<String>>();
+    let filter: Option<&str> = match args.as_slice() {
+        [_, f] => Some(f),
+        [_] => None,
+        args => panic!(
+            "unexpected number of args {args:?}\n\
+            usage: visualize-block-mesh [<substring filter>]"
+        ),
+    };
+
     let destination = rg::Destination {
         stream: rg::RecordingStreamBuilder::new("all-is-cubes/visualize-block-mesh")
             .default_enabled(true)
@@ -37,10 +47,23 @@ fn main() {
         for (i, block) in blocks.iter().enumerate() {
             let evaluated = block.evaluate(universe.read_ticket()).unwrap();
 
+            let name = &evaluated.attributes().display_name;
+            let entity_path = if name.is_empty() {
+                rg::entity_path![format_args!("{i}")]
+            } else {
+                rg::entity_path![name]
+            };
+
+            if let Some(filter) = filter
+                && !entity_path.last().unwrap().unescaped_str().contains(filter)
+            {
+                continue;
+            }
+
             let x = next_x;
             next_x += f32::from(evaluated.resolution()) + 4.0;
 
-            let destination = destination.child(&rg::entity_path![format!("{i}")]);
+            let destination = destination.child(&entity_path);
             scope.spawn(move || show(destination, x, &evaluated));
         }
     });
@@ -92,6 +115,7 @@ fn make_example_blocks(universe: &mut Universe) -> Vec<Block> {
     for i in [0b111, 0b10111, 0b01010011, 0b01111111, 0b01011111] {
         blocks.push(
             Block::builder()
+                .display_name(arcstr::format!("corner{i:08b}"))
                 .voxels_fn(Resolution::R2, |cube| {
                     if i & (1 << (indexing.index(cube).unwrap() as u8)) != 0 {
                         block::from_color!(0.5, 0.5, 0.5)
@@ -123,6 +147,7 @@ fn make_transparent_boxes(universe: &mut Universe) -> Block {
     let transparent_box = GridAab::for_block(resolution).abut(Face6::PX, -4).unwrap();
     let emissive_box = GridAab::for_block(resolution).abut(Face6::NX, -4).unwrap();
     Block::builder()
+        .display_name(arcstr::literal!("transparent-boxes"))
         .voxels_fn(resolution, |cube| {
             if solid_box.contains_cube(cube) {
                 &opaque_voxel
@@ -151,6 +176,7 @@ fn make_transparent_window(universe: &mut Universe) -> Block {
         .shrink(FaceMap::symmetric([2, 4, 2]))
         .unwrap();
     Block::builder()
+        .display_name(arcstr::literal!("transparent-window"))
         .voxels_fn(resolution, |cube| {
             if transparent_box.contains_cube(cube) {
                 &transparent_voxel
