@@ -397,7 +397,7 @@ impl Body {
                             // approximation of block's actual collision bounds
                             ev.voxels_bounds()
                                 .to_free()
-                                .scale(FreeCoordinate::from(ev.voxels().resolution()).recip())
+                                .scale(ev.voxels().resolution().recip_f64())
                                 .translate(cube.lower_bounds().to_f64().to_vector())
                         }),
                         FreeVector::zero(),

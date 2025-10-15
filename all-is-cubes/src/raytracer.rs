@@ -755,7 +755,7 @@ pub(crate) fn trace_for_eval(
     direction: Face6,
     resolution: Resolution,
 ) -> EvalTrace {
-    let thickness = f32::from(resolution).recip();
+    let thickness = resolution.recip_f32();
     let step = direction.normal_vector();
 
     let mut cube = origin;

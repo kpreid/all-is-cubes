@@ -77,6 +77,42 @@ impl Resolution {
     pub const fn log2(self) -> u8 {
         self as u8
     }
+
+    /// Returns the reciprocal of this resolution; that is, the scale factor from
+    /// voxels to blocks of this resolution.
+    ///
+    /// Equivalent to `f32::from(self).recip()` but does not perform division.
+    #[inline]
+    pub const fn recip_f32(self) -> f32 {
+        match self {
+            Self::R1 => const { 1.0f32.recip() },
+            Self::R2 => const { 2.0f32.recip() },
+            Self::R4 => const { 4.0f32.recip() },
+            Self::R8 => const { 8.0f32.recip() },
+            Self::R16 => const { 16.0f32.recip() },
+            Self::R32 => const { 32.0f32.recip() },
+            Self::R64 => const { 64.0f32.recip() },
+            Self::R128 => const { 128.0f32.recip() },
+        }
+    }
+
+    /// Returns the reciprocal of this resolution; that is, the scale factor from
+    /// voxels to blocks of this resolution.
+    ///
+    /// Equivalent to `f64::from(self).recip()` but does not perform division.
+    #[inline]
+    pub const fn recip_f64(self) -> f64 {
+        match self {
+            Self::R1 => const { 1.0f64.recip() },
+            Self::R2 => const { 2.0f64.recip() },
+            Self::R4 => const { 4.0f64.recip() },
+            Self::R8 => const { 8.0f64.recip() },
+            Self::R16 => const { 16.0f64.recip() },
+            Self::R32 => const { 32.0f64.recip() },
+            Self::R64 => const { 64.0f64.recip() },
+            Self::R128 => const { 128.0f64.recip() },
+        }
+    }
 }
 
 impl fmt::Debug for Resolution {
@@ -275,5 +311,13 @@ mod tests {
         assert_eq!(R128 / R128, Some(R1));
         assert_eq!(R1 / R2, None);
         assert_eq!(R64 / R128, None);
+    }
+
+    #[test]
+    fn recip() {
+        for resolution in RS {
+            assert_eq!(resolution.recip_f32(), f32::from(resolution).recip());
+            assert_eq!(resolution.recip_f64(), f64::from(resolution).recip());
+        }
     }
 }

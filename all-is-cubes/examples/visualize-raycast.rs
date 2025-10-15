@@ -69,7 +69,7 @@ fn show(
                 translation,
                 box_color,
             } => {
-                let scale = f64::from(resolution).recip();
+                let scale = resolution.recip_f64();
                 (
                     euclid::Transform3D::scale(scale, scale, scale)
                         .then_translate(translation.to_f64()),
@@ -129,7 +129,7 @@ fn show(
                 //     &rg::archetypes::Transform3D::from_translation_rotation_scale(
                 //         rg::convert_vec(step.cube_ahead().lower_bounds().to_vector()),
                 //         rg::datatypes::Rotation3D::IDENTITY,
-                //         rg::datatypes::Scale3D::Uniform(f32::from(resolution).recip()),
+                //         rg::datatypes::Scale3D::Uniform(resolution.recip_f32()),
                 //     ),
                 // );
                 show(

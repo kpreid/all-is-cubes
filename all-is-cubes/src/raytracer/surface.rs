@@ -294,7 +294,7 @@ where
                 let block_cube = rc_step.cube_ahead();
                 let (sub_raycaster, sub_ray) =
                     R::recursive_raycast(rc_step, self.ray, resolution, array.bounds());
-                let antiscale = FreeCoordinate::from(resolution).recip();
+                let antiscale = resolution.recip_f64();
 
                 self.current_block = Some(VoxelSurfaceIter {
                     voxel_ray: sub_ray,

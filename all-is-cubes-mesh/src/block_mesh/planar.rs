@@ -446,7 +446,7 @@ impl QuadTransform {
     pub fn new(face: Face6, resolution: Resolution) -> Self {
         // TODO: Have a different coordinate system type for planar coordinates
         let voxel_to_block_scale: Scale<PosCoord, MeshRel, MeshRel> =
-            Scale::new(PosCoord::from(resolution).recip());
+            Scale::new(resolution.recip_f32());
         Self {
             face,
             resolution,

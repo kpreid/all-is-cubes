@@ -224,7 +224,7 @@ impl lines::Wireframe for Cursor {
         let block_aabb = evaluated
             .voxels_bounds()
             .to_free()
-            .scale(FreeCoordinate::from(evaluated.resolution()).recip())
+            .scale(evaluated.resolution().recip_f64())
             .translate(
                 self.cube()
                     .lower_bounds()
