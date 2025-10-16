@@ -12,9 +12,10 @@ use crate::block_mesh::analyze::Analysis;
 
 #[cfg(feature = "rerun")]
 use {
+    crate::block_mesh::analyze::AnalysisVertex,
     all_is_cubes::block::Resolution,
     all_is_cubes::euclid::Vector3D,
-    all_is_cubes::math::{Cube, GridAab, GridVector},
+    all_is_cubes::math::{Cube, GridAab, GridVector, Octant},
     all_is_cubes::rerun_glue as rg,
     alloc::{vec, vec::Vec},
     core::iter,
@@ -321,18 +322,14 @@ impl Inner {
         }
 
         if self.analysis.vertices != old_analysis.vertices {
+            let entity_path = &self.analysis_vertices_path;
             self.destination.log(
-                &self.analysis_vertices_path,
-                // We use `Ellipsoids3D` instead of `Points3D`, even though these are semantically
-                // points, to get better rendering.
-                &rg::archetypes::Ellipsoids3D::from_centers_and_radii(
-                    self.analysis.vertices.iter().map(|av| {
-                        rg::components::PoseTranslation3D(rg::convert_vec(av.position.to_vector()))
-                    }),
-                    [0.15],
-                )
-                .with_colors([rg::components::Color::from_rgb(80, 80, 255)])
-                .with_fill_mode(rg::components::FillMode::Solid),
+                entity_path,
+                &convert_vertices(
+                    &self.analysis.vertices,
+                    0.18,
+                    rg::components::Color::from_rgb(80, 80, 255),
+                ),
             )
         }
     }
@@ -370,4 +367,34 @@ impl Inner {
             .with_radii([radius]),
         );
     }
+}
+
+#[cfg(feature = "rerun")]
+fn convert_vertices(
+    vertices: &[AnalysisVertex],
+    box_half_size: f32,
+    color: rg::components::Color,
+) -> rg::archetypes::Boxes3D {
+    // We use `Boxes3D` that are offset mostly into each octant, so that we can
+    // view which interior volumes the vertex is indicating as filled.
+
+    // TODO: `av.transparent` is ignored but we should be showing it too.
+
+    let offset = Vector3D::splat(box_half_size - 0.01);
+
+    rg::archetypes::Boxes3D::from_centers_and_half_sizes(
+        vertices.iter().flat_map(|av| {
+            Octant::ALL
+                .into_iter()
+                .filter(|&octant| av.opaque.get(octant))
+                .map(|octant| {
+                    rg::components::PoseTranslation3D(rg::convert_vec(
+                        av.position.to_vector().to_f32() + octant.reflect(offset),
+                    ))
+                })
+        }),
+        [rg::components::HalfSize3D::splat(box_half_size)],
+    )
+    .with_colors([color])
+    .with_fill_mode(rg::components::FillMode::Solid)
 }
