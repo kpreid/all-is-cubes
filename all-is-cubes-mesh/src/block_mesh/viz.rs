@@ -8,7 +8,7 @@ use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::math::{Face6, GridCoordinate, GridPoint, Rgba, Vol};
 
 use crate::Position;
-use crate::block_mesh::analyze::Analysis;
+use crate::block_mesh::analyze::{Analysis, AnalysisVertex};
 
 #[cfg(feature = "rerun")]
 use {
@@ -294,12 +294,12 @@ impl Viz {
         }
     }
 
-    pub(crate) fn add_analysis_vertex(&mut self, #[allow(unused)] point: GridPoint) {
+    pub(crate) fn add_analysis_vertex(&mut self, #[allow(unused)] vertex: AnalysisVertex) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
             state
                 .analysis_vertices
-                .push(rg::convert_vec(point.to_vector()));
+                .push(rg::convert_vec(vertex.position.to_vector()));
             state.analysis_vertices_dirty = true;
         }
     }

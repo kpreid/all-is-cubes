@@ -1,3 +1,6 @@
+use alloc::vec::Vec;
+use core::fmt;
+
 use itertools::Itertools;
 
 use all_is_cubes::block::{Evoxel, Resolution};
@@ -32,7 +35,7 @@ const EMPTY_PLANE_BOX: PlaneBox = PlaneBox {
     max: Point2D::new(GridCoordinate::MIN, GridCoordinate::MIN),
 };
 
-#[derive(Clone, Debug)] // could be Copy, but it's large so let's not
+#[derive(Clone, Debug)]
 #[repr(C, align(16))] // For perf, ensure the arrays are aligned to whole `PlaneBox`es, 4 × i32
 pub(crate) struct Analysis {
     /// For each face normal, which depths will need any triangles generated,
@@ -55,6 +58,33 @@ pub(crate) struct Analysis {
     /// Whether there are any adjacent visible voxels that have different colors, and therefore
     /// probably need a texture rather than vertex colors.
     pub needs_texture: bool,
+
+    /// Each point that is a vertex; that is, each point which
+    ///
+    /// * is a [vertex] of the block considered as a [polyhedron], and
+    /// * therefore, is necessarily a [`Vertex`] of the mesh.
+    ///
+    /// The vertices are sorted in [`ZMaj`] order.
+    ///
+    /// [vertex]: (https://en.wikipedia.org/wiki/Vertex_\(geometry\))
+    /// [orthogonal polyhedron]: https://en.wikipedia.org/wiki/Orthogonal_polyhedron
+    /// [`Vertex`]: crate::Vertex
+    //
+    // TODO: Currently, this information is not used (except by `Viz`).
+    // It is planned to be used by a new polygon triangulation algorithm.
+    pub vertices: Vec<AnalysisVertex>,
+}
+
+/// An abstract (not textured, not face-specific) vertex of the voxel shape.
+///
+/// Obtain this from [`Analysis::vertices`].
+#[derive(Clone, Copy)]
+pub(crate) struct AnalysisVertex {
+    pub position: GridPoint,
+    /// Bitmask of which volumes adjacent to this vertex are occupied by a visible material.
+    pub renderable: OctantMask,
+    /// Bitmask of which volumes adjacent to this vertex are occupied by a fully opaque material.
+    pub opaque: OctantMask,
 }
 
 /// Reverses the 2D-ification transformation done to `occupied_planes`.
@@ -77,6 +107,7 @@ impl Analysis {
             transparent_bounding_box: None,
             needs_texture: false,
             resolution: Resolution::R1,
+            vertices: Vec::new(),
         }
     };
 
@@ -155,6 +186,8 @@ impl Analysis {
 /// Analyze a block's voxel array and find characteristics its mesh will have.
 ///
 /// This is a preliminary step before creating the actual vertices and texture of a `BlockMesh`.
+///
+/// TODO: consider taking an `&mut Analysis` value to reuse allocation and reduce stack size.
 pub(crate) fn analyze(
     resolution: Resolution,
     voxels: Vol<&[Evoxel]>,
@@ -280,11 +313,13 @@ fn analyze_one_window(
             // “T-junctions”: places where an edge of one triangle meets a vertex of other
             // triangles, which are subject to numerical error during rendering that causes visible
             // gaps.
-            //
-            // TODO: Currently, this information is not used (except by `Viz`).
-            // We should store it in `analysis` or return it in a separate buffer,
-            // but only once it is actually going to be used.
-            viz.add_analysis_vertex(center);
+            let vertex = AnalysisVertex {
+                position: center,
+                renderable,
+                opaque,
+            };
+            analysis.vertices.push(vertex);
+            viz.add_analysis_vertex(vertex);
         }
     }
 }
@@ -300,6 +335,9 @@ fn uncovered(mask: OctantMask, face: Face6) -> bool {
 ///
 /// This is expressed as internal iteration (a callback rather than `-> impl Iterator`) for ease
 /// of implementing caching across steps.
+///
+/// Note: Changing the iteration order will change the ordering of the [`Analysis::vertices`]
+/// vector, which must be taken into account.
 fn for_each_window<'a>(
     voxels: Vol<&'a [Evoxel], ZMaj>,
     mut f: impl FnMut((GridPoint, OctantMap<&'a Evoxel>)),
@@ -358,6 +396,21 @@ fn for_each_window<'a>(
     }
 }
 
+impl fmt::Debug for AnalysisVertex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Always-single-line formatting
+        let Self {
+            position,
+            renderable,
+            opaque,
+        } = self;
+        write!(
+            f,
+            "{{ position: {position:?}, renderable: {renderable:?}, opaque: {opaque:?} }}"
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -404,7 +457,9 @@ mod tests {
         assert_eq!(size_of::<PlaneBox>(), plane_box_size);
         let planes_per_face = MAX_PLANES;
         let faces = Face6::ALL.len();
-        let other_fields = 32; // One GridAab + 2 byte-sized fields, aligned to 16
+        // One GridAab + one Vec + 2 byte-sized fields, aligned to 16
+        let other_fields =
+            (size_of::<GridAab>() + size_of::<Vec<AnalysisVertex>>() + 2).next_multiple_of(16);
         assert_eq!(
             dbg!(size_of::<Analysis>()),
             plane_box_size * planes_per_face * faces + other_fields
