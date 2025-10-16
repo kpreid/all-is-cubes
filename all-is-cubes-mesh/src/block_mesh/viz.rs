@@ -52,10 +52,6 @@ pub struct Inner {
     data_bounds: Option<GridAab>,
 
     analysis: Analysis,
-    analysis_vertices: Vec<rg::datatypes::Vec3D>,
-    /// Tracks whether we have new vertices, to reduce the amount of logged data
-    /// TODO: Do this for the other things too.
-    analysis_vertices_dirty: bool,
 
     destination: rg::Destination,
     window_voxels_path: rg::EntityPath,
@@ -108,8 +104,6 @@ impl Viz {
                 resolution: None,
                 data_bounds: None,
                 analysis: Analysis::EMPTY,
-                analysis_vertices: Vec::new(),
-                analysis_vertices_dirty: false,
                 mesh_edge_positions: Vec::new(),
                 mesh_edge_classes: Vec::new(),
                 mesh_vertex_positions: Vec::new(),
@@ -184,6 +178,7 @@ impl Viz {
     pub(crate) fn analysis_in_progress(&mut self, #[allow(unused)] analysis: &Analysis) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
+            // TODO: Compare what parts of the analysis have changed to deduplicate updates
             state.analysis = analysis.clone();
             state.log_analysis();
         }
@@ -293,16 +288,6 @@ impl Viz {
             );
         }
     }
-
-    pub(crate) fn add_analysis_vertex(&mut self, #[allow(unused)] vertex: AnalysisVertex) {
-        #[cfg(feature = "rerun")]
-        if let Self::Enabled(state) = self {
-            state
-                .analysis_vertices
-                .push(rg::convert_vec(vertex.position.to_vector()));
-            state.analysis_vertices_dirty = true;
-        }
-    }
 }
 
 #[cfg(feature = "rerun")]
@@ -337,20 +322,19 @@ impl Inner {
             );
         }
 
-        // Log analysis_vertices (not technically part of `Analysis` *yet*)
-        if mem::take(&mut self.analysis_vertices_dirty) {
-            self.destination.log(
-                &self.analysis_vertices_path,
-                // We use `Ellipsoids3D` instead of `Points3D`, even though these are semantically
-                // points, to get better rendering.
-                &rg::archetypes::Ellipsoids3D::from_centers_and_radii(
-                    self.analysis_vertices.iter().copied(),
-                    [0.15],
-                )
-                .with_colors([rg::components::Color::from_rgb(80, 80, 255)])
-                .with_fill_mode(rg::components::FillMode::Solid),
+        self.destination.log(
+            &self.analysis_vertices_path,
+            // We use `Ellipsoids3D` instead of `Points3D`, even though these are semantically
+            // points, to get better rendering.
+            &rg::archetypes::Ellipsoids3D::from_centers_and_radii(
+                self.analysis.vertices.iter().map(|av| {
+                    rg::components::PoseTranslation3D(rg::convert_vec(av.position.to_vector()))
+                }),
+                [0.15],
             )
-        }
+            .with_colors([rg::components::Color::from_rgb(80, 80, 255)])
+            .with_fill_mode(rg::components::FillMode::Solid),
+        )
     }
 
     fn log_voxels(

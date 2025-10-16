@@ -319,7 +319,6 @@ fn analyze_one_window(
                 opaque,
             };
             analysis.vertices.push(vertex);
-            viz.add_analysis_vertex(vertex);
         }
     }
 }
