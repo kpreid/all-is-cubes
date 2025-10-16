@@ -35,7 +35,7 @@ const EMPTY_PLANE_BOX: PlaneBox = PlaneBox {
     max: Point2D::new(GridCoordinate::MIN, GridCoordinate::MIN),
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)] // PartialEq impl is only for debugging
 #[repr(C, align(16))] // For perf, ensure the arrays are aligned to whole `PlaneBox`es, 4 × i32
 pub(crate) struct Analysis {
     /// For each face normal, which depths will need any triangles generated,
@@ -47,7 +47,7 @@ pub(crate) struct Analysis {
     /// If a given plane contains no voxels, its value will be [`EMPTY_PLANE_BOX`].
     ///
     /// The boxes' thickness happens to be equal to the layer position but this is coincidental.
-    occupied_planes: FaceMap<[PlaneBox; MAX_PLANES]>,
+    pub(crate) occupied_planes: FaceMap<[PlaneBox; MAX_PLANES]>,
 
     /// If there are any transparent voxels, and `transparency_format` is
     /// [`TransparencyFormat::BoundingBox`], this is their bounding box.
@@ -78,7 +78,7 @@ pub(crate) struct Analysis {
 /// An abstract (not textured, not face-specific) vertex of the voxel shape.
 ///
 /// Obtain this from [`Analysis::vertices`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) struct AnalysisVertex {
     pub position: GridPoint,
     /// Bitmask of which volumes adjacent to this vertex are occupied by a visible material.
@@ -204,7 +204,7 @@ pub(crate) fn analyze(
 
     for_each_window(voxels, |(center, window_voxels)| {
         viz.window(center, voxels);
-        analyze_one_window(&mut analysis, center, window_voxels, transparency, viz);
+        analyze_one_window(&mut analysis, center, window_voxels, transparency);
         viz.analysis_in_progress(&analysis);
     });
     viz.clear_window();
@@ -219,7 +219,6 @@ fn analyze_one_window(
     center: GridPoint,
     window: OctantMap<&Evoxel>,
     transparency: TransparencyFormat,
-    viz: &mut Viz,
 ) {
     use Face6::*;
     const ALL: OctantMask = OctantMask::ALL;

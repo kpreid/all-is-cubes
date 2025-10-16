@@ -8,7 +8,7 @@ use all_is_cubes::block::{Evoxel, Evoxels};
 use all_is_cubes::math::{Face6, GridCoordinate, GridPoint, Rgba, Vol};
 
 use crate::Position;
-use crate::block_mesh::analyze::{Analysis, AnalysisVertex};
+use crate::block_mesh::analyze::Analysis;
 
 #[cfg(feature = "rerun")]
 use {
@@ -179,8 +179,7 @@ impl Viz {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
             // TODO: Compare what parts of the analysis have changed to deduplicate updates
-            state.analysis = analysis.clone();
-            state.log_analysis();
+            state.update_and_log_analysis(analysis);
         }
     }
 
@@ -208,7 +207,7 @@ impl Viz {
             // Delete the corresponding analysis rect, to indicate that we're (about to be)
             // entirely done with it.
             state.analysis.delete_occupied_plane(face, layer);
-            state.log_analysis();
+            state.log_occupied_planes();
         }
     }
 
@@ -297,24 +296,23 @@ impl Inner {
     }
 
     /// Logs the current contents of the [`Analysis`], replacing any prior data.
-    fn log_analysis(&mut self) {
-        // Log occupied_planes
-        {
-            let iter = Face6::ALL.into_iter().flat_map(|face| {
-                self.analysis.occupied_planes(face).map({
-                    let this = &*self;
-                    move |(layer, _)| this.layer_box(face, layer)
-                })
-            });
-            self.destination.log(
-                &self.occupied_path,
-                &rg::convert_grid_aabs(iter)
-                    .with_class_ids([rg::ClassId::MeshVizOccupiedPlane])
-                    .with_radii([OCCUPIED_RADIUS]),
-            );
+    fn update_and_log_analysis(&mut self, new_analysis: &Analysis) {
+        // We compare current to previous data and log it only if it has changed.
+        // This is mainly so that the resulting Rerun dataset is not huge and the
+        // timeline is more useful.
+
+        if *new_analysis == self.analysis {
+            return;
+        }
+        let old_analysis = mem::replace(&mut self.analysis, new_analysis.clone());
+
+        if self.analysis.occupied_planes != old_analysis.occupied_planes {
+            self.log_occupied_planes();
         }
 
-        if let Some(bbox) = self.analysis.transparent_bounding_box {
+        if let Some(bbox) = self.analysis.transparent_bounding_box
+            && Some(bbox) != old_analysis.transparent_bounding_box
+        {
             self.destination.log(
                 &self.analysis_transparent_box_path,
                 &rg::convert_aabs([bbox.to_free()], Vector3D::zero())
@@ -322,19 +320,37 @@ impl Inner {
             );
         }
 
-        self.destination.log(
-            &self.analysis_vertices_path,
-            // We use `Ellipsoids3D` instead of `Points3D`, even though these are semantically
-            // points, to get better rendering.
-            &rg::archetypes::Ellipsoids3D::from_centers_and_radii(
-                self.analysis.vertices.iter().map(|av| {
-                    rg::components::PoseTranslation3D(rg::convert_vec(av.position.to_vector()))
-                }),
-                [0.15],
+        if self.analysis.vertices != old_analysis.vertices {
+            self.destination.log(
+                &self.analysis_vertices_path,
+                // We use `Ellipsoids3D` instead of `Points3D`, even though these are semantically
+                // points, to get better rendering.
+                &rg::archetypes::Ellipsoids3D::from_centers_and_radii(
+                    self.analysis.vertices.iter().map(|av| {
+                        rg::components::PoseTranslation3D(rg::convert_vec(av.position.to_vector()))
+                    }),
+                    [0.15],
+                )
+                .with_colors([rg::components::Color::from_rgb(80, 80, 255)])
+                .with_fill_mode(rg::components::FillMode::Solid),
             )
-            .with_colors([rg::components::Color::from_rgb(80, 80, 255)])
-            .with_fill_mode(rg::components::FillMode::Solid),
-        )
+        }
+    }
+
+    /// Logs the current `self.analysis.occupied_planes`.
+    /// Used from two different phases.
+    fn log_occupied_planes(&self) {
+        let iter = Face6::ALL.into_iter().flat_map(|face| {
+            self.analysis
+                .occupied_planes(face)
+                .map(move |(layer, _)| self.layer_box(face, layer))
+        });
+        self.destination.log(
+            &self.occupied_path,
+            &rg::convert_grid_aabs(iter)
+                .with_class_ids([rg::ClassId::MeshVizOccupiedPlane])
+                .with_radii([OCCUPIED_RADIUS]),
+        );
     }
 
     fn log_voxels(
