@@ -20,6 +20,7 @@ use crate::{Aabbs, IndexVec, MeshOptions, MeshTypes, Vertex};
 
 mod analyze;
 mod compute;
+mod extend;
 mod planar;
 mod viz;
 #[cfg_attr(feature = "_special_testing", visibility::make(pub))]

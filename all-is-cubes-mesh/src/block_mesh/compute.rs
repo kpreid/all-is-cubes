@@ -1,22 +1,21 @@
 //! The algorithm for generating block meshes, and nothing else.
 
-use all_is_cubes::euclid::{Point2D, point2};
 use alloc::vec::Vec;
 
 use itertools::Itertools as _;
 
 use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
 use all_is_cubes::math::{
-    Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSizeCoord, OpacityCategory, Rgb, Rgba, Vol,
-    ZeroOne,
+    Cube, Face6, GridAab, GridCoordinate, GridSizeCoord, OpacityCategory, Rgb, Rgba, Vol, ZeroOne,
 };
 use all_is_cubes_render::Flaws;
 
 use crate::block_mesh::SubMesh;
 use crate::block_mesh::analyze::{Analysis, analyze};
-use crate::block_mesh::planar::{
-    GmRect, QuadColoring, QuadTransform, VisualVoxel, greedy_mesh, push_quad,
+use crate::block_mesh::extend::{
+    BoxColoring, QuadColoring, QuadTransform, push_box, push_full_box, push_quad,
 };
+use crate::block_mesh::planar::{GmRect, VisualVoxel, greedy_mesh};
 use crate::texture::{self, Tile as _};
 use crate::{BlockMesh, MeshOptions, MeshTypes, PosCoord, Viz};
 
@@ -166,125 +165,6 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
                 &mut viz,
             );
         }
-    }
-}
-
-enum BoxColoring<M: MeshTypes> {
-    VolumeTexture(M::Tile),
-    Solid(FaceMap<Rgba>),
-}
-
-/// Append triangles to `output` which form a single box,
-/// and set the `fully_opaque` flags true when appropriate.
-fn push_box<M: MeshTypes>(
-    output: &mut BlockMesh<M>,
-    resolution: Resolution,
-    aab: GridAab,
-    opacity_category: OpacityCategory,
-    coloring: &BoxColoring<M>,
-    viz: &mut Viz,
-) {
-    if opacity_category == OpacityCategory::Invisible {
-        return;
-    }
-    let fully_opaque = opacity_category == OpacityCategory::Opaque;
-    for face in Face6::ALL {
-        let volume_to_planar = face
-            .face_transform(GridCoordinate::from(resolution))
-            .inverse();
-        let aab_in_face_coordinates = aab.transform(volume_to_planar).unwrap();
-
-        let lower_bounds = aab_in_face_coordinates.lower_bounds().xy();
-        let upper_bounds = aab_in_face_coordinates.upper_bounds().xy();
-        let depth = aab_in_face_coordinates.lower_bounds().z;
-
-        // Check whether this mesh layer meets the block face (face of a unit cube).
-        // If it does, put these vertices in the separate sub-mesh group for the block face.
-        let sub_mesh = if depth == 0 {
-            &mut output.face_vertices[face]
-        } else {
-            &mut output.interior_vertices[face]
-        };
-        sub_mesh.fully_opaque |= fully_opaque
-            & (depth == 0)
-            & (lower_bounds == point2(0, 0))
-            & (upper_bounds == Point2D::splat(resolution.into()));
-        reserve_vertices(&mut sub_mesh.vertices, 4);
-
-        // TODO: reduce duplication of code between push_box and push_full_box by factoring out
-        // "reserve 6 indices" but in a way that borrow checking likes
-        let plane: <M::Tile as texture::Tile>::Plane;
-        push_quad(
-            &mut sub_mesh.vertices,
-            if fully_opaque {
-                sub_mesh.indices_opaque.reserve_exact(6);
-                &mut sub_mesh.indices_opaque
-            } else {
-                sub_mesh.indices_transparent.reserve_exact(6);
-                &mut sub_mesh.indices_transparent
-            },
-            &QuadTransform::new(face, resolution),
-            depth as f32, // TODO: eliminate this case by using a smaller integer type for `aab`?
-            lower_bounds.to_f32().cast_unit(),
-            upper_bounds.to_f32().cast_unit(),
-            match &coloring {
-                // TODO: for our actual purposes, this should be a volume and not face slices
-                BoxColoring::VolumeTexture(tile) => {
-                    plane = tile.slice(aab.abut(face, -1).unwrap());
-                    QuadColoring::Volume {
-                        plane: &plane,
-                        far_depth: (aab_in_face_coordinates.upper_bounds().z as f32),
-                    }
-                }
-                BoxColoring::Solid(face_colors) => QuadColoring::Solid(face_colors[face]),
-            },
-            viz,
-            if fully_opaque {
-                &mut sub_mesh.bounding_box.opaque
-            } else {
-                &mut sub_mesh.bounding_box.transparent
-            },
-        );
-    }
-}
-
-/// Append triangles to `output` which form a single box filling the entire block cube,
-/// and set the `fully_opaque` flags true when appropriate.
-///
-/// This is a more efficient, specialized version of [`push_box()`].
-fn push_full_box<M: MeshTypes>(
-    output: &mut BlockMesh<M>,
-    opacity_category: OpacityCategory,
-    coloring: QuadColoring<'_, <M::Tile as texture::Tile>::Plane>,
-    viz: &mut Viz,
-) {
-    let fully_opaque = opacity_category == OpacityCategory::Opaque;
-    for (face, sub_mesh) in output.face_vertices.iter_mut() {
-        if opacity_category != OpacityCategory::Invisible {
-            reserve_vertices(&mut sub_mesh.vertices, 4);
-            push_quad(
-                &mut sub_mesh.vertices,
-                if fully_opaque {
-                    sub_mesh.indices_opaque.reserve_exact(6);
-                    &mut sub_mesh.indices_opaque
-                } else {
-                    sub_mesh.indices_transparent.reserve_exact(6);
-                    &mut sub_mesh.indices_transparent
-                },
-                &QuadTransform::new(face, Resolution::R1),
-                /* depth= */ 0.,
-                point2(0., 0.),
-                point2(1., 1.),
-                coloring,
-                viz,
-                if fully_opaque {
-                    &mut sub_mesh.bounding_box.opaque
-                } else {
-                    &mut sub_mesh.bounding_box.transparent
-                },
-            );
-        }
-        sub_mesh.fully_opaque |= fully_opaque;
     }
 }
 
@@ -558,9 +438,4 @@ fn get_voxel_with_limit(voxels: Vol<&[Evoxel]>, cube: Cube, options: &MeshOption
         }
     };
     evoxel
-}
-
-fn reserve_vertices<T, U>((v0, v1): &mut (Vec<T>, Vec<U>), n: usize) {
-    v0.reserve_exact(n);
-    v1.reserve_exact(n);
 }
