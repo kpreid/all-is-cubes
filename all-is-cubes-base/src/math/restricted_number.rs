@@ -1,3 +1,4 @@
+use core::cmp::Ordering;
 use core::fmt;
 use core::hash;
 use core::ops;
@@ -29,7 +30,7 @@ use ordered_float::NotNan;
 /// are either impossible or arise as “would be finite but it is too large to be represented”,
 /// and do not arise as the reciprocal of zero, and thus we can treat “zero times anything
 /// is zero” as being a more important property than “infinity times anything is infinity”.
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct PositiveSign<T>(T);
 
 /// A floating-point number which is within the range +0 to +1 (inclusive).
@@ -39,7 +40,7 @@ pub struct PositiveSign<T>(T);
 ///
 /// Because NaN and negative zero are excluded, this type implements [`Eq`] straightforwardly,
 /// and can reliably be used as a map key for caching, interning, etc.
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct ZeroOne<T>(T);
 
 // --- Inherent implementations --------------------------------------------------------------------
@@ -420,31 +421,61 @@ impl<T: PartialEq> PartialEq<T> for ZeroOne<T> {
 }
 impl<T: PartialOrd> PartialOrd<T> for PositiveSign<T> {
     #[inline]
-    fn partial_cmp(&self, other: &T) -> Option<core::cmp::Ordering> {
+    fn partial_cmp(&self, other: &T) -> Option<Ordering> {
         self.0.partial_cmp(other)
     }
 }
 impl<T: PartialOrd> PartialOrd<T> for ZeroOne<T> {
     #[inline]
-    fn partial_cmp(&self, other: &T) -> Option<core::cmp::Ordering> {
+    fn partial_cmp(&self, other: &T) -> Option<Ordering> {
         self.0.partial_cmp(other)
     }
 }
 
-#[allow(clippy::derive_ord_xor_partial_ord)]
-impl<T: FloatCore + PartialOrd> Ord for PositiveSign<T> {
+// This impl could be derived, but making it explicit will help us ensure it has identical
+// properties to  the `Ord` impl, and quiets `clippy::derive_ord_xor_partial_ord`.
+#[allow(
+    clippy::non_canonical_partial_ord_impl,
+    reason = "that way would have a needless unwrap"
+)]
+impl<T: FloatCore + PartialOrd> PartialOrd for PositiveSign<T> {
     #[inline]
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        // Correctness: All values that would violate `Ord`’s properties are prohibited.
-        self.partial_cmp(other).unwrap()
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
     }
 }
-#[allow(clippy::derive_ord_xor_partial_ord)]
+impl<T: FloatCore + PartialOrd> Ord for PositiveSign<T> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Correctness: All values that would violate `Ord`’s properties are prohibited
+        // by the constructors.
+        match self.0.partial_cmp(&other.0) {
+            Some(o) => o,
+            None => invalid_ps_panic(),
+        }
+    }
+}
+// This impl could be derived, but making it explicit will help us ensure it has identical
+// properties to  the `Ord` impl, and quiets `clippy::derive_ord_xor_partial_ord`.
+#[allow(
+    clippy::non_canonical_partial_ord_impl,
+    reason = "that way would have a needless unwrap"
+)]
+impl<T: FloatCore + PartialOrd> PartialOrd for ZeroOne<T> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
 impl<T: FloatCore + PartialOrd> Ord for ZeroOne<T> {
     #[inline]
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        // Correctness: All values that would violate `Ord`’s properties are prohibited.
-        self.partial_cmp(other).unwrap()
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Correctness: All values that would violate `Ord`’s properties are prohibited
+        // by the constructors.
+        match self.0.partial_cmp(&other.0) {
+            Some(o) => o,
+            None => invalid_zo_panic(),
+        }
     }
 }
 
@@ -781,6 +812,18 @@ const fn zero_one_out_of_range_panic() -> ! {
     panic!("ZeroOne value must be between zero and one")
 }
 
+#[track_caller]
+#[cold]
+const fn invalid_zo_panic() -> ! {
+    panic!("an invalid ZeroOne value was encountered; this should be impossible")
+}
+
+#[track_caller]
+#[cold]
+const fn invalid_ps_panic() -> ! {
+    panic!("an invalid PositiveSign value was encountered; this should be impossible")
+}
+
 // -------------------------------------------------------------------------------------------------
 
 /// Convenient alias for [`PositiveSign::<f32>::new_strict()`],
@@ -819,6 +862,51 @@ mod tests {
     use super::*;
     use alloc::string::ToString as _;
     use exhaust::Exhaust as _;
+
+    #[test]
+    fn ps_ord_self() {
+        assert_eq!(ps32(1.0).partial_cmp(&ps32(2.0)), Some(Ordering::Less));
+        assert_eq!(ps32(2.0).partial_cmp(&ps32(2.0)), Some(Ordering::Equal));
+        assert_eq!(ps32(3.0).partial_cmp(&ps32(2.0)), Some(Ordering::Greater));
+        assert_eq!(ps32(1.0).cmp(&ps32(2.0)), Ordering::Less);
+        assert_eq!(ps32(2.0).cmp(&ps32(2.0)), Ordering::Equal);
+        assert_eq!(ps32(3.0).cmp(&ps32(2.0)), Ordering::Greater);
+    }
+
+    #[test]
+    fn zo_ord_self() {
+        assert_eq!(zo32(0.1).partial_cmp(&zo32(0.2)), Some(Ordering::Less));
+        assert_eq!(zo32(0.2).partial_cmp(&zo32(0.2)), Some(Ordering::Equal));
+        assert_eq!(zo32(0.3).partial_cmp(&zo32(0.2)), Some(Ordering::Greater));
+        assert_eq!(zo32(0.1).cmp(&zo32(0.2)), Ordering::Less);
+        assert_eq!(zo32(0.2).cmp(&zo32(0.2)), Ordering::Equal);
+        assert_eq!(zo32(0.3).cmp(&zo32(0.2)), Ordering::Greater);
+    }
+
+    #[test]
+    fn ps_ord_inner() {
+        assert_eq!(ps32(1.0).partial_cmp(&2.0), Some(Ordering::Less));
+        assert_eq!(ps32(2.0).partial_cmp(&2.0), Some(Ordering::Equal));
+        assert_eq!(ps32(3.0).partial_cmp(&2.0), Some(Ordering::Greater));
+        // There is no `Ord` implementation to test.
+
+        // Since the RHS is not a `PositiveSign`, out-of-range values can occur.
+        assert_eq!(ps32(1.0).partial_cmp(&-1.0), Some(Ordering::Greater));
+        assert_eq!(ps32(1.0).partial_cmp(&f32::NAN), None);
+    }
+
+    #[test]
+    fn zo_ord_inner() {
+        assert_eq!(zo32(0.1).partial_cmp(&0.2), Some(Ordering::Less));
+        assert_eq!(zo32(0.2).partial_cmp(&0.2), Some(Ordering::Equal));
+        assert_eq!(zo32(0.3).partial_cmp(&0.2), Some(Ordering::Greater));
+        // There is no `Ord` implementation to test.
+
+        // Since the RHS is not a `ZeroOne`, out-of-range values can occur.
+        assert_eq!(zo32(0.0).partial_cmp(&-1.0), Some(Ordering::Greater));
+        assert_eq!(zo32(1.0).partial_cmp(&2.0), Some(Ordering::Less));
+        assert_eq!(zo32(1.0).partial_cmp(&f32::NAN), None);
+    }
 
     #[test]
     fn ps_canonicalizes_negative_zero() {
