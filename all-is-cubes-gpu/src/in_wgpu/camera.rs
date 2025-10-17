@@ -1,5 +1,5 @@
 use all_is_cubes::euclid::Transform3D;
-use all_is_cubes_render::camera::{Camera, FogOption, LightingOption};
+use all_is_cubes_render::camera::{AntialiasingOption, Camera, FogOption, LightingOption};
 
 /// Information corresponding to [`Camera`] but in a form suitable for passing in a
 /// uniform buffer to the `blocks-and-lines.wgsl` shader. Also includes some miscellaneous
@@ -24,13 +24,13 @@ pub(crate) struct ShaderSpaceCamera {
     /// Light rendering style to use; a copy of [`GraphicsOptions::lighting_display`].
     light_option: i32,
 
+    /// 0 or 1 indicating whether to apply antialiasing to block texture texel edges.
+    antialiasing_option: i32,
+
     /// Fog equation blending: 0 is realistic fog and 1 is distant more abrupt fog.
     fog_mode_blend: f32,
     /// How far out should be fully fogged?
     fog_distance: f32,
-
-    /// pad out to multiple of vec4<something32>
-    _padding: i32,
 }
 
 impl ShaderSpaceCamera {
@@ -70,10 +70,13 @@ impl ShaderSpaceCamera {
                 LightingOption::None => 0,
                 LightingOption::Flat => 1,
                 LightingOption::Smooth | LightingOption::Bounce => 2,
-                _ => unreachable!(
-                    "Unhandled LightingOption value {:?}",
-                    options.lighting_display
-                ),
+                ref u => unreachable!("Unhandled LightingOption value {u:?}"),
+            },
+
+            antialiasing_option: match options.antialiasing {
+                AntialiasingOption::None => 0,
+                AntialiasingOption::IfCheap | AntialiasingOption::Always => 1,
+                ref u => unreachable!("Unhandled AntialiasingOption value {u:?}"),
             },
 
             fog_mode_blend,
@@ -84,8 +87,6 @@ impl ShaderSpaceCamera {
             } else {
                 camera.exposure().into_inner()
             },
-
-            _padding: Default::default(),
         }
     }
 }

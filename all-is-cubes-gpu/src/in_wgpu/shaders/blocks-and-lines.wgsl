@@ -10,10 +10,9 @@ struct ShaderSpaceCamera {
     exposure: f32,
     // --- 16-byte aligned point ---
     light_option: i32,
+    antialiasing_option: i32,
     fog_mode_blend: f32,
     fog_distance: f32,
-    // pad out to multiple of 16 bytes
-    padding1: f32,
 }
 
 // Mirrors `struct BPosition` + `struct BColor` on the Rust side.
@@ -50,6 +49,9 @@ struct WgpuLinesVertex {
 
 // This group is named blocks_static_bind_group in the code.
 @group(2) @binding(0) var debug_font_texture: texture_2d<f32>;
+// This sampler is linear but not for linear interpolation of block textures;
+// rather, its input coordinates are distorted to create antialiased edges.
+@group(2) @binding(1) var block_linear_sampler: sampler;
 
 // --- Fog computation --------------------------------------------------------
 
@@ -432,19 +434,17 @@ fn get_material(in: BlockFragmentInput) -> Material {
     if in.color_or_texture[3] < -0.5 {
         // Texture coordinates.
         let atlas_id = get_atlas_id(in);
-        let clamped: vec3f = clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max);
 
-        // If activated, this code will produce an “x-ray” view of all textured surfaces
-        // by cutting out all but the clamped border. Other similar changes could be used to
-        // visualize the clamping itself without adding any transparency.
-        // 
-        // if (all(clamped == in.color_or_texture.xyz)) {
-        //     discard;
-        // }
-
-        // Note that coordinate rounding towards zero (truncation) is effectively floor() since the
-        // input is nonnegative.
-        return get_material_from_texture(vec3i(clamped), atlas_id);
+        if camera.antialiasing_option != 0 {
+            let warped: vec3f = antialias_texel_coordinates(in.color_or_texture.xyz);
+            let clamped: vec3f = clamp(warped, in.clamp_min, in.clamp_max);
+            return get_material_from_texture_linear(clamped, atlas_id);
+        } else {
+            let clamped: vec3f = clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max);
+            // Note that coordinate rounding towards zero (truncation) is effectively floor(),
+            // since the input is nonnegative.
+            return get_material_from_texture_unfiltered(vec3i(clamped), atlas_id);
+        }
     } else {
         // Solid color.
         return Material(in.color_or_texture, vec3<f32>(0.0));
@@ -457,8 +457,9 @@ fn get_atlas_id(in: BlockFragmentInput) -> i32 {
     return i32(round(-in.color_or_texture[3] - 1.0));
 }
 
-// Read material details from textures.
-fn get_material_from_texture(texcoord: vec3<i32>, atlas_id: i32) -> Material {    
+// Read material details from textures, without filtering.
+// The input coordinates are in units of texels, not 0-1.
+fn get_material_from_texture_unfiltered(texcoord: vec3<i32>, atlas_id: i32) -> Material {    
     // Read texture; using textureLoad because our coordinates are in units of texels
     // and we don't want any filtering or wrapping, so using a sampler gives no benefit.
     if atlas_id == 1 {
@@ -478,6 +479,46 @@ fn get_material_from_texture(texcoord: vec3<i32>, atlas_id: i32) -> Material {
             vec3<f32>(0.0),
         );
     }
+}
+
+// Read material details from textures, with linear filtering.
+// The input coordinates are in units of texels, not 0-1.
+fn get_material_from_texture_linear(texcoord_t: vec3<f32>, atlas_id: i32) -> Material {
+    if atlas_id == 1 {
+        let d = vec3f(textureDimensions(block_g1_reflectance));
+        let texcoord_s = texcoord_t / d;
+        return Material(
+            textureSampleLevel(block_g1_reflectance, block_linear_sampler, texcoord_s, 0),
+            textureSampleLevel(block_g1_emission, block_linear_sampler, texcoord_s, 0).rgb,
+        );
+    } else if atlas_id == 0 {
+        let d = vec3f(textureDimensions(block_g0_reflectance));
+        return Material(
+            textureSampleLevel(block_g0_reflectance, block_linear_sampler, texcoord_t / d, 0),
+            vec3<f32>(0.0),
+        );
+    } else {
+        // Error — incorrect atlas ID.
+        return Material(
+            vec4<f32>(1.0, f32(atlas_id), 0.0, 1.0),
+            vec3<f32>(0.0),
+        );
+    }
+}
+
+// Given 3D texture coordinates in units of whole texels,
+// transform them nonlinearly so that when given to a linear texture sampler,
+// the output acts like a nearest sampler except with antialiased edges between texels.
+@diagnostic(off,derivative_uniformity)
+// @diagnostic allows us to use `fwidth()` despite the `if in.color_or_texture[3] < -0.5`
+// in the caller, which will always be uniform in correct input data.
+fn antialias_texel_coordinates(texel_coordinates: vec3<f32>) -> vec3<f32> {
+    // Antialiasing technique by Inigo Quilez
+    // see https://www.shadertoy.com/view/MllBWf (user comments)
+    // via https://jorenjoestar.github.io/post/pixel_art_filtering/
+    let which_texel = floor(texel_coordinates + 0.5);
+    let scale = fwidth(texel_coordinates);
+    return which_texel + clamp((texel_coordinates - which_texel) / scale, vec3f(-0.5), vec3f(0.5));
 }
 
 // Apply the effects of distance fog and camera exposure.
@@ -588,7 +629,7 @@ fn raymarch_volumetric(in: BlockFragmentInput) -> vec4<f32> {
             return vec4f(1.0, 0.0, 0.0, 1.0);
         }
 
-        var material = get_material_from_texture(vec3i(march_position_in_texture), atlas_id);
+        var material = get_material_from_texture_unfiltered(vec3i(march_position_in_texture), atlas_id);
         if material.reflectance.a == 1.0 {
             // This is an opaque voxel, which will already have been drawn.
             // Don’t draw it again, to avoid any inconsistency with non-raymarching
