@@ -83,7 +83,7 @@ bevy_ecs = { version = "0.16.0", default-features = false }
 bevy_platform = { version = "0.16.0", default-features = false, features = ["alloc", "web"] }
 bitflags = { version = "2.9.0", default-features = false }
 bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
-bytemuck = { version = "1.22.0", default-features = false, features = ["derive", "must_cast"] }
+bytemuck = { version = "1.24.0", default-features = false, features = ["derive", "must_cast"] }
 cfg-if = { version = "1.0.0", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
@@ -105,14 +105,14 @@ futures-util = { version = "0.3.31", default-features = false, features = ["allo
 # TODO: evaluate which gilrs features should be enabled
 gilrs = { version = "0.11.0" }
 gloo-timers = { version = "0.3.0", default-features = false }
-half = { version = "2.5.0", default-features = false, features = ["bytemuck"] }
+half = { version = "2.6.0", default-features = false, features = ["bytemuck"] }
 hashbrown = { version = "0.16.0", default-features = false, features = ["default-hasher", "inline-more"] }
 image = { version = "0.25.1", default-features = false }
 imgref = { version = "1.10.1", default-features = false }
 indoc = { version = "2.0.1", default-features = false }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
 libm = { version = "0.2.8", default-features = false }
-log = { version = "0.4.27", default-features = false }
+log = { version = "0.4.28", default-features = false }
 macro_rules_attribute = { version = "0.2.0", default-features = false }
 manyfmt = { version = "0.1.0", default-features = false }
 mutants = { version = "0.0.3", default-features = false }
@@ -131,10 +131,10 @@ pretty_assertions = { version = "1.2.0" }
 rand = { version = "0.9.0", default-features = false }
 rand_distr = { version = "0.5.1", default-features = false }
 rand_xoshiro = { version = "0.7.0", default-features = false }
-rayon = { version = "1.10.0", default-features = false }
-re_log_types = { version = "0.25.0", default-features = false }
-re_sdk = { version = "0.25.0", default-features = false }
-re_types = { version = "0.25.0", default-features = false }
+rayon = { version = "1.11.0", default-features = false }
+re_log_types = { version = "0.26.0", default-features = false }
+re_sdk = { version = "0.26.0", default-features = false }
+re_types = { version = "0.26.0", default-features = false }
 rectangle-pack = { version = "0.4.2" } # currently only used in all-is-cubes-port which is currently std only
 rendiff = { version = "0.2.0", default-features = false }
 # We use rstest for parameterized tests where each case can fail or succeed independently.
@@ -144,7 +144,7 @@ rustc-hash = { version = "2.1.1", default-features = false }
 scopeguard = { version = "1.2.0", default-features = false }
 # "futures" feature is used by all-is-cubes-gpu, but it's small so we enable it everywhere 
 send_wrapper = { version = "0.6.0", default-features = false, features = ["futures"] }
-serde = { version = "1.0.219", default-features = false, features = ["derive"] }
+serde = { version = "1.0.220", default-features = false, features = ["derive"] }
 # TODO: currently all crates that use serde_json also need std, but that should change
 serde_json = { version = "1.0.142", default-features = false, features = ["std"] }
 simplelog = { version = "0.12.0", default-features = false, features = ["local-offset"] }
@@ -153,13 +153,13 @@ smol = { version = "2.0.2" }
 smol-macros = { version = "0.1.1" } # keep in sync with `smol`, `async-*`
 snapbox = "0.6.10" # keep in sync with `trycmd`
 strum = { version = "0.26.3", default-features = false, features = ["derive"] }
-sync_wrapper = { version = "1.0.0", default-features = false }
-tempfile = { version = "3.20.0", default-features = false }
+sync_wrapper = { version = "1.0.2", default-features = false }
+tempfile = { version = "3.23.0", default-features = false }
 thiserror = { version = "2.0.12", default-features = false }
 time = { version = "0.3.36", default-features = false }
 # Tokio is used for certain binaries.
 # The library crates do not require Tokio.
-tokio = { version = "1.44.2", default-features = false }
+tokio = { version = "1.47.1", default-features = false }
 trycmd = "0.15.4" # keep in sync with `snapbox`
 unicode-segmentation = { version = "1.10.1", default-features = false }
 unicode-width = { version = "0.2", default-features = false }
