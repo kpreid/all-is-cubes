@@ -60,7 +60,9 @@ impl ops::Sub<Duration> for Deadline {
         match self {
             Deadline::Asap => Deadline::Asap,
             #[allow(
-                clippy::unchecked_duration_subtraction,
+                renamed_and_removed_lints,
+                clippy::unchecked_duration_subtraction, // old name
+                clippy::unchecked_time_subtraction, // new name Rust 1.92/nightly
                 reason = "TODO: can we do better?"
             )]
             Deadline::At(i) => Deadline::At(i - rhs),

@@ -228,8 +228,5 @@ impl LightingBenchLayout {
 }
 
 fn saturating_cast(input: u32) -> u8 {
-    match u8::try_from(input) {
-        Ok(output) => output,
-        Err(_) => u8::MAX,
-    }
+    u8::try_from(input).unwrap_or(u8::MAX)
 }
