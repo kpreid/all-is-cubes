@@ -6,7 +6,6 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
-use rand::SeedableRng;
 
 use euclid::{Vector3D, vec3};
 use manyfmt::Fmt;
@@ -17,13 +16,14 @@ use manyfmt::Fmt;
     reason = "unclear why this warns even though it is needed"
 )]
 use num_traits::float::Float as _;
+use rand::SeedableRng;
 
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 use crate::block::{AIR, Evoxels, Resolution};
-use crate::camera::NdcPoint2;
 use crate::camera::{Camera, GraphicsOptions, TransparencyOption};
+use crate::camera::{FogOption, NdcPoint2};
 #[cfg(not(any(feature = "std", test)))]
 #[allow(
     unused_imports,
@@ -150,8 +150,23 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         };
         let ray_direction = ray.direction();
 
+        let sky_light = include_sky.then(|| self.sky.sample(ray.direction()));
+        let t_to_absolute_distance = ray.direction().length();
         let mut state: TracingState<'_, P> = TracingState {
-            t_to_absolute_distance: ray.direction().length(),
+            t_to_absolute_distance,
+            t_to_view_distance: (t_to_absolute_distance
+                / self.graphics_options.view_distance.into_inner())
+                as f32,
+            distance_fog_light: match self.graphics_options.fog {
+                FogOption::None => None,
+                _ => sky_light,
+            },
+            distance_fog_blend: match self.graphics_options.fog {
+                FogOption::Abrupt => 1.0,
+                FogOption::Compromise => 0.5,
+                FogOption::Physical => 0.0,
+                /* FogOption::None | */ _ => 0.0,
+            },
             primary_cubes_traced: 0,
             secondary_info: RaytraceInfo::default(),
             accumulator,
@@ -219,8 +234,8 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             }
         }
         state.finish(
-            if include_sky {
-                self.sky.sample(ray.direction()).with_alpha_one()
+            if let Some(sky_light) = sky_light {
+                sky_light.with_alpha_one()
             } else {
                 Rgba::TRANSPARENT
             },
@@ -556,6 +571,16 @@ struct TracingState<'a, P: Accumulate> {
     /// where 1 unit = 1 block thickness.
     t_to_absolute_distance: f64,
 
+    /// Conversion factor from raycaster `t` values to fractions of
+    /// `graphics_options.view_distance`.
+    t_to_view_distance: f32,
+
+    /// If fog is enabled, then this is what the light from the scene should be blended with.
+    distance_fog_light: Option<Rgb>,
+
+    /// Coefficient controlling fog density.
+    distance_fog_blend: f32,
+
     /// Number of cubes traced through by primary rays -- controlled by the caller, so not
     /// necessarily equal to the number of calls to [`Self::trace_through_surface()`].
     primary_cubes_traced: usize,
@@ -648,7 +673,7 @@ impl<P: Accumulate> TracingState<'_, P> {
         surface: &Surface<'_, P::BlockData>,
         rt: &SpaceRaytracer<P::BlockData>,
     ) {
-        if let Some((light, info)) = surface.to_light(rt, self.ray_bounce_rng.as_mut()) {
+        if let Some((light, info)) = surface.to_light(rt, self) {
             self.accumulator.add(Hit {
                 exception: None,
                 surface: light,

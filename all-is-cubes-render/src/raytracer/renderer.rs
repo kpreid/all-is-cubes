@@ -12,8 +12,7 @@ use all_is_cubes::space::Space;
 use all_is_cubes::universe::{Handle, ReadTicket};
 
 use crate::camera::{
-    Camera, FogOption, GraphicsOptions, Layers, Ndc, NdcPoint2, StandardCameras, Viewport,
-    area_usize,
+    Camera, GraphicsOptions, Layers, Ndc, NdcPoint2, StandardCameras, Viewport, area_usize,
 };
 use crate::raytracer::{
     Accumulate, ColorBuf, RaytraceInfo, RtBlockData, RtOptionsRef, SpaceRaytracer,
@@ -279,9 +278,6 @@ impl RtRenderer<()> {
         }
         if self.had_cursor {
             flaws |= Flaws::NO_CURSOR;
-        }
-        if !matches!(options.fog, FogOption::None) {
-            flaws |= Flaws::NO_FOG;
         }
 
         (Rendering { size, data, flaws }, info)
