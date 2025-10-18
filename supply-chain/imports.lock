@@ -114,8 +114,8 @@ user-login = "kornelski"
 user-name = "Kornel"
 
 [[publisher.emath]]
-version = "0.32.0"
-when = "2025-07-10"
+version = "0.33.0"
+when = "2025-10-09"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
@@ -197,190 +197,190 @@ user-login = "cwfitzgerald"
 user-name = "Connor Fitzgerald"
 
 [[publisher.re_arrow_util]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_build_info]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_build_tools]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_byte_size]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_case]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_chunk]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_error]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_format]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_format_arrow]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_grpc_client]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_grpc_server]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_log]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_log_encoding]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_log_types]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_memory]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_protos]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_sdk]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_smart_channel]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_sorbet]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_span]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_string_interner]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_tracing]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_tuid]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_types]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_types_builder]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_types_core]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
 
 [[publisher.re_uri]]
-version = "0.25.0"
-when = "2025-09-16"
+version = "0.26.0"
+when = "2025-10-16"
 user-id = 197939
 user-login = "rerunio"
 user-name = "rerun.io"
@@ -647,6 +647,12 @@ Changes in how macros are invoked and various bits and pieces of macro-fu.
 Otherwise no major changes and nothing dealing with `unsafe`.
 """
 
+[[audits.bytecode-alliance.audits.bytes]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "1.10.0 -> 1.10.1"
+notes = "Minor bugfix release."
+
 [[audits.bytecode-alliance.audits.camino]]
 who = "Pat Hickey <phickey@fastly.com>"
 criteria = "safe-to-deploy"
@@ -823,6 +829,18 @@ who = "Dan Gohman <dev@sunfishcode.online>"
 criteria = "safe-to-deploy"
 delta = "1.0.11 -> 1.0.14"
 
+[[audits.bytecode-alliance.audits.log]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "0.4.22 -> 0.4.27"
+notes = "Lots of minor updates to macros and such, nothing touching `unsafe`"
+
+[[audits.bytecode-alliance.audits.log]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "0.4.27 -> 0.4.28"
+notes = "Minor doc updates and lots new tests, nothing out of the ordinary."
+
 [[audits.bytecode-alliance.audits.mach2]]
 who = "Nick Fitzgerald <fitzgen@gmail.com>"
 criteria = "safe-to-deploy"
@@ -908,6 +926,36 @@ who = "Alex Crichton <alex@alexcrichton.com>"
 criteria = "safe-to-deploy"
 version = "1.1.0"
 notes = "Only minor `unsafe` code blocks which look valid and otherwise does what it says on the tin."
+
+[[audits.bytecode-alliance.audits.smallvec]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "1.13.2 -> 1.14.0"
+notes = "Minor new feature, nothing out of the ordinary."
+
+[[audits.bytecode-alliance.audits.tempfile]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "3.20.0 -> 3.21.0"
+notes = "Only minor manifest/CI changes."
+
+[[audits.bytecode-alliance.audits.tempfile]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "3.21.0 -> 3.23.0"
+notes = "Doc/test/platform updates, nothing out of the ordinary."
+
+[[audits.bytecode-alliance.audits.tracing-attributes]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.28 -> 0.1.30"
+notes = "Few code changes, a pretty minor update."
+
+[[audits.bytecode-alliance.audits.tracing-core]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.33 -> 0.1.34"
+notes = "Mostly just an update with Rust stylistic conventions changing. Nothing awry."
 
 [[audits.bytecode-alliance.audits.unicase]]
 who = "Alex Crichton <alex@alexcrichton.com>"
@@ -1712,6 +1760,18 @@ https://chromium-review.googlesource.com/c/chromium/src/+/6187726/2
 '''
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
+[[audits.google.audits.indexmap]]
+who = "Lukasz Anforowicz <lukasza@chromium.org>"
+criteria = "safe-to-deploy"
+delta = "2.7.1 -> 2.8.0"
+notes = """
+No `unsafe` introduced or affected in:
+* `indexmap_with_default!` and `indexset_with_default!` macros
+* New `PartialEq` implementations
+* `fn slice_eq` in `util.rs`
+"""
+aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
+
 [[audits.google.audits.itoa]]
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
@@ -1793,20 +1853,6 @@ Unsafe review in https://docs.google.com/document/d/1IXQbD1GhTRqNHIGxq6yy7qHqxeO
 Unsafety is generally very well-documented, with one exception, which we
 describe in the review doc.
 """
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.log]]
-who = "Lukasz Anforowicz <lukasza@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "0.4.22 -> 0.4.25"
-notes = "No impact on `unsafe` usage in `lib.rs`."
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.log]]
-who = "Daniel Cheng <dcheng@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "0.4.25 -> 0.4.26"
-notes = "Only trivial code and documentation changes."
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.nom]]
@@ -2426,20 +2472,6 @@ aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_p
 who = "Manish Goregaokar <manishearth@google.com>"
 criteria = "safe-to-deploy"
 version = "1.13.2"
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
-[[audits.google.audits.smallvec]]
-who = "Jonathan Hao <phao@chromium.org>"
-criteria = "safe-to-deploy"
-delta = "1.13.2 -> 1.14.0"
-notes = """
-WARNING: This certification is a result of a **partial** audit. The
-`malloc_size_of` feature has **not** been audited. This feature does
-not explicitly document its safety requirements.
-See also https://chromium-review.googlesource.com/c/chromium/src/+/6275133/comment/ea0d7a93_98051a2e/
-and https://github.com/servo/malloc_size_of/issues/8.
-This feature is banned in gnrt_config.toml.
-"""
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.stable_deref_trait]]
@@ -3321,10 +3353,15 @@ delta = "0.26.0 -> 0.27.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.hashbrown]]
-who = "Mike Hommey <mh+mozilla@glandium.org>"
+who = "Erich Gubler <erichdongubler@gmail.com>"
 criteria = "safe-to-deploy"
-version = "0.12.3"
-notes = "This version is used in rust's libstd, so effectively we're already trusting it"
+delta = "0.15.2 -> 0.15.5"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.hashbrown]]
+who = "Erich Gubler <erichdongubler@gmail.com>"
+criteria = "safe-to-deploy"
+delta = "0.15.5 -> 0.16.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.iana-time-zone]]
@@ -3404,6 +3441,12 @@ aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-ch
 who = "Makoto Kato <m_kato@ga2.so-net.ne.jp>"
 criteria = "safe-to-deploy"
 delta = "1.2.0 -> 1.2.1"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.indexmap]]
+who = "Erich Gubler <erichdongubler@gmail.com>"
+criteria = "safe-to-deploy"
+delta = "2.8.0 -> 2.11.4"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.jobserver]]
@@ -3622,6 +3665,17 @@ criteria = "safe-to-deploy"
 delta = "25.0.0 -> 26.0.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.naga]]
+who = [
+    "Andy Leiserson <aleiserson@mozilla.com>",
+    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
+    "Erich Gubler <erichdongubler@gmail.com>",
+]
+criteria = "safe-to-deploy"
+delta = "26.0.0 -> 27.0.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.num-conv]]
 who = "Alex Franchuk <afranchuk@mozilla.com>"
 criteria = "safe-to-deploy"
@@ -3785,6 +3839,12 @@ who = "Nika Layzell <nika@thelayzells.com>"
 criteria = "safe-to-deploy"
 delta = "2.2.1 -> 2.7.0"
 aggregated-from = "https://raw.githubusercontent.com/mozilla/cargo-vet/main/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.smallvec]]
+who = "Erich Gubler <erichdongubler@gmail.com>"
+criteria = "safe-to-deploy"
+delta = "1.14.0 -> 1.15.1"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.strsim]]
 who = "Ben Dean-Kawamura <bdk@mozilla.com>"
@@ -3986,6 +4046,17 @@ criteria = "safe-to-deploy"
 delta = "25.0.0 -> 26.0.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
+[[audits.mozilla.audits.wgpu-core-deps-apple]]
+who = [
+    "Andy Leiserson <aleiserson@mozilla.com>",
+    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
+    "Erich Gubler <erichdongubler@gmail.com>",
+]
+criteria = "safe-to-deploy"
+delta = "26.0.0 -> 27.0.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
 [[audits.mozilla.audits.wgpu-core-deps-windows-linux-android]]
 who = "Erich Gubler <erichdongubler@gmail.com>"
 criteria = "safe-to-deploy"
@@ -3996,6 +4067,17 @@ aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-ch
 who = "Erich Gubler <erichdongubler@gmail.com>"
 criteria = "safe-to-deploy"
 delta = "25.0.0 -> 26.0.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.wgpu-core-deps-windows-linux-android]]
+who = [
+    "Andy Leiserson <aleiserson@mozilla.com>",
+    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
+    "Erich Gubler <erichdongubler@gmail.com>",
+]
+criteria = "safe-to-deploy"
+delta = "26.0.0 -> 27.0.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.wgpu-types]]
@@ -4093,6 +4175,17 @@ aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-ch
 who = "Erich Gubler <erichdongubler@gmail.com>"
 criteria = "safe-to-deploy"
 delta = "25.0.0 -> 26.0.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.wgpu-types]]
+who = [
+    "Andy Leiserson <aleiserson@mozilla.com>",
+    "Teodor Tanasoaia <ttanasoaia@mozilla.com>",
+    "Jim Blandy <jimb@red-bean.com>",
+    "Erich Gubler <erichdongubler@gmail.com>",
+]
+criteria = "safe-to-deploy"
+delta = "26.0.0 -> 27.0.0"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.zeroize]]
