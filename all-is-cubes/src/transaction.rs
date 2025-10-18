@@ -1,5 +1,10 @@
 //! The [`Transaction`] trait, for modifying game objects.
 
+#![allow(
+    unused_assignments,
+    reason = "nightly FP <https://github.com/rust-lang/rust/issues/147648>"
+)]
+
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::any::type_name;

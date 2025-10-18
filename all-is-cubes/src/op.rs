@@ -1,5 +1,10 @@
 //! [`Operation`]s that modify the world due to player or world actions.
 
+#![allow(
+    unused_assignments,
+    reason = "nightly FP <https://github.com/rust-lang/rust/issues/147648>"
+)]
+
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::mem;
