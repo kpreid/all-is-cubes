@@ -408,17 +408,19 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                 // If we were to adopt a finer-grained analysis, we wouldn't be
                                 // able to get away with using only 1 mesh vertex per
                                 // analysis vertex per face.
-                                let acceptable_voxel = av.position
-                                    + (av.opaque & interior_side_octant_mask)
-                                        .first()
-                                        .unwrap_or_else(|| {
-                                            panic!(
-                                                "failed to find vertex color for {av:?}\n\
+                                let acceptable_voxel = Cube::from(
+                                    av.position
+                                        + (av.opaque & interior_side_octant_mask)
+                                            .first()
+                                            .unwrap_or_else(|| {
+                                                panic!(
+                                                    "failed to find vertex color for {av:?}\n\
                                                 {interior_side_octant_mask:?}\n {face:?}"
-                                            )
-                                        })
-                                        .to_01()
-                                        .map(|c| GridCoordinate::from(c) - 1); // TODO: add an Octant op for balanced cubes
+                                                )
+                                            })
+                                            .to_01()
+                                            .map(|c| GridCoordinate::from(c) - 1), // TODO: add an Octant op for balanced cubes
+                                );
 
                                 // Fetch color from voxel data
                                 vertex::Coloring::Solid(voxels_array[acceptable_voxel].color)

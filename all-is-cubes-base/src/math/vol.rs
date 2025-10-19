@@ -3,7 +3,13 @@ use alloc::sync::Arc;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 
-#[cfg(doc)]
+#[cfg_attr(
+    not(doc),
+    allow(
+        unused,
+        reason = "because this module’s items is hidden and reexported, we need unconditional imports for working doc links"
+    )
+)]
 use alloc::vec::Vec;
 
 use euclid::{Point3D, Size3D, vec3};
@@ -614,11 +620,7 @@ impl<C: fmt::Debug, O: fmt::Debug> fmt::Debug for Vol<C, O> {
     }
 }
 
-impl<P, C, V> core::ops::Index<P> for Vol<C, ZMaj>
-where
-    P: Into<Cube>,
-    C: Deref<Target = [V]>,
-{
+impl<C: Deref<Target = [V]>, V> core::ops::Index<Cube> for Vol<C, ZMaj> {
     type Output = V;
 
     /// Returns the element at `position` of this volume data,
@@ -626,8 +628,7 @@ where
     ///
     /// Use [`Vol::get()`] for a non-panicing alternative.
     #[inline(always)] // measured faster on wasm32 in worldgen
-    fn index(&self, position: P) -> &Self::Output {
-        let position: Cube = position.into();
+    fn index(&self, position: Cube) -> &Self::Output {
         if let Some(index) = self.index(position) {
             &self.contents[index]
         } else {
@@ -638,16 +639,11 @@ where
         }
     }
 }
-impl<P, C, V> core::ops::IndexMut<P> for Vol<C, ZMaj>
-where
-    P: Into<Cube>,
-    C: DerefMut<Target = [V]>,
-{
+impl<C: DerefMut<Target = [V]>, V> core::ops::IndexMut<Cube> for Vol<C, ZMaj> {
     /// Returns the element at `position` of this volume data,
     /// or panics if `position` is out of bounds.
     #[inline(always)]
-    fn index_mut(&mut self, position: P) -> &mut Self::Output {
-        let position: Cube = position.into();
+    fn index_mut(&mut self, position: Cube) -> &mut Self::Output {
         if let Some(index) = self.index(position) {
             &mut self.contents[index]
         } else {
@@ -656,6 +652,34 @@ where
                 position, self.bounds
             )
         }
+    }
+}
+
+impl<C: Deref<Target = [V]>, V> core::ops::Index<[GridCoordinate; 3]> for Vol<C, ZMaj> {
+    type Output = V;
+
+    /// Returns the element at <code>[Cube]::from(position)</code> of this volume data,
+    /// or panics if `position` is out of bounds.
+    ///
+    /// This implementation is a convenience for writing `vol[[x, y, z]]`.
+    /// We recommend indexing using [`Cube`] values in all non-trivial cases,
+    /// to avoid confusion between cubes and their corner points.
+    #[inline(always)]
+    fn index(&self, position: [GridCoordinate; 3]) -> &Self::Output {
+        &self[Cube::from(position)]
+    }
+}
+
+impl<C: DerefMut<Target = [V]>, V> core::ops::IndexMut<[GridCoordinate; 3]> for Vol<C, ZMaj> {
+    /// Returns the element at <code>[Cube]::from(position)</code>of this volume data,
+    /// or panics if `position` is out of bounds.
+    ///
+    /// This implementation is a convenience for writing `vol[[x, y, z]]`.
+    /// We recommend indexing using [`Cube`] values in all non-trivial cases,
+    /// to avoid confusion between cubes and their corner points.
+    #[inline(always)]
+    fn index_mut(&mut self, position: [GridCoordinate; 3]) -> &mut Self::Output {
+        &mut self[Cube::from(position)]
     }
 }
 

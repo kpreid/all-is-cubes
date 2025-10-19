@@ -11,9 +11,7 @@ use rand_xoshiro::Xoshiro256Plus;
 
 use all_is_cubes::block::{self, AIR, Block, BlockCollision};
 use all_is_cubes::content::palette;
-use all_is_cubes::math::{
-    Cube, GridAab, GridPoint, GridRotation, GridVector, Rgba, Vol, rgba_const,
-};
+use all_is_cubes::math::{Cube, GridAab, GridRotation, GridVector, Rgba, Vol, rgba_const};
 use all_is_cubes::space::{CubeTransaction, Space, SpaceTransaction};
 use all_is_cubes::time::Tick;
 use all_is_cubes::transaction::Merge;
@@ -151,7 +149,7 @@ impl Fire {
         for z in bounds.z_range() {
             for y in bounds.y_range().rev() {
                 for x in bounds.x_range() {
-                    let cube = GridPoint::new(x, y, z);
+                    let cube = Cube::new(x, y, z);
                     self.fire_state[cube] = if y == y0 {
                         (self.fire_state[cube] + self.rng.random_range(0..3))
                             .saturating_sub(1)

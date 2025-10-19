@@ -603,7 +603,7 @@ async fn install_atrium_blocks(
         if bricking == 0 {
             &grout_base
         } else {
-            stone_base_array[p.lower_bounds().map(|c| c.rem_euclid(resolution_g))]
+            stone_base_array[Cube::from(p.lower_bounds().map(|c| c.rem_euclid(resolution_g)))] // TODO: add way to express this transformation on `Cube` without going through points
         }
     };
     let bottom_grout_pattern = |p: Cube| {

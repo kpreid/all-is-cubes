@@ -880,13 +880,13 @@ impl GlyphMapping for RemapTo8859_1<'_> {
 mod tests {
     use super::*;
     use crate::block::Primitive;
+    use crate::math::Cube;
     use crate::raytracer::print_space;
     use crate::space::Space;
     use crate::universe::Universe;
     use alloc::string::String;
     use alloc::vec::Vec;
     use arcstr::literal;
-    use euclid::point3;
     use pretty_assertions::assert_eq;
 
     /// Convert voxels with z range = 1 to a string for readable comparisons.
@@ -909,7 +909,7 @@ mod tests {
                 voxels
                     .bounds()
                     .x_range()
-                    .map(|x| convert_voxel(&voxels[point3(x, y, z)]))
+                    .map(|x| convert_voxel(&voxels[Cube::new(x, y, z)]))
                     .collect::<String>()
             })
             .collect()
