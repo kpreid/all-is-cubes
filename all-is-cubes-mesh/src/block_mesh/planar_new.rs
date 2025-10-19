@@ -1,12 +1,18 @@
 //! Algorithm for taking arbitrary orthogonal polygons that form the surfaces of voxel shapes
 //! and triangulating them.
 //!
+//! This is a [sweep line algorithm] which processes vertices in the order which [`super::analyze`]
+//! provides them. It does not introduce any additional vertices, which ensures that the resulting
+//! mesh will not contain any “T-junctions” (places where a triangle edge meets a vertex rather than
+//! another edge).
+//!
+//! [sweep line algorithm]: https://en.wikipedia.org/wiki/Sweep_line_algorithm
+//
 // TODO(planar_new): This algorithm is not yet complete and is only conditionally used.
 // It will eventually replace [`crate::block_mesh::planar::greedy_mesh`].
 
 use alloc::collections::VecDeque;
 use core::cmp::Ordering;
-use core::fmt;
 use core::mem;
 
 use all_is_cubes::euclid::Scale;
@@ -17,20 +23,12 @@ use crate::{Viz, block_mesh::analyze::AnalysisVertex};
 
 // -------------------------------------------------------------------------------------------------
 
-pub fn run_planar_triangulation(
-    vertices: impl Iterator<Item = AnalysisVertex>,
-    basis: PtBasis,
-    viz: &mut Viz,
-    triangle_callback: impl FnMut([u32; 3]),
-) {
-    PlanarTriangulator::new(basis, viz).for_each_triangle(vertices, triangle_callback);
-}
-
-/// Iterator adapter whose input is [`AnalysisVertex`]es that lie in a common plane as input and
-/// whose output is a triangulation of that polygon that does not add any new vertices.
+/// Polygon triangulation algorithm state.
 ///
-/// The output is in the form of indices into the input.
-pub(super) struct PlanarTriangulator<'a> {
+/// Used by calling [`PlanarTriangulator::triangulate()`];
+/// may be reused to minimize memory allocation.
+#[derive(Debug)]
+pub(super) struct PlanarTriangulator {
     basis: PtBasis,
 
     /// Position of the line in the plane perpendicular to `sweep_direction` which we are currently
@@ -66,8 +64,6 @@ pub(super) struct PlanarTriangulator<'a> {
     /// Invariant: If a triangle in the output has vertices that are from some combination of
     /// `old_frontier[..end_in_old_frontier]` and `new_frontier`, then it has already been emitted.
     end_in_old_frontier: usize,
-
-    viz: &'a mut Viz,
 }
 
 /// Portion of [`PlanarTriangulator`] that determines the coordinate system and is not mutated.
@@ -113,40 +109,36 @@ pub(crate) struct FrontierVertex {
     pub index: u32,
 }
 
-impl fmt::Debug for PlanarTriangulator<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self {
-            basis,
-            sweep_position,
-            old_frontier,
-            new_frontier,
-            end_in_old_frontier,
-            viz: _,
-        } = self;
-        f.debug_struct("PlanarTriangulator")
-            // .field("input", &input) // don't want to require a useful impl Debug
-            .field("basis", &basis)
-            .field("sweep_position", &sweep_position)
-            .field("old_frontier", &old_frontier)
-            .field("new_frontier", &new_frontier)
-            .field("end_in_old_frontier", &end_in_old_frontier)
-            .finish()
-    }
-}
-
-impl<'a> PlanarTriangulator<'a> {
-    pub fn new(basis: PtBasis, viz: &'a mut Viz) -> Self {
+impl PlanarTriangulator {
+    pub fn new(basis: PtBasis) -> Self {
         Self {
             basis,
             sweep_position: GridCoordinate::MIN,
             old_frontier: VecDeque::new(),
             new_frontier: VecDeque::new(),
             end_in_old_frontier: 0,
-            viz,
         }
     }
 
-    fn advance_sweep_position(&mut self, new_sweep_position: GridCoordinate) {
+    /// Resets the current state to be equivalent to [`Self::new()`]
+    /// except for reusing memory allocations.
+    ///
+    /// This function does not need to be called externally; it is automatically called when needed.
+    fn clear(&mut self) {
+        let Self {
+            basis: _, // does not change
+            sweep_position,
+            old_frontier,
+            new_frontier,
+            end_in_old_frontier,
+        } = self;
+        *sweep_position = GridCoordinate::MIN;
+        old_frontier.clear();
+        new_frontier.clear();
+        *end_in_old_frontier = 0;
+    }
+
+    fn advance_sweep_position(&mut self, viz: &mut Viz, new_sweep_position: GridCoordinate) {
         assert!(
             new_sweep_position > self.sweep_position,
             "incorrect vertex ordering"
@@ -169,15 +161,24 @@ impl<'a> PlanarTriangulator<'a> {
         self.end_in_old_frontier = 0;
         self.sweep_position = new_sweep_position;
 
-        self.viz
-            .set_frontier(&self.old_frontier, &self.new_frontier);
+        viz.set_frontier(&self.old_frontier, &self.new_frontier);
     }
 
-    fn for_each_triangle(
-        mut self,
+    /// Perform triangulation.
+    ///
+    /// Requires as input an iterator of [`AnalysisVertex`]es that lie in a common plane as input;
+    /// produces a triangulation of that polygon that does not add any new vertices.
+    ///
+    /// The output is in the form of indices into the input.
+    pub fn triangulate(
+        &mut self,
+        viz: &mut Viz,
         input: impl Iterator<Item = AnalysisVertex>,
         mut triangle_callback: impl FnMut([u32; 3]),
     ) {
+        // Ensure any previous usage of self does not affect the results.
+        self.clear();
+
         for (input_index_usize, mut input_vertex) in input.enumerate() {
             // Forget about hidden voxel faces -- transform “this volume is solid” mask into
             // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
@@ -191,7 +192,7 @@ impl<'a> PlanarTriangulator<'a> {
                 v: input_vertex,
                 index: input_index,
             };
-            self.viz.set_current_triangulation_vertex(&input_fv);
+            viz.set_current_triangulation_vertex(&input_fv);
 
             // Advance sweep line if the new vertex is ahead of the line.
             let new_sweep_position = self
@@ -199,7 +200,7 @@ impl<'a> PlanarTriangulator<'a> {
                 .sweep_direction
                 .dot(input_vertex.position.to_vector());
             if new_sweep_position != self.sweep_position {
-                self.advance_sweep_position(new_sweep_position);
+                self.advance_sweep_position(viz, new_sweep_position);
             }
 
             // Check for vertices in the old frontier that the input vertex is perpendicularly
@@ -236,7 +237,7 @@ impl<'a> PlanarTriangulator<'a> {
                     // main phase, and use the new frontier vertex as what we connect to.
 
                     self.basis.emit(
-                        self.viz,
+                        viz,
                         &mut triangle_callback,
                         [
                             &passed_over_fv,
@@ -259,8 +260,7 @@ impl<'a> PlanarTriangulator<'a> {
             }
             if moved_any_vertices {
                 // let the steps be seen
-                self.viz
-                    .set_frontier(&self.old_frontier, &self.new_frontier);
+                viz.set_frontier(&self.old_frontier, &self.new_frontier);
             }
 
             // We now have the property that all vertices in old_frontier are perpendicularly
@@ -297,7 +297,7 @@ impl<'a> PlanarTriangulator<'a> {
                             "inconsistent"
                         );
                         self.basis.emit(
-                            self.viz,
+                            viz,
                             &mut triangle_callback,
                             [
                                 &input_fv,
@@ -316,7 +316,7 @@ impl<'a> PlanarTriangulator<'a> {
                             "inconsistent"
                         );
                         self.basis.emit(
-                            self.viz,
+                            viz,
                             &mut triangle_callback,
                             [
                                 &predecessor_vertex,
@@ -338,7 +338,7 @@ impl<'a> PlanarTriangulator<'a> {
                     );
 
                     self.basis.emit(
-                        self.viz,
+                        viz,
                         &mut triangle_callback,
                         [
                             self.new_frontier
@@ -352,13 +352,12 @@ impl<'a> PlanarTriangulator<'a> {
                 }
             }
 
-            self.viz
-                .set_frontier(&self.old_frontier, &self.new_frontier);
+            viz.set_frontier(&self.old_frontier, &self.new_frontier);
         }
 
         // Reuse sweep routine to do final state cleanup.
         // TODO(planar_new): Do only the minimal work needed for the validation assert(s) instead.
-        self.advance_sweep_position(GridCoordinate::MAX);
+        self.advance_sweep_position(viz, GridCoordinate::MAX);
 
         // The last vertex input should have caused the triangulation to become complete,
         // such that the frontier is now empty of all vertices.
@@ -454,6 +453,13 @@ mod tests {
     use all_is_cubes::math::Octant::{self, Nnn, Npn, Pnn, Ppn};
     use alloc::vec::Vec;
 
+    const TEST_BASIS: PtBasis = PtBasis {
+        face: Face6::PZ,
+        sweep_direction: Face6::PX,
+        perpendicular_direction: Face6::PY,
+        scale: Scale::new(1.0),
+    };
+
     /// `PlanarTriangulator::new()` parameterized for simplicity
     /// (for tests that aren't trying to exercise rotatability)
     #[inline(never)]
@@ -461,33 +467,28 @@ mod tests {
     fn check(vertices: &[AnalysisVertex], expected_triangles: &[[GridPoint; 3]]) {
         let mut viz = Viz::Disabled;
         let mut actual_triangles = Vec::new();
+        let mut triangulator = PlanarTriangulator::new(TEST_BASIS);
 
-        //eprintln!("Initial state: {triangulator:#?}"); // TODO: reenable state-printing
+        eprintln!("Initial state: {triangulator:#?}");
 
-        run_planar_triangulation(
+        triangulator.triangulate(
+            &mut viz,
             vertices
                 .iter()
                 .inspect(|vertex| println!("In: {vertex:?}"))
                 .copied(),
-            PtBasis {
-                face: Face6::PZ,
-                sweep_direction: Face6::PX,
-                perpendicular_direction: Face6::PY,
-                scale: Scale::new(1.0),
-            },
-            &mut viz,
-            |triangle_indices| {
+            |triangle_indices: [u32; 3]| {
                 let triangle_positions =
                     triangle_indices.map(|index| vertices[index as usize].position);
                 // Print as we go, so if there is a panic we can still see some results.
                 println!("Out: {triangle_indices:?} = {triangle_positions:?}");
                 actual_triangles.push(triangle_positions);
 
-                //println!("State: {triangulator:#?}");
+                // println!("State: {triangulator:#?}"); // TODO: make it possible to grab the state for debugging
             },
         );
 
-        //eprintln!("Final state: {triangulator:#?}");
+        eprintln!("Final state: {triangulator:#?}");
         pretty_assertions::assert_eq!(
             expected_triangles,
             actual_triangles.as_slice(),

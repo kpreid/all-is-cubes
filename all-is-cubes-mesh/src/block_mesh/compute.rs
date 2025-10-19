@@ -222,6 +222,29 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         let interior_mesh = &mut output.interior_vertices[face];
         let interior_side_octant_mask = OctantMask::ALL.shift(-face);
 
+        // Triangulator is used once per layer, but can be reused as long as the basis is the same.
+        // TODO: Allow reconfiguring basis.
+        let mut triangulator = planar_new::PlanarTriangulator::new(planar_new::PtBasis {
+            face,
+            sweep_direction: match face {
+                Face6::NX => Face6::PY,
+                Face6::NY => Face6::PX,
+                Face6::NZ => Face6::PX,
+                Face6::PX => Face6::PY,
+                Face6::PY => Face6::PX,
+                Face6::PZ => Face6::PX,
+            },
+            perpendicular_direction: match face {
+                Face6::NX => Face6::PZ,
+                Face6::NY => Face6::PZ,
+                Face6::NZ => Face6::PY,
+                Face6::PX => Face6::PZ,
+                Face6::PY => Face6::PZ,
+                Face6::PZ => Face6::PY,
+            },
+            scale: scale_to_block,
+        });
+
         // Rotate the voxel array's extent into our local coordinate system, so we can find
         // out what range to iterate over.
         let rotated_voxel_range = voxels_array
@@ -436,39 +459,15 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     }),
                 );
 
-                planar_new::run_planar_triangulation(
-                    iter_plane_vertices().copied(),
-                    planar_new::PtBasis {
-                        face,
-                        sweep_direction: match face {
-                            Face6::NX => Face6::PY,
-                            Face6::NY => Face6::PX,
-                            Face6::NZ => Face6::PX,
-                            Face6::PX => Face6::PY,
-                            Face6::PY => Face6::PX,
-                            Face6::PZ => Face6::PX,
-                        },
-                        perpendicular_direction: match face {
-                            Face6::NX => Face6::PZ,
-                            Face6::NY => Face6::PZ,
-                            Face6::NZ => Face6::PY,
-                            Face6::PX => Face6::PZ,
-                            Face6::PY => Face6::PZ,
-                            Face6::PZ => Face6::PY,
-                        },
-                        scale: scale_to_block,
-                    },
-                    viz,
-                    |triangle_indices| {
-                        let rect_has_alpha = false; // TODO(planar_new): implement transparent support
-                        if rect_has_alpha {
-                            &mut *indices_transparent
-                        } else {
-                            &mut *indices_opaque
-                        }
-                        .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
-                    },
-                );
+                triangulator.triangulate(viz, iter_plane_vertices().copied(), |triangle_indices| {
+                    let rect_has_alpha = false; // TODO(planar_new): implement transparent support
+                    if rect_has_alpha {
+                        &mut *indices_transparent
+                    } else {
+                        &mut *indices_opaque
+                    }
+                    .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
+                });
             } else {
                 // Traverse `visible_image` using the "greedy meshing" algorithm for
                 // breaking an irregular shape into quads.
