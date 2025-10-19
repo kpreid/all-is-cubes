@@ -200,7 +200,11 @@ impl Face6 {
     pub const fn cross(self, other: Self) -> Face7 {
         self.into7().cross(other.into7())
     }
+
     /// Returns the axis-aligned unit vector normal to this face.
+    ///
+    /// If a vector of a different length is desired, use [`Face6::vector()`] instead of
+    /// multiplying this.
     #[inline]
     #[must_use]
     pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
@@ -208,6 +212,40 @@ impl Face6 {
         S: Zero + num_traits::One + ops::Neg<Output = S>,
     {
         self.into7().normal_vector()
+    }
+
+    /// Returns an axis-aligned vector normal to this face, whose magnitude, and only nonzero
+    /// component, is `magnitude`.
+    ///
+    /// This is mathematically equivalent to multiplying [`Face6::normal_vector()`] by `magnitude`,
+    /// but does not perform those multiplications, and may have better type inference.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Face6, GridVector};
+    ///
+    /// assert_eq!(Face6::PY.vector(3), GridVector::new(0, 3, 0));
+    /// assert_eq!(Face6::NY.vector(3), GridVector::new(0, -3, 0));
+    /// ```
+    // TODO: better name for this operation?
+    #[inline]
+    #[must_use]
+    pub fn vector<S, U>(self, magnitude: S) -> Vector3D<S, U>
+    where
+        S: Zero + ops::Neg<Output = S>,
+    {
+        let zero1 = S::zero();
+        let zero2 = S::zero();
+        match self {
+            Face6::NX => Vector3D::new(-magnitude, zero1, zero2),
+            Face6::NY => Vector3D::new(zero1, -magnitude, zero2),
+            Face6::NZ => Vector3D::new(zero1, zero2, -magnitude),
+            Face6::PX => Vector3D::new(magnitude, zero1, zero2),
+            Face6::PY => Vector3D::new(zero1, magnitude, zero2),
+            Face6::PZ => Vector3D::new(zero1, zero2, magnitude),
+        }
     }
 
     /// Dot product of this face as a unit vector and the given vector,
@@ -496,21 +534,16 @@ impl Face7 {
 
     /// Returns the vector normal to this face. [`Within`](Self::Within) is assigned the
     /// zero vector.
+    ///
+    /// If a vector of a different length is desired, use [`Face6::vector()`] instead of
+    /// multiplying this.
     #[inline]
     #[must_use]
     pub fn normal_vector<S, U>(self) -> Vector3D<S, U>
     where
         S: Zero + num_traits::One + ops::Neg<Output = S>,
     {
-        match self {
-            Face7::Within => Vector3D::new(S::zero(), S::zero(), S::zero()),
-            Face7::NX => Vector3D::new(-S::one(), S::zero(), S::zero()),
-            Face7::NY => Vector3D::new(S::zero(), -S::one(), S::zero()),
-            Face7::NZ => Vector3D::new(S::zero(), S::zero(), -S::one()),
-            Face7::PX => Vector3D::new(S::one(), S::zero(), S::zero()),
-            Face7::PY => Vector3D::new(S::zero(), S::one(), S::zero()),
-            Face7::PZ => Vector3D::new(S::zero(), S::zero(), S::one()),
-        }
+        self.vector(S::one())
     }
 
     /// Returns the vector normal to this face. [`Within`](Self::Within) is assigned the
@@ -528,6 +561,41 @@ impl Face7 {
             Face7::PX => Vector3D::new(1, 0, 0),
             Face7::PY => Vector3D::new(0, 1, 0),
             Face7::PZ => Vector3D::new(0, 0, 1),
+        }
+    }
+
+    /// Returns an axis-aligned vector normal to this face, whose magnitude, and only nonzero
+    /// component, is `magnitude` unless `self == Face7::Within`.
+    ///
+    /// This is mathematically equivalent to multiplying [`Face7::normal_vector()`] by `magnitude`,
+    /// but does not perform those multiplications, and may have better type inference.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # extern crate all_is_cubes_base as all_is_cubes;
+    /// use all_is_cubes::math::{Face7, GridVector};
+    ///
+    /// assert_eq!(Face7::PY.vector(3), GridVector::new(0, 3, 0));
+    /// assert_eq!(Face7::Within.vector(3), GridVector::new(0, 0, 0));
+    /// ```
+    // TODO: better name for this operation?
+    #[inline]
+    #[must_use]
+    pub fn vector<S, U>(self, magnitude: S) -> Vector3D<S, U>
+    where
+        S: Zero + ops::Neg<Output = S>,
+    {
+        let zero1 = S::zero();
+        let zero2 = S::zero();
+        match self {
+            Face7::Within => Vector3D::new(zero1, zero2, S::zero()),
+            Face7::NX => Vector3D::new(-magnitude, zero1, zero2),
+            Face7::NY => Vector3D::new(zero1, -magnitude, zero2),
+            Face7::NZ => Vector3D::new(zero1, zero2, -magnitude),
+            Face7::PX => Vector3D::new(magnitude, zero1, zero2),
+            Face7::PY => Vector3D::new(zero1, magnitude, zero2),
+            Face7::PZ => Vector3D::new(zero1, zero2, magnitude),
         }
     }
 
