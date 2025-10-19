@@ -236,7 +236,8 @@ impl DemoTheme {
         };
         if gate_present {
             let gate_box = doorway_box.abut(face, -1).unwrap().translate(
-                face.opposite().normal_vector() * doorway_box.size().to_i32()[face.axis()] / 2,
+                face.opposite()
+                    .vector(doorway_box.size().to_i32()[face.axis()] / 2),
             );
             let gate_side_1 = gate_box.abut(wall_parallel.opposite(), -1).unwrap();
             let gate_side_2 = gate_box
@@ -414,8 +415,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
 
                         if let WallFeature::Window = room_data.wall_features[wall] {
                             for step in WINDOW_PATTERN {
-                                let mut window_pos =
-                                    origin + along_wall.normal_vector() * (midpoint + step);
+                                let mut window_pos = origin + along_wall.vector(midpoint + step);
                                 window_pos.y = window_y;
                                 if let Some(window_box) =
                                     GridAab::from_lower_size(window_pos, [1, 3, 1])
@@ -427,7 +427,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                         } else if room_data.lit && !room_data.corridor_only {
                             for step in TORCH_PATTERN {
                                 let mut torch_pos = origin
-                                    + along_wall.normal_vector() * (midpoint + step)
+                                    + along_wall.vector(midpoint + step)
                                     + wall.opposite().normal_vector();
                                 torch_pos.y = torch_y;
 

@@ -261,7 +261,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
         let above_surface_epsilon = 0.5 / 256.0;
 
         // The position we should start with for light lookup and interpolation.
-        let origin = point.to_vector() + face.normal_vector() * above_surface_epsilon;
+        let origin = point.to_vector() + face.vector(above_surface_epsilon);
 
         // Find linear interpolation coefficients based on where we are relative to
         // a half-cube-offset grid.

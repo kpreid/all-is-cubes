@@ -272,11 +272,10 @@ impl lines::Wireframe for Cursor {
             let face_transform_axes_only = face.rotation_from_nz().to_rotation_matrix().to_free();
             output.extend(lines::line_loop(
                 [Face7::PX, Face7::PY, Face7::NX, Face7::NY].map(|f| {
-                    let tip: FreeVector = face_transform_axes_only
-                        .transform_vector3d(f.normal_vector::<_, Cube>() * (1.0 / 32.0));
-                    let position = self.point_entered
-                        + self.face_entered.normal_vector() * offset_from_surface
-                        + tip;
+                    let tip: FreeVector =
+                        face_transform_axes_only.transform_vector3d(f.vector(1.0 / 32.0));
+                    let position =
+                        self.point_entered + self.face_entered.vector(offset_from_surface) + tip;
                     lines::Vertex {
                         position,
                         color: Some(palette::CURSOR_OUTLINE),

@@ -393,7 +393,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                     pos: plane.grid_to_texcoord(
                                         av.position.to_f32().cast_unit()
                                         // offset to mid-texel for unambiguity
-                                            + face.normal_vector::<f32, _>() * -0.5,
+                                            + face.vector(-0.5f32),
                                     ),
                                     // TODO: avoid unwrap
                                     clamp_min: clamp.unwrap().0,

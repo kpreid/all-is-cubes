@@ -343,7 +343,7 @@ impl<'u> State<'u> {
                 {
                     for side_of_road in [-1, 1] {
                         let globe_cube = Cube::new(0, 4, 0)
-                            + direction.normal_vector() * distance
+                            + direction.vector(distance)
                             + perpendicular * (side_of_road * CityPlanner::LAMP_POSITION_RADIUS);
                         if !bounds.contains_cube(globe_cube) {
                             continue 'directions;
@@ -1007,7 +1007,7 @@ impl CityPlanner {
         for distance in 0.. {
             let mut some_in_bounds = false;
             for &direction in directions {
-                let cube = start_cube + direction.normal_vector() * distance;
+                let cube = start_cube + direction.vector(distance);
                 if self.space_bounds.contains_cube(cube) {
                     some_in_bounds = true;
                 } else {

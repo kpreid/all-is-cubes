@@ -290,8 +290,7 @@ fn COLORED_BOUNCE(ctx: Context<'_>) {
 
             // Dig pockets for lights to be in
             for dir in Face6::ALL {
-                let far_end =
-                    GridAab::ORIGIN_CUBE.translate(dir.normal_vector() * (total_radius - 1));
+                let far_end = GridAab::ORIGIN_CUBE.translate(dir.vector(total_radius - 1));
                 m.fill_uniform(GridAab::ORIGIN_CUBE.union_box(far_end), &AIR)
                     .unwrap();
                 m.fill_uniform(far_end, &light_block).unwrap();

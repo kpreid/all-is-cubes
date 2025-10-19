@@ -424,7 +424,7 @@ fn arch_row(
     parallel: Face6,
     pattern: Vol<&[u8]>,
 ) -> Result<(), InGenError> {
-    let offset = parallel.normal_vector() * section_length as GridCoordinate;
+    let offset = parallel.vector(section_length as GridCoordinate);
     let rotation = GridRotation::from_to(Face6::NX, parallel, Face6::PY).unwrap();
     for i in 0..(section_count as GridCoordinate) {
         let column_base = first_column_base + offset * (i + 1);

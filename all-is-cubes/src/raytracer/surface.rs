@@ -153,7 +153,7 @@ impl<D: RtBlockData> Surface<'_, D> {
 
                     let ray = Ray::new(
                         // need some past-the-surface epsilon
-                        self.intersection_point + self.normal.normal_vector() * 0.0001,
+                        self.intersection_point + self.normal.vector(0.0001),
                         lambertian_bounce_direction,
                     );
 

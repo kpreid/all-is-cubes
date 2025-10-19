@@ -117,7 +117,7 @@ impl Move {
         // TODO: Generalize to being able to increase resolution to a chosen minimum.
         let distance_in_res =
             GridCoordinate::from(distance) * GridCoordinate::from(effective_resolution) / 256;
-        let translation_in_res = direction.normal_vector() * distance_in_res;
+        let translation_in_res = direction.vector(distance_in_res);
 
         // This will be None if the displacement puts the block entirely out of view.
         let displaced_bounds: Option<GridAab> = original_bounds

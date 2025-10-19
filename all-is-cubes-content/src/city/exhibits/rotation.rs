@@ -41,7 +41,7 @@ fn ROTATIONS(ctx: Context<'_>) {
 
         for face in [Face6::PX, Face6::PZ, Face6::NX, Face6::NZ] {
             place_rotated_arrow(
-                center + face.normal_vector() * 2,
+                center + face.vector(2),
                 GridRotation::from_to(Face6::NZ, face.opposite(), Face6::PY).unwrap(),
             )?;
         }
