@@ -232,8 +232,8 @@ fn evaluate_composition(
     }
 
     // Unpack blocks.
-    let (dst_att, dst_voxels) = dst_evaluated.into_parts();
-    let (src_att, src_voxels) = src_evaluated.into_parts();
+    let (dst_att, mut dst_voxels) = dst_evaluated.into_parts();
+    let (src_att, mut src_voxels) = src_evaluated.into_parts();
 
     let src_resolution = src_voxels.resolution();
     let dst_resolution = dst_voxels.resolution();
@@ -248,7 +248,11 @@ fn evaluate_composition(
 
     let output_bounds = operator.bounds(src_bounds_scaled, dst_bounds_scaled);
 
-    block::Budget::decrement_voxels(&filter.budget, output_bounds.volume().unwrap())?;
+    // Volume in which cubes from both sources exist and blending actually needs to be executed.
+    let intersection_for_blend = src_voxels
+        .bounds()
+        .intersection_cubes(dst_voxels.bounds())
+        .unwrap_or(GridAab::ORIGIN_EMPTY);
 
     let attributes = block::BlockAttributes {
         display_name: dst_att.display_name, // TODO merge
@@ -293,16 +297,50 @@ fn evaluate_composition(
         animation_hint: src_att.animation_hint | dst_att.animation_hint, // TODO: some operators should ignore some hints (e.g. `In` should ignore destination color changes)
     };
 
+    // Evaluate the voxel compositions, choosing an evaluation strategy based on the
+    // situation to minimize the number of voxels we need to process individually and
+    // memory we need to allocate.
     let voxels = if let (true, Some(src_voxel), Some(dst_voxel)) = (
         output_bounds == GridAab::ORIGIN_CUBE,
         src_voxels.single_voxel(),
         dst_voxels.single_voxel(),
     ) {
         // The output is nonempty and has resolution 1. No allocation needed.
+        block::Budget::decrement_voxels(&filter.budget, 1)?;
         // TODO: Do we need the `output_bounds == ORIGIN_CUBE` test?
         // It skips this branch to keep the bounds empty, but is that good?
         Evoxels::from_one(operator.blend_evoxel(src_voxel, dst_voxel))
+    } else if operator.air_src_leaves_dst_unchanged()
+        && output_bounds == dst_voxels.bounds()
+        && dst_scale == src_scale
+    {
+        // Perform composition in-place in dst_voxels.
+        // This may skip a memory allocation (depending on the reference count),
+        // and in any case avoids performing blending on voxels that are out of bounds of src.
+        block::Budget::decrement_voxels(&filter.budget, src_voxels.count())?;
+        let mut dst_voxels_mut = dst_voxels.as_vol_mut();
+        intersection_for_blend.interior_iter().for_each(|cube| {
+            let dst_voxel = &mut dst_voxels_mut[cube];
+            *dst_voxel = operator.blend_evoxel(src_voxels[cube], *dst_voxel);
+        });
+        dst_voxels
+    } else if operator.air_dst_leaves_src_unchanged()
+        && output_bounds == src_voxels.bounds()
+        && dst_scale == src_scale
+    {
+        // Perform composition in-place in src_voxels.
+        // This is the reverse of the previous case.
+        // TODO: deduplicate code?
+        block::Budget::decrement_voxels(&filter.budget, dst_voxels.count())?;
+        let mut src_voxels_mut = src_voxels.as_vol_mut();
+        intersection_for_blend.interior_iter().for_each(|cube| {
+            let src_voxel = &mut src_voxels_mut[cube];
+            *src_voxel = operator.blend_evoxel(*src_voxel, dst_voxels[cube]);
+        });
+        src_voxels
     } else {
+        // Allocate new output array that encloses the full output bounds.
+        block::Budget::decrement_voxels(&filter.budget, output_bounds.volume().unwrap())?;
         Evoxels::from_many(
             effective_resolution,
             Vol::from_fn(output_bounds, |cube| {
@@ -586,6 +624,26 @@ impl CompositeOperator {
         }
     }
 
+    /// Whether `self.blend_evoxel(Evoxel::AIR, dst) == dst` for all possible `dst`.
+    fn air_src_leaves_dst_unchanged(self) -> bool {
+        match self {
+            CompositeOperator::Over => true,
+            CompositeOperator::In => true,
+            CompositeOperator::Out => false,
+            CompositeOperator::Atop => true,
+        }
+    }
+
+    /// Whether `self.blend_evoxel(src, Evoxel::AIR) == src` for all possible `src`.
+    fn air_dst_leaves_src_unchanged(self) -> bool {
+        match self {
+            CompositeOperator::Over => true,
+            CompositeOperator::In => false,
+            CompositeOperator::Out => true,
+            CompositeOperator::Atop => false,
+        }
+    }
+
     /// Returns whether this operator’s effects are independent of how the input blocks are
     /// rotated.
     #[expect(clippy::unused_self)]
@@ -696,7 +754,7 @@ mod tests {
     use crate::time;
     use crate::universe::Universe;
     use BlockCollision::{Hard, None as CNone};
-    use CompositeOperator::{Atop, In, Over};
+    use CompositeOperator::{Atop, In, Out, Over};
     use pretty_assertions::assert_eq;
 
     // --- Helpers ---
@@ -1177,6 +1235,75 @@ mod tests {
                     recursion: 1
                 }
             );
+        }
+
+        /// Test that volumes that do not need to be touched, due to block bounds aren’t.
+        /// This optimization allows compositions of many small parts to be efficient.
+        ///
+        /// Note that this test relies on an accurate [`Cost`] result, but there is no good
+        /// way to do better.
+        #[test]
+        fn unaltered_volume_is_untouched() {
+            let universe = &mut Universe::new();
+
+            // Has voxels with a total volume of 64.
+            let base_block = Block::builder()
+                .voxels_fn(R4, |_| block::from_color!(1.0, 0.0, 0.0, 1.0))
+                .unwrap()
+                .build_into(universe);
+            // Has voxels with a total volume of 16.
+            let smaller_block = Block::builder()
+                .voxels_fn(R4, |cube| {
+                    if cube.x == 0 {
+                        block::from_color!(0.0, 1.0, 0.0, 1.0)
+                    } else {
+                        AIR
+                    }
+                })
+                .unwrap()
+                .build_into(universe);
+            assert_eq!(
+                smaller_block
+                    .evaluate(universe.read_ticket())
+                    .unwrap()
+                    .voxels()
+                    .bounds(),
+                GridAab::from_lower_size([0, 0, 0], [1, 4, 4]),
+                "test assumption failed"
+            );
+            let expected_lower_cost = block::Cost {
+                components: 3,
+                // 2 original blocks plus the composition, which should touch only the
+                // 16 and not the 64.
+                voxels: 64 + 16 + 16,
+                recursion: 1,
+            };
+
+            // Test with small src Over large dst
+            {
+                let composition_evaluation = base_block
+                    .clone()
+                    .with_modifier(Composite::new(smaller_block.clone(), Over))
+                    .evaluate(universe.read_ticket())
+                    .unwrap();
+                assert_eq!(
+                    composition_evaluation.cost, expected_lower_cost,
+                    "small Over large"
+                );
+            }
+
+            // Test with large src Out small dst
+            {
+                let composition_evaluation = smaller_block
+                    .clone()
+                    .with_modifier(Composite::new(base_block, Out))
+                    .evaluate(universe.read_ticket())
+                    .unwrap();
+                assert_eq!(
+                    composition_evaluation.cost, expected_lower_cost,
+                    "large Out small"
+                );
+            }
         }
     }
 }
