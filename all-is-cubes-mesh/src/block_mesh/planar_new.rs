@@ -6,7 +6,44 @@
 //! mesh will not contain any “T-junctions” (places where a triangle edge meets a vertex rather than
 //! another edge).
 //!
+//! # Background and alternatives
+//!
+//! Many voxel games use the so-called “greedy meshing” algorithm. This algorithm is fast and
+//! efficient in number of triangles created; however, it creates T-junctions, which lead to
+//! random single-pixel gaps in the rendered mesh. All is Cubes is designed to favor correctness.
+//!
+//! Still, there are other ways we could solve this problem:
+//!
+//! * We could take greedy meshing’s output of quads (not yet converted to triangles), then find
+//!   each T-junction between these quads’ edges and corners, and mark it as a place to introduce
+//!   an extra vertex on all quads touching that point (triangulating each quad as a simple convex
+//!   polygon). This produces extra vertices, and requires comparing all the quads to each other
+//!   to find the junctions.
+//!
+//! * We could use an existing polygon triangulation library.
+//!   This has not been done because
+//!
+//!   * algorithms not designed exclusively for [orthogonal polygons] would require us
+//!     to preprocess the vertices into separate loops and identify holes, and might do more
+//!     work than necessary to handle diagonal lines that won’t ever occur;
+//!   * with an internal algorithm we can tweak it for performance based on benchmarks of our
+//!     own situation;
+//!   * and writing a new algorithm was more fun;
+//!
+//!   but this option is still worth further investigation.
+//!   Searching for libraries that currently exist on crates.io which
+//!   claim to triangulate polygons with holes turned up [`earcut`](https://crates.io/crates/earcut)
+//!   which looks promising. Other libraries which looked less promising include:
+//!
+//!   * [`earcutr`](https://crates.io/crates/earcutr) — another port of the same algorithm as
+//!     `earcut`, but is not `no_std` and does not allow avoiding reallocations
+//!   * [`i_triangle`](https://crates.io/crates/i_triangle) — large API with little documentation
+//!   * [`poly2tri-rs`](https://crates.io/crates/poly2tri-rs) — not `no_std` (includes things like
+//!     file loading functions), not efficient in allocations, little documentation
+//!   * [`triangulate`](https://crates.io/crates/triangulate) — heavy deps (rand, backtrace)
+//!
 //! [sweep line algorithm]: https://en.wikipedia.org/wiki/Sweep_line_algorithm
+//! [orthogonal polygons]: https://en.wikipedia.org/wiki/Rectilinear_polygon
 //
 // TODO(planar_new): This algorithm is not yet complete and is only conditionally used.
 // It will eventually replace [`crate::block_mesh::planar::greedy_mesh`].
