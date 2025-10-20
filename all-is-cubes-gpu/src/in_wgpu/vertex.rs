@@ -28,14 +28,40 @@ pub enum AtlasTexel {}
 /// Coordinate system for within-cube positions divided by 128.
 pub(crate) enum CubeFix128 {}
 
-/// Triangle mesh vertex type that is used for rendering [blocks].
+/// Triangle mesh [`Vertex`] type that is used for rendering [blocks].
 ///
-/// `u32` is the smallest size of integer that is currently supported everywhere we want to run
-/// (the implementation of WebGPU on Chrome 132.0.6834.160 does not allow `u8` or `u16`),
-/// so several pieces of data are manually packed into `u32`s to save memory.
-/// (We could in principle use smaller fields here on the Rust side, but that would
-/// make the relationship between the two struct definitions endianness-sensitive,
-/// which is much worse.)
+/// This struct contains the vertex position, and [`BColor`] contains additional information
+/// for rendering which does not affect the position.
+///
+/// # Notes on data packing
+///
+/// In order to minimize data transfer costs, we want our vertices to be as small as possible.
+/// Therefore, we take advantage of the strict voxel nature of the world to represent the vertices
+/// using small integers and fixed-point numbers.
+///
+/// The vertex struct must have a size that is a multiple of [`wgpu::VERTEX_ALIGNMENT`], which is 4.
+/// Therefore, while we could use [`u8`] vertex attributes, they are not useful except for
+/// convenience, and take up more attribute slots. Instead, we use [`u32`] (4 bytes) containing
+/// data which we explicitly pack and unpack.
+///
+/// (We could in principle use smaller fields here on the Rust side at no cost, but then we would
+/// be using fields on one side and bit operations on the other, which seems confusing for little
+/// benefit. It would also make the code endianness-sensitive, but I believe WebGPU/WGSL aren’t
+/// intended to support big-endian.)
+///
+/// Counting individual bits, the data we actually need to store per [`BPosition`] is:
+///
+/// * Position of cube in chunk, range `0..=15`, 4 bits × 3 dimensions = 12 bits
+/// * Position of vertex in cube, range `0..=128`, 8 bits × 3 dimensions = 24 bits
+///
+/// This adds up to 36 bits, so we cannot make `BPosition` fit in a single [`u32`].
+/// Therefore, it is two [`u32`]s, and we use the additional bits for further information
+/// that is not strictly the position:
+///
+/// * Face/normal: range `0..=5`, 3 bits
+/// * Texture resolution: range `0..=7` (logarithm of 1 to 128), 3 bits
+///
+/// This makes a total of 42 used bits, out of a total of 64 bits.
 ///
 /// [blocks]: all_is_cubes::block::Block
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
@@ -69,6 +95,7 @@ pub(crate) struct BPosition {
     position_in_cube_and_normal_and_resolution_packed: u32,
 }
 
+/// Additional vertex data accompanying [`BPosition`].
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
 pub(crate) struct BColor {
@@ -88,6 +115,14 @@ pub(crate) struct BColor {
     ///
     /// Design note: It would be more straightforward to use `f16` here, but that's a
     /// WebGPU optional extension.
+    ///
+    /// # Note on data packing
+    ///
+    /// One might wonder if we could pack this smaller by using relative coordinates — (min,size)
+    /// instead of (min,max). The size is at most 256, so we need 9 bits per size, so the total
+    /// number of bits for a full box would be (16 + 9) × 3 = 75 bits, which still exceeds
+    /// 64 bits. Therefore, we cannot do better here without using spare bits from
+    /// `color_or_texture` — which is possible but not simple.
     clamp_min_max: [u32; 3],
 }
 
