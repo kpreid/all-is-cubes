@@ -1136,29 +1136,46 @@ mod tests {
             let base_block = Block::from(
                 universe.insert_anonymous(block::BlockDef::new(universe.read_ticket(), base_block)),
             );
-            let base_key = EvKey::new(&base_block.evaluate(universe.read_ticket()).unwrap());
+            let base_block_voxel_count = 64;
+            let base_ev = base_block.evaluate(universe.read_ticket()).unwrap();
+            let base_key = EvKey::new(&base_ev);
+            assert_eq!(base_key, EvKey::new(&base_ev), "test assumption failed");
             assert_eq!(
-                base_key,
-                EvKey::new(&base_block.evaluate(universe.read_ticket()).unwrap()),
+                base_ev.cost,
+                block::Cost {
+                    components: 1,
+                    voxels: 0, // zero because of BlockDef cache
+                    recursion: 0
+                },
                 "test assumption failed"
             );
 
             let air_src_block = base_block.clone().with_modifier(Composite::new(AIR, Over));
+            let air_src_ev = air_src_block.evaluate(universe.read_ticket()).unwrap();
+            assert_eq!(base_key, EvKey::new(&air_src_ev), "src");
             assert_eq!(
-                base_key,
-                EvKey::new(&air_src_block.evaluate(universe.read_ticket()).unwrap()),
-                "src"
+                air_src_ev.cost,
+                block::Cost {
+                    components: 3,
+                    voxels: 0,
+                    recursion: 1
+                }
             );
 
             // TODO: This assertion should be of equality, not inequality.
             // It is currently reversed, not because the short circuit logic is broken,
             // but because attribute merges aren't symmetric and the evaluation
-            // result has the display name `"<air>"`.
+            // result has the display name `"<air>"`, so the short circuit does not apply.
             let air_dst_block = base_block.with_modifier(Composite::new(AIR, Over).reversed());
-            assert_ne!(
-                base_key,
-                EvKey::new(&air_dst_block.evaluate(universe.read_ticket()).unwrap()),
-                "dst"
+            let air_dst_ev = air_dst_block.evaluate(universe.read_ticket()).unwrap();
+            assert_ne!(base_key, EvKey::new(&air_dst_ev), "dst");
+            assert_eq!(
+                air_dst_ev.cost,
+                block::Cost {
+                    components: 3,
+                    voxels: base_block_voxel_count,
+                    recursion: 1
+                }
             );
         }
     }
