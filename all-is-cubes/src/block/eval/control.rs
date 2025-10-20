@@ -84,10 +84,11 @@ pub(crate) struct Budget {
     /// Unlike the other budget parameters, this is not cumulative over the entire evaluation.
     pub(crate) recursion: u8,
 
-    /// Number of recursion levels actually used by the evaluation.
+    /// Lowest value that `self.recursion` has ever had.
+    ///
     /// This is tracked separately so that it can be reported afterward,
     /// whereas the other counters are only ever decremented and so a subtraction suffices.
-    pub(crate) recursion_used: u8,
+    pub(crate) min_recursion: u8,
 }
 
 impl Budget {
@@ -123,7 +124,10 @@ impl Budget {
         let current = cell.get();
         let mut recursed = current;
         match recursed.recursion.checked_sub(1) {
-            Some(updated) => recursed.recursion = updated,
+            Some(updated) => {
+                recursed.recursion = updated;
+                recursed.min_recursion = recursed.min_recursion.min(updated);
+            }
             None => return Err(InEvalError::BudgetExceeded),
         }
         cell.set(recursed);
@@ -131,11 +135,20 @@ impl Budget {
     }
 
     /// Express a budget as a [`Cost`] value, for public consumption.
+    ///
+    /// The [`Budget`] type is not public, so we only use [`Cost`] even when describing budgets.
+    ///
+    /// This method is only suitable for describing initial unused budgets.
+    /// For budgets that have been consumed, use [`Cost::from_difference()`].
     pub(crate) fn to_cost(self) -> Cost {
+        assert_eq!(
+            self.recursion, self.min_recursion,
+            "do not use `to_cost()` on used budgets"
+        );
         Cost {
             components: self.components,
             voxels: self.voxels,
-            recursion: self.recursion_used,
+            recursion: self.recursion,
         }
     }
 }
@@ -143,11 +156,12 @@ impl Budget {
 impl Default for Budget {
     /// Returns the standard budget for starting any evaluation.
     fn default() -> Self {
+        let recursion = 30;
         Self {
             components: 1000,
             voxels: 64 * 64 * 128,
-            recursion: 30,
-            recursion_used: 0,
+            recursion,
+            min_recursion: recursion,
         }
     }
 }
@@ -206,9 +220,10 @@ impl Cost {
                     .components
                     .checked_sub(final_budget.components)?,
                 voxels: original_budget.voxels.checked_sub(final_budget.voxels)?,
+                // note use of .min_recursion!
                 recursion: original_budget
-                    .recursion_used
-                    .checked_sub(final_budget.recursion_used)?,
+                    .recursion
+                    .checked_sub(final_budget.min_recursion)?,
             })
         })() else {
             panic!("overflow computing budget difference: {final_budget:#?} - {original_budget:#?}")
@@ -419,5 +434,31 @@ pub(in crate::block) fn finish_evaluation(
     match result {
         Ok(ev) => Ok(ev.finish(block, cost)),
         Err(err) => Err(err.into_eval_error(block, original_budget.to_cost(), cost)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Most cost-tracking tests are block evaluation tests, but recursion is subtler than
+    /// the other cases and had a bug this is a regression test for.
+    #[test]
+    fn tracking_recursion_cost() {
+        let cell = Cell::new(Budget::default());
+        assert_eq!((cell.get().recursion, cell.get().min_recursion), (30, 30));
+
+        {
+            let _guard1: BudgetRecurseGuard<'_> = Budget::recurse(&cell).unwrap();
+            assert_eq!((cell.get().recursion, cell.get().min_recursion), (29, 29));
+            {
+                let _guard2: BudgetRecurseGuard<'_> = Budget::recurse(&cell).unwrap();
+                assert_eq!((cell.get().recursion, cell.get().min_recursion), (28, 28));
+            }
+        }
+        assert_eq!((cell.get().recursion, cell.get().min_recursion), (30, 28));
+
+        let cost = Cost::from_difference(Budget::default(), cell.get());
+        assert_eq!(cost.recursion, 2);
     }
 }
