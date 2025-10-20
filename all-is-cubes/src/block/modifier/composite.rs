@@ -821,50 +821,6 @@ mod tests {
         );
     }
 
-    /// Test that when we composite with `AIR`, the result skips unnecessary evaluation.
-    ///
-    /// TODO: Expand this test to AIR-like blocks that aren't exactly AIR.
-    #[test]
-    fn composite_with_air_is_short_circuit_noop() {
-        let universe = &mut Universe::new();
-
-        // Construct a voxel block with BlockDef.
-        // By using the BlockDef, we get a cache that we can use to confirm
-        // by pointer identity that the composition didn't needlessly build a new
-        // voxel allocation.
-        let base_block = Block::builder()
-            .voxels_fn(R4, |_| block::from_color!(1.0, 0.0, 0.0, 1.0))
-            .unwrap()
-            .build_into(universe);
-        let base_block = Block::from(
-            universe.insert_anonymous(block::BlockDef::new(universe.read_ticket(), base_block)),
-        );
-        let base_key = EvKey::new(&base_block.evaluate(universe.read_ticket()).unwrap());
-        assert_eq!(
-            base_key,
-            EvKey::new(&base_block.evaluate(universe.read_ticket()).unwrap()),
-            "test assumption failed"
-        );
-
-        let air_src_block = base_block.clone().with_modifier(Composite::new(AIR, Over));
-        assert_eq!(
-            base_key,
-            EvKey::new(&air_src_block.evaluate(universe.read_ticket()).unwrap()),
-            "src"
-        );
-
-        // TODO: This assertion should be of equality, not inequality.
-        // It is currently reversed, not because the short circuit logic is broken,
-        // but because attribute merges aren't symmetric and the evaluation
-        // result has the display name `"<air>"`.
-        let air_dst_block = base_block.with_modifier(Composite::new(AIR, Over).reversed());
-        assert_ne!(
-            base_key,
-            EvKey::new(&air_dst_block.evaluate(universe.read_ticket()).unwrap()),
-            "dst"
-        );
-    }
-
     /// Test each operator’s treatment of input blocks’ individual voxels (not attributes).
     mod voxel {
         use super::*;
@@ -1154,6 +1110,56 @@ mod tests {
                 .clone()
                 .with_modifier(Composite::new(b2.clone(), Over).with_disassemblable());
             assert_eq!(composed.unspecialize(), vec![b2, b1]);
+        }
+    }
+
+    /// Tests of the self-reported performance of composition
+    /// under specific cases that are supposed to be optimized.
+    mod optimization {
+        use super::{assert_eq, *};
+
+        /// Test that when we composite with `AIR`, the result skips unnecessary evaluation.
+        ///
+        /// TODO: Expand this test to AIR-like blocks that aren't exactly AIR.
+        #[test]
+        fn composite_with_air_is_short_circuit_noop() {
+            let universe = &mut Universe::new();
+
+            // Construct a voxel block with BlockDef.
+            // By using the BlockDef, we get a cache that we can use to confirm
+            // by pointer identity that the composition didn't needlessly build a new
+            // voxel allocation.
+            let base_block = Block::builder()
+                .voxels_fn(R4, |_| block::from_color!(1.0, 0.0, 0.0, 1.0))
+                .unwrap()
+                .build_into(universe);
+            let base_block = Block::from(
+                universe.insert_anonymous(block::BlockDef::new(universe.read_ticket(), base_block)),
+            );
+            let base_key = EvKey::new(&base_block.evaluate(universe.read_ticket()).unwrap());
+            assert_eq!(
+                base_key,
+                EvKey::new(&base_block.evaluate(universe.read_ticket()).unwrap()),
+                "test assumption failed"
+            );
+
+            let air_src_block = base_block.clone().with_modifier(Composite::new(AIR, Over));
+            assert_eq!(
+                base_key,
+                EvKey::new(&air_src_block.evaluate(universe.read_ticket()).unwrap()),
+                "src"
+            );
+
+            // TODO: This assertion should be of equality, not inequality.
+            // It is currently reversed, not because the short circuit logic is broken,
+            // but because attribute merges aren't symmetric and the evaluation
+            // result has the display name `"<air>"`.
+            let air_dst_block = base_block.with_modifier(Composite::new(AIR, Over).reversed());
+            assert_ne!(
+                base_key,
+                EvKey::new(&air_dst_block.evaluate(universe.read_ticket()).unwrap()),
+                "dst"
+            );
         }
     }
 }
