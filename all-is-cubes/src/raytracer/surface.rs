@@ -1,5 +1,10 @@
 use rand_distr::Distribution;
 
+/// Acts as polyfill for float methods
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use num_traits::float::Float as _;
+
 use crate::block::{Evoxel, Resolution};
 use crate::camera::LightingOption;
 use crate::math::{
@@ -9,6 +14,8 @@ use crate::raycast::{Ray, RayIsh as _, RaycasterIsh};
 use crate::raytracer::{
     BounceRng, ColorBuf, RaytraceInfo, RtBlockData, SpaceRaytracer, TracingBlock, TracingCubeData,
 };
+
+// -------------------------------------------------------------------------------------------------
 
 /// Description of a surface the ray passes through (or from the volumetric perspective,
 /// a transition from one material to another).

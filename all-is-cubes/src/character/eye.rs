@@ -2,7 +2,7 @@
 
 #![expect(clippy::needless_pass_by_value, reason = "false positives from Res")]
 
-/// Acts as polyfill for float methods such as powf()
+/// Acts as polyfill for float methods such as `powf()`
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
