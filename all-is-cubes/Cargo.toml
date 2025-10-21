@@ -137,7 +137,7 @@ log = { workspace = true }
 macro_rules_attribute = { workspace = true }
 manyfmt = { workspace = true }
 mutants = { workspace = true }
-nosy = { workspace = true, features = ["async", "sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
+nosy = { workspace = true, features = ["async", "sync"] } # TODO(no_std): make "sync" conditional on our std feature again when possible
 num-traits = { workspace = true }
 once_cell = { workspace = true, features = ["alloc", "race", "std"] } # TODO(no_std): make "std" conditional on our std feature again when possible
 ordered-float = { workspace = true }

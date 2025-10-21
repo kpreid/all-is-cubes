@@ -1,7 +1,6 @@
 //! Broadcasting of notifications of state changes, and other messages.
 //!
-//! This module is a re-export of selected items from [`nosy`].
-//! Caution: if the `"std"` feature is disabled, they will change in non-additive ways.
+//! This module is a re-export and parameterization of selected items from [`nosy`].
 
 // -------------------------------------------------------------------------------------------------
 
@@ -10,10 +9,7 @@ pub use ::nosy::{
     NullListener, Source, Store, StoreLock, future::WakeFlag,
 };
 
-#[cfg(feature = "std")]
 pub use ::nosy::sync::{DynListener, DynSource, Notifier, constant};
-#[cfg(not(feature = "std"))]
-pub use ::nosy::unsync::{DynListener, DynSource, Notifier, constant};
 
 mod listeners;
 pub use listeners::FnListener;
