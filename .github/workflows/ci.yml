@@ -186,7 +186,7 @@ jobs:
     # Save the test-renderers results so we can download and view them
     - name: Save test-renderers output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: test-renderers-output ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
@@ -198,7 +198,7 @@ jobs:
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: cargo-timings build ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.depversions }}
         path: |
@@ -340,7 +340,7 @@ jobs:
 
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: cargo-timings lint ${{ matrix.toolchain }}
         path: |
@@ -402,7 +402,7 @@ jobs:
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: cargo-timings check-features
         path: |
@@ -465,7 +465,7 @@ jobs:
     # (for understanding build performance in CI)
     - name: Save cargo --timings output
       if: ${{ always() }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: cargo-timings test-more
         path: |
@@ -536,7 +536,7 @@ jobs:
         # See mutants.yml for notes on the package selection
         run: cargo mutants --in-diff git.diff --package all-is-cubes -- --all-features
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: ${{ always() }}
         with:
           name: mutants-incremental.out
@@ -632,7 +632,7 @@ jobs:
     # Save the fuzz artifacts so we can repro elsewhere
     - name: Save fuzz artifacts
       if: ${{ failure() }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: fuzz-artifacts
         path: fuzz/artifacts
