@@ -1503,7 +1503,3 @@ name = "yield-progress"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6a42dba597da5dc59841799b16dda7c254ad91a497aab4c594ba7a785eef688"
-
-[[patch.unused]]
-name = "nosy"
-version = "0.3.0-alpha"

@@ -1,6 +1,6 @@
 use rand_distr::Distribution;
 
-/// Acts as polyfill for float methods
+/// Acts as polyfill for float methods such as `exp()`
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
