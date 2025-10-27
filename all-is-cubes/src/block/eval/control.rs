@@ -174,7 +174,7 @@ pub(crate) struct BudgetRecurseGuard<'a> {
 impl Drop for BudgetRecurseGuard<'_> {
     fn drop(&mut self) {
         let mut budget = self.cell.get();
-        budget.recursion = budget.recursion.checked_add(1).unwrap();
+        budget.recursion = budget.recursion.strict_add(1);
         self.cell.set(budget);
     }
 }
