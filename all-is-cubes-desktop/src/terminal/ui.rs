@@ -547,7 +547,7 @@ impl InventoryDisplay {
         }
 
         Self {
-            slots: std::array::from_fn(|_| inv::Slot::Empty),
+            slots: std::array::repeat(inv::Slot::Empty),
             selected_slots: [0; 3],
         }
     }
