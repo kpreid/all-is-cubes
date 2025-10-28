@@ -137,10 +137,6 @@ pub type PredicateRes = Result<(), Box<dyn Error>>;
 
 struct TransactionAndPredicate<'a, Tr: Transaction> {
     transaction: Tr,
-    #[expect(
-        clippy::type_complexity,
-        reason = "https://github.com/rust-lang/rust-clippy/issues/9299"
-    )]
     predicate: Rc<dyn Fn(&Tr::Target, &Tr::Target) -> PredicateRes + 'a>,
 }
 

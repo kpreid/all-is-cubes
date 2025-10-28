@@ -45,7 +45,6 @@ pub type NoTextureMt = Mt<texture::NoTextures, { usize::MAX }>;
 pub type TextureMt = Mt<Allocator, { usize::MAX }>;
 
 /// Test helper to call [`block_meshes_for_space`] followed directly by [`SpaceMesh::new`].
-#[allow(clippy::type_complexity)]
 pub fn mesh_blocks_and_space(
     space: &Space,
 ) -> (Allocator, BlockMeshes<TextureMt>, SpaceMesh<TextureMt>) {
