@@ -1,5 +1,8 @@
+use alloc::boxed::Box;
+
 use rand::{Rng, SeedableRng as _};
 
+use all_is_cubes::arcstr::literal;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::euclid::{Size3D, Vector2D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
@@ -8,24 +11,20 @@ use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
 
+use crate::framework;
 use crate::landscape::{self, LandscapeBlocks};
-use crate::{TemplateParameters, free_editing_starter_inventory, palette};
+use crate::palette;
+use crate::{TemplateParameters, free_editing_starter_inventory};
 
 // -------------------------------------------------------------------------------------------------
 
 pub(crate) async fn islands(
     universe: &mut Universe,
-    p: YieldProgress,
+    progress: YieldProgress,
     params: TemplateParameters,
 ) -> Result<Space, InGenError> {
-    let landscape_blocks = landscape::create_landscape_blocks_and_variants(&BlockProvider::<
-        LandscapeBlocks,
-    >::using(universe)?);
-
     let TemplateParameters { size, seed } = params;
     let size = size.unwrap_or(GridSize::new(1000, 400, 1000));
-    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed.unwrap_or(0));
-
     // Set up dimensions
     let bounds = GridAab::checked_from_lower_size(
         [
@@ -36,6 +35,65 @@ pub(crate) async fn islands(
         size,
     )
     .map_err(InGenError::other)?; // TODO: add automatic error conversion?
+
+    let queue = {
+        let landscape_blocks =
+            landscape::create_landscape_blocks_and_variants(
+                &BlockProvider::<LandscapeBlocks>::using(universe)?,
+            );
+
+        let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed.unwrap_or(0));
+
+        // Set up grid in which islands are placed
+        // TODO: framework should be able to do this for us
+        let island_stride = 50;
+        let island_grid = bounds.divide(island_stride);
+
+        framework::Queue::from_iter(island_grid.interior_iter().filter_map(
+            |island_pos| -> Option<framework::Task> {
+                let cell_bounds = GridAab::from_lower_size(
+                    (island_pos.lower_bounds().to_vector() * island_stride).to_point(),
+                    Size3D::splat(island_stride).to_u32(),
+                )
+                .intersection_cubes(bounds)
+                .expect("island outside space bounds");
+
+                // TODO: generating random ranges not crossing the center is just a way to make sure we
+                // generate reasonable ranges, but leads to a bias of sorts that all islands touch the
+                // center line.
+                let cell_center = cell_bounds.center().to_i32();
+                let occupied_bounds = GridAab::from_lower_upper(
+                    [
+                        rng.random_range(cell_bounds.lower_bounds().x..=cell_center.x),
+                        rng.random_range(cell_bounds.lower_bounds().y..=cell_center.y),
+                        rng.random_range(cell_bounds.lower_bounds().z..=cell_center.z),
+                    ],
+                    [
+                        rng.random_range(cell_center.x..=cell_bounds.upper_bounds().x),
+                        rng.random_range(cell_center.y..=cell_bounds.upper_bounds().y),
+                        rng.random_range(cell_center.z..=cell_bounds.upper_bounds().z),
+                    ],
+                );
+
+                if !occupied_bounds.is_empty() {
+                    Some(framework::Task {
+                        label: literal!(""), // we could number them but it would not be very useful
+                        region: occupied_bounds,
+                        time_estimate: 1.0,
+                        operation: framework::Operation::Custom(Box::new({
+                            let landscape_blocks = landscape_blocks.clone();
+                            move |m| {
+                                fill_with_island(occupied_bounds, m, &landscape_blocks, 0.5)?;
+                                Ok(())
+                            }
+                        })),
+                    })
+                } else {
+                    None
+                }
+            },
+        ))
+    };
 
     let mut space = Space::builder(bounds)
         .sky_color(palette::DAY_SKY_COLOR)
@@ -53,44 +111,7 @@ pub(crate) async fn islands(
         })
         .build();
 
-    // Set up grid in which islands are placed
-    let island_stride = 50;
-    let island_grid = bounds.divide(island_stride);
-
-    for (i, island_pos) in island_grid.interior_iter().enumerate() {
-        let cell_bounds = GridAab::from_lower_size(
-            (island_pos.lower_bounds().to_vector() * island_stride).to_point(),
-            Size3D::splat(island_stride).to_u32(),
-        )
-        .intersection_cubes(bounds)
-        .expect("island outside space bounds");
-
-        // TODO: generating random ranges not crossing the center is just a way to make sure we
-        // generate reasonable ranges, but leads to a bias of sorts that all islands touch the
-        // center line.
-        let cell_center = cell_bounds.center().to_i32();
-        let occupied_bounds = GridAab::from_lower_upper(
-            [
-                rng.random_range(cell_bounds.lower_bounds().x..=cell_center.x),
-                rng.random_range(cell_bounds.lower_bounds().y..=cell_center.y),
-                rng.random_range(cell_bounds.lower_bounds().z..=cell_center.z),
-            ],
-            [
-                rng.random_range(cell_center.x..=cell_bounds.upper_bounds().x),
-                rng.random_range(cell_center.y..=cell_bounds.upper_bounds().y),
-                rng.random_range(cell_center.z..=cell_bounds.upper_bounds().z),
-            ],
-        );
-
-        if !occupied_bounds.is_empty() {
-            space.mutate(universe.read_ticket(), |m| {
-                fill_with_island(occupied_bounds, m, &landscape_blocks, 0.5)
-            })?;
-        }
-
-        p.progress(i as f32 / island_grid.volume_f64() as f32).await;
-    }
-
+    queue.run(progress, universe.read_ticket(), &mut space).await?;
     Ok(space)
 }
 
