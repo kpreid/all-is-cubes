@@ -41,16 +41,17 @@ pub use blocks::*;
 mod city;
 pub(crate) use city::demo_city;
 mod clouds;
-mod template;
-pub use template::*;
 mod dungeon;
 mod fractal;
+mod framework;
 mod islands;
 mod landscape;
 pub use landscape::*;
 mod menu;
 #[doc(hidden)] // TODO
 pub use menu::template_menu_space;
+mod template;
+pub use template::*;
 mod tree;
 
 #[cfg(feature = "_special_testing")] // used by benchmark
