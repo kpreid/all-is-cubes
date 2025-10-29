@@ -26,6 +26,8 @@ use all_is_cubes::util::YieldProgress;
 use crate::Fire;
 use crate::alg::{array_of_noise, four_walls, scale_color};
 
+// -------------------------------------------------------------------------------------------------
+
 /// A special name for "the thickness of a 1-block-thick wall/floor/pillar", for readability.
 const IWALL: GridCoordinate = 1;
 const UWALL: GridSizeCoord = 1;
@@ -34,43 +36,50 @@ const UWALL: GridSizeCoord = 1;
 /// TODO: Make this a run-time controllable parameter (templates need a way to do that).
 const MOVING_LIGHT: bool = false;
 
+// Dimensions and counts
+const BALCONY_RADIUS: GridSizeCoord = 4;
+const CEILING_HEIGHT: u32 = 6u32;
+const BETWEEN_SMALL_ARCHES: u32 = 3u32;
+const BETWEEN_LARGE_ARCHES: u32 = BETWEEN_SMALL_ARCHES * 2 + 1;
+const LARGE_ARCH_COUNT_X: u32 = 1;
+const LARGE_ARCH_COUNT_Z: u32 = 5;
+const FLOOR_COUNT: u32 = 4;
+const SUN_HEIGHT: u32 = 10;
+
+// -------------------------------------------------------------------------------------------------
+
 pub(crate) async fn atrium(
     universe: &mut Universe,
     progress: YieldProgress,
 ) -> Result<Space, InGenError> {
-    let ceiling_height = 6u32;
-    let between_small_arches = 3u32;
-    let between_large_arches = between_small_arches * 2 + 1;
-    let balcony_radius: GridSizeCoord = 4;
-    let large_arch_count_x = 1;
-    let large_arch_count_z = 5;
-    let floor_count = 4;
-    let sun_height = 10;
-
     // TODO: subdivide and report further progress after the block generation
-    let blocks = {
-        let mut install_txn = UniverseTransaction::default();
-        let blocks = install_atrium_blocks(&mut install_txn, progress, balcony_radius).await?;
-        install_txn.execute(universe, (), &mut transaction::no_outputs)?;
-        blocks
-    };
+    let mut install_txn = UniverseTransaction::default();
+    let blocks = install_atrium_blocks(&mut install_txn, progress).await?;
+    install_txn.execute(universe, (), &mut transaction::no_outputs)?;
 
+    atrium_non_async(universe, &blocks)
+}
+
+fn atrium_non_async(
+    universe: &mut Universe,
+    blocks: &BlockProvider<AtriumBlocks>,
+) -> Result<Space, InGenError> {
     let origin = GridAab::ORIGIN_CUBE;
     let atrium_footprint = origin.expand(FaceMap::symmetric([
-        ((between_large_arches + UWALL) * large_arch_count_x) / 2 - UWALL,
+        ((BETWEEN_LARGE_ARCHES + UWALL) * LARGE_ARCH_COUNT_X) / 2 - UWALL,
         0,
-        ((between_large_arches + UWALL) * large_arch_count_z) / 2 - UWALL,
+        ((BETWEEN_LARGE_ARCHES + UWALL) * LARGE_ARCH_COUNT_Z) / 2 - UWALL,
     ]));
     let arches_footprint = atrium_footprint.expand(FaceMap::symmetric([UWALL, 0, UWALL]));
     let balconies_footprint =
-        arches_footprint.expand(FaceMap::symmetric([balcony_radius, 0, balcony_radius]));
+        arches_footprint.expand(FaceMap::symmetric([BALCONY_RADIUS, 0, BALCONY_RADIUS]));
     let outer_walls_footprint = balconies_footprint.expand(FaceMap::symmetric([UWALL, 0, UWALL]));
 
-    let balcony_floor_pos = GridVector::new(0, (ceiling_height + UWALL).cast_signed(), 0);
-    let top_floor_pos = GridVector::new(0, (ceiling_height + UWALL).cast_signed() * 2, 0);
+    let balcony_floor_pos = GridVector::new(0, (CEILING_HEIGHT + UWALL).cast_signed(), 0);
+    let top_floor_pos = GridVector::new(0, (CEILING_HEIGHT + UWALL).cast_signed() * 2, 0);
 
     let space_bounds = outer_walls_footprint
-        .expand(FaceMap::default().with(Face6::PY, sun_height + ceiling_height * floor_count));
+        .expand(FaceMap::default().with(Face6::PY, SUN_HEIGHT + CEILING_HEIGHT * FLOOR_COUNT));
 
     let floor_with_cutout = |mut cube: Cube| {
         cube.y = 0;
@@ -87,7 +96,7 @@ pub(crate) async fn atrium(
             let mut spawn = Spawn::default_for_new_space(space_bounds);
             spawn.set_eye_position(Point3D::new(
                 0.5,
-                1.91 + FreeCoordinate::from(ceiling_height + 2),
+                1.91 + FreeCoordinate::from(CEILING_HEIGHT + 2),
                 10.0,
             ));
             spawn.set_inventory(free_editing_starter_inventory(true));
@@ -133,7 +142,7 @@ pub(crate) async fn atrium(
         })
         .create_box(
             outer_walls_footprint
-                .expand(FaceMap::default().with(Face6::PY, ceiling_height * floor_count)),
+                .expand(FaceMap::default().with(Face6::PY, CEILING_HEIGHT * FLOOR_COUNT)),
         )
         .execute_m(m)?;
 
@@ -151,7 +160,7 @@ pub(crate) async fn atrium(
             outer_walls_footprint
                 .translate(top_floor_pos)
                 .expand(FaceMap::from_fn(|f| {
-                    GridSizeCoord::from(f == Face6::PY) * ceiling_height
+                    GridSizeCoord::from(f == Face6::PY) * CEILING_HEIGHT
                 })),
             floor_with_cutout,
         )?;
@@ -225,10 +234,10 @@ pub(crate) async fn atrium(
         for wall in four_walls(arches_footprint.translate([0, IWALL, 0])) {
             arch_row(
                 m,
-                &blocks,
+                blocks,
                 wall.bottom_corner,
-                between_large_arches + UWALL,
-                wall.length / (between_large_arches + UWALL),
+                BETWEEN_LARGE_ARCHES + UWALL,
+                wall.length / (BETWEEN_LARGE_ARCHES + UWALL),
                 wall.counterclockwise_direction,
                 arches_pattern.as_ref(),
             )?;
@@ -236,14 +245,14 @@ pub(crate) async fn atrium(
 
         // Ceiling vaults
         // TODO: This only generates vaults along the long sides and not the short sides or corners.
-        for z_section in 0..(large_arch_count_z as i32) {
-            let z_low = z_section * (between_large_arches + UWALL) as i32;
+        for z_section in 0..(LARGE_ARCH_COUNT_Z as i32) {
+            let z_low = z_section * (BETWEEN_LARGE_ARCHES + UWALL) as i32;
             for (flip_x, x_low) in [
                 (false, balconies_footprint.lower_bounds().x),
                 (true, atrium_footprint.upper_bounds().x + IWALL),
             ] {
                 for which_floor in 0..2 {
-                    let start_y = which_floor * (ceiling_height + UWALL) as i32 + 4;
+                    let start_y = which_floor * (CEILING_HEIGHT + UWALL) as i32 + 4;
                     let low_corner = GridPoint::new(
                         x_low,
                         start_y,
@@ -256,16 +265,16 @@ pub(crate) async fn atrium(
                         GridAab::from_lower_size(
                             low_corner,
                             // TODO: have constant for arch height
-                            [balcony_radius, 3, between_large_arches + UWALL],
+                            [BALCONY_RADIUS, 3, BETWEEN_LARGE_ARCHES + UWALL],
                         ),
                         |abs_cube| {
                             let rel_cube = abs_cube - low_corner.to_vector();
                             let balcony_axis_arch = lookup_multiblock_2d(
-                                &blocks,
+                                blocks,
                                 AtriumBlocks::VaultBalcony,
                                 [
                                     if flip_x {
-                                        balcony_radius as GridCoordinate - rel_cube.x
+                                        BALCONY_RADIUS as GridCoordinate - rel_cube.x
                                     } else {
                                         // +1 because this arch doesn't have its own support pillar so we skip the full pillar part of the arch shape
                                         rel_cube.x + 1
@@ -281,7 +290,7 @@ pub(crate) async fn atrium(
                                 }) * Face6::PY.counterclockwise(),
                             );
                             let arch_axis_arch = lookup_multiblock_2d(
-                                &blocks,
+                                blocks,
                                 AtriumBlocks::VaultArch,
                                 [rel_cube.z, rel_cube.y],
                             );
@@ -478,6 +487,8 @@ fn fill_space_transformed(
     Ok(())
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Exhaust)]
 #[non_exhaustive]
 enum AtriumBlocks {
@@ -567,15 +578,14 @@ impl BannerColor {
 async fn install_atrium_blocks(
     txn: &mut UniverseTransaction,
     progress: YieldProgress,
-    balcony_radius: GridSizeCoord,
 ) -> Result<BlockProvider<AtriumBlocks>, InGenError> {
-    let resolution = Resolution::R16;
-    let resolution_g = GridCoordinate::from(resolution);
-    let stone_base = block::from_color!(0.53, 0.48, 0.40, 1.0);
-    let heavy_grout_base = block::from_color!(0.1, 0.1, 0.1, 1.0);
-    let grout_base = block::from_color!(0.32, 0.30, 0.28, 1.0);
-    let ceiling_paint = block::from_color!(0.975, 0.975, 0.975, 1.0);
-    let pole_color = block::from_color!(0.27, 0.20, 0.18, 1.0);
+    const RESOLUTION: Resolution = Resolution::R16;
+    const RESOLUTION_G: i32 = RESOLUTION.to_grid();
+    const STONE_BASE: &Block = &block::from_color!(0.53, 0.48, 0.40, 1.0);
+    const HEAVY_GROUT_BASE: &Block = &block::from_color!(0.1, 0.1, 0.1, 1.0);
+    const GROUT_BASE: &Block = &block::from_color!(0.32, 0.30, 0.28, 1.0);
+    const CEILING_PAINT: &Block = &block::from_color!(0.975, 0.975, 0.975, 1.0);
+    const POLE_COLOR: &Block = &block::from_color!(0.27, 0.20, 0.18, 1.0);
 
     // TODO: This whole section is about having noise pick from a fixed set of pregenerated shades.
     // We should abstract it out if we like this style
@@ -584,36 +594,36 @@ async fn install_atrium_blocks(
         reason = "warns on 32-bit but f64::from() is not an option on 64-bit"
     )]
     let stone_range: Vec<Block> = (-2..=2_isize)
-        .map(|x| scale_color(stone_base.clone(), 1.0 + x as f64 * 0.08, 0.02))
+        .map(|x| scale_color(STONE_BASE.clone(), 1.0 + x as f64 * 0.08, 0.02))
         .collect();
 
     // increased resolution to support brick offset patterning
     let stone_base_array = array_of_noise(
-        resolution,
+        RESOLUTION,
         &noise::ScalePoint::new(noise::OpenSimplex::new(0x2e240365))
-            .set_scale(4.0 / f64::from(resolution_g)),
+            .set_scale(4.0 / f64::from(RESOLUTION_G)),
         |value| &stone_range[(value * 8.0 + 2.5).round().clamp(0.0, 4.0) as usize],
     );
 
     let brick_pattern = |mut p: Cube| {
-        if (p.x.rem_euclid(resolution_g) > resolution_g / 2)
-            ^ (p.y.rem_euclid(resolution_g) > resolution_g / 2)
+        if (p.x.rem_euclid(RESOLUTION_G) > RESOLUTION_G / 2)
+            ^ (p.y.rem_euclid(RESOLUTION_G) > RESOLUTION_G / 2)
         {
             // Create brick half-overlap offset
-            p.z = (p.z + resolution_g / 2).rem_euclid(resolution_g);
+            p.z = (p.z + RESOLUTION_G / 2).rem_euclid(RESOLUTION_G);
         }
         let bricking = (p.x.rem_euclid(8))
             .min(p.y.rem_euclid(8))
             .min(p.z.rem_euclid(16));
         if bricking == 0 {
-            &grout_base
+            GROUT_BASE
         } else {
-            stone_base_array[Cube::from(p.lower_bounds().map(|c| c.rem_euclid(resolution_g)))] // TODO: add way to express this transformation on `Cube` without going through points
+            stone_base_array[Cube::from(p.lower_bounds().map(|c| c.rem_euclid(RESOLUTION_G)))] // TODO: add way to express this transformation on `Cube` without going through points
         }
     };
     let bottom_grout_pattern = |p: Cube| {
         if p.y == 0 {
-            &grout_base
+            GROUT_BASE
         } else {
             stone_base_array[p]
         }
@@ -626,48 +636,51 @@ async fn install_atrium_blocks(
             &AIR
         }
     };
-    let pole_shape = Vol::<Box<[u8]>>::from_y_flipped_array([
-        [
-            *br"                           #####",
-            *br"                      ##########",
-            *br"                ############    ",
-            *br"           ############         ",
-            *br"#     ############              ",
-            *br"#############                   ",
-            *br"########                        ",
-            *br"#                               ",
-        ],
-        [
-            *br"                                ",
-            *br"                         ###### ",
-            *br"                    ######      ",
-            *br"               ######           ",
-            *br"          ######                ",
-            *br"     ######                     ",
-            *br"######                          ",
-            *br"                                ",
-        ],
-    ]);
-    let pole_fn = |p: Cube| match pole_shape
-        .get(Cube {
-            x: p.z,
-            y: p.y,
-            z: match p.x - 8 {
-                // remap ..-2 -1 0 1.. to ..1 0 0 1..
-                z @ 0.. => z,
-                z => (-1) - z,
-            },
-        })
-        .copied()
-        .unwrap_or(b' ')
-    {
-        b'#' => &pole_color,
-        _ => &AIR,
+
+    let pole_fn = {
+        let pole_shape = Vol::<Box<[u8]>>::from_y_flipped_array([
+            [
+                *br"                           #####",
+                *br"                      ##########",
+                *br"                ############    ",
+                *br"           ############         ",
+                *br"#     ############              ",
+                *br"#############                   ",
+                *br"########                        ",
+                *br"#                               ",
+            ],
+            [
+                *br"                                ",
+                *br"                         ###### ",
+                *br"                    ######      ",
+                *br"               ######           ",
+                *br"          ######                ",
+                *br"     ######                     ",
+                *br"######                          ",
+                *br"                                ",
+            ],
+        ]);
+        move |p: Cube| match pole_shape
+            .get(Cube {
+                x: p.z,
+                y: p.y,
+                z: match p.x - 8 {
+                    // remap ..-2 -1 0 1.. to ..1 0 0 1..
+                    z @ 0.. => z,
+                    z => (-1) - z,
+                },
+            })
+            .copied()
+            .unwrap_or(b' ')
+        {
+            b'#' => POLE_COLOR,
+            _ => &AIR,
+        }
     };
 
     // TODO: duplicated procgen code — figure out a good toolkit of math helpers
     let one_diagonal = GridVector::new(1, 1, 1);
-    let center_point_doubled = (one_diagonal * resolution_g).to_point();
+    let center_point_doubled = (one_diagonal * RESOLUTION_G).to_point();
 
     Ok(BlockProvider::<AtriumBlocks>::new(progress, |key| {
         Ok(match key {
@@ -679,9 +692,9 @@ async fn install_atrium_blocks(
 
             AtriumBlocks::GroundFloor => Block::builder()
                 .display_name("Atrium Ground Floor")
-                .voxels_fn(resolution, |p| {
+                .voxels_fn(RESOLUTION, |p| {
                     if p.x == 0 {
-                        &heavy_grout_base
+                        HEAVY_GROUT_BASE
                     } else {
                         brick_pattern(p)
                     }
@@ -689,10 +702,10 @@ async fn install_atrium_blocks(
                 .build_txn(txn),
             AtriumBlocks::UpperFloor => Block::builder()
                 .display_name("Atrium Upper Floor")
-                .voxels_fn(resolution, |p| {
+                .voxels_fn(RESOLUTION, |p| {
                     // Add a white ceiling
                     if p.y == 0 {
-                        &ceiling_paint
+                        CEILING_PAINT
                     } else {
                         brick_pattern(p)
                     }
@@ -700,13 +713,13 @@ async fn install_atrium_blocks(
                 .build_txn(txn),
             AtriumBlocks::SolidBricks => Block::builder()
                 .display_name("Atrium Wall Bricks")
-                .voxels_fn(resolution, brick_pattern)?
+                .voxels_fn(RESOLUTION, brick_pattern)?
                 .build_txn(txn),
             AtriumBlocks::GroundArch => generate_arch(
                 txn,
                 &stone_range,
                 brick_pattern,
-                resolution,
+                RESOLUTION,
                 ArchStyle::GroundFloor,
                 7,
                 3,
@@ -715,7 +728,7 @@ async fn install_atrium_blocks(
                 txn,
                 &stone_range,
                 brick_pattern,
-                resolution,
+                RESOLUTION,
                 ArchStyle::UpperFloor,
                 3,
                 2,
@@ -723,8 +736,8 @@ async fn install_atrium_blocks(
             AtriumBlocks::VaultArch => generate_arch(
                 txn,
                 &stone_range,
-                |_| &ceiling_paint,
-                resolution,
+                |_| CEILING_PAINT,
+                RESOLUTION,
                 ArchStyle::Vault,
                 7, // size same as GroundArch
                 3,
@@ -732,18 +745,18 @@ async fn install_atrium_blocks(
             AtriumBlocks::VaultBalcony => generate_arch(
                 txn,
                 &stone_range,
-                |_| &ceiling_paint,
-                resolution,
+                |_| CEILING_PAINT,
+                RESOLUTION,
                 ArchStyle::Vault,
-                balcony_radius as GridCoordinate,
+                BALCONY_RADIUS as GridCoordinate,
                 3,
             )?,
             AtriumBlocks::GroundColumn => Block::builder()
                 .display_name("Large Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(resolution, |p| {
+                .voxels_fn(RESOLUTION, |p| {
                     let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
-                    if mid.x + mid.z < resolution_g * 6 / 4 {
+                    if mid.x + mid.z < RESOLUTION_G * 6 / 4 {
                         bottom_grout_pattern(p)
                     } else {
                         &AIR
@@ -753,9 +766,9 @@ async fn install_atrium_blocks(
             AtriumBlocks::SquareColumn => Block::builder()
                 .display_name("Square Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(resolution, |p| {
+                .voxels_fn(RESOLUTION, |p| {
                     let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
-                    if mid.x.max(p.z) < resolution_g * 6 / 4 {
+                    if mid.x.max(p.z) < RESOLUTION_G * 6 / 4 {
                         bottom_grout_pattern(p)
                     } else {
                         &AIR
@@ -765,9 +778,9 @@ async fn install_atrium_blocks(
             AtriumBlocks::SmallColumn => Block::builder()
                 .display_name("Round Atrium Column")
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(resolution, |p| {
+                .voxels_fn(RESOLUTION, |p| {
                     let mid = (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
-                    if mid.x.pow(2) + mid.z.pow(2) < (resolution_g * 3 / 4).pow(2) {
+                    if mid.x.pow(2) + mid.z.pow(2) < (RESOLUTION_G * 3 / 4).pow(2) {
                         bottom_grout_pattern(p)
                     } else {
                         &AIR
@@ -777,15 +790,15 @@ async fn install_atrium_blocks(
             AtriumBlocks::Molding => Block::builder()
                 .display_name("Atrium Top Edge Molding")
                 // TODO: rotation rule
-                .voxels_fn(resolution, molding_fn)?
+                .voxels_fn(RESOLUTION, molding_fn)?
                 .build_txn(txn),
 
             AtriumBlocks::Banner(color) => Block::builder()
                 .display_name(format!("Atrium Banner {color}"))
-                .voxels_fn(resolution, |p| {
+                .voxels_fn(RESOLUTION, |p| {
                     // wavy banner shape
-                    let wave = (f64::from(p.x) * (TAU / f64::from(resolution))).sin() * 2.2;
-                    if p.z == i32::from(resolution) / 2 + wave as i32 {
+                    let wave = (f64::from(p.x) * (TAU / f64::from(RESOLUTION))).sin() * 2.2;
+                    if p.z == i32::from(RESOLUTION) / 2 + wave as i32 {
                         Block::from(color.color())
                     } else {
                         AIR
@@ -796,7 +809,7 @@ async fn install_atrium_blocks(
                 let accent_color = block::from_color!(0.95, 0.89, 0.05, 1.0);
                 Block::builder()
                     .display_name("Banner Accent")
-                    .voxels_fn(resolution, |p| {
+                    .voxels_fn(RESOLUTION, |p| {
                         if [0, 1, 2, 6, 8].contains(&p.y) {
                             &accent_color
                         } else {
@@ -815,19 +828,19 @@ async fn install_atrium_blocks(
                 .animation_hint(block::AnimationHint::redefinition(
                     block::AnimationChange::Shape,
                 ))
-                .voxels_handle(resolution, {
+                .voxels_handle(RESOLUTION, {
                     // Use a darker color to dampen the effect of interior light
                     let body_block = Block::from(palette::STEEL * zo32(0.2));
-                    let space = Space::for_block(resolution).build_and_mutate(|m| {
+                    let space = Space::for_block(RESOLUTION).build_and_mutate(|m| {
                         m.fill(
                             GridAab::from_lower_upper(
                                 [0, 0, 0],
-                                [resolution_g, resolution_g / 2, resolution_g],
+                                [RESOLUTION_G, RESOLUTION_G / 2, RESOLUTION_G],
                             ),
                             |p| {
                                 let mid =
                                     (p.lower_bounds() * 2 - center_point_doubled).map(|c| c.abs());
-                                if mid.x.max(mid.z) + (mid.y / 2) < resolution_g + 4 {
+                                if mid.x.max(mid.z) + (mid.y / 2) < RESOLUTION_G + 4 {
                                     Some(&body_block)
                                 } else {
                                     None
@@ -838,11 +851,11 @@ async fn install_atrium_blocks(
                             let fire_inset = 2;
                             let bounds = GridAab::from_lower_upper(
                                 // Vertical overlap will be overwritten, making a bowl shape
-                                [fire_inset, resolution_g / 2 - 2, fire_inset],
+                                [fire_inset, RESOLUTION_G / 2 - 2, fire_inset],
                                 [
-                                    resolution_g - fire_inset,
-                                    resolution_g,
-                                    resolution_g - fire_inset,
+                                    RESOLUTION_G - fire_inset,
+                                    RESOLUTION_G,
+                                    RESOLUTION_G - fire_inset,
                                 ],
                             );
                             SpaceTransaction::add_behavior(bounds, Fire::new(bounds))
@@ -860,6 +873,8 @@ async fn install_atrium_blocks(
     .await?
     .install(ReadTicket::stub(), txn)?)
 }
+
+// -------------------------------------------------------------------------------------------------
 
 const MULTIBLOCK_SCALE: Resolution = Resolution::R8;
 
