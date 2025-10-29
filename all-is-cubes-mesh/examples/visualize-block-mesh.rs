@@ -71,7 +71,7 @@ fn main() {
 
                 let destination = destination.child(&entity_path);
                 let evaluated = evaluated.clone();
-                scope.spawn(move || {
+                let join_handle = scope.spawn(move || {
                     show(
                         destination,
                         point3(x, f32::from(use_new_triangulator) * 32., 0.),
@@ -83,6 +83,9 @@ fn main() {
                         },
                     )
                 });
+
+                // temporarily disable parallelism until we have a better solution for log timestamps
+                let (Ok(()) | Err(_ /* continue on error */)) = join_handle.join();
             }
         }
     });
@@ -96,7 +99,7 @@ fn show(
     evaluated: &EvaluatedBlock,
     options: &mesh::MeshOptions,
 ) {
-    destination.log(
+    destination.log_static(
         &rg::entity_path![],
         &rg::archetypes::Transform3D::from_translation(rg::convert_vec(position.to_vector())),
     );
