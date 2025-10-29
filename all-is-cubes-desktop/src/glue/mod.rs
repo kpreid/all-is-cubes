@@ -77,11 +77,14 @@ impl Executor {
             // TODO: configurable, linked to runtime config
             per_task_parallelism: parallelism,
         });
-        for _ in 0..parallelism {
-            std::thread::spawn({
-                let executor: Arc<Executor> = new_self.clone();
-                move || async_io::block_on(executor.inner().run(std::future::pending::<()>()))
-            });
+        for i in 0..parallelism {
+            let executor: Arc<Executor> = new_self.clone();
+            std::thread::Builder::new()
+                .name(format!("all-is-cubes-desktop executor thread {i}"))
+                .spawn(move || {
+                    async_io::block_on(executor.inner().run(std::future::pending::<()>()))
+                })
+                .unwrap();
         }
         new_self
     }
