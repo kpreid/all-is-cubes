@@ -471,6 +471,8 @@ impl BoxPart {
     /// Returns the part which is the given face of the box.
     ///
     /// Note that this does not include the edges and corners of that face.
+    ///
+    /// This function is the inverse of [`BoxPart::to_face()`].
     #[must_use]
     pub const fn face(face: Face6) -> Self {
         match face {
@@ -514,8 +516,29 @@ impl BoxPart {
 
     /// Returns whether this part is a face, in the polyhedron sense
     /// (i.e. touches only one side of the box, or one side and its opposite).
+    ///
+    /// Equivalent to `self.to_face().is_some()`.
     pub fn is_face(self) -> bool {
+        // Note: the aarch64 machine code for this is much shorter than `.to_face().is_some()`.
         self.count_touched_axes() == 1
+    }
+
+    /// If this part is a face, in the polyhedron sense
+    /// (i.e. touches only one side of the box, or one side and its opposite),
+    /// then return that face.
+    ///
+    /// This function is the inverse of [`BoxPart::face()`].
+    #[rustfmt::skip]
+    pub fn to_face(self) -> Option<Face6> {
+        match self.0 {
+            Vector3D { x: LOWER, y: 0, z: 0, .. } => Some(Face6::NX),
+            Vector3D { x: 0, y: LOWER, z: 0, .. } => Some(Face6::NY),
+            Vector3D { x: 0, y: 0, z: LOWER, .. } => Some(Face6::NZ),
+            Vector3D { x: UPPER, y: 0, z: 0, .. } => Some(Face6::PX),
+            Vector3D { x: 0, y: UPPER, z: 0, .. } => Some(Face6::PY),
+            Vector3D { x: 0, y: 0, z: UPPER, .. } => Some(Face6::PZ),
+            _ => None,
+        }
     }
 
     /// Returns whether this part is an edge, in the polyhedron sense
@@ -615,6 +638,11 @@ mod tests {
                 BoxPart::face(face),
                 BoxPart::INTERIOR.push(face),
                 "{face:?} push"
+            );
+            assert_eq!(
+                BoxPart::face(face).to_face(),
+                Some(face),
+                "{face:?} to_face"
             );
         }
     }
