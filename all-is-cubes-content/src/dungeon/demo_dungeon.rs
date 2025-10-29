@@ -407,37 +407,35 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 // Windowed walls and torches on walls
                 let window_y = unmodified_room_box.lower_bounds().y + 1;
                 let torch_y = unmodified_room_box.lower_bounds().y;
-                four_walls(
-                    interior.expand(FaceMap::splat(1)),
-                    |origin, along_wall, length, wall_excluding_corners_box| {
-                        let wall = Face6::PY.clockwise().transform(along_wall); // TODO: make four_walls provide this in a nice name
-                        let midpoint = (length / 2).cast_signed();
+                for wall in four_walls(interior.expand(FaceMap::splat(1))) {
+                    let face = Face6::PY
+                        .clockwise()
+                        .transform(wall.counterclockwise_direction); // TODO: make four_walls provide this (which face of the box it is) in a nice name
+                    let midpoint = (wall.length / 2).cast_signed();
 
-                        if let WallFeature::Window = room_data.wall_features[wall] {
-                            for step in WINDOW_PATTERN {
-                                let mut window_pos = origin + along_wall.vector(midpoint + step);
-                                window_pos.y = window_y;
-                                if let Some(window_box) =
-                                    GridAab::from_lower_size(window_pos, [1, 3, 1])
-                                        .intersection_cubes(wall_excluding_corners_box)
-                                {
-                                    ctx.fill_uniform(window_box, &self.window_glass_block)?;
-                                }
-                            }
-                        } else if room_data.lit && !room_data.corridor_only {
-                            for step in TORCH_PATTERN {
-                                let mut torch_pos = origin
-                                    + along_wall.vector(midpoint + step)
-                                    + wall.opposite().normal_vector();
-                                torch_pos.y = torch_y;
-
-                                ctx.set(torch_pos, &self.blocks[Brazier])?;
+                    if let WallFeature::Window = room_data.wall_features[face] {
+                        for step in WINDOW_PATTERN {
+                            let mut window_pos = wall.bottom_corner
+                                + wall.counterclockwise_direction.vector(midpoint + step);
+                            window_pos.y = window_y;
+                            if let Some(window_box) =
+                                GridAab::from_lower_size(window_pos, [1, 3, 1])
+                                    .intersection_cubes(wall.bounds_excluding_corners)
+                            {
+                                ctx.fill_uniform(window_box, &self.window_glass_block)?;
                             }
                         }
+                    } else if room_data.lit && !room_data.corridor_only {
+                        for step in TORCH_PATTERN {
+                            let mut torch_pos = wall.bottom_corner
+                                + wall.counterclockwise_direction.vector(midpoint + step)
+                                + face.opposite().normal_vector();
+                            torch_pos.y = torch_y;
 
-                        Ok::<(), InGenError>(())
-                    },
-                )?;
+                            ctx.set(torch_pos, &self.blocks[Brazier])?;
+                        }
+                    }
+                }
 
                 // Ceiling light port (not handled by four_walls above)
                 if let WallFeature::Window = room_data.wall_features[Face6::PY] {

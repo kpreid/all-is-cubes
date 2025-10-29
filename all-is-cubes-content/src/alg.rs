@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use all_is_cubes::block::{Atom, Block, Primitive, Resolution};
 use all_is_cubes::euclid::vec3;
 use all_is_cubes::math::{
-    Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint,
+    Cube, CubeFace, Face6, FaceMap, FreeCoordinate, FreePoint, GridAab, GridCoordinate,
     GridSizeCoord, GridVector, Gridgid, PositiveSign, Vol,
 };
 use all_is_cubes::space::{self, CubeTransaction, SetCubeError, Space, SpaceTransaction};
@@ -131,49 +131,58 @@ pub(crate) fn voronoi_pattern<'a>(
     move |cube| pattern[cube.map(|component| component.rem_euclid(resolution.into()))].block
 }
 
-/// Given a room's exterior bounding box, act on its four walls.
+/// Given a room's exterior bounding box, compute the locations of its four 1-cube-thick walls.
 ///
-/// The function is given the bottom-left (from an exterior perspective) corner cube
-/// of each wall, the rightward direction of the wall, its length (counted such
-/// that each wall overlaps its neighbor at the corner), and its bounding box (assuming
-/// the wall is one block thick, but _excluding_ the corners).
+/// Panics if the box’s size in the X or Z axes is less than 2.
 ///
-/// TODO: There is probably other worldgen code that should be using this now that we've invented it.
-///
-/// TODO: Change the callback value to a struct
-pub(crate) fn four_walls<F, E>(bounding_box: GridAab, mut f: F) -> Result<(), E>
-where
-    F: FnMut(GridPoint, Face6, GridSizeCoord, GridAab) -> Result<(), E>,
-{
+/// TODO: Consider if all uses of this can be replaced by the less ad-hoc `BoxStyle`/`BoxPart`.
+pub(crate) fn four_walls(bounding_box: GridAab) -> [FirstThroughFourthWall; 4] {
     let interior = bounding_box.shrink(FaceMap::symmetric([1, 0, 1])).unwrap();
     let low = bounding_box.lower_bounds();
     let high = bounding_box.upper_bounds() - GridVector::new(1, 1, 1);
     let size = bounding_box.size();
-    f(
-        low,
-        Face6::PZ,
-        size.depth,
-        interior.abut(Face6::NX, 1).unwrap(),
-    )?;
-    f(
-        GridPoint::new(low.x, low.y, high.z),
-        Face6::PX,
-        size.width,
-        interior.abut(Face6::PZ, 1).unwrap(),
-    )?;
-    f(
-        GridPoint::new(high.x, low.y, high.z),
-        Face6::NZ,
-        size.depth,
-        interior.abut(Face6::PX, 1).unwrap(),
-    )?;
-    f(
-        GridPoint::new(high.x, low.y, low.z),
-        Face6::NX,
-        size.width,
-        interior.abut(Face6::NZ, 1).unwrap(),
-    )?;
-    Ok(())
+    [
+        FirstThroughFourthWall {
+            bottom_corner: Cube::from(low),
+            counterclockwise_direction: Face6::PZ,
+            length: size.depth,
+            bounds_excluding_corners: interior.abut(Face6::NX, 1).unwrap(),
+        },
+        FirstThroughFourthWall {
+            bottom_corner: Cube::new(low.x, low.y, high.z),
+            counterclockwise_direction: Face6::PX,
+            length: size.width,
+            bounds_excluding_corners: interior.abut(Face6::PZ, 1).unwrap(),
+        },
+        FirstThroughFourthWall {
+            bottom_corner: Cube::new(high.x, low.y, high.z),
+            counterclockwise_direction: Face6::NZ,
+            length: size.depth,
+            bounds_excluding_corners: interior.abut(Face6::PX, 1).unwrap(),
+        },
+        FirstThroughFourthWall {
+            bottom_corner: Cube::new(high.x, low.y, low.z),
+            counterclockwise_direction: Face6::NX,
+            length: size.width,
+            bounds_excluding_corners: interior.abut(Face6::NZ, 1).unwrap(),
+        },
+    ]
+}
+
+/// Output of [`four_walls()`].
+pub(crate) struct FirstThroughFourthWall {
+    /// From outside the box, the bottom left corner cube of this wall.
+    pub bottom_corner: Cube,
+
+    /// From outside the box, the rightward direction.
+    /// From inside the box, the leftward direction.
+    pub counterclockwise_direction: Face6,
+
+    /// The length of the wall in cubes
+    /// (counted such that each wall overlaps its neighbor at the corner).
+    pub length: GridSizeCoord,
+
+    pub bounds_excluding_corners: GridAab,
 }
 
 // TODO: this should probably be in main all-is-cubes crate

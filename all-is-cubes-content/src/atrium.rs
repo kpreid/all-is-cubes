@@ -115,19 +115,19 @@ pub(crate) async fn atrium(
         }
 
         // Outer walls
-        four_walls(
+        // TODO: This use of `four_walls()` can be replaced with a `BoxStyle`.
+        for wall in four_walls(
             outer_walls_footprint
                 .expand(FaceMap::default().with(Face6::PY, ceiling_height * floor_count)),
-            |_origin, direction, _length, wall_excluding_corners| -> Result<(), InGenError> {
-                m.fill_uniform(
-                    wall_excluding_corners,
-                    &blocks[AtriumBlocks::GroundFloor]
-                        .clone()
-                        .rotate(GridRotation::from_to(Face6::PZ, direction, Face6::PY).unwrap()),
-                )?;
-                Ok(())
-            },
-        )?;
+        ) {
+            m.fill_uniform(
+                wall.bounds_excluding_corners,
+                &blocks[AtriumBlocks::GroundFloor].clone().rotate(
+                    GridRotation::from_to(Face6::PZ, wall.counterclockwise_direction, Face6::PY)
+                        .unwrap(),
+                ),
+            )?;
+        }
 
         // Ground floor
         m.fill_uniform(outer_walls_footprint, &blocks[AtriumBlocks::GroundFloor])?;
@@ -214,20 +214,17 @@ pub(crate) async fn atrium(
             *br"        ", 
             *br"        ",
         ]]);
-        four_walls(
-            arches_footprint.translate([0, IWALL, 0]),
-            |origin, direction, length, _box| {
-                arch_row(
-                    m,
-                    &blocks,
-                    origin,
-                    between_large_arches + UWALL,
-                    length / (between_large_arches + UWALL),
-                    direction,
-                    arches_pattern.as_ref(),
-                )
-            },
-        )?;
+        for wall in four_walls(arches_footprint.translate([0, IWALL, 0])) {
+            arch_row(
+                m,
+                &blocks,
+                wall.bottom_corner,
+                between_large_arches + UWALL,
+                wall.length / (between_large_arches + UWALL),
+                wall.counterclockwise_direction,
+                arches_pattern.as_ref(),
+            )?;
+        }
 
         // Ceiling vaults
         // TODO: This only generates vaults along the long sides and not the short sides or corners.
@@ -418,7 +415,7 @@ fn map_text_block(
 fn arch_row(
     ctx: &mut space::Mutation<'_, '_>,
     blocks: &BlockProvider<AtriumBlocks>,
-    first_column_base: GridPoint,
+    first_column_base: Cube,
     section_length: GridSizeCoord,
     section_count: GridSizeCoord,
     parallel: Face6,
@@ -443,7 +440,7 @@ fn arch_row(
             |p, block| map_text_block(pattern[p], blocks, p, block, banner_color),
             pattern.bounds(),
             ctx,
-            Gridgid::from_translation(column_base.to_vector())
+            Gridgid::from_translation(column_base.lower_bounds().to_vector())
                 * rotation.to_positive_octant_transform(1),
         )?;
     }

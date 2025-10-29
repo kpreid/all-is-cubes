@@ -152,18 +152,16 @@ fn TRANSPARENCY_GLASS_AND_WATER(ctx: Context<'_>) {
     };
 
     space.mutate(ctx.universe.read_ticket(), |m| {
-        four_walls(
-            pool.expand(FaceMap::symmetric([1, 0, 1])),
-            |_origin, direction, _length, wall_excluding_corners| {
-                m.fill_uniform(
-                    wall_excluding_corners,
-                    &window_block
-                        .clone()
-                        .rotate(GridRotation::from_to(Face6::PX, direction, Face6::PY).unwrap()),
-                )?;
-                Ok::<(), InGenError>(())
-            },
-        )?;
+        // TODO: This use of `four_walls()` can be replaced with a `BoxStyle`.
+        for wall in four_walls(pool.expand(FaceMap::symmetric([1, 0, 1]))) {
+            m.fill_uniform(
+                wall.bounds_excluding_corners,
+                &window_block.clone().rotate(
+                    GridRotation::from_to(Face6::PX, wall.counterclockwise_direction, Face6::PY)
+                        .unwrap(),
+                ),
+            )?;
+        }
 
         m.fill_uniform(
             pool.abut(Face6::NY, 0).unwrap().abut(Face6::PY, 1).unwrap(),
