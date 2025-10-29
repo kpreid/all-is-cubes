@@ -255,7 +255,15 @@ fn evaluate_composition(
         .unwrap_or(GridAab::ORIGIN_EMPTY);
 
     let attributes = block::BlockAttributes {
-        display_name: dst_att.display_name, // TODO merge
+        // TODO: smarter, configurable merge — e.g. the game logic might want to compose a noun and
+        // adjective or otherwise acknowledge two blocks into one.
+        // This may require more from the `CompositeOperator` type or from the type of the
+        // `display_name` attribute (which is currently a string).
+        display_name: if dst_att.display_name.is_empty() {
+            src_att.display_name
+        } else {
+            dst_att.display_name
+        },
         selectable: src_att.selectable | dst_att.selectable,
         inventory: src_att.inventory.concatenate(dst_att.inventory),
         rotation_rule: dst_att.rotation_rule, // TODO merge
@@ -755,6 +763,7 @@ mod tests {
     use crate::universe::Universe;
     use BlockCollision::{Hard, None as CNone};
     use CompositeOperator::{Atop, In, Out, Over};
+    use arcstr::literal;
     use pretty_assertions::assert_eq;
 
     // --- Helpers ---
@@ -1048,6 +1057,62 @@ mod tests {
     /// Test each operator’s treatment of input blocks’ attributes (not voxels).
     mod attributes {
         use super::{assert_eq, *};
+
+        #[test]
+        fn display_name() {
+            let u = Universe::new();
+            let no_name = &Block::builder().color(Rgba::WHITE).build();
+            let has_name_1 = &Block::builder()
+                .color(Rgba::WHITE)
+                .display_name(literal!("has_name_1"))
+                .build();
+            let has_name_2 = &Block::builder()
+                .color(Rgba::WHITE)
+                .display_name(literal!("has_name_2"))
+                .build();
+
+            // Nonempty source overrides empty destination.
+            assert_eq!(
+                eval_compose(&u, has_name_1, Over, no_name)
+                    .attributes()
+                    .display_name,
+                literal!("has_name_1")
+            );
+
+            // Nonempty destination overrides empty source.
+            assert_eq!(
+                eval_compose(&u, no_name, Over, has_name_1)
+                    .attributes()
+                    .display_name,
+                literal!("has_name_1")
+            );
+
+            // If both have names, destination wins.
+            assert_eq!(
+                eval_compose(&u, has_name_1, Over, has_name_2)
+                    .attributes()
+                    .display_name,
+                // the original block’s name is preferred over the modifier
+                literal!("has_name_2")
+            );
+
+            // If both have names and the composition is reversed, the source wins because it is
+            // playing the destination role.
+            //
+            // TODO: This is probably not desired behavior. Think about what the semantics of
+            // the reversed flag should be. Maybe we should have separate flags for voxels and
+            // attributes?
+            assert_eq!(
+                has_name_2
+                    .clone()
+                    .with_modifier(Composite::new(has_name_1.clone(), Over).reversed())
+                    .evaluate(u.read_ticket())
+                    .unwrap()
+                    .attributes()
+                    .display_name,
+                literal!("has_name_1")
+            );
+        }
 
         #[test]
         fn selectable_if_either_is_selectable() {
