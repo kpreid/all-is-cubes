@@ -240,6 +240,8 @@ impl PlanarTriangulator {
                 self.advance_sweep_position(viz, new_sweep_position);
             }
 
+            viz.completed_step();
+
             // Check for vertices in the old frontier that the input vertex is perpendicularly
             // ahead of. These vertices either need to be joined with triangles, or should be moved
             // to the new frontier, or some of each.
@@ -294,10 +296,12 @@ impl PlanarTriangulator {
                     self.new_frontier.push_back(passed_over_fv);
                     moved_any_vertices = true;
                 }
+                viz.completed_step();
             }
             if moved_any_vertices {
                 // let the steps be seen
                 viz.set_frontier(&self.old_frontier, &self.new_frontier);
+                viz.completed_step();
             }
 
             // We now have the property that all vertices in old_frontier are perpendicularly
@@ -387,14 +391,17 @@ impl PlanarTriangulator {
                         ],
                     );
                 }
+                viz.completed_step();
             }
 
             viz.set_frontier(&self.old_frontier, &self.new_frontier);
+            viz.completed_step();
         }
 
         // Reuse sweep routine to do final state cleanup.
         // TODO(planar_new): Do only the minimal work needed for the validation assert(s) instead.
         self.advance_sweep_position(viz, GridCoordinate::MAX);
+        viz.completed_step();
 
         // The last vertex input should have caused the triangulation to become complete,
         // such that the frontier is now empty of all vertices.

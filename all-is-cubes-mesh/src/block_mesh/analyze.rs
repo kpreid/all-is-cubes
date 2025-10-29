@@ -211,8 +211,10 @@ pub(crate) fn analyze(
         viz.window(center, voxels);
         analyze_one_window(&mut analysis, center, window_voxels, transparency);
         viz.analysis_in_progress(&analysis);
+        viz.completed_step();
     });
     viz.clear_window();
+    viz.completed_step();
 
     analysis
 }

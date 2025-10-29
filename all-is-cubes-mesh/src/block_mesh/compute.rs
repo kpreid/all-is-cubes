@@ -122,6 +122,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
         push_full_box(output, voxel.opacity_category(), coloring, &mut viz);
     } else {
         viz.voxels(voxels);
+        viz.completed_step();
         let voxels_array = voxels.as_vol_ref();
 
         // Exit when the voxel data is not at all in the right volume, or is empty.
@@ -281,6 +282,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             }
 
             viz.set_layer_in_progress(face, layer);
+            viz.completed_step();
 
             // Contains a color with alpha > 0 for every voxel that _should be drawn_.
             // That is, it excludes all obscured interior volume.
@@ -529,6 +531,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                             &mut bounding_box.opaque
                         },
                     );
+                    viz.completed_step();
                 });
             }
         }

@@ -51,13 +51,18 @@ pub(crate) enum Viz {
 #[doc(hidden)]
 #[allow(missing_debug_implementations, unnameable_types)]
 pub struct Inner {
+    /// Rerun log time counter
+    timestamp: i64,
+
     // Info captured from the `Evoxels` to give context to later data
     resolution: Option<Resolution>,
     data_bounds: Option<GridAab>,
 
     analysis: Analysis,
 
+    // Constants for logging to Rerun.
     destination: rg::Destination,
+    timeline_name: rg::TimelineName,
     window_voxels_path: rg::EntityPath,
     layer_path: rg::EntityPath,
     occupied_path: rg::EntityPath,
@@ -99,8 +104,10 @@ impl Viz {
         if !destination.is_enabled() {
             Self::disabled()
         } else {
-            Self::Enabled(Inner {
+            let mut new_self = Self::Enabled(Inner {
+                timestamp: -1,
                 destination,
+                timeline_name: rg::TimelineName::new("block_mesh_step"),
                 window_voxels_path: rg::entity_path!["progress", "analysis_window"],
                 layer_path: rg::entity_path!["progress", "mesh_plane"],
                 occupied_path: rg::entity_path!["occupied_planes"],
@@ -126,13 +133,30 @@ impl Viz {
                 mesh_vertex_colors: Vec::new(),
                 mesh_vertex_normals: Vec::new(),
                 mesh_triangle_indices: Vec::new(),
-            })
+            });
+            new_self.completed_step(); // perform initial set_time_sequence()
+            new_self
         }
     }
 
     /// Creates an [`Viz`] that discards all its input.
     pub fn disabled() -> Self {
         Self::Disabled
+    }
+
+    /// Declare that all visualization data for a particular step of the algorithm has been
+    /// completed.
+    ///
+    /// This advances the custom Rerun timeline.
+    pub(crate) fn completed_step(&mut self) {
+        #[cfg(feature = "rerun")]
+        if let Self::Enabled(state) = self {
+            state.timestamp += 1;
+            state
+                .destination
+                .stream
+                .set_time_sequence(state.timeline_name, state.timestamp);
+        }
     }
 
     pub(crate) fn voxels(&mut self, #[allow(unused)] voxels: &Evoxels) {

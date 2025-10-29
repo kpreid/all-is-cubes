@@ -4,7 +4,7 @@ use core::fmt;
 use crate::math::{self, Axis, Rgb, Rgba, lines, rgba_const};
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
-pub use re_log_types::{EntityPath, EntityPathPart, entity_path};
+pub use re_log_types::{EntityPath, EntityPathPart, TimelineName, entity_path};
 pub use re_sdk::{RecordingStream, RecordingStreamBuilder, RecordingStreamResult};
 pub use re_types::datatypes;
 // pub use re_types::external::arrow::types::f16;
