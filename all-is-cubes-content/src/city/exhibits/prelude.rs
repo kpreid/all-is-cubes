@@ -24,7 +24,7 @@ pub(super) use all_is_cubes::inv;
 pub(super) use all_is_cubes::linking::{BlockProvider, InGenError};
 pub(super) use all_is_cubes::listen;
 pub(super) use all_is_cubes::math::{
-    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
+    Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
     GridSize, GridSizeCoord, GridVector, Gridgid, Rgb, Rgb01, Rgba, ZeroOne, rgb_const, rgb01,
     rgba_const, zo32,
 };
@@ -34,7 +34,7 @@ pub(super) use all_is_cubes::time;
 pub(super) use all_is_cubes::transaction::{self, Transaction as _};
 pub(super) use all_is_cubes::universe::ReadTicket;
 
-pub(super) use crate::alg::{self, four_walls, stack};
+pub(super) use crate::alg::{self, stack};
 pub(super) use crate::city::exhibit::{Context, Exhibit, ExhibitTransaction, Placement, exhibit};
 pub(super) use crate::load_image::include_image;
 pub(super) use crate::{

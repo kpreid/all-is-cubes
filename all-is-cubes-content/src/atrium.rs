@@ -10,7 +10,7 @@ use exhaust::Exhaust;
 
 use all_is_cubes::block::{self, AIR, Block, Resolution, RotationPlacementRule, Zoom};
 use all_is_cubes::character::Spawn;
-use all_is_cubes::content::{free_editing_starter_inventory, palette};
+use all_is_cubes::content::{BoxStyle, free_editing_starter_inventory, palette};
 use all_is_cubes::euclid::Point3D;
 use all_is_cubes::linking::{BlockModule, BlockProvider, InGenError};
 use all_is_cubes::math::{
@@ -115,19 +115,27 @@ pub(crate) async fn atrium(
         }
 
         // Outer walls
-        // TODO: This use of `four_walls()` can be replaced with a `BoxStyle`.
-        for wall in four_walls(
+        BoxStyle::from_fn(|part| {
+            // TODO: this rotation of wall blocks is a slightly recurring pattern (here and in
+            // the TRANSPARENCY_GLASS_AND_WATER exhibit) and perhaps BoxStyle should help with it
+            // so that a function need not be written each time.
+            if let Some(face) = part.to_face()
+                && face.axis() != Axis::Y
+            {
+                Some(
+                    blocks[AtriumBlocks::GroundFloor]
+                        .clone()
+                        .rotate(GridRotation::from_to(Face6::NX, face, Face6::PY).unwrap()),
+                )
+            } else {
+                None
+            }
+        })
+        .create_box(
             outer_walls_footprint
                 .expand(FaceMap::default().with(Face6::PY, ceiling_height * floor_count)),
-        ) {
-            m.fill_uniform(
-                wall.bounds_excluding_corners,
-                &blocks[AtriumBlocks::GroundFloor].clone().rotate(
-                    GridRotation::from_to(Face6::PZ, wall.counterclockwise_direction, Face6::PY)
-                        .unwrap(),
-                ),
-            )?;
-        }
+        )
+        .execute_m(m)?;
 
         // Ground floor
         m.fill_uniform(outer_walls_footprint, &blocks[AtriumBlocks::GroundFloor])?;

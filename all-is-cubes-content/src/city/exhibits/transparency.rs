@@ -152,22 +152,26 @@ fn TRANSPARENCY_GLASS_AND_WATER(ctx: Context<'_>) {
     };
 
     space.mutate(ctx.universe.read_ticket(), |m| {
-        // TODO: This use of `four_walls()` can be replaced with a `BoxStyle`.
-        for wall in four_walls(pool.expand(FaceMap::symmetric([1, 0, 1]))) {
-            m.fill_uniform(
-                wall.bounds_excluding_corners,
-                &window_block.clone().rotate(
-                    GridRotation::from_to(Face6::PX, wall.counterclockwise_direction, Face6::PY)
-                        .unwrap(),
-                ),
-            )?;
-        }
-
-        m.fill_uniform(
-            pool.abut(Face6::NY, 0).unwrap().abut(Face6::PY, 1).unwrap(),
-            &water_voxel,
-        )?;
-        m.fill_uniform(pool.abut(Face6::PY, -1).unwrap(), &water_surface_block)?;
+        BoxStyle::from_fn(|part| {
+            if part == BoxPart::face(Face6::PY) {
+                // top
+                Some(water_surface_block.clone())
+            } else if let Some(face) = part.centered_on(Axis::Y).to_face() {
+                // side
+                Some(
+                    window_block
+                        .clone()
+                        .rotate(GridRotation::from_to(Face6::PZ, face, Face6::PY).unwrap()),
+                )
+            } else if part == BoxPart::INTERIOR || part == BoxPart::face(Face6::NY) {
+                // interior or bottom
+                Some(water_voxel.clone())
+            } else {
+                None
+            }
+        })
+        .create_box(pool.expand(FaceMap::symmetric([1, 0, 1])))
+        .execute_m(m)?;
 
         let [floater] = make_some_voxel_blocks_txn(&mut txn);
         m.set([3, 1, 3], floater)?;
