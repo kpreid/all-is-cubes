@@ -3,6 +3,8 @@
 //! Note: This is *not* a code sample to be imitated, as it uses unstable/pseudo-private APIs.
 //! It is listed as an “example” because it is a program that only makes sense to run manually.
 
+use std::thread;
+
 use pollster::block_on;
 
 use all_is_cubes::block::{self, Block, EvaluatedBlock, Resolution};
@@ -43,7 +45,7 @@ fn main() {
     let mut universe = Universe::new();
     let blocks = make_example_blocks(&mut universe);
 
-    std::thread::scope(|scope| {
+    thread::scope(|scope| {
         let mut next_x = 0.;
         for (i, block) in blocks.iter().enumerate() {
             let evaluated = block.evaluate(universe.read_ticket()).unwrap();
@@ -71,18 +73,22 @@ fn main() {
 
                 let destination = destination.child(&entity_path);
                 let evaluated = evaluated.clone();
-                let join_handle = scope.spawn(move || {
-                    show(
-                        destination,
-                        point3(x, f32::from(use_new_triangulator) * 32., 0.),
-                        &evaluated,
-                        &{
-                            let mut options = mesh::MeshOptions::new(&GraphicsOptions::default());
-                            options.use_new_block_triangulator = use_new_triangulator;
-                            options
-                        },
-                    )
-                });
+                let join_handle = thread::Builder::new()
+                    .name(block_name.to_string())
+                    .spawn_scoped(scope, move || {
+                        show(
+                            destination,
+                            point3(x, f32::from(use_new_triangulator) * 32., 0.),
+                            &evaluated,
+                            &{
+                                let mut options =
+                                    mesh::MeshOptions::new(&GraphicsOptions::default());
+                                options.use_new_block_triangulator = use_new_triangulator;
+                                options
+                            },
+                        )
+                    })
+                    .unwrap();
 
                 // temporarily disable parallelism until we have a better solution for log timestamps
                 let (Ok(()) | Err(_ /* continue on error */)) = join_handle.join();
