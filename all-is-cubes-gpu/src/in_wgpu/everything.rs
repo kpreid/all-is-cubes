@@ -334,16 +334,16 @@ impl EverythingRenderer {
             .set_space(&self.executor, read_tickets.ui, spaces_to_render.ui)
             .map_err(RenderError::Read)?;
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("EverythingRenderer::update()"),
-            });
+        let mut belt_encoder =
+            self.device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("EverythingRenderer::update() staging belt encoder"),
+                });
 
         let mut bwp = BeltWritingParts {
             device: &self.device,
             belt: &mut self.staging_belt,
-            encoder: &mut encoder,
+            encoder: &mut belt_encoder,
         };
 
         let update_prep_to_space_update_time = time::Instant::now();
@@ -447,7 +447,7 @@ impl EverythingRenderer {
 
         // TODO: measure time of these
         self.staging_belt.finish();
-        queue.submit(std::iter::once(encoder.finish()));
+        queue.submit(std::iter::once(belt_encoder.finish()));
 
         let finish_update_time = time::Instant::now();
         Ok(UpdateInfo {
