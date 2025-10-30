@@ -166,6 +166,7 @@ impl ResizingBuffer {
     /// Write one or more blocks of new data, reallocating if needed to fit all of them.
     ///
     /// * `label` and `usage` are ignored when not reallocating.
+    /// * `usage` must include `wgpu::BufferUsages::COPY_DST`.
     /// * There may be padding between the provided slices to meet alignment requirements.
     /// * `contents[0]` is always positioned at address 0.
     pub(crate) fn write_with_resizing<const N: usize>(
@@ -175,6 +176,9 @@ impl ResizingBuffer {
         usage: wgpu::BufferUsages,
         contents: [&[u8]; N],
     ) -> [wgpu::BufferAddress; N] {
+        // Buffers, mapped ranges, and copy lengths are all required to be a multiple of 4.
+        const BUFFER_AND_MAPPING_SIZE_MULT: usize = 4;
+
         // Compute the size and offsets that fit all the given slices.
         // Note we are using Layout as a handy utility here, not to define any *Rust* memory layout.
         // Technically this is restrictive for 32-bit usize, but we're probably doomed then anyway
@@ -188,14 +192,21 @@ impl ResizingBuffer {
             layout = next_layout;
             addresses[i] = u64::try_from(addr).unwrap();
         }
-        let new_size: u64 = layout.size().try_into().unwrap();
+
+        let new_size: u64 = layout
+            .size()
+            .next_multiple_of(BUFFER_AND_MAPPING_SIZE_MULT)
+            .try_into()
+            .unwrap();
 
         if let Some(buffer) = self.buffer.as_ref().filter(|b| b.size() >= new_size) {
             // Buffer is already big enough to fit the data.
             for (address, data) in addresses.into_iter().zip(contents) {
-                if let Some(data_size) = wgpu::BufferSize::new(u64::try_from(data.len()).unwrap()) {
-                    bwp.reborrow()
-                        .write_buffer(buffer, address, data_size)
+                if let Some(data_size) = wgpu::BufferSize::new(
+                    u64::try_from(data.len().next_multiple_of(BUFFER_AND_MAPPING_SIZE_MULT))
+                        .unwrap(),
+                ) {
+                    bwp.reborrow().write_buffer(buffer, address, data_size)[..data.len()] // trim off the padding
                         .copy_from_slice(data);
                 } else {
                     // zero bytes to write
@@ -314,6 +325,72 @@ impl<T> Default for MapVec<'_, T> {
             unwritten: Default::default(),
             len: Default::default(),
             _phantom: Default::default(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::in_wgpu::init::map_really_async;
+    use pollster::block_on;
+    use std::string::ToString;
+
+    /// Test that `ResizingBuffer` works with data whose size is not a multiple of the required
+    /// alignment.
+    #[test]
+    fn resizing_buffer_ensures_required_alignment() {
+        fn label_fn() -> String {
+            "resizing_buffer_alignment".to_string()
+        }
+
+        let (device, queue) = wgpu::Device::noop(&wgpu::DeviceDescriptor::default());
+        let mut rb = ResizingBuffer::default();
+        let mut belt = wgpu::util::StagingBelt::new(128);
+
+        // Run the operation twice, to exercise both growth/allocation and writing without growth
+        for i in 0..2 {
+            std::println!("iteration {i}");
+            let test_data_to_write: [&[u8]; 3] = [&[10 + i], &[20 + i], &[30 + i]];
+
+            // Create single-use resources
+            let mut encoder =
+                device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+            let bwp = BeltWritingParts {
+                device: &device,
+                belt: &mut belt,
+                encoder: &mut encoder,
+            };
+
+            // If the code is wrong, these operations will fail with a validation error, because
+            // the provided slices are 1 byte each and so will not be naturally aligned.
+            let addresses = rb.write_with_resizing(
+                bwp,
+                &label_fn,
+                wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+                test_data_to_write,
+            );
+            belt.finish();
+            queue.submit([encoder.finish()]);
+            belt.recall();
+
+            // We don't technically care what the addresses are, but we do care they have been
+            // adjusted to match the alignment
+            assert_eq!(addresses, [0, wgpu::MAP_ALIGNMENT, wgpu::MAP_ALIGNMENT * 2]);
+
+            // Check the actual buffer contents have been written in the right places.
+            let buffer_to_read = rb.get().unwrap();
+            block_on(map_really_async(device.clone(), buffer_to_read.slice(..))).unwrap();
+            let mapped_view = buffer_to_read.get_mapped_range(..);
+            for (&address, expected_data) in addresses.iter().zip(test_data_to_write) {
+                assert_eq!(
+                    mapped_view[address as usize..][..expected_data.len()],
+                    *expected_data,
+                    "address {address:?} of iteration {i:?}"
+                );
+            }
+            drop(mapped_view);
+            buffer_to_read.unmap();
         }
     }
 }
