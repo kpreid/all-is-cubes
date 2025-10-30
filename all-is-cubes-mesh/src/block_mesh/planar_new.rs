@@ -52,10 +52,8 @@ use alloc::collections::VecDeque;
 use core::cmp::Ordering;
 use core::mem;
 
-use all_is_cubes::euclid::Scale;
-use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridRotation, OctantMask, rgba_const};
+use all_is_cubes::math::{Face6, GridCoordinate, GridRotation, OctantMask, rgba_const};
 
-use crate::MeshRel;
 use crate::{Viz, block_mesh::analyze::AnalysisVertex};
 
 // -------------------------------------------------------------------------------------------------
@@ -122,12 +120,12 @@ pub(super) struct PtBasis {
     /// as a secondary key after `sweep_direction`.
     pub perpendicular_direction: Face6,
 
-    /// Scale factor from the voxel grid to mesh positions — reciprocal of the block resolution.
-    #[allow(
-        dead_code,
-        reason = "TODO(planar_new): added this and then turned out not to need it; remove if final version doesn't use it"
-    )]
-    pub scale: Scale<f32, Cube, MeshRel>,
+    /// Our normal coordinate system is understood as right-handed and in that system we build
+    /// meshes that have counterclockwise triangle winding.
+    ///
+    /// If the coordinate system established by the sweep is mirrored (which it is, half the time),
+    /// then this is true to tell us to flip the winding order.
+    pub left_handed: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -414,6 +412,20 @@ impl PlanarTriangulator {
 }
 
 impl PtBasis {
+    pub const fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
+        let left_handed =
+            GridRotation::try_from_basis_const([face, sweep_direction, perpendicular_direction])
+                .expect("directions provided to PtBasis must be orthogonal")
+                .is_reflection();
+
+        Self {
+            face,
+            sweep_direction,
+            perpendicular_direction,
+            left_handed,
+        }
+    }
+
     /// Compare two vertices’ positions along the direction perpendicular to the sweep.
     fn compare_perp(&self, v1: &AnalysisVertex, v2: &AnalysisVertex) -> Ordering {
         self.perpendicular_direction
@@ -451,24 +463,36 @@ impl PtBasis {
             != OctantMask::NONE
     }
 
+    /// Returns whether the winding order of the triangle is as it should be.
+    fn is_correct_winding(&self, triangle: [&FrontierVertex; 3]) -> bool {
+        let triangle_normal_by_cross_product = (triangle[2].v.position - triangle[0].v.position)
+            .cross(triangle[1].v.position - triangle[0].v.position);
+        let is_counterclockwise = self.face.dot(triangle_normal_by_cross_product) > 0;
+        is_counterclockwise ^ self.left_handed
+    }
+
     /// Emit triangle to both the callback and viz.
     ///
     /// The triangle should be counterclockwise wound in the coordinate frame where
     /// `self.sweep_direction` is right and `self.perpendicular_direction` is up.
+    #[cfg_attr(debug_assertions, track_caller)]
     fn emit(
         &self,
         viz: &mut Viz,
         triangle_callback: &mut impl FnMut([u32; 3]),
         mut triangle: [&FrontierVertex; 3],
     ) {
-        // Flip the triangle based on our basis's handedness
-        if GridRotation::from_basis([
-            self.face,
-            self.sweep_direction,
-            self.perpendicular_direction,
-        ])
-        .is_reflection()
-        {
+        if false {
+            // TODO(planar_new): enable this assertion once known bugs are fixed
+            debug_assert!(
+                self.is_correct_winding(triangle),
+                "incorrect winding order passed to emit(): {triangle:?}"
+            );
+        }
+
+        // Flip the triangle based on our basis's handedness, so that the final output is always
+        // counterclockwise wound when understood in the right-handed output coordinate system.
+        if self.left_handed {
             triangle.reverse();
         }
 
@@ -497,11 +521,10 @@ mod tests {
     use all_is_cubes::math::Octant::{self, Nnn, Npn, Pnn, Ppn};
     use alloc::vec::Vec;
 
-    const TEST_BASIS: PtBasis = PtBasis {
-        face: Face6::PZ,
-        sweep_direction: Face6::PX,
-        perpendicular_direction: Face6::PY,
-        scale: Scale::new(1.0),
+    const TEST_BASIS: PtBasis = {
+        let b = PtBasis::new(Face6::PZ, Face6::PX, Face6::PY);
+        assert!(!b.left_handed); // TODO: could use tests that *are* left-handed
+        b
     };
 
     /// `PlanarTriangulator::new()` parameterized for simplicity

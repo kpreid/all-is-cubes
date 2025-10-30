@@ -92,12 +92,18 @@ impl GridRotation {
     /// Panics if the three provided axes are not mutually perpendicular.
     #[inline]
     pub fn from_basis(basis: impl Into<[Face6; 3]>) -> Self {
-        Self::from_basis_impl(basis.into())
+        let basis = basis.into();
+        Self::try_from_basis_const(basis)
+            .unwrap_or_else(|| panic!("Invalid basis given to GridRotation::from_basis: {basis:?}"))
     }
 
-    fn from_basis_impl(basis: [Face6; 3]) -> Self {
+    // TODO: This is public-hidden because we need the const form.
+    // When const traits are available, make regular `from_basis()` const.
+    #[doc(hidden)]
+    #[inline]
+    pub const fn try_from_basis_const(basis: [Face6; 3]) -> Option<Self> {
         use {Face6::*, GridRotation::*};
-        match basis {
+        Some(match basis {
             [PX, PY, PZ] => RXYZ,
             [PX, PZ, PY] => RXZY,
             [PY, PX, PZ] => RYXZ,
@@ -154,8 +160,8 @@ impl GridRotation {
             [NZ, NX, NY] => Rzxy,
             [NZ, NY, NX] => Rzyx,
 
-            _ => panic!("Invalid basis given to GridRotation::from_basis: {basis:?}"),
-        }
+            _ => return None,
+        })
     }
 
     /// Find the rotation (without reflection) which rotates `source` to `destination`.

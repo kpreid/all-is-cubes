@@ -225,9 +225,10 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
         // Triangulator is used once per layer, but can be reused as long as the basis is the same.
         // TODO: Allow reconfiguring basis.
-        let mut triangulator = planar_new::PlanarTriangulator::new(planar_new::PtBasis {
+        let mut triangulator = planar_new::PlanarTriangulator::new(planar_new::PtBasis::new(
             face,
-            sweep_direction: match face {
+            /* sweep_direction: */
+            match face {
                 Face6::NX => Face6::PY,
                 Face6::NY => Face6::PX,
                 Face6::NZ => Face6::PX,
@@ -235,7 +236,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 Face6::PY => Face6::PX,
                 Face6::PZ => Face6::PX,
             },
-            perpendicular_direction: match face {
+            /* perpendicular_direction: */
+            match face {
                 Face6::NX => Face6::PZ,
                 Face6::NY => Face6::PZ,
                 Face6::NZ => Face6::PY,
@@ -243,8 +245,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 Face6::PY => Face6::PZ,
                 Face6::PZ => Face6::PY,
             },
-            scale: scale_to_block,
-        });
+        ));
 
         // Rotate the voxel array's extent into our local coordinate system, so we can find
         // out what range to iterate over.
