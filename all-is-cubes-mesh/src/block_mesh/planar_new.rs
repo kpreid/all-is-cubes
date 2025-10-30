@@ -50,6 +50,7 @@
 
 use alloc::collections::VecDeque;
 use core::cmp::Ordering;
+use core::format_args;
 use core::mem;
 
 use all_is_cubes::math::{Face6, GridCoordinate, GridRotation, OctantMask, rgba_const};
@@ -99,6 +100,13 @@ pub(super) struct PlanarTriangulator {
     /// Invariant: If a triangle in the output has vertices that are from some combination of
     /// `old_frontier[..end_in_old_frontier]` and `new_frontier`, then it has already been emitted.
     end_in_old_frontier: usize,
+
+    /// This flag is set when the main algorithm is unable to create non-inverted triangles.
+    /// When this happens, we skip that triangle, and set this flag. Then, the next time
+    /// `sweep_position` is advanced, we run the the “ear clipping” algorithm on the frontier
+    /// to fill in as many triangles as possible, which will include the skipped region,
+    /// before continuing with the main algorithm that processes new vertices.
+    needs_ears_fixed: bool,
 }
 
 /// Portion of [`PlanarTriangulator`] that determines the coordinate system and is not mutated.
@@ -158,6 +166,7 @@ impl PlanarTriangulator {
             old_frontier: VecDeque::new(),
             new_frontier: VecDeque::new(),
             end_in_old_frontier: 0,
+            needs_ears_fixed: false,
         }
     }
 
@@ -172,15 +181,22 @@ impl PlanarTriangulator {
             old_frontier,
             new_frontier,
             end_in_old_frontier,
+            needs_ears_fixed,
         } = self;
         *basis = new_basis;
         *sweep_position = GridCoordinate::MIN;
         old_frontier.clear();
         new_frontier.clear();
         *end_in_old_frontier = 0;
+        *needs_ears_fixed = false;
     }
 
-    fn advance_sweep_position(&mut self, viz: &mut Viz, new_sweep_position: GridCoordinate) {
+    fn advance_sweep_position(
+        &mut self,
+        viz: &mut Viz,
+        triangle_callback: &mut impl FnMut([u32; 3]),
+        new_sweep_position: GridCoordinate,
+    ) {
         assert!(
             new_sweep_position > self.sweep_position,
             "incorrect vertex ordering"
@@ -188,6 +204,8 @@ impl PlanarTriangulator {
 
         // Move the end-of-row old frontier vertices to new frontier.
         self.new_frontier.extend(self.old_frontier.drain(..));
+
+        self.clip_ears_in_new_frontier(viz, triangle_callback);
 
         // Discard all vertices that are connected only to area that is behind the line.
         // It would be more efficient to not insert them in the first place, but that would
@@ -235,15 +253,15 @@ impl PlanarTriangulator {
                 v: input_vertex,
                 index: input_index,
             };
-            viz.set_current_triangulation_vertex(&input_fv);
 
             // Advance sweep line if the new vertex is ahead of the line.
             let new_sweep_position =
                 self.basis.sweep_direction.dot(input_vertex.position.to_vector());
             if new_sweep_position != self.sweep_position {
-                self.advance_sweep_position(viz, new_sweep_position);
+                self.advance_sweep_position(viz, &mut triangle_callback, new_sweep_position);
             }
 
+            viz.set_current_triangulation_vertex(&input_fv, format_args!("main"));
             viz.completed_step();
 
             // Check for vertices in the old frontier that the input vertex is perpendicularly
@@ -259,39 +277,28 @@ impl PlanarTriangulator {
             {
                 let passed_over_fv = self.old_frontier.pop_front().unwrap();
 
-                // TODO(planar_new): I think we need a rule that works like
-                // previous_should_connect_forward, but applies to the current vertex connecting
-                // backwards.
-
                 if previous_should_connect_forward
                     && self.basis.connectivity(&passed_over_fv.v, true, true)
+                    && let triangle = [
+                        &passed_over_fv,
+                        self.new_frontier.back().expect("preceding vertex in new frontier missing"),
+                        self.old_frontier
+                            .front()
+                            .expect("no next vertex to connect to for passed-over vertex"),
+                    ]
+                    && {
+                        let ok = self.basis.is_correct_winding(triangle);
+                        // If we are skipping a triangle *because of winding* then we will need
+                        // to fix it later.
+                        if !ok {
+                            self.needs_ears_fixed = true;
+                        }
+                        ok
+                    }
                 {
                     // connect old vertex forward because it is possible
-
-                    // TODO(planar_new): This technique is not correct, because we don't have a
-                    // guarantee that this triangle won't cross some space that should be empty.
-                    // I think we will need to redesign the algorithm so that it has more awareness
-                    // of what makes a good triangle, perhaps by updating the frontier in a less
-                    // one-pass way and more:
-                    // 1. Find vertices that are “clear wins” like the equal perpendicular case.
-                    // 2. Look for places where a concavity in the frontier can be turned into
-                    //    convexity and incrementally add triangles there.
-                    // Or maybe we just need to do this fill-in triangle emission *after* the
-                    // main phase, and use the new frontier vertex as what we connect to.
-
-                    self.basis.emit(
-                        viz,
-                        &mut triangle_callback,
-                        [
-                            &passed_over_fv,
-                            self.new_frontier
-                                .back()
-                                .expect("preceding vertex in new frontier missing"),
-                            self.old_frontier
-                                .front()
-                                .expect("no next vertex to connect to for passed-over vertex"), // next triangle in the passed over set. TODO(planar_new): unsure if this is correct in general
-                        ],
-                    );
+                    self.basis.emit(viz, &mut triangle_callback, triangle);
+                    viz.completed_step();
                 } else {
                     // if this was true, then we've now hit a gap and should stop connecting
                     previous_should_connect_forward = false;
@@ -300,7 +307,6 @@ impl PlanarTriangulator {
                     self.new_frontier.push_back(passed_over_fv);
                     moved_any_vertices = true;
                 }
-                viz.completed_step();
             }
             if moved_any_vertices {
                 // let the steps be seen
@@ -402,18 +408,74 @@ impl PlanarTriangulator {
             viz.completed_step();
         }
 
-        // Reuse sweep routine to do final state cleanup.
-        // TODO(planar_new): Do only the minimal work needed for the validation assert(s) instead.
-        self.advance_sweep_position(viz, GridCoordinate::MAX);
+        // Advance past the last vertex to do the last ear processing and state cleanup.
+        self.advance_sweep_position(viz, &mut triangle_callback, GridCoordinate::MAX);
         viz.completed_step();
 
         // The last vertex input should have caused the triangulation to become complete,
         // such that the frontier is now empty of all vertices.
         debug_assert!(
             self.old_frontier.is_empty(),
-            "input vertices incomplete or mismatched; frontier is not empty {:?}",
+            "input vertices erroneous or triangulator has a bug; frontier is not empty {:?}",
             self.old_frontier
         );
+    }
+
+    /// Look at `self.new_frontier` and generate triangles according to the principle of the
+    /// “ear clipping” algorithm: any three sequential vertices might form a triangle which may be
+    /// emitted and forgotten, deleting the middle vertex.
+    ///
+    /// While this algorithm could in principle do a lot of the work that is handled by other means,
+    /// it is O(n²), so we want to give it as little work as possible.
+    fn clip_ears_in_new_frontier(
+        &mut self,
+        viz: &mut Viz,
+        triangle_callback: &mut impl FnMut([u32; 3]),
+    ) {
+        // TODO: be smarter about the range we iterate over after the first time; we only need to
+        // consider the vertices in the neighborhood of the vertices we deleted on the previous
+        // iteration.
+        while self.needs_ears_fixed {
+            self.needs_ears_fixed = false;
+            let mut i: usize = 0;
+            while i.saturating_add(2) < self.new_frontier.len() {
+                let first = &self.new_frontier[i];
+                let middle = &self.new_frontier[i + 1];
+                let last = &self.new_frontier[i + 2];
+                let candidate_triangle = [last, middle, first];
+
+                let connected_back = self.basis.connectivity(&middle.v, true, false);
+                let connected_fwd = self.basis.connectivity(&middle.v, true, true);
+                let is_convex = self.basis.is_correct_winding(candidate_triangle);
+
+                viz.set_current_triangulation_vertex(
+                    candidate_triangle[1],
+                    format_args!(
+                        "clip {i}..={last}/{len}\n\
+                        back={connected_back} && fwd={connected_fwd} && convex={is_convex}",
+                        last = i + 2,
+                        len = self.new_frontier.len()
+                    ),
+                );
+                viz.completed_step();
+
+                if connected_fwd && connected_back && is_convex {
+                    // Emit the ear triangle.
+                    self.basis.emit(viz, triangle_callback, candidate_triangle);
+                    // Clip the ear: delete its middle vertex, so as to remove that triangle from
+                    // the frontier.
+                    self.new_frontier.remove(i + 1);
+
+                    viz.set_frontier(&self.old_frontier, &self.new_frontier);
+                    viz.completed_step();
+
+                    // There might be further triangles that were enabled by this deletion.
+                    self.needs_ears_fixed = true;
+                }
+
+                i += 1;
+            }
+        }
     }
 }
 
@@ -499,11 +561,27 @@ impl PtBasis {
     }
 
     /// Returns whether the winding order of the triangle is as it should be.
+    ///
+    /// Always returns `false` for degenerate triangles (ones where all vertices lie on one line
+    /// and thus cover no area).
+    ///
+    /// TODO: the naming of things may be backwards somewhere; this was tweaked to work empirically
     fn is_correct_winding(self, triangle: [&FrontierVertex; 3]) -> bool {
-        let triangle_normal_by_cross_product = (triangle[2].v.position - triangle[0].v.position)
-            .cross(triangle[1].v.position - triangle[0].v.position);
-        let is_counterclockwise = self.face.dot(triangle_normal_by_cross_product) > 0;
-        is_counterclockwise ^ self.left_handed
+        // depending on handedness this might be negated
+        let triangle_normal_by_cross_product = (triangle[1].v.position - triangle[0].v.position)
+            .cross(triangle[2].v.position - triangle[0].v.position);
+
+        let normal_dot_face = self.face.dot(triangle_normal_by_cross_product);
+
+        // This is not a single case because we want to always return false for degenerate
+        // triangles.
+        //
+        // (Note that because our coordinates are integers, there will be no rounding error.)
+        if self.left_handed {
+            normal_dot_face < 0
+        } else {
+            normal_dot_face > 0
+        }
     }
 
     /// Emit triangle to both the callback and viz.
@@ -517,13 +595,10 @@ impl PtBasis {
         triangle_callback: &mut impl FnMut([u32; 3]),
         mut triangle: [&FrontierVertex; 3],
     ) {
-        if false {
-            // TODO(planar_new): enable this assertion once known bugs are fixed
-            debug_assert!(
-                self.is_correct_winding(triangle),
-                "incorrect winding order passed to emit(): {triangle:?}"
-            );
-        }
+        debug_assert!(
+            self.is_correct_winding(triangle),
+            "incorrect winding order passed to emit(): {triangle:?}"
+        );
 
         // Flip the triangle based on our basis's handedness, so that the final output is always
         // counterclockwise wound when understood in the right-handed output coordinate system.

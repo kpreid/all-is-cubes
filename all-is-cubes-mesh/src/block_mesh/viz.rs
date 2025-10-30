@@ -279,15 +279,19 @@ impl Viz {
     pub(crate) fn set_current_triangulation_vertex(
         &mut self,
         #[allow(unused)] vertex: &FrontierVertex,
+        #[allow(unused)] label: core::fmt::Arguments<'_>,
     ) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
+            use std::string::ToString;
+
             state.destination.log(
                 &state.triangulator_current_vertex_path,
                 &convert_frontier_vertices(
                     &mut [vertex].into_iter(),
                     rg::components::Color::from_rgb(255, 255, 100),
-                ),
+                )
+                .with_labels([label.to_string()]),
             );
         }
     }
