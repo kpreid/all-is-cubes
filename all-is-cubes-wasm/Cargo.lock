@@ -204,6 +204,7 @@ dependencies = [
  "futures-task",
  "futures-util",
  "indoc",
+ "itertools",
  "log",
  "macro_rules_attribute",
  "num-traits",

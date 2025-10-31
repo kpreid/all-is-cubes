@@ -10,6 +10,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::Cell;
 use core::fmt;
+use core::iter;
 use core::sync::atomic::Ordering;
 
 use bevy_ecs::change_detection::DetectChangesMut as _;
@@ -121,7 +122,7 @@ impl Palette {
         };
 
         let mut remapping = hashbrown::HashMap::new();
-        for (original_index, block) in (0..=BlockIndex::MAX).zip(blocks) {
+        for (original_index, block) in iter::zip(0..=BlockIndex::MAX, blocks) {
             let new_index = new_self
                 .ensure_index(
                     &mut EvaluationMethod::Ticket(read_ticket),
@@ -425,7 +426,9 @@ impl Clone for Palette {
         // This will unfortunately also cause a reevaluation, but avoiding that would
         // be additional complexity.
         let todo = Arc::new(Mutex::new(PaletteTodo {
-            blocks: hashbrown::HashSet::from_iter((0..self.entries.len()).map(|i| i as BlockIndex)),
+            blocks: hashbrown::HashSet::from_iter(
+                (0..self.entries.len()).into_iter().map(|i| i as BlockIndex),
+            ),
         }));
 
         Self {
@@ -933,7 +936,8 @@ mod tests {
     #[test]
     fn with_maximum_number_of_entries() {
         let expected_len = usize::from(BlockIndex::MAX) + 1;
-        let mut blocks_iter = (0..=BlockIndex::MAX).map(|i| {
+        // need ExactSizeIterator
+        let mut blocks_iter = core::ops::RangeInclusive::from(0..=BlockIndex::MAX).map(|i| {
             // These blocks must all be distinct.
             Block::builder()
                 .color(Rgba::WHITE)

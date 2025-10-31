@@ -942,23 +942,25 @@ mod arbitrary_block {
     // Manual impl because `Primitive::Text` isn't properly overflow-proof yet.
     impl<'a> Arbitrary<'a> for Primitive {
         fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
-            Ok(match u.int_in_range(0..=4)? {
-                0 => Primitive::Air,
-                1 => Primitive::Atom(Atom::arbitrary(u)?),
-                2 => Primitive::Indirect(Handle::arbitrary(u)?),
-                3 => Primitive::Recur {
-                    offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
-                    resolution: Resolution::arbitrary(u)?,
-                    space: Handle::arbitrary(u)?,
+            Ok(
+                match u.int_in_range(core::ops::RangeInclusive::from(0..=4))? {
+                    0 => Primitive::Air,
+                    1 => Primitive::Atom(Atom::arbitrary(u)?),
+                    2 => Primitive::Indirect(Handle::arbitrary(u)?),
+                    3 => Primitive::Recur {
+                        offset: GridPoint::from(<[i32; 3]>::arbitrary(u)?),
+                        resolution: Resolution::arbitrary(u)?,
+                        space: Handle::arbitrary(u)?,
+                    },
+                    4 => Primitive::Text {
+                        text: text::Text::arbitrary(u)?,
+                        // TODO: fix unhandled overflows so this can be full i32 range,
+                        // then replace this `Arbitrary` impl with a derived one
+                        offset: GridVector::from(<[i16; 3]>::arbitrary(u)?.map(i32::from)),
+                    },
+                    _ => unreachable!(),
                 },
-                4 => Primitive::Text {
-                    text: text::Text::arbitrary(u)?,
-                    // TODO: fix unhandled overflows so this can be full i32 range,
-                    // then replace this `Arbitrary` impl with a derived one
-                    offset: GridVector::from(<[i16; 3]>::arbitrary(u)?.map(i32::from)),
-                },
-                _ => unreachable!(),
-            })
+            )
         }
 
         fn size_hint(_depth: usize) -> (usize, Option<usize>) {

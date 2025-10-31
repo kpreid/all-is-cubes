@@ -193,7 +193,7 @@ fn demo_blocks_generator(
                     .display_name("Road")
                     .voxels_fn(output_resolution, |cube| {
                         let y = (i32::from(output_resolution) - 1 - cube.y) / 2;
-                        let x = rng.random_range(range.clone());
+                        let x = rng.random_range(core::ops::Range::from(range));
                         palette_image.get_brush(x, y).origin_block().unwrap_or(&AIR)
                     })?
                     .build_txn(txn)
