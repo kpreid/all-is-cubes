@@ -373,8 +373,17 @@ impl SpaceRenderer {
                             u.render_data.as_ref().and_then(|b| b.index_buf.get())
                         {
                             let mesh_indices = u.mesh.indices();
-                            let byte_range = (index_range.start * mesh_indices.element_size())
+                            let mut byte_range = (index_range.start * mesh_indices.element_size())
                                 ..(index_range.end * mesh_indices.element_size());
+
+                            // Widen the range to ensure the alignment is acceptable to wgpu.
+                            // (This is okay because the only reason we are picking a range
+                            // less than the entire buffer is to avoid copying unchanged data.)
+                            byte_range.start &= !(wgpu::COPY_BUFFER_ALIGNMENT as usize - 1);
+                            byte_range.end = byte_range
+                                .end
+                                .next_multiple_of(wgpu::COPY_BUFFER_ALIGNMENT as usize);
+                            assert!(byte_range.len().is_multiple_of(4));
 
                             bwp.reborrow()
                                 .write_buffer(
