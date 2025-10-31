@@ -12,6 +12,8 @@ use all_is_cubes::math::{GridSize, Rgba};
 use all_is_cubes_mesh::IndexSlice;
 use num_traits::NumCast;
 
+// -------------------------------------------------------------------------------------------------
+
 /// Construct `wgpu::BufferSize` from the size of `T`.
 ///
 /// Panics if `T`’s size is zero.
@@ -122,6 +124,46 @@ pub fn extent_to_size3d(size: wgpu::Extent3d) -> GridSize {
     GridSize::new(size.width, size.height, size.depth_or_array_layers)
 }
 
+/// Use `bwp` to copy at least the part of `source` specified by `byte_range` to the corresponding
+/// part of `destination`.
+///
+/// To satisfy alignment requirements, more than requested may be copied.
+/// If the length of `source` is not a multiple of 4 and `byte_range` is less than 4 bytes away
+/// from the end of `source`, zeroes may be written past the end of `byte_range`.
+pub fn write_part_of_slice_to_part_of_buffer(
+    bwp: &mut BeltWritingParts<'_>,
+    source: &[u8],
+    destination: &wgpu::Buffer,
+    byte_range: Range<usize>,
+) {
+    const ALIGN: usize = wgpu::COPY_BUFFER_ALIGNMENT as usize;
+
+    // Widen the range to ensure the alignment is acceptable to wgpu.
+    // (This is okay because the only reason we are picking a range
+    // less than the entire buffer is to avoid copying unchanged data.)
+    let mapping_range: Range<usize> = (
+        // Like next_multiple_of() but rounding down — mask off the low bits.
+        byte_range.start & !(ALIGN - 1)
+    )..(byte_range.end.next_multiple_of(ALIGN));
+    debug_assert!(mapping_range.start <= byte_range.start);
+    debug_assert!(mapping_range.end >= byte_range.end);
+    debug_assert!(mapping_range.len().is_multiple_of(ALIGN));
+
+    let mut staging = bwp.reborrow().write_buffer(
+        destination,
+        mapping_range.start as u64,
+        wgpu::BufferSize::new(mapping_range.len() as u64).unwrap(),
+    );
+
+    // Note that we must not overrun the end of `source`, so we can't just use `mapping_range`;
+    // we have to slice both `source` and `staging` so that they match.
+    let copy_end = mapping_range.end.min(source.len());
+    staging[..(copy_end - mapping_range.start)]
+        .copy_from_slice(&source[mapping_range.start..copy_end]);
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// The ingredients to make use of a [`wgpu::util::StagingBelt`].
 pub(crate) struct BeltWritingParts<'a> {
     pub device: &'a wgpu::Device,
@@ -150,6 +192,8 @@ impl BeltWritingParts<'_> {
             .write_buffer(self.encoder, target, offset, size, self.device)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// A [`wgpu::Buffer`] wrapper that allows loading differently-sized data with automatic
 /// reallocation as needed. Also supports not yet having allocated a buffer.
@@ -285,6 +329,8 @@ impl ResizingBuffer {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Wraps a byte slice to present a `Vec::push()`-like interface.
 #[derive(Debug)]
 pub(crate) struct MapVec<'buf, T> {
@@ -329,12 +375,15 @@ impl<T> Default for MapVec<'_, T> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::in_wgpu::init::map_really_async;
+    use alloc::string::ToString;
+    use alloc::{vec, vec::Vec};
     use pollster::block_on;
-    use std::string::ToString;
 
     /// Test that `ResizingBuffer` works with data whose size is not a multiple of the required
     /// alignment.
@@ -391,6 +440,67 @@ mod tests {
             }
             drop(mapped_view);
             buffer_to_read.unmap();
+        }
+    }
+
+    #[test]
+    fn write_part_of_slice() {
+        let (device, queue) = wgpu::Device::noop(&wgpu::DeviceDescriptor::default());
+        let mut belt = wgpu::util::StagingBelt::new(128);
+
+        // Starting with initialization with 1, not 0, because 0s easily appear incorrectly.
+        let mut source_data: Vec<u8> = vec![1; 128];
+        let destination_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: 128,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: true,
+        });
+
+        // Initial contents not using write_part_of_slice_to_part_of_buffer().
+        destination_buffer
+            .get_mapped_range_mut(..)
+            .copy_from_slice(&source_data);
+        destination_buffer.unmap();
+
+        for (value, range) in [
+            // TODO: better set of test cases, exercising the behavior at an unaligned
+            // end of slice in particular
+            (2u8, 0..1),
+            (3u8, 2..3),
+            (4u8, 3..4),
+            (5u8, 4..5),
+            (6u8, 12..16),
+        ] {
+            // Add new data to write.
+            source_data[range.clone()].fill(value);
+
+            // Ask for the data to be written.
+            let mut encoder =
+                device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+            let mut bwp = BeltWritingParts {
+                device: &device,
+                belt: &mut belt,
+                encoder: &mut encoder,
+            };
+            write_part_of_slice_to_part_of_buffer(
+                &mut bwp,
+                &source_data,
+                &destination_buffer,
+                range,
+            );
+            belt.finish();
+            queue.submit([encoder.finish()]);
+            belt.recall();
+
+            // Check that the correct data was written and other data was not written.
+            block_on(map_really_async(
+                device.clone(),
+                destination_buffer.slice(..),
+            ))
+            .unwrap();
+            assert_eq!(destination_buffer.get_mapped_range(..)[..], source_data,);
+            destination_buffer.unmap();
         }
     }
 }

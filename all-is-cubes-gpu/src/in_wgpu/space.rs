@@ -6,6 +6,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::mem;
+use core::ops::Range;
 use core::sync::atomic;
 use core::time::Duration;
 use std::sync::{Mutex, PoisonError, mpsc};
@@ -34,7 +35,7 @@ use crate::in_wgpu::block_texture::{AtlasAllocator, BlockTextureViews};
 use crate::in_wgpu::camera::ShaderSpaceCamera;
 use crate::in_wgpu::glue::{
     BeltWritingParts, MapVec, ResizingBuffer, buffer_size_of, to_wgpu_index_format,
-    to_wgpu_index_range,
+    to_wgpu_index_range, write_part_of_slice_to_part_of_buffer,
 };
 use crate::in_wgpu::pipelines::{BlockBufferSlot, Pipelines};
 use crate::in_wgpu::skybox;
@@ -373,25 +374,13 @@ impl SpaceRenderer {
                             u.render_data.as_ref().and_then(|b| b.index_buf.get())
                         {
                             let mesh_indices = u.mesh.indices();
-                            let mut byte_range = (index_range.start * mesh_indices.element_size())
-                                ..(index_range.end * mesh_indices.element_size());
-
-                            // Widen the range to ensure the alignment is acceptable to wgpu.
-                            // (This is okay because the only reason we are picking a range
-                            // less than the entire buffer is to avoid copying unchanged data.)
-                            byte_range.start &= !(wgpu::COPY_BUFFER_ALIGNMENT as usize - 1);
-                            byte_range.end = byte_range
-                                .end
-                                .next_multiple_of(wgpu::COPY_BUFFER_ALIGNMENT as usize);
-                            assert!(byte_range.len().is_multiple_of(4));
-
-                            bwp.reborrow()
-                                .write_buffer(
-                                    index_buf,
-                                    byte_range.start as u64,
-                                    wgpu::BufferSize::new(byte_range.len() as u64).unwrap(),
-                                )
-                                .copy_from_slice(&mesh_indices.as_bytes()[byte_range]);
+                            write_part_of_slice_to_part_of_buffer(
+                                bwp,
+                                mesh_indices.as_bytes(),
+                                index_buf,
+                                (index_range.start * mesh_indices.element_size())
+                                    ..(index_range.end * mesh_indices.element_size()),
+                            );
                         }
                     } else {
                         update_chunk_buffers(bwp.reborrow(), u, &self.space_label);
@@ -536,7 +525,7 @@ impl SpaceRenderer {
         // that's a chunk mesh (i.e. instance range is length 1).
         #[allow(clippy::too_many_arguments)]
         fn draw_chunk_instance<'pass>(
-            range: std::ops::Range<usize>,
+            range: Range<usize>,
             render_pass: &mut wgpu::RenderPass<'pass>,
             buffers: &'pass ChunkBuffers,
             instance_buffer_writer: &mut MapVec<'_, WgpuInstanceData>,
