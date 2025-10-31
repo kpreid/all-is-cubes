@@ -132,13 +132,14 @@ impl Fire {
         let bounds = self.fire_state.bounds();
         let y0 = bounds.lower_bounds().y;
         for z in bounds.z_range() {
-            for y in bounds.y_range().rev() {
+            for y in bounds.y_range().into_iter().rev() {
                 for x in bounds.x_range() {
                     let cube = Cube::new(x, y, z);
                     self.fire_state[cube] = if y == y0 {
-                        (self.fire_state[cube] + self.rng.random_range(0..3))
-                            .saturating_sub(1)
-                            .min(self.blocks.len() as u8 - 1)
+                        (self.fire_state[cube]
+                            + self.rng.random_range(core::ops::Range::from(0..3)))
+                        .saturating_sub(1)
+                        .min(self.blocks.len() as u8 - 1)
                     } else {
                         let below = self.fire_state[cube + GridVector::new(0, -1, 0)];
                         if !self.rng.random_bool(0.25) {

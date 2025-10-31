@@ -121,8 +121,8 @@ pub(in crate::block::eval) fn compute_derived(voxels: &block::Evoxels) -> Derive
             let rotated_voxel_range = data_bounds.transform(transform.inverse()).unwrap();
 
             let face_sum: VoxSum = Itertools::cartesian_product(
-                rotated_voxel_range.y_range(),
-                rotated_voxel_range.x_range(),
+                rotated_voxel_range.y_range().into_iter(),
+                rotated_voxel_range.x_range().into_iter(),
             )
             .map(|(v, u)| {
                 let cube: Cube =

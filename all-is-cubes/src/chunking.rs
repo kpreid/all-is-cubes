@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 use core::iter::FusedIterator;
-use core::ops::RangeTo;
+use core::ops::RangeTo; // TODO: When possible, change this to core::range::RangeTo
 
 #[cfg(feature = "std")]
 use std::sync::Mutex;
@@ -689,11 +689,12 @@ mod tests {
     #[test]
     #[ignore = "TODO: enable this when we have cleverer resizing that might be wrong"]
     fn chunk_chart_resize_rand() {
+        use core::ops::Range as LegacyRange;
         let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(0);
         for _ in 0..50 {
-            let target_size = rng.random_range(0.0..200.0);
-            let small_size = rng.random_range(0.0..target_size);
-            let big_size = rng.random_range(target_size..200.0);
+            let target_size = rng.random_range(LegacyRange::from(0.0..200.0));
+            let small_size = rng.random_range(LegacyRange::from(0.0..target_size));
+            let big_size = rng.random_range(LegacyRange::from(target_size..200.0));
             print!("{small_size:?} -> {target_size:?} <- {big_size:?} | ");
 
             let exact = ChunkChart::<16>::new(target_size);
