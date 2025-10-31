@@ -5,6 +5,7 @@
 
 use std::thread;
 
+use itertools::iproduct;
 use pollster::block_on;
 
 use all_is_cubes::block::{self, Block, EvaluatedBlock, Resolution};
@@ -16,7 +17,7 @@ use all_is_cubes::universe::{Universe, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_content as content;
 use all_is_cubes_mesh as mesh;
-use all_is_cubes_render::camera::GraphicsOptions;
+use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 use content::DemoBlocks;
 
 /// Private — do not use.
@@ -65,10 +66,31 @@ fn main() {
             let x = next_x;
             next_x += f32::from(evaluated.resolution()) + 4.0;
 
-            for use_new_triangulator in [false, true] {
+            for (use_new_triangulator, (ti, transparency)) in iproduct!(
+                [false, true],
+                [
+                    // TODO: add command line options to use the other or both
+                    TransparencyOption::Surface,
+                    //TransparencyOption::Volumetric,
+                ]
+                .into_iter()
+                .enumerate()
+            ) {
                 let entity_path = rg::EntityPath::from_iter([
                     block_name_part.clone(),
-                    rg::EntityPathPart::new(use_new_triangulator.to_string()),
+                    rg::EntityPathPart::new(format!(
+                        "{},{}",
+                        if use_new_triangulator {
+                            "newtri"
+                        } else {
+                            "greedy"
+                        },
+                        match transparency {
+                            TransparencyOption::Volumetric => "volumetric",
+                            TransparencyOption::Surface => "surface",
+                            _ => unreachable!(),
+                        }
+                    )),
                 ]);
 
                 let destination = destination.child(&entity_path);
@@ -78,11 +100,12 @@ fn main() {
                     .spawn_scoped(scope, move || {
                         show(
                             destination,
-                            point3(x, f32::from(use_new_triangulator) * 32., 0.),
+                            point3(x, f32::from(use_new_triangulator) * 32., ti as f32 * 64.),
                             &evaluated,
                             &{
-                                let mut options =
-                                    mesh::MeshOptions::new(&GraphicsOptions::default());
+                                let mut graphics_options = GraphicsOptions::default();
+                                graphics_options.transparency = transparency;
+                                let mut options = mesh::MeshOptions::new(&graphics_options);
                                 options.use_new_block_triangulator = use_new_triangulator;
                                 options
                             },
