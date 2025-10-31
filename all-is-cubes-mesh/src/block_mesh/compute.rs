@@ -212,6 +212,10 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         None
     };
 
+    // Triangulator contains allocations that we reuse for all planes of the block.
+    // TODO: Allow reusing them across multiple blocks, if that is faster.
+    let mut triangulator = planar_new::PlanarTriangulator::new();
+
     // Walk through the planes (layers) of the block, figuring out what geometry to
     // generate for each layer and whether it needs a texture.
     for face in Face6::ALL {
@@ -223,9 +227,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         let interior_mesh = &mut output.interior_vertices[face];
         let interior_side_octant_mask = OctantMask::ALL.shift(-face);
 
-        // Triangulator is used once per layer, but can be reused as long as the basis is the same.
-        // TODO: Allow reconfiguring basis.
-        let mut triangulator = planar_new::PlanarTriangulator::new(planar_new::PtBasis::new(
+        let triangulator_basis = planar_new::PtBasis::new(
             face,
             /* sweep_direction: */
             match face {
@@ -245,7 +247,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 Face6::PY => Face6::PZ,
                 Face6::PZ => Face6::PY,
             },
-        ));
+        );
 
         // Rotate the voxel array's extent into our local coordinate system, so we can find
         // out what range to iterate over.
@@ -462,15 +464,20 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     }),
                 );
 
-                triangulator.triangulate(viz, iter_plane_vertices().copied(), |triangle_indices| {
-                    let rect_has_alpha = false; // TODO(planar_new): implement transparent support
-                    if rect_has_alpha {
-                        &mut *indices_transparent
-                    } else {
-                        &mut *indices_opaque
-                    }
-                    .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
-                });
+                triangulator.triangulate(
+                    viz,
+                    triangulator_basis,
+                    iter_plane_vertices().copied(),
+                    |triangle_indices| {
+                        let rect_has_alpha = false; // TODO(planar_new): implement transparent support
+                        if rect_has_alpha {
+                            &mut *indices_transparent
+                        } else {
+                            &mut *indices_opaque
+                        }
+                        .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
+                    },
+                );
             } else {
                 // Traverse `visible_image` using the "greedy meshing" algorithm for
                 // breaking an irregular shape into quads.

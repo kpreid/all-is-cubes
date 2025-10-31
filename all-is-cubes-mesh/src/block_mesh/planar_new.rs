@@ -105,7 +105,7 @@ pub(super) struct PlanarTriangulator {
 ///
 /// Design note: These three orthogonal axes could be denoted more compactly by a [`GridRotation`].
 /// That might or might not be wise, but for now, it would make the code less clear.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct PtBasis {
     /// Orientation of the face/plane being processed.
     pub face: Face6,
@@ -145,9 +145,9 @@ pub(crate) struct FrontierVertex {
 }
 
 impl PlanarTriangulator {
-    pub fn new(basis: PtBasis) -> Self {
+    pub fn new() -> Self {
         Self {
-            basis,
+            basis: PtBasis::DUMMY,
             sweep_position: GridCoordinate::MIN,
             old_frontier: VecDeque::new(),
             new_frontier: VecDeque::new(),
@@ -159,14 +159,15 @@ impl PlanarTriangulator {
     /// except for reusing memory allocations.
     ///
     /// This function does not need to be called externally; it is automatically called when needed.
-    fn clear(&mut self) {
+    fn clear_and_set_basis(&mut self, new_basis: PtBasis) {
         let Self {
-            basis: _, // does not change
+            basis,
             sweep_position,
             old_frontier,
             new_frontier,
             end_in_old_frontier,
         } = self;
+        *basis = new_basis;
         *sweep_position = GridCoordinate::MIN;
         old_frontier.clear();
         new_frontier.clear();
@@ -208,11 +209,12 @@ impl PlanarTriangulator {
     pub fn triangulate(
         &mut self,
         viz: &mut Viz,
+        basis: PtBasis,
         input: impl Iterator<Item = AnalysisVertex>,
         mut triangle_callback: impl FnMut([u32; 3]),
     ) {
-        // Ensure any previous usage of self does not affect the results.
-        self.clear();
+        // Set the basis, and ensure any previous usage of self does not affect the results.
+        self.clear_and_set_basis(basis);
 
         for (input_index_usize, mut input_vertex) in input.enumerate() {
             // Forget about hidden voxel faces -- transform “this volume is solid” mask into
@@ -412,6 +414,15 @@ impl PlanarTriangulator {
 }
 
 impl PtBasis {
+    /// Value used as a placeholder in [`PlanarTriangulator`]s that are not currently in use.
+    /// Its data is nonsense and it is never actually used.
+    const DUMMY: Self = Self {
+        face: Face6::PX,
+        sweep_direction: Face6::PX,
+        perpendicular_direction: Face6::PX,
+        left_handed: false,
+    };
+
     pub const fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
         let left_handed =
             GridRotation::try_from_basis_const([face, sweep_direction, perpendicular_direction])
@@ -427,7 +438,7 @@ impl PtBasis {
     }
 
     /// Compare two vertices’ positions along the direction perpendicular to the sweep.
-    fn compare_perp(&self, v1: &AnalysisVertex, v2: &AnalysisVertex) -> Ordering {
+    fn compare_perp(self, v1: &AnalysisVertex, v2: &AnalysisVertex) -> Ordering {
         self.perpendicular_direction
             .dot(v1.position.to_vector())
             .cmp(&self.perpendicular_direction.dot(v2.position.to_vector()))
@@ -438,7 +449,7 @@ impl PtBasis {
     /// or negated as indicated.
     // TODO(planar_new): better explanation
     fn connectivity(
-        &self,
+        self,
         vertex: &AnalysisVertex,
         forward_in_sweep: bool,
         forward_in_perpendicular: bool,
@@ -464,7 +475,7 @@ impl PtBasis {
     }
 
     /// Returns whether the winding order of the triangle is as it should be.
-    fn is_correct_winding(&self, triangle: [&FrontierVertex; 3]) -> bool {
+    fn is_correct_winding(self, triangle: [&FrontierVertex; 3]) -> bool {
         let triangle_normal_by_cross_product = (triangle[2].v.position - triangle[0].v.position)
             .cross(triangle[1].v.position - triangle[0].v.position);
         let is_counterclockwise = self.face.dot(triangle_normal_by_cross_product) > 0;
@@ -477,7 +488,7 @@ impl PtBasis {
     /// `self.sweep_direction` is right and `self.perpendicular_direction` is up.
     #[cfg_attr(debug_assertions, track_caller)]
     fn emit(
-        &self,
+        self,
         viz: &mut Viz,
         triangle_callback: &mut impl FnMut([u32; 3]),
         mut triangle: [&FrontierVertex; 3],
@@ -534,12 +545,13 @@ mod tests {
     fn check(vertices: &[AnalysisVertex], expected_triangles: &[[GridPoint; 3]]) {
         let mut viz = Viz::Disabled;
         let mut actual_triangles = Vec::new();
-        let mut triangulator = PlanarTriangulator::new(TEST_BASIS);
+        let mut triangulator = PlanarTriangulator::new();
 
         eprintln!("Initial state: {triangulator:#?}");
 
         triangulator.triangulate(
             &mut viz,
+            TEST_BASIS,
             vertices
                 .iter()
                 .inspect(|vertex| println!("In: {vertex:?}"))
