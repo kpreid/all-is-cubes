@@ -236,11 +236,7 @@ fn set_no_neighbor_overflow_high() {
 #[test]
 fn set_no_neighbor_overflow_low() {
     let [block] = make_some_blocks();
-    let low_corner = GridPoint::new(
-        GridCoordinate::MIN,
-        GridCoordinate::MIN,
-        GridCoordinate::MIN,
-    );
+    let low_corner = GridPoint::splat(GridCoordinate::MIN);
     let mut space = Space::empty(GridAab::from_lower_size(low_corner, [1, 1, 1]));
     space
         .mutate(ReadTicket::stub(), |m| m.set(low_corner, block.clone()))

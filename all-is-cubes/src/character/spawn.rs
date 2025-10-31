@@ -72,14 +72,9 @@ impl Spawn {
 
     /// Sets the position at which the character will appear, in terms of its viewpoint.
     pub fn set_eye_position(&mut self, position: impl Into<FreePoint>) {
-        let position = position.into();
         // TODO: accept None for clearing
         // TODO: If we're going to suppress NaN, then it makes sense to suppress infinities too; come up with a general theory of how we want all-is-cubes to handle unreasonable positions.
-        self.eye_position = Some(Point3D::new(
-            notnan_or_zero(position.x),
-            notnan_or_zero(position.y),
-            notnan_or_zero(position.z),
-        ));
+        self.eye_position = Some(position.into().map(notnan_or_zero));
     }
 
     /// Sets the bounds within which the character may be placed is allowed.
@@ -91,12 +86,7 @@ impl Spawn {
     ///
     /// The results are unspecified but harmless if the direction is zero or NaN.
     pub fn set_look_direction(&mut self, direction: impl Into<FreeVector>) {
-        let direction = direction.into();
-        self.look_direction = Vector3D::new(
-            notnan_or_zero(direction.x),
-            notnan_or_zero(direction.y),
-            notnan_or_zero(direction.z),
-        );
+        self.look_direction = direction.into().map(notnan_or_zero);
     }
 
     /// Sets the starting inventory items.

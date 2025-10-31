@@ -507,11 +507,10 @@ impl BoxPart {
     }
 
     fn from_on_faces(on_faces: FaceMap<bool>) -> Self {
-        Self(vec3(
-            u8::from(on_faces.nx) + u8::from(on_faces.px) * 2,
-            u8::from(on_faces.ny) + u8::from(on_faces.py) * 2,
-            u8::from(on_faces.nz) + u8::from(on_faces.pz) * 2,
-        ))
+        Self(
+            on_faces.negatives().map(u8::from)
+                + on_faces.positives().map(|p: bool| u8::from(p) * 2),
+        )
     }
 
     /// Returns whether this part is a face, in the polyhedron sense
