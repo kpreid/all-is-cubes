@@ -409,11 +409,7 @@ impl Inner {
             let entity_path = &self.analysis_vertices_path;
             self.destination.log(
                 entity_path,
-                &convert_vertices(
-                    &self.analysis.vertices,
-                    0.18,
-                    rg::components::Color::from_rgb(80, 80, 255),
-                ),
+                &convert_vertices(&self.analysis.vertices, 0.18),
             )
         }
     }
@@ -454,32 +450,37 @@ impl Inner {
 }
 
 #[cfg(feature = "rerun")]
-fn convert_vertices(
-    vertices: &[AnalysisVertex],
-    box_half_size: f32,
-    color: rg::components::Color,
-) -> rg::archetypes::Boxes3D {
+fn convert_vertices(vertices: &[AnalysisVertex], box_half_size: f32) -> rg::archetypes::Boxes3D {
     // We use `Boxes3D` that are offset mostly into each octant, so that we can
     // view which interior volumes the vertex is indicating as filled.
 
-    // TODO: `av.transparent` is ignored but we should be showing it too.
-
+    let opaque_color = rg::components::Color::from_rgb(80, 80, 255);
+    let transparent_color = rg::components::Color::from_rgb(255, 255, 80);
     let offset = Vector3D::splat(box_half_size - 0.01);
 
+    // Iterator over all the boxes that should exist, which we clone and reuse to produce the
+    // parallel vectors for Rerun.
+    let which_boxes = vertices.iter().cartesian_product(Octant::ALL).filter_map(
+        move |(vertex, octant): (&AnalysisVertex, Octant)| {
+            vertex.renderable.get(octant).then_some((vertex, octant))
+        },
+    );
+
     rg::archetypes::Boxes3D::from_centers_and_half_sizes(
-        vertices.iter().flat_map(|av| {
-            Octant::ALL
-                .into_iter()
-                .filter(|&octant| av.opaque.get(octant))
-                .map(|octant| {
-                    rg::components::PoseTranslation3D(rg::convert_vec(
-                        av.position.to_vector().to_f32() + octant.reflect(offset),
-                    ))
-                })
+        which_boxes.clone().map(|(vertex, octant)| {
+            rg::components::PoseTranslation3D(rg::convert_vec(
+                vertex.position.to_vector().to_f32() + octant.reflect(offset),
+            ))
         }),
         [rg::components::HalfSize3D::splat(box_half_size)],
     )
-    .with_colors([color])
+    .with_colors(which_boxes.clone().map(|(vertex, octant)| {
+        if vertex.opaque.get(octant) {
+            opaque_color
+        } else {
+            transparent_color
+        }
+    }))
     .with_fill_mode(rg::components::FillMode::Solid)
 }
 
