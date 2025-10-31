@@ -42,10 +42,14 @@ fn COLLISION(ctx: Context<'_>) {
             }
 
             let range = footprint.z_range();
-            for i in 0..(range.len() as GridCoordinate) {
+            for i in 0..(range.end - range.start) {
                 m.set(
                     [4, 0, range.start + i],
-                    make_slab_txn(&mut txn, range.end - i, range.len().try_into().unwrap()),
+                    make_slab_txn(
+                        &mut txn,
+                        range.end - i,
+                        range_len(range).try_into().unwrap(),
+                    ),
                 )?;
             }
             Ok(())

@@ -1,6 +1,8 @@
 //! A space with miscellaneous demonstrations/tests of functionality.
 //! The individual buildings/exhibits are defined in [`DEMO_CITY_EXHIBITS`].
 
+use core::iter;
+
 use alloc::{sync::Arc, vec::Vec};
 
 use itertools::Itertools;
@@ -294,7 +296,7 @@ impl<'u> State<'u> {
             // compensate for terrain even though the planner doesn't
             tree_origin.y = terrain_height_function(tree_origin.lower_bounds().xz()).0;
 
-            let height = rng.random_range(1..8);
+            let height = rng.random_range(core::ops::Range::from(1..8));
             let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
                 nx: height / 3,
                 ny: 0,
@@ -331,6 +333,7 @@ impl<'u> State<'u> {
                 let perpendicular: GridVector =
                     Face6::PY.clockwise().transform(direction).normal_vector();
                 for distance in (CityPlanner::LAMP_POSITION_RADIUS..self.planner.city_radius)
+                    .into_iter()
                     .step_by(lamp_spacing)
                 {
                     for side_of_road in [-1, 1] {
@@ -713,7 +716,7 @@ fn place_roads_and_tunnels(
             .cast()
             .within(m.bounds(), false);
         let curb_y = vec3(0, 1, 0);
-        for (i, step) in (0i32..).zip(raycaster) {
+        for (i, step) in iter::zip(0i32.., raycaster) {
             let cube = step.cube_ahead();
             let road_not_ended = i < planner.city_radius;
 

@@ -1,8 +1,6 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use itertools::Itertools;
-
 use all_is_cubes::arcstr;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::euclid::Size3D;
@@ -133,7 +131,7 @@ where
     let region = space.bounds(); // TODO: compute individual room regions
 
     framework::Queue::from_iter(
-        Itertools::cartesian_product(0..theme.passes(), map.bounds().interior_iter()).map(
+        itertools::iproduct!(0..theme.passes(), map.bounds().interior_iter()).map(
             move |(pass, room_position)| {
                 let theme = theme.clone();
                 let map = map.clone();

@@ -1,8 +1,10 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::fmt;
+use core::iter;
 use core::num::NonZeroU32;
+use core::ops;
 use core::time::Duration;
-use core::{fmt, ops};
 
 use futures_channel::oneshot::Canceled;
 
@@ -120,9 +122,10 @@ where
                 // Note that the ..= range is necessary; `(old_len as BlockIndex)..` would overflow
                 // before it produces `BlockIndex::MAX`, as documented in
                 // <https://doc.rust-lang.org/std/ops/struct.RangeFrom.html>.
-                for (index, bd) in
-                    ((old_len as BlockIndex)..=BlockIndex::MAX).zip(&block_data[old_len..new_len])
-                {
+                for (index, bd) in iter::zip(
+                    (old_len as BlockIndex)..=BlockIndex::MAX,
+                    &block_data[old_len..new_len],
+                ) {
                     let evaluated = bd.evaluated();
 
                     // If the block has nontrivial voxels, generate a placeholder mesh,

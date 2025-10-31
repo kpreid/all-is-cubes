@@ -1,10 +1,10 @@
 use core::cmp::Ordering;
 use core::iter::FusedIterator;
-use core::ops::Range;
+use core::range::Range;
 
 use euclid::point2;
 
-use crate::math::{Cube, GridAab, GridCoordinate, GridPoint};
+use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, range_len};
 
 /// Iterator produced by [`GridAab::interior_iter()`].
 #[derive(Clone, Debug)]
@@ -36,11 +36,7 @@ impl GridIter {
     /// This may be larger than the union of produced cubes, but it will not be smaller.
     #[inline]
     pub fn bounds(&self) -> GridAab {
-        GridAab::from_ranges([
-            self.x_range.clone(),
-            self.y_range.clone(),
-            self.z_range.clone(),
-        ])
+        GridAab::from_ranges([self.x_range, self.y_range, self.z_range])
     }
 
     /// Returns whether the iterator will produce the given cube.
@@ -116,9 +112,9 @@ impl Iterator for GridIter {
                 (0, Some(0))
             }
             Ok(planes_remaining) => {
-                let rows_remaining = planes_remaining * self.y_range.len()
+                let rows_remaining = planes_remaining * range_len(self.y_range)
                     + usize::try_from((self.y_range.end - self.cube.y) - 1).unwrap_or(0);
-                let cubes_remaining = rows_remaining * self.z_range.len()
+                let cubes_remaining = rows_remaining * range_len(self.z_range)
                     + usize::try_from(self.z_range.end - self.cube.z).unwrap();
 
                 (cubes_remaining, Some(cubes_remaining))
@@ -152,8 +148,8 @@ impl Iterator for GridIter {
         // Now, we can perform iteration over the numeric ranges independently,
         // with no additional checks.
         for x in self.cube.x..self.x_range.end {
-            for y in self.y_range.clone() {
-                for z in self.z_range.clone() {
+            for y in self.y_range {
+                for z in self.z_range {
                     state = f(state, Cube::new(x, y, z));
                 }
             }
@@ -201,7 +197,7 @@ mod tests {
         // Exact at start
         assert_eq!(iter.size_hint(), (expected_size, Some(expected_size)));
 
-        for remaining in (1..=expected_size).rev() {
+        for remaining in (1..=expected_size).into_iter().rev() {
             assert_eq!(iter.size_hint(), (remaining, Some(remaining)));
             assert!(iter.next().is_some());
         }

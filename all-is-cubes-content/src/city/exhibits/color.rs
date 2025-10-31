@@ -125,7 +125,7 @@ fn COLOR_LIGHTS(ctx: Context<'_>) {
                     let transform = rotation.to_positive_octant_transform(wall_resolution_g)
                         * Gridgid::from_translation([4, 4, wall_resolution_g - 1]);
 
-                    for (i, swatch_block) in (0i32..).zip(colors_as_blocks.iter()) {
+                    for (i, swatch_block) in iter::zip(0i32.., colors_as_blocks.iter()) {
                         m.fill_uniform(
                             GridAab::from_lower_size(
                                 [i.rem_euclid(3) * 3, i.div_euclid(3) * 3, 0],

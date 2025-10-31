@@ -17,7 +17,7 @@ fn RESOLUTIONS(ctx: Context<'_>) {
     let pedestal = &demo_blocks[DemoBlocks::Pedestal];
 
     space.mutate(ctx.universe.read_ticket(), |m| {
-        for (i, &resolution) in (0i32..).zip([R1, R2, R4, R8, R16, R32].iter()) {
+        for (i, resolution) in iter::zip(0i32.., [R1, R2, R4, R8, R16, R32]) {
             let example = Block::builder()
                 .voxels_fn(resolution, |p| {
                     if p.x + p.y + p.z >= GridCoordinate::from(resolution) {

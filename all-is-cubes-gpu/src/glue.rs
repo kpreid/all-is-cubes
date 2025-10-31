@@ -3,12 +3,12 @@
 use alloc::alloc::Layout;
 use alloc::string::String;
 use core::marker::PhantomData;
-use core::ops::Range;
+use core::range::Range;
 
 use bytemuck::Pod;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size2D, Size3D};
-use all_is_cubes::math::{GridSize, Rgba};
+use all_is_cubes::math::{GridSize, Rgba, range_len};
 use all_is_cubes_mesh::IndexSlice;
 use num_traits::NumCast;
 
@@ -48,9 +48,9 @@ pub fn to_wgpu_index_format(slice: IndexSlice<'_>) -> wgpu::IndexFormat {
 }
 
 #[track_caller]
-pub fn to_wgpu_index_range(range: Range<usize>) -> Range<u32> {
+pub fn to_wgpu_index_range(range: Range<usize>) -> core::ops::Range<u32> {
     match (range.start.try_into(), range.end.try_into()) {
-        (Ok(start), Ok(end)) => start..end,
+        (Ok(start), Ok(end)) => core::ops::Range { start, end },
         _ => panic!("index range {range:?} too large for u32"),
     }
 }
@@ -153,12 +153,12 @@ pub fn write_part_of_slice_to_part_of_buffer(
     )..(byte_range.end.next_multiple_of(ALIGN));
     debug_assert!(mapping_range.start <= byte_range.start);
     debug_assert!(mapping_range.end >= byte_range.end);
-    debug_assert!(mapping_range.len().is_multiple_of(ALIGN));
+    debug_assert!(range_len(mapping_range).is_multiple_of(ALIGN));
 
     let mut staging = bwp.reborrow().write_buffer(
         destination,
         mapping_range.start as u64,
-        wgpu::BufferSize::new(mapping_range.len() as u64).unwrap(),
+        wgpu::BufferSize::new(range_len(mapping_range) as u64).unwrap(),
     );
 
     // Note that we must not overrun the end of `source`, so we can't just use `mapping_range`;
@@ -497,7 +497,7 @@ mod tests {
             (6u8, 12..16),
         ] {
             // Add new data to write.
-            source_data[range.clone()].fill(value);
+            source_data[range].fill(value);
 
             // Ask for the data to be written.
             let mut encoder =

@@ -5,9 +5,11 @@ pub(super) use alloc::sync::Arc;
 pub(super) use alloc::vec::Vec;
 pub(super) use core::convert::{TryFrom as _, identity};
 pub(super) use core::f64::consts::PI;
+pub(super) use core::iter;
 pub(super) use core::num::NonZero;
 
 pub(super) use exhaust::Exhaust as _;
+pub(super) use itertools::izip;
 pub(super) use rand::SeedableRng as _;
 
 pub(super) use all_is_cubes::arcstr::{self, literal};
@@ -25,8 +27,8 @@ pub(super) use all_is_cubes::linking::{BlockProvider, InGenError};
 pub(super) use all_is_cubes::listen;
 pub(super) use all_is_cubes::math::{
     Axis, Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridPoint, GridRotation,
-    GridSize, GridSizeCoord, GridVector, Gridgid, Rgb, Rgb01, Rgba, ZeroOne, rgb_const, rgb01,
-    rgba_const, zo32,
+    GridSize, GridSizeCoord, GridVector, Gridgid, Rgb, Rgb01, Rgba, ZeroOne, range_len, rgb_const,
+    rgb01, rgba_const, zo32,
 };
 pub(super) use all_is_cubes::op::Operation;
 pub(super) use all_is_cubes::space::{self, Space, SpacePhysics, SpaceTransaction};

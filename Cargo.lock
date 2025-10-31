@@ -358,6 +358,7 @@ dependencies = [
  "futures-util",
  "hashbrown 0.16.1",
  "indoc",
+ "itertools 0.14.0",
  "log",
  "macro_rules_attribute",
  "mutants 0.0.4",

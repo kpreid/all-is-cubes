@@ -2,7 +2,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 use core::mem;
-use core::ops::{self, Range};
+use core::ops;
+use core::range::Range;
 
 use all_is_cubes::chunking::ChunkPos;
 use all_is_cubes::euclid::{Point3D, Translation3D};

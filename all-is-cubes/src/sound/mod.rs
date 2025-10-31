@@ -63,7 +63,7 @@ impl SoundDef {
             self.frequency.into_inner() * core::f32::consts::TAU / sample_rate;
         let amplitude = self.amplitude.into_inner();
 
-        (0..sample_count).map(move |sample_index| {
+        (0..sample_count).into_iter().map(move |sample_index| {
             let time_in_fraction = sample_index as f32 / (sample_count - 1).max(1) as f32;
             let time_in_radians = sample_index as f32 * sample_index_to_radians;
 

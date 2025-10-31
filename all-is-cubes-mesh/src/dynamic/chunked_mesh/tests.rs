@@ -550,6 +550,7 @@ fn at_maximum_number_of_blocks() {
     );
 
     let blocks: Vec<Block> = (0..=BlockIndex::MAX)
+        .into_iter()
         .map(|i| {
             // These blocks must all be distinct.
             // We are not using `make_some_blocks()` because that would construct a large array
@@ -564,8 +565,11 @@ fn at_maximum_number_of_blocks() {
     let space = Space::builder(bounds)
         .palette_and_contents(
             blocks,
-            Vol::from_elements(bounds, (0..=BlockIndex::MAX).collect::<Box<[BlockIndex]>>())
-                .unwrap(),
+            Vol::from_elements(
+                bounds,
+                (0..=BlockIndex::MAX).into_iter().collect::<Box<[BlockIndex]>>(),
+            )
+            .unwrap(),
             None,
         )
         .unwrap()

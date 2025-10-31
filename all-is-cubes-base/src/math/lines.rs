@@ -67,7 +67,7 @@ impl From<FreePoint> for Vertex {
 #[doc(hidden)] // for implementors’ use; not sure if good API
 #[allow(clippy::missing_inline_in_public_items)] // already generic
 pub fn line_loop<const N: usize>(vertices: [Vertex; N]) -> impl Iterator<Item = [Vertex; 2]> {
-    (0..N).map(move |i| [vertices[i], vertices[(i + 1).rem_euclid(N)]])
+    (0..N).into_iter().map(move |i| [vertices[i], vertices[(i + 1).rem_euclid(N)]])
 }
 
 /// Add color to all vertices that don't have it.

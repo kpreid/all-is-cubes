@@ -57,7 +57,7 @@ fn UI_BLOCKS(ctx: Context<'_>) {
         ))
         .read_ticket(ctx.universe.read_ticket())
         .build_and_mutate(|m| {
-            for (index, block) in (0i32..).zip(all_blocks) {
+            for (index, block) in iter::zip(0i32.., all_blocks) {
                 m.set(
                     [
                         index.rem_euclid(row_length),

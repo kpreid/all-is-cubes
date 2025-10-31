@@ -150,6 +150,18 @@ pub fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
     }
 }
 
+/// Implements the `len()` that `core::ops::Range*` has and `core::range::Range*` does not.
+///
+/// This function is trivial, but intended to mark the places where we are using legacy
+/// ranges for this reason only, and to make it one function call instead of two.
+#[inline]
+pub fn range_len<T>(range: core::range::Range<T>) -> usize
+where
+    core::ops::Range<T>: ExactSizeIterator,
+{
+    core::ops::Range::from(range).len()
+}
+
 /// Returns the length of the vector in [Chebyshev distance].
 ///
 /// Returns the maximum length of the vector’s projections onto all 3 coordinate axes.

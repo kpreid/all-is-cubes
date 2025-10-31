@@ -206,7 +206,7 @@ impl RerunImageExport {
                 });
                 render_pass.set_pipeline(&pipelines.rerun_copy_pipeline);
                 render_pass.set_bind_group(0, copy_bind_group, &[]);
-                render_pass.draw(0..3, 0..1);
+                render_pass.draw((0..3).into(), (0..1).into());
             }
 
             queue.submit([encoder.finish()]);

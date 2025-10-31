@@ -46,27 +46,29 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
     // `OrthoCamera` to be more aware of its alignment with the block grid.
 
     #[cfg(feature = "auto-threads")]
-    let (data, info_sum): (Vec<Pixel>, raytracer::rayon_util::ParExtSum<RaytraceInfo>) = (0
-        ..camera.image_size.height)
-        .into_par_iter()
-        .flat_map(|y| {
-            (0..camera.image_size.width)
-                .into_par_iter()
-                .map_with(Cache::default(), move |cache: &mut Cache, x| {
-                    trace_one_pixel_with_cache(camera, rt, cache, x, y)
-                })
-        })
-        .unzip();
+    let (data, info_sum): (Vec<Pixel>, raytracer::rayon_util::ParExtSum<RaytraceInfo>) =
+        core::ops::Range::from(0..camera.image_size.height)
+            .into_par_iter()
+            .flat_map(|y| {
+                core::ops::Range::from(0..camera.image_size.width)
+                    .into_par_iter()
+                    .map_with(Cache::default(), move |cache: &mut Cache, x| {
+                        trace_one_pixel_with_cache(camera, rt, cache, x, y)
+                    })
+            })
+            .unzip();
 
     #[cfg(feature = "auto-threads")]
     let info = info_sum.result();
 
     #[cfg(not(feature = "auto-threads"))]
     let (data, info): (Vec<Pixel>, RaytraceInfo) = (0..camera.image_size.height)
+        .into_iter()
         .flat_map(|y| {
             let mut cache = Cache::default();
 
             (0..camera.image_size.width)
+                .into_iter()
                 .map(move |x| trace_one_pixel_with_cache(camera, rt, &mut cache, x, y))
         })
         .collect();

@@ -270,7 +270,6 @@ impl GridMatrix {
         const INVERSE_EPSILON: FreeCoordinate = 0.25 / (GridCoordinate::MAX as FreeCoordinate);
         fn try_round(v: [FreeCoordinate; 4], expected_w: FreeCoordinate) -> Option<GridVector> {
             let mut result = Vector3D::zero();
-            #[expect(clippy::needless_range_loop)]
             for axis in 0..4 {
                 let rounded = v[axis].round();
                 let remainder = v[axis] - rounded;
@@ -375,12 +374,12 @@ mod tests {
     use rand_xoshiro::Xoshiro256Plus;
 
     fn random_grid_matrix(mut rng: impl Rng) -> GridMatrix {
-        let mut r = || rng.random_range(-100..=100);
+        let mut r = || rng.random_range(ops::RangeInclusive::from(-100..=100));
         GridMatrix::new(r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r())
     }
 
     fn random_possibly_invertible_matrix(mut rng: impl Rng) -> GridMatrix {
-        let mut r = |n: GridCoordinate| rng.random_range(-n..=n);
+        let mut r = |n: GridCoordinate| rng.random_range(ops::RangeInclusive::from(-n..=n));
         GridMatrix::new(
             r(1),
             r(1),

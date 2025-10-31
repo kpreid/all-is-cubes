@@ -202,7 +202,7 @@ impl Aab {
         let upper = self.upper_bounds;
         // TODO: replacing this with iterating Octant + corner_point() produces larger code;
         // investigate if there is something that's net better instead of net worse
-        (0..8).map(move |i| {
+        (0..8u8).into_iter().map(move |i| {
             Point3D::new(
                 if i & 1 == 0 { lower.x } else { upper.x },
                 if i & 2 == 0 { lower.y } else { upper.y },
@@ -286,11 +286,14 @@ impl Aab {
         exported_private_dependencies,
         reason = "Rng is public in rand, which is itself a public dep"
     )]
+    #[rustfmt::skip]
     pub fn random_point(self, rng: &mut impl rand::Rng) -> FreePoint {
+        // rand doesn't support core::range yet
+        use core::ops::RangeInclusive;
         FreePoint::new(
-            rng.random_range(self.lower_bounds.x..=self.upper_bounds.x),
-            rng.random_range(self.lower_bounds.y..=self.upper_bounds.y),
-            rng.random_range(self.lower_bounds.z..=self.upper_bounds.z),
+            rng.random_range(RangeInclusive::new(self.lower_bounds.x, self.upper_bounds.x)),
+            rng.random_range(RangeInclusive::new(self.lower_bounds.y, self.upper_bounds.y)),
+            rng.random_range(RangeInclusive::new(self.lower_bounds.z, self.upper_bounds.z)),
         )
     }
 
@@ -647,6 +650,7 @@ mod tests {
     fn leading_corner_consistency() {
         let aab = Aab::new(-1.1, 2.2, -3.3, 4.4, -5.5, 6.6);
         for direction in (-1..=1)
+            .into_iter()
             .zip(-1..=1)
             .zip(-1..=1)
             .map(|((x, y), z)| Vector3D::new(x, y, z).map(FreeCoordinate::from))

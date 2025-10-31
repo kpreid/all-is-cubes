@@ -384,7 +384,8 @@ fn no_passing_through_blocks() {
         let random_velocity = Vector3D::<f32 /* dummy */, _>::zero().map(|_| {
             // Generate vector components which are not too close to zero
             // to finish the test promptly
-            rng.random_range(0.04..=1.) * [-1., 1.].choose(&mut rng).unwrap()
+            rng.random_range(core::ops::RangeInclusive::from(0.04..=1.))
+                * [-1., 1.].choose(&mut rng).unwrap()
         });
         if random_velocity.length() < 0.05 {
             // Too slow

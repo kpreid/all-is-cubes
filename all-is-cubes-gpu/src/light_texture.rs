@@ -8,22 +8,19 @@ use rayon::{
     slice::ParallelSliceMut as _,
 };
 
+use all_is_cubes::euclid::{Box3D, Point3D, Size3D, Vector3D, vec3};
 use all_is_cubes::math::{
     Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord,
-    PositiveSign,
+    PositiveSign, VectorOps as _,
 };
 use all_is_cubes::space;
-use all_is_cubes::{
-    euclid::{Box3D, Point3D, Size3D, Vector3D, vec3},
-    math::VectorOps,
-};
 use all_is_cubes_render::camera::Camera;
 
 use crate::common::Identified;
 use crate::glue::{extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab};
 
 type Texel = [u8; LightTexture::COMPONENTS];
-type Range = std::ops::Range<GridCoordinate>;
+type Range = std::range::Range<GridCoordinate>;
 
 /// Kludge to account for chunks being more visible than expected when fog is disabled and
 /// visibility is controlled by the far clipping plane instead of the fog.
@@ -341,7 +338,7 @@ impl LightTexture {
                     self.copy_contiguous_region(
                         queue,
                         space,
-                        GridAab::from_ranges([x_range.clone(), y_range.clone(), z_range]),
+                        GridAab::from_ranges([x_range, y_range, z_range]),
                         buffer,
                     );
                 });
@@ -366,24 +363,26 @@ impl LightTexture {
         buffer.clear();
         cfg_select! {
             feature = "auto-threads" => {
+                use all_is_cubes::math::range_len;
+
                 buffer.resize(volume, [0; Self::COMPONENTS]);
 
-                let x_chunk_size = region.x_range().len();
-                let xy_chunk_size = x_chunk_size * region.y_range().len();
-                region
-                    .z_range()
+                let x_chunk_size = range_len(region.x_range());
+                let xy_chunk_size = x_chunk_size * range_len(region.y_range());
+                core::ops::Range::from(region
+                    .z_range())
                     .into_par_iter()
                     .zip(buffer.par_chunks_mut(xy_chunk_size))
                     .for_each(|(z, xy_chunk)| {
-                        region
-                        .y_range()
+                        core::ops::Range::from(region
+                        .y_range())
                         .into_par_iter()
                         .zip(xy_chunk.par_chunks_mut(x_chunk_size))
                         .for_each(|(y, x_chunk)| {
                             // Not parallelizing this deepest level because in the typical case,
                             // we're updating either a volume or a plane, which will have at least
                             // one of a long Y axis or a long Z axis.
-                            for (x, light_value) in region.x_range().zip(x_chunk.iter_mut()) {
+                            for (x, light_value) in core::iter::zip(region.x_range(), x_chunk.iter_mut()) {
                                 *light_value = space.get_lighting([x, y, z]).as_texel();
                             }
                         });
@@ -608,7 +607,7 @@ mod tests {
         // for this.
         let step = 1. / 8.;
         // note: view distance is clamped in graphics options to be a minimum of 1.0
-        for view_distance in (8..100).map(|i| ps64(f64::from(i) * step)) {
+        for view_distance in (8..100).into_iter().map(|i| ps64(f64::from(i) * step)) {
             let texture_size =
                 LightTexture::choose_size(&limits, irrelevant_space_bounds, view_distance);
 
@@ -616,7 +615,7 @@ mod tests {
             options.view_distance = view_distance;
             camera.set_options(options);
 
-            for position in (0..100).map(|i| f64::from(i) * step) {
+            for position in (0..100).into_iter().map(|i| f64::from(i) * step) {
                 eprintln!("{view_distance} {position}");
                 camera.set_view_transform(ViewTransform::from_translation(vec3(position, 0., 0.)));
                 let visible_bounds = visible_light_volume(irrelevant_space_bounds, &camera);

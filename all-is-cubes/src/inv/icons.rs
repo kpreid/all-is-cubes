@@ -115,7 +115,7 @@ impl Icons {
                     let dots = [block::from_color!(Rgba::BLACK), AIR];
                     let dots = move |y: GridCoordinate| dots[y.rem_euclid(2) as usize].clone();
                     fn ybrush(mut f: impl FnMut(GridCoordinate) -> Block) -> VoxelBrush<'static> {
-                        VoxelBrush::new((0..16).map(|y| ([0, y, 0], f(y))))
+                        VoxelBrush::new((0..16).into_iter().map(|y| ([0, y, 0], f(y))))
                     }
 
                     block_from_image(

@@ -1059,7 +1059,9 @@ mod tests {
                 Aab::new(-2., 2., -2., 2., -2., 2.).random_point(&mut rng),
                 Aab::new(-1., 1., -1., 1., -1., 1.).random_point(&mut rng).to_vector(),
             );
-            let step = aab_raycast(moving_aab, ray, false).nth(rng.random_range(1..10)).unwrap();
+            let step = aab_raycast(moving_aab, ray, false)
+                .nth(rng.random_range(core::ops::Range::from(1..10)))
+                .unwrap();
             let axis = step.face().axis().expect("should have an axis");
             let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?
             let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vector());

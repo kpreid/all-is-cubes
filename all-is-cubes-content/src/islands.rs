@@ -51,6 +51,8 @@ pub(crate) async fn islands(
 
         framework::Queue::from_iter(island_grid.interior_iter().filter_map(
             |island_pos| -> Option<framework::Task> {
+                use core::ops::RangeInclusive as Ri;
+
                 let cell_bounds = GridAab::from_lower_size(
                     (island_pos.lower_bounds().to_vector() * island_stride).to_point(),
                     Size3D::splat(island_stride).to_u32(),
@@ -64,14 +66,14 @@ pub(crate) async fn islands(
                 let cell_center = cell_bounds.center().to_i32();
                 let occupied_bounds = GridAab::from_lower_upper(
                     [
-                        rng.random_range(cell_bounds.lower_bounds().x..=cell_center.x),
-                        rng.random_range(cell_bounds.lower_bounds().y..=cell_center.y),
-                        rng.random_range(cell_bounds.lower_bounds().z..=cell_center.z),
+                        rng.random_range(Ri::from(cell_bounds.lower_bounds().x..=cell_center.x)),
+                        rng.random_range(Ri::from(cell_bounds.lower_bounds().y..=cell_center.y)),
+                        rng.random_range(Ri::from(cell_bounds.lower_bounds().z..=cell_center.z)),
                     ],
                     [
-                        rng.random_range(cell_center.x..=cell_bounds.upper_bounds().x),
-                        rng.random_range(cell_center.y..=cell_bounds.upper_bounds().y),
-                        rng.random_range(cell_center.z..=cell_bounds.upper_bounds().z),
+                        rng.random_range(Ri::from(cell_center.x..=cell_bounds.upper_bounds().x)),
+                        rng.random_range(Ri::from(cell_center.y..=cell_bounds.upper_bounds().y)),
+                        rng.random_range(Ri::from(cell_center.z..=cell_bounds.upper_bounds().z)),
                     ],
                 );
 

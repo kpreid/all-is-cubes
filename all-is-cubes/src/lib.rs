@@ -11,6 +11,7 @@
 #![feature(macro_attr)]
 #![feature(negative_impls)]
 #![feature(never_type)]
+#![feature(new_range, new_range_api)]
 #![feature(try_blocks)]
 
 //! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks

@@ -646,9 +646,10 @@ fn push_out(body: &mut Body, space: &space::Read<'_>) -> Option<FreeVector> {
     if colliding {
         let exit_backwards: FreeVector = -body.velocity.map(NotNan::into_inner).cast_unit(); // don't care about magnitude
         let shortest_push_out = (-1..=1)
+            .into_iter()
             .flat_map(move |dx| {
-                (-1..=1).flat_map(move |dy| {
-                    (-1..=1).map(move |dz| {
+                (-1..=1).into_iter().flat_map(move |dy| {
+                    (-1..=1).into_iter().map(move |dz| {
                         let direction = Vector3D::new(dx, dy, dz).map(FreeCoordinate::from);
                         if direction == Vector3D::zero() {
                             // We've got an extra case, and an item to delete from the combinations,

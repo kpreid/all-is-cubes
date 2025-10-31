@@ -57,6 +57,7 @@ impl<const N: usize> Pipelines<N> {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some(&format!("{label} mip_ping::Pipelines::bind_group_layout")),
             entries: &(0..N * 2 + 1)
+                .into_iter()
                 .map(|i| {
                     let binding = u32::try_from(i).unwrap();
                     if (0..N).contains(&i) {
@@ -193,6 +194,7 @@ impl<const N: usize> Pipelines<N> {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &self.bind_group_layout,
             entries: &(0..N * 2 + 1)
+                .into_iter()
                 .map(|i| {
                     let binding = u32::try_from(i).unwrap();
                     if (0..N).contains(&i) {
@@ -329,7 +331,7 @@ impl<const N: usize> Texture<N> {
                 encoder.set_pipeline(&pipelines.downsample_pipeline);
                 encoder.set_bind_group(0, &input_bind_group, &[]);
                 // Using the instance ID to communicate which downsample stage this is.
-                encoder.draw(0..3, output_mip..(output_mip + 1));
+                encoder.draw((0..3).into(), (output_mip..(output_mip + 1)).into());
 
                 let pass_label = format!("{label} rep {repetition} downsample {output_mip}");
                 let render_bundle = encoder.finish(&wgpu::RenderBundleDescriptor {
@@ -348,7 +350,7 @@ impl<const N: usize> Texture<N> {
             }
 
             // Generate upsampling stages.
-            for output_mip in (0..mip_level_count - 1).rev() {
+            for output_mip in (0..mip_level_count - 1).into_iter().rev() {
                 let input_mip = output_mip + 1;
                 let higher_mip = output_mip.checked_sub(1).unwrap_or(input_mip);
                 let input_bind_group = pipelines.bind_group(
@@ -374,7 +376,7 @@ impl<const N: usize> Texture<N> {
                 encoder.set_pipeline(&pipelines.upsample_pipeline);
                 encoder.set_bind_group(0, &input_bind_group, &[]);
                 // Using the instance ID to communicate which upsample stage this is.
-                encoder.draw(0..3, output_mip..(output_mip + 1));
+                encoder.draw((0..3).into(), (output_mip..(output_mip + 1)).into());
 
                 let pass_label = format!("{label} rep {repetition} upsample {output_mip}");
                 let render_bundle = encoder.finish(&wgpu::RenderBundleDescriptor {

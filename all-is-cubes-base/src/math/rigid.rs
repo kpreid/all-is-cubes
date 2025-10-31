@@ -212,7 +212,7 @@ mod tests {
         Gridgid {
             rotation: *GridRotation::ALL.choose(&mut rng).unwrap(),
             translation: {
-                let mut r = || rng.random_range(-100..=100);
+                let mut r = || rng.random_range(core::ops::RangeInclusive::from(-100..=100));
                 GridVector::new(r(), r(), r())
             },
         }

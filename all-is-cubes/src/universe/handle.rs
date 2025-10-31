@@ -787,32 +787,34 @@ mod arbitrary_handle {
         /// Do not call this! It will panic under most circumstances.
         /// Because [`Handle`]s belong to a [`Universe`], they must be constructed together.
         fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-            Ok(match u.int_in_range(0..=2)? {
-                0 => Handle::new_gone(Name::arbitrary(u)?),
-                1 => {
-                    let name = Name::arbitrary(u)?;
-                    let value = T::arbitrary(u)?;
+            Ok(
+                match u.int_in_range(core::ops::RangeInclusive::from(0..=2))? {
+                    0 => Handle::new_gone(Name::arbitrary(u)?),
+                    1 => {
+                        let name = Name::arbitrary(u)?;
+                        let value = T::arbitrary(u)?;
 
-                    tl::get_from_context(tl::Purpose::Arbitrary, |context| {
-                        context.universe.insert(name.clone(), value).unwrap_or_else(|_| {
-                            // TODO: insert anonymous if picking an arbitrary name failed;
-                            // right now we can't recover ownership of the value!
-                            Handle::new_gone(name)
+                        tl::get_from_context(tl::Purpose::Arbitrary, |context| {
+                            context.universe.insert(name.clone(), value).unwrap_or_else(|_| {
+                                // TODO: insert anonymous if picking an arbitrary name failed;
+                                // right now we can't recover ownership of the value!
+                                Handle::new_gone(name)
+                            })
                         })
+                        .unwrap_or_else(no_context)
+                    }
+                    _ => tl::get_from_context(tl::Purpose::Arbitrary, |context| {
+                        // must collect to get an ExactSizeIterator
+                        let handles: Vec<Handle<T>> = context
+                            .universe
+                            .iter_by_type::<T>()
+                            .map(|(_name, handle)| handle)
+                            .collect();
+                        u.choose_iter(handles.into_iter())
                     })
-                    .unwrap_or_else(no_context)
-                }
-                _ => tl::get_from_context(tl::Purpose::Arbitrary, |context| {
-                    // must collect to get an ExactSizeIterator
-                    let handles: Vec<Handle<T>> = context
-                        .universe
-                        .iter_by_type::<T>()
-                        .map(|(_name, handle)| handle)
-                        .collect();
-                    u.choose_iter(handles.into_iter())
-                })
-                .unwrap_or_else(no_context)?,
-            })
+                    .unwrap_or_else(no_context)?,
+                },
+            )
         }
 
         fn size_hint(depth: usize) -> (usize, Option<usize>) {
