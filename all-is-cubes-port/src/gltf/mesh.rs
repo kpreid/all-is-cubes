@@ -7,6 +7,7 @@ use gltf_json::buffer::Stride;
 use gltf_json::validation::Checked::Valid;
 use gltf_json::validation::USize64;
 
+use all_is_cubes::math::range_len;
 use all_is_cubes_mesh::{IndexSlice, MeshTypes, SpaceMesh};
 
 use crate::gltf::glue::create_accessor;
@@ -146,7 +147,7 @@ where
                                 byte_offset: Some(USize64::from(
                                     index_range.start * index_type.size(),
                                 )),
-                                count: USize64::from(index_range.len()),
+                                count: USize64::from(range_len(index_range)),
                                 component_type: Valid(gltf_json::accessor::GenericComponentType(
                                     index_type,
                                 )),

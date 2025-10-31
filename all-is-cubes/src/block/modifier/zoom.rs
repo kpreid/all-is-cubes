@@ -156,13 +156,13 @@ impl universe::VisitHandles for Zoom {
 impl<'a> arbitrary::Arbitrary<'a> for Zoom {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         let scale = u.arbitrary()?;
-        let max_offset = GridCoordinate::from(scale) - 1;
+        let offset_range = 0..=(GridCoordinate::from(scale) - 1);
         Ok(Self::new(
             scale,
             GridPoint::new(
-                u.int_in_range(0..=max_offset)?,
-                u.int_in_range(0..=max_offset)?,
-                u.int_in_range(0..=max_offset)?,
+                u.int_in_range(core::ops::RangeInclusive::from(offset_range))?,
+                u.int_in_range(core::ops::RangeInclusive::from(offset_range))?,
+                u.int_in_range(core::ops::RangeInclusive::from(offset_range))?,
             ),
         ))
     }

@@ -1,3 +1,5 @@
+use core::iter;
+
 use all_is_cubes::character::Spawn;
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::linking::InGenError;
@@ -119,7 +121,7 @@ pub async fn build_dungeon<Room, ThemeT: Theme<Room>>(
     progress: YieldProgress,
 ) -> Result<(), InGenError> {
     let passes = theme.passes();
-    for (pass, mut progress) in (0..passes).zip(progress.split_evenly(passes)) {
+    for (pass, mut progress) in iter::zip(0..passes, progress.split_evenly(passes)) {
         progress.set_label(format_args!("pass {pass}/{passes}", pass = pass + 1));
         progress.progress(0.0).await;
         for (room_position, mut progress) in
