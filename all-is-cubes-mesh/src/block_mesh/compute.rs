@@ -247,6 +247,9 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 Face6::PY => Face6::PZ,
                 Face6::PZ => Face6::PY,
             },
+            // TODO(planar_new): need to do two passes, one transparent and one opaque
+            /* transparent: */
+            false,
         );
 
         // Rotate the voxel array's extent into our local coordinate system, so we can find
@@ -390,6 +393,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                         // Filter to vertices on this layer...
                         voxel_transform_inverse.transform_point(v.position).z == layer
                             // ...that have some content on this face and are not purely opposite
+                            // TODO(planar_new): need to check opaque vs transparent here and
+                            // make separate vertices for separate passes
                             && (v.renderable & interior_side_octant_mask) != OctantMask::NONE
                     })
                 };
@@ -438,7 +443,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                 // analysis vertex per face.
                                 let acceptable_voxel = Cube::from(
                                     av.position
-                                        + (av.opaque & interior_side_octant_mask)
+                                        + (av.renderable & interior_side_octant_mask)
                                             .first()
                                             .unwrap_or_else(|| {
                                                 panic!(

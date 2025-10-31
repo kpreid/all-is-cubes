@@ -126,6 +126,12 @@ pub(super) struct PtBasis {
     /// If the coordinate system established by the sweep is mirrored (which it is, half the time),
     /// then this is true to tell us to flip the winding order.
     pub left_handed: bool,
+
+    /// Selects mode between:
+    ///
+    /// * `false`: triangulate opaque surfaces; ignore transparent ones.
+    /// * `true`: triangulate transparent surfaces; use opaque ones as occlusion only.
+    pub transparent: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -421,9 +427,15 @@ impl PtBasis {
         sweep_direction: Face6::PX,
         perpendicular_direction: Face6::PX,
         left_handed: false,
+        transparent: false,
     };
 
-    pub const fn new(face: Face6, sweep_direction: Face6, perpendicular_direction: Face6) -> Self {
+    pub const fn new(
+        face: Face6,
+        sweep_direction: Face6,
+        perpendicular_direction: Face6,
+        transparent: bool,
+    ) -> Self {
         let left_handed =
             GridRotation::try_from_basis_const([face, sweep_direction, perpendicular_direction])
                 .expect("directions provided to PtBasis must be orthogonal")
@@ -434,6 +446,7 @@ impl PtBasis {
             sweep_direction,
             perpendicular_direction,
             left_handed,
+            transparent,
         }
     }
 
@@ -454,12 +467,25 @@ impl PtBasis {
         forward_in_sweep: bool,
         forward_in_perpendicular: bool,
     ) -> bool {
+        // Compute the surfaces adjacent to this vertex that this execution should actually render.
+        let should_render = (if self.transparent {
+                // Find transparent voxels only (neither invisible nor opaque)
+                vertex.renderable & !vertex.opaque
+            } else {
+                vertex.opaque
+            })
+            // Mask off all voxels whose surface would be occluded by opaque surfaces,
+            // and also the voxels that are above rather than below the surface.
+            & (!vertex.opaque).shift(self.face.opposite());
+
+        // Out of those surfaces, check the single quadrant we are being asked about in this
+        // particular call.
+        //
         // Shift all the unwanted bits out (by shifting in the opposite direction to the one we
         // are testing), then check if the wanted one is left.
         // (This always picks one octant, but in order to express this in terms of a `math::Octant`
         // we'd have to prove the 3 faces are orthogonal to each other.)
-        vertex
-            .renderable
+        should_render
             .shift(self.face)
             .shift(if forward_in_sweep {
                 -self.sweep_direction
@@ -533,7 +559,7 @@ mod tests {
     use alloc::vec::Vec;
 
     const TEST_BASIS: PtBasis = {
-        let b = PtBasis::new(Face6::PZ, Face6::PX, Face6::PY);
+        let b = PtBasis::new(Face6::PZ, Face6::PX, Face6::PY, false);
         assert!(!b.left_handed); // TODO: could use tests that *are* left-handed
         b
     };
