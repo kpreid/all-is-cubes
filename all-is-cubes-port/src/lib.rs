@@ -7,6 +7,7 @@
 #![move_size_limit = "5000"]
 #![feature(macro_attr)]
 #![feature(never_type)]
+#![feature(new_range, new_range_api)]
 
 //! Data import and export between [`all_is_cubes`] types and other data formats.
 //!

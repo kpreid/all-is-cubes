@@ -124,7 +124,9 @@ pub(crate) fn make_tree(
     let not_on_surface = bounds.shrink(FaceMap::splat(1)).unwrap_or(GridAab::ORIGIN_EMPTY);
 
     let max_leaves_height_for_size = (i32::try_from(bounds.size().height).unwrap_or(1) / 3) + 1;
-    let leaves_height = rng.random_range(1..=max_leaves_height_for_size);
+    let leaves_height = rng.random_range(core::ops::RangeInclusive::from(
+        1..=max_leaves_height_for_size,
+    ));
 
     // Generate foliage (before the branches that lead to it)
     let mut leaves_missing_branches = Vec::new();
@@ -144,7 +146,7 @@ pub(crate) fn make_tree(
                 max_growth * (1.0 - (distance_from_top / (leaves_height as f32 - 0.99)));
 
             *l = Some(TreeGrowth::from_radius(
-                rng.random_range(min_growth..=8.5).floor() as i32,
+                rng.random_range(core::ops::RangeInclusive::from(min_growth..=8.5)).floor() as i32,
             ));
             leaves_missing_branches.push(cube);
         }

@@ -457,7 +457,7 @@ impl PlanarTriangulator {
         let mut range_to_check_next_pass = 0..self.new_frontier.len();
 
         while !range_to_check_next_pass.is_empty() {
-            let mut range_to_iterate_now = range_to_check_next_pass.clone();
+            let mut range_to_iterate_now = range_to_check_next_pass;
 
             // Reset to inverted empty, for min/max accumulation of what the next pass should check
             range_to_check_next_pass = usize::MAX..0;
