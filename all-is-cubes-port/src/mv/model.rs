@@ -4,7 +4,7 @@ use all_is_cubes::block::{Block, EvaluatedBlock, Evoxel};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
 use all_is_cubes::euclid::{Point3D, vec3};
-use all_is_cubes::math::{Cube, GridAab, Gridgid, OpacityCategory};
+use all_is_cubes::math::{Cube, GridAab, Gridgid, OpacityCategory, range_len};
 
 use all_is_cubes::space::{self, Space};
 #[cfg(feature = "export")]
@@ -51,7 +51,7 @@ pub(crate) fn to_space(
         } else {
             let mut p = space::SpacePhysics::default();
             p.light = space::LightPhysics::Rays {
-                maximum_distance: u8::try_from(bounds.y_range().len()).unwrap_or(u8::MAX),
+                maximum_distance: u8::try_from(range_len(bounds.y_range())).unwrap_or(u8::MAX),
             };
             p
         })

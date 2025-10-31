@@ -85,7 +85,7 @@ fn vertices_from_ascii_art<const W: usize, const H: usize>(
 ) -> Vec<planar::Vertex> {
     let mut output = Vec::new();
     for x in 0..W {
-        for y in (0..H).rev() {
+        for y in (0..H).into_iter().rev() {
             let get = |dx, dy| {
                 let neighbor_x = x.wrapping_add_signed(dx);
                 let neighbor_y = y.wrapping_add_signed(dy);

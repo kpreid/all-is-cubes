@@ -381,11 +381,11 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         let viewport = camera.viewport();
         let viewport_size = viewport.framebuffer_size.to_usize();
-        let output_iterator = (0..viewport_size.height)
+        let output_iterator = core::ops::Range::from(0..viewport_size.height)
             .into_par_iter()
             .map(move |ych| {
                 let y = viewport.normalize_fb_y(ych);
-                (0..viewport_size.width)
+                core::ops::Range::from(0..viewport_size.width)
                     .into_par_iter()
                     .map(move |xch| {
                         let x = viewport.normalize_fb_x(xch);

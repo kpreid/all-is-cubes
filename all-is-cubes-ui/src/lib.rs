@@ -5,6 +5,7 @@
 #![move_size_limit = "2500"] // TODO: look at `Session` size
 #![feature(macro_attr)]
 #![feature(never_type)]
+#![feature(new_range, new_range_api)]
 
 //! User interface framework and screens for [`all_is_cubes`].
 //!

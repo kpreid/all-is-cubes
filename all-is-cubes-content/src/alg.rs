@@ -3,6 +3,8 @@
 //! They are gathered in this module to encourage noting similarities rather than writing
 //! near-duplicate code.
 
+use core::iter;
+
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
@@ -332,7 +334,7 @@ where
     B: Into<alloc::borrow::Cow<'b, Block>>,
 {
     let origin = origin.into();
-    for (y, block) in (0..).zip(blocks) {
+    for (y, block) in iter::zip(0.., blocks) {
         m.set(origin + GridVector::new(0, y, 0), block)?;
     }
     Ok(())
