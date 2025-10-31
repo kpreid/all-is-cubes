@@ -25,8 +25,8 @@ fn MAKE_SOME_BLOCKS(ctx: Context<'_>) {
     let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [3, ROWS, ROWS]))
         .read_ticket(ctx.universe.read_ticket())
         .build_and_mutate(|m| {
-            for (y, (blocks_a, blocks_v)) in (0i32..).zip(rows) {
-                for (h, (block_a, block_v)) in (0i32..).zip(blocks_a.into_iter().zip(blocks_v)) {
+            for (y, (blocks_a, blocks_v)) in iter::zip(0i32.., rows) {
+                for (h, block_a, block_v) in izip!(0i32.., blocks_a, blocks_v) {
                     m.set([0, y, h], block_a)?;
                     m.set([2, y, h], block_v)?;
                 }

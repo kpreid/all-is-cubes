@@ -6,7 +6,6 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::mem;
-use core::ops::Range;
 use core::sync::atomic;
 use core::time::Duration;
 use std::sync::{Mutex, PoisonError, mpsc};
@@ -18,7 +17,7 @@ use all_is_cubes::content::palette;
 use all_is_cubes::listen::{self, Listen as _, Listener};
 use all_is_cubes::math::{
     Face6, FreeCoordinate, GridCoordinate, GridPoint, GridSize, PositiveSign, Rgb, Rgba, ZeroOne,
-    lines::Wireframe as _,
+    lines::Wireframe as _, range_len,
 };
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
@@ -518,7 +517,7 @@ impl SpaceRenderer {
         // Helper for the common logic of opaque + transparent drawing of a single instance
         // that's a chunk mesh (i.e. instance range is length 1).
         fn draw_chunk_instance<'pass>(
-            index_range: Range<usize>,
+            index_range: std::range::Range<usize>,
             render_pass: &mut wgpu::RenderPass<'pass>,
             buffers: &'pass ChunkBuffers,
             instance_buffer_writer: &mut MapVec<'_, WgpuInstanceData>,
@@ -549,8 +548,12 @@ impl SpaceRenderer {
                     return;
                 }
 
-                render_pass.draw_indexed(to_wgpu_index_range(index_range.clone()), 0, id..(id + 1));
-                *triangles_drawn += index_range.len() / 3;
+                render_pass.draw_indexed(
+                    to_wgpu_index_range(index_range),
+                    0,
+                    (id..(id + 1)).into(),
+                );
+                *triangles_drawn += range_len(index_range) / 3;
             }
         }
 
@@ -560,7 +563,7 @@ impl SpaceRenderer {
             // smarter depth test setup.
             render_pass.set_pipeline(&pipelines.skybox_render_pipeline);
             // No vertex buffer; shader generates a fullscreen triangle.
-            render_pass.draw(0..3, 0..1);
+            render_pass.draw((0..3).into(), (0..1).into());
         }
 
         if camera.options().debug_pixel_cost {
@@ -699,9 +702,13 @@ impl SpaceRenderer {
             }
             // Record draw command for all instances using this mesh
             let instance_range = first_instance_index..(first_instance_index + count);
-            blocks_drawn += instance_range.len();
-            triangles_drawn += (meta.opaque_range().len() / 3) * instance_range.len();
-            render_pass.draw_indexed(to_wgpu_index_range(meta.opaque_range()), 0, instance_range);
+            blocks_drawn += range_len(instance_range);
+            triangles_drawn += (range_len(meta.opaque_range()) / 3) * range_len(instance_range);
+            render_pass.draw_indexed(
+                to_wgpu_index_range(meta.opaque_range()),
+                0,
+                instance_range.into(),
+            );
 
             // If we are doing overdraw visualization, run the depthless overdraw visualization.
             // We do this here so that we can take advantage of the state in this loop, even though
@@ -712,7 +719,7 @@ impl SpaceRenderer {
                 render_pass.draw_indexed(
                     to_wgpu_index_range(meta.opaque_range()),
                     0,
-                    first_instance_index..(first_instance_index + count),
+                    (first_instance_index..(first_instance_index + count)).into(),
                 );
                 // Restore previous pipeline
                 render_pass.set_pipeline(pipeline_for_opaque);
