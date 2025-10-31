@@ -25,16 +25,16 @@ fn benches() {
 
 fn block_mesh_benches(c: &mut Criterion) {
     let mut g = c.benchmark_group("block");
-    let options = &MeshOptions::new(&GraphicsOptions::default());
+    let default_options = &MeshOptions::new(&GraphicsOptions::default());
 
     // Exercise the code paths that only apply to resolution 1;
     // all the other benchmarks use larger resolutions.
-    g.bench_function("r1-new", |b| {
+    g.bench_function("r1-fresh", |b| {
         let universe = Universe::new();
         iter_new_block_mesh(
             b,
             &universe,
-            options,
+            default_options,
             &Block::builder().color(Rgba::WHITE).build(),
         );
     });
@@ -43,54 +43,62 @@ fn block_mesh_benches(c: &mut Criterion) {
         iter_reused_block_mesh(
             b,
             &universe,
-            options,
+            default_options,
             &Block::builder().color(Rgba::WHITE).build(),
         );
     });
 
-    g.bench_function("checker-new", |b| {
-        let mut universe = Universe::new();
-        let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
-        iter_new_block_mesh(b, &universe, options, &block);
-    });
-    g.bench_function("checker-reused", |b| {
-        let mut universe = Universe::new();
-        let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
-        iter_reused_block_mesh(b, &universe, options, &block);
-    });
+    for (use_new_block_triangulator, suffix) in [(false, "greedy"), (true, "newtri")] {
+        let mut options = MeshOptions::new(&GraphicsOptions::default());
+        options.use_new_block_triangulator = use_new_block_triangulator;
+        let options = &options;
 
-    g.bench_function("half", |b| {
-        let mut universe = Universe::new();
-        // Elsewhere this kind of block is called a slab, but “half” is consistent with the
-        // terminology of the space mesh benches in this file.
-        // Note also that unlike `make_slab()`, `half_space()` is not shrinkwrapping the space
-        // — there are empty voxels.
-        let block = Block::builder()
-            .voxels_handle(
-                R16,
-                universe.insert_anonymous(half_space(&block::from_color!(Rgba::WHITE))),
-            )
-            .build();
-        iter_new_block_mesh(b, &universe, options, &block);
-    });
+        let namer = |str| format!("{str}/{suffix}");
 
-    g.bench_function("opaque", |b| {
-        let mut universe = Universe::new();
-        let block = checkerboard_block(
-            &mut universe,
-            &[
-                block::from_color!(Rgba::BLACK),
-                block::from_color!(Rgba::WHITE),
-            ],
-        );
-        iter_new_block_mesh(b, &universe, options, &block);
-    });
+        g.bench_function(namer("checker-fresh"), |b| {
+            let mut universe = Universe::new();
+            let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
+            iter_new_block_mesh(b, &universe, options, &block);
+        });
+        g.bench_function(namer("checker-reused"), |b| {
+            let mut universe = Universe::new();
+            let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
+            iter_reused_block_mesh(b, &universe, options, &block);
+        });
 
-    g.bench_function("msvb", |b| {
-        let mut universe = Universe::new();
-        let [block] = make_some_voxel_blocks(&mut universe);
-        iter_new_block_mesh(b, &universe, options, &block);
-    });
+        g.bench_function(namer("half"), |b| {
+            let mut universe = Universe::new();
+            // Elsewhere this kind of block is called a slab, but “half” is consistent with the
+            // terminology of the space mesh benches in this file.
+            // Note also that unlike `make_slab()`, `half_space()` is not shrinkwrapping the space
+            // — there are empty voxels.
+            let block = Block::builder()
+                .voxels_handle(
+                    R16,
+                    universe.insert_anonymous(half_space(&block::from_color!(Rgba::WHITE))),
+                )
+                .build();
+            iter_new_block_mesh(b, &universe, options, &block);
+        });
+
+        g.bench_function(namer("opaque"), |b| {
+            let mut universe = Universe::new();
+            let block = checkerboard_block(
+                &mut universe,
+                &[
+                    block::from_color!(Rgba::BLACK),
+                    block::from_color!(Rgba::WHITE),
+                ],
+            );
+            iter_new_block_mesh(b, &universe, options, &block);
+        });
+
+        g.bench_function(namer("msvb"), |b| {
+            let mut universe = Universe::new();
+            let [block] = make_some_voxel_blocks(&mut universe);
+            iter_new_block_mesh(b, &universe, options, &block);
+        });
+    }
 
     // TODO: Add meshing a block that has a complex but not worst-case shape.
 }
@@ -131,7 +139,7 @@ fn space_mesh_benches(c: &mut Criterion) {
     // This also ensures we're not timing dropping them.
     let checker_ing = checkerboard_space_bench_setup(options.clone(), false);
 
-    g.bench_function("checker-new", |b| {
+    g.bench_function("checker-fresh", |b| {
         // This benchmark actually has no use for iter_batched_ref -- it could be
         // iter_with_large_drop -- but I want to make sure any quirks of the measurement
         // are shared between all cases.
@@ -160,7 +168,7 @@ fn space_mesh_benches(c: &mut Criterion) {
     });
 
     let half_ing = SpaceMeshIngredients::new(options, half_space(&block::from_color!(Rgba::WHITE)));
-    g.bench_function("half-new", |b| {
+    g.bench_function("half-fresh", |b| {
         b.iter_batched_ref(|| (), |()| half_ing.do_new(), BatchSize::SmallInput);
     });
 
