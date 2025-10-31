@@ -3,7 +3,6 @@
 use alloc::alloc::Layout;
 use alloc::string::String;
 use core::marker::PhantomData;
-use core::ops::Range;
 
 use bytemuck::Pod;
 
@@ -45,8 +44,11 @@ pub fn to_wgpu_index_format(slice: IndexSlice<'_>) -> wgpu::IndexFormat {
     }
 }
 
-pub fn to_wgpu_index_range(range: Range<usize>) -> Range<u32> {
-    range.start.try_into().unwrap()..range.end.try_into().unwrap()
+pub fn to_wgpu_index_range(range: core::range::Range<usize>) -> core::ops::Range<u32> {
+    core::ops::Range {
+        start: range.start.try_into().unwrap(),
+        end: range.end.try_into().unwrap(),
+    }
 }
 
 /// Write to the specified region of a 3D texture.

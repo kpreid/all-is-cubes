@@ -5,7 +5,7 @@
 use alloc::string::String;
 use core::fmt;
 
-use arcstr::{ArcStr, Substr, literal_substr};
+use arcstr::{ArcStr, Substr, literal};
 use euclid::size2;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -24,21 +24,24 @@ pub struct CharacterRtData(pub Substr);
 impl RtBlockData for CharacterRtData {
     type Options = ();
 
+    // TODO: not using `arcstr::literal_substr!()` because it is broken by `feature(new_range)`.
+    // <https://github.com/rust-lang/rust/issues/148342>
+
     fn from_block(_: RtOptionsRef<'_, Self::Options>, s: &SpaceBlockData) -> Self {
         // TODO: allow customizing the fallback character
         let name: &ArcStr = &s.evaluated().attributes().display_name;
         let char = match name.graphemes(true).next() {
             Some(grapheme) => name.substr_from(grapheme),
-            None => literal_substr!("#"),
+            None => literal!("#").substr(..),
         };
         Self(char)
     }
 
     fn exception(exception: Exception, _: RtOptionsRef<'_, Self::Options>) -> Self {
         match exception {
-            Exception::Sky => Self(literal_substr!(" ")),
-            Exception::Incomplete => Self(literal_substr!("X")),
-            _ => Self(literal_substr!(" ")), // TODO: what is the best paint behavior for text?
+            Exception::Sky => Self(literal!(" ").substr(..)),
+            Exception::Incomplete => Self(literal!("X").substr(..)),
+            _ => Self(literal!(" ").substr(..)), // TODO: what is the best paint behavior for text?
         }
     }
 }
@@ -109,8 +112,8 @@ impl From<CharacterBuf> for Substr {
     #[inline]
     fn from(buf: CharacterBuf) -> Substr {
         match buf.0 {
-            State::Empty => literal_substr!("."),
-            State::EnteredSpace => literal_substr!(" "),
+            State::Empty => literal!(".").substr(..),
+            State::EnteredSpace => literal!(" ").substr(..),
             State::Hit(character) => character,
         }
     }

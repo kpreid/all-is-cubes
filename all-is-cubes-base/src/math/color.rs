@@ -1232,8 +1232,10 @@ mod tests {
 
     #[test]
     fn check_const_srgb_table() {
-        let generated_table: Vec<f32> =
-            (0..=u8::MAX).map(component_from_srgb8_arithmetic).collect();
+        let generated_table: Vec<f32> = (0..=u8::MAX)
+            .into_iter()
+            .map(component_from_srgb8_arithmetic)
+            .collect();
         print!("static CONST_SRGB_LOOKUP_TABLE: [f32; 256] = [");
         for i in 0..=u8::MAX {
             if i.is_multiple_of(6) {

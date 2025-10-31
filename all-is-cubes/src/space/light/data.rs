@@ -362,6 +362,7 @@ mod tests {
 
     fn packed_light_test_values() -> impl Iterator<Item = PackedLight> {
         (PackedLightScalar::MIN..PackedLightScalar::MAX)
+            .into_iter()
             .flat_map(|s| {
                 vec![
                     PackedLight {
@@ -409,6 +410,7 @@ mod tests {
     #[test]
     fn check_packed_light_table() {
         let generated_table: Vec<f32> = (0..=u8::MAX)
+            .into_iter()
             .map(PackedLight::scalar_out_arithmetic)
             .collect();
         print!("static PACKED_LIGHT_SCALAR_LOOKUP_TABLE: [PositiveSign<f32>; 256] = [");

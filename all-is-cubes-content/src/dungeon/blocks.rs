@@ -208,6 +208,7 @@ pub(crate) async fn install_dungeon_blocks(
                         };
                         VoxelBrush::new(
                             (5..11)
+                                .into_iter()
                                 .map(|z| ([0, 0, z], block.clone()))
                                 .collect::<Vec<_>>(),
                         )

@@ -213,7 +213,7 @@ impl PostprocessResources {
                 ),
                 &[],
             );
-            render_pass.draw(0..3, 0..1);
+            render_pass.draw((0..3).into(), (0..1).into());
         }
 
         (encoder.finish(), Flaws::empty())

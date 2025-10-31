@@ -258,6 +258,7 @@ mod tests {
 
         assert_eq!(
             (0..10)
+                .into_iter()
                 .map(|i| data.get(Duration::from_secs(i * 5)).unwrap())
                 .collect::<Vec<TestVector>>(),
             vec![

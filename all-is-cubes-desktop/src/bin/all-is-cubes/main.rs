@@ -1,5 +1,6 @@
 //! Binary for All is Cubes desktop app.
 
+#![feature(new_range, new_range_api)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 

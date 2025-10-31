@@ -121,20 +121,19 @@ impl Icons {
                         &|color| {
                             // TODO: Figure out abstractions to not need so much fiddly custom code
                             let bcolor = Block::from(Rgba::from_srgb8(color));
+                            fn ybrush(
+                                mut f: impl FnMut(GridCoordinate) -> Block,
+                            ) -> VoxelBrush<'static> {
+                                VoxelBrush::new((0..16).into_iter().map(|y| ([0, y, 0], f(y))))
+                            }
                             match color {
                                 [0, 0, 0, 255] => VoxelBrush::new(vec![([0, 15, 0], dots(0))]),
                                 [0x85, 0x85, 0x85, 255] => {
                                     VoxelBrush::new(vec![([0, 0, 0], dots(0))])
                                 }
-                                [0, 127, 0, 255] => {
-                                    VoxelBrush::new((0..16).map(|y| ([0, y, 0], dots(y))))
-                                }
-                                [0, 255, 0, 255] => {
-                                    VoxelBrush::new((0..16).map(|y| ([0, y, 0], dots(y + 1))))
-                                }
-                                [255, 0, 0, 255] => {
-                                    VoxelBrush::new((0..16).map(|y| ([0, y, 0], bcolor.clone())))
-                                }
+                                [0, 127, 0, 255] => ybrush(&dots),
+                                [0, 255, 0, 255] => ybrush(|y| dots(y + 1)),
+                                [255, 0, 0, 255] => ybrush(|_| bcolor.clone()),
                                 _ => VoxelBrush::new([([0, 0, 0], bcolor)]),
                             }
                             .translate([0, 8, 0])

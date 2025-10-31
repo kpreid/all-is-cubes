@@ -281,8 +281,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             // If they are, then we'll take care of `fully_opaque` later, but if we don't even
             // iterate over the whole face, we need this extra check.
             if layer == 0
-                && (occupied_rect.x_range() != (0..resolution_g)
-                    || occupied_rect.y_range() != (0..resolution_g))
+                && (occupied_rect.x_range() != (0..resolution_g).into()
+                    || occupied_rect.y_range() != (0..resolution_g).into())
             {
                 face_mesh.fully_opaque = false;
             }
@@ -303,8 +303,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     // TODO: It would be better if this were shrunk to the visible voxels
                     // in this specific layer, not just all voxels.
                     let slice_range = GridAab::from_ranges([
-                        occupied_rect.x_range(),
-                        occupied_rect.y_range(),
+                        occupied_rect.x_range().into(),
+                        occupied_rect.y_range().into(),
                         layer..layer + 1,
                     ])
                     .transform(face.face_transform(resolution_g))

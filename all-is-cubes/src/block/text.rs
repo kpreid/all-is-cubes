@@ -900,15 +900,17 @@ mod tests {
         }
 
         let z = voxels.bounds().lower_bounds().z;
-        assert_eq!(voxels.bounds().z_range().len(), 1);
+        assert_eq!(voxels.bounds().size().depth, 1);
         voxels
             .bounds()
             .y_range()
+            .into_iter()
             .rev() // flip Y axis
             .map(|y| {
                 voxels
                     .bounds()
                     .x_range()
+                    .into_iter()
                     .map(|x| convert_voxel(&voxels[Cube::new(x, y, z)]))
                     .collect::<String>()
             })
@@ -1086,8 +1088,8 @@ mod tests {
     fn positioning_x(
         #[case] pos: PositioningX,
         #[case] odd_font: bool,
-        #[case] bounds_range: core::ops::Range<i32>,
-        #[case] expected: core::ops::Range<i32>,
+        #[case] bounds_range: core::range::Range<i32>,
+        #[case] expected: core::range::Range<i32>,
     ) {
         let text = Text::builder()
             .string(if odd_font {

@@ -4,6 +4,7 @@
 //! most of the modules excluded from compilation.
 
 #![feature(doc_cfg)]
+#![feature(new_range, new_range_api)]
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
 #![allow(

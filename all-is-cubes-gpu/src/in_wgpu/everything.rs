@@ -574,7 +574,7 @@ impl EverythingRenderer {
                     .expect("missing lines buffer!")
                     .slice(..),
             );
-            world_render_pass.draw(0..self.lines_vertex_count, 0..1);
+            world_render_pass.draw((0..self.lines_vertex_count).into(), (0..1).into());
         }
 
         // New render pass so we clear the depth buffer for the UI.

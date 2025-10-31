@@ -43,10 +43,10 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
     // `OrthoCamera` to be more aware of its alignment with the block grid.
 
     #[cfg(feature = "auto-threads")]
-    let data = (0..camera.image_size.height)
+    let data = core::ops::Range::from(0..camera.image_size.height)
         .into_par_iter()
         .flat_map(|y| {
-            (0..camera.image_size.width)
+            core::ops::Range::from(0..camera.image_size.width)
                 .into_par_iter()
                 .map_with(Cache::default(), move |cache: &mut Cache, x| {
                     trace_one_pixel_with_cache(camera, rt, cache, x, y)
@@ -56,10 +56,12 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
 
     #[cfg(not(feature = "auto-threads"))]
     let data = (0..camera.image_size.height)
+        .into_iter()
         .flat_map(|y| {
             let mut cache = Cache::default();
 
             (0..camera.image_size.width)
+                .into_iter()
                 .map(move |x| trace_one_pixel_with_cache(camera, rt, &mut cache, x, y))
         })
         .collect();

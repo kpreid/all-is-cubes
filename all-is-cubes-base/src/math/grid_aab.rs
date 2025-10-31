@@ -2,7 +2,7 @@
 //! volumes ([`Vol`]), and related.
 
 use core::fmt;
-use core::ops::Range;
+use core::range::Range;
 
 use euclid::{Vector3D, size3};
 use manyfmt::Refmt;
@@ -152,7 +152,7 @@ impl GridAab {
     pub fn from_ranges(ranges: impl Into<Vector3D<Range<GridCoordinate>, Cube>>) -> GridAab {
         let ranges = ranges.into();
         GridAab::from_lower_upper(
-            ranges.clone().map(|r| r.start).to_point(),
+            ranges.map(|r| r.start).to_point(),
             ranges.map(|r| r.end).to_point(),
         )
     }
@@ -670,9 +670,9 @@ impl GridAab {
         } else {
             let _upper_bounds = self.upper_bounds();
             Some(Cube::new(
-                rng.random_range(self.x_range()),
-                rng.random_range(self.y_range()),
-                rng.random_range(self.z_range()),
+                rng.random_range(core::ops::Range::from(self.x_range())),
+                rng.random_range(core::ops::Range::from(self.y_range())),
+                rng.random_range(core::ops::Range::from(self.z_range())),
             ))
         }
     }
@@ -1254,8 +1254,8 @@ mod tests {
     }
 
     /// Test `Debug` formatting. Note this should be similar to the [`Aab`] formatting.
-       #[cfg(fmt_debug = "full")]
- #[test]
+    #[cfg(fmt_debug = "full")]
+    #[test]
     fn debug() {
         let b = GridAab::from_lower_size([1, 2, 3], [10, 20, 30]);
         println!("{b:#?}");
