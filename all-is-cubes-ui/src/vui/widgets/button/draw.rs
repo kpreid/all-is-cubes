@@ -4,6 +4,7 @@ use alloc::borrow::ToOwned as _;
 use alloc::format;
 use core::fmt;
 use core::hash::Hash;
+use core::iter;
 
 use exhaust::Exhaust;
 
@@ -48,7 +49,7 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
         let mut shape_txn = self.shape[state.clone()].create_box(grant.bounds);
 
         // Composite label and shape
-        for (x, label_block) in (0..).zip(self.label.blocks(grant.gravity)) {
+        for (x, label_block) in iter::zip(0.., self.label.blocks(grant.gravity)) {
             // TODO: centered in case the button is larger
             let cube = Cube::from(grant.bounds.lower_bounds() + vec3(x, 0, 0));
 
@@ -114,7 +115,7 @@ impl ButtonLabel {
             move |label_widget| {
                 let text = label_widget.text(gravity);
                 let bb = text.bounding_blocks();
-                bb.x_range().map(move |x| {
+                bb.x_range().into_iter().map(move |x| {
                     Block::from_primitive(block::Primitive::Text {
                         text: text.clone(),
                         offset: GridVector::new(x, bb.lower_bounds().y, bb.lower_bounds().z),
@@ -287,7 +288,7 @@ fn draw_button_multiblock_from_image(
         &|color| match color {
             image_palette::OUTSIDE => VoxelBrush::single(AIR),
             image_palette::FRAME => VoxelBrush::single(block::from_color!(palette::BUTTON_FRAME)),
-            image_palette::RIM => VoxelBrush::new((0..label_z).map(|z| {
+            image_palette::RIM => VoxelBrush::new((0..label_z).into_iter().map(|z| {
                 // Highlight just the corner with a lighter color;
                 // otherwise identical to BACK.
                 (

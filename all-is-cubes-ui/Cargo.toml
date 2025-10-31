@@ -44,6 +44,7 @@ futures-core = { workspace = true, optional = true }
 futures-task = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 indoc = { workspace = true }
+itertools = { workspace = true }
 log = { workspace = true }
 num-traits = { workspace = true }
 scopeguard = { workspace = true, optional = true }

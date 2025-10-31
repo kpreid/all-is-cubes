@@ -201,6 +201,7 @@ dependencies = [
  "futures-task",
  "futures-util",
  "indoc",
+ "itertools",
  "log",
  "num-traits",
  "scopeguard",

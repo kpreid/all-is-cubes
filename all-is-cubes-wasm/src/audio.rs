@@ -367,8 +367,7 @@ fn white_noise(sample_rate: u32, sample_count: u32) -> Result<AudioBuffer, JsVal
         options
     })?;
 
-    #[expect(clippy::map_with_unused_argument_over_ranges)]
-    let vec: Vec<f32> = (0..sample_count).map(|_| rng.random()).collect();
+    let vec: Vec<f32> = (0..sample_count).into_iter().map(|_| rng.random()).collect();
 
     buffer.copy_to_channel(vec.as_slice(), 0).expect("channel buffer length error");
 

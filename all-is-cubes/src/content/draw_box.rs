@@ -134,11 +134,10 @@ impl BoxStyle {
         let resolution = GridCoordinate::from(resolution);
         let ranges = [0..resolution * 3, resolution * 3..resolution * 4];
 
-        ranges.clone().into_iter().flat_map(move |y_range| {
+        ranges.into_iter().flat_map(move |y_range| {
             ranges
-                .clone()
                 .into_iter()
-                .map(move |x_range| GridAab::from_ranges([x_range, y_range.clone(), 0..resolution]))
+                .map(move |x_range| GridAab::from_ranges([x_range, y_range, 0..resolution]))
         })
     }
 

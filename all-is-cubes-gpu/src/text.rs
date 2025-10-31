@@ -121,7 +121,7 @@ pub(crate) fn generate_texture_atlas(
 
     // Write characters into atlas
     let mut string_buf: [u8; 4] = [0; 4];
-    for (character, (y, x)) in ('\u{00}'..='\u{FF}').zip(iproduct!(0..16, 0..16)) {
+    for (character, (y, x)) in ('\u{00}'..='\u{FF}').into_iter().zip(iproduct!(0..16, 0..16)) {
         let string = character.encode_utf8(&mut string_buf);
 
         let position = Point::new(

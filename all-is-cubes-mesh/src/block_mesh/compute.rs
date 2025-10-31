@@ -261,9 +261,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             // TODO: It would make sense to move this calculation to block evaluation, which
             // already has to do 99% of the work.
             if layer == 0 {
-                if occupied_rect.x_range() != (0..resolution_g)
-                    || occupied_rect.y_range() != (0..resolution_g)
-                {
+                let full_range: core::ops::Range<GridCoordinate> = (0..resolution_g).into();
+                if occupied_rect.x_range() != full_range || occupied_rect.y_range() != full_range {
                     // Not full coverage
                     face_mesh.fully_opaque = false;
                 } else {
@@ -291,8 +290,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     // TODO: It would be better if this were shrunk to the visible voxels
                     // in this specific layer, not just all voxels.
                     let slice_range = GridAab::from_ranges([
-                        occupied_rect.x_range(),
-                        occupied_rect.y_range(),
+                        occupied_rect.x_range().into(),
+                        occupied_rect.y_range().into(),
                         layer..layer + 1,
                     ])
                     .transform(face.face_transform(resolution_g))
