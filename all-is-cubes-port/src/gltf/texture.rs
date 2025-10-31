@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::iter;
 
 use gltf_json::validation::Checked::Valid;
 
@@ -306,7 +307,7 @@ mod internal {
                     sliced_bounds,
                     rotation,
                 },
-            ) in (0..).zip(entries.iter())
+            ) in iter::zip(0.., entries.iter())
             {
                 let size = sliced_bounds
                     .transform(rotation.into())

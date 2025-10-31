@@ -3,7 +3,8 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
-use core::ops::{self, Deref, Range};
+use core::ops::{self, Deref};
+use core::range::Range;
 
 use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
@@ -11,7 +12,7 @@ use smallvec::SmallVec;
 
 use all_is_cubes::euclid::{self, Vector3D, vec3};
 use all_is_cubes::math::lines::Wireframe as _;
-use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation, lines};
+use all_is_cubes::math::{Axis, Face6, FaceMap, GridRotation, lines, range_len};
 
 use crate::{
     Aabb, IndexInt, IndexSliceMut, IndexVec, MeshRel, MeshTypes, PosCoord, Position,
@@ -373,7 +374,7 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
             debug_assert!(!index_range.is_empty());
             *meta = TransparentMeta {
                 // Always dynamically sort everything.
-                dynamic_sub_ranges: SmallVec::from([0..index_range.len()]),
+                dynamic_sub_ranges: SmallVec::from([0..range_len(index_range)]),
                 // Haven't performed any sorting yet, so there is no region of validity.
                 depth_sort_validity: Aabb::EMPTY,
                 index_range,
@@ -476,7 +477,7 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
                     group_upper_bound = qmax;
                 } else {
                     // Quad does not overlap; finish the current group and start a new one.
-                    if quad_group.len() > 1 {
+                    if range_len(quad_group) > 1 {
                         meta.dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
                     }
                     quad_group = i..(i + 1);
@@ -484,7 +485,7 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
                 }
             }
             // Write the last group
-            if quad_group.len() > 1 {
+            if range_len(quad_group) > 1 {
                 meta.dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
             }
 
@@ -566,7 +567,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         // (TODO: Prove this claim.)
         let mut new_validity = Aabb::EVERYWHERE;
 
-        for sub_range in meta.dynamic_sub_ranges.iter().cloned() {
+        for sub_range in meta.dynamic_sub_ranges.iter().copied() {
             let data_slice: &mut [Ix] = &mut data[sub_range];
             // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
             let quads_slice: &mut [[Ix; 6]] = expect_quads(data_slice.as_chunks_mut::<6>());
@@ -615,9 +616,9 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     if needs_static_sort {
         // If we did a static sort, then all indices in the range changed,
         // not just the ones the dynamic sort touched.
-        result.changed = Some(meta.index_range.clone());
+        result.changed = Some(meta.index_range);
 
-        result.info.quads_sorted += meta.index_range.len();
+        result.info.quads_sorted += range_len(meta.index_range);
         result.info.static_groups_sorted += 1;
     }
     result
@@ -813,9 +814,9 @@ mod tests {
         let range = -3..3;
         // TODO: exercise the bounds not being near 0
         let bounds = Aab::from_lower_upper([-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]);
-        for x in range.clone() {
-            for y in range.clone() {
-                for z in range.clone() {
+        for x in range {
+            for y in range {
+                for z in range {
                     let camera_position = point3(x, y, z);
 
                     let ordering =
@@ -934,8 +935,8 @@ mod tests {
         let position_with_nothing = Position::new(0.5, 0.5, 10.0);
         assert_eq!(
             (
-                space_mesh.transparent_range(ordering_with_face).len(),
-                space_mesh.transparent_range(ordering_with_nothing).len()
+                range_len(space_mesh.transparent_range(ordering_with_face)),
+                range_len(space_mesh.transparent_range(ordering_with_nothing))
             ),
             (6, 0),
             "expected culling did not occur; test is invalid"
@@ -974,7 +975,7 @@ mod tests {
         let ordering = DepthOrdering(vec3(Rel::Lower, Rel::Within, Rel::Within));
         let position = Position::new(-10.5, 0.5, 0.5);
         assert_eq!(
-            space_mesh.transparent_range(ordering).len(),
+            range_len(space_mesh.transparent_range(ordering)),
             6 * 3,
             "expected 3 quads",
         );

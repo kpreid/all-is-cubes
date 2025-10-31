@@ -122,11 +122,11 @@ impl<T> ops::IndexMut<Band> for [T; Band::COUNT] {
 }
 
 impl Exhaust for Band {
-    type Iter = ops::Range<u8>;
+    type Iter = core::range::IterRange<u8>;
     type Factory = u8;
 
     fn exhaust_factories() -> Self::Iter {
-        Self::MIN.index..(Self::MAX.index + 1)
+        (Self::MIN.index..(Self::MAX.index + 1)).into_iter()
     }
 
     fn from_factory(index: Self::Factory) -> Self {

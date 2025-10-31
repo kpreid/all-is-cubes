@@ -718,11 +718,11 @@ pub(crate) mod vol_arb {
         ) -> arbitrary::Result<Self> {
             // Pick sizes within the volume constraint.
             let mut limit: u32 = volume.try_into().unwrap_or(u32::MAX);
-            let size_1 = u.int_in_range(0..=limit)?;
+            let size_1 = u.int_in_range((0..=limit).into())?;
             limit /= size_1.max(1);
-            let size_2 = u.int_in_range(0..=limit)?;
+            let size_2 = u.int_in_range((0..=limit).into())?;
             limit /= size_2.max(1);
-            let size_3 = u.int_in_range(0..=limit)?;
+            let size_3 = u.int_in_range((0..=limit).into())?;
 
             // Shuffle the sizes to remove any bias.
             let sizes = *u.choose(&[
@@ -736,7 +736,7 @@ pub(crate) mod vol_arb {
 
             // Compute lower bounds that are valid for the sizes.
             let possible_lower_bounds = sizes.map(|coord| {
-                GridCoordinate::MIN..=GridCoordinate::MAX.saturating_sub_unsigned(coord)
+                (GridCoordinate::MIN..=GridCoordinate::MAX.saturating_sub_unsigned(coord)).into()
             });
             let lower_bounds = GridPoint::new(
                 u.int_in_range(possible_lower_bounds.x)?,
@@ -1166,6 +1166,7 @@ mod tests {
         use arbitrary::{Arbitrary, Unstructured};
         let hint = vol_arb::ARBITRARY_BOUNDS_SIZE_HINT;
         let most_bytes_used = (0..=255)
+            .into_iter()
             .map(|byte| {
                 // TODO: sketchy coverage; would be better to generate some random/hashed data
                 let data = [byte; 1000];
@@ -1193,6 +1194,7 @@ mod tests {
         use itertools::Itertools as _;
         let max_volume = 100;
         let minmax = (0..=255)
+            .into_iter()
             .map(|byte| {
                 // TODO: sketchy coverage; would be better to generate some random/hashed data
                 let data = [byte; 25];
