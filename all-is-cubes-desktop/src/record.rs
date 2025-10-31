@@ -281,6 +281,7 @@ impl Recorder {
     /// Capture frames of recording, then wait for the recording to have been finished.
     pub(crate) async fn record_task(mut self, ctx: &MainTaskContext) {
         let frame_range = self.options.frame_range();
+        let frame_count = frame_range.into_iter().count();
 
         #[allow(clippy::literal_string_with_formatting_args)]
         let progress_style = indicatif::ProgressStyle::default_bar()
@@ -291,7 +292,7 @@ impl Recorder {
         let (status_tx, status_receiver) = async_channel::unbounded();
         self.listen(rmain::ChannelListener::new(status_tx));
 
-        let drawing_progress_bar = indicatif::ProgressBar::new(frame_range.clone().count() as u64)
+        let drawing_progress_bar = indicatif::ProgressBar::new(frame_count as u64)
             .with_style(progress_style)
             .with_prefix("Drawing");
         drawing_progress_bar.enable_steady_tick(Duration::from_secs(1));
@@ -301,7 +302,7 @@ impl Recorder {
         // Capture first (no step) frame
         ctx.with_universe(|u| self.capture_frame(u.read_ticket()));
         // Capture remaining frames
-        while self.sending_frame_number < frame_range.clone().count() {
+        while self.sending_frame_number < frame_count {
             ctx.yield_to_step().await;
             ctx.with_universe(|u| self.capture_frame(u.read_ticket()));
 
@@ -330,7 +331,7 @@ impl Recorder {
         }
         assert_eq!(
             drawing_progress_bar.position() as usize,
-            frame_range.count(),
+            frame_count,
             "Didn't draw the correct number of frames"
         );
         drawing_progress_bar.finish();

@@ -1,9 +1,12 @@
+#![expect(clippy::single_range_in_vec_init)]
+
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
-use core::ops::{self, Range};
+use core::ops;
+use core::range::Range;
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size3D, Translation3D};
 use all_is_cubes::math::{
@@ -293,8 +296,6 @@ impl AlloctreeNode {
         low_corner_of_node: Point3D<TreeCoord, A>,
         request: GridAab,
     ) -> Option<AlloctreeHandle<A>> {
-        #![expect(clippy::single_range_in_vec_init)]
-
         // eprintln!(
         //     "allocate(2^{} = {}, {:?})",
         //     size_exponent,
@@ -378,7 +379,7 @@ impl AlloctreeNode {
                 let node_size = expsize(size_exponent);
                 let request_size_on_axis = TreeCoord::try_from(request.size()[axis]).unwrap();
                 let (insert_index, relative_offset): (usize, TreeCoord) = 'pos: {
-                    let occupied_iter = occupied.iter().cloned();
+                    let occupied_iter = occupied.iter().copied();
                     // Iterate over adjacent pairs, including off the beginning and off the end
                     // represented by placeholder empty ranges
                     for (
@@ -682,6 +683,7 @@ mod tests {
     fn basic_complete_fill() {
         let mut t = Alloctree::new(5); // side length 2^5 cube = eight side length 16 cubes
         let _allocations: Vec<AlloctreeHandle<()>> = (0..8)
+            .into_iter()
             .map(|i| match t.allocate(GridAab::for_block(R16)) {
                 Some(val) => val,
                 None => panic!("basic_complete_fill allocation failure for #{i}"),
@@ -695,6 +697,7 @@ mod tests {
     fn free_and_allocate_again() {
         let mut t = Alloctree::new(6); // side length 2^6 cube = 64 side length 16 cubes
         let mut allocations: Vec<Option<AlloctreeHandle<()>>> = (0..64)
+            .into_iter()
             .map(|i| match t.allocate(GridAab::for_block(R16)) {
                 Some(val) => Some(val),
                 None => panic!("free_and_allocate_again initial allocation failure for #{i}"),

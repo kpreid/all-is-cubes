@@ -36,9 +36,9 @@ fn COMPOSITE(ctx: Context<'_>) {
     ))
     .read_ticket(ctx.universe.read_ticket())
     .build_and_mutate(|m| {
-        for (di, destination) in (0i32..).zip(destinations) {
-            for (si, source) in (0i32..).zip(sources) {
-                for (oi, operator) in (0i32..).zip(operators) {
+        for (di, destination) in iter::zip(0i32.., destinations) {
+            for (si, source) in iter::zip(0i32.., sources) {
+                for (oi, operator) in iter::zip(0i32.., operators) {
                     let composite = destination.clone().with_modifier(Composite::new(
                         source.clone().rotate(Face6::PY.clockwise()),
                         operator,

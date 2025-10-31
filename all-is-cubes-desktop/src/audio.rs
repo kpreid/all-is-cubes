@@ -90,6 +90,7 @@ fn audio_command_thread(
     let white_noise = StaticSoundData {
         sample_rate: 44100,
         frames: (0..44100 * 10)
+            .into_iter()
             .map({
                 let mut rng = rand::rngs::StdRng::seed_from_u64(0);
                 move |_| kira::Frame::from_mono(rng.random())

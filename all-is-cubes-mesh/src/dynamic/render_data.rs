@@ -1,5 +1,5 @@
 use core::fmt;
-use core::ops::Range;
+use core::range::Range;
 
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::{FreeVector, GridCoordinate};
