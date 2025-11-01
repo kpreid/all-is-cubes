@@ -182,15 +182,15 @@ impl Aab {
     pub fn corner_points(
         self,
     ) -> impl DoubleEndedIterator<Item = FreePoint> + ExactSizeIterator + FusedIterator {
-        let l = self.lower_bounds;
-        let u = self.upper_bounds;
+        let lower = self.lower_bounds;
+        let upper = self.upper_bounds;
         // TODO: replacing this with iterating Octant + corner_point() produces larger code;
         // investigate if there is something that's net better instead of net worse
         (0..8).map(move |i| {
             Point3D::new(
-                if i & 1 == 0 { l.x } else { u.x },
-                if i & 2 == 0 { l.y } else { u.y },
-                if i & 4 == 0 { l.z } else { u.z },
+                if i & 1 == 0 { lower.x } else { upper.x },
+                if i & 2 == 0 { lower.y } else { upper.y },
+                if i & 4 == 0 { lower.z } else { upper.z },
             )
         })
     }

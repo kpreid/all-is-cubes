@@ -304,10 +304,7 @@ impl Operation {
                             });
                         };
 
-                        if adjacent_inventory
-                            .get(0)
-                            .is_some_and(|slot| *slot == inv::Slot::Empty)
-                        {
+                        if adjacent_inventory.get(0) == Some(&inv::Slot::Empty) {
                             // There is room in the adjacent block, so create a transaction to transfer
                             // this slot.
                             // TODO: We should have the option of transferring into the first available

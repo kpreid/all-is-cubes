@@ -95,11 +95,11 @@ mod tests {
 
     #[test]
     fn quote_evaluation() {
-        let l = Rgb::new(1.0, 2.0, 3.0);
+        let light = Rgb::new(1.0, 2.0, 3.0);
 
         let block = Block::builder()
             .color(Rgba::WHITE)
-            .light_emission(l)
+            .light_emission(light)
             .placement_action(block::PlacementAction {
                 operation: op::Operation::Become(block::AIR),
                 in_front: true,
@@ -118,7 +118,7 @@ mod tests {
             eval_without_metadata(
                 &Block::builder()
                     .color(Rgba::WHITE)
-                    .light_emission(l)
+                    .light_emission(light)
                     .build()
             ),
             "suppress_ambient = false"

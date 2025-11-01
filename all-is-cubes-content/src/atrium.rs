@@ -159,9 +159,7 @@ fn atrium_non_async(
         m.fill(
             outer_walls_footprint
                 .translate(top_floor_pos)
-                .expand(FaceMap::from_fn(|f| {
-                    GridSizeCoord::from(f == Face6::PY) * CEILING_HEIGHT
-                })),
+                .expand(FaceMap::splat(0).with(Face6::PY, CEILING_HEIGHT)),
             floor_with_cutout,
         )?;
 

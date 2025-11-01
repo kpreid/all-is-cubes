@@ -230,7 +230,7 @@ where
             rts: self
                 .rts
                 .as_refs()
-                .map(|opt_urt| opt_urt.as_ref().map(|urt| urt.get())),
+                .map(|opt_urt| opt_urt.as_ref().map(UpdatingSpaceRaytracer::get)),
             cameras,
             custom_options: &self.custom_options_cache,
         }

@@ -128,12 +128,12 @@ struct AicLogger {
 impl log::Log for AicLogger {
     fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
         #[cfg(feature = "rerun")]
-        let rr = self.rerun_destination.is_enabled();
+        let rerun_enabled = self.rerun_destination.is_enabled();
         #[cfg(not(feature = "rerun"))]
-        let rr = false;
+        let rerun_enabled = false;
 
         all_is_cubes::util::log::standard_filter(metadata)
-            && (rr
+            && (rerun_enabled
                 || self
                     .stderr_logger
                     .as_ref()

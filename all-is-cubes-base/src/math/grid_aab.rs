@@ -832,18 +832,18 @@ impl GridAab {
     #[inline]
     #[must_use]
     pub fn expand(self, deltas: FaceMap<GridSizeCoord>) -> Self {
-        let l = self.lower_bounds();
-        let u = self.upper_bounds();
+        let lower = self.lower_bounds();
+        let upper = self.upper_bounds();
         Self::from_lower_upper(
             [
-                l.x.saturating_sub_unsigned(deltas.nx),
-                l.y.saturating_sub_unsigned(deltas.ny),
-                l.z.saturating_sub_unsigned(deltas.nz),
+                lower.x.saturating_sub_unsigned(deltas.nx),
+                lower.y.saturating_sub_unsigned(deltas.ny),
+                lower.z.saturating_sub_unsigned(deltas.nz),
             ],
             [
-                u.x.saturating_add_unsigned(deltas.px),
-                u.y.saturating_add_unsigned(deltas.py),
-                u.z.saturating_add_unsigned(deltas.pz),
+                upper.x.saturating_add_unsigned(deltas.px),
+                upper.y.saturating_add_unsigned(deltas.py),
+                upper.z.saturating_add_unsigned(deltas.pz),
             ],
         )
     }
@@ -868,18 +868,18 @@ impl GridAab {
     #[inline]
     #[must_use]
     pub fn shrink(self, deltas: FaceMap<GridSizeCoord>) -> Option<Self> {
-        let l = self.lower_bounds();
-        let u = self.upper_bounds();
+        let lower = self.lower_bounds();
+        let upper = self.upper_bounds();
         Self::checked_from_lower_upper(
             [
-                l.x.checked_add_unsigned(deltas.nx)?,
-                l.y.checked_add_unsigned(deltas.ny)?,
-                l.z.checked_add_unsigned(deltas.nz)?,
+                lower.x.checked_add_unsigned(deltas.nx)?,
+                lower.y.checked_add_unsigned(deltas.ny)?,
+                lower.z.checked_add_unsigned(deltas.nz)?,
             ],
             [
-                u.x.checked_sub_unsigned(deltas.px)?,
-                u.y.checked_sub_unsigned(deltas.py)?,
-                u.z.checked_sub_unsigned(deltas.pz)?,
+                upper.x.checked_sub_unsigned(deltas.px)?,
+                upper.y.checked_sub_unsigned(deltas.py)?,
+                upper.z.checked_sub_unsigned(deltas.pz)?,
             ],
         )
         .ok()

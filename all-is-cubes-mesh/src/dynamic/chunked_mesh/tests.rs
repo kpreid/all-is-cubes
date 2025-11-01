@@ -30,13 +30,10 @@ const NO_INSTANCES: usize = usize::MAX;
 const ALL_INSTANCES: usize = 0;
 
 fn read_todo_chunks(todo: &CsmTodo<CHUNK_SIZE>) -> Vec<(ChunkPos<CHUNK_SIZE>, ChunkTodo)> {
-    let mut v = todo
-        .chunks
-        .iter()
-        .map(|(&p, ct)| (p, ct.clone()))
-        .collect::<Vec<_>>();
-    v.sort_by_key(|(p, _): &(ChunkPos<CHUNK_SIZE>, _)| <_ as Into<[GridCoordinate; 3]>>::into(p.0));
-    v
+    let mut output: Vec<(ChunkPos<_>, ChunkTodo)> =
+        todo.chunks.iter().map(|(&p, ct)| (p, ct.clone())).collect();
+    output.sort_by_key(|(p, _)| <[GridCoordinate; 3]>::from(p.0));
+    output
 }
 
 #[test]

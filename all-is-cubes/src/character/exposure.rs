@@ -101,10 +101,10 @@ impl State {
                             space.physics().sky.sample(ray.direction).luminance();
                         continue 'rays;
                     } else if space.get_evaluated(step.cube_ahead()).visible() {
-                        let l = space.get_lighting(step.cube_behind());
-                        if l.valid() {
+                        let light = space.get_lighting(step.cube_behind());
+                        if light.valid() {
                             self.luminance_samples[self.luminance_sample_index] =
-                                l.value().luminance();
+                                light.value().luminance();
                             continue 'rays;
                         }
                     }

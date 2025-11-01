@@ -120,14 +120,14 @@ impl LayoutGrant {
         let mut origin = GridPoint::new(0, 0, 0);
         for axis in Axis::ALL {
             // TODO: numeric overflow considerations
-            let l = self.bounds.lower_bounds()[axis];
-            let h = self.bounds.upper_bounds()[axis]
+            let lower = self.bounds.lower_bounds()[axis];
+            let upper = self.bounds.upper_bounds()[axis]
                 .checked_sub_unsigned(sizes[axis])
                 .unwrap();
             origin[axis] = match self.gravity[axis] {
-                Align::Low => l,
-                Align::Center => l + (h - l) / 2,
-                Align::High => h,
+                Align::Low => lower,
+                Align::Center => lower + (upper - lower) / 2,
+                Align::High => upper,
             };
         }
         LayoutGrant {

@@ -161,10 +161,10 @@ pub(super) fn start_gltf_writing(
     // Currently this path should always have a .gltf extension.
     let file = fs::File::create(&options.output_path)?;
 
-    let frame_pace = options
-        .animation
-        .as_ref()
-        .map_or(time::Duration::ZERO, |a| a.frame_period);
+    let frame_pace = match options.animation {
+        Some(super::RecordAnimationOptions { frame_period, .. }) => frame_period,
+        None => time::Duration::ZERO,
+    };
 
     std::thread::Builder::new()
         .name("Mesh data encoder".to_string())
