@@ -5,11 +5,10 @@ use std::sync::OnceLock;
 use cfg_if::cfg_if;
 #[cfg(target_family = "wasm")]
 use futures_util::StreamExt as _;
-use hashbrown::HashMap;
 
 // -------------------------------------------------------------------------------------------------
 
-// Common point for defining presence and level of logging of poller activity.
+/// Common point for defining presence and level of logging of poller activity.
 macro_rules! log {
     ($($args:tt)*) => {
         ::log::trace!("[poll] {}", format_args!($($args)*));
@@ -18,9 +17,15 @@ macro_rules! log {
 
 /// Start polling the given [`wgpu::Device`] in the background until the returned guard is dropped.
 ///
-/// Calling this function again with the same device will not create redundant work.
-/// It may block briefly if demand is high or if a callback function takes a long time
-/// (which they should avoid).
+/// This function may block briefly if demand is high or if a callback function provided to `wgpu`
+/// takes a long time (which they should avoid).
+// ---
+// We used to offer that
+// /// Calling this function again with the same device will not create redundant work.
+// but <https://github.com/gfx-rs/wgpu/issues/8461> broke that, and it wasn’t ever very useful
+// because all of the uses of this are tests that use their device sequentially so there would
+// never be concurrent registrations of the same device.
+#[must_use = "the returned `Poller` must be kept as long as polling is desired"]
 pub(crate) fn start_polling(device: wgpu::Device) -> Poller {
     log!("start_polling({device:?})");
 
@@ -108,9 +113,7 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
     // non-realtime headless rendering.
     let polling_interval = core::time::Duration::from_millis(10);
 
-    // We want to poll each device only once per polling interval, but there may be multiple
-    // requests to poll the same device. This table has devices as keys and requests as values.
-    let mut to_poll: HashMap<wgpu::Device, Vec<Weak<wgpu::Device>>> = HashMap::new();
+    let mut to_poll: Vec<Weak<wgpu::Device>> = Vec::new();
 
     #[cfg(target_family = "wasm")]
     let mut tick_stream =
@@ -118,26 +121,25 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
             .fuse();
 
     loop {
-        // Prune dropped requests and their devices.
+        // Poll devices and prune ones for which the `Poller` was dropped.
         let count_before_prune = to_poll.len();
-        to_poll.retain(|_, requests| {
-            requests.retain(|request| Weak::upgrade(request).is_some());
-            !requests.is_empty()
+        to_poll.retain(|weak_device| {
+            let upgrade: Option<Arc<wgpu::Device>> = weak_device.upgrade();
+            if let Some(device) = upgrade {
+                device
+                    .poll(wgpu::PollType::Poll)
+                    .expect("unreachable: poll() timed out despite not using timeout");
+                true
+            } else {
+                false
+            }
         });
         let count_after_prune = to_poll.len();
         if count_after_prune < count_before_prune {
             log!(
                 "PT pruned {} devices",
-                count_after_prune - count_before_prune
+                count_before_prune - count_after_prune
             );
-        }
-
-        // Poll all the devices to poll.
-        // log!("PT polling {count_after_prune} devices");
-        for device in to_poll.keys() {
-            device
-                .poll(wgpu::PollType::Poll)
-                .expect("unreachable: poll() timed out despite not using timeout");
         }
 
         // While waiting for it to be time to poll again, check for incoming requests.
@@ -168,14 +170,12 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
         };
 
         match recv_result {
-            Ok(request) => {
-                if let Some(device) = request.upgrade() {
-                    log!("PT received request to poll {device:?}");
-                    to_poll
-                        .entry(wgpu::Device::clone(&*device))
-                        .or_default()
-                        .push(request);
-                }
+            Ok(weak_device) => {
+                log!(
+                    "PT received request to poll {device:?}",
+                    device = weak_device.upgrade()
+                );
+                to_poll.push(weak_device);
             }
             Err(flume::RecvTimeoutError::Disconnected) => {
                 // This shouldn't happen because the sender is static and never dropped
