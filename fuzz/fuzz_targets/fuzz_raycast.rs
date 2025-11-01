@@ -84,10 +84,7 @@ fn exercise(
         // Check that within() is applied correctly.
         if let Some(bounds) = bounds
             && !bounds.contains_cube(step.cube_ahead())
-            && !(expect_exit
-                && bounds
-                    .expand(FaceMap::splat(1))
-                    .contains_cube(step.cube_ahead()))
+            && !(expect_exit && bounds.expand(FaceMap::splat(1)).contains_cube(step.cube_ahead()))
         {
             panic!("out of bounds {bounds:?}: step {step:#?}");
         }

@@ -631,9 +631,7 @@ mod tests {
 
     #[test]
     fn evaluated_block_debug_simple() {
-        let ev = block::from_color!(Rgba::WHITE)
-            .evaluate(ReadTicket::stub())
-            .unwrap();
+        let ev = block::from_color!(Rgba::WHITE).evaluate(ReadTicket::stub()).unwrap();
 
         // not testing the one-line version because it'll be not too surprising
         assert_eq!(
@@ -778,10 +776,7 @@ mod tests {
             Rgba::new(0.0, 0.5, 1.0, 0.5),
         ] {
             assert_eq!(
-                Block::from(color)
-                    .evaluate(ReadTicket::stub())
-                    .unwrap()
-                    .opacity_as_category(),
+                Block::from(color).evaluate(ReadTicket::stub()).unwrap().opacity_as_category(),
                 color.opacity_category(),
                 "Input color {color:?}"
             );

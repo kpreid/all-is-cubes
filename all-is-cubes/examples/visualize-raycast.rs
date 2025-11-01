@@ -54,9 +54,7 @@ fn show(
 ) {
     let mut previous_point = None;
     for (i, step) in (0..1000).zip(raycaster) {
-        destination
-            .stream
-            .set_time_sequence("global_step", *global_t);
+        destination.stream.set_time_sequence("global_step", *global_t);
         *global_t += 1;
 
         let (transform, box_color) = match recurse {
@@ -79,10 +77,7 @@ fn show(
         };
 
         let intersection_point = rg::convert_vec(
-            transform
-                .transform_point3d(step.intersection_point(ray))
-                .unwrap()
-                .to_vector(),
+            transform.transform_point3d(step.intersection_point(ray)).unwrap().to_vector(),
         );
         if let Some(previous_point) = previous_point {
             destination.log(
@@ -101,12 +96,8 @@ fn show(
             &rg::entity_path!["cube_ahead"],
             &rg::convert_aabs(
                 [Aab::from_lower_upper(
-                    transform
-                        .transform_point3d(step.cube_ahead().lower_bounds().to_f64())
-                        .unwrap(),
-                    transform
-                        .transform_point3d(step.cube_ahead().upper_bounds().to_f64())
-                        .unwrap(),
+                    transform.transform_point3d(step.cube_ahead().lower_bounds().to_f64()).unwrap(),
+                    transform.transform_point3d(step.cube_ahead().upper_bounds().to_f64()).unwrap(),
                 )],
                 FreeVector::zero(),
             )

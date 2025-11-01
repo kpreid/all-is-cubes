@@ -76,8 +76,7 @@ impl Gridgid {
     #[inline]
     #[track_caller]
     pub fn transform_point(self, point: GridPoint) -> GridPoint {
-        self.checked_transform_point(point)
-            .expect("transformed point overflowed")
+        self.checked_transform_point(point).expect("transformed point overflowed")
     }
 
     /// Applies this transform to the given point.

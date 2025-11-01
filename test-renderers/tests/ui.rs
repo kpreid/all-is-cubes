@@ -186,8 +186,7 @@ async fn create_widget_theme_universe() -> Arc<Universe> {
     widgets::WidgetTheme::new(u.read_ticket(), &mut txn, YieldProgress::noop())
         .await
         .unwrap();
-    txn.execute(&mut u, (), &mut transaction::no_outputs)
-        .unwrap();
+    txn.execute(&mut u, (), &mut transaction::no_outputs).unwrap();
     Arc::new(u)
 }
 
@@ -196,9 +195,7 @@ fn widget_theme(context: &RenderTestContext) -> widgets::WidgetTheme {
 }
 
 fn advance_time(session: &mut Session) {
-    session
-        .frame_clock
-        .advance_by(session.universe().clock().schedule().delta_t());
+    session.frame_clock.advance_by(session.universe().clock().schedule().delta_t());
     let step = session.maybe_step_universe();
     assert_ne!(step, None);
 }
@@ -237,12 +234,8 @@ fn render_widget(
     let end_time = Instant::now();
     log::trace!(
         "render_widget: {} to_space, {} render",
-        space_to_render_time
-            .saturating_duration_since(start_time)
-            .refmt(&ConciseDebug),
-        end_time
-            .saturating_duration_since(space_to_render_time)
-            .refmt(&ConciseDebug),
+        space_to_render_time.saturating_duration_since(start_time).refmt(&ConciseDebug),
+        end_time.saturating_duration_since(space_to_render_time).refmt(&ConciseDebug),
     );
 
     rendering

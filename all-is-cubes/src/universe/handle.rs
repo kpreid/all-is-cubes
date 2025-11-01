@@ -224,11 +224,7 @@ impl<T: 'static> Handle<T> {
     /// a [`Universe`].
     pub fn name(&self) -> Name {
         // This code is also duplicated as `RootHandle::name()`
-        self.inner
-            .permanent_name
-            .get()
-            .unwrap_or(&Name::Pending)
-            .clone()
+        self.inner.permanent_name.get().unwrap_or(&Name::Pending).clone()
     }
 
     /// Obtains the [`ecs::Entity`] for this handle.
@@ -345,14 +341,11 @@ impl<T: 'static> Handle<T> {
         // Actually obtain access.
         match access {
             Access::Pending => Ok(ReadGuard(
-                read_ticket
-                    .borrow_pending(self)
-                    .map_err(|e| e.into_handle_error(self))?,
+                read_ticket.borrow_pending(self).map_err(|e| e.into_handle_error(self))?,
             )),
             Access::Entity(entity) => {
-                let component = read_ticket
-                    .get::<T>(entity)
-                    .map_err(|e| e.into_handle_error(self))?;
+                let component =
+                    read_ticket.get::<T>(entity).map_err(|e| e.into_handle_error(self))?;
                 Ok(ReadGuard(component))
             }
         }
@@ -408,9 +401,7 @@ impl<T: 'static> Handle<T> {
             }
         };
 
-        let component = read_ticket
-            .get::<C>(entity)
-            .map_err(|e| e.into_handle_error(self))?;
+        let component = read_ticket.get::<C>(entity).map_err(|e| e.into_handle_error(self))?;
         Ok(component)
     }
 
@@ -544,12 +535,7 @@ impl<T: 'static> Handle<T> {
     where
         T: UniverseMember,
     {
-        let pending_name = self
-            .inner
-            .permanent_name
-            .get()
-            .unwrap_or(&Name::Pending)
-            .clone();
+        let pending_name = self.inner.permanent_name.get().unwrap_or(&Name::Pending).clone();
         let new_name = universe.allocate_name(&pending_name)?;
 
         // We have now completed all checks that could fail under reasonable circumstances, and can
@@ -601,10 +587,7 @@ impl<T: 'static> Handle<T> {
     }
 
     pub(in crate::universe) fn has_strong_handles(&self) -> bool {
-        self.inner
-            .strong_handle_count
-            .load(atomic::Ordering::Acquire)
-            > 0
+        self.inner.strong_handle_count.load(atomic::Ordering::Acquire) > 0
     }
 }
 
@@ -731,14 +714,11 @@ mod arbitrary_handle {
                     let value = T::arbitrary(u)?;
 
                     tl::get_from_context(tl::Purpose::Arbitrary, |context| {
-                        context
-                            .universe
-                            .insert(name.clone(), value)
-                            .unwrap_or_else(|_| {
-                                // TODO: insert anonymous if picking an arbitrary name failed;
-                                // right now we can't recover ownership of the value!
-                                Handle::new_gone(name)
-                            })
+                        context.universe.insert(name.clone(), value).unwrap_or_else(|_| {
+                            // TODO: insert anonymous if picking an arbitrary name failed;
+                            // right now we can't recover ownership of the value!
+                            Handle::new_gone(name)
+                        })
                     })
                     .unwrap_or_else(no_context)
                 }
@@ -931,10 +911,7 @@ impl<T: UniverseMember> StrongHandle<T> {
         // unintended retention, neither of which is a soundness issue.
         //
         // TODO: Think about the optimal choice of atomic ordering
-        handle
-            .inner
-            .strong_handle_count
-            .fetch_add(1, atomic::Ordering::AcqRel);
+        handle.inner.strong_handle_count.fetch_add(1, atomic::Ordering::AcqRel);
 
         Self(handle)
     }
@@ -953,10 +930,7 @@ impl<T: UniverseMember> StrongHandle<T> {
 
 impl<T: UniverseMember> Drop for StrongHandle<T> {
     fn drop(&mut self) {
-        self.0
-            .inner
-            .strong_handle_count
-            .fetch_sub(1, atomic::Ordering::Relaxed);
+        self.0.inner.strong_handle_count.fetch_sub(1, atomic::Ordering::Relaxed);
     }
 }
 

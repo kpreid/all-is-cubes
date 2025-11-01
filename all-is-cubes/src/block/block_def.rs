@@ -290,9 +290,7 @@ impl Transaction for BlockDefTransaction {
     type Mismatch = BlockDefMismatch;
 
     fn check(&self, target: &BlockDef) -> Result<Self::CommitCheck, Self::Mismatch> {
-        self.old
-            .check(&target.state.block)
-            .map_err(|_| BlockDefMismatch::Unexpected)
+        self.old.check(&target.state.block).map_err(|_| BlockDefMismatch::Unexpected)
     }
 
     fn commit(
@@ -508,18 +506,17 @@ pub(crate) fn update_phase_2(
     mut defs: ecs::Query<'_, '_, (&mut BlockDef, &mut BlockDefNextValue)>,
 ) {
     // TODO: run this only on entities that need it, somehow
-    defs.par_iter_mut()
-        .for_each(|(mut def, mut next)| match mem::take(&mut *next) {
-            BlockDefNextValue::NewEvaluation(result) => {
-                def.state.cache = result;
-                def.notifier.notify(&BlockChange::new());
-            }
-            BlockDefNextValue::NewState(result) => {
-                def.state = result;
-                def.notifier.notify(&BlockChange::new());
-            }
-            BlockDefNextValue::None => {}
-        });
+    defs.par_iter_mut().for_each(|(mut def, mut next)| match mem::take(&mut *next) {
+        BlockDefNextValue::NewEvaluation(result) => {
+            def.state.cache = result;
+            def.notifier.notify(&BlockChange::new());
+        }
+        BlockDefNextValue::NewState(result) => {
+            def.state = result;
+            def.notifier.notify(&BlockChange::new());
+        }
+        BlockDefNextValue::None => {}
+    });
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -538,9 +535,7 @@ mod tests {
     #[test]
     fn evaluate_equivalence() {
         let mut universe = Universe::new();
-        let block = Block::builder()
-            .color(Rgba::new(1.0, 0.0, 0.0, 1.0))
-            .build();
+        let block = Block::builder().color(Rgba::new(1.0, 0.0, 0.0, 1.0)).build();
 
         let eval_bare = block.evaluate(universe.read_ticket()).unwrap();
         let block_def = BlockDef::new(universe.read_ticket(), block.clone());

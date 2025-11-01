@@ -247,9 +247,7 @@ mod tests {
         )
         .await
         .unwrap();
-        install_txn
-            .execute(&mut universe, (), &mut transaction::no_outputs)
-            .unwrap();
+        install_txn.execute(&mut universe, (), &mut transaction::no_outputs).unwrap();
 
         let bounds = GridAab::from_lower_upper([0, 0, 0], [4, 1, 1]);
 

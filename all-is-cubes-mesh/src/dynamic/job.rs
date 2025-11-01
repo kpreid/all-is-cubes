@@ -328,17 +328,13 @@ pub(in crate::dynamic) struct Receiver<T> {
 }
 impl<T> fmt::Debug for Receiver<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("job::Receiver")
-            .field("receiver", &self.receiver)
-            .finish()
+        f.debug_struct("job::Receiver").field("receiver", &self.receiver).finish()
     }
 }
 impl<T> Receiver<T> {
     // TODO: tidy up return type
     pub fn try_recv(&mut self) -> Result<Option<T>, oneshot::Canceled> {
-        self.receiver
-            .try_recv()
-            .map(|option| option.map(|shell| shell.output))
+        self.receiver.try_recv().map(|option| option.map(|shell| shell.output))
     }
 }
 
@@ -464,12 +460,7 @@ mod state {
         }
 
         pub fn take_completed(&self) -> Vec<BlockIndex> {
-            self.counters
-                .lock()
-                .unwrap()
-                .completed_blocks
-                .drain()
-                .collect()
+            self.counters.lock().unwrap().completed_blocks.drain().collect()
         }
     }
 

@@ -296,9 +296,7 @@ fn write_and_measure<B: Backend + io::Write>(
 }
 
 fn fallback_measure_str(text: &str) -> u16 {
-    unicode_width::UnicodeWidthStr::width(text)
-        .try_into()
-        .unwrap_or(u16::MAX)
+    unicode_width::UnicodeWidthStr::width(text).try_into().unwrap_or(u16::MAX)
 }
 
 #[cfg(test)]

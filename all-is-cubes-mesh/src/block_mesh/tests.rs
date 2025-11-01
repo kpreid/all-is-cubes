@@ -32,9 +32,7 @@ fn default_is_empty() {
 
 #[test]
 fn nonempty() {
-    let ev = block::from_color!(Rgba::WHITE)
-        .evaluate(ReadTicket::stub())
-        .unwrap();
+    let ev = block::from_color!(Rgba::WHITE).evaluate(ReadTicket::stub()).unwrap();
     let mesh: TestMesh = BlockMesh::new(
         &ev,
         &NoTextures,
@@ -108,14 +106,9 @@ fn mesh_has_documented_depth_ordering() {
         );
         let increasing_direction = face.opposite().normal_vector();
         assert!(
-            sub_mesh
-                .indices_opaque
-                .as_slice(..)
-                .iter_u32()
-                .is_sorted_by_key(|i| sub_mesh.vertices.0[i as usize]
-                    .position
-                    .to_vector()
-                    .dot(increasing_direction)),
+            sub_mesh.indices_opaque.as_slice(..).iter_u32().is_sorted_by_key(|i| {
+                sub_mesh.vertices.0[i as usize].position.to_vector().dot(increasing_direction)
+            }),
             "should be sorted along {face:?}"
         );
     }

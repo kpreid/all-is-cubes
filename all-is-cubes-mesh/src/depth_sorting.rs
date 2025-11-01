@@ -477,8 +477,7 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
                 } else {
                     // Quad does not overlap; finish the current group and start a new one.
                     if quad_group.len() > 1 {
-                        meta.dynamic_sub_ranges
-                            .push((quad_group.start * 6)..(quad_group.end * 6));
+                        meta.dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
                     }
                     quad_group = i..(i + 1);
                     group_upper_bound = qmax;
@@ -486,8 +485,7 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
             }
             // Write the last group
             if quad_group.len() > 1 {
-                meta.dynamic_sub_ranges
-                    .push((quad_group.start * 6)..(quad_group.end * 6));
+                meta.dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
             }
 
             if meta.dynamic_sub_ranges.is_empty() {
@@ -829,9 +827,8 @@ mod tests {
                         }
                     }
 
-                    let rotated_position = ordering
-                        .sort_key_rotation()
-                        .transform_vector(camera_position.to_vector());
+                    let rotated_position =
+                        ordering.sort_key_rotation().transform_vector(camera_position.to_vector());
                     // The sort rotation is supposed to rotate vertex positions so that they
                     // are back-to-front as coordinates increase.
                     // Therefore, if we rotate the vector which is the direction
@@ -982,12 +979,7 @@ mod tests {
         );
         assert_eq!(space_mesh.needs_depth_sorting(ordering, position), true);
 
-        assert!(
-            space_mesh
-                .depth_sort_for_view(ordering, position)
-                .changed
-                .is_some()
-        );
+        assert!(space_mesh.depth_sort_for_view(ordering, position).changed.is_some());
         assert_eq!(space_mesh.needs_depth_sorting(ordering, position), false);
 
         // Second sort should do nothing

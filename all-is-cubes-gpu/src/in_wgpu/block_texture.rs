@@ -326,13 +326,9 @@ impl texture::Tile for AtlasTile {
 
             texture::copy_voxels_into_xmaj_texture(
                 data,
-                tile_backing
-                    .reflectance
-                    .get_or_insert_with(|| zero_box(volume)),
+                tile_backing.reflectance.get_or_insert_with(|| zero_box(volume)),
                 self.channels.has_emission().then(|| {
-                    &mut tile_backing
-                        .emission
-                        .get_or_insert_with(|| zero_box(volume))[..]
+                    &mut tile_backing.emission.get_or_insert_with(|| zero_box(volume))[..]
                 }),
             );
             tile_backing.dirty = true;
@@ -342,9 +338,8 @@ impl texture::Tile for AtlasTile {
                 let mut points_for_rerun = Vec::new();
                 let mut colors_for_rerun = Vec::new();
                 let mut radii_for_rerun = Vec::new();
-                let region: Box3D<_, _> = self
-                    .offset
-                    .transform_box3d(&Box3D::from(self.bounds()).cast_unit());
+                let region: Box3D<_, _> =
+                    self.offset.transform_box3d(&Box3D::from(self.bounds()).cast_unit());
 
                 points_for_rerun.extend(
                     iproduct!(region.z_range(), region.y_range(), region.x_range()).map(

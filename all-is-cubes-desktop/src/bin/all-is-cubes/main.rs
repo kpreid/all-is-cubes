@@ -73,9 +73,7 @@ fn main() -> Result<(), anyhow::Error> {
     let record_options: Option<record::RecordOptions> =
         options.record_options().inspect(|optropt| {
             if graphics_type == GraphicsType::Record
-                && optropt
-                    .as_ref()
-                    .is_some_and(|ropt| ropt.output_format.includes_light())
+                && optropt.as_ref().is_some_and(|ropt| ropt.output_format.includes_light())
             {
                 precompute_light = true;
             }
@@ -112,9 +110,7 @@ fn main() -> Result<(), anyhow::Error> {
     let session_done_time = Instant::now();
     log::debug!(
         "Initialized session ({:.3} s)",
-        session_done_time
-            .duration_since(start_session_time)
-            .as_secs_f32()
+        session_done_time.duration_since(start_session_time).as_secs_f32()
     );
 
     // Bundle of inputs to `inner_main()`, which — unlike this function — is generic over

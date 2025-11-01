@@ -41,9 +41,7 @@ impl WidgetTheme {
         txn: &mut UniverseTransaction,
         progress: YieldProgress,
     ) -> Result<Self, GenError> {
-        let widget_blocks = WidgetBlocks::new(txn, progress)
-            .await
-            .install(read_ticket, txn)?;
+        let widget_blocks = WidgetBlocks::new(txn, progress).await.install(read_ticket, txn)?;
 
         Ok(Self::from_provider(widget_blocks))
     }

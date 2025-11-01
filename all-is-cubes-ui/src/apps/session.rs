@@ -346,11 +346,7 @@ impl Session {
                 self.input_processor.apply_input(
                     InputTargets {
                         universe: Some(&mut shuttle.game_universe),
-                        character: shuttle
-                            .game_character
-                            .get()
-                            .as_ref()
-                            .map(StrongHandle::as_ref),
+                        character: shuttle.game_character.get().as_ref().map(StrongHandle::as_ref),
                         paused: Some(&self.paused),
                         settings: Some(&shuttle.settings),
                         control_channel: Some(&self.control_channel_sender),
@@ -524,14 +520,11 @@ impl Session {
     /// We'd like to not have too much dependencies on the rendering, but also
     /// not obligate each platform/renderer layer to have too much boilerplate.
     pub fn update_cursor(&mut self, cameras: &StandardCameras) {
-        let cursor_result = self
-            .input_processor
-            .cursor_ndc_position()
-            .and_then(|ndc_pos| {
-                cameras
-                    .project_cursor(self.read_tickets(), ndc_pos)
-                    .expect("shouldn't happen: read error in update_cursor()")
-            });
+        let cursor_result = self.input_processor.cursor_ndc_position().and_then(|ndc_pos| {
+            cameras
+                .project_cursor(self.read_tickets(), ndc_pos)
+                .expect("shouldn't happen: read error in update_cursor()")
+        });
         self.shuttle_mut().cursor_result = cursor_result;
     }
 
@@ -642,11 +635,7 @@ impl Session {
     /// containing diagnostic information about rendering and stepping.
     pub fn info_text<T: Fmt<StatusText>>(&self, render: T) -> InfoText<'_, T> {
         let fopt = StatusText {
-            show: self
-                .shuttle()
-                .settings
-                .get_graphics_options()
-                .debug_info_text_contents,
+            show: self.shuttle().settings.get_graphics_options().debug_info_text_contents,
         };
 
         if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
@@ -675,11 +664,8 @@ impl Session {
 impl Shuttle {
     fn set_universe(&mut self, universe: Universe) {
         self.game_universe = universe;
-        self.game_character.set(
-            self.game_universe
-                .get_default_character()
-                .map(StrongHandle::new),
-        );
+        self.game_character
+            .set(self.game_universe.get_default_character().map(StrongHandle::new));
 
         self.sync_universe_and_character_derived();
         // TODO: Need to sync FrameClock's schedule with the universe in case it is different
@@ -1101,10 +1087,7 @@ impl<T: Fmt<StatusText>> fmt::Display for InfoText<'_, T> {
                 f,
                 "{:#?}\n\nFPS: {:2.1}\n{:#?}",
                 self.session.last_step_info.refmt(&fopt),
-                self.session
-                    .frame_clock
-                    .draw_fps_counter()
-                    .frames_per_second(),
+                self.session.frame_clock.draw_fps_counter().frames_per_second(),
                 self.render.refmt(&fopt),
             )?;
         }
@@ -1322,15 +1305,9 @@ impl MainTaskContext {
     // in lieu of an arbitrary function, that deletes the command if dropped.
     pub fn add_custom_command(&mut self, command: crate::ui_content::Command) {
         self.with_mut(|shuttle| {
-            shuttle.custom_commands.set(
-                shuttle
-                    .custom_commands
-                    .get()
-                    .iter()
-                    .cloned()
-                    .chain([command])
-                    .collect(),
-            )
+            shuttle
+                .custom_commands
+                .set(shuttle.custom_commands.get().iter().cloned().chain([command]).collect())
         });
     }
 
@@ -1347,10 +1324,7 @@ impl MainTaskContext {
     // TODO: Replace this entirely with `show_notification`.
     pub fn show_modal_message(&self, message: ArcStr) {
         self.with_ref(|shuttle| {
-            shuttle
-                .control_channel_sender
-                .send(ControlMessage::ShowModal(message))
-                .unwrap();
+            shuttle.control_channel_sender.send(ControlMessage::ShowModal(message)).unwrap();
         })
     }
 
@@ -1429,9 +1403,7 @@ mod tests {
     use futures_channel::oneshot;
 
     fn advance_time(session: &mut Session) {
-        session
-            .frame_clock
-            .advance_by(session.universe().clock().schedule().delta_t());
+        session.frame_clock.advance_by(session.universe().clock().schedule().delta_t());
         let step = session.maybe_step_universe();
         assert_ne!(step, None);
     }
@@ -1460,10 +1432,7 @@ mod tests {
         session.listen_fluff(log.listener());
 
         // Try some fluff with the initial state (we haven't even stepped the session)
-        session
-            .universe_mut()
-            .execute_1(&space1, st.clone())
-            .unwrap();
+        session.universe_mut().execute_1(&space1, st.clone()).unwrap();
         assert_eq!(log.drain(), vec![Fluff::Happened]);
 
         // Change spaces
@@ -1477,10 +1446,7 @@ mod tests {
         session.maybe_step_universe();
 
         // Check we're now listening to the new space only
-        session
-            .universe_mut()
-            .execute_1(&space1, st.clone())
-            .unwrap();
+        session.universe_mut().execute_1(&space1, st.clone()).unwrap();
         assert_eq!(log.drain(), vec![]);
         session.universe_mut().execute_1(&space2, st).unwrap();
         assert_eq!(log.drain(), vec![Fluff::Happened]);
@@ -1529,9 +1495,8 @@ mod tests {
 
         // Deliver new universe.
         let mut new_universe = Universe::new();
-        let new_space = new_universe
-            .insert(new_marker.clone(), Space::empty_positive(1, 1, 1))
-            .unwrap();
+        let new_space =
+            new_universe.insert(new_marker.clone(), Space::empty_positive(1, 1, 1)).unwrap();
         new_universe
             .insert(
                 Name::from("character"),
@@ -1560,10 +1525,8 @@ mod tests {
 
     #[macro_rules_attribute::apply(smol_macros::test)]
     async fn input_is_processed_even_without_character() {
-        let mut session = Session::builder()
-            .ui(listen::constant(Viewport::ARBITRARY))
-            .build()
-            .await;
+        let mut session =
+            Session::builder().ui(listen::constant(Viewport::ARBITRARY)).build().await;
         assert!(!session.paused.get());
 
         session.input_processor.key_momentary(Key::Escape); // need to not just use control_channel

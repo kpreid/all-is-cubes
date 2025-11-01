@@ -349,11 +349,8 @@ impl Accumulate for ColorBuf {
     #[inline]
     fn add(&mut self, hit: Hit<'_, Self::BlockData>) {
         if matches!(hit.exception, Some(Exception::DebugOverrideRg)) {
-            self.light = hit
-                .surface
-                .light
-                .xy()
-                .extend(Rgba::from(*self).to_rgb().luminance() * 0.2);
+            self.light =
+                hit.surface.light.xy().extend(Rgba::from(*self).to_rgb().luminance() * 0.2);
             self.transmittance = 0.0;
         } else {
             // Note that the order of these assignments matters.
@@ -366,11 +363,7 @@ impl Accumulate for ColorBuf {
     #[inline]
     fn mean<const N: usize>(items: [Self; N]) -> Self {
         Self {
-            light: items
-                .iter()
-                .map(|cb| cb.light)
-                .sum::<Vector3D<f32, Intensity>>()
-                / (N as f32),
+            light: items.iter().map(|cb| cb.light).sum::<Vector3D<f32, Intensity>>() / (N as f32),
             transmittance: items.iter().map(|cb| cb.transmittance).sum::<f32>() / (N as f32),
         }
     }

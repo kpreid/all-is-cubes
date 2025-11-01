@@ -109,9 +109,7 @@ impl SettingsArgs {
 }
 
 fn parse_configure(arg: &str) -> Result<(String, serde_json::Value), anyhow::Error> {
-    let (key, value) = arg
-        .split_once('=')
-        .ok_or_else(|| anyhow::anyhow!("missing '='"))?;
+    let (key, value) = arg.split_once('=').ok_or_else(|| anyhow::anyhow!("missing '='"))?;
     let value = serde_json::from_str(value)?;
     Ok((key.to_owned(), value))
 }

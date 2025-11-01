@@ -153,9 +153,7 @@ fn inspect_modifier(
     let modifier = &block.modifiers()[modifier_index];
 
     let mut block_up_to_this = block.clone();
-    block_up_to_this
-        .modifiers_mut()
-        .truncate(modifier_index + 1);
+    block_up_to_this.modifiers_mut().truncate(modifier_index + 1);
 
     let (name, details) = match modifier {
         block::Modifier::Attributes(a) => {

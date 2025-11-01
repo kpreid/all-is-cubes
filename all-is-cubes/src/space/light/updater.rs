@@ -109,8 +109,7 @@ impl LightStorage {
 
     pub(crate) fn light_needs_update(&mut self, cube: Cube, priority: Priority) {
         if self.contents.bounds().contains_cube(cube) {
-            self.light_update_queue
-                .insert(LightUpdateRequest { priority, cube });
+            self.light_update_queue.insert(LightUpdateRequest { priority, cube });
         }
     }
 
@@ -619,9 +618,7 @@ impl<'a> UpdateCtx<'a> {
     }
 
     fn get_evaluated_by_index(&self, cube_index: usize) -> &'a EvaluatedBlock {
-        self.palette
-            .entry(self.contents.as_linear()[cube_index])
-            .evaluated()
+        self.palette.entry(self.contents.as_linear()[cube_index]).evaluated()
     }
 }
 
@@ -868,9 +865,7 @@ impl LightBuffer {
                 // Don't read the value we're trying to recalculate.
                 Rgb::ZERO
             } else {
-                light_ahead_cache
-                    .get_or_insert_with(|| current_light.get(light_cube))
-                    .value()
+                light_ahead_cache.get_or_insert_with(|| current_light.get(light_cube)).value()
             };
             // Note that light emission is *not* multiplied by the alpha, because alpha is about
             // reflection/transmission. It's perfectly okay to have a totally transparent (alpha

@@ -13,8 +13,7 @@ fn trycmd_tests() {
     // Docs: https://docs.rs/anyhow/1.0.75/anyhow/index.html#details
     tc.env("RUST_LIB_BACKTRACE", "0");
 
-    tc.insert_var("[DESKTOPVERSION]", env!("CARGO_PKG_VERSION"))
-        .unwrap();
+    tc.insert_var("[DESKTOPVERSION]", env!("CARGO_PKG_VERSION")).unwrap();
     tc.case("tests/end-to-end/*.toml");
 
     // TODO: doesn't work, for reasons that are not currently a priority

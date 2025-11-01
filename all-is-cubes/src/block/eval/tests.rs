@@ -108,10 +108,7 @@ fn air_consistent_with_evoxel_air() {
 #[test]
 fn air_in_recursive_block() {
     let mut universe = Universe::new();
-    let block = Block::builder()
-        .voxels_fn(R1, |_| AIR)
-        .unwrap()
-        .build_into(&mut universe);
+    let block = Block::builder().voxels_fn(R1, |_| AIR).unwrap().build_into(&mut universe);
     assert_eq!(
         eval_in(&block, &universe).voxels.single_voxel().unwrap(),
         Evoxel::AIR
@@ -169,10 +166,7 @@ fn transparent_atom() {
 #[test]
 fn emissive_only_atom() {
     let emissive_color = Rgb::new(1.0, 2.0, 3.0);
-    let block = Block::builder()
-        .color(Rgba::TRANSPARENT)
-        .light_emission(emissive_color)
-        .build();
+    let block = Block::builder().color(Rgba::TRANSPARENT).light_emission(emissive_color).build();
     let e = eval_out(&block);
     assert_eq!(e.color(), Rgba::TRANSPARENT);
     assert_eq!(e.face_colors(), FaceMap::splat(Rgba::TRANSPARENT));
@@ -277,10 +271,7 @@ fn voxels_emission_equivalence(
 ) {
     let mut universe = Universe::new();
     let atom_emission = Rgb::new(1.0, 2.0, 3.0);
-    let atom = Block::builder()
-        .color(reflectance)
-        .light_emission(atom_emission)
-        .build();
+    let atom = Block::builder().color(reflectance).light_emission(atom_emission).build();
 
     let voxel_block = Block::builder()
         .voxels_fn(resolution, |_| &atom)
@@ -426,13 +417,10 @@ fn voxels_partial_not_filling() {
     let mut universe = Universe::new();
     let mut space = Space::empty_positive(2, 4, 4);
     space.mutate(universe.read_ticket(), |m| {
-        m.fill_all_uniform(&block::from_color!(Rgba::WHITE))
-            .unwrap()
+        m.fill_all_uniform(&block::from_color!(Rgba::WHITE)).unwrap()
     });
     let space_handle = universe.insert_anonymous(space);
-    let block = Block::builder()
-        .voxels_handle(resolution, space_handle)
-        .build();
+    let block = Block::builder().voxels_handle(resolution, space_handle).build();
 
     let e = eval_in(&block, &universe);
     // of 6 faces, 2 are opaque and 2 are half-transparent, thus there are 8 opaque half-faces.
@@ -544,9 +532,7 @@ fn indirect_equivalence() {
         })
         .unwrap();
     let space_handle = universe.insert_anonymous(space);
-    let block = Block::builder()
-        .voxels_handle(resolution, space_handle)
-        .build();
+    let block = Block::builder().voxels_handle(resolution, space_handle).build();
 
     let eval_bare = eval_in(&block, &universe);
     let block_def_handle = universe.insert_anonymous(BlockDef::new(universe.read_ticket(), block));

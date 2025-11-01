@@ -43,18 +43,12 @@ fn INVENTORY(ctx: Context<'_>) {
     let pipe_table = prepare_pipes([
         // TODO: Should prepare_pipes() automatically fix the lack of inventories?
         PipeData {
-            block: straight_pipe_block
-                .evaluate(txn.read_ticket())
-                .unwrap()
-                .with_inventory([]),
+            block: straight_pipe_block.evaluate(txn.read_ticket()).unwrap().with_inventory([]),
             from_face: Face6::NZ,
             to_face: Face6::PZ,
         },
         PipeData {
-            block: elbow_pipe_block
-                .evaluate(txn.read_ticket())
-                .unwrap()
-                .with_inventory([]),
+            block: elbow_pipe_block.evaluate(txn.read_ticket()).unwrap().with_inventory([]),
             from_face: Face6::NZ,
             to_face: Face6::NX,
         },
@@ -112,20 +106,14 @@ fn INVENTORY(ctx: Context<'_>) {
 
         // Place some items in the loop of pipe
         {
-            let pipe_with_item_1 = straight_pipe_block
-                .evaluate(txn.read_ticket())
-                .unwrap()
-                .with_inventory([inv::Tool::Block(block::from_color!(
-                    Rgb01::UNIFORM_LUMINANCE_RED
-                ))
-                .into()]);
-            let pipe_with_item_2 = straight_pipe_block
-                .evaluate(txn.read_ticket())
-                .unwrap()
-                .with_inventory([inv::Tool::Block(block::from_color!(
-                    Rgb01::UNIFORM_LUMINANCE_BLUE
-                ))
-                .into()]);
+            let pipe_with_item_1 =
+                straight_pipe_block.evaluate(txn.read_ticket()).unwrap().with_inventory([
+                    inv::Tool::Block(block::from_color!(Rgb01::UNIFORM_LUMINANCE_RED)).into(),
+                ]);
+            let pipe_with_item_2 =
+                straight_pipe_block.evaluate(txn.read_ticket()).unwrap().with_inventory([
+                    inv::Tool::Block(block::from_color!(Rgb01::UNIFORM_LUMINANCE_BLUE)).into(),
+                ]);
             m.set([2, 1, 0], pipe_with_item_1.rotate(GridRotation::RXzY))?;
             m.set([3, 1, 0], pipe_with_item_2.rotate(GridRotation::RXZy))?;
         }
@@ -161,9 +149,7 @@ fn prepare_pipes(pipes: impl IntoIterator<Item = PipeData>) -> PipeTable {
                 table.insert(faces, pipe.block.clone().rotate(rotation));
             } else {
                 // Insert only if we don't have one already.
-                table
-                    .entry(faces)
-                    .or_insert_with(|| pipe.block.clone().rotate(rotation));
+                table.entry(faces).or_insert_with(|| pipe.block.clone().rotate(rotation));
             }
         }
     }
@@ -186,14 +172,12 @@ fn fit_pipes(
     pipes: &PipeTable,
     path: impl IntoIterator<Item = Cube>,
 ) -> impl Iterator<Item = (Cube, &Block)> {
-    path.into_iter()
-        .tuple_windows()
-        .map(|(cube_behind, cube_here, cube_ahead)| {
-            let face_behind = Face6::try_from(cube_behind - cube_here).expect("invalid path");
-            let face_ahead = Face6::try_from(cube_ahead - cube_here).expect("invalid path");
+    path.into_iter().tuple_windows().map(|(cube_behind, cube_here, cube_ahead)| {
+        let face_behind = Face6::try_from(cube_behind - cube_here).expect("invalid path");
+        let face_ahead = Face6::try_from(cube_ahead - cube_here).expect("invalid path");
 
-            (cube_here, &pipes[&(face_behind, face_ahead)])
-        })
+        (cube_here, &pipes[&(face_behind, face_ahead)])
+    })
 }
 
 fn make_pipe_blocks(txn: &mut ExhibitTransaction) -> (Block, Block) {

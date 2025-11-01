@@ -449,11 +449,7 @@ impl Operation {
             Operation::Become(block) => Operation::Become(block.rotate(rotation)),
             Operation::DestroyTo(block) => Operation::DestroyTo(block.rotate(rotation)),
             Operation::AddModifiers(modifiers) => Operation::AddModifiers(
-                modifiers
-                    .iter()
-                    .cloned()
-                    .map(|modifier| modifier.rotate(rotation))
-                    .collect(),
+                modifiers.iter().cloned().map(|modifier| modifier.rotate(rotation)).collect(),
             ),
             Operation::Replace {
                 old,
@@ -580,21 +576,15 @@ mod tests {
         );
         assert_eq!(
             op.apply(&Space::empty_positive(2, 1, 1), None, Gridgid::IDENTITY),
-            Ok(move_x
-                .apply(&Space::empty_positive(2, 1, 1), None, Gridgid::IDENTITY)
-                .unwrap()),
+            Ok(move_x.apply(&Space::empty_positive(2, 1, 1), None, Gridgid::IDENTITY).unwrap()),
         );
         assert_eq!(
             op.apply(&Space::empty_positive(1, 2, 1), None, Gridgid::IDENTITY),
-            Ok(move_y
-                .apply(&Space::empty_positive(1, 2, 1), None, Gridgid::IDENTITY)
-                .unwrap()),
+            Ok(move_y.apply(&Space::empty_positive(1, 2, 1), None, Gridgid::IDENTITY).unwrap()),
         );
         assert_eq!(
             op.apply(&Space::empty_positive(1, 1, 2), None, Gridgid::IDENTITY),
-            Ok(move_z
-                .apply(&Space::empty_positive(1, 1, 2), None, Gridgid::IDENTITY)
-                .unwrap()),
+            Ok(move_z.apply(&Space::empty_positive(1, 1, 2), None, Gridgid::IDENTITY).unwrap()),
         );
     }
 
@@ -668,8 +658,7 @@ mod tests {
 
         // Test effect on AIR; it should do nothing because the block is symmetric
         assert_eq!(
-            op.apply(&space, None, Gridgid::from_translation([1, 0, 0]))
-                .unwrap(),
+            op.apply(&space, None, Gridgid::from_translation([1, 0, 0])).unwrap(),
             (SpaceTransaction::default(), InventoryTransaction::default())
         );
     }
@@ -750,9 +739,8 @@ mod tests {
     fn take_inventory_and_destroy_success() {
         let [block_bare] = make_some_blocks();
         let stack = inv::Slot::stack(3, inv::Tool::Activate);
-        let block_with_inventory = block_bare
-            .clone()
-            .with_modifier(Inventory::from_slots(vec![stack.clone()]));
+        let block_with_inventory =
+            block_bare.clone().with_modifier(Inventory::from_slots(vec![stack.clone()]));
         let op = Operation::TakeInventory {
             destroy_if_empty: true,
         };
@@ -762,8 +750,7 @@ mod tests {
         let character_inventory = Inventory::new(2);
 
         assert_eq!(
-            op.apply(&space, Some(&character_inventory), Gridgid::IDENTITY)
-                .unwrap(),
+            op.apply(&space, Some(&character_inventory), Gridgid::IDENTITY).unwrap(),
             (
                 {
                     let mut txn = SpaceTransaction::default();
@@ -779,9 +766,8 @@ mod tests {
     fn take_inventory_and_keep_success() {
         let [block_bare] = make_some_blocks();
         let stack = inv::Slot::stack(3, inv::Tool::Activate);
-        let block_with_inventory = block_bare
-            .clone()
-            .with_modifier(Inventory::from_slots(vec![stack.clone()]));
+        let block_with_inventory =
+            block_bare.clone().with_modifier(Inventory::from_slots(vec![stack.clone()]));
         let op = Operation::TakeInventory {
             destroy_if_empty: false,
         };
@@ -791,8 +777,7 @@ mod tests {
         let character_inventory = Inventory::new(2);
 
         assert_eq!(
-            op.apply(&space, Some(&character_inventory), Gridgid::IDENTITY)
-                .unwrap(),
+            op.apply(&space, Some(&character_inventory), Gridgid::IDENTITY).unwrap(),
             (
                 {
                     let mut txn = SpaceTransaction::default();

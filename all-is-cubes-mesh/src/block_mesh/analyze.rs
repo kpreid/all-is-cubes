@@ -158,10 +158,8 @@ impl Analysis {
     fn pbox_to_rect(&self, face: Face6, pbox: PlaneBox) -> Rect {
         let t = face.face_transform(self.resolution.into()).inverse();
         Rect::from_points([
-            t.transform_point(unflatten(face.axis(), 0, pbox.min))
-                .to_2d(),
-            t.transform_point(unflatten(face.axis(), 0, pbox.max))
-                .to_2d(),
+            t.transform_point(unflatten(face.axis(), 0, pbox.min)).to_2d(),
+            t.transform_point(unflatten(face.axis(), 0, pbox.max)).to_2d(),
         ])
     }
 

@@ -121,9 +121,7 @@ impl LayoutGrant {
         for axis in Axis::ALL {
             // TODO: numeric overflow considerations
             let lower = self.bounds.lower_bounds()[axis];
-            let upper = self.bounds.upper_bounds()[axis]
-                .checked_sub_unsigned(sizes[axis])
-                .unwrap();
+            let upper = self.bounds.upper_bounds()[axis].checked_sub_unsigned(sizes[axis]).unwrap();
             origin[axis] = match self.gravity[axis] {
                 Align::Low => lower,
                 Align::Center => lower + (upper - lower) / 2,
@@ -140,10 +138,7 @@ impl LayoutGrant {
     ///
     /// This is a common pattern but I'm not sure it should be, so this isn't public.
     pub(crate) fn shrink_to_cube(&self) -> Option<Cube> {
-        self.shrink_to(GridSize::new(1, 1, 1), false)
-            .bounds
-            .interior_iter()
-            .next()
+        self.shrink_to(GridSize::new(1, 1, 1), false).bounds.interior_iter().next()
     }
 }
 
@@ -632,10 +627,7 @@ mod tests {
         let grant = LayoutGrant::new(GridAab::from_lower_size([10, 10, 10], [10, 10, 10]));
         let stack_gravity = vec3(Align::Low, Align::Center, Align::Center);
         assert_eq!(
-            tree.perform_layout(grant)
-                .unwrap()
-                .leaves()
-                .collect::<Vec<_>>(),
+            tree.perform_layout(grant).unwrap().leaves().collect::<Vec<_>>(),
             vec![
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),
@@ -677,10 +669,7 @@ mod tests {
         let grant = LayoutGrant::new(GridAab::from_lower_size([10, 10, 10], [10, 10, 10]));
         let stack_gravity = vec3(Align::Low, Align::Center, Align::Center);
         assert_eq!(
-            tree.perform_layout(grant)
-                .unwrap()
-                .leaves()
-                .collect::<Vec<_>>(),
+            tree.perform_layout(grant).unwrap().leaves().collect::<Vec<_>>(),
             vec![
                 &Positioned {
                     value: LT::new("a", [1, 1, 1]),

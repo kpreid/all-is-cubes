@@ -238,10 +238,8 @@ impl PlanarTriangulator {
             viz.set_current_triangulation_vertex(&input_fv);
 
             // Advance sweep line if the new vertex is ahead of the line.
-            let new_sweep_position = self
-                .basis
-                .sweep_direction
-                .dot(input_vertex.position.to_vector());
+            let new_sweep_position =
+                self.basis.sweep_direction.dot(input_vertex.position.to_vector());
             if new_sweep_position != self.sweep_position {
                 self.advance_sweep_position(viz, new_sweep_position);
             }
@@ -578,10 +576,7 @@ mod tests {
         triangulator.triangulate(
             &mut viz,
             TEST_BASIS,
-            vertices
-                .iter()
-                .inspect(|vertex| println!("In: {vertex:?}"))
-                .copied(),
+            vertices.iter().inspect(|vertex| println!("In: {vertex:?}")).copied(),
             |triangle_indices: [u32; 3]| {
                 let triangle_positions =
                     triangle_indices.map(|index| vertices[index as usize].position);

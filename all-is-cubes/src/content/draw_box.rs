@@ -164,9 +164,7 @@ impl BoxStyle {
 
         let corner_px_nz = corner.clone().map(|block| block.rotate(up.clockwise()));
         let corner_px_pz = corner.clone().map(|block| block.rotate(GridRotation::RxYz));
-        let corner_nx_pz = corner
-            .clone()
-            .map(|block| block.rotate(up.counterclockwise()));
+        let corner_nx_pz = corner.clone().map(|block| block.rotate(up.counterclockwise()));
         let corner_nx_nz = corner;
         let unsupported = || None;
 

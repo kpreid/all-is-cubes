@@ -467,9 +467,8 @@ impl UniverseTransaction {
     /// or the value has already been set.
     #[track_caller]
     pub fn set_pending_value<T: UniverseMember>(&mut self, handle: &Handle<T>, value: T) {
-        let value_option: &mut Option<Box<T>> = self
-            .get_pending_mut(handle)
-            .expect("handle not present in this transaction");
+        let value_option: &mut Option<Box<T>> =
+            self.get_pending_mut(handle).expect("handle not present in this transaction");
         *value_option = Some(Box::new(value));
     }
 
@@ -668,14 +667,12 @@ impl Transaction for UniverseTransaction {
         for (handle, insert_txn) in &self.anonymous_insertions {
             insert_checks.insert(
                 handle.clone(),
-                insert_txn
-                    .check(self, target, &Name::Pending)
-                    .map_err(|mismatch| {
-                        UniverseMismatch::Member(transaction::MapMismatch {
-                            key: Name::Pending,
-                            mismatch,
-                        })
-                    })?,
+                insert_txn.check(self, target, &Name::Pending).map_err(|mismatch| {
+                    UniverseMismatch::Member(transaction::MapMismatch {
+                        key: Name::Pending,
+                        mismatch,
+                    })
+                })?,
             );
         }
 
@@ -726,10 +723,12 @@ impl Transaction for UniverseTransaction {
         }
 
         for (handle, check) in check_anon {
-            anonymous_insertions
-                .remove(&handle)
-                .expect("invalid check value")
-                .commit(target, &Name::Pending, check, outputs)?;
+            anonymous_insertions.remove(&handle).expect("invalid check value").commit(
+                target,
+                &Name::Pending,
+                check,
+                outputs,
+            )?;
         }
 
         behaviors.commit(
@@ -755,10 +754,7 @@ impl Merge for UniverseTransaction {
             }
         }
         Ok(UniverseMergeCheck {
-            members: self
-                .members
-                .check_merge(&other.members)
-                .map_err(UniverseConflict::Member)?,
+            members: self.members.check_merge(&other.members).map_err(UniverseConflict::Member)?,
             behaviors: self
                 .behaviors
                 .check_merge(&other.behaviors)
@@ -1330,9 +1326,7 @@ mod tests {
 
         // Without a value, the transaction is temporarily invalid.
         assert_eq!(
-            txn.check(&u)
-                .expect_err("should not succeed without value")
-                .to_string(),
+            txn.check(&u).expect_err("should not succeed without value").to_string(),
             // TODO: this is a lazy incomplete check of the full error
             "transaction precondition not met in member 'foo'",
         );
@@ -1369,9 +1363,7 @@ mod tests {
         let s1 = u1.insert_anonymous(Space::empty_positive(1, 1, 1));
         let t1 = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(s1);
 
-        let e = t1
-            .execute(&mut u2, (), &mut transaction::no_outputs)
-            .unwrap_err();
+        let e = t1.execute(&mut u2, (), &mut transaction::no_outputs).unwrap_err();
         assert!(matches!(e, ExecuteError::Check(_)));
     }
 

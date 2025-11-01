@@ -116,10 +116,7 @@ mod tests {
                 suppress_ambient: false,
             })),
             eval_without_metadata(
-                &Block::builder()
-                    .color(Rgba::WHITE)
-                    .light_emission(light)
-                    .build()
+                &Block::builder().color(Rgba::WHITE).light_emission(light).build()
             ),
             "suppress_ambient = false"
         );

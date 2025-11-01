@@ -356,8 +356,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
             for ToText<'_, D, P>
         {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                self.rt
-                    .trace_scene_to_text_impl::<P>(self.camera, self.line_ending, f)?;
+                self.rt.trace_scene_to_text_impl::<P>(self.camera, self.line_ending, f)?;
                 Ok(())
             }
         }

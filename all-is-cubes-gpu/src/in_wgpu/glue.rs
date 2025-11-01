@@ -188,8 +188,7 @@ impl BeltWritingParts<'_> {
         offset: wgpu::BufferAddress,
         size: wgpu::BufferSize,
     ) -> wgpu::BufferViewMut {
-        self.belt
-            .write_buffer(self.encoder, target, offset, size, self.device)
+        self.belt.write_buffer(self.encoder, target, offset, size, self.device)
     }
 }
 
@@ -237,11 +236,8 @@ impl ResizingBuffer {
             addresses[i] = u64::try_from(addr).unwrap();
         }
 
-        let new_size: u64 = layout
-            .size()
-            .next_multiple_of(BUFFER_AND_MAPPING_SIZE_MULT)
-            .try_into()
-            .unwrap();
+        let new_size: u64 =
+            layout.size().next_multiple_of(BUFFER_AND_MAPPING_SIZE_MULT).try_into().unwrap();
 
         if let Some(buffer) = self.buffer.as_ref().filter(|b| b.size() >= new_size) {
             // Buffer is already big enough to fit the data.
@@ -458,9 +454,7 @@ mod tests {
         });
 
         // Initial contents not using write_part_of_slice_to_part_of_buffer().
-        destination_buffer
-            .get_mapped_range_mut(..)
-            .copy_from_slice(&source_data);
+        destination_buffer.get_mapped_range_mut(..).copy_from_slice(&source_data);
         destination_buffer.unmap();
 
         for (value, range) in [

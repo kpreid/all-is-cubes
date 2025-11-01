@@ -177,9 +177,7 @@ fn fill_remaining_distances(maze: &mut Maze, starting_room: Cube) {
                 let neighbor = here + direction;
                 let needs_fill = maze[neighbor].position_on_path.is_none();
                 let needs_visit = needs_fill
-                    || maze[neighbor]
-                        .position_on_path
-                        .is_some_and(|np| np > here_position_on_path);
+                    || maze[neighbor].position_on_path.is_some_and(|np| np > here_position_on_path);
 
                 if needs_fill {
                     // Note the number is unchanged.

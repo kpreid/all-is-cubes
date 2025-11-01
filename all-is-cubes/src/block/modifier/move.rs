@@ -371,11 +371,7 @@ mod tests {
         });
 
         assert_eq!(
-            moved
-                .evaluate(universe.read_ticket())
-                .unwrap()
-                .attributes
-                .tick_action,
+            moved.evaluate(universe.read_ticket()).unwrap().attributes.tick_action,
             None
         );
     }
@@ -456,11 +452,7 @@ mod tests {
             .with_modifier(R);
 
         assert_eq!(
-            block
-                .evaluate(universe.read_ticket())
-                .unwrap()
-                .attributes
-                .tick_action,
+            block.evaluate(universe.read_ticket()).unwrap().attributes.tick_action,
             Some(TickAction::from(Operation::Become(expected_after_tick)))
         );
     }
@@ -492,11 +484,7 @@ mod tests {
             .with_modifier(composite);
 
         assert_eq!(
-            block
-                .evaluate(universe.read_ticket())
-                .unwrap()
-                .attributes
-                .tick_action,
+            block.evaluate(universe.read_ticket()).unwrap().attributes.tick_action,
             Some(TickAction::from(Operation::Become(expected_after_tick)))
         );
     }
@@ -528,11 +516,7 @@ mod tests {
         ));
 
         assert_eq!(
-            block
-                .evaluate(universe.read_ticket())
-                .unwrap()
-                .attributes
-                .tick_action,
+            block.evaluate(universe.read_ticket()).unwrap().attributes.tick_action,
             Some(TickAction::from(Operation::Become(expected_after_tick)))
         );
     }

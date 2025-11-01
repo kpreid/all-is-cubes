@@ -95,9 +95,7 @@ pub(crate) fn make_log(
         let leaves_rotation = *GridRotation::ALL.choose(rng).unwrap();
         wood.with_modifier(
             block::Composite::new(
-                blocks[Leaves(leaves_growth)]
-                    .clone()
-                    .rotate(leaves_rotation),
+                blocks[Leaves(leaves_growth)].clone().rotate(leaves_rotation),
                 block::CompositeOperator::Over,
             )
             .reversed() // wood always wins
@@ -124,20 +122,14 @@ pub(crate) fn make_tree(
     // Establish the root.
     *graph.edge_mut(root, Face6::NY).unwrap() = Some(TreeGrowth::Sapling);
 
-    let not_on_surface = bounds
-        .shrink(FaceMap::splat(1))
-        .unwrap_or(GridAab::ORIGIN_EMPTY);
+    let not_on_surface = bounds.shrink(FaceMap::splat(1)).unwrap_or(GridAab::ORIGIN_EMPTY);
 
     let max_leaves_height_for_size = (i32::try_from(bounds.size().height).unwrap_or(1) / 3) + 1;
     let leaves_height = rng.random_range(1..=max_leaves_height_for_size);
 
     // Generate foliage (before the branches that lead to it)
     let mut leaves_missing_branches = Vec::new();
-    for cube in bounds
-        .abut(Face6::PY, -leaves_height)
-        .unwrap()
-        .interior_iter()
-    {
+    for cube in bounds.abut(Face6::PY, -leaves_height).unwrap().interior_iter() {
         if not_on_surface.contains_cube(cube) {
             // leaves don't hide behind other leaves
             continue;
@@ -283,9 +275,7 @@ mod graph {
                     .get(cube + neighbor_face.normal_vector())
                     .map(|cell| cell.pos_neighbors[neighbor_face.axis()])
             } else {
-                self.data
-                    .get(cube)
-                    .map(|cell| cell.pos_neighbors[neighbor_face.axis()])
+                self.data.get(cube).map(|cell| cell.pos_neighbors[neighbor_face.axis()])
             }
         }
 

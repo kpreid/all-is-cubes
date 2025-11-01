@@ -190,9 +190,7 @@ impl StandardCameras {
         let options_dirty = self.graphics_options_dirty.get_and_clear();
         if options_dirty {
             anything_changed = true;
-            self.cameras
-                .world
-                .set_options((*self.graphics_options.get()).clone());
+            self.cameras.world.set_options((*self.graphics_options.get()).clone());
         }
 
         let ui_dirty = self.ui_dirty.get_and_clear();
@@ -230,9 +228,7 @@ impl StandardCameras {
             if self.character.is_none() {
                 // Reset transform so it isn't a *stale* transform.
                 // TODO: set an error flag saying that nothing should be drawn
-                self.cameras
-                    .world
-                    .set_view_transform(ViewTransform::identity());
+                self.cameras.world.set_view_transform(ViewTransform::identity());
             }
         }
 

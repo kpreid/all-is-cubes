@@ -134,12 +134,7 @@ impl Settings {
         // TODO: kludge: this condition is only vaguely reasonable because state never transitions
         // from Some to None. In reality, we should be using our own mutex instead of depending on
         // listen::Cell.
-        if let Some(parent) = self
-            .0
-            .inherit
-            .as_ref()
-            .filter(|_| self.0.state.get().is_none())
-        {
+        if let Some(parent) = self.0.inherit.as_ref().filter(|_| self.0.state.get().is_none()) {
             parent.set_state(state);
         } else {
             (self.0.persister)(&state);

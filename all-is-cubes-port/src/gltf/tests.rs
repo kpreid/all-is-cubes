@@ -92,9 +92,7 @@ async fn export_snapshot_test(
     .unwrap();
 
     snapbox::Assert::new().action_env("AICSNAP").subset_eq(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src/gltf/tests/")
-            .join(test_name),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("src/gltf/tests/").join(test_name),
         destination_dir.path(),
     );
 }

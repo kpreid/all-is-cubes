@@ -73,10 +73,7 @@ impl<D: RtBlockData> Surface<'_, D> {
         rt: &SpaceRaytracer<D>,
         ts: &mut super::TracingState<'_, P>, // knowing about TracingState here is inelegant but convenient
     ) -> Option<(ColorBuf, RaytraceInfo)> {
-        let diffuse_color = rt
-            .graphics_options
-            .transparency
-            .limit_alpha(self.diffuse_color);
+        let diffuse_color = rt.graphics_options.transparency.limit_alpha(self.diffuse_color);
         if diffuse_color.fully_transparent() && self.emission == Rgb::ZERO {
             // Short-circuit if the surface has no effect.
             return None;
@@ -85,9 +82,7 @@ impl<D: RtBlockData> Surface<'_, D> {
         // Obtain the illumination of this surface.
         let (illumination, info) = self.compute_illumination(
             rt,
-            ts.ray_bounce_rng
-                .as_mut()
-                .filter(|_| diffuse_color.fully_opaque()),
+            ts.ray_bounce_rng.as_mut().filter(|_| diffuse_color.fully_opaque()),
         );
 
         // Combine reflected and emitted light to produce the outgoing light.
@@ -185,9 +180,7 @@ impl<D: RtBlockData> Surface<'_, D> {
             // Note that if we've exceeded our bounce budget (which is always 1) we use Flat.
             // We don't combine Bounce and Smooth because the improvement of Smooth is negligible.
             (LightingOption::Flat | LightingOption::Bounce, _) => {
-                let light = rt
-                    .get_packed_light(self.cube + self.normal.normal_vector())
-                    .value();
+                let light = rt.get_packed_light(self.cube + self.normal.normal_vector()).value();
                 (light, RaytraceInfo::default())
             }
 
@@ -402,11 +395,7 @@ where
             voxel: (self.resolution, rc_step.cube_ahead()),
             t_distance,
             intersection_point: rc_step.intersection_point(self.voxel_ray.into()) * self.antiscale
-                + self
-                    .block_cube
-                    .lower_bounds()
-                    .map(FreeCoordinate::from)
-                    .to_vector(),
+                + self.block_cube.lower_bounds().map(FreeCoordinate::from).to_vector(),
             normal: rc_step.face(),
         }))
     }

@@ -136,9 +136,7 @@ fn no_panic_on_missing_blocks() {
     );
     assert_eq!(block_meshes.len(), 1); // check our assumption
 
-    space
-        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
-        .unwrap(); // render data does not know about this
+    space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block)).unwrap(); // render data does not know about this
 
     // This should not panic; visual glitches are preferable to failure.
     let space_mesh = SpaceMesh::new(
@@ -159,10 +157,8 @@ fn trivial_voxels_equals_atom() {
     // Construct recursive block.
     let mut u = Universe::new();
     let atom_block = block::from_color!(0.0, 1.0, 0.0, 1.0);
-    let trivial_recursive_block = Block::builder()
-        .voxels_fn(R1, |_| &atom_block)
-        .unwrap()
-        .build_into(&mut u);
+    let trivial_recursive_block =
+        Block::builder().voxels_fn(R1, |_| &atom_block).unwrap().build_into(&mut u);
 
     let (_, _, space_rendered_a) = mesh_blocks_and_space(
         &Space::builder(GridAab::ORIGIN_CUBE)
@@ -193,9 +189,7 @@ fn animated_atom_uses_texture() {
         .build();
 
     let (allocator, _, mesh) = mesh_blocks_and_space(
-        &Space::builder(GridAab::ORIGIN_CUBE)
-            .filled_with(atom_block)
-            .build(),
+        &Space::builder(GridAab::ORIGIN_CUBE).filled_with(atom_block).build(),
     );
 
     assert_eq!(allocator.count_allocated(), 1);
@@ -254,9 +248,7 @@ fn emissive_atom_uses_texture() {
         .build();
 
     let (allocator, _, mesh) = mesh_blocks_and_space(
-        &Space::builder(GridAab::ORIGIN_CUBE)
-            .filled_with(atom_block)
-            .build(),
+        &Space::builder(GridAab::ORIGIN_CUBE).filled_with(atom_block).build(),
     );
 
     assert_eq!(allocator.count_allocated(), 1);
@@ -275,15 +267,10 @@ fn emissive_atom_uses_texture() {
 /// for an atom (resolution-1) block; it should have a nonempty mesh.
 #[test]
 fn emissive_only_atom() {
-    let atom_block = Block::builder()
-        .color(Rgba::TRANSPARENT)
-        .light_emission(Rgb::ONE)
-        .build();
+    let atom_block = Block::builder().color(Rgba::TRANSPARENT).light_emission(Rgb::ONE).build();
 
     let (allocator, block_meshes, space_mesh) = mesh_blocks_and_space(
-        &Space::builder(GridAab::ORIGIN_CUBE)
-            .filled_with(atom_block)
-            .build(),
+        &Space::builder(GridAab::ORIGIN_CUBE).filled_with(atom_block).build(),
     );
 
     assert!(!block_meshes[0].is_empty());
@@ -305,10 +292,7 @@ fn emissive_only_atom() {
 #[test]
 fn emissive_only_voxels() {
     let mut u = Universe::new();
-    let atom_block = Block::builder()
-        .color(Rgba::TRANSPARENT)
-        .light_emission(Rgb::ONE)
-        .build();
+    let atom_block = Block::builder().color(Rgba::TRANSPARENT).light_emission(Rgb::ONE).build();
     let voxel_block = Block::builder()
         .voxels_fn(R2, |cube| {
             if cube == Cube::ORIGIN {
@@ -651,11 +635,7 @@ fn invisible_voxel_block() {
         })
         .build();
     assert_eq!(
-        block
-            .evaluate(universe.read_ticket())
-            .unwrap()
-            .voxels()
-            .bounds(),
+        block.evaluate(universe.read_ticket()).unwrap().voxels().bounds(),
         GridAab::for_block(R8),
         "sanity check test data"
     );

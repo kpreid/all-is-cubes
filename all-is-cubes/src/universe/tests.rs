@@ -58,8 +58,7 @@ fn universe_debug_empty() {
 #[test]
 fn universe_debug_elements() {
     let mut u = Universe::new();
-    u.insert("foo".into(), Space::empty_positive(1, 2, 3))
-        .unwrap();
+    u.insert("foo".into(), Space::empty_positive(1, 2, 3)).unwrap();
     u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     assert_eq!(
         format!("{u:?}"),
@@ -119,11 +118,8 @@ fn universe_default_whence() {
 #[test]
 fn get_any() {
     let mut u = Universe::new();
-    u.insert("test_block".into(), BlockDef::new(u.read_ticket(), AIR))
-        .unwrap();
-    let sp = u
-        .insert("test_space".into(), Space::empty_positive(1, 1, 1))
-        .unwrap();
+    u.insert("test_block".into(), BlockDef::new(u.read_ticket(), AIR)).unwrap();
+    let sp = u.insert("test_space".into(), Space::empty_positive(1, 1, 1)).unwrap();
     u.insert(
         "test_char".into(),
         Character::spawn_default(u.read_ticket(), sp),
@@ -152,10 +148,8 @@ fn insert_anonymous_makes_distinct_names() {
     let mut u = Universe::new();
     let handle_a = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
     let handle_b = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
-    u.execute_1(&handle_a, BlockDefTransaction::overwrite(block_0))
-        .unwrap();
-    u.execute_1(&handle_b, BlockDefTransaction::overwrite(block_1))
-        .unwrap();
+    u.execute_1(&handle_a, BlockDefTransaction::overwrite(block_0)).unwrap();
+    u.execute_1(&handle_b, BlockDefTransaction::overwrite(block_1)).unwrap();
     assert_ne!(handle_a, handle_b, "not equal");
     assert_ne!(
         handle_a.read(u.read_ticket(),).unwrap().block(),
@@ -167,8 +161,7 @@ fn insert_anonymous_makes_distinct_names() {
 #[test]
 fn insert_duplicate_name_same_type() {
     let mut u = Universe::new();
-    u.insert("test_block".into(), BlockDef::new(u.read_ticket(), AIR))
-        .unwrap();
+    u.insert("test_block".into(), BlockDef::new(u.read_ticket(), AIR)).unwrap();
     assert_eq!(
         u.insert("test_block".into(), BlockDef::new(u.read_ticket(), AIR)),
         Err(InsertError {
@@ -181,8 +174,7 @@ fn insert_duplicate_name_same_type() {
 #[test]
 fn insert_duplicate_name_different_type() {
     let mut u = Universe::new();
-    u.insert("test_thing".into(), BlockDef::new(u.read_ticket(), AIR))
-        .unwrap();
+    u.insert("test_thing".into(), BlockDef::new(u.read_ticket(), AIR)).unwrap();
     assert_eq!(
         u.insert("test_thing".into(), Space::empty_positive(1, 1, 1)),
         Err(InsertError {
@@ -195,12 +187,9 @@ fn insert_duplicate_name_different_type() {
 #[test]
 fn insert_duplicate_name_via_txn() {
     let mut u = Universe::new();
-    u.insert("test_thing".into(), BlockDef::new(u.read_ticket(), AIR))
-        .unwrap();
+    u.insert("test_thing".into(), BlockDef::new(u.read_ticket(), AIR)).unwrap();
     let (_, txn) = UniverseTransaction::insert("test_thing".into(), Space::empty_positive(1, 1, 1));
-    let error = txn
-        .execute(&mut u, (), &mut transaction::no_outputs)
-        .unwrap_err();
+    let error = txn.execute(&mut u, (), &mut transaction::no_outputs).unwrap_err();
 
     assert_eq!(
         error,
@@ -230,9 +219,7 @@ fn insert_anonym_prohibited_direct() {
 #[test]
 fn insert_anonym_prohibited_via_txn() {
     let (_, txn) = UniverseTransaction::insert(Name::Anonym(0), Space::empty_positive(1, 1, 1));
-    let error = txn
-        .execute(&mut Universe::new(), (), &mut drop)
-        .unwrap_err();
+    let error = txn.execute(&mut Universe::new(), (), &mut drop).unwrap_err();
 
     assert_eq!(
         error,
@@ -251,12 +238,9 @@ fn insert_anonym_prohibited_via_txn() {
 #[test]
 fn insert_pending_becomes_anonym_direct() {
     let mut u = Universe::new();
-    u.insert(Name::Pending, BlockDef::new(u.read_ticket(), AIR))
-        .unwrap();
+    u.insert(Name::Pending, BlockDef::new(u.read_ticket(), AIR)).unwrap();
     assert_eq!(
-        u.iter_by_type::<BlockDef>()
-            .map(|(name, _)| name)
-            .collect::<Vec<_>>(),
+        u.iter_by_type::<BlockDef>().map(|(name, _)| name).collect::<Vec<_>>(),
         vec![Name::Anonym(0)]
     );
 }
@@ -267,9 +251,7 @@ fn insert_pending_becomes_anonym_via_txn() {
     let (_, txn) = UniverseTransaction::insert(Name::Pending, BlockDef::new(u.read_ticket(), AIR));
     txn.execute(&mut u, (), &mut drop).unwrap();
     assert_eq!(
-        u.iter_by_type::<BlockDef>()
-            .map(|(name, _)| name)
-            .collect::<Vec<_>>(),
+        u.iter_by_type::<BlockDef>().map(|(name, _)| name).collect::<Vec<_>>(),
         vec![Name::Anonym(0)]
     );
 }
@@ -311,9 +293,7 @@ fn delete_success() {
         )
         .unwrap();
     assert_eq!(
-        handle_1
-            .read(u.read_ticket(),)
-            .expect_err("should not be resurrected"),
+        handle_1.read(u.read_ticket(),).expect_err("should not be resurrected"),
         HandleError::Gone {
             name: name.clone(),
             reason: GoneReason::Deleted {}
@@ -327,9 +307,7 @@ fn delete_success() {
 fn delete_anonymous_fails() {
     let mut u = Universe::new();
     let anon = u.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
-    UniverseTransaction::delete(anon)
-        .execute(&mut u, (), &mut drop)
-        .unwrap_err();
+    UniverseTransaction::delete(anon).execute(&mut u, (), &mut drop).unwrap_err();
 }
 
 #[test]
@@ -337,18 +315,14 @@ fn delete_twice_fails() {
     let mut u = Universe::new();
     let name: Name = "test_thing".into();
     let [block] = make_some_blocks();
-    let handle = u
-        .insert(name.clone(), BlockDef::new(u.read_ticket(), block))
-        .unwrap();
+    let handle = u.insert(name.clone(), BlockDef::new(u.read_ticket(), block)).unwrap();
 
     // Deletion should succeed...
     UniverseTransaction::delete(handle.clone())
         .execute(&mut u, (), &mut drop)
         .unwrap();
     // ...but not trying to delete the same thing again.
-    UniverseTransaction::delete(handle)
-        .execute(&mut u, (), &mut drop)
-        .unwrap_err();
+    UniverseTransaction::delete(handle).execute(&mut u, (), &mut drop).unwrap_err();
 }
 
 #[test]
@@ -357,9 +331,7 @@ fn delete_wrong_universe_fails() {
     let mut u2 = Universe::new();
     let name: Name = "test_thing".into();
     let [block] = make_some_blocks();
-    let handle = u1
-        .insert(name.clone(), BlockDef::new(ReadTicket::stub(), block))
-        .unwrap();
+    let handle = u1.insert(name.clone(), BlockDef::new(ReadTicket::stub(), block)).unwrap();
 
     let txn = UniverseTransaction::delete(handle);
 
@@ -458,8 +430,7 @@ fn gc_implicit() {
 #[test]
 fn gc_preserves_named() {
     let mut u = Universe::new();
-    u.insert("foo".into(), BlockDef::new(u.read_ticket(), AIR))
-        .unwrap();
+    u.insert("foo".into(), BlockDef::new(u.read_ticket(), AIR)).unwrap();
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
     u.gc();
     assert_eq!(1, u.iter_by_type::<BlockDef>().count());
@@ -477,14 +448,10 @@ fn visit_handles_block_def_no_handle() {
 #[test]
 fn visit_handles_block_def_space() {
     let mut u = Universe::new();
-    let space_handle = u
-        .insert("s".into(), Space::empty_positive(1, 1, 1))
-        .unwrap();
+    let space_handle = u.insert("s".into(), Space::empty_positive(1, 1, 1)).unwrap();
     let block_def = BlockDef::new(
         u.read_ticket(),
-        Block::builder()
-            .voxels_handle(Resolution::R1, space_handle)
-            .build(),
+        Block::builder().voxels_handle(Resolution::R1, space_handle).build(),
     );
     assert_eq!(list_handles(&block_def), vec!["s".into()]);
 }
@@ -501,9 +468,7 @@ fn visit_handles_block_def_indirect() {
 #[test]
 fn visit_handles_block_tick_action() {
     let mut u = Universe::new();
-    let b1 = u
-        .insert("foo".into(), BlockDef::new(ReadTicket::stub(), AIR))
-        .unwrap();
+    let b1 = u.insert("foo".into(), BlockDef::new(ReadTicket::stub(), AIR)).unwrap();
     let b2 = Block::builder()
         .color(Rgba::WHITE)
         .tick_action(Some(TickAction::from(Operation::Become(Block::from(b1)))))
@@ -516,16 +481,12 @@ fn visit_handles_character() {
     let mut u = Universe::new();
 
     // Character's space
-    let space_handle = u
-        .insert("space".into(), Space::empty_positive(1, 1, 1))
-        .unwrap();
+    let space_handle = u.insert("space".into(), Space::empty_positive(1, 1, 1)).unwrap();
 
     let mut character = Character::spawn_default(u.read_ticket(), space_handle.clone());
 
     // A block handle in inventory.
-    let block_handle = u
-        .insert("block".into(), BlockDef::new(u.read_ticket(), AIR))
-        .unwrap();
+    let block_handle = u.insert("block".into(), BlockDef::new(u.read_ticket(), AIR)).unwrap();
     CharacterTransaction::inventory(InventoryTransaction::insert([Tool::Block(Block::from(
         block_handle,
     ))]))

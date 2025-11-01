@@ -80,11 +80,7 @@ pub struct LightChunk(Point3D<i32, ()>);
 impl LightChunk {
     /// Computes the light data chunk the given cube belongs to.
     pub fn new(cube: Cube) -> Self {
-        LightChunk(
-            cube.lower_bounds()
-                .div_euclid(&LIGHT_CHUNK_SIZE_I32)
-                .cast_unit(),
-        )
+        LightChunk(cube.lower_bounds().div_euclid(&LIGHT_CHUNK_SIZE_I32).cast_unit())
     }
 
     /// Returns the lowest cube in this chunk.

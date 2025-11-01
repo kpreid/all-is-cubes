@@ -152,9 +152,7 @@ mod block {
                         .into_iter();
                     let general_mod_iter = modifiers.into_iter().map(Modifier::from);
 
-                    block
-                        .modifiers_mut()
-                        .extend(attr_mod_iter.chain(general_mod_iter));
+                    block.modifiers_mut().extend(attr_mod_iter.chain(general_mod_iter));
                     block
                 }
             })
@@ -832,9 +830,7 @@ mod op {
                 },
 
                 schema::OperationSer::AddModifiersV1 { modifiers } => op::Operation::AddModifiers(
-                    cow_into_iter(modifiers)
-                        .map(crate::block::Modifier::from)
-                        .collect(),
+                    cow_into_iter(modifiers).map(crate::block::Modifier::from).collect(),
                 ),
                 schema::OperationSer::StartMoveV1 { modifier: m } => {
                     op::Operation::StartMove(m.into())
@@ -848,9 +844,7 @@ mod op {
                     op::Operation::TakeInventory { destroy_if_empty }
                 }
                 schema::OperationSer::NeighborsV1 { neighbors } => op::Operation::Neighbors(
-                    cow_into_iter(neighbors)
-                        .map(|(offset, op)| (offset.into(), op))
-                        .collect(),
+                    cow_into_iter(neighbors).map(|(offset, op)| (offset.into(), op)).collect(),
                 ),
             })
         }
@@ -909,14 +903,9 @@ mod space {
             schema::SpaceSer::SpaceV1 {
                 bounds: self.bounds(),
                 physics: self.physics().into(),
-                blocks: self
-                    .block_data()
-                    .iter()
-                    .map(|bd| bd.block().clone())
-                    .collect(),
+                blocks: self.block_data().iter().map(|bd| bd.block().clone()).collect(),
                 contents: GzSerde(Cow::Owned(
-                    self.extract(self.bounds(), |e| Leu16::from(e.block_index()))
-                        .into_elements(),
+                    self.extract(self.bounds(), |e| Leu16::from(e.block_index())).into_elements(),
                 )),
                 light: if matches!(self.physics().light, LightPhysics::None) {
                     None
@@ -1256,9 +1245,7 @@ mod universe {
                 }
             }
 
-            universe
-                .validate_deserialized_members()
-                .map_err(serde::de::Error::custom)?;
+            universe.validate_deserialized_members().map_err(serde::de::Error::custom)?;
 
             // Perform a paused step to let things do re-initialization,
             // such as `Space` block evaluation, without actually causing any in-game time

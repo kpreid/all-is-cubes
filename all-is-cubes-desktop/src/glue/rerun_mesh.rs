@@ -103,37 +103,35 @@ impl RerunMesher {
     }
 
     pub(crate) fn update(&mut self, read_ticket: ReadTicket<'_>, camera: &Camera) {
-        let _info = self
-            .csm
-            .update(read_ticket, camera, Deadline::Whenever, |u| {
-                assert_eq!(u.indices_only, None);
+        let _info = self.csm.update(read_ticket, camera, Deadline::Whenever, |u| {
+            assert_eq!(u.indices_only, None);
 
-                let singleton_translation = u.mesh_id.singleton_translation(CHUNK_SIZE);
+            let singleton_translation = u.mesh_id.singleton_translation(CHUNK_SIZE);
 
-                let dm = u.render_data.get_or_insert_with(|| {
-                    let dm = DroppingMesh {
-                        destination: self.destination.child(&rg::entity_path![u.mesh_id]),
-                        mesh: rg::archetypes::Mesh3D::new([[0., 0., 0.]; 0]),
-                    };
+            let dm = u.render_data.get_or_insert_with(|| {
+                let dm = DroppingMesh {
+                    destination: self.destination.child(&rg::entity_path![u.mesh_id]),
+                    mesh: rg::archetypes::Mesh3D::new([[0., 0., 0.]; 0]),
+                };
 
-                    let transform = if let Some(translation) = singleton_translation {
-                        rg::archetypes::InstancePoses3D::new()
-                            .with_translations([rg::convert_vec(translation)])
-                    } else {
-                        // Log a transform which will hide the mesh until we reveal it later.
-                        rg::archetypes::InstancePoses3D::new().with_scales([0.0])
-                    };
+                let transform = if let Some(translation) = singleton_translation {
+                    rg::archetypes::InstancePoses3D::new()
+                        .with_translations([rg::convert_vec(translation)])
+                } else {
+                    // Log a transform which will hide the mesh until we reveal it later.
+                    rg::archetypes::InstancePoses3D::new().with_scales([0.0])
+                };
 
-                    dm.destination.log(&rg::entity_path![], &transform);
+                dm.destination.log(&rg::entity_path![], &transform);
 
-                    dm
-                });
-
-                convert_to_rerun_mesh(u.mesh, &mut dm.mesh);
-
-                // TODO: this will need different handling for instances
-                dm.destination.log(&rg::entity_path![], &dm.mesh);
+                dm
             });
+
+            convert_to_rerun_mesh(u.mesh, &mut dm.mesh);
+
+            // TODO: this will need different handling for instances
+            dm.destination.log(&rg::entity_path![], &dm.mesh);
+        });
 
         // Gather and send all instances.
         // TODO: It would be more efficient to do this only if there was a change, but
@@ -169,9 +167,7 @@ fn convert_to_rerun_mesh(input: &mesh::SpaceMesh<Mt>, output: &mut rg::archetype
     *output = rg::archetypes::Mesh3D::new(vertices.iter().map(|v| v.position))
         .with_vertex_colors(vertices.iter().map(|v| v.color))
         .with_vertex_normals(
-            vertices
-                .iter()
-                .map(|v| rg::convert_vec(v.face.normal_vector::<f32, ()>())),
+            vertices.iter().map(|v| rg::convert_vec(v.face.normal_vector::<f32, ()>())),
         )
         .with_triangle_indices(input.indices().iter_u32().tuples().map(|(i1, i2, i3)| {
             rg::components::TriangleIndices(rg::datatypes::UVec3D::new(i1, i2, i3))

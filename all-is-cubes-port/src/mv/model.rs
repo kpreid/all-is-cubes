@@ -60,8 +60,7 @@ pub(crate) fn to_space(
                 }
             })?;
 
-            m.set(transformed_cube, block)
-                .map_err(mv::DotVoxConversionError::SetCube)?;
+            m.set(transformed_cube, block).map_err(mv::DotVoxConversionError::SetCube)?;
         }
         Ok::<(), mv::DotVoxConversionError>(())
     })?;

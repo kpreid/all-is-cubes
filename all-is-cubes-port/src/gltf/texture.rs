@@ -53,17 +53,15 @@ impl GltfTextureAllocator {
 
     pub(crate) fn write_png_atlas(&self) -> Result<(gltf_json::Buffer, AtlasMapping), io::Error> {
         let (image, mapping): (image::RgbaImage, AtlasMapping) = self.gatherer.build_atlas();
-        let buffer = self
-            .destination
-            .write(String::from("texture"), "texture", "png", |w| {
-                // `image` wants `Write + Seek` but `w` is not currently `Seek`
-                let mut tmp = io::Cursor::new(Vec::new());
-                image
-                    .write_to(&mut tmp, image::ImageFormat::Png)
-                    .expect("failed to write image to in-memory buffer");
-                w.write_all(tmp.into_inner().as_slice())?;
-                Ok(())
-            })?;
+        let buffer = self.destination.write(String::from("texture"), "texture", "png", |w| {
+            // `image` wants `Write + Seek` but `w` is not currently `Seek`
+            let mut tmp = io::Cursor::new(Vec::new());
+            image
+                .write_to(&mut tmp, image::ImageFormat::Png)
+                .expect("failed to write image to in-memory buffer");
+            w.write_all(tmp.into_inner().as_slice())?;
+            Ok(())
+        })?;
         Ok((buffer, mapping))
     }
 }
@@ -120,9 +118,7 @@ impl texture::Tile for GltfTile {
         texture::copy_voxels_into_xmaj_texture(data, &mut buffer, None);
 
         // OK to panic on failure because if we do, the caller ignored Self::REUSABLE.
-        self.texels
-            .set(buffer)
-            .expect("cannot overwrite glTF textures")
+        self.texels.set(buffer).expect("cannot overwrite glTF textures")
     }
 
     fn bounds(&self) -> GridAab {

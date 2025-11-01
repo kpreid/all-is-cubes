@@ -30,9 +30,7 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
     // for "what's the highest resolution that was tested along this ray", we can do adaptive
     // sampling so we can trace whole blocks at once when they're simple, and also detect if
     // the image scale is too low to accurately capture the scene.
-    let space = &*space
-        .read(read_ticket)
-        .expect("failed to read space to render");
+    let space = &*space.read(read_ticket).expect("failed to read space to render");
     let camera = &MultiOrthoCamera::new(Resolution::R32, space.bounds());
     let rt = &raytracer::SpaceRaytracer::new(space, GraphicsOptions::UNALTERED_COLORS, ());
 
@@ -86,8 +84,7 @@ fn trace_one_pixel_with_cache(
             let cache_key: CacheKey = (
                 ray.origin_cube(),
                 cache.resolution,
-                ray.zoom_in(ray.origin_cube(), cache.resolution)
-                    .origin_cube(),
+                ray.zoom_in(ray.origin_cube(), cache.resolution).origin_cube(),
             );
             if let Some((_, v)) = cache.pixel.filter(|&(k, _)| k == cache_key) {
                 v
@@ -100,8 +97,7 @@ fn trace_one_pixel_with_cache(
                 let new_cache_key = (
                     ray.origin_cube(),
                     pixel.max_resolution,
-                    ray.zoom_in(ray.origin_cube(), pixel.max_resolution)
-                        .origin_cube(),
+                    ray.zoom_in(ray.origin_cube(), pixel.max_resolution).origin_cube(),
                 );
                 *cache = Cache {
                     resolution: pixel.max_resolution,
@@ -271,10 +267,7 @@ impl OrthoCamera {
         point: Point2D<u32, ImagePixel>,
     ) -> Option<raycast::AaRay> {
         raycast::Ray {
-            origin: self
-                .transform
-                .transform_point3d(point.to_f64().to_3d())
-                .unwrap(),
+            origin: self.transform.transform_point3d(point.to_f64().to_3d()).unwrap(),
             direction: self.ray_direction,
         }
         .try_into()

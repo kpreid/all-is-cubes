@@ -21,9 +21,7 @@ pub struct Destination {
 
 impl fmt::Debug for Destination {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Destination")
-            .field("path", &self.path)
-            .finish_non_exhaustive()
+        f.debug_struct("Destination").field("path", &self.path).finish_non_exhaustive()
     }
 }
 
@@ -41,8 +39,7 @@ impl Destination {
     pub fn log_initialization(&self) {
         let path = EntityPath::from(vec![]);
         self.catch(|| {
-            self.stream
-                .log_static(path.clone(), &annotation_context())?;
+            self.stream.log_static(path.clone(), &annotation_context())?;
             self.stream.log_static(
                 path.clone(),
                 &archetypes::ViewCoordinates::new(OUR_VIEW_COORDINATES),
@@ -167,9 +164,7 @@ fn annotation_context() -> archetypes::AnnotationContext {
     archetypes::AnnotationContext::new(descs.into_iter().map(|(id, label, color)| {
         datatypes::AnnotationInfo {
             id: id as u16,
-            label: Some(label)
-                .filter(|label| !label.is_empty())
-                .map(datatypes::Utf8::from),
+            label: Some(label).filter(|label| !label.is_empty()).map(datatypes::Utf8::from),
             color: Some(datatypes::Rgba32::from(color)),
         }
     }))

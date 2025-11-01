@@ -37,14 +37,11 @@ pub(crate) fn write_report_file(suite_id: SuiteId) -> PathBuf {
     })
     .collect();
 
-    let all_test_ids: BTreeSet<String> = comparison_records
-        .iter()
-        .flat_map(|map| map.keys().cloned())
-        .collect();
+    let all_test_ids: BTreeSet<String> =
+        comparison_records.iter().flat_map(|map| map.keys().cloned()).collect();
 
     let mut tt = TinyTemplate::new();
-    tt.add_template("report", include_str!("report.template.html"))
-        .unwrap();
+    tt.add_template("report", include_str!("report.template.html")).unwrap();
 
     let context = tmpl::Context {
         statuses: all_test_ids

@@ -128,12 +128,7 @@ impl TerminalWindow {
     pub(super) fn send(&self, msg: OutMsg) {
         // TODO: handle error — don't return it to the caller here, to keep things write-only,
         // but signal that we should be shutting down.
-        match self
-            .out_sender
-            .as_ref()
-            .expect("TerminalWindow already shut down")
-            .send(msg)
-        {
+        match self.out_sender.as_ref().expect("TerminalWindow already shut down").send(msg) {
             Ok(()) => {}
             Err(mpsc::SendError(msg)) => {
                 log::trace!("TerminalWindow output thread not listening; message = {msg:?}");
@@ -143,11 +138,7 @@ impl TerminalWindow {
 
     pub(crate) fn wait_for_sync(&self) {
         let (ping_sender, ping_receiver) = mpsc::sync_channel(1);
-        let _ = self
-            .out_sender
-            .as_ref()
-            .unwrap()
-            .send(OutMsg::Ping(ping_sender));
+        let _ = self.out_sender.as_ref().unwrap().send(OutMsg::Ping(ping_sender));
         // TODO: error handling
         ping_receiver.recv().unwrap();
     }
@@ -242,9 +233,7 @@ impl TerminalState {
                 if self.has_terminal_stdin {
                     crossterm::terminal::enable_raw_mode()?;
                 }
-                terminal
-                    .backend_mut()
-                    .queue(crossterm::event::EnableMouseCapture)?;
+                terminal.backend_mut().queue(crossterm::event::EnableMouseCapture)?;
                 terminal.clear()?;
                 Ok(())
             }
@@ -431,9 +420,8 @@ impl TerminalState {
                             SELECTED_BLANK
                         },
                     ];
-                    let block = ratatui::widgets::Block::default()
-                        .title(slot_info)
-                        .borders(Borders::ALL);
+                    let block =
+                        ratatui::widgets::Block::default().title(slot_info).borders(Borders::ALL);
                     f.render_widget(
                         match slot {
                             // TODO: Use item icon text -- we need a way to access the predefined icons from here

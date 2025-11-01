@@ -46,10 +46,8 @@ pub(crate) async fn scene_to_space(
         .try_build()
         .map_err(|e| mv::DotVoxConversionError::Unexpected(InGenError::from(e)))?;
 
-    for (leaf_index, (leaf, mut leaf_progress)) in leaves
-        .iter()
-        .zip(progress.split_evenly(leaves.len()))
-        .enumerate()
+    for (leaf_index, (leaf, mut leaf_progress)) in
+        leaves.iter().zip(progress.split_evenly(leaves.len())).enumerate()
     {
         leaf_progress.set_label(format!("Placing model #{leaf_index}/{n}", n = leaves.len()));
         leaf_progress.progress(0.0).await;

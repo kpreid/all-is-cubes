@@ -463,9 +463,7 @@ fn intersection_point_random_test() {
     for case in 0..1000 {
         let ray = Ray::new(
             ray_origins.random_point(&mut rng),
-            Aab::new(-1., 1., -1., 1., -1., 1.)
-                .random_point(&mut rng)
-                .to_vector(),
+            Aab::new(-1., 1., -1., 1., -1., 1.).random_point(&mut rng).to_vector(),
         );
         let steps: Vec<RaycastStep> = ray.cast().within(bounds, true).collect();
         match steps.len() {

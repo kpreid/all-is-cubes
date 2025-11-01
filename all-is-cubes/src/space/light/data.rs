@@ -408,9 +408,8 @@ mod tests {
 
     #[test]
     fn check_packed_light_table() {
-        let generated_table: Vec<f32> = (0..=u8::MAX)
-            .map(PackedLight::scalar_out_arithmetic)
-            .collect();
+        let generated_table: Vec<f32> =
+            (0..=u8::MAX).map(PackedLight::scalar_out_arithmetic).collect();
         print!("static PACKED_LIGHT_SCALAR_LOOKUP_TABLE: [PositiveSign<f32>; 256] = [");
         for i in 0..=u8::MAX {
             if i.is_multiple_of(5) {

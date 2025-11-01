@@ -237,9 +237,8 @@ where
 
         // Compute the AAB of the potential intersection, excluding the exterior of the
         // space.
-        let Some(potential_intersection_bounds) = step_aab
-            .round_up_to_grid()
-            .intersection_cubes(space.bounds())
+        let Some(potential_intersection_bounds) =
+            step_aab.round_up_to_grid().intersection_cubes(space.bounds())
         else {
             continue 'ray_step;
         };
@@ -363,16 +362,12 @@ where
 
         // Compute the AAB of the potential intersection, excluding the exterior of the
         // space.
-        let potential_intersection_bounds = step_aab
-            .round_up_to_grid()
-            .intersection_cubes(space.bounds());
+        let potential_intersection_bounds =
+            step_aab.round_up_to_grid().intersection_cubes(space.bounds());
 
         let mut farthest_recursive_end: Option<CollisionRayEnd> = None;
         // Loop over all the cubes that our AAB is currently intersecting.
-        for cube in potential_intersection_bounds
-            .iter()
-            .flat_map(|ib| ib.interior_iter())
-        {
+        for cube in potential_intersection_bounds.iter().flat_map(|ib| ib.interior_iter()) {
             let cell = space.get_cell(cube);
             match Sp::collision(cell) {
                 Some(BlockCollision::None) => {
@@ -390,9 +385,7 @@ where
                     println_escape_debug!("  < exiting recursion {found_end:?}");
                     if let Some(found_end) = found_end
                         && found_end.t_distance
-                            > farthest_recursive_end
-                                .as_ref()
-                                .map_or(0., |end| end.t_distance)
+                            > farthest_recursive_end.as_ref().map_or(0., |end| end.t_distance)
                     {
                         farthest_recursive_end = Some(found_end);
                     }
@@ -480,11 +473,8 @@ fn collides_at_end<Sp>(space: &Sp, collision_box: Aab, ray: Ray, end: &Collision
 where
     Sp: CollisionSpace,
 {
-    let proposed_aab = collision_box.translate(
-        ray.scale_direction(end.t_distance)
-            .unit_endpoint()
-            .to_vector(),
-    );
+    let proposed_aab =
+        collision_box.translate(ray.scale_direction(end.t_distance).unit_endpoint().to_vector());
     find_colliding_cubes(space, proposed_aab).next().is_some()
 }
 
@@ -549,10 +539,7 @@ impl CollisionSpace for Space {
         stop_at: StopAt,
     ) -> Option<CollisionRayEnd> {
         let resolution = evaluated.resolution();
-        let cube_translation = cube
-            .lower_bounds()
-            .to_vector()
-            .map(|s| -FreeCoordinate::from(s));
+        let cube_translation = cube.lower_bounds().to_vector().map(|s| -FreeCoordinate::from(s));
         let scale = FreeCoordinate::from(resolution);
         // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
         // Note: aab is not translated since it's relative to the ray anyway.
@@ -577,10 +564,7 @@ impl CollisionSpace for Space {
     ) -> Option<CollisionRayEnd> {
         let resolution = evaluated.resolution();
         // TODO: deduplicate scaling code
-        let cube_translation = cube
-            .lower_bounds()
-            .to_vector()
-            .map(|s| -FreeCoordinate::from(s));
+        let cube_translation = cube.lower_bounds().to_vector().map(|s| -FreeCoordinate::from(s));
         let scale = FreeCoordinate::from(resolution);
         // Transform our original AAB and ray so that it is in the coordinate system of the block voxels.
         // Note: aab is not translated since it's relative to the ray anyway.
@@ -676,10 +660,8 @@ pub(crate) fn nudge_on_ray(
     // This is the depth by which the un-nudged face penetrates the plane, which we are going to subtract.
     let penetration_depth = {
         let subdivision = FreeCoordinate::from(subdivision);
-        let fc_scaled = aab
-            .translate(segment.unit_endpoint().to_vector())
-            .face_coordinate(face)
-            * subdivision;
+        let fc_scaled =
+            aab.translate(segment.unit_endpoint().to_vector()).face_coordinate(face) * subdivision;
         (fc_scaled - fc_scaled.round()) / subdivision
     };
 
@@ -982,9 +964,7 @@ mod tests {
         for _ in 0..1000 {
             let ray = Ray::new(
                 Aab::new(-2., 2., -2., 2., -2., 2.).random_point(&mut rng),
-                Aab::new(-1., 1., -1., 1., -1., 1.)
-                    .random_point(&mut rng)
-                    .to_vector(),
+                Aab::new(-1., 1., -1., 1., -1., 1.).random_point(&mut rng).to_vector(),
             );
             // No assertion of the expected result; just not triggering any assertion.
             escape_along_ray(
@@ -1027,13 +1007,9 @@ mod tests {
             // Prepare test data
             let ray = Ray::new(
                 Aab::new(-2., 2., -2., 2., -2., 2.).random_point(&mut rng),
-                Aab::new(-1., 1., -1., 1., -1., 1.)
-                    .random_point(&mut rng)
-                    .to_vector(),
+                Aab::new(-1., 1., -1., 1., -1., 1.).random_point(&mut rng).to_vector(),
             );
-            let step = aab_raycast(moving_aab, ray, false)
-                .nth(rng.random_range(1..10))
-                .unwrap();
+            let step = aab_raycast(moving_aab, ray, false).nth(rng.random_range(1..10)).unwrap();
             let axis = step.face().axis().expect("should have an axis");
             let segment = ray.scale_direction(step.t_distance()); // TODO: this should be a function? Should aab_raycast return a special step type with these features?
             let unnudged_aab = moving_aab.translate(segment.unit_endpoint().to_vector());
@@ -1079,9 +1055,8 @@ mod tests {
 
                 let enclosing = nudged_aab.round_up_to_grid();
                 if backward {
-                    let expected_enclosing = Cube::containing(segment.unit_endpoint())
-                        .unwrap()
-                        .grid_aab();
+                    let expected_enclosing =
+                        Cube::containing(segment.unit_endpoint()).unwrap().grid_aab();
                     assert_eq!(
                         enclosing.axis_range(axis),
                         expected_enclosing.axis_range(axis),

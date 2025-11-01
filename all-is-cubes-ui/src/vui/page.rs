@@ -156,24 +156,22 @@ impl Page {
                     0., 0., 0., 0.7
                 ))),
                 Arc::new(LayoutTree::Shrink(
-                    theme
-                        .dialog_background()
-                        .as_background_of(Arc::new(LayoutTree::Stack {
-                            direction: Face6::NY,
-                            children: vec![
-                                Arc::new(LayoutTree::Stack {
-                                    direction: Face6::PX,
-                                    children: if let Some(corner_button) = corner_button {
-                                        // TODO: arrange so that title text is centered if possible
-                                        // (need a new LayoutTree variant or to generalize Stack, but it might help with our HUD too)
-                                        vec![corner_button, title_widget]
-                                    } else {
-                                        vec![title_widget]
-                                    },
-                                }),
-                                contents,
-                            ],
-                        })),
+                    theme.dialog_background().as_background_of(Arc::new(LayoutTree::Stack {
+                        direction: Face6::NY,
+                        children: vec![
+                            Arc::new(LayoutTree::Stack {
+                                direction: Face6::PX,
+                                children: if let Some(corner_button) = corner_button {
+                                    // TODO: arrange so that title text is centered if possible
+                                    // (need a new LayoutTree variant or to generalize Stack, but it might help with our HUD too)
+                                    vec![corner_button, title_widget]
+                                } else {
+                                    vec![title_widget]
+                                },
+                            }),
+                            contents,
+                        ],
+                    })),
                 )),
             ],
         });
@@ -265,9 +263,7 @@ impl PageInst {
         // TODO: We need overall better handling of this; for example, we should be able to
         // pan ("scroll") the camera over a tall dialog box.
         // Also, this doesn't handle Z size.
-        let fitting_size = size
-            .size
-            .max(drop_depth(self.page.tree.requirements().minimum));
+        let fitting_size = size.size.max(drop_depth(self.page.tree.requirements().minimum));
         if fitting_size != size.size {
             log::debug!("VUI page had to enlarge proposed size {size:?} to {fitting_size:?}");
             size.size = fitting_size;

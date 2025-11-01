@@ -160,9 +160,8 @@ impl ReloadableShader {
         }
 
         if let Some(f) = self.next_module.as_mut()
-            && let task::Poll::Ready(result) = f
-                .as_mut()
-                .poll(&mut task::Context::from_waker(task::Waker::noop()))
+            && let task::Poll::Ready(result) =
+                f.as_mut().poll(&mut task::Context::from_waker(task::Waker::noop()))
         {
             self.next_module = None;
             match result {

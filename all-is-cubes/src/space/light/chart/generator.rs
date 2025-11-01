@@ -197,9 +197,7 @@ fn tree_to_flat(root: &RayTreeNode) -> Vec<FlatNode> {
         table[this_index] = FlatNode::new(
             node.weight,
             FaceMap::from_fn(|face| {
-                node.children[face]
-                    .as_ref()
-                    .map(|child| cube_to_index[&child.relative_cube])
+                node.children[face].as_ref().map(|child| cube_to_index[&child.relative_cube])
             }),
         );
     });

@@ -362,10 +362,7 @@ impl VoxelOpacityMask {
             VoxelOpacityMask(MaskInner::Irregular(
                 resolution,
                 voxels.map_container(|voxels| {
-                    voxels
-                        .iter()
-                        .map(|voxel| voxel.opacity_category())
-                        .collect()
+                    voxels.iter().map(|voxel| voxel.opacity_category()).collect()
                 }),
             ))
         }

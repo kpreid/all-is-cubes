@@ -124,16 +124,9 @@ impl Tool {
                     input.set_cube(cursor.cube(), cursor.hit().block.clone(), AIR)?;
                 if keep {
                     deletion
-                        .merge_from(
-                            input.produce_items(
-                                cursor
-                                    .hit()
-                                    .block
-                                    .unspecialize()
-                                    .into_iter()
-                                    .map(Tool::Block),
-                            )?,
-                        )
+                        .merge_from(input.produce_items(
+                            cursor.hit().block.unspecialize().into_iter().map(Tool::Block),
+                        )?)
                         .unwrap();
                 }
                 Ok((Some(self), deletion))
@@ -368,9 +361,7 @@ impl<'ticket> ToolInput<'ticket> {
         new_block: Block,
     ) -> Result<UniverseTransaction, ToolError> {
         let space_handle = self.cursor()?.space();
-        let space = space_handle
-            .read(self.read_ticket)
-            .map_err(ToolError::SpaceHandle)?;
+        let space = space_handle.read(self.read_ticket).map_err(ToolError::SpaceHandle)?;
         if space[cube] != old_block {
             return Err(ToolError::Obstacle);
         }
@@ -397,11 +388,8 @@ impl<'ticket> ToolInput<'ticket> {
         let rotation = match new_ev.attributes().rotation_rule {
             RotationPlacementRule::Never => GridRotation::IDENTITY,
             RotationPlacementRule::Attach { by: attached_face } => {
-                let world_cube_face: Face6 = cursor
-                    .face_selected()
-                    .opposite()
-                    .try_into()
-                    .unwrap_or(Face6::NZ);
+                let world_cube_face: Face6 =
+                    cursor.face_selected().opposite().try_into().unwrap_or(Face6::NZ);
                 // TODO: RotationPlacementRule should control the "up" axis choices
                 GridRotation::from_to(attached_face, world_cube_face, Face6::PY)
                     .or_else(|| GridRotation::from_to(attached_face, world_cube_face, Face6::PX))
@@ -478,11 +466,8 @@ impl<'ticket> ToolInput<'ticket> {
         // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
 
         let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail if this returns None?
-        let character_guard: Option<ReadGuard<'ticket, Character>> = self
-            .character
-            .as_ref()
-            .map(|c| c.read(self.read_ticket))
-            .transpose()?;
+        let character_guard: Option<ReadGuard<'ticket, Character>> =
+            self.character.as_ref().map(|c| c.read(self.read_ticket)).transpose()?;
 
         let cube = if in_front {
             cursor.preceding_cube()
@@ -746,9 +731,7 @@ mod tests {
                 self.character().inventory().slots[usize::from(index)].clone(),
                 stack.into(),
             ));
-            self.universe
-                .execute_1(&self.character_handle, insert_txn)
-                .unwrap();
+            self.universe.execute_1(&self.character_handle, insert_txn).unwrap();
 
             // Invoke Inventory::use_tool, which knows how to assemble the answer into a
             // single transaction.
@@ -777,9 +760,7 @@ mod tests {
             &self.space_handle
         }
         fn character(&self) -> ReadGuard<'_, Character> {
-            self.character_handle
-                .read(self.universe.read_ticket())
-                .unwrap()
+            self.character_handle.read(self.universe.read_ticket()).unwrap()
         }
     }
 
@@ -826,10 +807,7 @@ mod tests {
 
     #[test]
     fn use_activate_on_block_action() {
-        let after = Block::builder()
-            .color(Rgba::WHITE)
-            .display_name("after")
-            .build();
+        let after = Block::builder().color(Rgba::WHITE).display_name("after").build();
         let before = Block::builder()
             .color(Rgba::WHITE)
             .display_name("before")
@@ -864,9 +842,7 @@ mod tests {
         let mut tester = ToolTester::new(|m| {
             m.set([1, 0, 0], &existing).unwrap();
         });
-        let actual_transaction = tester
-            .equip_and_use_tool(Tool::RemoveBlock { keep })
-            .unwrap();
+        let actual_transaction = tester.equip_and_use_tool(Tool::RemoveBlock { keep }).unwrap();
 
         let mut expected_delete =
             SpaceTransaction::set_cube([1, 0, 0], Some(existing.clone()), Some(AIR))
@@ -883,9 +859,7 @@ mod tests {
         }
         assert_eq!(actual_transaction, expected_delete);
 
-        actual_transaction
-            .execute(&mut tester.universe, (), &mut drop)
-            .unwrap();
+        actual_transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
         print_space(&tester.space(), [-1., 1., 1.]);
         assert_eq!(&tester.space()[[1, 0, 0]], &AIR);
     }
@@ -924,9 +898,7 @@ mod tests {
 
         let mut expected_cube_transaction =
             SpaceTransaction::set_cube(Cube::ORIGIN, Some(AIR), Some(tool_block.clone()));
-        expected_cube_transaction
-            .at(Cube::ORIGIN)
-            .add_fluff(Fluff::PlaceBlockGeneric);
+        expected_cube_transaction.at(Cube::ORIGIN).add_fluff(Fluff::PlaceBlockGeneric);
         let mut expected_cube_transaction =
             expected_cube_transaction.bind(tester.space_handle.clone());
         if expect_consume {
@@ -943,9 +915,7 @@ mod tests {
         }
         assert_eq!(transaction, expected_cube_transaction);
 
-        transaction
-            .execute(&mut tester.universe, (), &mut drop)
-            .unwrap();
+        transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
         print_space(&tester.space(), [-1., 1., 1.]);
         assert_eq!(&tester.space()[[1, 0, 0]], &existing);
         assert_eq!(&tester.space()[[0, 0, 0]], &tool_block);
@@ -961,17 +931,14 @@ mod tests {
 
         // Make a block with a rotation rule
         let [mut tool_block] = make_some_voxel_blocks(&mut tester.universe);
-        tool_block
-            .modifiers_mut()
-            .push(block::Modifier::from(block::BlockAttributes {
-                rotation_rule: RotationPlacementRule::Attach { by: Face6::NZ },
-                ..block::BlockAttributes::default()
-            }));
+        tool_block.modifiers_mut().push(block::Modifier::from(block::BlockAttributes {
+            rotation_rule: RotationPlacementRule::Attach { by: Face6::NZ },
+            ..block::BlockAttributes::default()
+        }));
 
         // TODO: For more thorough testing, we need to be able to control ToolTester's choice of ray
-        let transaction = tester
-            .equip_and_use_tool(Tool::InfiniteBlocks(tool_block.clone()))
-            .unwrap();
+        let transaction =
+            tester.equip_and_use_tool(Tool::InfiniteBlocks(tool_block.clone())).unwrap();
         assert_eq!(
             transaction,
             {
@@ -1000,9 +967,8 @@ mod tests {
             .inventory_config(inv::InvInBlock::new(10, R4, R16, []))
             .build();
 
-        let transaction = tester
-            .equip_and_use_tool(Tool::InfiniteBlocks(tool_block.clone()))
-            .unwrap();
+        let transaction =
+            tester.equip_and_use_tool(Tool::InfiniteBlocks(tool_block.clone())).unwrap();
         assert_eq!(
             transaction,
             {
@@ -1046,9 +1012,8 @@ mod tests {
             .build();
         let tool = tool_ctor(tool_block.clone());
         let expect_consume = matches!(tool, Tool::Block(_));
-        let expected_result_block = existing_affected_block
-            .clone()
-            .with_modifier(modifier_to_add.clone());
+        let expected_result_block =
+            existing_affected_block.clone().with_modifier(modifier_to_add.clone());
 
         dbg!(&tool);
         let mut tester = ToolTester::new(|m| {
@@ -1086,9 +1051,7 @@ mod tests {
             "actual transaction ≠ expected transaction"
         );
 
-        transaction
-            .execute(&mut tester.universe, (), &mut drop)
-            .unwrap();
+        transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
         print_space(&tester.space(), [-1., 1., 1.]);
         assert_eq!(
             (&tester.space()[[1, 0, 0]], &tester.space()[[0, 0, 0]]),
@@ -1170,9 +1133,7 @@ mod tests {
             )]))
             .bind(tester.character_handle.clone())
         );
-        transaction
-            .execute(&mut tester.universe, (), &mut drop)
-            .unwrap();
+        transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
         // Space is unmodified
         assert_eq!(&tester.space()[[1, 0, 0]], &existing);
     }

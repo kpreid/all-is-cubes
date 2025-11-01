@@ -121,9 +121,7 @@ pub async fn install_demo_blocks(
             .light_emission(Rgb::ONE * 180.0 * on as f32)
             .build()
     });
-    let lamppost_metal = Block::builder()
-        .color(palette::ALMOST_BLACK.with_alpha_one())
-        .build();
+    let lamppost_metal = Block::builder().color(palette::ALMOST_BLACK.with_alpha_one()).build();
     let lamppost_edge = Block::from(palette::ALMOST_BLACK.saturating_scale(ps32(1.12)));
 
     let pedestal_voxel = block::from_color!(palette::STONE);

@@ -141,9 +141,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             "bounding box of vertices ≠ recorded bounding box"
         );
 
-        self.transparent
-            .iter()
-            .for_each(TransparentMeta::consistency_check);
+        self.transparent.iter().for_each(TransparentMeta::consistency_check);
     }
 
     /// Returns the total memory (not counting allocator overhead) occupied by this
@@ -276,9 +274,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
 
             if !already_seen_index {
                 // Capture texture handles to ensure that our texture coordinates stay valid.
-                self.meta
-                    .textures_used
-                    .extend(block_mesh.textures().iter().cloned());
+                self.meta.textures_used.extend(block_mesh.textures().iter().cloned());
                 // Record flaws
                 self.meta.flaws |= block_mesh.flaws();
             }
@@ -501,11 +497,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     }
 
     let inst = M::Vertex::instantiate_block(translation);
-    let bb_translation = translation
-        .lower_bounds()
-        .to_f32()
-        .to_vector()
-        .cast_unit::<MeshRel>();
+    let bb_translation = translation.lower_bounds().to_f32().to_vector().cast_unit::<MeshRel>();
 
     for (face, on_block_face, sub_mesh) in block_mesh.all_sub_meshes_keyed() {
         if sub_mesh.is_empty() {
@@ -519,9 +511,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
 
         // Copy vertices, offset to the block position
         let index_offset_usize = vertices.0.len();
-        let index_offset: u32 = index_offset_usize
-            .try_into()
-            .expect("vertex index overflow");
+        let index_offset: u32 = index_offset_usize.try_into().expect("vertex index overflow");
         vertices.0.extend(sub_mesh.vertices.0.iter());
         vertices.1.extend(sub_mesh.vertices.1.iter());
         for vertex in &mut vertices.0[index_offset_usize..] {
@@ -562,10 +552,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
         let mut block_indices_used = BitVec::new();
         block_indices_used.push(true);
 
-        let vertex_count = block_mesh
-            .all_sub_meshes()
-            .map(|sm| sm.vertices.0.len())
-            .sum();
+        let vertex_count = block_mesh.all_sub_meshes().map(|sm| sm.vertices.0.len()).sum();
 
         let mut space_mesh = Self {
             vertices: (
@@ -584,10 +571,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
         };
 
         let mut opaque_indices_deque = IndexVecDeque::from(IndexVec::with_capacity(
-            block_mesh
-                .all_sub_meshes()
-                .map(|sm| sm.indices_opaque.len())
-                .sum(),
+            block_mesh.all_sub_meshes().map(|sm| sm.indices_opaque.len()).sum(),
         ));
         let mut transparent_indices: FaceMap<IndexVec> = FaceMap::default();
 

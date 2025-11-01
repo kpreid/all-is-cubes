@@ -128,13 +128,11 @@ impl VisitableComponents {
     ) -> impl Iterator<Item = &'w dyn VisitHandles> {
         // TODO: should this accept a visitor instead as its name suggest,
         // or is this version with less code near the unsafe{} preferable?
-        self.0
-            .iter()
-            .filter_map(move |(&component_id, &downcaster)| {
-                entity
-                    .get_by_id(component_id)
-                    // SAFETY: the component id ensures the component is of the correct type
-                    .map(|ptr| unsafe { downcaster(ptr) })
-            })
+        self.0.iter().filter_map(move |(&component_id, &downcaster)| {
+            entity
+                .get_by_id(component_id)
+                // SAFETY: the component id ensures the component is of the correct type
+                .map(|ptr| unsafe { downcaster(ptr) })
+        })
     }
 }

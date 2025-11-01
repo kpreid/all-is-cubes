@@ -165,10 +165,7 @@ impl Composite {
     pub(super) fn unspecialize(&self, entire_block: &Block) -> block::ModifierUnspecialize {
         if self.disassemblable {
             let mut destination = entire_block.clone();
-            destination
-                .modifiers_mut()
-                .pop()
-                .expect("Missing Composite modifier");
+            destination.modifiers_mut().pop().expect("Missing Composite modifier");
             block::ModifierUnspecialize::Replace(vec![self.source.clone(), destination])
         } else {
             block::ModifierUnspecialize::Keep
@@ -354,12 +351,8 @@ fn evaluate_composition(
             Vol::from_fn(output_bounds, |cube| {
                 let p = cube.lower_bounds();
                 operator.blend_evoxel(
-                    src_voxels
-                        .get(Cube::from(p / src_scale))
-                        .unwrap_or(Evoxel::AIR),
-                    dst_voxels
-                        .get(Cube::from(p / dst_scale))
-                        .unwrap_or(Evoxel::AIR),
+                    src_voxels.get(Cube::from(p / src_scale)).unwrap_or(Evoxel::AIR),
+                    dst_voxels.get(Cube::from(p / dst_scale)).unwrap_or(Evoxel::AIR),
                 )
             }),
         )
@@ -594,26 +587,24 @@ impl CompositeOperator {
                 new_block
             }
         };
-        new_block
-            .modifiers_mut()
-            .push(Modifier::Composite(Composite {
-                source: match source_becoming {
-                    Some(source_becoming) => source_becoming.clone(),
-                    None => {
-                        // If the source block had no `Operation::Become` of its own, then treat
-                        // it as becoming itself.
-                        let Modifier::Composite(Composite { source, .. }) =
-                            &ctx.block.modifiers()[this_modifier_index]
-                        else {
-                            panic!("modifier mismatch");
-                        };
-                        source.clone()
-                    }
-                },
-                operator: self,
-                reverse: ctx.was_reversed,
-                disassemblable: ctx.disassemblable,
-            }));
+        new_block.modifiers_mut().push(Modifier::Composite(Composite {
+            source: match source_becoming {
+                Some(source_becoming) => source_becoming.clone(),
+                None => {
+                    // If the source block had no `Operation::Become` of its own, then treat
+                    // it as becoming itself.
+                    let Modifier::Composite(Composite { source, .. }) =
+                        &ctx.block.modifiers()[this_modifier_index]
+                    else {
+                        panic!("modifier mismatch");
+                    };
+                    source.clone()
+                }
+            },
+            operator: self,
+            reverse: ctx.was_reversed,
+            disassemblable: ctx.disassemblable,
+        }));
 
         Some(Operation::Become(new_block))
     }
@@ -624,9 +615,7 @@ impl CompositeOperator {
             Self::Over => source.union_cubes(destination),
             // We could equally well use intersection_cubes() here, but prefer the one that
             // more often returns a box related to the input.
-            Self::In => source
-                .intersection_box(destination)
-                .unwrap_or(GridAab::ORIGIN_EMPTY),
+            Self::In => source.intersection_box(destination).unwrap_or(GridAab::ORIGIN_EMPTY),
             Self::Out => source,
             Self::Atop => destination,
         }
@@ -678,11 +667,7 @@ pub(in crate::block) fn render_inventory(
     for (slot_index, icon_position) in config.icon_positions(inventory.size()) {
         let Some(placed_icon_bounds) = GridAab::checked_from_lower_size(
             icon_position,
-            GridSize::splat(
-                (config.icon_resolution / config.icon_scale)
-                    .unwrap_or(R1)
-                    .into(),
-            ),
+            GridSize::splat((config.icon_resolution / config.icon_scale).unwrap_or(R1).into()),
         )
         .ok()
         .and_then(|b| b.intersection_cubes(GridAab::for_block(config.icon_resolution))) else {
@@ -691,9 +676,8 @@ pub(in crate::block) fn render_inventory(
         };
 
         // TODO(inventory): icon_only_if_intrinsic is a kludge
-        let Some(icon): Option<&Block> = inventory
-            .get(slot_index)
-            .and_then(|slot| slot.icon_only_if_intrinsic())
+        let Some(icon): Option<&Block> =
+            inventory.get(slot_index).and_then(|slot| slot.icon_only_if_intrinsic())
         else {
             // No slot to render at this position.
             continue;
@@ -702,8 +686,7 @@ pub(in crate::block) fn render_inventory(
         let mut icon_evaluated = {
             let _recursion_scope = block::Budget::recurse(&filter.budget)?;
             // this is the wrong cost value but it doesn't matter
-            icon.evaluate_impl(filter)?
-                .finish(icon.clone(), filter.budget.get().to_cost())
+            icon.evaluate_impl(filter)?.finish(icon.clone(), filter.budget.get().to_cost())
         };
 
         // TODO(inventory): Instead of roughly downsampling the icons here, we should be
@@ -861,10 +844,7 @@ mod tests {
     fn bounding_volume_when_one_is_air() {
         let universe = &mut Universe::new();
         let slab = make_slab(universe, 1, R2);
-        let slab_bounds = slab
-            .evaluate(universe.read_ticket())
-            .unwrap()
-            .voxels_bounds();
+        let slab_bounds = slab.evaluate(universe.read_ticket()).unwrap().voxels_bounds();
 
         assert_eq!(
             eval_compose(universe, &slab, Over, &AIR).voxels_bounds(),
@@ -1062,36 +1042,26 @@ mod tests {
         fn display_name() {
             let u = Universe::new();
             let no_name = &Block::builder().color(Rgba::WHITE).build();
-            let has_name_1 = &Block::builder()
-                .color(Rgba::WHITE)
-                .display_name(literal!("has_name_1"))
-                .build();
-            let has_name_2 = &Block::builder()
-                .color(Rgba::WHITE)
-                .display_name(literal!("has_name_2"))
-                .build();
+            let has_name_1 =
+                &Block::builder().color(Rgba::WHITE).display_name(literal!("has_name_1")).build();
+            let has_name_2 =
+                &Block::builder().color(Rgba::WHITE).display_name(literal!("has_name_2")).build();
 
             // Nonempty source overrides empty destination.
             assert_eq!(
-                eval_compose(&u, has_name_1, Over, no_name)
-                    .attributes()
-                    .display_name,
+                eval_compose(&u, has_name_1, Over, no_name).attributes().display_name,
                 literal!("has_name_1")
             );
 
             // Nonempty destination overrides empty source.
             assert_eq!(
-                eval_compose(&u, no_name, Over, has_name_1)
-                    .attributes()
-                    .display_name,
+                eval_compose(&u, no_name, Over, has_name_1).attributes().display_name,
                 literal!("has_name_1")
             );
 
             // If both have names, destination wins.
             assert_eq!(
-                eval_compose(&u, has_name_1, Over, has_name_2)
-                    .attributes()
-                    .display_name,
+                eval_compose(&u, has_name_1, Over, has_name_2).attributes().display_name,
                 // the original block’s name is preferred over the modifier
                 literal!("has_name_2")
             );
@@ -1120,10 +1090,7 @@ mod tests {
             // TODO: make this a more thorough test by making the two blocks slabs so that
             // all four types of voxels are involved. This currently doesn't matter but it may.
             let is_s = &Block::builder().color(Rgba::WHITE).selectable(true).build();
-            let not_s = &Block::builder()
-                .color(Rgba::WHITE)
-                .selectable(false)
-                .build();
+            let not_s = &Block::builder().color(Rgba::WHITE).selectable(false).build();
 
             assert!(eval_compose(&u, is_s, Over, is_s).attributes().selectable);
             assert!(eval_compose(&u, is_s, Over, not_s).attributes().selectable);
@@ -1150,9 +1117,7 @@ mod tests {
                 .build();
 
             assert_eq!(
-                eval_compose(&universe, b1, Over, b2)
-                    .attributes()
-                    .activation_action,
+                eval_compose(&universe, b1, Over, b2).attributes().activation_action,
                 Some(Operation::Become(
                     result2.with_modifier(Composite::new(result1, Over))
                 ))
@@ -1181,9 +1146,7 @@ mod tests {
                 .build();
 
             assert_eq!(
-                eval_compose(&universe, b1, Over, b2)
-                    .attributes()
-                    .tick_action,
+                eval_compose(&universe, b1, Over, b2).attributes().tick_action,
                 Some(block::TickAction {
                     schedule: time::Schedule::EVERY_TICK,
                     operation: Operation::Become(
@@ -1229,9 +1192,8 @@ mod tests {
         #[test]
         fn unspecialize_yes() {
             let [b1, b2] = make_some_blocks();
-            let composed = b1
-                .clone()
-                .with_modifier(Composite::new(b2.clone(), Over).with_disassemblable());
+            let composed =
+                b1.clone().with_modifier(Composite::new(b2.clone(), Over).with_disassemblable());
             assert_eq!(composed.unspecialize(), vec![b2, b1]);
         }
     }
@@ -1328,11 +1290,7 @@ mod tests {
                 .unwrap()
                 .build_into(universe);
             assert_eq!(
-                smaller_block
-                    .evaluate(universe.read_ticket())
-                    .unwrap()
-                    .voxels()
-                    .bounds(),
+                smaller_block.evaluate(universe.read_ticket()).unwrap().voxels().bounds(),
                 GridAab::from_lower_size([0, 0, 0], [1, 4, 4]),
                 "test assumption failed"
             );

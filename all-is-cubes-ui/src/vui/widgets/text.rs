@@ -71,17 +71,12 @@ impl Widget for LargeText {
         let drawable = self.drawable();
         let draw_bounds = self.bounds();
         drawable
-            .draw(
-                &mut txn.draw_target(
-                    Gridgid::from_translation(
-                        position
-                            .shrink_to(draw_bounds.size(), false)
-                            .bounds
-                            .lower_bounds()
-                            - draw_bounds.lower_bounds(),
-                    ) * Gridgid::FLIP_Y,
-                ),
-            )
+            .draw(&mut txn.draw_target(
+                Gridgid::from_translation(
+                    position.shrink_to(draw_bounds.size(), false).bounds.lower_bounds()
+                        - draw_bounds.lower_bounds(),
+                ) * Gridgid::FLIP_Y,
+            ))
             .unwrap();
 
         widgets::OneshotController::new(txn)
@@ -133,8 +128,7 @@ impl Label {
         text_for_widget(
             self.text.clone(),
             self.font.clone(),
-            self.positioning
-                .unwrap_or_else(|| gravity_to_positioning(gravity, true)),
+            self.positioning.unwrap_or_else(|| gravity_to_positioning(gravity, true)),
         )
     }
 }
@@ -152,10 +146,7 @@ impl Layoutable for Label {
         // When we actually go to render text, we'll use the actual gravity and bounds, so this
         // alignment choice won't matter.
         LayoutRequest {
-            minimum: self
-                .text(vui::Gravity::splat(vui::Align::Low))
-                .bounding_blocks()
-                .size(),
+            minimum: self.text(vui::Gravity::splat(vui::Align::Low)).bounding_blocks().size(),
         }
     }
 }

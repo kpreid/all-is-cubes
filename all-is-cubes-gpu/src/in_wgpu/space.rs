@@ -237,9 +237,7 @@ impl SpaceRenderer {
 
         {
             let (particle_tx, new_particle_rx) = mpsc::sync_channel(400);
-            space_borrowed
-                .fluff()
-                .listen(FluffListener::new(particle_tx));
+            space_borrowed.fluff().listen(FluffListener::new(particle_tx));
             particle_sets.clear();
             *particle_rx = new_particle_rx;
         }
@@ -338,24 +336,20 @@ impl SpaceRenderer {
             // Check the size.
             let needed_size =
                 LightTexture::choose_size(&device.limits(), space.bounds(), camera.view_distance());
-            self.light_texture
-                .ensure_as_big_as(&self.space_label, device, needed_size);
+            self.light_texture.ensure_as_big_as(&self.space_label, device, needed_size);
 
             // Handle individual changed cubes, or the space changing.
             if let Some(set) = &mut todo.light {
                 // Update individual cubes.
                 light_update_count +=
-                    self.light_texture
-                        .update_scatter(device, queue, space, set.drain());
+                    self.light_texture.update_scatter(device, queue, space, set.drain());
             } else {
                 self.light_texture.forget_mapped();
                 todo.light = Some(HashSet::new());
             }
 
             // Ensure the texture covers the right region for the camera.
-            light_update_count += self
-                .light_texture
-                .ensure_visible_is_mapped(queue, space, camera);
+            light_update_count += self.light_texture.ensure_visible_is_mapped(queue, space, camera);
         }
         let end_light_update = time::Instant::now();
 
@@ -715,10 +709,8 @@ impl SpaceRenderer {
         }
 
         block_instances.clear();
-        *self
-            .instance_collector
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner) = Some(block_instances);
+        *self.instance_collector.lock().unwrap_or_else(PoisonError::into_inner) =
+            Some(block_instances);
 
         // Transparent geometry after opaque geometry, in back-to-front order
         let start_draw_transparent_time = time::Instant::now();
@@ -806,12 +798,9 @@ impl SpaceRenderer {
             // Draw the modified view frustum, which becomes a viewport box in screen space.
             // (Note the lines are at risk of being clipped, but in practice are sufficiently
             // visible but flickery.)
-            camera
-                .view_frustum_geometry()
-                .wireframe_points(&mut crate::map_line_vertices::<WgpuLinesVertex>(
-                    v,
-                    Rgba::WHITE,
-                ));
+            camera.view_frustum_geometry().wireframe_points(&mut crate::map_line_vertices::<
+                WgpuLinesVertex,
+            >(v, Rgba::WHITE));
         }
 
         if camera.options().debug_chunk_boxes {
@@ -944,11 +933,7 @@ fn set_buffers<'a>(render_pass: &mut wgpu::RenderPass<'a>, buffers: &'a ChunkBuf
         vertex_buffer.slice(buffers.vertices_color_addr..),
     );
     render_pass.set_index_buffer(
-        buffers
-            .index_buf
-            .get()
-            .expect("missing index buffer")
-            .slice(..),
+        buffers.index_buf.get().expect("missing index buffer").slice(..),
         buffers.index_format,
     );
 }
@@ -980,9 +965,7 @@ fn update_chunk_buffers(
         vertices_color_addr,
         index_buf,
         index_format,
-    } = &mut **update
-        .render_data
-        .get_or_insert_with(|| Msw::new(ChunkBuffers::default()));
+    } = &mut **update.render_data.get_or_insert_with(|| Msw::new(ChunkBuffers::default()));
 
     [*vertices_pos_addr, *vertices_color_addr] = vertex_buf.write_with_resizing(
         bwp.reborrow(),

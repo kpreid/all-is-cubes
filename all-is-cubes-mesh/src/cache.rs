@@ -56,14 +56,8 @@ impl<M: MeshTypes> BlockMeshCache<M> {
         block: &EvaluatedBlock,
     ) -> impl Deref<Target = BlockMesh<M>> + use<M> {
         let key = EvKey::new(block);
-        let cell: Arc<OnceLock<BlockMesh<M>>> = self
-            .storage
-            .lock()
-            .unwrap()
-            .blocks
-            .entry(key)
-            .or_default()
-            .clone();
+        let cell: Arc<OnceLock<BlockMesh<M>>> =
+            self.storage.lock().unwrap().blocks.entry(key).or_default().clone();
 
         cell.get_or_init(|| BlockMesh::new(block, &self.texture_allocator, &self.options));
 

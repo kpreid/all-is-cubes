@@ -578,10 +578,7 @@ mod tests {
     #[test]
     fn corner_points() {
         assert_eq!(
-            Cube::new(10, 20, 30)
-                .aab()
-                .corner_points()
-                .collect::<Vec<_>>(),
+            Cube::new(10, 20, 30).aab().corner_points().collect::<Vec<_>>(),
             vec![
                 point3(10., 20., 30.),
                 point3(11., 20., 30.),

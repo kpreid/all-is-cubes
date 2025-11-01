@@ -44,11 +44,7 @@ async fn port_whence_load_then_save() {
         .unwrap();
 
     // Save it.
-    universe
-        .whence
-        .save(&universe, yield_progress_for_testing())
-        .await
-        .unwrap();
+    universe.whence.save(&universe, yield_progress_for_testing()).await.unwrap();
 
     // Check the saved result
     assert_eq!(

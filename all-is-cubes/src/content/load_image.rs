@@ -73,9 +73,7 @@ impl<'a> PngAdapter<'a> {
         let mut color_map: HashMap<Srgba, VoxelBrush<'a>> = HashMap::new();
         let mut max_brush: Option<GridAab> = None;
         for &color in rgba_image_data.iter() {
-            let brush = color_map
-                .entry(color)
-                .or_insert_with(|| pixel_function(color));
+            let brush = color_map.entry(color).or_insert_with(|| pixel_function(color));
             if let Some(bounds) = brush.bounds() {
                 max_brush = max_brush.map(|m| m.union_box(bounds)).or(Some(bounds));
             }
@@ -107,9 +105,7 @@ impl PngAdapter<'_> {
         let Some(pixel) = self.rgba_image_data.get(pixel_index) else {
             return VoxelBrush::EMPTY_REF;
         };
-        self.color_map
-            .get(pixel)
-            .expect("can't happen: color data changed")
+        self.color_map.get(pixel).expect("can't happen: color data changed")
     }
 }
 

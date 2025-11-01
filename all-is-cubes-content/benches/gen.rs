@@ -57,9 +57,7 @@ fn component_benches(c: &mut criterion::Criterion) {
     c.bench_function("install_demo_blocks", |b| {
         b.to_async(Executor).iter_with_large_drop(|| async {
             let mut txn = UniverseTransaction::default();
-            () = content::install_demo_blocks(&mut txn, YieldProgress::noop())
-                .await
-                .unwrap();
+            () = content::install_demo_blocks(&mut txn, YieldProgress::noop()).await.unwrap();
             txn
         });
     });

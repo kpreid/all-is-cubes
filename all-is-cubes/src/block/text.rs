@@ -1004,13 +1004,7 @@ mod tests {
         );
 
         assert_eq!(
-            plane_to_text(
-                block
-                    .evaluate(universe.read_ticket())
-                    .unwrap()
-                    .voxels
-                    .as_vol_ref()
-            ),
+            plane_to_text(block.evaluate(universe.read_ticket()).unwrap().voxels.as_vol_ref()),
             vec![
                 "................................",
                 "........##...................##.",

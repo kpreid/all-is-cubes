@@ -183,9 +183,7 @@ fn light_source_test_space(block: Block) -> Space {
     let mut space = Space::builder(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
         .sky_color(Rgb::ZERO)
         .build();
-    space
-        .mutate(ReadTicket::stub(), |m| m.set([1, 1, 1], block))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set([1, 1, 1], block)).unwrap();
     space.evaluate_light(0, drop);
     space
 }
@@ -214,9 +212,7 @@ fn light_source_self_illumination_opaque() {
     let space = light_source_test_space(block);
     assert_eq!(space.get_lighting([1, 1, 1]), light.into());
     let adjacents = FaceMap::from_fn(|face| {
-        space
-            .get_lighting(GridPoint::new(1, 1, 1) + face.normal_vector())
-            .value()
+        space.get_lighting(GridPoint::new(1, 1, 1) + face.normal_vector()).value()
     });
     assert_eq!(
         adjacents,
@@ -242,9 +238,7 @@ fn light_source_self_illumination_opaque() {
 fn animation_treated_as_visible() {
     fn eval_mid_block(block: Block) -> [LightStatus; 2] {
         let mut space = Space::empty_positive(3, 3, 3);
-        space
-            .mutate(ReadTicket::stub(), |m| m.set([1, 1, 1], block))
-            .unwrap();
+        space.mutate(ReadTicket::stub(), |m| m.set([1, 1, 1], block)).unwrap();
         space.evaluate_light(0, drop);
         [
             space.get_lighting([1, 1, 1]).status(),
@@ -312,15 +306,10 @@ fn disabled_lighting_returns_one_always() {
 fn disabled_lighting_does_not_update() {
     let mut universe = Universe::new();
     let mut space = space_with_disabled_light();
-    space
-        .light
-        .light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
+    space.light.light_needs_update(Cube::new(0, 0, 0), Priority::UNINIT);
     universe.insert_anonymous(space);
     assert_eq!(
-        universe
-            .step(false, time::Deadline::Whenever)
-            .space_step
-            .light,
+        universe.step(false, time::Deadline::Whenever).space_step.light,
         LightUpdatesInfo::default()
     );
     // TODO: this test could really easily fail to report anything meaningful; also test non-disabled lighting.

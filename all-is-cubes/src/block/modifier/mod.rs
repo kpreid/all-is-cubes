@@ -303,9 +303,7 @@ fn evaluate_rotate(
 
             let resolution = voxels.resolution();
             let inner_to_outer = rotation.to_positive_octant_transform(resolution.into());
-            let outer_to_inner = rotation
-                .inverse()
-                .to_positive_octant_transform(resolution.into());
+            let outer_to_inner = rotation.inverse().to_positive_octant_transform(resolution.into());
 
             MinEval::new(
                 attributes.rotate(rotation),

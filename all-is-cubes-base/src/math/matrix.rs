@@ -422,15 +422,11 @@ mod tests {
             let m = random_grid_matrix(&mut rng);
             dbg!(m, m.to_free());
             assert_eq!(
-                m.transform_point(GridPoint::new(2, 300, 40000))
-                    .map(FreeCoordinate::from),
-                m.to_free()
-                    .transform_point3d(point3(2., 300., 40000.))
-                    .unwrap(),
+                m.transform_point(GridPoint::new(2, 300, 40000)).map(FreeCoordinate::from),
+                m.to_free().transform_point3d(point3(2., 300., 40000.)).unwrap(),
             );
             assert_eq!(
-                m.transform_vector(GridVector::new(10, 20, 30))
-                    .map(FreeCoordinate::from),
+                m.transform_vector(GridVector::new(10, 20, 30)).map(FreeCoordinate::from),
                 m.to_free().transform_vector3d(vec3(10., 20., 30.)),
             );
         }

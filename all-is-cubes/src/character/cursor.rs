@@ -58,9 +58,7 @@ pub fn cursor_raycast(
                             // evaluation to make the bounding box guaranteed tight.
                             face_selected = Some(voxel_step.face());
                         }
-                        voxels
-                            .get(voxel_step.cube_ahead())
-                            .map(|v| (voxel_step.cube_ahead(), v))
+                        voxels.get(voxel_step.cube_ahead()).map(|v| (voxel_step.cube_ahead(), v))
                     })
                     .find(|(_, v)| v.selectable);
                 if recursive_hit.is_none() {
@@ -225,12 +223,7 @@ impl lines::Wireframe for Cursor {
             .voxels_bounds()
             .to_free()
             .scale(evaluated.resolution().recip_f64())
-            .translate(
-                self.cube()
-                    .lower_bounds()
-                    .map(FreeCoordinate::from)
-                    .to_vector(),
-            );
+            .translate(self.cube().lower_bounds().map(FreeCoordinate::from).to_vector());
 
         // Add wireframe of the block.
         block_aabb
@@ -344,10 +337,7 @@ mod tests {
     fn ignores_not_selectable_atom() {
         let universe = &mut Universe::new();
         let [block] = make_some_blocks();
-        let not_selectable = Block::builder()
-            .color(Rgba::WHITE)
-            .selectable(false)
-            .build();
+        let not_selectable = Block::builder().color(Rgba::WHITE).selectable(false).build();
         let space_handle = test_space(universe, [&not_selectable, &block]);
 
         let cursor = cursor_raycast(universe.read_ticket(), X_RAY, &space_handle, f64::INFINITY)

@@ -196,11 +196,7 @@ pub(crate) fn space_to_space_copy(
     let block_rotation = src_to_dst_transform.rotation;
 
     dst.fill(src_bounds.transform(src_to_dst_transform).unwrap(), |p| {
-        Some(
-            src[dst_to_src_transform.transform_cube(p)]
-                .clone()
-                .rotate(block_rotation),
-        )
+        Some(src[dst_to_src_transform.transform_cube(p)].clone().rotate(block_rotation))
     })
 }
 
@@ -218,11 +214,7 @@ pub(crate) fn space_to_transaction_copy(
         |cube| {
             CubeTransaction::replacing(
                 None, // TODO: provide control over what the old-values are
-                Some(
-                    src[dst_to_src_transform.transform_cube(cube)]
-                        .clone()
-                        .rotate(block_rotation),
-                ),
+                Some(src[dst_to_src_transform.transform_cube(cube)].clone().rotate(block_rotation)),
             )
         },
     )

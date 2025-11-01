@@ -99,11 +99,7 @@ pub fn finish_universe_from_space(
     let space_handle = universe.insert("space".into(), space).unwrap();
 
     // If the universe is dumped, include tools and jetpack
-    let mut spawn = space_handle
-        .read(universe.read_ticket())
-        .unwrap()
-        .spawn()
-        .clone();
+    let mut spawn = space_handle.read(universe.read_ticket()).unwrap().spawn().clone();
     spawn.set_inventory(free_editing_starter_inventory(true));
 
     let character_handle = universe
@@ -171,12 +167,7 @@ impl ComparisonRecord {
                 .to_str()
                 .unwrap()
                 .to_string(),
-            actual_file_name: actual_file_path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string(),
+            actual_file_name: actual_file_path.file_name().unwrap().to_str().unwrap().to_string(),
             diff_file_name: diff_file_path
                 .map(|p| p.file_name().unwrap().to_str().unwrap().to_string()),
             diff_histogram: diff_histogram.0.into_iter().collect(),
@@ -304,12 +295,8 @@ pub fn compare_rendered_image(
     let end_time = Instant::now();
     log::trace!(
         "compare_rendered_image {test:?}: {} total, {} diff",
-        end_time
-            .saturating_duration_since(start_time)
-            .refmt(&ConciseDebug),
-        end_diff_time
-            .saturating_duration_since(start_diff_time)
-            .refmt(&ConciseDebug),
+        end_time.saturating_duration_since(start_time).refmt(&ConciseDebug),
+        end_diff_time.saturating_duration_since(start_diff_time).refmt(&ConciseDebug),
     );
 
     record
@@ -332,12 +319,10 @@ pub fn initialize_logging(args: &HarnessArgs) {
             if self.enabled(record.metadata()) {
                 let test_id: Option<TestId> = TEST_ID.try_with(|id| id.clone()).ok();
                 let mut lock = io::stderr().lock();
-                _ = time::OffsetDateTime::now_utc()
-                    .to_offset(time::UtcOffset::UTC)
-                    .format_into(
-                        &mut lock,
-                        time::macros::format_description!("[hour]:[minute]:[second]"),
-                    );
+                _ = time::OffsetDateTime::now_utc().to_offset(time::UtcOffset::UTC).format_into(
+                    &mut lock,
+                    time::macros::format_description!("[hour]:[minute]:[second]"),
+                );
                 _ = write!(lock, " [{level}] (", level = record.level(),);
                 _ = match test_id {
                     Some(id) => write!(lock, "{id}"),

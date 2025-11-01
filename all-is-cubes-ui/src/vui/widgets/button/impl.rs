@@ -149,8 +149,7 @@ impl vui::WidgetController for ActionButtonController {
         let draw = self.txns[ButtonVisualState { pressed: false }].clone();
         let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             SpaceBehaviorAttachment::new(grant.bounds),
-            self.common
-                .make_activation_behavior(self.definition.action.clone()),
+            self.common.make_activation_behavior(self.definition.action.clone()),
         ));
         draw.merge(activatable)
             .map_err(|error| vui::InstallVuiError::Conflict { error })
@@ -186,8 +185,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
 
         let activatable = SpaceTransaction::behaviors(BehaviorSetTransaction::insert(
             SpaceBehaviorAttachment::new(grant.bounds),
-            self.common
-                .make_activation_behavior(self.definition.action.clone()),
+            self.common.make_activation_behavior(self.definition.action.clone()),
         ));
         self.draw_txn(ButtonVisualState::default())
             .merge(activatable)

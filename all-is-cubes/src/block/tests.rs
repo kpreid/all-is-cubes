@@ -174,9 +174,7 @@ fn listen_recur() {
     let mut universe = Universe::new();
     let [block_0, block_1] = make_some_blocks();
     let space_handle = universe.insert_anonymous(Space::empty_positive(2, 1, 1));
-    let block = Block::builder()
-        .voxels_handle(R1, space_handle.clone())
-        .build();
+    let block = Block::builder().voxels_handle(R1, space_handle.clone()).build();
     let log = Log::new();
     listen(&universe, &block, log.listener()).unwrap();
     assert_eq!(log.drain(), vec![]);

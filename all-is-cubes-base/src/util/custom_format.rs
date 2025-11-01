@@ -29,9 +29,7 @@ pub struct ConciseDebug;
 
 impl<T: Fmt<ConciseDebug>, const N: usize> Fmt<ConciseDebug> for [T; N] {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &ConciseDebug) -> fmt::Result {
-        fmt.debug_list()
-            .entries(self.iter().map(|item| item.refmt(fopt)))
-            .finish()
+        fmt.debug_list().entries(self.iter().map(|item| item.refmt(fopt))).finish()
     }
 }
 

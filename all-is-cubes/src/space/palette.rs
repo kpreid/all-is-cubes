@@ -160,8 +160,7 @@ impl Palette {
                             block.clone(),
                             self.listener_for_block(new_index as BlockIndex),
                         );
-                        self.block_to_index
-                            .insert(block.clone(), new_index as BlockIndex);
+                        self.block_to_index.insert(block.clone(), new_index as BlockIndex);
                         change_buffer.push(SpaceChange::BlockIndex(new_index as BlockIndex));
                         return Ok(new_index as BlockIndex);
                     }
@@ -211,8 +210,7 @@ impl Palette {
 
             // Update block_to_index.
             self.block_to_index.remove(&old_block);
-            self.block_to_index
-                .insert(new_block.clone(), old_block_index);
+            self.block_to_index.insert(new_block.clone(), old_block_index);
 
             change_buffer.push(SpaceChange::BlockIndex(old_block_index));
 
@@ -683,10 +681,7 @@ mod tests {
         cloned.consistency_check(space.contents.as_linear());
 
         let extract = |p: &Palette| {
-            p.entries()
-                .iter()
-                .map(|e| (e.block.clone(), e.count))
-                .collect::<Vec<_>>()
+            p.entries().iter().map(|e| (e.block.clone(), e.count)).collect::<Vec<_>>()
         };
         assert_eq!(extract(&cloned), extract(&space.palette));
 

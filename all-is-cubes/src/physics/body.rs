@@ -459,9 +459,7 @@ impl Body {
                 rerun_destination.log(
                     &rg::entity_path!["move_segment"],
                     &rg::archetypes::Arrows3D::from_vectors(arrow_offsets().flat_map(|_| {
-                        move_segments
-                            .iter()
-                            .map(|seg| rg::convert_vec(seg.delta_position))
+                        move_segments.iter().map(|seg| rg::convert_vec(seg.delta_position))
                     }))
                     .with_origins(arrow_offsets().flat_map(|offset| {
                         move_segments.iter().scan(
@@ -553,9 +551,7 @@ impl Body {
     fn push_out(&mut self, space: &Space) -> Option<FreeVector> {
         // TODO: need to unsquash the `occupying` box if possible
 
-        let colliding = find_colliding_cubes(space, self.collision_box_abs())
-            .next()
-            .is_some();
+        let colliding = find_colliding_cubes(space, self.collision_box_abs()).next().is_some();
         if colliding {
             let exit_backwards: FreeVector = -self.velocity.map(NotNan::into_inner).cast_unit(); // don't care about magnitude
             let shortest_push_out = (-1..=1)
@@ -681,9 +677,8 @@ impl Body {
 
         // This new box might collide with the `Space`, but (TODO: not implemented yet)
         // stepping will recover from that if possible.
-        self.occupying = self
-            .collision_box
-            .translate(self.position.map(NotNan::into_inner).to_vector());
+        self.occupying =
+            self.collision_box.translate(self.position.map(NotNan::into_inner).to_vector());
     }
 
     /// Returns the body’s current velocity.
@@ -763,8 +758,7 @@ impl Body {
 
     /// Returns the direction the body is facing (when it is part of a character).
     pub fn look_direction(&self) -> FreeVector {
-        self.look_rotation()
-            .transform_vector3d(Vector3D::new(0., 0., -1.))
+        self.look_rotation().transform_vector3d(Vector3D::new(0., 0., -1.))
     }
 
     /// Changes [`self.yaw`](Self::yaw) and [`self.pitch`](Self::pitch) to look in the given
@@ -1006,9 +1000,7 @@ impl transaction::Merge for BodyTransaction {
         } = self;
         let conflict = BodyConflict {
             position: set_position.check_merge(&other.set_position).is_err(),
-            look_direction: set_look_direction
-                .check_merge(&other.set_look_direction)
-                .is_err(),
+            look_direction: set_look_direction.check_merge(&other.set_look_direction).is_err(),
         };
         if conflict
             != (BodyConflict {

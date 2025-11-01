@@ -186,9 +186,8 @@ impl<'universe> ReadTicket<'universe> {
                 if entity == prohibited_entity {
                     Err(TicketErrorKind::BeingMutated)
                 } else {
-                    let entity_ref = world
-                        .get_entity(entity)
-                        .map_err(|_| TicketErrorKind::MissingEntity)?;
+                    let entity_ref =
+                        world.get_entity(entity).map_err(|_| TicketErrorKind::MissingEntity)?;
                     // SAFETY:
                     // If [`ReadTicket::everything_but()`]'s safety conditions were met,
                     // this access will not alias.

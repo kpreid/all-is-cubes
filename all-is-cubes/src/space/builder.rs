@@ -162,9 +162,8 @@ impl Builder<'_, Vol<()>> {
             "spawn_position must be finite"
         );
 
-        let mut spawn = self
-            .spawn
-            .unwrap_or_else(|| Spawn::default_for_new_space(self.bounds.bounds()));
+        let mut spawn =
+            self.spawn.unwrap_or_else(|| Spawn::default_for_new_space(self.bounds.bounds()));
         spawn.set_eye_position(position);
         self.spawn = Some(spawn);
         self
@@ -552,10 +551,7 @@ mod tests {
         space.consistency_check();
 
         // blocks[1] was not used so it should not be in the palette.
-        let found = space
-            .block_data()
-            .iter()
-            .find(|entry| entry.block == blocks[1]);
+        let found = space.block_data().iter().find(|entry| entry.block == blocks[1]);
         assert!(found.is_none(), "{found:?}");
     }
 

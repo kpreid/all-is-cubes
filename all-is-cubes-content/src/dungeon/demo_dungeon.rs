@@ -142,9 +142,7 @@ impl DemoTheme {
             &self.room_style
         };
 
-        room_style
-            .create_box(interior.expand(FaceMap::splat(1)))
-            .execute_m(ctx)?;
+        room_style.create_box(interior.expand(FaceMap::splat(1))).execute_m(ctx)?;
 
         Ok(())
     }
@@ -164,12 +162,8 @@ impl DemoTheme {
             mem::swap(&mut room_1_position, &mut room_2_position);
         }
 
-        let room_1_data = map[room_1_position]
-            .as_ref()
-            .expect("passage led to nonexistent room");
-        let room_2_data = map[room_2_position]
-            .as_ref()
-            .expect("passage led to nonexistent room");
+        let room_1_data = map[room_1_position].as_ref().expect("passage led to nonexistent room");
+        let room_2_data = map[room_2_position].as_ref().expect("passage led to nonexistent room");
         let room_1_box = self.actual_room_box(room_1_position, room_1_data);
         let room_2_box = self.actual_room_box(room_2_position, room_2_data);
 
@@ -182,9 +176,8 @@ impl DemoTheme {
         // This box is exactly the volume which would ordinarily be impassable if this corridor.
         // were not being added.
         let doorway_box = {
-            let corridor_box = self
-                .corridor_box
-                .translate(self.dungeon_grid.room_translation(room_1_position));
+            let corridor_box =
+                self.corridor_box.translate(self.dungeon_grid.room_translation(room_1_position));
             // TODO: Add GridAab operations to make this easier
             let mut lower = corridor_box.lower_bounds();
             let mut upper = corridor_box.upper_bounds();
@@ -218,10 +211,7 @@ impl DemoTheme {
             v[passage_axis] = 0;
             FaceMap::symmetric(v)
         });
-        corridor_box_style
-            .create_box(doorway_box_for_box_style)
-            .execute_m(ctx)
-            .unwrap();
+        corridor_box_style.create_box(doorway_box_for_box_style).execute_m(ctx).unwrap();
 
         // * If !gate_present, we don't generate a gate at all.
         // * If gate_movable, we generate a GatePocket for it to slide into; otherwise it is
@@ -235,14 +225,13 @@ impl DemoTheme {
             Door::Permanent => (true, false, false),
         };
         if gate_present {
-            let gate_box = doorway_box.abut(face, -1).unwrap().translate(
-                face.opposite()
-                    .vector(doorway_box.size().to_i32()[face.axis()] / 2),
-            );
+            let gate_box = doorway_box
+                .abut(face, -1)
+                .unwrap()
+                .translate(face.opposite().vector(doorway_box.size().to_i32()[face.axis()] / 2));
             let gate_side_1 = gate_box.abut(wall_parallel.opposite(), -1).unwrap();
-            let gate_side_2 = gate_box
-                .abut(wall_parallel, if gate_open { -1 } else { -2 })
-                .unwrap();
+            let gate_side_2 =
+                gate_box.abut(wall_parallel, if gate_open { -1 } else { -2 }).unwrap();
             let lock_box = if gate_movable && !gate_open {
                 gate_side_1
                     .abut(Face6::NY, -1) // one cube up from bottom
@@ -279,8 +268,7 @@ impl DemoTheme {
     /// TODO: Should we teach `DungeonGrid` to help with this?
     fn actual_room_box(&self, room_position: Cube, room_data: &DemoRoom) -> GridAab {
         if room_data.corridor_only {
-            self.corridor_box
-                .translate(self.dungeon_grid.room_translation(room_position))
+            self.corridor_box.translate(self.dungeon_grid.room_translation(room_position))
         } else {
             let eb = room_data.extended_map_bounds();
             self.dungeon_grid
@@ -408,9 +396,7 @@ impl Theme<Option<DemoRoom>> for DemoTheme {
                 let window_y = unmodified_room_box.lower_bounds().y + 1;
                 let torch_y = unmodified_room_box.lower_bounds().y;
                 for wall in four_walls(interior.expand(FaceMap::splat(1))) {
-                    let face = Face6::PY
-                        .clockwise()
-                        .transform(wall.counterclockwise_direction); // TODO: make four_walls provide this (which face of the box it is) in a nice name
+                    let face = Face6::PY.clockwise().transform(wall.counterclockwise_direction); // TODO: make four_walls provide this (which face of the box it is) in a nice name
                     let midpoint = (wall.length / 2).cast_signed();
 
                     if let WallFeature::Window = room_data.wall_features[face] {
@@ -651,12 +637,10 @@ pub(crate) async fn demo_dungeon(
                 on_horizontal_axis(Axis::Z),
             )
         },
-        locked_gate_block: dungeon_blocks[Gate]
-            .clone()
-            .with_modifier(block::Composite::new(
-                dungeon_blocks[GateLock].clone(),
-                block::CompositeOperator::Over,
-            )),
+        locked_gate_block: dungeon_blocks[Gate].clone().with_modifier(block::Composite::new(
+            dungeon_blocks[GateLock].clone(),
+            block::CompositeOperator::Over,
+        )),
         window_glass_block: demo_blocks[DemoBlocks::GlassBlock].clone(),
         item_pedestal: demo_blocks[DemoBlocks::Pedestal].clone(),
         blocks: dungeon_blocks,
@@ -915,8 +899,6 @@ struct KeyLocation {
 }
 impl KeyLocation {
     fn room_may_require_this(&self, maze_room: &super::maze::MazeRoom) -> bool {
-        maze_room
-            .position_on_path
-            .is_some_and(|p| p > self.found_on_path_position)
+        maze_room.position_on_path.is_some_and(|p| p > self.found_on_path_position)
     }
 }

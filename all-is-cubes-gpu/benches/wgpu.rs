@@ -47,10 +47,7 @@ fn render_benches(c: &mut Criterion, instance: &wgpu::Instance) {
 
         b.iter_with_large_drop(move || {
             for txn in [&txn1, &txn2] {
-                txn.clone()
-                    .bind(space.clone())
-                    .execute(&mut universe, (), &mut drop)
-                    .unwrap();
+                txn.clone().bind(space.clone()).execute(&mut universe, (), &mut drop).unwrap();
             }
             renderer
                 .lock()
@@ -108,18 +105,15 @@ async fn create_updated_renderer(
         .unwrap();
 
     let adapter = init::create_adapter_for_test(instance).await;
-    let mut renderer = headless::Builder::from_adapter(device_label, adapter)
-        .await
-        .unwrap()
-        .build(StandardCameras::from_constant_for_test(
+    let mut renderer = headless::Builder::from_adapter(device_label, adapter).await.unwrap().build(
+        StandardCameras::from_constant_for_test(
             GraphicsOptions::default(),
             Viewport::with_scale(1.0, [1024, 1024]),
             &universe,
-        ));
+        ),
+    );
 
-    renderer
-        .update(Layers::splat(universe.read_ticket()), None)
-        .unwrap();
+    renderer.update(Layers::splat(universe.read_ticket()), None).unwrap();
 
     // Arc<Mutex< needed to satisfy borrow checking of the benchmark closure
     (universe, space, Arc::new(Mutex::new(renderer)))

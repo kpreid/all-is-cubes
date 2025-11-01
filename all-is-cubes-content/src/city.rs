@@ -86,9 +86,7 @@ pub(crate) async fn demo_city(
     let blank_landscape_time = Instant::now();
     log::trace!(
         "Blank landscape took {:.3} s",
-        blank_landscape_time
-            .saturating_duration_since(start_city_time)
-            .as_secs_f32()
+        blank_landscape_time.saturating_duration_since(start_city_time).as_secs_f32()
     );
 
     // Clouds
@@ -98,9 +96,7 @@ pub(crate) async fn demo_city(
         let sky_height = state.space.bounds().upper_bounds().y;
         state.space.mutate(state.universe.read_ticket(), |m| {
             clouds(
-                state
-                    .planner
-                    .y_range(sky_height - cloud_thickness, sky_height),
+                state.planner.y_range(sky_height - cloud_thickness, sky_height),
                 m,
                 0.1,
             )
@@ -126,9 +122,7 @@ pub(crate) async fn demo_city(
     final_progress.progress(0.0).await;
 
     // Sprinkle some trees around in the remaining space.
-    state
-        .plant_trees(final_progress.start_and_cut(0.5, "Trees").await)
-        .await?;
+    state.plant_trees(final_progress.start_and_cut(0.5, "Trees").await).await?;
 
     // Enable light computation
     state.space.set_physics({
@@ -245,9 +239,7 @@ impl<'u> State<'u> {
             )
         })?;
 
-        self.planner
-            .occupied_plots
-            .push(self.planner.landscape_region());
+        self.planner.occupied_plots.push(self.planner.landscape_region());
 
         Ok(())
     }
@@ -313,9 +305,7 @@ impl<'u> State<'u> {
                 && !self.planner.is_occupied(tree_bounds)
             {
                 crate::tree::make_tree(
-                    &self
-                        .landscape_blocks
-                        .subset(LandscapeBlocksAndVariants::Base),
+                    &self.landscape_blocks.subset(LandscapeBlocksAndVariants::Base),
                     &mut rng,
                     tree_origin,
                     tree_bounds,
@@ -781,9 +771,8 @@ fn place_roads_and_tunnels(
             // Underground lighting
             if (i - CityPlanner::LAMP_POSITION_RADIUS).rem_euclid(7) == 0 {
                 // Underground lamps
-                for (side, &p) in [-CityPlanner::ROAD_RADIUS, CityPlanner::ROAD_RADIUS]
-                    .iter()
-                    .enumerate()
+                for (side, &p) in
+                    [-CityPlanner::ROAD_RADIUS, CityPlanner::ROAD_RADIUS].iter().enumerate()
                 {
                     m.set(
                         cube + GridVector::new(0, -2, 0) + perpendicular * p,
@@ -827,18 +816,14 @@ fn place_lamppost(
         let block = if next_cube == globe_position {
             demo_blocks[LamppostTop].clone().rotate(rot_py_to(next_dir))
         } else {
-            demo_blocks[LamppostSegment]
-                .clone()
-                .rotate(rot_py_to(next_dir))
+            demo_blocks[LamppostSegment].clone().rotate(rot_py_to(next_dir))
         };
 
         let block = if prev_dir == next_dir {
             block
         } else {
             block::Composite::new(
-                demo_blocks[LamppostSegment]
-                    .clone()
-                    .rotate(rot_py_to(prev_dir)),
+                demo_blocks[LamppostSegment].clone().rotate(rot_py_to(prev_dir)),
                 block::CompositeOperator::Over,
             )
             .compose_or_replace(block)

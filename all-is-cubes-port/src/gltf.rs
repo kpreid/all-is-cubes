@@ -178,8 +178,7 @@ impl GltfWriter {
             camera_transform: our_camera
                 .map_or_else(ViewTransform::identity, |camera| camera.view_transform()),
         });
-        self.any_time_visible_mesh_instances
-            .extend(visible_meshes.iter());
+        self.any_time_visible_mesh_instances.extend(visible_meshes.iter());
 
         // TODO: report only flaws from this frame
         self.flaws
@@ -310,18 +309,14 @@ impl GltfWriter {
                     &self.buffer_dest,
                     format!("node {node_index} animation time"),
                     &format!("node-{node_index}-time"),
-                    timeline
-                        .iter()
-                        .map(|&(t, _vis)| [frame_pace.as_secs_f32() * t as f32]),
+                    timeline.iter().map(|&(t, _vis)| [frame_pace.as_secs_f32() * t as f32]),
                 )?;
                 let scale_accessor = create_buffer_and_accessor(
                     &mut self.root,
                     &self.buffer_dest,
                     format!("node {node_index} visibility"),
                     &format!("node-{node_index}-vis"),
-                    timeline
-                        .iter()
-                        .map(|&(_t, vis)| [f32::from(u8::from(vis)); 3]),
+                    timeline.iter().map(|&(_t, vis)| [f32::from(u8::from(vis)); 3]),
                 )?;
                 animation_channels.push(gltf_json::animation::Channel {
                     sampler: Index::push(
@@ -391,13 +386,11 @@ pub(crate) fn export_gltf(
             let block_def = block_def_handle.read(read_ticket)?;
             let name = block_def_handle.name();
             let evaluation =
-                block_def
-                    .evaluate(read_ticket)
-                    .map_err(|eve| ExportError::NotRepresentable {
-                        format: Format::Gltf,
-                        name: Some(name.clone()),
-                        reason: format!("block evaluation failed: {eve}"),
-                    })?;
+                block_def.evaluate(read_ticket).map_err(|eve| ExportError::NotRepresentable {
+                    format: Format::Gltf,
+                    name: Some(name.clone()),
+                    reason: format!("block evaluation failed: {eve}"),
+                })?;
             Ok((name, evaluation))
         })
         .collect::<Result<_, ExportError>>()?;
@@ -424,9 +417,8 @@ pub(crate) fn export_gltf(
 
         // TODO: deduplicate these two extremely similar loops
 
-        for (mut p, (name, evaluation)) in block_def_progress
-            .split_evenly(block_evaluations.len())
-            .zip(block_evaluations)
+        for (mut p, (name, evaluation)) in
+            block_def_progress.split_evenly(block_evaluations.len()).zip(block_evaluations)
         {
             p.set_label(&name);
             p.progress(0.01).await;
@@ -455,9 +447,8 @@ pub(crate) fn export_gltf(
             p.finish().await;
         }
 
-        for (mut p, (name, mesh, translation)) in space_progress
-            .split_evenly(space_meshes.len())
-            .zip(space_meshes)
+        for (mut p, (name, mesh, translation)) in
+            space_progress.split_evenly(space_meshes.len()).zip(space_meshes)
         {
             p.set_label(&name);
             p.progress(0.01).await;

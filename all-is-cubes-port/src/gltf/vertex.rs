@@ -37,10 +37,7 @@ impl Vertex for GltfVertex {
 
     #[inline]
     fn instantiate_block(cube: Cube) -> Self::BlockInst {
-        cube.lower_bounds()
-            .to_vector()
-            .map(|s| s as f32)
-            .cast_unit()
+        cube.lower_bounds().to_vector().map(|s| s as f32).cast_unit()
     }
 
     #[inline]

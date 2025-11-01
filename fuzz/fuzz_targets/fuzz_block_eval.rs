@@ -31,9 +31,7 @@ fn check_block(read_ticket: ReadTicket<'_>, block: &Block) {
 
                 // Test against an *actual* rotation
                 let mut rotated = block.clone();
-                rotated
-                    .modifiers_mut()
-                    .push(block::Modifier::Rotate(Face6::PY.clockwise()));
+                rotated.modifiers_mut().push(block::Modifier::Rotate(Face6::PY.clockwise()));
                 if let Ok(ev_rotated) = rotated.evaluate(ReadTicket::stub()) {
                     assert_eq!(
                         (ev_rotated.attributes(), ev_rotated.voxels()),

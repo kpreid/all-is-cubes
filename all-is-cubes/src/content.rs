@@ -72,9 +72,7 @@ fn make_one_block(i: usize, n: usize) -> Block {
 ///
 /// [`Primitive::Recur`]: crate::block::Primitive::Recur
 pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [Block; COUNT] {
-    universe
-        .transact(|txn, _| Ok(make_some_voxel_blocks_txn(txn)))
-        .unwrap()
+    universe.transact(|txn, _| Ok(make_some_voxel_blocks_txn(txn))).unwrap()
 }
 
 #[doc(hidden)] // TODO: make this replace the other version once we've confirmed that `&mut SomeTransaction` is the direction we want to go for composing worldgen transactions

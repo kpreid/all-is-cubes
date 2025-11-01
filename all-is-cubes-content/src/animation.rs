@@ -64,10 +64,7 @@ impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavi
             mut_self.frame = mut_self.frame.wrapping_add(1);
 
             let paint_txn = mut_self.paint(context.attachment.bounds());
-            context
-                .replace_self(mut_self)
-                .merge(context.bind_host(paint_txn))
-                .unwrap()
+            context.replace_self(mut_self).merge(context.bind_host(paint_txn)).unwrap()
         } else {
             UniverseTransaction::default()
         };
@@ -187,10 +184,7 @@ impl behavior::Behavior<Space> for Fire {
         let mut mut_self = self.clone();
         let txn = if mut_self.tick_state(context.tick) {
             let paint_txn = mut_self.paint();
-            context
-                .replace_self(mut_self)
-                .merge(context.bind_host(paint_txn))
-                .unwrap()
+            context.replace_self(mut_self).merge(context.bind_host(paint_txn)).unwrap()
         } else {
             context.replace_self(mut_self)
         };

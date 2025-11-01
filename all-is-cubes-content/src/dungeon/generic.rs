@@ -50,13 +50,11 @@ impl DungeonGrid {
     }
 
     pub fn room_box_including_walls(&self) -> GridAab {
-        self.room_box
-            .expand(self.room_wall_thickness.map(|_, c| c.into()))
+        self.room_box.expand(self.room_wall_thickness.map(|_, c| c.into()))
     }
 
     pub fn room_box_at(&self, room_position: Cube) -> GridAab {
-        self.room_box
-            .translate(self.room_translation(room_position))
+        self.room_box.translate(self.room_translation(room_position))
     }
 
     /// Returns the volume which lies between two rooms and meets their adjoining faces.
@@ -83,11 +81,7 @@ impl DungeonGrid {
     pub fn minimum_space_for_rooms(&self, rooms: GridAab) -> GridAab {
         let spacing = self.room_spacing().to_i32().to_vector();
         let basic_size = GridAab::from_lower_upper(
-            rooms
-                .lower_bounds()
-                .to_vector()
-                .component_mul(spacing)
-                .to_point(),
+            rooms.lower_bounds().to_vector().component_mul(spacing).to_point(),
             rooms
                 .upper_bounds()
                 .to_vector()
@@ -128,10 +122,8 @@ pub async fn build_dungeon<Room, ThemeT: Theme<Room>>(
     for (pass, mut progress) in (0..passes).zip(progress.split_evenly(passes)) {
         progress.set_label(format_args!("pass {pass}/{passes}", pass = pass + 1));
         progress.progress(0.0).await;
-        for (room_position, mut progress) in map
-            .bounds()
-            .interior_iter()
-            .zip(progress.split_evenly(map.volume()))
+        for (room_position, mut progress) in
+            map.bounds().interior_iter().zip(progress.split_evenly(map.volume()))
         {
             progress.set_label(format_args!(
                 "pass {pass} @ {room_position:?}",

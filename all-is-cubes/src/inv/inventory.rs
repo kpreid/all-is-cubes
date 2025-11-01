@@ -160,10 +160,7 @@ impl Inventory {
     /// TODO: Added for tests; is this generally useful?
     #[cfg(test)]
     pub(crate) fn count_of(&self, item: &Tool) -> u32 {
-        self.slots
-            .iter()
-            .map(|slot| u32::from(slot.count_of(item)))
-            .sum::<u32>()
+        self.slots.iter().map(|slot| u32::from(slot.count_of(item))).sum::<u32>()
     }
 }
 
@@ -484,11 +481,7 @@ impl Merge for InventoryTransaction {
     type Conflict = InventoryConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
-        if let Some(&slot) = self
-            .replace
-            .keys()
-            .find(|slot| other.replace.contains_key(slot))
-        {
+        if let Some(&slot) = self.replace.keys().find(|slot| other.replace.contains_key(slot)) {
             return Err(InventoryConflict::ReplaceSameSlot { slot });
         }
         Ok(())

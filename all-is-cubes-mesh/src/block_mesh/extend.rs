@@ -36,9 +36,7 @@ pub(crate) fn push_box<M: MeshTypes>(
     }
     let fully_opaque = opacity_category == OpacityCategory::Opaque;
     for face in Face6::ALL {
-        let volume_to_planar = face
-            .face_transform(GridCoordinate::from(resolution))
-            .inverse();
+        let volume_to_planar = face.face_transform(GridCoordinate::from(resolution)).inverse();
         let aab_in_face_coordinates = aab.transform(volume_to_planar).unwrap();
 
         let lower_bounds = aab_in_face_coordinates.lower_bounds().xy();

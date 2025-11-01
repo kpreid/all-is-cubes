@@ -73,10 +73,7 @@ impl AxisAlignedRaycaster {
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     #[inline]
     pub fn within(mut self, bounds: GridAab, include_exit: bool) -> Self {
-        self.bounds = self
-            .bounds
-            .intersection_cubes(bounds)
-            .unwrap_or(GridAab::ORIGIN_EMPTY);
+        self.bounds = self.bounds.intersection_cubes(bounds).unwrap_or(GridAab::ORIGIN_EMPTY);
         if self.first_last != FirstLast::Ended {
             self.first_last = FirstLast::Beginning; // TODO: do we need more nuance here?
             self.include_exit = include_exit;

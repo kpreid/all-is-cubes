@@ -154,13 +154,8 @@ impl HudBlocks {
     ) -> Self {
         let [p12, p3] = p.split(0.667);
         let [p1, p2] = p12.split(0.5);
-        let widget_theme = widgets::WidgetTheme::new(read_ticket, txn, p1)
-            .await
-            .unwrap();
-        let ui_blocks = UiBlocks::new(txn, p2)
-            .await
-            .install(read_ticket, txn)
-            .unwrap();
+        let widget_theme = widgets::WidgetTheme::new(read_ticket, txn, p1).await.unwrap();
+        let ui_blocks = UiBlocks::new(txn, p2).await.install(read_ticket, txn).unwrap();
         let icons = Icons::new(txn, p3).await.install(read_ticket, txn).unwrap();
         Self {
             widget_theme,

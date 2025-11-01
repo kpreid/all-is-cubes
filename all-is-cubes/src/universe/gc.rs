@@ -29,9 +29,7 @@ const GC_DEBUG_LOG: bool = false;
 ///
 /// See [`Universe::gc()`].
 pub(in crate::universe) fn add_gc(world: &mut ecs::World) {
-    world
-        .resource_mut::<ecs::Schedules>()
-        .add_systems(Gc, gc_system);
+    world.resource_mut::<ecs::Schedules>().add_systems(Gc, gc_system);
 }
 
 /// ECS system function that performs mark-and-sweep garbage collection on universe members.
@@ -98,9 +96,7 @@ fn gc_system(
             if GC_DEBUG_LOG {
                 log::trace!("despawning {entity}");
             }
-            membership
-                .handle
-                .set_state_to_gone(crate::universe::GoneReason::Gc {});
+            membership.handle.set_state_to_gone(crate::universe::GoneReason::Gc {});
             commands.entity(entity).despawn()
         }
     }

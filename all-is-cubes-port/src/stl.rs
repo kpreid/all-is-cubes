@@ -41,13 +41,12 @@ pub(crate) fn export_stl(
     }
 
     for block_def in block_defs {
-        let ev = block_def
-            .read(read_ticket)?
-            .evaluate(read_ticket)
-            .map_err(|error| crate::ExportError::Eval {
+        let ev = block_def.read(read_ticket)?.evaluate(read_ticket).map_err(|error| {
+            crate::ExportError::Eval {
                 name: block_def.name(),
                 error,
-            })?;
+            }
+        })?;
         items.insert(
             source.member_export_path(destination, &block_def),
             block_to_stl_triangles(&ev),
@@ -179,11 +178,7 @@ mod tests {
         assert_eq!(
             fs::read_dir(&destination_dir)
                 .unwrap()
-                .map(|entry_res| entry_res
-                    .unwrap()
-                    .file_name()
-                    .to_string_lossy()
-                    .into_owned())
+                .map(|entry_res| entry_res.unwrap().file_name().to_string_lossy().into_owned())
                 .collect::<BTreeSet<String>>(),
             BTreeSet::from([
                 String::from("foo-block0.stl"),

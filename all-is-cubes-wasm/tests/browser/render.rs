@@ -53,9 +53,7 @@ async fn renderer_test() {
             .await
             .unwrap()
             .build(cameras.clone_unupdated());
-    renderer
-        .update(Layers::splat(universe.read_ticket()), None)
-        .unwrap();
+    renderer.update(Layers::splat(universe.read_ticket()), None).unwrap();
     let image = renderer.draw("").await.unwrap();
 
     // TODO: hook up a full image comparison here

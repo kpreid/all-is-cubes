@@ -73,11 +73,7 @@ fn KNOT(ctx: Context<'_>) {
         txn.read_ticket(),
         resolution,
         &mut |block| {
-            block.with_modifier(
-                Block::builder()
-                    .display_name(ctx.exhibit.name)
-                    .build_attributes(),
-            )
+            block.with_modifier(Block::builder().display_name(ctx.exhibit.name).build_attributes())
         },
     )?;
     Ok((space, txn))

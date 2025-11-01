@@ -92,10 +92,7 @@ impl LightUpdateQueue {
     #[inline]
     pub fn contains(&self, cube: Cube) -> bool {
         self.queue.contains(cube)
-            || self
-                .sweep
-                .as_ref()
-                .is_some_and(|sweep| sweep.contains_cube(cube))
+            || self.sweep.as_ref().is_some_and(|sweep| sweep.contains_cube(cube))
     }
 
     /// Inserts a queue entry or increases the priority of an existing one.
@@ -107,10 +104,7 @@ impl LightUpdateQueue {
     /// Requests that the queue should produce every cube in `bounds` at `priority`,
     /// without the cost of designating each cube individually.
     pub(crate) fn sweep(&mut self, bounds: GridAab, priority: Priority) {
-        if self
-            .sweep
-            .as_ref()
-            .is_some_and(|it| it.bounds().contains_box(bounds))
+        if self.sweep.as_ref().is_some_and(|it| it.bounds().contains_box(bounds))
             && self.sweep_priority >= priority
         {
             self.sweep_again = true;
@@ -139,11 +133,7 @@ impl LightUpdateQueue {
     #[mutants::skip] // if it fails to pop, causes hangs
     pub fn pop(&mut self) -> Option<LightUpdateRequest> {
         if let Some(sweep) = &mut self.sweep {
-            if self
-                .queue
-                .peek_priority()
-                .is_none_or(|p| self.sweep_priority > p)
-            {
+            if self.queue.peek_priority().is_none_or(|p| self.sweep_priority > p) {
                 if let Some(cube) = sweep.next() {
                     return Some(LightUpdateRequest {
                         cube,
@@ -227,9 +217,7 @@ mod queue_impl {
         }
 
         pub fn contains(&self, cube: Cube) -> bool {
-            self.by_cube
-                .find(hash_cube(&cube), tuple_eq_predicate(cube))
-                .is_some()
+            self.by_cube.find(hash_cube(&cube), tuple_eq_predicate(cube)).is_some()
         }
 
         pub fn pop(&mut self) -> Option<LightUpdateRequest> {
@@ -254,10 +242,7 @@ mod queue_impl {
 
         pub(crate) fn insert(&mut self, cube: Cube, priority: Priority) {
             let hash = hash_cube(&cube);
-            match self
-                .by_cube
-                .entry(hash, tuple_eq_predicate(cube), |(cube, _)| hash_cube(cube))
-            {
+            match self.by_cube.entry(hash, tuple_eq_predicate(cube), |(cube, _)| hash_cube(cube)) {
                 Entry::Occupied(mut oe) => {
                     let old_priority: Priority = oe.get().1;
                     if old_priority >= priority {
@@ -289,9 +274,7 @@ mod queue_impl {
             };
             let ((_, priority), _) = by_cube_entry.remove();
             let set = &mut self.by_priority[index(priority)];
-            set.find_entry(hash, cube_eq_predicate(cube))
-                .unwrap()
-                .remove();
+            set.find_entry(hash, cube_eq_predicate(cube)).unwrap().remove();
             if set.is_empty() {
                 self.decrease_highest()
             }

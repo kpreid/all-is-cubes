@@ -339,9 +339,7 @@ fn map_text_block(
     match ascii {
         b' ' => existing_block,
         b'.' => AIR,
-        b'#' => blocks[AtriumBlocks::SolidBricks]
-            .clone()
-            .rotate(Face6::PY.clockwise()),
+        b'#' => blocks[AtriumBlocks::SolidBricks].clone().rotate(Face6::PY.clockwise()),
         b'G' => blocks[AtriumBlocks::GroundColumn].clone(),
         b'o' => blocks[AtriumBlocks::SmallColumn].clone(),
         b'|' => blocks[AtriumBlocks::SquareColumn].clone(),
@@ -392,9 +390,7 @@ fn map_text_block(
             )
         }
         b'T' => block::Composite::new(
-            blocks[AtriumBlocks::Molding]
-                .clone()
-                .rotate(Face6::PY.clockwise()),
+            blocks[AtriumBlocks::Molding].clone().rotate(Face6::PY.clockwise()),
             block::CompositeOperator::Over,
         )
         .with_disassemblable()
@@ -472,11 +468,7 @@ fn fill_space_transformed(
     // TODO: don't panic
     let dst_to_src_transform = src_to_dst_transform.inverse();
     let block_rotation = src_to_dst_transform.rotation;
-    for cube in src_bounds
-        .transform(src_to_dst_transform)
-        .unwrap()
-        .interior_iter()
-    {
+    for cube in src_bounds.transform(src_to_dst_transform).unwrap().interior_iter() {
         let existing_block = dst[cube].clone().rotate(block_rotation.inverse());
         let new_block =
             src(dst_to_src_transform.transform_cube(cube), existing_block).rotate(block_rotation);
@@ -610,9 +602,7 @@ async fn install_atrium_blocks(
             // Create brick half-overlap offset
             p.z = (p.z + RESOLUTION_G / 2).rem_euclid(RESOLUTION_G);
         }
-        let bricking = (p.x.rem_euclid(8))
-            .min(p.y.rem_euclid(8))
-            .min(p.z.rem_euclid(16));
+        let bricking = (p.x.rem_euclid(8)).min(p.y.rem_euclid(8)).min(p.z.rem_euclid(16));
         if bricking == 0 {
             GROUT_BASE
         } else {

@@ -780,8 +780,7 @@ mod tests {
             let vector = GridVector::new(1, 20, 300);
             assert_eq!(
                 rot.transform_vector(vector).abs().to_u32(),
-                rot.transform_size(GridSize::from(vector.to_u32()))
-                    .to_vector()
+                rot.transform_size(GridSize::from(vector.to_u32())).to_vector()
             )
         }
     }

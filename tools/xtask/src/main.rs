@@ -228,11 +228,7 @@ fn main() -> Result<(), ActionError> {
                     config.do_for_all_workspaces(|| {
                         // Note: The `fuzz` workspace lock file is ignored in version control.
                         // But we do want to occasionally update it anyway.
-                        config
-                            .cargo()
-                            .arg("update")
-                            .args(&cargo_update_args)
-                            .run()?;
+                        config.cargo().arg("update").args(&cargo_update_args).run()?;
                         Ok(())
                     })?;
                 }
@@ -327,11 +323,7 @@ fn main() -> Result<(), ActionError> {
                 }
 
                 let _pushd = sh.push_dir(package);
-                config
-                    .cargo()
-                    .arg("publish")
-                    .args(maybe_dry.iter().copied())
-                    .run()?;
+                config.cargo().arg("publish").args(maybe_dry.iter().copied()).run()?;
             }
         }
     }
@@ -577,9 +569,7 @@ fn do_for_all_packages(
             Features::AllAndNothing => {
                 {
                     let _t = CaptureTime::new(time_log, format!("{op:?} --all-features"));
-                    op.cargo_cmd(config)
-                        .args(["--all-targets", "--all-features"])
-                        .run()?;
+                    op.cargo_cmd(config).args(["--all-targets", "--all-features"]).run()?;
                 }
 
                 // To test with limited features, we need to run commands separately for each
@@ -610,14 +600,10 @@ fn do_for_all_packages(
                     // TODO: This could be more efficient if it looked at feature dependencies
                     // and skipped equivalent sets.
                     for feature_set in itertools::Itertools::powerset(
-                        package
-                            .features
-                            .keys()
-                            .map(String::as_str)
-                            .filter(|&feature_name| {
-                                feature_name != "default" // should not enable anything itself
+                        package.features.keys().map(String::as_str).filter(|&feature_name| {
+                            feature_name != "default" // should not enable anything itself
                                  && feature_name != "_special_testing" // not for public use, so we care less if it breaks funny
-                            }),
+                        }),
                     ) {
                         let package_name: &str = &package.name;
                         let feature_set_commas: String = feature_set.join(",");
@@ -651,9 +637,7 @@ fn do_for_all_packages(
             // Note that we use `--manifest-path` instead of `pushd` because we don't want to
             // use the `.cargo/config.toml` from that directory, which would change the target
             // tuple to wasm32-unknown-unknown.
-            op.cargo_cmd(config)
-                .arg("--manifest-path=all-is-cubes-wasm/Cargo.toml")
-                .run()?;
+            op.cargo_cmd(config).arg("--manifest-path=all-is-cubes-wasm/Cargo.toml").run()?;
         }
 
         let _t = CaptureTime::new(time_log, format!("{op:?} all-is-cubes-wasm (browser)"));

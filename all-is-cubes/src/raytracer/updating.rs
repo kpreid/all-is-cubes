@@ -146,9 +146,7 @@ where
             if block_data_slice.len() > self.state.blocks.len() {
                 anything_changed = true;
                 for block_data in block_data_slice[self.state.blocks.len()..].iter() {
-                    self.state
-                        .blocks
-                        .push(TracingBlock::from_block(options, block_data));
+                    self.state.blocks.push(TracingBlock::from_block(options, block_data));
                 }
             }
             for block_index in todo.blocks.drain() {
@@ -274,14 +272,10 @@ mod tests {
         }
 
         fn update_and_assert(&mut self, read_ticket: ReadTicket<'_>) -> Result<bool, HandleError> {
-            self.camera
-                .set_options((*self.graphics_options.get()).clone());
+            self.camera.set_options((*self.graphics_options.get()).clone());
             let changed = self.updating.update(read_ticket)?;
-            let image_updating = self
-                .updating
-                .get()
-                .to_text::<CharacterBuf>(&self.camera, "\n")
-                .to_string();
+            let image_updating =
+                self.updating.get().to_text::<CharacterBuf>(&self.camera, "\n").to_string();
             #[expect(clippy::unit_arg)]
             let image_fresh = SpaceRaytracer::<CharacterRtData>::new(
                 &self.space.read(read_ticket).unwrap(),
@@ -304,9 +298,7 @@ mod tests {
 
         // Initial state
         let [block1, block2] = make_some_voxel_blocks(&mut universe);
-        space
-            .mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block1))
-            .unwrap();
+        space.mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block1)).unwrap();
 
         let space = universe.insert_anonymous(space);
         let mut tester = EquivalenceTester::new(universe.read_ticket(), space.clone());
@@ -314,9 +306,7 @@ mod tests {
         tester.update_and_assert(universe.read_ticket()).unwrap();
 
         // Make some light changes
-        universe
-            .try_modify(&space, |space| space.fast_evaluate_light())
-            .unwrap();
+        universe.try_modify(&space, |space| space.fast_evaluate_light()).unwrap();
         tester.update_and_assert(universe.read_ticket()).unwrap();
 
         // Add a second block

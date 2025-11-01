@@ -68,9 +68,7 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
         &self,
         grant: &vui::LayoutGrant,
     ) -> linking::Provider<St, vui::WidgetTransaction> {
-        self.shape
-            .clone()
-            .map(|state, _| self.create_draw_txn(grant, state))
+        self.shape.clone().map(|state, _| self.create_draw_txn(grant, state))
     }
 
     pub(in crate::vui::widgets::button) fn shrink_bounds(
@@ -84,9 +82,7 @@ impl<St: ButtonBase + Clone + Eq + Hash + Exhaust + fmt::Debug> ButtonCommon<St>
 impl vui::Layoutable for ButtonLabel {
     fn requirements(&self) -> vui::LayoutRequest {
         let Self { icon, text } = self;
-        let text_size = text
-            .as_ref()
-            .map_or(GridSize::zero(), |text| text.requirements().minimum);
+        let text_size = text.as_ref().map_or(GridSize::zero(), |text| text.requirements().minimum);
         let icon_size = if icon.is_some() {
             GridSize::new(1, 1, 1)
         } else {
@@ -114,28 +110,18 @@ impl ButtonLabel {
             gravity.x = vui::Align::Low;
         }
 
-        self.icon
-            .clone()
-            .into_iter()
-            .chain(
-                self.text
-                    .as_ref()
-                    .into_iter()
-                    .flat_map(move |label_widget| {
-                        let text = label_widget.text(gravity);
-                        let bb = text.bounding_blocks();
-                        bb.x_range().map(move |x| {
-                            Block::from_primitive(block::Primitive::Text {
-                                text: text.clone(),
-                                offset: GridVector::new(
-                                    x,
-                                    bb.lower_bounds().y,
-                                    bb.lower_bounds().z,
-                                ),
-                            })
-                        })
-                    }),
-            )
+        self.icon.clone().into_iter().chain(self.text.as_ref().into_iter().flat_map(
+            move |label_widget| {
+                let text = label_widget.text(gravity);
+                let bb = text.bounding_blocks();
+                bb.x_range().map(move |x| {
+                    Block::from_primitive(block::Primitive::Text {
+                        text: text.clone(),
+                        offset: GridVector::new(x, bb.lower_bounds().y, bb.lower_bounds().z),
+                    })
+                })
+            },
+        ))
     }
 }
 

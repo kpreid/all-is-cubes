@@ -35,21 +35,14 @@ fn add_membership_hook(
     context: bevy_ecs::component::HookContext,
 ) {
     let membership = world.get::<Membership>(context.entity).unwrap().clone();
-    world
-        .resource_mut::<NameMap>()
-        .map
-        .insert(membership.name, membership.handle);
+    world.resource_mut::<NameMap>().map.insert(membership.name, membership.handle);
 }
 
 fn remove_membership_hook(
     mut world: bevy_ecs::world::DeferredWorld<'_>,
     context: bevy_ecs::component::HookContext,
 ) {
-    let name: Name = world
-        .get::<Membership>(context.entity)
-        .unwrap()
-        .name
-        .clone();
+    let name: Name = world.get::<Membership>(context.entity).unwrap().name.clone();
     world.resource_mut::<NameMap>().map.remove(&name);
 }
 

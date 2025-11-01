@@ -60,21 +60,14 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             // instead of full bounds.
             // TODO: It would be more direct for `EvaluatedBlock` to provide us this value since
             // it is trivial to compute there, but is it worth storing that value always?
-            let voxels_surface_area = block
-                .voxels()
-                .bounds()
-                .abut(face, 1)
-                .unwrap()
-                .volume()
-                .unwrap() as f32;
+            let voxels_surface_area =
+                block.voxels().bounds().abut(face, 1).unwrap().volume().unwrap() as f32;
             let full_surface_area = GridSizeCoord::from(resolution).pow(2) as f32;
             let partial_face_color =
-                full_face_color
-                    .to_rgb()
-                    .with_alpha(ZeroOne::<f32>::new_clamped(
-                        full_face_color.alpha().into_inner()
-                            * (full_surface_area / voxels_surface_area),
-                    ));
+                full_face_color.to_rgb().with_alpha(ZeroOne::<f32>::new_clamped(
+                    full_face_color.alpha().into_inner()
+                        * (full_surface_area / voxels_surface_area),
+                ));
 
             options.transparency.limit_alpha(partial_face_color)
         });
@@ -254,10 +247,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
         // Rotate the voxel array's extent into our local coordinate system, so we can find
         // out what range to iterate over.
-        let rotated_voxel_range = voxels_array
-            .bounds()
-            .transform(voxel_transform.inverse())
-            .unwrap();
+        let rotated_voxel_range =
+            voxels_array.bounds().transform(voxel_transform.inverse()).unwrap();
 
         // Check the case where the block's voxels don't meet its front face.
         // If they do, then we'll take care of `fully_opaque` later, but if we don't even
@@ -315,10 +306,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     None
                 };
 
-            for (t, s) in occupied_rect
-                .y_range()
-                .cartesian_product(occupied_rect.x_range())
-            {
+            for (t, s) in occupied_rect.y_range().cartesian_product(occupied_rect.x_range()) {
                 let cube: Cube = voxel_transform.transform_cube(Cube::new(s, t, layer));
                 let evoxel = get_voxel_with_limit(voxels_array, cube, options);
 

@@ -198,10 +198,8 @@ mod tests {
         // Let exposure sampling reach steady state
         for i in 0..100 {
             {
-                let exposure = &character
-                    .query::<CharacterEye>(universe.read_ticket())
-                    .unwrap()
-                    .exposure;
+                let exposure =
+                    &character.query::<CharacterEye>(universe.read_ticket()).unwrap().exposure;
                 eprintln!(
                     "{i:3} {exp_log} {exp}",
                     exp_log = exposure.exposure_log,
@@ -213,10 +211,7 @@ mod tests {
 
         // Done running; examine results.
 
-        let exposure = &character
-            .query::<CharacterEye>(universe.read_ticket())
-            .unwrap()
-            .exposure;
+        let exposure = &character.query::<CharacterEye>(universe.read_ticket()).unwrap().exposure;
 
         // Luminance sampling should match the scene we set up.
         eprintln!("{:?}", exposure.luminance_samples);

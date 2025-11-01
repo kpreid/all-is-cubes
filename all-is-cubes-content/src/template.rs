@@ -306,12 +306,9 @@ impl WhenceUniverse for TemplateAndParameters {
             );
         }
 
-        Box::pin(async move {
-            this.template
-                .build(progress, this.parameters)
-                .await
-                .map_err(From::from)
-        })
+        Box::pin(
+            async move { this.template.build(progress, this.parameters).await.map_err(From::from) },
+        )
     }
 
     fn can_save(&self) -> bool {
@@ -438,9 +435,8 @@ async fn islands(
             && cell_bounds.size().height >= margin + 25
             && cell_bounds.size().depth >= margin * 2
         {
-            let occupied_bounds = cell_bounds
-                .shrink(FaceMap::splat(10).with(Face6::PY, 25))
-                .unwrap();
+            let occupied_bounds =
+                cell_bounds.shrink(FaceMap::splat(10).with(Face6::PY, 25)).unwrap();
             space.mutate(universe.read_ticket(), |m| {
                 wavy_landscape(occupied_bounds, m, &landscape_blocks, 0.5)
             })?;
@@ -604,10 +600,7 @@ mod tests {
             }
         };
 
-        let result = template
-            .clone()
-            .build(yield_progress_for_testing(), params)
-            .await;
+        let result = template.clone().build(yield_progress_for_testing(), params).await;
 
         if matches!(template, UniverseTemplate::Fail) {
             // The Fail template _should_ return an error
@@ -616,11 +609,7 @@ mod tests {
             let mut u = result.unwrap();
 
             if template != UniverseTemplate::Blank {
-                let _ = u
-                    .get_default_character()
-                    .unwrap()
-                    .read(u.read_ticket())
-                    .unwrap();
+                let _ = u.get_default_character().unwrap().read(u.read_ticket()).unwrap();
             }
             u.step(false, time::Deadline::Asap);
 
@@ -664,11 +653,7 @@ mod tests {
             } = block_def.block().primitive()
             {
                 assert_eq!(
-                    space_handle
-                        .read(universe.read_ticket())
-                        .unwrap()
-                        .physics()
-                        .light,
+                    space_handle.read(universe.read_ticket()).unwrap().physics().light,
                     LightPhysics::None,
                     "block {block_def_name} has space {space_name} \
                         whose light physics are not disabled",

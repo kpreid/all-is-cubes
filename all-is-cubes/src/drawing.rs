@@ -133,10 +133,7 @@ impl<'s, T, C> DrawingPlane<'s, T, C> {
     fn convert_point(&self, point: Point) -> Cube {
         // TODO: This should, now obviously, be `transform_cube` but changing that will
         // break other things.
-        Cube::from(
-            self.transform
-                .transform_point(GridPoint::new(point.x, point.y, 0)),
-        )
+        Cube::from(self.transform.transform_point(GridPoint::new(point.x, point.y, 0)))
     }
 }
 
@@ -180,9 +177,7 @@ where
             // TODO: Add a cache so we're not reconstructing the block for every single pixel.
             // (This is possible because `PixelColor: PartialEq`.)
             // TODO: Need to rotate the brush to match our transform
-            color
-                .into_blocks()
-                .paint_transaction_mut(self.space, self.convert_point(point));
+            color.into_blocks().paint_transaction_mut(self.space, self.convert_point(point));
         }
         Ok(())
     }
@@ -379,30 +374,18 @@ impl<'a> VoxelBrush<'a> {
     /// out-of-bounds drawing, but transactions do not support this and will fail instead.
     pub fn paint_transaction_mut(&self, transaction: &mut SpaceTransaction, origin: Cube) {
         for &(offset, ref block) in &self.0 {
-            transaction
-                .at(origin + offset)
-                .overwrite(Block::clone(block));
+            transaction.at(origin + offset).overwrite(Block::clone(block));
         }
     }
 
     /// Converts a `&VoxelBrush` into a `VoxelBrush` that borrows it.
     pub fn as_ref(&self) -> VoxelBrush<'_> {
-        VoxelBrush(
-            self.0
-                .iter()
-                .map(|(v, b)| (*v, Cow::Borrowed(b.as_ref())))
-                .collect(),
-        )
+        VoxelBrush(self.0.iter().map(|(v, b)| (*v, Cow::Borrowed(b.as_ref()))).collect())
     }
 
     /// Converts a `VoxelBrush` with borrowed blocks to one with owned blocks.
     pub fn into_owned(self) -> VoxelBrush<'static> {
-        VoxelBrush(
-            self.0
-                .into_iter()
-                .map(|(v, b)| (v, Cow::Owned(b.into_owned())))
-                .collect(),
-        )
+        VoxelBrush(self.0.into_iter().map(|(v, b)| (v, Cow::Owned(b.into_owned()))).collect())
     }
 
     /// Add the given offset to the offset of each block, offsetting everything drawn.
@@ -624,10 +607,7 @@ mod tests {
                     // Try actually drawing (to transaction, since that has an easy bounds check),
                     // and see what the bounds of the drawing are.
                     let mut txn = SpaceTransaction::default();
-                    plane_bbox
-                        .into_styled(style)
-                        .draw(&mut txn.draw_target(transform))
-                        .unwrap();
+                    plane_bbox.into_styled(style).draw(&mut txn.draw_target(transform)).unwrap();
                     let txn_bounds = txn.bounds().unwrap();
                     let txn_matches_bounding_box = txn_bounds == bounds_converted;
 
@@ -650,9 +630,7 @@ mod tests {
         let mut space = Space::empty_positive(100, 100, 100);
         space.mutate(ReadTicket::stub(), |m| {
             let mut display = m.draw_target(Gridgid::from_translation([1, 2, 4]));
-            Pixel(Point::new(2, 3), color_value)
-                .draw(&mut display)
-                .unwrap();
+            Pixel(Point::new(2, 3), color_value).draw(&mut display).unwrap();
         });
         assert_eq!(space[[3, 5, 4]], *expected_block);
     }
@@ -717,9 +695,7 @@ mod tests {
     #[cfg(false)]
     fn draw_set_failure() {
         let name = Name::from("foo");
-        let dead_block = Block::builder()
-            .voxels_handle(R1, Handle::new_gone(name.clone()))
-            .build();
+        let dead_block = Block::builder().voxels_handle(R1, Handle::new_gone(name.clone())).build();
         let mut space = Space::empty_positive(100, 100, 100);
 
         // This should fail with SetCubeError::EvalBlock since the block has no valid definition

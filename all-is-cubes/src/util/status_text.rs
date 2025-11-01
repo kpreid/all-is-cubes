@@ -54,10 +54,7 @@ bitflags::bitflags! {
 
 impl ShowStatus {
     #[doc(hidden)] // just a substitute for const trait impl
-    pub const DEFAULT: Self = Self::WORLD
-        .union(Self::STEP)
-        .union(Self::RENDER)
-        .union(Self::CURSOR);
+    pub const DEFAULT: Self = Self::WORLD.union(Self::STEP).union(Self::RENDER).union(Self::CURSOR);
 }
 
 impl Default for ShowStatus {

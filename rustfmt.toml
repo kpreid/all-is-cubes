@@ -1,3 +1,7 @@
+max_width = 100
+chain_width = 80
+use_small_heuristics = "Default"
+
 use_field_init_shorthand = true
 
 style_edition = "2024"

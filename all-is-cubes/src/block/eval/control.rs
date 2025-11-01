@@ -107,10 +107,7 @@ impl Budget {
         amount: usize,
     ) -> Result<(), InEvalError> {
         let mut budget = cell.get();
-        match u32::try_from(amount)
-            .ok()
-            .and_then(|amount| budget.voxels.checked_sub(amount))
-        {
+        match u32::try_from(amount).ok().and_then(|amount| budget.voxels.checked_sub(amount)) {
             Some(updated) => budget.voxels = updated,
             None => return Err(InEvalError::BudgetExceeded),
         }
@@ -216,14 +213,10 @@ impl Cost {
     pub(crate) fn from_difference(original_budget: Budget, final_budget: Budget) -> Self {
         let Some(new_self) = (|| {
             Some(Self {
-                components: original_budget
-                    .components
-                    .checked_sub(final_budget.components)?,
+                components: original_budget.components.checked_sub(final_budget.components)?,
                 voxels: original_budget.voxels.checked_sub(final_budget.voxels)?,
                 // note use of .min_recursion!
-                recursion: original_budget
-                    .recursion
-                    .checked_sub(final_budget.min_recursion)?,
+                recursion: original_budget.recursion.checked_sub(final_budget.min_recursion)?,
             })
         })() else {
             panic!("overflow computing budget difference: {final_budget:#?} - {original_budget:#?}")

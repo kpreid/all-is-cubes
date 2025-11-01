@@ -172,10 +172,7 @@ where
             let new_evaluated_block: &EvaluatedBlock = block_data[uindex].evaluated();
             let current_mesh_entry: &mut VersionedBlockMesh<_> = &mut self.meshes[uindex];
 
-            if current_mesh_entry
-                .mesh
-                .try_update_texture_only(new_evaluated_block)
-            {
+            if current_mesh_entry.mesh.try_update_texture_only(new_evaluated_block) {
                 // Updated the texture in-place. No need for mesh updates.
             } else {
                 current_mesh_entry.spawn_update_job(
@@ -468,10 +465,7 @@ fn should_use_instances<M: DynamicMeshTypes>(
     }
 
     // TODO(instancing): Remove the restriction to only nontransparent meshes when (if) rendering transparent instances is supported.
-    if !block_mesh
-        .all_sub_meshes()
-        .all(|sm| sm.indices_transparent.is_empty())
-    {
+    if !block_mesh.all_sub_meshes().all(|sm| sm.indices_transparent.is_empty()) {
         return false;
     }
 

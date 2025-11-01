@@ -97,9 +97,7 @@ impl vui::Widget for Voxels {
         let mut txn = SpaceTransaction::default();
         for cube in position.bounds.interior_iter() {
             let mut block = Block::from_primitive(Primitive::Recur {
-                offset: block_to_voxels_transform
-                    .transform_cube(cube)
-                    .lower_bounds(),
+                offset: block_to_voxels_transform.transform_cube(cube).lower_bounds(),
                 resolution: self.scale,
                 space: self.space.clone().into(),
             });

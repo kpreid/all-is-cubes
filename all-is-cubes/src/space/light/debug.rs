@@ -83,10 +83,7 @@ impl LightUpdateRayInfo {
 
         // We used to have precise rays, but we don't have them any more.
         // Approximate them using the involved cubes.
-        let hit_point = self
-            .trigger_cube
-            .center()
-            .lerp(self.value_cube.center(), 0.5);
+        let hit_point = self.trigger_cube.center().lerp(self.value_cube.center(), 0.5);
         let ray = Ray::new(lit_cube.center(), hit_point - lit_cube.center());
 
         self.value_cube.aab().expand(0.01).wireframe_points(output);

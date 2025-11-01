@@ -134,8 +134,7 @@ pub trait Transaction: Merge {
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), ExecuteError<Self>> {
         let check = self.check(target).map_err(ExecuteError::Check)?;
-        self.commit(target, context, check, outputs)
-            .map_err(ExecuteError::Commit)
+        self.commit(target, context, check, outputs).map_err(ExecuteError::Commit)
     }
 
     /// Specify the target of this transaction as a [`Handle`], and erase its type,

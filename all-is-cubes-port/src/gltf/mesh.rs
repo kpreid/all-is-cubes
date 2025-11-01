@@ -102,10 +102,7 @@ where
                 format!("{name} base color"),
                 vertex_buffer_view,
                 offset_of!(GltfVertex, base_color),
-                mesh.vertices()
-                    .0
-                    .iter()
-                    .map(|v| v.base_color.map(f32::from)),
+                mesh.vertices().0.iter().map(|v| v.base_color.map(f32::from)),
             )),
         ),
         (
@@ -114,10 +111,7 @@ where
                 format!("{name} base color texcoords"),
                 vertex_buffer_view,
                 offset_of!(GltfVertex, base_color_tc),
-                mesh.vertices()
-                    .0
-                    .iter()
-                    .map(|v| v.base_color_tc.map(f32::from)),
+                mesh.vertices().0.iter().map(|v| v.base_color_tc.map(f32::from)),
             )),
         ),
     ]);

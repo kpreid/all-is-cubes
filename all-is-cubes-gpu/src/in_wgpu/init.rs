@@ -233,9 +233,7 @@ pub fn map_really_async(
 
     async move {
         let _poller = poller;
-        receiver
-            .await
-            .expect("map_async callback was dropped without call")
+        receiver.await.expect("map_async callback was dropped without call")
     }
 }
 
@@ -274,8 +272,7 @@ impl TextureCopyParameters {
     }
 
     pub fn padded_bytes_per_row(&self) -> u32 {
-        self.dense_bytes_per_row()
-            .div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
+        self.dense_bytes_per_row().div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT)
             * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT
     }
 

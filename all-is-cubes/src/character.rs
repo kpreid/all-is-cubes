@@ -356,9 +356,7 @@ impl Character {
             if let Some(fluff_txn) = info.impact_fluff().and_then(|fluff| {
                 Some(CubeTransaction::fluff(fluff).at(Cube::containing(self.body.position())?))
             }) {
-                result_transaction
-                    .merge_from(fluff_txn.bind(self.space.clone()))
-                    .unwrap(); // cannot fail
+                result_transaction.merge_from(fluff_txn.bind(self.space.clone())).unwrap(); // cannot fail
             }
 
             Some(info)
@@ -373,8 +371,7 @@ impl Character {
             if self.velocity_input.y > 0. {
                 if let Some((slot_index, false)) = find_jetpacks(&self.inventory).next()
                     && let Ok(t) =
-                        self.inventory
-                            .use_tool(read_ticket, None, self_handle, slot_index)
+                        self.inventory.use_tool(read_ticket, None, self_handle, slot_index)
                 {
                     result_transaction.merge_from(t).unwrap();
                 }
@@ -453,11 +450,7 @@ impl Character {
             }
         }
 
-        let slot_index = tb
-            .selected_slots
-            .get(button)
-            .copied()
-            .unwrap_or(tb.selected_slots[0]);
+        let slot_index = tb.selected_slots.get(button).copied().unwrap_or(tb.selected_slots[0]);
         tb.inventory.use_tool(read_ticket, cursor, this, slot_index)
     }
 
@@ -474,10 +467,7 @@ impl Character {
 
     fn is_on_ground(&self) -> bool {
         self.body.velocity().y <= 0.0
-            && self
-                .colliding_cubes
-                .iter()
-                .any(|contact| contact.normal() == Face7::PY)
+            && self.colliding_cubes.iter().any(|contact| contact.normal() == Face7::PY)
     }
 
     /// Activate logging this character's state to a Rerun stream.
@@ -695,8 +685,7 @@ impl Transaction for CharacterTransaction {
             behaviors,
         } = self;
         Ok((
-            body.check(&target.body)
-                .map_err(CharacterTransactionMismatch::Body)?,
+            body.check(&target.body).map_err(CharacterTransactionMismatch::Body)?,
             inventory
                 .check(&target.inventory)
                 .map_err(CharacterTransactionMismatch::Inventory)?,
@@ -748,12 +737,8 @@ impl Merge for CharacterTransaction {
         }
         Ok((
             self.body.check_merge(&other.body).map_err(C::Body)?,
-            self.inventory
-                .check_merge(&other.inventory)
-                .map_err(C::Inventory)?,
-            self.behaviors
-                .check_merge(&other.behaviors)
-                .map_err(C::Behaviors)?,
+            self.inventory.check_merge(&other.inventory).map_err(C::Inventory)?,
+            self.behaviors.check_merge(&other.behaviors).map_err(C::Behaviors)?,
         ))
     }
 

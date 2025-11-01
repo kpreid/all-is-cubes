@@ -44,12 +44,8 @@ async fn binary_fractal(
     // powers of 2 and the fractal is not. But, that might be worth restoring given other
     // fractals that aren't scaled by powers of 3.
 
-    let leaf_block_1 = Block::builder()
-        .color(rgba_const!(0.5, 0.5, 0.4, 1.0))
-        .build();
-    let leaf_block_2 = Block::builder()
-        .color(rgba_const!(0.4, 0.5, 0.5, 1.0))
-        .build();
+    let leaf_block_1 = Block::builder().color(rgba_const!(0.5, 0.5, 0.4, 1.0)).build();
+    let leaf_block_2 = Block::builder().color(rgba_const!(0.4, 0.5, 0.5, 1.0)).build();
 
     let mut space = {
         let demo_blocks = BlockProvider::<DemoBlocks>::using(universe)?;
@@ -151,21 +147,18 @@ impl BinaryFractal {
         } else {
             let size_of_next_level = self.level_aab(level - 1).size();
             let iterator: Box<dyn Iterator<Item = Cube> + Send> = Box::new(
-                self.pattern
-                    .bounds()
-                    .interior_iter()
-                    .flat_map(move |which_section| {
-                        if self.pattern[which_section] {
-                            let section_corner = lower_corner
-                                + which_section
-                                    .lower_bounds()
-                                    .to_vector()
-                                    .component_mul(size_of_next_level.to_vector().to_i32());
-                            Either::Left(self.cubes(level - 1, section_corner))
-                        } else {
-                            Either::Right(iter::empty())
-                        }
-                    }),
+                self.pattern.bounds().interior_iter().flat_map(move |which_section| {
+                    if self.pattern[which_section] {
+                        let section_corner = lower_corner
+                            + which_section
+                                .lower_bounds()
+                                .to_vector()
+                                .component_mul(size_of_next_level.to_vector().to_i32());
+                        Either::Left(self.cubes(level - 1, section_corner))
+                    } else {
+                        Either::Right(iter::empty())
+                    }
+                }),
             );
             Either::Right(iterator)
         }

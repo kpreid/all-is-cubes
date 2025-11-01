@@ -291,8 +291,7 @@ fn COLORED_BOUNCE(ctx: Context<'_>) {
             // Dig pockets for lights to be in
             for dir in Face6::ALL {
                 let far_end = GridAab::ORIGIN_CUBE.translate(dir.vector(total_radius - 1));
-                m.fill_uniform(GridAab::ORIGIN_CUBE.union_box(far_end), &AIR)
-                    .unwrap();
+                m.fill_uniform(GridAab::ORIGIN_CUBE.union_box(far_end), &AIR).unwrap();
                 m.fill_uniform(far_end, &light_block).unwrap();
             }
 
@@ -331,9 +330,7 @@ fn SPOTLIGHT(ctx: Context<'_>) {
 
     // --- Blocks ---
 
-    let shadowing_block = Block::builder()
-        .color(palette::ALMOST_BLACK.with_alpha_one())
-        .build();
+    let shadowing_block = Block::builder().color(palette::ALMOST_BLACK.with_alpha_one()).build();
 
     let light_block = Block::builder()
         .color(Rgba::WHITE)
@@ -357,8 +354,7 @@ fn SPOTLIGHT(ctx: Context<'_>) {
 
             // Light in a recess
             let far_end = GridAab::ORIGIN_CUBE.translate(vec3(0, total_radius, 0));
-            m.fill_uniform(GridAab::ORIGIN_CUBE.union_box(far_end), &AIR)
-                .unwrap();
+            m.fill_uniform(GridAab::ORIGIN_CUBE.union_box(far_end), &AIR).unwrap();
             m.fill_uniform(far_end, &light_block).unwrap();
 
             // Central block that casts a shadow

@@ -29,9 +29,7 @@ impl Config<'_> {
 
     #[allow(clippy::unused_self, reason = "we might want to configure this later")]
     pub fn cargo_path(&self) -> std::path::PathBuf {
-        std::env::var("CARGO")
-            .expect("CARGO environment variable not set")
-            .into()
+        std::env::var("CARGO").expect("CARGO environment variable not set").into()
     }
 
     /// Arguments that should be passed to any Cargo command that runs a build

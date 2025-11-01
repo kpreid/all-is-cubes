@@ -11,7 +11,7 @@ use all_is_cubes::math::VectorOps as _;
 use all_is_cubes::time;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::Executor;
-use all_is_cubes_render::camera::{Layers, RenderMethod, StandardCameras};
+use all_is_cubes_render::camera::{ImagePixel, Layers, RenderMethod, StandardCameras};
 use all_is_cubes_render::info_text_drawable;
 use all_is_cubes_render::{Flaws, RenderError};
 
@@ -245,7 +245,7 @@ impl EverythingRenderer {
             viewport
                 .nominal_size
                 .map(|component| (component as u32).max(1))
-                .cast_unit(), // info text texture is deliberately sized in nominal pixels to control the font size
+                .cast_unit::<ImagePixel>(), // info text texture is deliberately sized in nominal pixels to control the font size
         );
         new_self
     }
@@ -283,10 +283,7 @@ impl EverythingRenderer {
                 self.info_text_texture.resize(
                     &self.device,
                     Some("info_text_texture"),
-                    viewport
-                        .nominal_size
-                        .map(|component| (component as u32).max(1))
-                        .cast_unit(),
+                    viewport.nominal_size.map(|component| (component as u32).max(1)).cast_unit(),
                 );
             }
 
@@ -313,8 +310,7 @@ impl EverythingRenderer {
 
         // Recompile pipelines if needed.
         self.update_postprocess_pipeline();
-        self.pipelines
-            .rebuild_if_changed(&self.device, queue, &self.shaders, &self.fb);
+        self.pipelines.rebuild_if_changed(&self.device, queue, &self.shaders, &self.fb);
 
         // Identify spaces to be rendered
         let ws = self.cameras.world_space().get();
@@ -335,10 +331,9 @@ impl EverythingRenderer {
             .map_err(RenderError::Read)?;
 
         let mut belt_encoder =
-            self.device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("EverythingRenderer::update() staging belt encoder"),
-                });
+            self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("EverythingRenderer::update() staging belt encoder"),
+            });
 
         let mut bwp = BeltWritingParts {
             device: &self.device,
@@ -418,9 +413,7 @@ impl EverythingRenderer {
             );
 
             // Chunk debug -- not currently part of gather_debug_lines
-            self.space_renderers
-                .world
-                .debug_lines(&self.cameras.cameras().world, &mut v);
+            self.space_renderers.world.debug_lines(&self.cameras.cameras().world, &mut v);
 
             v.extend(self.space_renderers.world.particle_lines());
 
@@ -482,15 +475,13 @@ impl EverythingRenderer {
 
         // We need multiple encoders to avoid borrow conflicts between render pass and StagingBelt.
         let mut pass_encoder =
-            self.device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("EverythingRenderer::draw_frame_linear().pass_encoder"),
-                });
+            self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("EverythingRenderer::draw_frame_linear().pass_encoder"),
+            });
         let mut belt_encoder =
-            self.device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("EverythingRenderer::draw_frame_linear().belt_encoder"),
-                });
+            self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("EverythingRenderer::draw_frame_linear().belt_encoder"),
+            });
 
         let mut bwp = BeltWritingParts {
             device: &self.device,
@@ -532,9 +523,7 @@ impl EverythingRenderer {
                 // Update camera buffer since space_renderers.world.draw() won't be doing that,
                 // but the lines pass wants to have it available.
                 let world_camera = &self.cameras.cameras().world;
-                self.space_renderers
-                    .world
-                    .write_camera_only(bwp.reborrow(), world_camera);
+                self.space_renderers.world.write_camera_only(bwp.reborrow(), world_camera);
 
                 // Draw the raytracing results
                 let flaws = self.rt.draw(&self.pipelines, &mut world_render_pass);
@@ -568,10 +557,7 @@ impl EverythingRenderer {
             );
             world_render_pass.set_vertex_buffer(
                 0,
-                self.lines_buffer
-                    .get()
-                    .expect("missing lines buffer!")
-                    .slice(..),
+                self.lines_buffer.get().expect("missing lines buffer!").slice(..),
             );
             world_render_pass.draw(0..self.lines_vertex_count, 0..1);
         }
@@ -712,13 +698,10 @@ impl EverythingRenderer {
             self.space_renderers
                 .world
                 .log_to_rerun(destination.child(&rg::entity_path!["world"]));
-            self.space_renderers
-                .ui
-                .log_to_rerun(destination.child(&rg::entity_path!["ui"]));
+            self.space_renderers.ui.log_to_rerun(destination.child(&rg::entity_path!["ui"]));
         }
         if image {
-            self.rerun_image
-                .log_to_rerun(destination.child(&rg::entity_path!["image"]));
+            self.rerun_image.log_to_rerun(destination.child(&rg::entity_path!["image"]));
         }
         if textures {
             self.space_renderers

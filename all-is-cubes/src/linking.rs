@@ -252,9 +252,7 @@ impl<E: Exhaust + fmt::Debug + Clone + Eq + Hash, V> Provider<E, V> {
         F: FnMut(E) -> V,
     {
         Provider {
-            map: E::exhaust()
-                .map(|key| (key.clone(), definer(key)))
-                .collect(),
+            map: E::exhaust().map(|key| (key.clone(), definer(key))).collect(),
         }
     }
 

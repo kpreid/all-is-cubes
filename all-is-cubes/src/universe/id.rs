@@ -55,10 +55,7 @@ impl OnceUniverseId {
     ///
     /// On failure, returns the already-stored ID.
     pub fn set(&self, new_id: UniverseId) -> Result<(), UniverseId> {
-        match self
-            .0
-            .compare_exchange(0, to_atomic_value(new_id.0), Acquire, Relaxed)
-        {
+        match self.0.compare_exchange(0, to_atomic_value(new_id.0), Acquire, Relaxed) {
             Ok(_) => Ok(()),
             Err(existing) => Err(UniverseId(from_atomic_value(existing).unwrap())),
         }

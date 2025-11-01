@@ -710,14 +710,8 @@ impl GridAab {
     pub fn translate(&self, offset: impl Into<GridVector>) -> Self {
         fn inner(this: &GridAab, offset: GridVector) -> GridAab {
             let offset = offset.to_point();
-            let new_lb = this
-                .lower_bounds()
-                .zip(offset, GridCoordinate::saturating_add)
-                .to_point();
-            let new_ub = this
-                .upper_bounds()
-                .zip(offset, GridCoordinate::saturating_add)
-                .to_point();
+            let new_lb = this.lower_bounds().zip(offset, GridCoordinate::saturating_add).to_point();
+            let new_ub = this.upper_bounds().zip(offset, GridCoordinate::saturating_add).to_point();
             GridAab::from_lower_upper(new_lb, new_ub)
         }
 
@@ -949,13 +943,13 @@ impl GridAab {
             self.upper_bounds()[axis]
         } else {
             // TODO: better error message
-            self.lower_bounds[axis]
-                .checked_sub(thickness)
-                .ok_or(GridOverflowError(OverflowKind::OverflowedAbut {
+            self.lower_bounds[axis].checked_sub(thickness).ok_or(GridOverflowError(
+                OverflowKind::OverflowedAbut {
                     original: self,
                     face,
                     thickness,
-                }))?
+                },
+            ))?
         };
 
         let mut lower_bounds = self.lower_bounds();

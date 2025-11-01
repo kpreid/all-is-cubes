@@ -83,11 +83,8 @@ impl TooltipState {
 
             if let Some(character_handle) = &self.character {
                 let character = character_handle.read(world_read_ticket).unwrap();
-                let selected_slot = character
-                    .selected_slots()
-                    .get(1)
-                    .copied()
-                    .unwrap_or(inv::Ix::MAX);
+                let selected_slot =
+                    character.selected_slots().get(1).copied().unwrap_or(inv::Ix::MAX);
                 if let Some(tool) = character.inventory().get(selected_slot).cloned() {
                     // TODO: This logic is redundant with what `InventoryWatcher` does and should be replaced with it.
                     let icon = tool.icon(&hud_blocks.icons);
@@ -272,10 +269,7 @@ impl WidgetController for TooltipController {
                 .clone()
                 .layout_bounds(
                     block::Resolution::R16,
-                    grant
-                        .bounds
-                        .translate(-grant.bounds.lower_bounds().to_vector())
-                        .multiply(16),
+                    grant.bounds.translate(-grant.bounds.lower_bounds().to_vector()).multiply(16),
                 )
                 .string(new_contents.string().clone())
                 .build();
@@ -322,9 +316,7 @@ mod tests {
             yield_progress_for_testing(),
         )
         .await;
-        install_txn
-            .execute(&mut universe, (), &mut transaction::no_outputs)
-            .unwrap();
+        install_txn.execute(&mut universe, (), &mut transaction::no_outputs).unwrap();
 
         // Initial state: no update.
         let mut t = TooltipState::default();

@@ -28,11 +28,7 @@ fn rotate_evaluation() {
         )
     };
     let rotated_color_fn = |cube: Cube| {
-        color_fn(
-            rotation
-                .to_positive_octant_transform(resolution.into())
-                .transform_cube(cube),
-        )
+        color_fn(rotation.to_positive_octant_transform(resolution.into()).transform_cube(cube))
     };
     let block = Block::builder()
         .display_name("foo")

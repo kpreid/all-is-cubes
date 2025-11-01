@@ -398,8 +398,7 @@ impl Space {
 
             // Find or allocate index for new block. This must be done before other mutations since it can fail.
             let new_block_index =
-                m.palette
-                    .ensure_index(m.read_ticket, block, m.change_buffer, true)?;
+                m.palette.ensure_index(m.read_ticket, block, m.change_buffer, true)?;
 
             // Update counts
             m.palette.decrement_maybe_free(old_block_index);
@@ -1357,8 +1356,7 @@ impl Mutation<'_, '_> {
                 linear.fill(/* block index = */ 0);
             }
             // TODO: if opaque, don't schedule updates
-            self.light
-                .light_needs_update_in_region(region, light::Priority::UNINIT);
+            self.light.light_needs_update_in_region(region, light::Priority::UNINIT);
             // TODO: also need to activate tick_action if present.
             // And see if we can share more of the logic of this with new_from_builder().
             self.change_buffer.push(SpaceChange::EveryBlock);

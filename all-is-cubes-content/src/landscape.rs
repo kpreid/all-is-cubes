@@ -165,10 +165,7 @@ impl BlockModule for LandscapeBlocks {
 impl DefaultProvision<Block> for LandscapeBlocks {
     fn module_default(self) -> Block {
         fn color_and_name(color: Rgb01, name: &'static str) -> Block {
-            Block::builder()
-                .display_name(name)
-                .color(color.with_alpha_one())
-                .build()
+            Block::builder().display_name(name).color(color.with_alpha_one()).build()
         }
 
         fn blades() -> Block {
@@ -390,10 +387,9 @@ pub(crate) fn create_landscape_blocks_and_variants(
 ) -> BlockProvider<LandscapeBlocksAndVariants> {
     BlockProvider::new_sync(|key| match key {
         LandscapeBlocksAndVariants::Base(base) => blocks[base].clone(),
-        LandscapeBlocksAndVariants::Grass(GrassHeightAndRot { height, rotation }) => blocks
-            [LandscapeBlocks::GrassBlades { height }]
-        .clone()
-        .rotate(rotation.into()),
+        LandscapeBlocksAndVariants::Grass(GrassHeightAndRot { height, rotation }) => {
+            blocks[LandscapeBlocks::GrassBlades { height }].clone().rotate(rotation.into())
+        }
     })
 }
 

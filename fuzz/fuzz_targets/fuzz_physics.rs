@@ -48,23 +48,16 @@ fuzz_target!(|input: (
     let character = StrongHandle::from(universe.insert_anonymous(character));
 
     for i in 0..5000 {
-        if !interesting_bounds_aab.contains(
-            character
-                .read(universe.read_ticket())
-                .unwrap()
-                .body
-                .position(),
-        ) {
+        if !interesting_bounds_aab
+            .contains(character.read(universe.read_ticket()).unwrap().body.position())
+        {
             // Flying out of bounds is not interesting.
             return;
         }
 
         // dbg!((i, character.body.position));
         universe.step(false, time::Deadline::Whenever);
-        let body_info = character
-            .read(universe.read_ticket())
-            .unwrap()
-            .last_step_info;
+        let body_info = character.read(universe.read_ticket()).unwrap().last_step_info;
         // dbg!(info);
 
         // Check for no push out, but not on the first step, which might have been due to initial

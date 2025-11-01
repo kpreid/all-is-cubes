@@ -157,9 +157,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         &self,
     ) -> impl Iterator<Item = (Face6, bool, &SubMesh<M::Vertex>)> {
         Iterator::chain(
-            self.interior_vertices
-                .iter()
-                .map(|(f, mesh)| (f, false, mesh)),
+            self.interior_vertices.iter().map(|(f, mesh)| (f, false, mesh)),
             self.face_vertices.iter().map(|(f, mesh)| (f, true, mesh)),
         )
     }
@@ -185,10 +183,7 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     /// Note that a particular occurrence of this mesh in a [`SpaceMesh`] may have a smaller
     /// bounding box due to hidden face culling.
     pub fn bounding_box(&self) -> Aabbs {
-        self.all_sub_meshes()
-            .map(|sm| sm.bounding_box)
-            .reduce(Aabbs::union)
-            .unwrap()
+        self.all_sub_meshes().map(|sm| sm.bounding_box).reduce(Aabbs::union).unwrap()
     }
 
     /// Reports any flaws in this mesh: reasons why using it to create a rendering would

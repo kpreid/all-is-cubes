@@ -217,9 +217,7 @@ impl SpaceTransaction {
                 }
             }
         }
-        self.behaviors
-            .check(behaviors)
-            .map_err(SpaceTransactionMismatch::Behaviors)
+        self.behaviors.check(behaviors).map_err(SpaceTransactionMismatch::Behaviors)
     }
 
     fn commit_common(
@@ -296,8 +294,7 @@ impl SpaceTransaction {
         let check = self
             .check_common(target.palette, target.contents.as_ref(), target.behaviors)
             .map_err(ExecuteError::Check)?;
-        self.commit_common(target, check)
-            .map_err(ExecuteError::Commit)
+        self.commit_common(target, check).map_err(ExecuteError::Commit)
     }
 }
 
@@ -342,11 +339,10 @@ impl Merge for SpaceTransaction {
         for (&cube, t1) in cubes1 {
             if let Some(t2) = cubes2.get(&cube) {
                 let CubeMergeCheck {} =
-                    t1.check_merge(t2)
-                        .map_err(|conflict| SpaceTransactionConflict::Cube {
-                            cube: cube.into(),
-                            conflict,
-                        })?;
+                    t1.check_merge(t2).map_err(|conflict| SpaceTransactionConflict::Cube {
+                        cube: cube.into(),
+                        conflict,
+                    })?;
             }
         }
         self.behaviors

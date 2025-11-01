@@ -170,9 +170,7 @@ fn set_error_format() {
 fn set_updates_evaluated_on_added_block() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
-    space
-        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block)).unwrap();
     // Confirm the expected indices
     assert_eq!(Some(1), space.get_block_index([0, 0, 0]));
     assert_eq!(Some(0), space.get_block_index([1, 0, 0]));
@@ -193,9 +191,7 @@ fn set_updates_evaluated_and_notifies_on_replaced_block() {
     space.listen(log.listener());
 
     let cube = Cube::ORIGIN;
-    space
-        .mutate(ReadTicket::stub(), |m| m.set(cube, &block))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set(cube, &block)).unwrap();
 
     // Confirm the expected indices
     assert_eq!(Some(0), space.get_block_index(cube));
@@ -228,9 +224,7 @@ fn set_no_neighbor_overflow_high() {
     let one_less = GridCoordinate::MAX - 1;
     let high_corner = GridPoint::new(one_less, one_less, one_less);
     let mut space = Space::empty(GridAab::from_lower_size(high_corner, [1, 1, 1]));
-    space
-        .mutate(ReadTicket::stub(), |m| m.set(high_corner, block.clone()))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set(high_corner, block.clone())).unwrap();
 }
 /// No arithmetic overflow when modifying a block at the numeric range lower bound.
 #[test]
@@ -238,9 +232,7 @@ fn set_no_neighbor_overflow_low() {
     let [block] = make_some_blocks();
     let low_corner = GridPoint::splat(GridCoordinate::MIN);
     let mut space = Space::empty(GridAab::from_lower_size(low_corner, [1, 1, 1]));
-    space
-        .mutate(ReadTicket::stub(), |m| m.set(low_corner, block.clone()))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set(low_corner, block.clone())).unwrap();
 }
 
 #[test]
@@ -251,27 +243,21 @@ fn removed_blocks_are_forgotten() {
     let pt2 = GridPoint::new(1, 0, 0);
     // TODO: This test depends on block allocation order. distinct_blocks() ought to be stable or explicitly return a HashSet or something.
     assert_eq!(space.distinct_blocks(), vec![AIR.clone()], "step 1");
-    space
-        .mutate(ReadTicket::stub(), |m| m.set(pt1, &block_0))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set(pt1, &block_0)).unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
         vec![AIR.clone(), block_0.clone()],
         "step 2"
     );
-    space
-        .mutate(ReadTicket::stub(), |m| m.set(pt2, &block_1))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set(pt2, &block_1)).unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
         vec![block_1.clone(), block_0.clone()],
         "step 3"
     );
-    space
-        .mutate(ReadTicket::stub(), |m| m.set(pt1, &block_2))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set(pt1, &block_2)).unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
@@ -280,9 +266,7 @@ fn removed_blocks_are_forgotten() {
     );
 
     // Make sure that reinserting an old block correctly allocates an index rather than using the old one.
-    space
-        .mutate(ReadTicket::stub(), |m| m.set(pt2, &block_0))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set(pt2, &block_0)).unwrap();
     space.consistency_check();
     assert_eq!(
         space.distinct_blocks(),
@@ -449,9 +433,7 @@ fn replace_last_block_regression() {
     let bounds = GridAab::from_lower_size([0, 0, 0], [3, 1, 1]);
     let mut space = Space::empty(bounds);
     for i in 0..3 {
-        space
-            .mutate(ReadTicket::stub(), |m| m.set([i, 0, 0], &block))
-            .unwrap();
+        space.mutate(ReadTicket::stub(), |m| m.set([i, 0, 0], &block)).unwrap();
         space.consistency_check();
     }
 }
@@ -481,9 +463,7 @@ fn listens_to_block_changes() {
     universe
         .execute_1(&block_def_handle, BlockDefTransaction::overwrite(new_block))
         .unwrap();
-    let new_evaluated = Block::from(block_def_handle)
-        .evaluate(universe.read_ticket())
-        .unwrap();
+    let new_evaluated = Block::from(block_def_handle).evaluate(universe.read_ticket()).unwrap();
 
     // This does not result in an outgoing notification, because we don't want
     // computations like reevaluation to happen during the notification process.
@@ -493,10 +473,7 @@ fn listens_to_block_changes() {
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
-        space
-            .read(universe.read_ticket())
-            .unwrap()
-            .get_evaluated([0, 0, 0]),
+        space.read(universe.read_ticket()).unwrap().get_evaluated([0, 0, 0]),
         &new_evaluated
     );
 }
@@ -519,9 +496,7 @@ fn indirect_becomes_evaluation_error() {
 
     // Set up space and listener
     let mut space = Space::empty_positive(1, 1, 1);
-    space
-        .mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block))
-        .unwrap();
+    space.mutate(universe.read_ticket(), |m| m.set([0, 0, 0], &block)).unwrap();
     let log = Log::new();
     space.listen(log.listener());
     let space = universe.insert("space".into(), space).unwrap();
@@ -540,14 +515,8 @@ fn indirect_becomes_evaluation_error() {
     // Now we should see a notification and the evaluated block data having changed.
     assert_eq!(log.drain(), vec![SpaceChange::BlockEvaluation(0)]);
     assert_eq!(
-        space
-            .read(universe.read_ticket())
-            .unwrap()
-            .get_evaluated([0, 0, 0]),
-        &block
-            .evaluate(universe.read_ticket())
-            .unwrap_err()
-            .to_placeholder()
+        space.read(universe.read_ticket()).unwrap().get_evaluated([0, 0, 0]),
+        &block.evaluate(universe.read_ticket()).unwrap_err().to_placeholder()
     );
 }
 
@@ -676,9 +645,7 @@ fn block_tick_action_does_not_run_paused() {
         })
         .build();
     let mut space = Space::empty_positive(1, 1, 1);
-    space
-        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &vanisher))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &vanisher)).unwrap();
     let space = universe.insert("space".into(), space).unwrap();
 
     // No effect when paused
@@ -709,9 +676,7 @@ fn block_tick_action_timing() {
     connect(universe.read_ticket(), &mut block1, &block2);
 
     let mut space = Space::empty_positive(1, 1, 1);
-    space
-        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block1))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &block1)).unwrap();
     let space = universe.insert("space".into(), space).unwrap();
 
     // Setup done, now simulate.
@@ -754,8 +719,7 @@ fn block_tick_action_conflict() {
         output2,
     ] = make_some_blocks();
     fn connect(from: &mut Block, to: &Block, face: Face6) {
-        from.freezing_get_attributes_mut(ReadTicket::stub())
-            .tick_action = Some(TickAction {
+        from.freezing_get_attributes_mut(ReadTicket::stub()).tick_action = Some(TickAction {
             // TODO: replace this with a better-behaved neighbor-modifying operation,
             // once we have one
             operation: Operation::Neighbors(
@@ -857,17 +821,13 @@ fn block_tick_action_repeats() {
         })
         .build();
     let mut space = Space::empty_positive(1, 2, 1);
-    space
-        .mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &ticker))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set([0, 0, 0], &ticker)).unwrap();
     let space = universe.insert("space".into(), space).unwrap();
 
     for t in 0..2 {
         universe.step(false, time::Deadline::Whenever);
         assert_eq!(
-            space.read(universe.read_ticket()).unwrap()[[0, 1, 0]]
-                .modifiers()
-                .len(),
+            space.read(universe.read_ticket()).unwrap()[[0, 1, 0]].modifiers().len(),
             t + 1
         );
     }

@@ -107,8 +107,7 @@ impl RenderTestContext {
     }
 
     pub fn renderer(&self, scene: impl Scene) -> Box<dyn HeadlessRenderer + Send> {
-        self.renderer_factory
-            .renderer_from_cameras(scene.into_cameras())
+        self.renderer_factory.renderer_from_cameras(scene.into_cameras())
     }
 
     /// Returns the [`Universe`] for this test case.
@@ -470,9 +469,8 @@ where
             .into_inner()
             .unwrap();
 
-        let comparison_failure: Option<String> = comparisons
-            .iter()
-            .find_map(|entry| entry.describe_failure());
+        let comparison_failure: Option<String> =
+            comparisons.iter().find_map(|entry| entry.describe_failure());
 
         // Print out outcome of test
         match format {

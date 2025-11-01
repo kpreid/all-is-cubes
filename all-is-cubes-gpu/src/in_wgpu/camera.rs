@@ -54,11 +54,8 @@ impl ShaderSpaceCamera {
 
         // If the matrix isn't invertible, then what we're rendering must be degenerate (e.g.
         // zero FOV), so use a mostly harmless placeholder.
-        let inverse_projection_matrix = convert_matrix(
-            projection_matrix
-                .inverse()
-                .unwrap_or(Transform3D::identity()),
-        );
+        let inverse_projection_matrix =
+            convert_matrix(projection_matrix.inverse().unwrap_or(Transform3D::identity()));
 
         Self {
             projection_matrix: convert_matrix(projection_matrix),

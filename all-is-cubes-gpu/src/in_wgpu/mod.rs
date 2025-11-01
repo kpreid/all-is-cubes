@@ -168,8 +168,7 @@ impl SurfaceRenderer {
         about_to_present: impl FnOnce(),
     ) -> Result<RenderInfo, RenderError> {
         let update_info =
-            self.everything
-                .update(read_tickets, &self.queue, cursor_result, frame_budget)?;
+            self.everything.update(read_tickets, &self.queue, cursor_result, frame_budget)?;
 
         if self.viewport_dirty.get_and_clear() {
             // Test because wgpu insists on nonzero values -- we'd rather be inconsistent
@@ -201,8 +200,7 @@ impl SurfaceRenderer {
                 log::error!(
                     "Error from wgpu::Surface::get_current_texture(): {e:?}. Skipping this frame."
                 );
-                self.surface
-                    .configure(&self.device, self.everything.config());
+                self.surface.configure(&self.device, self.everything.config());
                 return Ok(RenderInfo {
                     flaws: Flaws::UNFINISHED,
                     ..RenderInfo::default()

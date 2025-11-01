@@ -401,10 +401,7 @@ impl Block {
         // other applications might care not whether it is *currently* symmetric but whether
         // it can ever change to be asymmetric, for which this is the actual right answer.
         self.primitive().rotationally_symmetric()
-            && self
-                .modifiers()
-                .iter()
-                .all(|m| m.does_not_introduce_asymmetry())
+            && self.modifiers().iter().all(|m| m.does_not_introduce_asymmetry())
     }
 
     /// Add a [`Modifier::Attributes`] if there isn't one already.
@@ -1046,18 +1043,13 @@ impl fmt::Debug for Primitive {
                 .field("resolution", resolution)
                 .finish(),
             Self::Air => write!(f, "Air"),
-            Self::Text { text, offset } => f
-                .debug_struct("Text")
-                .field("offset", offset)
-                .field("text", text)
-                .finish(),
+            Self::Text { text, offset } => {
+                f.debug_struct("Text").field("offset", offset).field("text", text).finish()
+            }
             Self::Raw {
                 attributes,
                 voxels: _,
-            } => f
-                .debug_struct("Raw")
-                .field("attributes", attributes)
-                .finish_non_exhaustive(),
+            } => f.debug_struct("Raw").field("attributes", attributes).finish_non_exhaustive(),
         }
     }
 }

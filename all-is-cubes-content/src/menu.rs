@@ -105,11 +105,9 @@ fn template_menu_widget_tree(
         )));
     }
     let tree: vui::WidgetTree =
-        widget_theme
-            .dialog_background()
-            .as_background_of(Arc::new(LayoutTree::Stack {
-                direction: Face6::NY,
-                children: vertical_widgets,
-            }));
+        widget_theme.dialog_background().as_background_of(Arc::new(LayoutTree::Stack {
+            direction: Face6::NY,
+            children: vertical_widgets,
+        }));
     Ok((tree, txn))
 }

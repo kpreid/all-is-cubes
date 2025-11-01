@@ -66,9 +66,8 @@ impl WinAndState {
             size
         } else {
             // Guess which monitor we will get.
-            let maybe_monitor = event_loop
-                .primary_monitor()
-                .or_else(|| event_loop.available_monitors().next());
+            let maybe_monitor =
+                event_loop.primary_monitor().or_else(|| event_loop.available_monitors().next());
             choose_graphical_window_size(match maybe_monitor {
                 Some(monitor) => {
                     guessed_monitor = true;
@@ -244,9 +243,7 @@ pub async fn create_winit_wgpu_desktop_session(
     // that lets us draw to invisible windows.
     // (However, it's not perfect, because the renderer won't necessarily finish its work
     // in one frame; perhaps we should ask it to stretch its frame budget.)
-    dsession
-        .renderer
-        .redraw(&dsession.session, &dsession.window.window);
+    dsession.renderer.redraw(&dsession.session, &dsession.window.window);
     // Now that the window has proper contents (if possible), make it visible.
     dsession.window.window.set_visible(true);
 
@@ -340,9 +337,7 @@ impl<Ren: RendererToWinit> winit::application::ApplicationHandler for Handler<Re
         };
 
         // Sync UI state back to window
-        dsession
-            .window
-            .sync_cursor_grab(&mut dsession.session.input_processor);
+        dsession.window.sync_cursor_grab(&mut dsession.session.input_processor);
 
         // Compute when we want to resume.
         if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
@@ -366,10 +361,7 @@ impl<Ren: RendererToWinit> winit::application::ApplicationHandler for Handler<Re
                 if mem::take(&mut dsession.window.ignore_next_mouse_move) {
                     return;
                 }
-                dsession
-                    .session
-                    .input_processor
-                    .mouselook_delta(delta.into())
+                dsession.session.input_processor.mouselook_delta(delta.into())
             }
 
             // Unused
@@ -407,18 +399,14 @@ fn handle_window_event<Ren: RendererToWinit>(
                 return;
             }
 
-            dsession
-                .renderer
-                .update_world_camera(dsession.session.read_tickets());
+            dsession.renderer.update_world_camera(dsession.session.read_tickets());
             dsession.session.update_cursor(dsession.renderer.cameras());
             dsession
                 .window
                 .window
                 .set_cursor(cursor_icon_to_winit(dsession.session.cursor_icon()));
 
-            dsession
-                .renderer
-                .redraw(&dsession.session, &dsession.window.window);
+            dsession.renderer.redraw(&dsession.session, &dsession.window.window);
 
             dsession.session.frame_clock.did_draw();
 
@@ -559,10 +547,7 @@ impl RendererToWinit for SurfaceRenderer {
 
     fn redraw(&mut self, session: &Session, window: &Window) {
         let frame_budget = FrameBudget::from_frame_period(
-            match window
-                .current_monitor()
-                .and_then(|m| m.refresh_rate_millihertz())
-            {
+            match window.current_monitor().and_then(|m| m.refresh_rate_millihertz()) {
                 Some(mhz) => Duration::from_secs_f32(1000.0 / mhz as f32),
                 None => Duration::from_millis(16), // assume ~60 Hz
             },

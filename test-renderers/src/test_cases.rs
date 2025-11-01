@@ -174,9 +174,7 @@ async fn bloom(mut context: RenderTestContext, bloom_intensity: f32) {
         },
         context.universe(),
     );
-    context
-        .render_comparison_test(12, scene, Overlays::NONE)
-        .await;
+    context.render_comparison_test(12, scene, Overlays::NONE).await;
 }
 
 /// Generate colors which should be every sRGB component value.
@@ -202,12 +200,9 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
                     0,
                 );
                 m.set(p, Block::from(Rgb01::from_srgb8([i, i, i]))).unwrap();
-                m.set(p + dr, Block::from(Rgb01::from_srgb8([i, 0, 0])))
-                    .unwrap();
-                m.set(p + dg, Block::from(Rgb01::from_srgb8([0, i, 0])))
-                    .unwrap();
-                m.set(p + db, Block::from(Rgb01::from_srgb8([0, 0, i])))
-                    .unwrap();
+                m.set(p + dr, Block::from(Rgb01::from_srgb8([i, 0, 0]))).unwrap();
+                m.set(p + dg, Block::from(Rgb01::from_srgb8([0, i, 0]))).unwrap();
+                m.set(p + db, Block::from(Rgb01::from_srgb8([0, 0, i]))).unwrap();
             }
             Ok(())
         })
@@ -225,9 +220,7 @@ async fn color_srgb_ramp(mut context: RenderTestContext) {
         context.universe(),
     );
 
-    context
-        .render_comparison_test(0, cameras, Overlays::NONE)
-        .await;
+    context.render_comparison_test(0, cameras, Overlays::NONE).await;
 }
 
 /// Test rendering of the cursor.
@@ -259,9 +252,7 @@ async fn cursor_basic(mut context: RenderTestContext) {
 
     // 1 unit difference threshold: we might have a color rounding error,
     // but everything else should be exact.
-    context
-        .render_comparison_test(COLOR_ROUNDING_MAX_DIFF, cameras, overlays)
-        .await;
+    context.render_comparison_test(COLOR_ROUNDING_MAX_DIFF, cameras, overlays).await;
 }
 
 async fn debug_pixel_cost(mut context: RenderTestContext) {
@@ -325,9 +316,7 @@ async fn emission(mut context: RenderTestContext) {
     // In CI, macOS on GitHub Actions, this test sometimes produces a 1-level difference.
     // I don't know why, but it's presumably some kind of nondeterministic rounding, not
     // really worth worrying about...? None of the non-emissive tests have this problem.
-    context
-        .render_comparison_test(1, cameras, Overlays::NONE)
-        .await;
+    context.render_comparison_test(1, cameras, Overlays::NONE).await;
 }
 
 /// Test rendering of emitted light from atoms that are otherwise invisible.
@@ -415,9 +404,7 @@ async fn error_character_gone(mut context: RenderTestContext) {
     let mut renderer = context.renderer(context.universe());
 
     // Run a first render because this test is about what happens afterward
-    renderer
-        .update(Layers::splat(context.universe().read_ticket()), None)
-        .unwrap();
+    renderer.update(Layers::splat(context.universe().read_ticket()), None).unwrap();
     let _ = renderer.draw("").await.unwrap();
 
     UniverseTransaction::delete(character_handle)
@@ -491,9 +478,7 @@ async fn fog(mut context: RenderTestContext, fog: FogOption) {
 /// Does the renderer properly follow a change of character?
 async fn follow_character_change(mut context: RenderTestContext) {
     let mut character_of_a_color = |color: Rgb| -> StrongHandle<Character> {
-        let space = Space::builder(GridAab::ORIGIN_CUBE)
-            .sky_color(color)
-            .build();
+        let space = Space::builder(GridAab::ORIGIN_CUBE).sky_color(color).build();
         let space = context.universe_mut().insert_anonymous(space);
         let character = Character::spawn_default(context.universe().read_ticket(), space);
         StrongHandle::from(context.universe_mut().insert_anonymous(character))
@@ -510,9 +495,7 @@ async fn follow_character_change(mut context: RenderTestContext) {
     let mut renderer = context.renderer(cameras);
 
     // Draw the first character
-    renderer
-        .update(Layers::splat(context.universe().read_ticket()), None)
-        .unwrap();
+    renderer.update(Layers::splat(context.universe().read_ticket()), None).unwrap();
     let image1 = renderer.draw("").await.unwrap();
 
     // Don't assert if they would fail because the renderer is stubbed
@@ -529,9 +512,7 @@ async fn follow_character_change(mut context: RenderTestContext) {
 
     // Switch characters and draw the second -- the resulting sky color should be from it
     character_cell.set(Some(c2));
-    renderer
-        .update(Layers::splat(context.universe().read_ticket()), None)
-        .unwrap();
+    renderer.update(Layers::splat(context.universe().read_ticket()), None).unwrap();
     let image2 = renderer.draw("").await.unwrap();
 
     assert_eq!(
@@ -568,12 +549,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
     let cameras: StandardCameras = StandardCameras::new(
         options_cell.as_source(),
         listen::constant(COMMON_VIEWPORT),
-        listen::constant(
-            context
-                .universe()
-                .get_default_character()
-                .map(StrongHandle::from),
-        ),
+        listen::constant(context.universe().get_default_character().map(StrongHandle::from)),
         listen::constant(Arc::new(UiViewState::default())),
     );
 
@@ -630,9 +606,7 @@ async fn furnace(mut context: RenderTestContext) {
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
 
-    context
-        .render_comparison_test(1, scene, Overlays::NONE)
-        .await;
+    context.render_comparison_test(1, scene, Overlays::NONE).await;
 }
 
 async fn info_text(mut context: RenderTestContext) {
@@ -771,11 +745,8 @@ async fn icons(mut context: RenderTestContext) {
         )
     });
 
-    let all_blocks: Vec<Block> = icons
-        .chain(widget_blocks)
-        .chain(action_widgets)
-        .chain(toggle_widgets)
-        .collect();
+    let all_blocks: Vec<Block> =
+        icons.chain(widget_blocks).chain(action_widgets).chain(toggle_widgets).collect();
 
     // Compute layout
     let count = all_blocks.len() as GridCoordinate;
@@ -850,12 +821,7 @@ async fn layers_all_show_ui(mut context: RenderTestContext, show_ui: bool) {
     let cameras: StandardCameras = StandardCameras::new(
         listen::constant(Arc::new(options.clone())),
         listen::constant(COMMON_VIEWPORT),
-        listen::constant(
-            context
-                .universe()
-                .get_default_character()
-                .map(StrongHandle::from),
-        ),
+        listen::constant(context.universe().get_default_character().map(StrongHandle::from)),
         listen::constant(Arc::new(UiViewState {
             space: Some(ui_space),
             view_transform: ViewTransform::identity(),
@@ -926,9 +892,7 @@ async fn light(mut context: RenderTestContext, option: LightingOption) {
     options.lighting_display = option;
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
-    context
-        .render_comparison_test(7, scene, Overlays::NONE)
-        .await;
+    context.render_comparison_test(7, scene, Overlays::NONE).await;
 }
 
 /// Test calling renderer's `draw()` without `update()`.
@@ -997,9 +961,7 @@ async fn sky(mut context: RenderTestContext, face: Face6) {
     let scene =
         StandardCameras::from_constant_for_test(options, COMMON_VIEWPORT, context.universe());
 
-    context
-        .render_comparison_test(4, scene, Overlays::NONE)
-        .await;
+    context.render_comparison_test(4, scene, Overlays::NONE).await;
 }
 
 async fn template(mut context: RenderTestContext, template_name: &'static str) {
@@ -1114,12 +1076,7 @@ async fn viewport_zero(mut context: RenderTestContext) {
     let cameras: StandardCameras = StandardCameras::new(
         listen::constant(Arc::new(GraphicsOptions::default())),
         viewport_cell.as_source(),
-        listen::constant(
-            context
-                .universe()
-                .get_default_character()
-                .map(StrongHandle::from),
-        ),
+        listen::constant(context.universe().get_default_character().map(StrongHandle::from)),
         listen::constant(Arc::new(UiViewState::default())),
     );
     let overlays = Overlays {
@@ -1131,13 +1088,8 @@ async fn viewport_zero(mut context: RenderTestContext) {
 
     // Initially zero viewport
     {
-        renderer
-            .update(Layers::splat(context.universe().read_ticket()), None)
-            .unwrap();
-        let zero_image = renderer
-            .draw(overlays.info_text.as_ref().unwrap())
-            .await
-            .unwrap();
+        renderer.update(Layers::splat(context.universe().read_ticket()), None).unwrap();
+        let zero_image = renderer.draw(overlays.info_text.as_ref().unwrap()).await.unwrap();
         assert_eq!(zero_image.size, size2(0, 0));
     }
     // Now confirm the renderer can produce an okay image afterward
@@ -1149,13 +1101,8 @@ async fn viewport_zero(mut context: RenderTestContext) {
     // Now try *resizing to* zero and back
     {
         viewport_cell.set(zero);
-        renderer
-            .update(Layers::splat(context.universe().read_ticket()), None)
-            .unwrap();
-        let zero_image = renderer
-            .draw(overlays.info_text.as_ref().unwrap())
-            .await
-            .unwrap();
+        renderer.update(Layers::splat(context.universe().read_ticket()), None).unwrap();
+        let zero_image = renderer.draw(overlays.info_text.as_ref().unwrap()).await.unwrap();
         assert_eq!(zero_image.size, size2(0, 0));
     }
     viewport_cell.set(COMMON_VIEWPORT);
@@ -1469,8 +1416,7 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
             .unwrap();
 
             // Front air space
-            m.fill_uniform(bounds.abut(Face6::PZ, -1).unwrap(), &AIR)
-                .unwrap();
+            m.fill_uniform(bounds.abut(Face6::PZ, -1).unwrap(), &AIR).unwrap();
 
             for (i, luminance) in (0i32..).zip(luminance_ramp) {
                 let x = i * x_spacing;

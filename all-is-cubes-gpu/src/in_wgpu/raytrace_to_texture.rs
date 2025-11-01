@@ -202,9 +202,7 @@ impl RaytraceToTexture {
         let got_lock_time = Instant::now();
         log::trace!(
             "waiting for raytracer lock lock for {}",
-            got_lock_time
-                .saturating_duration_since(start_time)
-                .refmt(&ConciseDebug)
+            got_lock_time.saturating_duration_since(start_time).refmt(&ConciseDebug)
         );
 
         let adjusted_viewport = raytracer_size_policy(camera.viewport());
@@ -781,10 +779,7 @@ struct ReprojectionUniforms {
 
 fn raytracer_size_policy(mut viewport: Viewport) -> Viewport {
     // use 2x2 nominal pixels
-    viewport.framebuffer_size = viewport
-        .nominal_size
-        .map(|c| (c / 2.0).round() as u32)
-        .cast_unit();
+    viewport.framebuffer_size = viewport.nominal_size.map(|c| (c / 2.0).round() as u32).cast_unit();
     viewport
 }
 

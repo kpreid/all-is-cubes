@@ -33,9 +33,7 @@ pub(crate) fn mv_to_aic_coordinate_transform(mv_size: dot_vox::Size) -> Gridgid 
 /// Also translates coordinates so that the lower bounds are zero, since the dot-vox format
 /// does not support arbitrary lower bounds.
 pub(crate) fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Gridgid {
-    let rotated_size = MV_TO_AIC_ROTATION
-        .inverse()
-        .transform_size(aic_bounds.size());
+    let rotated_size = MV_TO_AIC_ROTATION.inverse().transform_size(aic_bounds.size());
     let mv_size = dot_vox::Size {
         x: rotated_size.width,
         y: rotated_size.height,

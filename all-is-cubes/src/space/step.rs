@@ -80,12 +80,10 @@ pub(crate) fn update_palette_phase_2(
     mut spaces: ecs::Query<'_, '_, (&mut Space, &mut SpacePaletteNextValue)>,
 ) {
     // TODO(ecs): run this only on entities that need it, somehow
-    spaces
-        .par_iter_mut()
-        .for_each(|(mut space, mut next_palette)| {
-            let space: &mut Space = &mut space; // deref for borrow splitting
-            space
-                .palette
-                .apply_update(&mut next_palette, &mut space.change_notifier.buffer());
-        });
+    spaces.par_iter_mut().for_each(|(mut space, mut next_palette)| {
+        let space: &mut Space = &mut space; // deref for borrow splitting
+        space
+            .palette
+            .apply_update(&mut next_palette, &mut space.change_notifier.buffer());
+    });
 }

@@ -1338,9 +1338,8 @@ mod tests {
 
     #[test]
     fn face_map_debug_cmp() {
-        let strings = FaceMap::<bool>::exhaust()
-            .map(|fm| format!("{fm:?}"))
-            .collect::<Vec<String>>();
+        let strings =
+            FaceMap::<bool>::exhaust().map(|fm| format!("{fm:?}")).collect::<Vec<String>>();
         assert_eq!(
             strings.iter().map(String::as_str).collect::<Vec<_>>(),
             vec![

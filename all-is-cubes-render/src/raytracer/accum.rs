@@ -50,11 +50,7 @@ impl Accumulate for DepthBuf {
         // TODO: Choosing the approximate mode might make more sense than choosing the minimum.
         // Also,
         Self {
-            depth: items
-                .into_iter()
-                .map(|db| db.depth)
-                .reduce(f64::min)
-                .unwrap_or(f64::INFINITY),
+            depth: items.into_iter().map(|db| db.depth).reduce(f64::min).unwrap_or(f64::INFINITY),
         }
     }
 }

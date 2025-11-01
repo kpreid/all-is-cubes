@@ -314,9 +314,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
                 u.int_in_range(lower_bounds.y..=limit)?,
                 u.int_in_range(lower_bounds.z..=limit)?,
             );
-            let bounds = GridAab::from_lower_upper(lower_bounds, upper_bounds)
-                .to_vol()
-                .unwrap();
+            let bounds = GridAab::from_lower_upper(lower_bounds, upper_bounds).to_vol().unwrap();
             let contents = u
                 .arbitrary_iter()?
                 .take(bounds.volume())

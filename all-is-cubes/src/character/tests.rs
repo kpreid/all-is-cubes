@@ -215,11 +215,7 @@ fn no_superjumping() {
     let mut character = Character::spawn_default(universe.read_ticket(), space);
     character.body.set_position(point3(
         0.,
-        character
-            .body
-            .collision_box_rel()
-            .face_coordinate(Face6::NY)
-            + 1.001,
+        character.body.collision_box_rel().face_coordinate(Face6::NY) + 1.001,
         0.,
     ));
     let character = universe.insert("character".into(), character).unwrap();

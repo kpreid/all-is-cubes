@@ -640,9 +640,7 @@ mod tests {
         ] {
             assert_eq!(
                 transparency.will_output_alpha(),
-                transparency
-                    .limit_alpha(rgba_const!(1.0, 1.0, 1.0, 0.25))
-                    .opacity_category()
+                transparency.limit_alpha(rgba_const!(1.0, 1.0, 1.0, 0.25)).opacity_category()
                     == OpacityCategory::Partial
             );
         }

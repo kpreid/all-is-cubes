@@ -448,9 +448,7 @@ fn resolution() {
 fn resolution_de_err() {
     use serde_json::{from_value, json};
     assert_eq!(
-        from_value::<Resolution>(json!(-16))
-            .unwrap_err()
-            .to_string(),
+        from_value::<Resolution>(json!(-16)).unwrap_err().to_string(),
         "invalid value: integer `-16`, expected u16"
     );
     assert_eq!(
@@ -458,9 +456,7 @@ fn resolution_de_err() {
         "0 is not a permitted resolution; must be a power of 2 between 1 and 127"
     );
     assert_eq!(
-        from_value::<Resolution>(json!(1.5))
-            .unwrap_err()
-            .to_string(),
+        from_value::<Resolution>(json!(1.5)).unwrap_err().to_string(),
         "invalid type: floating point `1.5`, expected u16"
     );
 }
@@ -792,19 +788,13 @@ fn space_with_sparse_indices() {
         .unwrap();
     // Now overwrite with AIR, resulting in a discontinuity in the indices because
     // there are no block1s left.
-    space
-        .mutate(ReadTicket::stub(), |m| m.set([1, 0, 0], AIR))
-        .unwrap();
+    space.mutate(ReadTicket::stub(), |m| m.set([1, 0, 0], AIR)).unwrap();
 
     // Check that we produced the expected sparse indices.
     // If this assertion fails, then `Space` behavior has changed, which may not be wrong
     // but will invalidate this particular test.
     assert_eq!(
-        space
-            .block_data()
-            .iter()
-            .map(|d| d.block())
-            .collect::<Vec<&Block>>(),
+        space.block_data().iter().map(|d| d.block()).collect::<Vec<&Block>>(),
         vec![&AIR, &block0, &AIR, &block2],
     );
 
@@ -1056,19 +1046,12 @@ fn universe_success() {
     );
 
     // Test that the members and handles are in fact hooked up.
-    let a_block_def = deserialized_universe
-        .get::<BlockDef>(&"a_block".into())
-        .unwrap();
-    let a_space = deserialized_universe
-        .get::<Space>(&"a_space".into())
-        .unwrap();
-    let a_character = deserialized_universe
-        .get::<Character>(&"a_character".into())
-        .unwrap();
+    let a_block_def = deserialized_universe.get::<BlockDef>(&"a_block".into()).unwrap();
+    let a_space = deserialized_universe.get::<Space>(&"a_space".into()).unwrap();
+    let a_character = deserialized_universe.get::<Character>(&"a_character".into()).unwrap();
 
-    let a_block_def_ev = Block::from(a_block_def)
-        .evaluate(deserialized_universe.read_ticket())
-        .unwrap();
+    let a_block_def_ev =
+        Block::from(a_block_def).evaluate(deserialized_universe.read_ticket()).unwrap();
     assert_eq!(a_block_def_ev.attributes().display_name, "0");
 
     assert_eq!(
@@ -1080,13 +1063,8 @@ fn universe_success() {
     );
 
     assert_eq!(
-        a_character
-            .read(deserialized_universe.read_ticket())
-            .unwrap()
-            .space,
-        deserialized_universe
-            .get::<Space>(&"a_space".into())
-            .unwrap()
+        a_character.read(deserialized_universe.read_ticket()).unwrap().space,
+        deserialized_universe.get::<Space>(&"a_space".into()).unwrap()
     );
 }
 

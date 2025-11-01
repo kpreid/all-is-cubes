@@ -213,11 +213,8 @@ impl Raycaster {
     #[mutants::skip] // mutation testing will hang; thoroughly tested otherwise
     #[inline]
     pub fn within(mut self, bounds: GridAab, include_exit: bool) -> Self {
-        self.state.bounds = self
-            .state
-            .bounds
-            .intersection_cubes(bounds)
-            .unwrap_or(GridAab::ORIGIN_EMPTY);
+        self.state.bounds =
+            self.state.bounds.intersection_cubes(bounds).unwrap_or(GridAab::ORIGIN_EMPTY);
         self.first_last = FirstLast::Beginning; // TODO: do we need more nuance here?
         self.include_exit = include_exit;
         self.state.fast_forward();
@@ -594,9 +591,7 @@ impl State {
         self.last_t_distance = self.t_max[axis];
 
         // Move into the new cube, checking for overflow.
-        self.cube[axis] = self.cube[axis]
-            .checked_add(self.param.step[axis])
-            .ok_or(())?;
+        self.cube[axis] = self.cube[axis].checked_add(self.param.step[axis]).ok_or(())?;
 
         // Update t_max to reflect that we have crossed the previous t_max boundary.
         self.t_max[axis] += self.param.t_delta[axis];

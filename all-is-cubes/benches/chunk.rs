@@ -60,10 +60,7 @@ fn cull_bench(c: &mut Criterion) {
     c.bench_function("bounds", |b| {
         b.iter(|| {
             let mut matched = 0;
-            for p in chart
-                .chunks(ChunkPos(Cube::new(0, 0, 0)), OctantMask::ALL)
-                .rev()
-            {
+            for p in chart.chunks(ChunkPos(Cube::new(0, 0, 0)), OctantMask::ALL).rev() {
                 if chunked_bounds.contains_cube(p.0) {
                     matched += 1;
                 }
@@ -102,10 +99,7 @@ fn cull_bench(c: &mut Criterion) {
     c.bench_function("mask-frustum-bounds", |b| {
         b.iter(|| {
             let mut matched = 0;
-            for p in chart
-                .chunks(ChunkPos(Cube::ORIGIN), camera.view_direction_mask())
-                .rev()
-            {
+            for p in chart.chunks(ChunkPos(Cube::ORIGIN), camera.view_direction_mask()).rev() {
                 if camera.aab_in_view(p.bounds().into()) && chunked_bounds.contains_cube(p.0) {
                     matched += 1;
                 }
@@ -118,10 +112,7 @@ fn cull_bench(c: &mut Criterion) {
     c.bench_function("mask-bounds-frustum", |b| {
         b.iter(|| {
             let mut matched = 0;
-            for p in chart
-                .chunks(ChunkPos(Cube::ORIGIN), camera.view_direction_mask())
-                .rev()
-            {
+            for p in chart.chunks(ChunkPos(Cube::ORIGIN), camera.view_direction_mask()).rev() {
                 if chunked_bounds.contains_cube(p.0) && camera.aab_in_view(p.bounds().into()) {
                     matched += 1;
                 }

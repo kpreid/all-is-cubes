@@ -46,21 +46,13 @@ pub fn terminal_print_once(
     dsession.window.wait_for_sync();
     sync_viewport(&mut dsession);
 
-    dsession
-        .renderer
-        .send_frame_to_render(&mut dsession.session);
-    let frame = dsession
-        .renderer
-        .render_pipe_out
-        .recv()
-        .expect("Internal error in rendering");
+    dsession.renderer.send_frame_to_render(&mut dsession.session);
+    let frame = dsession.renderer.render_pipe_out.recv().expect("Internal error in rendering");
     dsession.window.send(OutMsg::WriteFrameOnly(frame));
 
     let (dsession, _, window) = dsession.into_renderer_and_window();
 
-    window
-        .stop()
-        .context("failed to stop TerminalWindow after printing")?;
+    window.stop().context("failed to stop TerminalWindow after printing")?;
     Ok(dsession)
 }
 
@@ -272,11 +264,7 @@ fn run(
                 terminal_options: dsession.renderer.options.clone(),
                 inventory: InventoryDisplay::new(
                     dsession.session.universe().read_ticket(),
-                    dsession
-                        .session
-                        .character()
-                        .get()
-                        .map(StrongHandle::into_weak),
+                    dsession.session.character().get().map(StrongHandle::into_weak),
                 ),
             })),
             // TODO: Even if we don't have a frame, we might want to update the UI anyway.
@@ -290,9 +278,7 @@ fn run(
             c.update(dsession.session.read_tickets());
             dsession.session.update_cursor(&*c);
 
-            dsession
-                .renderer
-                .send_frame_to_render(&mut dsession.session);
+            dsession.renderer.send_frame_to_render(&mut dsession.session);
         } else if let Some(t) = dsession.session.frame_clock.next_step_or_draw_time() {
             std::thread::sleep(t - Instant::now());
         }
@@ -305,9 +291,7 @@ impl TerminalRenderer {
     fn send_frame_to_render(&mut self, session: &mut Session) {
         // Fetch and update one of our recirculating renderers.
         let mut renderer = self.buffer_reuse_out.recv().unwrap();
-        renderer
-            .update(session.read_tickets(), session.cursor_result())
-            .unwrap();
+        renderer.update(session.read_tickets(), session.cursor_result()).unwrap();
 
         match self.render_pipe_in.try_send(FrameInput {
             options: self.options.clone(),

@@ -159,10 +159,8 @@ impl Vertex for BPosition {
 
     #[inline]
     fn from_block_vertex(vertex: BlockVertex<Self::TexPoint>) -> (BPosition, BColor) {
-        let position_in_cube_fixed: Point3D<u32, CubeFix128> = vertex
-            .position
-            .map(|coord| (coord * 128.) as u32)
-            .cast_unit();
+        let position_in_cube_fixed: Point3D<u32, CubeFix128> =
+            vertex.position.map(|coord| (coord * 128.) as u32).cast_unit();
         let cube_packed = 0; // will be overwritten later by instantiate_vertex()
         let normal = vertex.face as u32;
 

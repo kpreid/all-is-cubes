@@ -92,9 +92,8 @@ async fn start_game_with_dom(
     let [app_progress, progress] = progress.split(0.1);
     let [universe_progress, post_universe_progress] = progress.split(0.98);
 
-    let query_string: String = document
-        .location()
-        .map_or_else(String::new, |q| q.search().unwrap_or_default());
+    let query_string: String =
+        document.location().map_or_else(String::new, |q| q.search().unwrap_or_default());
     let OptionsInUrl {
         template,
         seed,

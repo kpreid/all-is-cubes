@@ -361,9 +361,8 @@ mod tests {
     #[test]
     fn discard() {
         let d = GltfDataDestination::null();
-        let buffer_entity = d
-            .write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 3]))
-            .unwrap();
+        let buffer_entity =
+            d.write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 3])).unwrap();
         assert_eq!(buffer_entity.name, Some("foo".into()));
         assert_eq!(buffer_entity.uri, None);
         assert_eq!(buffer_entity.byte_length, USize64(3));
@@ -372,9 +371,8 @@ mod tests {
     #[test]
     fn inline_only_success() {
         let d = GltfDataDestination::new(None, usize::MAX);
-        let buffer_entity = d
-            .write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 255]))
-            .unwrap();
+        let buffer_entity =
+            d.write("foo".into(), "bar", "glbin", |w| w.write_all(&[1, 2, 255])).unwrap();
         assert_eq!(buffer_entity.name, Some("foo".into()));
         assert_eq!(
             buffer_entity.uri.as_deref(),

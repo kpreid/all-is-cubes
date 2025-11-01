@@ -88,9 +88,7 @@ impl Zoom {
             None => {
                 let (attributes, voxels) = input.into_parts();
                 let voxels = voxels.as_vol_ref();
-                let voxel_offset = offset_in_zoomed_blocks
-                    .map(GridCoordinate::from)
-                    .to_vector()
+                let voxel_offset = offset_in_zoomed_blocks.map(GridCoordinate::from).to_vector()
                     * GridCoordinate::from(zoom_resolution);
                 match GridAab::for_block(zoom_resolution)
                     .intersection_cubes(voxels.bounds().translate(-voxel_offset))
@@ -214,9 +212,7 @@ mod tests {
         // Try zoom at multiple offset steps.
         for x in 0i32..2 {
             dbg!(x);
-            let zoomed = original_block
-                .clone()
-                .with_modifier(Zoom::new(scale, point3(x, 0, 0)));
+            let zoomed = original_block.clone().with_modifier(Zoom::new(scale, point3(x, 0, 0)));
             let ev_zoomed = zoomed.evaluate(universe.read_ticket()).unwrap();
             assert_eq!(
                 ev_zoomed,

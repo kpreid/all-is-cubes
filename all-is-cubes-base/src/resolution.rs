@@ -235,9 +235,7 @@ impl serde::Serialize for Resolution {
 impl<'de> serde::Deserialize<'de> for Resolution {
     #[allow(clippy::missing_inline_in_public_items)]
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        u16::deserialize(deserializer)?
-            .try_into()
-            .map_err(serde::de::Error::custom)
+        u16::deserialize(deserializer)?.try_into().map_err(serde::de::Error::custom)
     }
 }
 

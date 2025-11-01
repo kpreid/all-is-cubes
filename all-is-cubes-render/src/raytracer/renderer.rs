@@ -67,9 +67,7 @@ where
         RtRenderer {
             rts: Layers::<Option<_>>::default(),
             ui_graphics_options: Arc::new(
-                cameras
-                    .ui_view_source()
-                    .map(|view| view.graphics_options.clone()),
+                cameras.ui_view_source().map(|view| view.graphics_options.clone()),
             ),
             cameras,
             size_policy,
@@ -142,13 +140,7 @@ where
             &mut self.rts.world,
             Option::as_ref(&self.cameras.world_space().get()),
             self.cameras.graphics_options_source(),
-            || {
-                Arc::new(
-                    self.custom_options
-                        .clone()
-                        .map(|layers| layers.world.clone()),
-                )
-            },
+            || Arc::new(self.custom_options.clone().map(|layers| layers.world.clone())),
             &mut anything_changed,
         )?;
         sync_space(
@@ -404,13 +396,7 @@ impl<P: Accumulate + Default> RtScene<'_, P> {
     #[inline]
     pub fn trace_patch(&self, patch: NdcRect) -> (P, RaytraceInfo) {
         let mut info = RaytraceInfo::default();
-        let pixel = if self
-            .cameras
-            .world
-            .options()
-            .antialiasing
-            .is_strongly_enabled()
-        {
+        let pixel = if self.cameras.world.options().antialiasing.is_strongly_enabled() {
             const N: usize = 4;
             const SAMPLE_POINTS: [euclid::default::Vector2D<f64>; N] = [
                 vec2(1. / 8., 5. / 8.),
@@ -514,19 +500,16 @@ mod trace_image {
             .map(move |(ych, raster_row)| {
                 let y0 = viewport.normalize_fb_y_edge(ych);
                 let y1 = viewport.normalize_fb_y_edge(ych + 1);
-                raster_row
-                    .into_par_iter()
-                    .enumerate()
-                    .map(move |(xch, pixel_out)| {
-                        let x0 = viewport.normalize_fb_x_edge(xch);
-                        let x1 = viewport.normalize_fb_x_edge(xch + 1);
-                        let (pixel, info) = scene.trace_patch(NdcRect {
-                            min: point2(x0, y0),
-                            max: point2(x1, y1),
-                        });
-                        *pixel_out = encoder(pixel);
-                        info
-                    })
+                raster_row.into_par_iter().enumerate().map(move |(xch, pixel_out)| {
+                    let x0 = viewport.normalize_fb_x_edge(xch);
+                    let x1 = viewport.normalize_fb_x_edge(xch + 1);
+                    let (pixel, info) = scene.trace_patch(NdcRect {
+                        min: point2(x0, y0),
+                        max: point2(x1, y1),
+                    });
+                    *pixel_out = encoder(pixel);
+                    info
+                })
             })
             .flatten()
             .sum() // sum of info
@@ -609,21 +592,11 @@ mod eg {
         };
         let shadow = info_text_drawable(info_text, BinaryColor::Off);
         // TODO: use .into_ok() when stable for infallible drawing
-        shadow
-            .draw(&mut target.translated(Point::new(0, -1)))
-            .unwrap();
-        shadow
-            .draw(&mut target.translated(Point::new(0, 1)))
-            .unwrap();
-        shadow
-            .draw(&mut target.translated(Point::new(-1, 0)))
-            .unwrap();
-        shadow
-            .draw(&mut target.translated(Point::new(1, 0)))
-            .unwrap();
-        info_text_drawable(info_text, BinaryColor::On)
-            .draw(target)
-            .unwrap();
+        shadow.draw(&mut target.translated(Point::new(0, -1))).unwrap();
+        shadow.draw(&mut target.translated(Point::new(0, 1))).unwrap();
+        shadow.draw(&mut target.translated(Point::new(-1, 0))).unwrap();
+        shadow.draw(&mut target.translated(Point::new(1, 0))).unwrap();
+        info_text_drawable(info_text, BinaryColor::On).draw(target).unwrap();
     }
 
     /// Just enough [`DrawTarget`] to implement info text drawing.

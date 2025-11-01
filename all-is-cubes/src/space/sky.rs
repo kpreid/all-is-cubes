@@ -109,9 +109,7 @@ impl BlockSky {
         let lower = bounds
             .lower_bounds()
             .zip(cube.lower_bounds(), |bl, cl| bl.checked_sub(cl) == Some(1));
-        let upper = bounds
-            .upper_bounds()
-            .zip(cube.lower_bounds(), |bu, cl| bu == cl);
+        let upper = bounds.upper_bounds().zip(cube.lower_bounds(), |bu, cl| bu == cl);
         match (lower.x, lower.y, lower.z, upper.x, upper.y, upper.z) {
             (true, false, false, false, false, false) => self.faces.nx,
             (false, true, false, false, false, false) => self.faces.ny,

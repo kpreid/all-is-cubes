@@ -171,11 +171,9 @@ impl RerunImageExport {
             }));
 
         {
-            let mut encoder = self
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("RerunImageExport operations"),
-                });
+            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("RerunImageExport operations"),
+            });
 
             // GPU performs linear to sRGB conversion and depth rescaling
             {

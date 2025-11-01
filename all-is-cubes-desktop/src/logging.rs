@@ -133,11 +133,7 @@ impl log::Log for AicLogger {
         let rerun_enabled = false;
 
         all_is_cubes::util::log::standard_filter(metadata)
-            && (rerun_enabled
-                || self
-                    .stderr_logger
-                    .as_ref()
-                    .is_some_and(|l| l.enabled(metadata)))
+            && (rerun_enabled || self.stderr_logger.as_ref().is_some_and(|l| l.enabled(metadata)))
     }
 
     fn log(&self, record: &log::Record<'_>) {

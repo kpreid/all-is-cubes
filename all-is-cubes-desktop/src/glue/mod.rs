@@ -68,9 +68,7 @@ impl Executor {
     ///
     /// No means exists to shut down the executor.,
     pub fn new() -> Arc<Self> {
-        let parallelism = std::thread::available_parallelism()
-            .unwrap_or(NonZeroUsize::MIN)
-            .get();
+        let parallelism = std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN).get();
 
         let new_self = Arc::new(Self {
             inner: async_executor::Executor::new(),

@@ -23,9 +23,7 @@ fn TRANSPARENCY_WHOLE_BLOCK(ctx: Context<'_>) {
         .build_and_mutate(|m| {
             for (rot, color) in Face6::PY.clockwise().iterate().zip(&colors) {
                 m.fill(
-                    windowpane
-                        .transform(rot.to_positive_octant_transform(1))
-                        .unwrap(),
+                    windowpane.transform(rot.to_positive_octant_transform(1)).unwrap(),
                     |Cube { y, .. }| Some(Block::from(color.with_alpha(alphas[y as usize]))),
                 )?;
             }
@@ -72,9 +70,7 @@ fn TRANSPARENCY_SHRUNKEN_BLOCK(ctx: Context<'_>) {
             for rot in Face6::PY.clockwise().iterate() {
                 let region = GridAab::from_lower_upper([-1, 0, 3], [2, 4, 4]);
                 m.fill(
-                    region
-                        .transform(rot.to_positive_octant_transform(1))
-                        .unwrap(),
+                    region.transform(rot.to_positive_octant_transform(1)).unwrap(),
                     |Cube { x, y, z, .. }| {
                         Some(
                             [&slab_1, &slab_2]

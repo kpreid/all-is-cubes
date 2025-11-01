@@ -128,9 +128,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     /// for the given view point in [`Space`] coordinates.
     pub fn depth_ordering_for_view(&self, view_position: FreePoint) -> DepthOrdering {
         DepthOrdering::from_view_of_aabb(
-            self.mesh_origin()
-                .inverse()
-                .transform_point3d(&view_position),
+            self.mesh_origin().inverse().transform_point3d(&view_position),
             self.mesh().bounding_box().transparent,
         )
     }
@@ -173,9 +171,8 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
                 // We know the mesh is fine, so sweep for instances only.
                 let mut missing_instance_mesh = false;
                 for cube in bounds.interior_iter() {
-                    let relative_cube = absolute_to_relative
-                        .transform_point3d(&cube.lower_bounds())
-                        .cast();
+                    let relative_cube =
+                        absolute_to_relative.transform_point3d(&cube.lower_bounds()).cast();
                     if old_mesh_cubes.contains(&relative_cube) {
                         // If the cube is in the mesh, then `chunk_todo` won't have sent us
                         // merely `DirtyInstances` unless we don't need to care about updating it.
@@ -200,8 +197,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
 
                 if missing_instance_mesh {
                     tracking_block_meshes.instances.clear();
-                    self.mesh
-                        .compute(space, bounds, options, tracking_block_meshes);
+                    self.mesh.compute(space, bounds, options, tracking_block_meshes);
                 } else {
                     // We successfully updated instances, so the mesh is unchanged, so put back
                     // the info about the mesh.
@@ -210,8 +206,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
                 missing_instance_mesh
             }
             ChunkTodoState::DirtyMeshAndInstances => {
-                self.mesh
-                    .compute(space, bounds, options, tracking_block_meshes);
+                self.mesh.compute(space, bounds, options, tracking_block_meshes);
                 true
             }
         };
@@ -294,13 +289,9 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
         // The mesh coordinates are in chunk-relative coordinates,
         // but the incoming view position is in world coordinates,
         // so we bring the view position into chunk-relative coordinates.
-        let relative_view_position: Position = self
-            .mesh_origin()
-            .inverse()
-            .transform_point3d(&absolute_view_position)
-            .to_f32();
-        self.mesh
-            .depth_sort_for_view(ordering, relative_view_position)
+        let relative_view_position: Position =
+            self.mesh_origin().inverse().transform_point3d(&absolute_view_position).to_f32();
+        self.mesh.depth_sort_for_view(ordering, relative_view_position)
     }
 
     pub(crate) fn stale_blocks(&self, block_meshes: &dynamic::VersionedBlockMeshes<M>) -> bool {
@@ -424,9 +415,7 @@ impl<'a, M: DynamicMeshTypes> GetBlockMesh<'a, M> for InstanceTrackingBlockMeshS
         } else {
             if primary && !vbm.mesh.is_empty() {
                 self.mesh_cubes.insert(
-                    self.absolute_to_relative
-                        .transform_point3d(&cube.lower_bounds())
-                        .cast(),
+                    self.absolute_to_relative.transform_point3d(&cube.lower_bounds()).cast(),
                 );
             }
             Some(&vbm.mesh)

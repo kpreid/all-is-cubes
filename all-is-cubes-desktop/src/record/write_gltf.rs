@@ -52,10 +52,7 @@ impl MeshRecorder {
         MeshRecorder {
             // TODO: We need to tell the ChunkedSpaceMesh to have an infinite view distance
             // (or at least as much data as we care about).
-            csm: cameras
-                .world_space()
-                .get()
-                .map(|s| ChunkedSpaceMesh::new(s, tex, false)),
+            csm: cameras.world_space().get().map(|s| ChunkedSpaceMesh::new(s, tex, false)),
             scene_sender,
             cameras,
         }
@@ -105,15 +102,14 @@ impl MeshRecorder {
         if let Some(ref csm) = self.csm {
             for c in csm.iter_chunks() {
                 instances.extend(
-                    c.block_instances()
-                        .flat_map(move |(block_index, positions)| {
-                            positions.filter_map(move |position| {
-                                Some((
-                                    csm.block_instance_mesh(block_index)?.render_data.clone(),
-                                    position.lower_bounds().to_vector(),
-                                ))
-                            })
-                        }),
+                    c.block_instances().flat_map(move |(block_index, positions)| {
+                        positions.filter_map(move |position| {
+                            Some((
+                                csm.block_instance_mesh(block_index)?.render_data.clone(),
+                                position.lower_bounds().to_vector(),
+                            ))
+                        })
+                    }),
                 );
                 instances.push((
                     c.render_data.clone(),
@@ -204,11 +200,7 @@ pub(super) fn start_gltf_writing(
             }
 
             // Write and close file
-            writer
-                .into_root(frame_pace)
-                .unwrap()
-                .to_writer_pretty(&file)
-                .unwrap();
+            writer.into_root(frame_pace).unwrap().to_writer_pretty(&file).unwrap();
             file.sync_all().unwrap();
             drop(file);
             // TODO: communicate "successfully completed" or errors on the status channel

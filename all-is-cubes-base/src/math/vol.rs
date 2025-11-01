@@ -212,9 +212,7 @@ where
         F: FnMut(Cube) -> V,
     {
         let bounds = bounds.to_vol::<ZMaj>().unwrap();
-        bounds
-            .with_elements(bounds.iter_cubes().map(f).collect())
-            .unwrap()
+        bounds.with_elements(bounds.iter_cubes().map(f).collect()).unwrap()
     }
 
     /// Constructs a `Vol<C>` by cloning the provided value for each point.
@@ -459,12 +457,8 @@ impl<'a, V> Vol<&'a [V], ZMaj> {
                 let (lower_contents, upper_contents) = self.contents.split_at(lower_half_len);
 
                 Ok([
-                    lower_half
-                        .with_elements(lower_contents)
-                        .unwrap_or_else(unreachable_wrong_size),
-                    upper_half
-                        .with_elements(upper_contents)
-                        .unwrap_or_else(unreachable_wrong_size),
+                    lower_half.with_elements(lower_contents).unwrap_or_else(unreachable_wrong_size),
+                    upper_half.with_elements(upper_contents).unwrap_or_else(unreachable_wrong_size),
                 ])
             }
             _ => Err(self),
@@ -496,12 +490,8 @@ impl<V> Vol<&mut [V], ZMaj> {
                 let (lower_contents, upper_contents) = self.contents.split_at_mut(lower_half_len);
 
                 Ok([
-                    lower_half
-                        .with_elements(lower_contents)
-                        .unwrap_or_else(unreachable_wrong_size),
-                    upper_half
-                        .with_elements(upper_contents)
-                        .unwrap_or_else(unreachable_wrong_size),
+                    lower_half.with_elements(lower_contents).unwrap_or_else(unreachable_wrong_size),
+                    upper_half.with_elements(upper_contents).unwrap_or_else(unreachable_wrong_size),
                 ])
             }
             _ => Err(self),
@@ -576,9 +566,7 @@ impl<V, O> Vol<Box<[V]>, O> {
             bounds: self.bounds,
             ordering: self.ordering,
             // When we switch to Rust 2024 edition, replace this qualified call with a method call.
-            contents: <Box<[V]> as IntoIterator>::into_iter(self.contents)
-                .map(f)
-                .collect(),
+            contents: <Box<[V]> as IntoIterator>::into_iter(self.contents).map(f).collect(),
         }
     }
 }
@@ -768,13 +756,9 @@ pub(crate) mod vol_arb {
     {
         fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
             let bounds = Vol::<()>::arbitrary_with_max_volume(u, MAX_VOLUME)?;
-            let contents: C = u
-                .arbitrary_iter()?
-                .take(bounds.volume())
-                .collect::<Result<C, _>>()?;
-            bounds
-                .with_elements(contents)
-                .map_err(|_| arbitrary::Error::NotEnoughData)
+            let contents: C =
+                u.arbitrary_iter()?.take(bounds.volume()).collect::<Result<C, _>>()?;
+            bounds.with_elements(contents).map_err(|_| arbitrary::Error::NotEnoughData)
         }
 
         fn size_hint(depth: usize) -> (usize, Option<usize>) {
@@ -884,12 +868,9 @@ fn index_into_aab_zmaj(bounds: GridAab, cube: Cube) -> Option<usize> {
     // Always use wrapping (rather than maybe-checked) arithmetic, because we
     // checked the criteria for it to not overflow.
     Some(
-        (ixvec
-            .x
-            .wrapping_mul(sizes.height as usize)
-            .wrapping_add(ixvec.y))
-        .wrapping_mul(sizes.depth as usize)
-        .wrapping_add(ixvec.z),
+        (ixvec.x.wrapping_mul(sizes.height as usize).wrapping_add(ixvec.y))
+            .wrapping_mul(sizes.depth as usize)
+            .wrapping_add(ixvec.z),
     )
 }
 
@@ -951,9 +932,7 @@ mod tests {
 
     #[test]
     fn debug_no_elements() {
-        let vol = GridAab::from_lower_size([10, 0, 0], [4, 1, 1])
-            .to_vol::<ZMaj>()
-            .unwrap();
+        let vol = GridAab::from_lower_size([10, 0, 0], [4, 1, 1]).to_vol::<ZMaj>().unwrap();
         assert_eq!(
             format!("{vol:#?}"),
             indoc::indoc! {"
@@ -1215,9 +1194,7 @@ mod tests {
                 // TODO: sketchy coverage; would be better to generate some random/hashed data
                 let data = [byte; 25];
                 let mut u = Unstructured::new(&data);
-                Vol::<()>::arbitrary_with_max_volume(&mut u, max_volume)
-                    .unwrap()
-                    .volume()
+                Vol::<()>::arbitrary_with_max_volume(&mut u, max_volume).unwrap().volume()
             })
             .minmax()
             .into_option();

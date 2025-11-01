@@ -152,8 +152,7 @@ impl InputProcessor {
     /// Handles incoming key events in the case where key-up events are not available,
     /// such that an assumption about equivalent press duration must be made.
     pub fn key_momentary(&mut self, key: Key) -> bool {
-        self.momentary_timeout
-            .insert(key, Duration::from_millis(200));
+        self.momentary_timeout.insert(key, Duration::from_millis(200));
         self.key_up(key);
         self.key_down(key)
     }

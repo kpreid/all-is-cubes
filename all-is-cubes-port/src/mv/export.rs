@@ -16,17 +16,12 @@ pub(crate) async fn export_to_dot_vox_data(
     mut source: ExportSet,
 ) -> Result<dot_vox::DotVoxData, ExportError> {
     let spaces_to_export = source.contents.extract_type::<Space>();
-    let blocks_to_export = source
-        .contents
-        .extract_type::<all_is_cubes::block::BlockDef>();
+    let blocks_to_export = source.contents.extract_type::<all_is_cubes::block::BlockDef>();
     source.reject_unsupported(Format::DotVox)?;
 
     let mut palette: Vec<dot_vox::Color> = Vec::new();
-    let mut models: Vec<dot_vox::Model> = Vec::with_capacity(
-        spaces_to_export
-            .len()
-            .saturating_add(blocks_to_export.len()),
-    );
+    let mut models: Vec<dot_vox::Model> =
+        Vec::with_capacity(spaces_to_export.len().saturating_add(blocks_to_export.len()));
     #[expect(clippy::shadow_unrelated)]
     for (mut progress, space_handle) in progress
         .start_and_cut(0.5, "")
@@ -44,19 +39,17 @@ pub(crate) async fn export_to_dot_vox_data(
     }
 
     #[expect(clippy::shadow_unrelated)]
-    for (mut progress, block_def_handle) in progress
-        .split_evenly(blocks_to_export.len())
-        .zip(blocks_to_export)
+    for (mut progress, block_def_handle) in
+        progress.split_evenly(blocks_to_export.len()).zip(blocks_to_export)
     {
         progress.set_label(format!("Exporting block {}", block_def_handle.name()));
         models.push(mv::model::from_block(
-            &block_def_handle
-                .read(read_ticket)?
-                .evaluate(read_ticket)
-                .map_err(|error| ExportError::Eval {
+            &block_def_handle.read(read_ticket)?.evaluate(read_ticket).map_err(|error| {
+                ExportError::Eval {
                     name: block_def_handle.name(),
                     error,
-                })?,
+                }
+            })?,
             &mut palette,
         )?);
         progress.finish().await

@@ -150,9 +150,7 @@ fn make_example_blocks(universe: &mut Universe) -> Vec<Block> {
             YieldProgress::noop(),
         ))
         .unwrap();
-        install_txn
-            .execute(universe, (), &mut transaction::no_outputs)
-            .unwrap();
+        install_txn.execute(universe, (), &mut transaction::no_outputs).unwrap();
     }
     let demo_blocks = BlockProvider::<DemoBlocks>::using(universe).unwrap();
 
@@ -198,9 +196,7 @@ fn make_transparent_boxes(universe: &mut Universe) -> Block {
         .light_emission(Rgb::new(0.0, 1.0, 1.0))
         .build();
     let resolution = Resolution::R16;
-    let solid_box = GridAab::for_block(resolution)
-        .shrink(FaceMap::splat(2))
-        .unwrap();
+    let solid_box = GridAab::for_block(resolution).shrink(FaceMap::splat(2)).unwrap();
     let transparent_box = GridAab::for_block(resolution).abut(Face6::PX, -4).unwrap();
     let emissive_box = GridAab::for_block(resolution).abut(Face6::NX, -4).unwrap();
     Block::builder()
@@ -226,12 +222,9 @@ fn make_transparent_window(universe: &mut Universe) -> Block {
     let transparent_voxel = block::from_color!(0.7, 0.7, 0.2, 0.25);
 
     let resolution = Resolution::R16;
-    let solid_box = GridAab::for_block(resolution)
-        .shrink(FaceMap::symmetric([0, 0, 2]))
-        .unwrap();
-    let transparent_box = GridAab::for_block(resolution)
-        .shrink(FaceMap::symmetric([2, 4, 2]))
-        .unwrap();
+    let solid_box = GridAab::for_block(resolution).shrink(FaceMap::symmetric([0, 0, 2])).unwrap();
+    let transparent_box =
+        GridAab::for_block(resolution).shrink(FaceMap::symmetric([2, 4, 2])).unwrap();
     Block::builder()
         .display_name(arcstr::literal!("transparent-window"))
         .voxels_fn(resolution, |cube| {

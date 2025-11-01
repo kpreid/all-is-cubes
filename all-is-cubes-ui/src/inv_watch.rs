@@ -174,13 +174,12 @@ impl InventoryWatcher {
             self.notifier.notify(&WatcherChange::Inventory);
 
             self.snapshotted_icons.clear();
-            self.snapshotted_icons
-                .extend(self.inventory.slots().iter().map(|stack| {
-                    vui::quote_and_snapshot_block(
-                        [icons_read_ticket, inventory_read_ticket],
-                        &stack.icon(&self.icon_provider),
-                    )
-                }));
+            self.snapshotted_icons.extend(self.inventory.slots().iter().map(|stack| {
+                vui::quote_and_snapshot_block(
+                    [icons_read_ticket, inventory_read_ticket],
+                    &stack.icon(&self.icon_provider),
+                )
+            }));
         }
         if new_selections != self.selected_slots {
             self.selected_slots = new_selections;
@@ -290,8 +289,7 @@ mod tests {
             }
         }
         pub fn update(&mut self) {
-            self.watcher
-                .update(self.universe.read_ticket(), ReadTicket::stub());
+            self.watcher.update(self.universe.read_ticket(), ReadTicket::stub());
         }
     }
 

@@ -309,11 +309,7 @@ fn dynamic_benches(c: &mut Criterion) {
                 // Note: this number will change if the number of `DepthOrdering`s changes.
                 assert_eq!(
                     1327104,
-                    csm.chunk(ChunkPos::new(0, 0, 0))
-                        .unwrap()
-                        .mesh()
-                        .indices()
-                        .len(),
+                    csm.chunk(ChunkPos::new(0, 0, 0)).unwrap().mesh().indices().len(),
                     "mesh is not of the expected complexity"
                 );
 

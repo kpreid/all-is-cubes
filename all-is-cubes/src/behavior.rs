@@ -99,9 +99,7 @@ impl<'a, H: Host> Context<'a, H> {
 impl<H: Host + fmt::Debug> fmt::Debug for Context<'_, H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // binder functions are not debuggable
-        f.debug_struct("Context")
-            .field("host", &self.host)
-            .finish_non_exhaustive()
+        f.debug_struct("Context").field("host", &self.host).finish_non_exhaustive()
     }
 }
 
@@ -675,21 +673,19 @@ impl<H: Host> Transaction for BehaviorSetTransaction<H> {
             transaction::CommitError::message::<Self>("behavior set wake lock poisoned".into())
         })?;
 
-        target
-            .members
-            .extend(self.insert.iter().cloned().map(|mut entry| {
-                // Note: This is similar to `BehaviorSet::clone()`.
+        target.members.extend(self.insert.iter().cloned().map(|mut entry| {
+            // Note: This is similar to `BehaviorSet::clone()`.
 
-                let key = Key::new();
+            let key = Key::new();
 
-                // Mark behavior as to be stepped immediately
-                woken.insert(key);
+            // Mark behavior as to be stepped immediately
+            woken.insert(key);
 
-                // Hook up waker
-                entry.waker = Some(BehaviorWakerInner::create_waker(key, &target.woken));
+            // Hook up waker
+            entry.waker = Some(BehaviorWakerInner::create_waker(key, &target.woken));
 
-                (key, entry)
-            }));
+            (key, entry)
+        }));
         Ok(())
     }
 }
@@ -700,11 +696,7 @@ impl<H: Host> transaction::Merge for BehaviorSetTransaction<H> {
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
         // Don't allow any touching the same slot at all.
-        if let Some(&key) = self
-            .replace
-            .keys()
-            .find(|key| other.replace.contains_key(key))
-        {
+        if let Some(&key) = self.replace.keys().find(|key| other.replace.contains_key(key)) {
             return Err(BehaviorTransactionConflict { key });
         }
         Ok(MergeCheck { _private: () })
@@ -1091,9 +1083,7 @@ mod tests {
 
         // Type-specific query should find one
         assert_eq!(
-            set.query::<NoopBehavior<Expected>>()
-                .map(|qi| qi.behavior)
-                .collect::<Vec<_>>(),
+            set.query::<NoopBehavior<Expected>>().map(|qi| qi.behavior).collect::<Vec<_>>(),
             vec![&NoopBehavior(Expected)],
         );
 
@@ -1133,9 +1123,7 @@ mod tests {
         // Setup
         let (tx, rx) = mpsc::channel();
         let mut u = Universe::new();
-        let space = u
-            .insert("space".into(), Space::empty_positive(1, 1, 1))
-            .unwrap();
+        let space = u.insert("space".into(), Space::empty_positive(1, 1, 1)).unwrap();
         SpaceTransaction::add_behavior(GridAab::ORIGIN_CUBE, SleepBehavior { tx })
             .bind(space)
             .execute(&mut u, (), &mut no_outputs)

@@ -65,9 +65,7 @@ pub struct NonDiskFile<O> {
 impl<O> fmt::Debug for NonDiskFile<O> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { name, reader: _ } = self;
-        f.debug_struct("NonDiskFile")
-            .field("name", name)
-            .finish_non_exhaustive()
+        f.debug_struct("NonDiskFile").field("name", name).finish_non_exhaustive()
     }
 }
 

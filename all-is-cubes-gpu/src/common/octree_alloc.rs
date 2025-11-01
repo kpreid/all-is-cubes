@@ -84,9 +84,7 @@ impl<A> Alloctree<A> {
             // Too big, can never fit.
             return None;
         }
-        let handle = self
-            .root
-            .allocate::<A>(self.size_exponent, Point3D::origin(), request)?;
+        let handle = self.root.allocate::<A>(self.size_exponent, Point3D::origin(), request)?;
         self.used_volume += request.volume().unwrap();
         self.allocated_volume += handle.allocated_volume;
         Some(handle)
@@ -118,9 +116,8 @@ impl<A> Alloctree<A> {
         // to simultaneously contain the new allocation and all old allocations.
         // (If we used a different packing strategy where single allocations span
         // multiple child nodes, then this might be overkill, but currently it is not.)
-        let new_size_exponent = initial_size_exponent
-            .max(requested_size_exponent)
-            .checked_add(1)?;
+        let new_size_exponent =
+            initial_size_exponent.max(requested_size_exponent).checked_add(1)?;
 
         if new_size_exponent <= grow_to_at_most_size_exponent {
             // Grow the allocatable region and try again.
@@ -440,9 +437,7 @@ impl AlloctreeNode {
                 debug_assert!(size_exponent > 0, "tree is deeper than size");
                 let child_size = expsize(size_exponent - 1);
                 let octant = Octant::try_from_01(
-                    relative_low_corner
-                        .map(|c| c.div_euclid(child_size))
-                        .to_vector(),
+                    relative_low_corner.map(|c| c.div_euclid(child_size)).to_vector(),
                 )
                 .expect("Alloctree::free: out of bounds");
                 children[octant].free(
@@ -761,22 +756,13 @@ mod tests {
     fn regression_1() {
         let mut t = Alloctree::<()>::new(8);
         let mut handles = Vec::new();
-        handles.push(
-            t.allocate(GridAab::from_lower_size([0, 0, 0], [1, 129, 59]))
-                .unwrap(),
-        );
+        handles.push(t.allocate(GridAab::from_lower_size([0, 0, 0], [1, 129, 59])).unwrap());
         dbg!(&t);
-        handles.push(
-            t.allocate(GridAab::from_lower_size([0, 0, 0], [26, 32, 128]))
-                .unwrap(),
-        );
+        handles.push(t.allocate(GridAab::from_lower_size([0, 0, 0], [26, 32, 128])).unwrap());
         dbg!(&t);
         t.free(handles.remove(0));
         dbg!(&t);
-        handles.push(
-            t.allocate(GridAab::from_lower_size([0, 0, 0], [1, 7, 129]))
-                .unwrap(),
-        );
+        handles.push(t.allocate(GridAab::from_lower_size([0, 0, 0], [1, 7, 129])).unwrap());
         dbg!(&t);
         t.consistency_check(&handles);
     }

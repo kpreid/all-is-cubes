@@ -141,10 +141,8 @@ impl listen::Listener<Fluff> for FluffListener {
 // -------------------------------------------------------------------------------------------------
 
 fn convert_sound_to_buffer(sample_rate: u32, sound: &SoundDef) -> Result<AudioBuffer, JsValue> {
-    let (left_vec, right_vec): (Vec<f32>, Vec<f32>) = sound
-        .synthesize(sample_rate as f32)
-        .map(|[l, r]| (l, r))
-        .unzip();
+    let (left_vec, right_vec): (Vec<f32>, Vec<f32>) =
+        sound.synthesize(sample_rate as f32).map(|[l, r]| (l, r)).unzip();
 
     let options =
         web_sys::AudioBufferOptions::new(left_vec.len().try_into().unwrap(), sample_rate as f32);

@@ -13,9 +13,7 @@ async fn main() -> test_renderers::HarnessResult {
     let args = test_renderers::HarnessArgs::parse();
     test_renderers::initialize_logging(&args);
 
-    WGPU_INSTANCE
-        .set(init::create_instance_for_test_or_exit(true).await)
-        .unwrap();
+    WGPU_INSTANCE.set(init::create_instance_for_test_or_exit(true).await).unwrap();
 
     let parallelism = if option_env!("CI").is_some() && cfg!(target_os = "macos") {
         // Workaround for limited available memory on macOS CI.

@@ -478,10 +478,7 @@ fn instances_dont_dirty_mesh_when_block_changes() {
         .execute_1(
             &anim_def,
             BlockDefTransaction::overwrite(
-                Block::builder()
-                    .display_name("replaced")
-                    .color(will_be_anim.color())
-                    .build(),
+                Block::builder().display_name("replaced").color(will_be_anim.color()).build(),
             ),
         )
         .unwrap();

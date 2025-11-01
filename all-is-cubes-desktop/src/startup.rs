@@ -55,9 +55,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
     let entered_inner_time = Instant::now();
     log::debug!(
         "Initialized graphics ({:.3} s)",
-        entered_inner_time
-            .duration_since(before_loop_time)
-            .as_secs_f64()
+        entered_inner_time.duration_since(before_loop_time).as_secs_f64()
     );
 
     dsession.set_fixed_title(application_title);
@@ -177,10 +175,8 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
                 }
                 ReplaceUniverseCommand::Reload => {
                     let whence = ctx.with_universe(|u| u.whence.clone());
-                    let title = whence
-                        .document_name()
-                        .map(arcstr::ArcStr::from)
-                        .unwrap_or(literal!(""));
+                    let title =
+                        whence.document_name().map(arcstr::ArcStr::from).unwrap_or(literal!(""));
                     let executor = executor.clone();
                     ctx.set_universe_async(async move |progress| {
                         executor
@@ -231,11 +227,7 @@ pub fn headless_main_loop(
                     return Ok(());
                 }
 
-                let when = dsession
-                    .session
-                    .frame_clock
-                    .next_step_or_draw_time()
-                    .unwrap();
+                let when = dsession.session.frame_clock.next_step_or_draw_time().unwrap();
                 std::thread::sleep(when - now);
             }
             ClockSource::Fixed(_) => {

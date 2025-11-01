@@ -152,10 +152,7 @@ impl Viz {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
             state.timestamp += 1;
-            state
-                .destination
-                .stream
-                .set_time_sequence(state.timeline_name, state.timestamp);
+            state.destination.stream.set_time_sequence(state.timeline_name, state.timestamp);
         }
     }
 
@@ -309,9 +306,7 @@ impl Viz {
 
             // Append vertices for real mesh
             let index_base = state.mesh_vertex_positions.len() as u32;
-            state
-                .mesh_vertex_positions
-                .extend(vertex_positions.iter().copied());
+            state.mesh_vertex_positions.extend(vertex_positions.iter().copied());
             state.mesh_vertex_colors.extend(iter::repeat_n(
                 rg::components::Color(color_fn().into()),
                 vertex_positions.len(),
@@ -439,9 +434,7 @@ impl Inner {
         self.destination.log(
             path,
             &rg::archetypes::Points3D::new(
-                voxel_iter
-                    .clone()
-                    .map(|(cube, _)| rg::convert_point(cube.center())),
+                voxel_iter.clone().map(|(cube, _)| rg::convert_point(cube.center())),
             )
             .with_colors(voxel_iter.map(|(_, voxel)| rg::components::Color(voxel.color.into())))
             .with_radii([radius]),

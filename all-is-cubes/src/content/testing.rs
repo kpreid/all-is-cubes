@@ -39,9 +39,7 @@ pub async fn lighting_bench_space(
         .build_and_mutate(|m| {
             // Ground level
             m.fill_uniform(
-                m.bounds()
-                    .shrink(FaceMap::default().with(Face6::PY, layout.yup()))
-                    .unwrap(),
+                m.bounds().shrink(FaceMap::default().with(Face6::PY, layout.yup())).unwrap(),
                 &block::from_color!(0.5, 0.5, 0.5),
             )
         })

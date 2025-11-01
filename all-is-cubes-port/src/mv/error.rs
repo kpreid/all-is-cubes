@@ -32,9 +32,7 @@ pub(crate) fn warn_extra_attributes(
     expected_attributes: &[&'static str],
 ) {
     let unexpected = Vec::from_iter(
-        attributes
-            .keys()
-            .filter(|key| !expected_attributes.contains(&key.as_str())),
+        attributes.keys().filter(|key| !expected_attributes.contains(&key.as_str())),
     );
     if !unexpected.is_empty() {
         // TODO: have a better path for reporting this kind of info about the results of the import

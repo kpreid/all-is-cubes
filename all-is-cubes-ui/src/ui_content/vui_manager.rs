@@ -151,9 +151,7 @@ impl Vui {
             )
             .await,
         );
-        content_txn
-            .execute(&mut universe, (), &mut transaction::no_outputs)
-            .unwrap();
+        content_txn.execute(&mut universe, (), &mut transaction::no_outputs).unwrap();
 
         let (control_send, control_recv) = flume::bounded(100);
         let state = listen::Cell::new(Arc::new(VuiPageState::Hud));
@@ -346,10 +344,9 @@ impl Vui {
 
         if self.changed_graphics_options.get_and_clear() {
             anything_changed = true;
-            self.ui_graphics_options
-                .set_if_unequal(Arc::new(Self::graphics_options(
-                    (*self.hud_inputs.graphics_options.get()).clone(),
-                )));
+            self.ui_graphics_options.set_if_unequal(Arc::new(Self::graphics_options(
+                (*self.hud_inputs.graphics_options.get()).clone(),
+            )));
         }
 
         // TODO: This should possibly be the responsibility of the TooltipState itself?
@@ -501,19 +498,13 @@ impl Vui {
                     // TODO: instead of unwrapping, log and visually report the error
                     // (there should be some simple way to do that).
                     // TODO: We should have a "set paused state" message instead of toggle.
-                    self.hud_inputs
-                        .app_control_channel
-                        .send(ControlMessage::TogglePause)
-                        .unwrap();
+                    self.hud_inputs.app_control_channel.send(ControlMessage::TogglePause).unwrap();
                 }
             }
             VuiPageState::Paused => {
                 if self.hud_inputs.paused.get() {
                     // Unpause
-                    self.hud_inputs
-                        .app_control_channel
-                        .send(ControlMessage::TogglePause)
-                        .unwrap();
+                    self.hud_inputs.app_control_channel.send(ControlMessage::TogglePause).unwrap();
                 }
             }
             VuiPageState::AboutText | VuiPageState::Options => {
@@ -659,9 +650,7 @@ pub(crate) enum CueMessage {
 
 impl fmt::Debug for Command {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Command")
-            .field("label", &self.label)
-            .finish_non_exhaustive()
+        f.debug_struct("Command").field("label", &self.label).finish_non_exhaustive()
     }
 }
 

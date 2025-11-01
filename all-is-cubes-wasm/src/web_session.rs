@@ -117,12 +117,7 @@ impl WebSession {
     /// This method is broken out of `new()` so we can just use `self`. Well, some of the time.
     /// TODO: reconsider
     fn init_dom(self: Rc<Self>) {
-        let document = &self
-            .gui_helpers
-            .canvas_helper()
-            .canvas()
-            .owner_document()
-            .unwrap();
+        let document = &self.gui_helpers.canvas_helper().canvas().owner_document().unwrap();
         let options_passive_true = AddEventListenerOptions::new();
         options_passive_true.set_passive(true);
 
@@ -409,19 +404,14 @@ impl WebSession {
                     inner.session.update_cursor(renderer.cameras());
                 }
             }
-            let _: Result<_, _> = self
-                .gui_helpers
-                .canvas_helper()
-                .canvas()
-                .style()
-                .set_property(
-                    "cursor",
-                    match inner.session.cursor_icon() {
-                        CursorIcon::Crosshair => "crosshair",
-                        CursorIcon::PointingHand => "pointer",
-                        /* CursorIcon::Normal | */ _ => "default",
-                    },
-                );
+            let _: Result<_, _> = self.gui_helpers.canvas_helper().canvas().style().set_property(
+                "cursor",
+                match inner.session.cursor_icon() {
+                    CursorIcon::Crosshair => "crosshair",
+                    CursorIcon::PointingHand => "pointer",
+                    /* CursorIcon::Normal | */ _ => "default",
+                },
+            );
 
             // Do graphics
             let render_info = match &mut inner.renderer {
@@ -501,9 +491,7 @@ impl WebSession {
     fn check_pointer_lock(&self) -> bool {
         // TODO: should this be a method on CanvasHelper?
         let canvas = self.gui_helpers.canvas_helper().canvas(); // TODO: less indirection?
-        canvas
-            .owner_document()
-            .and_then(|d| d.pointer_lock_element())
+        canvas.owner_document().and_then(|d| d.pointer_lock_element())
             == canvas.dyn_into::<Element>().ok()
     }
 }

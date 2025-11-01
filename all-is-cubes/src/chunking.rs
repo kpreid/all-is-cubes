@@ -94,10 +94,7 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkPos<CHUNK_SIZE> {
     pub fn min_distance_squared_from(self, origin_chunk: Self) -> GridCoordinate {
         // TODO: change this to return the `Distance` instead of a value derived from it.
         // That'll be less exactly-one-use-case.
-        self.distance(origin_chunk)
-            .nearest_approach_squared
-            .cast_signed()
-            * CHUNK_SIZE.pow(2)
+        self.distance(origin_chunk).nearest_approach_squared.cast_signed() * CHUNK_SIZE.pow(2)
     }
 }
 
@@ -440,9 +437,7 @@ impl Iterator for AxisMirrorIter {
     type Item = Ccv;
     #[inline]
     fn next(&mut self) -> Option<Ccv> {
-        self.todo
-            .first()
-            .map(|index| self.generate_and_clear(index))
+        self.todo.first().map(|index| self.generate_and_clear(index))
     }
 
     // Not useful because in the one place AxisMirrorIter is used, use of `flat_map()`
@@ -535,9 +530,7 @@ mod tests {
     fn chunk_chart_epsilon_size() {
         let chart = ChunkChart::<16>::new(0.00001);
         assert_eq!(
-            chart
-                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
-                .collect::<Vec<_>>(),
+            chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
             vec![
                 ChunkPos::new(0, 0, 0),
                 // Face meetings.
@@ -622,9 +615,7 @@ mod tests {
             println!("distance {distance_in_chunks}, expected count {count}");
             print_space(&chart.visualization(), [1., 1., 1.]);
 
-            let chunks: Vec<_> = chart
-                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
-                .collect();
+            let chunks: Vec<_> = chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect();
             assert_eq!(
                 chunks.len(),
                 count,
@@ -688,12 +679,8 @@ mod tests {
         let mut chart2 = ChunkChart::new(300.0);
         chart2.resize_if_needed(200.0);
         assert_eq!(
-            chart1
-                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
-                .collect::<Vec<_>>(),
-            chart2
-                .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
-                .collect::<Vec<_>>()
+            chart1.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
+            chart2.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>()
         );
     }
 
@@ -731,12 +718,8 @@ mod tests {
 
             // Check the public interface
             assert_eq!(
-                enlarged
-                    .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
-                    .collect::<Vec<_>>(),
-                shrunk
-                    .chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL)
-                    .collect::<Vec<_>>()
+                enlarged.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>(),
+                shrunk.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect::<Vec<_>>()
             );
         }
     }

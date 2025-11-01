@@ -155,15 +155,12 @@ where
                     chunk,
                     // TODO: distinguish between opaque in view and transparent in view
                     // so callers can benefit from our tracking of that distinction.
-                    mesh_in_view: chunk
-                        .mesh_local_bounding_box()
-                        .all()
-                        .is_some_and(|local_bb| {
-                            camera.aab_in_view(
-                                // TODO: make this more coordinate-space-type-safe
-                                local_bb.translate(chunk.mesh_origin().to_vector().cast_unit()),
-                            )
-                        }),
+                    mesh_in_view: chunk.mesh_local_bounding_box().all().is_some_and(|local_bb| {
+                        camera.aab_in_view(
+                            // TODO: make this more coordinate-space-type-safe
+                            local_bb.translate(chunk.mesh_origin().to_vector().cast_unit()),
+                        )
+                    }),
                     instances_in_view: chunk
                         .block_instances_bounding_box()
                         .is_some_and(|bb| camera.aab_in_view(bb)),
@@ -318,8 +315,7 @@ where
         // If we need to redo everything, then clear all the old blocks.
         if todo.all_blocks_and_chunks {
             todo.all_blocks_and_chunks = false;
-            todo.blocks
-                .extend(0..=((space.block_data().len() - 1) as BlockIndex));
+            todo.blocks.extend(0..=((space.block_data().len() - 1) as BlockIndex));
             self.block_meshes.clear();
             // We don't need to clear self.chunks because they will automatically be considered
             // stale by the new block versioning value.
@@ -328,8 +324,7 @@ where
             self.complete_time = None;
         }
 
-        self.chunk_chart
-            .resize_if_needed(camera.view_distance().into_inner());
+        self.chunk_chart.resize_if_needed(camera.view_distance().into_inner());
 
         let prep_to_update_meshes_time = time::Instant::now();
 
@@ -421,10 +416,8 @@ where
                 if let Entry::Occupied(chunk_mesh_oe) = &chunk_mesh_entry
                     && let chunk_mesh = chunk_mesh_oe.get()
                     && let lbb = chunk_mesh.mesh_local_bounding_box().transparent
-                    && let relative_view_point = chunk_mesh
-                        .mesh_origin()
-                        .inverse()
-                        .transform_point3d(&view_point)
+                    && let relative_view_point =
+                        chunk_mesh.mesh_origin().inverse().transform_point3d(&view_point)
                     && let depth_ordering =
                         DepthOrdering::from_view_of_aabb(relative_view_point, lbb)
                     && chunk_mesh
@@ -485,11 +478,7 @@ where
                 // If we rebuilt the mesh then we need a new depth sort,
                 // whether or not we planned on one.
                 state.chunk_todo.needs_depth_sort = Some(DepthOrdering::from_view_of_aabb(
-                    state
-                        .chunk_mesh
-                        .mesh_origin()
-                        .inverse()
-                        .transform_point3d(&view_point),
+                    state.chunk_mesh.mesh_origin().inverse().transform_point3d(&view_point),
                     state.chunk_mesh.mesh_local_bounding_box().transparent,
                 ));
             }
@@ -510,13 +499,11 @@ where
             let run_updater = actually_changed_mesh || actually_sorted_indices.is_some();
             if run_updater {
                 render_data_updater(
-                    state
-                        .chunk_mesh
-                        .borrow_for_update(if actually_changed_mesh {
-                            None
-                        } else {
-                            actually_sorted_indices
-                        }),
+                    state.chunk_mesh.borrow_for_update(if actually_changed_mesh {
+                        None
+                    } else {
+                        actually_sorted_indices
+                    }),
                 );
             }
             let update_end = time::Instant::now();
@@ -600,9 +587,7 @@ where
             log::debug!(
                 "SpaceRenderer({space}): all meshes done in {time}",
                 space = self.space().name(),
-                time = end_all_time
-                    .saturating_duration_since(self.zero_time)
-                    .refmt(&ConciseDebug)
+                time = end_all_time.saturating_duration_since(self.zero_time).refmt(&ConciseDebug)
             );
             #[cfg(feature = "rerun")]
             if self.rerun_destination.is_enabled() {

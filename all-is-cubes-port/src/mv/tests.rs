@@ -51,14 +51,8 @@ async fn roundtrip(
 async fn export_import_space() {
     // Irregular and negative dimensions to check that the coordinate transform worked.
     let bounds = GridAab::from_lower_size([-20, -30, -40], [1, 2, 3]);
-    let block1 = Block::builder()
-        .color(Rgba::WHITE)
-        .display_name("a")
-        .build();
-    let block2 = Block::builder()
-        .color(Rgba::WHITE)
-        .display_name("b")
-        .build();
+    let block1 = Block::builder().color(Rgba::WHITE).display_name("a").build();
+    let block2 = Block::builder().color(Rgba::WHITE).display_name("b").build();
 
     // Construct universe for export.
     let mut export_universe = Universe::new();
@@ -95,17 +89,11 @@ async fn export_import_space() {
     // Block metadata is not preserved. The display name is filled with the palette index.
     assert_eq!(
         s[[0, 1, 2]],
-        Block::builder()
-            .color(block1.color())
-            .display_name("0")
-            .build()
+        Block::builder().color(block1.color()).display_name("0").build()
     );
     assert_eq!(
         s[[0, 1, 0]],
-        Block::builder()
-            .color(block1.color())
-            .display_name("1")
-            .build()
+        Block::builder().color(block1.color()).display_name("1").build()
     );
     // TODO: make more assertions about the data?
 }
@@ -116,9 +104,7 @@ async fn export_import_space() {
 #[cfg(feature = "import")]
 #[macro_rules_attribute::apply(smol_macros::test)]
 async fn invalid_file_error() {
-    let error = mv::load_dot_vox(yield_progress_for_testing(), &[])
-        .await
-        .unwrap_err();
+    let error = mv::load_dot_vox(yield_progress_for_testing(), &[]).await.unwrap_err();
     assert!(
         matches!(
             error,

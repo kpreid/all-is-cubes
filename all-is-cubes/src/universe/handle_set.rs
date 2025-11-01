@@ -20,10 +20,7 @@ pub struct HandleSet {
 impl HandleSet {
     pub fn all_of(universe: &Universe) -> Self {
         Self {
-            handles: universe
-                .iter()
-                .map(|handle| (handle.name(), handle))
-                .collect(),
+            handles: universe.iter().map(|handle| (handle.name(), handle)).collect(),
         }
     }
 

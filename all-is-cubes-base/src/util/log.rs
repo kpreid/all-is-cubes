@@ -27,9 +27,7 @@ mod tests {
     #[test]
     fn filter() {
         assert!(!standard_filter(
-            &log::Metadata::builder()
-                .target("tracing::span::active")
-                .build()
+            &log::Metadata::builder().target("tracing::span::active").build()
         ));
         assert!(standard_filter(
             &log::Metadata::builder()

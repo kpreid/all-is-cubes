@@ -317,10 +317,8 @@ impl Universe {
             // TODO(ecs): convert Space::step() to a series of systems
             // (this will require stopping using get_one_mut_and_ticket, which is currently
             // used to allow Space block changes to evaluate blocks).
-            let spaces: Vec<Handle<Space>> = self
-                .iter_by_type::<Space>()
-                .map(|(_, handle)| handle)
-                .collect();
+            let spaces: Vec<Handle<Space>> =
+                self.iter_by_type::<Space>().map(|(_, handle)| handle).collect();
 
             if !paused {
                 self.world
@@ -342,9 +340,9 @@ impl Universe {
                     Some(&space_handle),
                     tick,
                     match si.budget_per_space {
-                        Some(budget) => si
-                            .deadline
-                            .min(time::Deadline::At(time::Instant::now() + budget)),
+                        Some(budget) => {
+                            si.deadline.min(time::Deadline::At(time::Instant::now() + budget))
+                        }
                         None => si.deadline,
                     },
                 );
@@ -419,20 +417,14 @@ impl Universe {
     }
 
     fn sync_space_blocks(&mut self) {
-        self.world
-            .run_system_cached(space::step::update_palette_phase_1)
-            .unwrap();
-        self.world
-            .run_system_cached(space::step::update_palette_phase_2)
-            .unwrap();
+        self.world.run_system_cached(space::step::update_palette_phase_1).unwrap();
+        self.world.run_system_cached(space::step::update_palette_phase_2).unwrap();
     }
 
     fn sync_block_defs(&mut self) -> BlockDefStepInfo {
         let mut info = BlockDefStepInfo::default();
         // TODO(ecs): register these systems
-        self.world
-            .run_system_cached_with(block::update_phase_1, &mut info)
-            .unwrap();
+        self.world.run_system_cached_with(block::update_phase_1, &mut info).unwrap();
         self.world.run_system_cached(block::update_phase_2).unwrap();
         info
     }
@@ -526,8 +518,7 @@ impl Universe {
     where
         T: UniverseMember,
     {
-        self.get_or_insert_deserializing(name)?
-            .insert_deserialized_value(self, value);
+        self.get_or_insert_deserializing(name)?.insert_deserialized_value(self, value);
         Ok(())
     }
 
@@ -641,10 +632,8 @@ impl Universe {
     #[cfg(feature = "save")]
     pub(crate) fn validate_deserialized_members(&self) -> Result<(), DeserializeHandlesError> {
         let read_ticket = self.read_ticket();
-        self.regs
-            .all_members_query
-            .iter_manual(&self.world)
-            .try_for_each(|(_entity, membership)| {
+        self.regs.all_members_query.iter_manual(&self.world).try_for_each(
+            |(_entity, membership)| {
                 if membership.handle.not_still_deserializing(read_ticket) {
                     Ok(())
                 } else {
@@ -652,7 +641,8 @@ impl Universe {
                         to: membership.handle.name(),
                     })
                 }
-            })
+            },
+        )
     }
 
     /// Apply the given function to the referent of the given handle.

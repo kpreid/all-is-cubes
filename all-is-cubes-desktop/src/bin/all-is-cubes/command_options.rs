@@ -170,11 +170,7 @@ impl AicDesktopArgs {
         let options = RecordOptions {
             output_path,
             output_format,
-            image_size: self
-                .display_size
-                .0
-                .unwrap_or_else(|| Size2D::new(640, 480))
-                .cast_unit(), // nominal = physical here
+            image_size: self.display_size.0.unwrap_or_else(|| Size2D::new(640, 480)).cast_unit(), // nominal = physical here
             save_all: self.save_all,
             animation: match self.duration {
                 Some(duration) => {
@@ -208,11 +204,7 @@ static GRAPHICS_HELP_LONG: LazyLock<String> = LazyLock::new(|| {
         .filter_map(|v| v.to_possible_value())
         .filter(|pv| !pv.is_hide_set());
 
-    let max_width = pv_iter
-        .clone()
-        .map(|pv| pv.get_name().len())
-        .max()
-        .unwrap_or(0);
+    let max_width = pv_iter.clone().map(|pv| pv.get_name().len()).max().unwrap_or(0);
 
     let mut text = String::from("Graphics/UI mode; one of the following keywords:\n");
     for pv in pv_iter {
@@ -299,10 +291,7 @@ impl FromStr for DisplaySizeArg {
         } else {
             let dims: [u32; 2] = s
                 .split(&['×', 'x', ',', ';', ' '][..])
-                .map(|s| {
-                    s.parse::<u32>()
-                        .map_err(|_| format!("{s:?} not an integer or \"auto\""))
-                })
+                .map(|s| s.parse::<u32>().map_err(|_| format!("{s:?} not an integer or \"auto\"")))
                 .collect::<Result<Vec<u32>, String>>()?
                 .try_into()
                 .map_err(|_| String::from("must be two integers or \"auto\""))?;
@@ -398,9 +387,7 @@ mod tests {
         error: &clap::Error,
         wanted_kind: clap::error::ContextKind,
     ) -> Option<&ContextValue> {
-        error
-            .context()
-            .find_map(|(k, v)| if k == wanted_kind { Some(v) } else { None })
+        error.context().find_map(|(k, v)| if k == wanted_kind { Some(v) } else { None })
     }
 
     #[test]
@@ -525,9 +512,7 @@ mod tests {
     #[test]
     fn universe_option_conflict() {
         assert_eq!(
-            parse_universe_test(&["--template", "demo-city", "foo"])
-                .unwrap_err()
-                .kind(),
+            parse_universe_test(&["--template", "demo-city", "foo"]).unwrap_err().kind(),
             ErrorKind::ArgumentConflict
         );
     }
@@ -535,9 +520,7 @@ mod tests {
     #[test]
     fn universe_option_invalid_template() {
         assert_eq!(
-            parse_universe_test(&["--template", "foo"])
-                .unwrap_err()
-                .kind(),
+            parse_universe_test(&["--template", "foo"]).unwrap_err().kind(),
             ErrorKind::InvalidValue
         );
     }

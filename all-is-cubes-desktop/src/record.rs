@@ -255,9 +255,7 @@ impl Recorder {
                         .inner()
                         .spawn(async move {
                             // TODO: need a proper error reporting path so this doesn't just turn into a dropped channel
-                            export_task
-                                .await
-                                .expect("failed to perform export operation");
+                            export_task.await.expect("failed to perform export operation");
 
                             status_notifier.notify(&Status {
                                 frame_number: this_frame_number,

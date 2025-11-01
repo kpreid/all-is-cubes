@@ -55,9 +55,7 @@ impl TestData {
             Box::new(core::convert::identity),
             listen::constant(Default::default()),
         );
-        renderer
-            .update(Layers::splat(self.universe.read_ticket()), None)
-            .unwrap();
+        renderer.update(Layers::splat(self.universe.read_ticket()), None).unwrap();
         renderer
     }
 

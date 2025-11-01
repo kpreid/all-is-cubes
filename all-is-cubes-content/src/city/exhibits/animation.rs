@@ -38,9 +38,8 @@ fn ANIMATION(ctx: Context<'_>) {
                 let location_offset = p.x + p.y + p.z;
                 let time_offset = (frame as GridCoordinate).rem_euclid(n);
                 let value = location_offset.wrapping_sub(time_offset);
-                fills[value
-                    .div_euclid(repeats_per_fill)
-                    .rem_euclid(fills.len() as GridCoordinate) as usize]
+                fills[value.div_euclid(repeats_per_fill).rem_euclid(fills.len() as GridCoordinate)
+                    as usize]
                     .clone()
             }),
         )

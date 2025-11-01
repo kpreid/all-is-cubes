@@ -229,12 +229,7 @@ pub(super) fn copy_voxels_to_new_texture<A: Allocator>(
 pub(super) fn needed_channels(voxels: &Evoxels) -> Channels {
     // This has false positives because it includes obscured voxels, but that is probably not
     // worth fixing with a more complex algorithm.
-    if voxels
-        .as_vol_ref()
-        .as_linear()
-        .iter()
-        .any(|voxel| voxel.emission != Rgb::ZERO)
-    {
+    if voxels.as_vol_ref().as_linear().iter().any(|voxel| voxel.emission != Rgb::ZERO) {
         Channels::ReflectanceEmission
     } else {
         Channels::Reflectance

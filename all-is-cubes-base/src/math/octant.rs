@@ -93,10 +93,8 @@ impl Octant {
     pub fn try_from_01<T: Copy + num_traits::NumCast, U>(
         corner_or_translation: Vector3D<T, U>,
     ) -> Option<Self> {
-        let low_corner: GridPoint = corner_or_translation
-            .try_cast::<GridCoordinate>()?
-            .cast_unit()
-            .to_point();
+        let low_corner: GridPoint =
+            corner_or_translation.try_cast::<GridCoordinate>()?.cast_unit().to_point();
         Self::try_from_positive_cube(Cube::from(low_corner))
     }
 

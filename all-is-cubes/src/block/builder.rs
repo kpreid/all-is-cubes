@@ -271,9 +271,8 @@ impl<'u, P, Txn> Builder<'u, P, Txn> {
             if space.bounds() != not_air_bounds {
                 // TODO: Eventually we should be able to ask the Space to resize itself,
                 // but that is not yet an available operation.
-                let mut shrunk = Space::builder(not_air_bounds)
-                    .physics(space.physics().clone())
-                    .build();
+                let mut shrunk =
+                    Space::builder(not_air_bounds).physics(space.physics().clone()).build();
                 shrunk.mutate(read_ticket, |m| {
                     m.fill(not_air_bounds, |cube| Some(&space[cube]))
                 })?;
@@ -380,9 +379,7 @@ impl<P: BuildPrimitive> Builder<'_, P, UniverseTransaction> {
         let (block, transaction) = self.build_block_and_txn_internal();
 
         // The transaction is always an insert_anonymous, which cannot fail.
-        transaction
-            .execute(universe, (), &mut transaction::no_outputs)
-            .unwrap();
+        transaction.execute(universe, (), &mut transaction::no_outputs).unwrap();
 
         block
     }

@@ -169,9 +169,7 @@ fn look_at_direction_consistency() {
             continue;
         };
         let rotation = look_at_y_up(point3(0., 0., 0.), direction.to_point());
-        let rotated_eye_vector = rotation
-            .to_transform()
-            .transform_vector3d(vec3(0., 0., -1.));
+        let rotated_eye_vector = rotation.to_transform().transform_vector3d(vec3(0., 0., -1.));
 
         let difference = rotated_eye_vector - direction;
         assert!(

@@ -125,9 +125,7 @@ where
     ) -> impl Iterator<Item = TransactionAndPredicate<'a, Tr>> + 'b {
         self.transactions.iter().flat_map(move |t1| {
             core::iter::once(t1.clone()).chain(
-                self.transactions
-                    .iter()
-                    .filter_map(move |t2| t1.clone().try_merge(t2.clone())),
+                self.transactions.iter().filter_map(move |t2| t1.clone().try_merge(t2.clone())),
             )
         })
     }
@@ -155,8 +153,7 @@ where
 {
     fn try_merge(mut self, other: Self) -> Option<Self> {
         let merge_check = self.transaction.check_merge(&other.transaction).ok()?;
-        self.transaction
-            .commit_merge(other.transaction, merge_check);
+        self.transaction.commit_merge(other.transaction, merge_check);
         Some(TransactionAndPredicate {
             transaction: self.transaction,
             predicate: {

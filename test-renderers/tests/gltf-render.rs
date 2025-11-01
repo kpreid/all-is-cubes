@@ -86,9 +86,8 @@ impl GltfRend3Renderer {
     async fn load_latest_gltf(&mut self) -> Result<(Option<()>, Flaws), RenderError> {
         match &self.gltf_output {
             &Some(GltfOutput { ref path, flaws }) => {
-                let gltf_json_data: Vec<u8> = tokio::fs::read(path)
-                    .await
-                    .expect("failed to read glTF JSON");
+                let gltf_json_data: Vec<u8> =
+                    tokio::fs::read(path).await.expect("failed to read glTF JSON");
                 let parent_dir = path.parent().unwrap().to_owned();
 
                 // match rend3_gltf::load_gltf(
@@ -142,10 +141,7 @@ impl HeadlessRenderer for GltfRend3Renderer {
                 progress,
                 port::Format::Gltf,
                 port::ExportSet::from_spaces(
-                    world_space
-                        .into_iter()
-                        .map(|r| Handle::clone(&r))
-                        .collect::<Vec<_>>(),
+                    world_space.into_iter().map(|r| Handle::clone(&r)).collect::<Vec<_>>(),
                 ),
                 gltf_path.clone(),
             )
