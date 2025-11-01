@@ -7,12 +7,23 @@ use cfg_if::cfg_if;
 use futures_util::StreamExt as _;
 use hashbrown::HashMap;
 
+// -------------------------------------------------------------------------------------------------
+
+// Common point for defining presence and level of logging of poller activity.
+macro_rules! log {
+    ($($args:tt)*) => {
+        ::log::trace!("[poll] {}", format_args!($($args)*));
+    }
+}
+
 /// Start polling the given [`wgpu::Device`] in the background until the returned guard is dropped.
 ///
 /// Calling this function again with the same device will not create redundant work.
 /// It may block briefly if demand is high or if a callback function takes a long time
 /// (which they should avoid).
 pub(crate) fn start_polling(device: wgpu::Device) -> Poller {
+    log!("start_polling({device:?})");
+
     let poller = Poller(Arc::new(device));
 
     // (The wgpu docs say polling is automatic “on web” but they mean WebGPU, not WebGL,
@@ -41,6 +52,11 @@ mod inner {
     }
 
     fn init_poller_task() -> flume::Sender<Weak<wgpu::Device>> {
+        log!(
+            "{tid:?} init_poller_task()",
+            tid = std::thread::current().id()
+        );
+
         let (tx, rx) = flume::bounded(4);
         std::thread::Builder::new()
             .name("all-is-cubes wgpu poller".into())
@@ -48,7 +64,7 @@ mod inner {
             // polling_task() does is read a channel, and the only reason this is async is for
             // wasm compatibility.
             .spawn(move || pollster::block_on(polling_task(rx)))
-            .expect("shouldn't happen: wgpu channel poller task is dead");
+            .expect("failed to spawn wgpu poller task");
         tx
     }
 }
@@ -70,6 +86,8 @@ mod inner {
     }
 
     fn init_poller_task() -> flume::Sender<Weak<wgpu::Device>> {
+        log!("init_poller_task()");
+
         // Using unbounded channel does no harm since we have only one thread, so
         // cannot have any relevantly unfair scheduling between sender and receiver.
         let (tx, rx) = flume::unbounded();
@@ -81,9 +99,9 @@ mod inner {
 /// Polls all [`wgpu::Device`]s delivered to it on `POLLING_CHANNEL`,
 /// as long as each device has at least one weak handle to it.
 /// To be run on a thread or async task as the platform permits.
-#[allow(
+#[expect(
     clippy::infinite_loop,
-    reason = "spawn_local() requires () as return type; allow() for false negative rust-clippy/15541"
+    reason = "spawn_local() requires () as return type"
 )]
 async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
     // 10 milliseconds is much better than acceptable latency for our applications, which are all
@@ -101,13 +119,21 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
 
     loop {
         // Prune dropped requests and their devices.
+        let count_before_prune = to_poll.len();
         to_poll.retain(|_, requests| {
             requests.retain(|request| Weak::upgrade(request).is_some());
             !requests.is_empty()
         });
+        let count_after_prune = to_poll.len();
+        if count_after_prune < count_before_prune {
+            log!(
+                "PT pruned {} devices",
+                count_after_prune - count_before_prune
+            );
+        }
 
         // Poll all the devices to poll.
-        // eprintln!("poller: polling {}", to_poll.len());
+        // log!("PT polling {count_after_prune} devices");
         for device in to_poll.keys() {
             device
                 .poll(wgpu::PollType::Poll)
@@ -117,9 +143,10 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
         // While waiting for it to be time to poll again, check for incoming requests.
         let recv_result = if to_poll.is_empty() {
             // If we have nothing to poll, then we don't need to wake up.
-            // eprintln!("poller: sleeping indefinitely");
+            log!("PT has nothing to poll; waiting for new devices");
             rx.recv_async().await.map_err(flume::RecvTimeoutError::from)
         } else {
+            log!("PT polled {count_after_prune} devices and will recv with timeout");
             cfg_if! {
                 if #[cfg(target_family = "wasm")] {
                     // On wasm, we must not block, which means we must instead use async timers
@@ -143,7 +170,7 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
         match recv_result {
             Ok(request) => {
                 if let Some(device) = request.upgrade() {
-                    // eprintln!("poller: got request for {device:?}");
+                    log!("PT received request to poll {device:?}");
                     to_poll
                         .entry(wgpu::Device::clone(&*device))
                         .or_default()
@@ -155,7 +182,7 @@ async fn polling_task(rx: flume::Receiver<Weak<wgpu::Device>>) {
                 log::warn!("shouldn't happen: wgpu poller channel disconnected");
             }
             Err(flume::RecvTimeoutError::Timeout) => {
-                // eprintln!("poller: time to poll");
+                log!("PT got timeout");
                 // continue to poll
             }
         }
