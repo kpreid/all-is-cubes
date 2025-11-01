@@ -14,7 +14,7 @@ use all_is_cubes::euclid::{Point2D, point2};
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
     Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgb01, ZeroOne,
-    zo32,
+    chebyshev_length, zo32,
 };
 use all_is_cubes::space::{self, SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
@@ -355,13 +355,11 @@ pub async fn install_landscape_blocks(
                     // TODO: This is the same computation as done by square_radius() but
                     // not with the same output. Can we share some logic there?
                     // Or add a helpful method on GridAab?
-                    let radius_vec =
-                        cube.map(|c| (c * 2 + 1 - GridCoordinate::from(resolution)).abs() / 2 + 1);
-                    let radius = radius_vec
-                        .x
-                        .abs()
-                        .max(radius_vec.y.abs())
-                        .max(radius_vec.z.abs());
+                    let radius_vec = cube
+                        .lower_bounds()
+                        .to_vector()
+                        .map(|c| (c * 2 + 1 - GridCoordinate::from(resolution)).abs() / 2 + 1);
+                    let radius = chebyshev_length(radius_vec);
 
                     let signed_distance_from_edge = radius - growth.radius();
                     let unit_scale_distance =

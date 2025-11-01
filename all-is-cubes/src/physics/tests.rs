@@ -11,7 +11,7 @@ use crate::block::{
     Resolution::{self, R2},
 };
 use crate::content::{make_slab, make_some_blocks};
-use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, GridAab};
+use crate::math::{Aab, Cube, CubeFace, Face7, FreeCoordinate, GridAab, chebyshev_length};
 use crate::physics::{Body, Contact, POSITION_EPSILON, VELOCITY_MAGNITUDE_LIMIT, Velocity};
 use crate::space::{Space, SpacePhysics};
 use crate::time::Tick;
@@ -243,7 +243,7 @@ fn no_passing_through_blocks() {
             position_history.push_front(body.position());
             body.step(Tick::from_seconds(1.0 / 60.0), Some(&space), |_contact| {});
 
-            let distance_from_start = max_norm(body.position() - start);
+            let distance_from_start = chebyshev_length(body.position() - start);
             assert!(
                 distance_from_start < 0.5,
                 "escaped to {:?}",
@@ -256,7 +256,7 @@ fn no_passing_through_blocks() {
             position_history.truncate(10);
         }
         println!("{iterations:?} iterations to {:?}", body.position());
-        let distance_from_start = max_norm(body.position() - start);
+        let distance_from_start = chebyshev_length(body.position() - start);
         assert!(
             distance_from_start > 0.09,
             "didn't move away from origin: {distance_from_start}"
@@ -316,14 +316,6 @@ fn velocity_limit() {
         body.position(),
         point3(2. * VELOCITY_MAGNITUDE_LIMIT, 0., 0.)
     );
-}
-
-/// Takes the maximum length on all coordinate axes; all points forming a cube
-/// centered on the origin will have the same value for this norm.
-///
-/// See also <https://en.wikipedia.org/wiki/Uniform_norm>
-fn max_norm<S: num_traits::real::Real, U>(v: Vector3D<S, U>) -> S {
-    v.x.abs().max(v.y.abs()).max(v.z.abs())
 }
 
 // TODO: test collision more

@@ -264,6 +264,9 @@ pub(crate) fn gradient_lookup(gradient: &[Block], value: f32) -> &Block {
 /// The first returned number is the "radius" value and the second is the distance
 /// on the lesser axis, which may be used for distance from the center or corner along
 /// the surface.
+///
+/// This is similar to an application of [`all_is_cubes::math::chebyshev_length()`],
+/// except for the second output.
 pub(crate) fn square_radius(resolution: Resolution, cube: Cube) -> [GridCoordinate; 2] {
     let distances_vec = cube
         .lower_bounds()

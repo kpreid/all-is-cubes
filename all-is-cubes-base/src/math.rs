@@ -149,3 +149,45 @@ pub fn sort_two<T: PartialOrd>(a: &mut T, b: &mut T) {
         core::mem::swap(a, b);
     }
 }
+
+/// Returns the length of the vector in [Chebyshev distance].
+///
+/// Returns the maximum length of the vector’s projections onto all 3 coordinate axes.
+/// This has the property that all points forming a cube centered on the origin will have the
+/// same `chebyshev_length()`.
+///
+/// This is useful for procedurally generating layered cubical shapes.
+/// It can also be used to generate squares if the third axis is set to zero.
+///
+/// If any element is NaN (more precisely, if [`PartialOrd`] returns [`None`]),
+/// the result will be the absolute value of an arbitrary one of the inputs.
+///
+/// [Chebyshev distance]: <https://en.wikipedia.org/w/index.php?title=Chebyshev_distance&oldid=1314633868>.
+///
+/// # Examples
+///
+/// ```
+/// # extern crate all_is_cubes_base as all_is_cubes;
+/// use all_is_cubes::math::{chebyshev_length, FreeVector, GridVector};
+///
+/// assert_eq!(chebyshev_length(GridVector::new(1, 3, 2)), 3);
+/// assert_eq!(chebyshev_length(GridVector::new(2, -1, -3)), 3);
+/// assert_eq!(chebyshev_length(FreeVector::new(1.0, -2.5, 3.75)), 3.75);
+/// ```
+#[inline]
+#[allow(clippy::needless_pass_by_value)]
+pub fn chebyshev_length<S: num_traits::Signed + PartialOrd, U>(v: Vector3D<S, U>) -> S {
+    let abs_x = v.x.abs();
+    let abs_y = v.y.abs();
+    let abs_z = v.z.abs();
+
+    // 3-way max without requiring `Ord` or `Float` traits.
+    let mut result = abs_x;
+    if abs_y > result {
+        result = abs_y;
+    }
+    if abs_z > result {
+        result = abs_z;
+    }
+    result
+}
