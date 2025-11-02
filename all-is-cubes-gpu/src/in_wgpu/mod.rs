@@ -1,4 +1,8 @@
 //! Rendering via the [`wgpu`] WebGPU-in-Rust graphics library.
+//!
+//! TODO: The existence of the `in_wgpu` module is an artifact of the development history.
+//! Flatten it out entirely (not just in public API), but only while preserving any useful
+//! code organization.
 
 use alloc::string::String;
 use alloc::sync::Arc;

@@ -11,8 +11,7 @@ use winit::window::{CursorGrabMode, Window};
 
 use all_is_cubes::euclid::{Point2D, Size2D};
 use all_is_cubes::universe::ReadTicket;
-use all_is_cubes_gpu::FrameBudget;
-use all_is_cubes_gpu::in_wgpu::SurfaceRenderer;
+use all_is_cubes_gpu::{FrameBudget, SurfaceRenderer};
 use all_is_cubes_render::camera::{self, Layers, StandardCameras};
 
 use all_is_cubes_ui::apps::InputProcessor;

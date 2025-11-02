@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 
 use web_sys::{Document, console};
 
-use all_is_cubes_gpu::in_wgpu;
+use all_is_cubes_gpu as gpu;
 
 use crate::js_bindings::{GuiHelpers, make_all_static_gui_helpers};
 use crate::url_params::{OptionsInUrl, RendererOption, options_from_query_string};
@@ -127,7 +127,7 @@ async fn start_game_with_dom(
                 }
             }?;
             log::debug!("adapter: {:?}", adapter.get_info());
-            let renderer = in_wgpu::SurfaceRenderer::new(
+            let renderer = gpu::SurfaceRenderer::new(
                 cameras,
                 surface,
                 adapter,

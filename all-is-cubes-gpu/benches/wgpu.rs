@@ -18,7 +18,7 @@ use all_is_cubes_render::Flaws;
 use all_is_cubes_render::HeadlessRenderer;
 use all_is_cubes_render::camera::{GraphicsOptions, Layers, StandardCameras, Viewport};
 
-use all_is_cubes_gpu::in_wgpu::{LightChunk, LightTexture, headless, init};
+use all_is_cubes_gpu::{LightChunk, LightTexture, headless, init};
 
 fn main() {
     let mut criterion: Criterion<_> = Criterion::default().configure_from_args();
@@ -129,7 +129,7 @@ fn light_benches(c: &mut Criterion, instance: &wgpu::Instance) {
         .block_on(async {
             let adapter = init::create_adapter_for_test(instance).await;
             adapter
-                .request_device(&all_is_cubes_gpu::in_wgpu::device_descriptor(
+                .request_device(&all_is_cubes_gpu::device_descriptor(
                     "module_benches",
                     adapter.limits(),
                 ))

@@ -42,7 +42,7 @@ pub trait Renderer {
 
 impl Renderer for () {}
 
-impl Renderer for all_is_cubes_gpu::in_wgpu::SurfaceRenderer {
+impl Renderer for all_is_cubes_gpu::SurfaceRenderer {
     #[cfg(feature = "rerun")]
     fn log_to_rerun(&mut self, destination: rg::Destination, filter: GpuRerunFilter) {
         // calling inherent method

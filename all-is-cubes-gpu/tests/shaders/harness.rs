@@ -1,7 +1,7 @@
 use half::f16;
 
-use all_is_cubes_gpu::in_wgpu::init;
-use all_is_cubes_gpu::in_wgpu::shader_testing;
+use all_is_cubes_gpu::init;
+use all_is_cubes_gpu::shader_testing;
 use all_is_cubes_render::camera;
 
 /// Obtain the common [`wgpu::Adapter`] used by `#[test]` tests in this module,

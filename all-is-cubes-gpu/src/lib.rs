@@ -17,12 +17,13 @@
 extern crate alloc;
 extern crate std;
 
-#[cfg_attr(not(feature = "wgpu"), allow(unused))]
+// -------------------------------------------------------------------------------------------------
+
+/// Re-export the version of the `wgpu` crate we're using.
+pub use wgpu;
+
 mod common;
 pub use common::*;
 
-/// Re-export the version of the `wgpu` crate we're using.
-#[cfg(feature = "wgpu")]
-pub use wgpu;
-#[cfg(feature = "wgpu")]
-pub mod in_wgpu;
+mod in_wgpu;
+pub use in_wgpu::*;

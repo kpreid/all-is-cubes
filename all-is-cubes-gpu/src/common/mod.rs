@@ -1,4 +1,8 @@
-//! Items not specific to a particular GPU API.
+//! Items that do not depend on any particular GPU API.
+//!
+//! This module exists largely due to the history of having switched from one to another.
+//! But, I hope it still provides some useful structure to the code.
+
 mod debug_lines;
 pub(crate) use debug_lines::*;
 mod draw_to_texture;

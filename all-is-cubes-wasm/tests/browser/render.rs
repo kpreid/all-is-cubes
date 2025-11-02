@@ -12,7 +12,7 @@ use all_is_cubes::euclid::vec3;
 use all_is_cubes::time::Instant;
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
-use all_is_cubes_gpu::in_wgpu::init;
+use all_is_cubes_gpu::init;
 use all_is_cubes_render::HeadlessRenderer as _;
 use all_is_cubes_render::camera::{GraphicsOptions, Layers, StandardCameras, Viewport};
 
@@ -48,11 +48,10 @@ async fn renderer_test() {
     );
     let world_space = cameras.world_space().get().unwrap();
 
-    let mut renderer =
-        all_is_cubes_gpu::in_wgpu::headless::Builder::from_adapter("renderer_test", adapter)
-            .await
-            .unwrap()
-            .build(cameras.clone_unupdated());
+    let mut renderer = all_is_cubes_gpu::headless::Builder::from_adapter("renderer_test", adapter)
+        .await
+        .unwrap()
+        .build(cameras.clone_unupdated());
     renderer.update(Layers::splat(universe.read_ticket()), None).unwrap();
     let image = renderer.draw("").await.unwrap();
 

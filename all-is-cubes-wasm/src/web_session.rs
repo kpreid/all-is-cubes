@@ -16,7 +16,7 @@ use web_sys::{
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::listen;
 use all_is_cubes::universe::{Universe, UniverseStepInfo};
-use all_is_cubes_gpu::{FrameBudget, in_wgpu};
+use all_is_cubes_gpu as gpu;
 use all_is_cubes_port::file::NonDiskFile;
 use all_is_cubes_render::camera::{StandardCameras, Viewport};
 use all_is_cubes_ui::apps::{CursorIcon, Key, Settings};
@@ -30,7 +30,7 @@ use crate::web_glue::{
 pub(crate) type Session = all_is_cubes_ui::apps::Session;
 
 pub(crate) enum WebRenderer {
-    Wgpu(in_wgpu::SurfaceRenderer),
+    Wgpu(gpu::SurfaceRenderer),
 }
 
 /// The interior-mutable state of an All is Cubes session in a web page, owning a
@@ -421,7 +421,7 @@ impl WebSession {
                         .render_frame(
                             inner.session.read_tickets(),
                             inner.session.cursor_result(),
-                            &FrameBudget::SIXTY_FPS, // TODO: try to estimate real refresh rate
+                            &gpu::FrameBudget::SIXTY_FPS, // TODO: try to estimate real refresh rate
                             |_| String::new(),
                             || {},
                         )

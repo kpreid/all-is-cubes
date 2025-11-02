@@ -1,9 +1,9 @@
-//! Runs [`test_renderers::harness_main`] against [`all_is_cubes_gpu::in_wgpu`].
+//! Runs [`test_renderers::harness_main`] against [`all_is_cubes_gpu`].
 
 use clap::Parser as _;
 use tokio::sync::OnceCell;
 
-use all_is_cubes_gpu::in_wgpu::{headless, init};
+use all_is_cubes_gpu::{headless, init};
 use all_is_cubes_render::HeadlessRenderer;
 use all_is_cubes_render::camera::StandardCameras;
 use test_renderers::{RendererFactory, RendererId};

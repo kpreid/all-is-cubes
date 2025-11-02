@@ -4,7 +4,7 @@ use all_is_cubes::math::{GridAab, GridSize, Rgb, Vol, ps64};
 use all_is_cubes::raycast::scale_to_integer_step;
 use all_is_cubes::space::{PackedLight, Space};
 
-use all_is_cubes_gpu::in_wgpu::{LightChunk, LightTexture, init};
+use all_is_cubes_gpu::{LightChunk, LightTexture, init};
 
 use crate::harness::run_shader_test;
 use crate::wgsl::{frag_expr, to_wgsl};

@@ -209,6 +209,7 @@ In order to resolve various design problems interfering with development, the `a
     - `BoxStyle`’s functionality has been expanded; `BoxStyle::from_fn()` and the new companion type `BoxPart` allows constructing arbitrary `BoxStyle`s rather than only the specific patterns supported by previous constructors.
 
 - `all-is-cubes-gpu` library:
+    - Everything in the `in_wgpu` module is now located at the root of the crate instead.
     - `in_wgpu::SurfaceRenderer::new()` requires `wgpu::Adapter` instead of `&wgpu::Adapter`.
 
 - `all-is-cubes-mesh` library:
@@ -232,6 +233,9 @@ In order to resolve various design problems interfering with development, the `a
 - `all-is-cubes` library:
     - `block::Primitive` no longer contains `BlockAttributes` in any of its variants.
       The new means of specifying attributes is `block::Modifier::Attributes`.
+
+- `all-is-cubes-gpu` library:
+    - The `"wgpu"` crate feature no longer exists; it is not optional.
 
 ## 0.8.0 (2024-07-08)
 

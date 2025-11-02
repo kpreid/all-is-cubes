@@ -23,20 +23,16 @@ doctest = false
 
 [[test]]
 name = "shaders"
-required-features = ["wgpu"]
+required-features = []
 
 [[bench]]
 name = "wgpu"
 harness = false
-required-features = ["wgpu", "_special_testing"]
+required-features = ["_special_testing"]
 
 [features]
 # Adds support for render info logging to Rerun.
 rerun = ["all-is-cubes/rerun", "all-is-cubes-mesh/rerun"]
-# Enable wgpu support.
-# (The library is useless without this, but we used to have multiple GPU API support
-# and I don't want to go entirely deleting it quite yet.)
-wgpu = ["dep:wgpu"]
 # Adds automatic parallelism to some algorithms.
 # If disabled, `std::thread` is never used.
 # If enabled, threads may be created and the active `rayon` thread pool may be used.
@@ -88,7 +84,7 @@ web-sys = { version = "0.3.77", features = ["OffscreenCanvas"] }
 web-time = { workspace = true }
 # std feature is needed for `wgpu::util::StagingBelt`
 # wgsl feature is needed because our shaders are written in WGSL
-wgpu = { workspace = true, optional = true, features = ["std", "wgsl"] }
+wgpu = { workspace = true, features = ["std", "wgsl"] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 # Used in the `poll` module to implement timeout
