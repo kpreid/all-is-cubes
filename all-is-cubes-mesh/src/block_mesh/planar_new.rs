@@ -521,6 +521,7 @@ impl PtBasis {
     /// `(self.sweep_direction, self.perpendicular_direction)` quadrant,
     /// or negated as indicated.
     // TODO(planar_new): better explanation
+    #[inline(always)] // confirmed by benchmark to be faster
     fn connectivity(
         self,
         vertex: &AnalysisVertex,
