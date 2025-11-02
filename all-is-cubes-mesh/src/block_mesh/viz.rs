@@ -283,15 +283,13 @@ impl Viz {
     ) {
         #[cfg(feature = "rerun")]
         if let Self::Enabled(state) = self {
-            use std::string::ToString;
-
             state.destination.log(
                 &state.triangulator_current_vertex_path,
                 &convert_frontier_vertices(
                     &mut [vertex].into_iter(),
                     rg::components::Color::from_rgb(255, 255, 100),
                 )
-                .with_labels([label.to_string()]),
+                .with_labels([alloc::string::ToString::to_string(&label)]),
             );
         }
     }
