@@ -8,12 +8,13 @@ use hashbrown::HashMap as HbHashMap;
 
 use crate::behavior;
 use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
+use crate::universe::{
+    AnyPending, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadGuard, ReadTicket,
+    SealedMember, Universe, UniverseId, UniverseMember,
+};
+
 #[cfg(doc)]
 use crate::universe::HandleError;
-use crate::universe::{
-    AnyPending, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadTicket, SealedMember,
-    Universe, UniverseId, UniverseMember,
-};
 
 // Reëxports for macro-generated types
 #[doc(inline)]
@@ -25,11 +26,16 @@ pub(in crate::universe) use crate::universe::members::{
 
 /// Check a transaction against a [`Handle`].
 /// This is a shared helper between [`TransactionInUniverse`] and [`Universe::execute_1()`].
-pub(in crate::universe) fn check_transaction_in_universe<O: UniverseMember + Transactional>(
+pub(in crate::universe) fn check_transaction_in_universe<O>(
     universe: &Universe,
     target: &Handle<O>,
     transaction: &<O as Transactional>::Transaction,
 ) -> Result<<O::Transaction as Transaction>::CommitCheck, <O::Transaction as Transaction>::Mismatch>
+where
+    O: UniverseMember + Transactional,
+    // TODO(ecs): this bound must go away for <https://github.com/kpreid/all-is-cubes/issues/644>,
+    // which will require an alternate or generalized Transaction trait.
+    for<'t> O: UniverseMember<Read<'t> = ReadGuard<'t, O>>,
 {
     let check = transaction.check(
         &target
@@ -99,6 +105,9 @@ where
     O: UniverseMember + Transactional + 'static,
     for<'a> O::Transaction:
         Transaction<Output = transaction::NoOutput, Context<'a> = ReadTicket<'a>>,
+    // TODO(ecs): this bound must go away for <https://github.com/kpreid/all-is-cubes/issues/644>,
+    // which will require an alternate or generalized Transaction trait.
+    for<'t> O: UniverseMember<Read<'t> = ReadGuard<'t, O>>,
 {
     type Target = Universe;
     type Context<'a> = ();

@@ -17,8 +17,8 @@ use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
-    ErasedHandle, Handle, InsertError, Name, Universe, VisitableComponents, handle::HandlePtr,
-    universe_txn as ut,
+    ErasedHandle, Handle, InsertError, Name, ReadGuard, Universe, VisitableComponents,
+    handle::HandlePtr, universe_txn as ut,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -34,6 +34,12 @@ pub(in crate::universe) trait SealedMember:
 
     /// Generic constructor for [`AnyPending`].
     fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending;
+
+    /// Constructs `Self::Read` from a value that has not yet been inserted into the
+    /// [`Universe`].
+    fn read_from_standalone(value: &Self) -> Self::Read<'_>
+    where
+        Self: UniverseMember;
 }
 
 /// Trait for every type which can be a named member of a universe and be referred to by
@@ -46,7 +52,11 @@ pub(in crate::universe) trait SealedMember:
 // in a purely abstract architecture sense it’s a sort of “entity” but that conflicts with
 // “is a bevy_ecs entity”.
 #[expect(private_bounds)]
-pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember {}
+pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember {
+    /// Type returned by [`Handle::<T>::read()`][Handle::read()] which is the way to read the
+    /// `T` value after it has been inserted into the [`Universe`].
+    type Read<'ticket>;
+}
 
 /// Generates impls for a specific Universe member type.
 macro_rules! impl_universe_for_member {
@@ -59,9 +69,18 @@ macro_rules! impl_universe_for_member {
             fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending {
                 AnyPending::$member_type { handle, value }
             }
+
+            fn read_from_standalone(value: &Self) -> <Self as UniverseMember>::Read<'_> {
+                // TODO(ecs): using ReadGuard is a placeholder for future work.
+                // It used to be a lock guard, but now it stands in for the fact that
+                // Self::Read != &self in the future.
+                ReadGuard(value)
+            }
         }
 
-        impl UniverseMember for $member_type {}
+        impl UniverseMember for $member_type {
+            type Read<'ticket> = ReadGuard<'ticket, $member_type>;
+        }
 
         impl ut::UTransactional for $member_type {
             fn bind(

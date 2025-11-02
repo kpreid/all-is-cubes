@@ -247,6 +247,9 @@ impl Universe {
         T::Transaction:
             for<'u> Transaction<Output = transaction::NoOutput, Context<'u> = ReadTicket<'u>>,
         T: UniverseMember + Transactional,
+        // TODO(ecs): this bound must go away for <https://github.com/kpreid/all-is-cubes/issues/644>,
+        // which will require an alternate or generalized Transaction trait.
+        for<'t> T: UniverseMember<Read<'t> = ReadGuard<'t, T>>,
     {
         let check = check_transaction_in_universe(self, handle, &transaction)
             .map_err(ExecuteError::Check)?;

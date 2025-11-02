@@ -277,17 +277,14 @@ impl<T: 'static> Handle<T> {
         self.inner.universe_id.get(atomic::Ordering::Relaxed)
     }
 
-    /// Acquire temporary read access to the value, in the sense of
-    /// [`std::sync::RwLock::try_read()`].
-    // TODO(ecs): revise explanation now that this isn't always a RwLock, just on principle
+    /// Acquire read access to the referent of this handle.
     ///
-    /// The caller must supply a [`ReadTicket`] from the [`Universe`] the handle belongs to.
-    /// If the handle is pending (not yet inserted into a universe) then any ticket is acceptable.
+    /// The caller must supply a [`ReadTicket`] from the [`Universe`] or [`UniverseTransaction`]
+    /// the handle belongs to.
     ///
-    /// Returns an error if the value does not exist, is currently being written to, or if the
-    /// ticket does not match.
+    /// Returns an error if the handle is invalid or the ticket does not match.
     #[inline(never)]
-    pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<ReadGuard<'t, T>, HandleError>
+    pub fn read<'t>(&self, read_ticket: ReadTicket<'t>) -> Result<T::Read<'t>, HandleError>
     where
         T: UniverseMember,
     {
@@ -341,13 +338,14 @@ impl<T: 'static> Handle<T> {
 
         // Actually obtain access.
         match access {
-            Access::Pending => Ok(ReadGuard(
+            Access::Pending => Ok(T::read_from_standalone(
                 read_ticket.borrow_pending(self).map_err(|e| e.into_handle_error(self))?,
             )),
             Access::Entity(entity) => {
+                // TODO: this should be going through an ECS-specific path instead of read_from_standalone
                 let component =
                     read_ticket.get::<T>(entity).map_err(|e| e.into_handle_error(self))?;
-                Ok(ReadGuard(component))
+                Ok(T::read_from_standalone(component))
             }
         }
     }
@@ -460,8 +458,9 @@ impl<T: 'static> Handle<T> {
             }
         }
 
-        match self.read(read_ticket_for_self) {
-            Ok(data_guard) => {
+        // TODO: get rid of unnecessary into_handle_error() intermediate conversion
+        match read_ticket_for_self.borrow_pending(self).map_err(|e| e.into_handle_error(self)) {
+            Ok(data) => {
                 // Check for contained handles belonging to the wrong universe.
                 //
                 // TODO: This check should be applied to *both* transaction-based insertion and
@@ -469,7 +468,7 @@ impl<T: 'static> Handle<T> {
                 // There should also be similar checks for transactions inserting
                 // handle-containing data into existing members.
                 let mut ok = true;
-                (*data_guard).visit_handles(&mut |r: &dyn ErasedHandle| match r.universe_id() {
+                data.visit_handles(&mut |r: &dyn ErasedHandle| match r.universe_id() {
                     Some(id) if id == future_universe_id => {}
                     None => {}
                     Some(_) => ok = false,
@@ -1007,8 +1006,10 @@ impl<T: UniverseMember> Clone for StrongHandle<T> {
 /// You can create this by calling [`Handle::read()`], and must drop it before the next time
 /// the handle's referent is mutated.
 //---
-// TODO(ecs): This can become just a reference, now. Do that API change as a separate commit.
-pub struct ReadGuard<'ticket, T: 'static>(&'ticket T);
+// TODO(ecs): This type used to serve as a lock guard but is now a placeholder for access to
+// multi-component universe members. It should stop being used gradually as multi-component
+// universe members are introduced, then be deleted — any final uses being replaced with `&T`.
+pub struct ReadGuard<'ticket, T: 'static>(pub(in crate::universe) &'ticket T);
 
 impl<T: fmt::Debug> fmt::Debug for ReadGuard<'_, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {

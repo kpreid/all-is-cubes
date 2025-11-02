@@ -1307,9 +1307,12 @@ mod universe {
         }
     }
 
-    impl<T> Serialize for schema::SerializeHandle<'_, T>
+    impl<'ticket, T> Serialize for schema::SerializeHandle<'ticket, T>
     where
         T: Serialize + universe::UniverseMember,
+        // TODO(ecs): this bound must go away for <https://github.com/kpreid/all-is-cubes/issues/644>,
+        // which will require an alternate or generalized Transaction trait.
+        T: universe::UniverseMember<Read<'ticket> = ReadGuard<'ticket, T>>,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
