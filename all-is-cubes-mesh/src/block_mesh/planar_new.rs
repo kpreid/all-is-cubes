@@ -52,12 +52,16 @@ use alloc::collections::VecDeque;
 use core::cmp::Ordering;
 use core::format_args;
 use core::mem;
+use core::num::Wrapping;
 
-use all_is_cubes::math::{Face6, GridCoordinate, GridRotation, OctantMask, rgba_const};
+use all_is_cubes::math::{Cube, Face6, GridCoordinate, GridRotation, OctantMask, rgba_const};
 
 use crate::{Viz, block_mesh::analyze::AnalysisVertex};
 
 // -------------------------------------------------------------------------------------------------
+
+/// Wrapping arithmetic helps `compare_perp()` be simple
+type WrappingVector3D = all_is_cubes::euclid::Vector3D<Wrapping<GridCoordinate>, Cube>;
 
 /// Polygon triangulation algorithm state.
 ///
@@ -127,6 +131,12 @@ pub(super) struct PtBasis {
     /// Input vertices must be sorted by `perpendicular_direction.dot(vertex.position)`
     /// as a secondary key after `sweep_direction`.
     pub perpendicular_direction: Face6,
+
+    /// `perpendicular_direction` as a unit vector.
+    /// Wrapping arithmetic helps `compare_perp()` compile to simple code.
+    /// (We do not need to worry about actual wrapping because vertices are always in u8 range
+    /// anyway.)
+    perpendicular_vector: WrappingVector3D,
 
     /// Our normal coordinate system is understood as right-handed and in that system we build
     /// meshes that have counterclockwise triangle winding.
@@ -486,11 +496,12 @@ impl PtBasis {
         face: Face6::PX,
         sweep_direction: Face6::PX,
         perpendicular_direction: Face6::PX,
+        perpendicular_vector: WrappingVector3D::new(Wrapping(0), Wrapping(0), Wrapping(0)),
         left_handed: false,
         transparent: false,
     };
 
-    pub const fn new(
+    pub fn new(
         face: Face6,
         sweep_direction: Face6,
         perpendicular_direction: Face6,
@@ -505,16 +516,21 @@ impl PtBasis {
             face,
             sweep_direction,
             perpendicular_direction,
+            perpendicular_vector: perpendicular_direction.normal_vector(),
             left_handed,
             transparent,
         }
     }
 
     /// Compare two vertices’ positions along the direction perpendicular to the sweep.
+    #[inline(always)]
     fn compare_perp(self, v1: &AnalysisVertex, v2: &AnalysisVertex) -> Ordering {
-        self.perpendicular_direction
-            .dot(v1.position.to_vector())
-            .cmp(&self.perpendicular_direction.dot(v2.position.to_vector()))
+        // Wrapping arithmetic helps `compare_perp()` compile to simple code.
+        // (We do not need to worry about actual wrapping because vertices are always in u8 range
+        // anyway.)
+        self.perpendicular_vector
+            .dot(v1.position.to_vector().map(Wrapping))
+            .cmp(&self.perpendicular_vector.dot(v2.position.to_vector().map(Wrapping)))
     }
 
     /// Returns whether the vertex borders a part of the polygon that extends in the
@@ -632,11 +648,11 @@ mod tests {
     use all_is_cubes::math::Octant::{self, Nnn, Npn, Pnn, Ppn};
     use alloc::vec::Vec;
 
-    const TEST_BASIS: PtBasis = {
+    fn test_basis() -> PtBasis {
         let b = PtBasis::new(Face6::PZ, Face6::PX, Face6::PY, false);
         assert!(!b.left_handed); // TODO: could use tests that *are* left-handed
         b
-    };
+    }
 
     /// `PlanarTriangulator::new()` parameterized for simplicity
     /// (for tests that aren't trying to exercise rotatability)
@@ -651,7 +667,7 @@ mod tests {
 
         triangulator.triangulate(
             &mut viz,
-            TEST_BASIS,
+            test_basis(),
             vertices.iter().inspect(|vertex| println!("In: {vertex:?}")).copied(),
             |triangle_indices: [u32; 3]| {
                 let triangle_positions =
