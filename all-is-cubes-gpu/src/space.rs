@@ -31,17 +31,17 @@ use all_is_cubes_mesh::dynamic::{self, ChunkedSpaceMesh, RenderDataUpdate};
 use all_is_cubes_render::camera::Camera;
 use all_is_cubes_render::{Flaws, RenderError};
 
-use crate::in_wgpu::block_texture::{AtlasAllocator, BlockTextureViews};
-use crate::in_wgpu::camera::ShaderSpaceCamera;
-use crate::in_wgpu::glue::{
+use crate::block_texture::{AtlasAllocator, BlockTextureViews};
+use crate::camera::ShaderSpaceCamera;
+use crate::common::{DebugLineVertex, Memo, Msw, SpaceDrawInfo, SpaceUpdateInfo};
+use crate::glue::{
     BeltWritingParts, MapVec, ResizingBuffer, buffer_size_of, to_wgpu_index_format,
     to_wgpu_index_range, write_part_of_slice_to_part_of_buffer,
 };
-use crate::in_wgpu::pipelines::{BlockBufferSlot, Pipelines};
-use crate::in_wgpu::skybox;
-use crate::in_wgpu::vertex::{self, WgpuInstanceData, WgpuLinesVertex};
-use crate::in_wgpu::{LightChunk, LightTexture, WgpuMt};
-use crate::{DebugLineVertex, Memo, Msw, SpaceDrawInfo, SpaceUpdateInfo};
+use crate::pipelines::{BlockBufferSlot, Pipelines};
+use crate::skybox;
+use crate::vertex::{self, WgpuInstanceData, WgpuLinesVertex};
+use crate::{LightChunk, LightTexture, WgpuMt};
 
 // temporarily public for a lighting kludge
 pub(super) const CHUNK_SIZE: GridCoordinate = 16;
@@ -851,12 +851,12 @@ impl SpaceRenderer {
 /// GPU resources for the camera uniform that [`BLOCKS_AND_LINES_SHADER`] expects,
 /// matching [`Pipelines::camera_bind_group_layout`].
 #[derive(Debug)]
-pub(in crate::in_wgpu) struct SpaceCameraBuffer {
+pub(crate) struct SpaceCameraBuffer {
     /// Buffer containing a [`ShaderSpaceCamera`].
-    pub(in crate::in_wgpu) buffer: wgpu::Buffer,
+    pub(crate) buffer: wgpu::Buffer,
 
     /// Bind group binding the buffer.
-    pub(in crate::in_wgpu) bind_group: wgpu::BindGroup,
+    pub(crate) bind_group: wgpu::BindGroup,
 }
 
 impl SpaceCameraBuffer {
@@ -882,7 +882,7 @@ impl SpaceCameraBuffer {
 /// Create the bind group to be used with [`Pipelines::space_texture_bind_group_layout`].
 ///
 /// Must be called after `block_texture.flush()`.
-pub(in crate::in_wgpu) fn create_space_bind_group(
+pub(crate) fn create_space_bind_group(
     space_label: &str,
     device: &wgpu::Device,
     pipelines: &Pipelines,

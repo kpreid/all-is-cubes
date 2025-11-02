@@ -23,10 +23,10 @@ use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
 use all_is_cubes_mesh::texture::{self, Channels};
 
-use crate::in_wgpu::glue::{size3d_to_extent, write_texture_by_aab};
-use crate::in_wgpu::vertex::{AtlasTexel, FixTexCoord, TexPoint};
+use crate::common::{BlockTextureInfo, Identified, Msw};
+use crate::glue::{size3d_to_extent, write_texture_by_aab};
 use crate::octree_alloc::{Alloctree, AlloctreeHandle};
-use crate::{BlockTextureInfo, Identified, Msw};
+use crate::vertex::{AtlasTexel, FixTexCoord, TexPoint};
 
 //------------------------------------------------------------------------------------------------//
 // Types

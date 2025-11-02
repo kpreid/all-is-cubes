@@ -1,3 +1,5 @@
+//! Defines the [`Pipelines`] struct.
+
 use alloc::sync::Arc;
 use core::mem;
 use wgpu::util::DeviceExt;
@@ -6,10 +8,10 @@ use all_is_cubes::content::load_image::include_image;
 use all_is_cubes::listen::{self, Listen as _};
 use all_is_cubes_render::camera::{GraphicsOptions, TransparencyOption};
 
-use crate::in_wgpu::frame_texture::FramebufferTextures;
-use crate::in_wgpu::glue::size2d_to_extent;
-use crate::in_wgpu::shaders::Shaders;
-use crate::in_wgpu::vertex;
+use crate::frame_texture::FramebufferTextures;
+use crate::glue::size2d_to_extent;
+use crate::shaders::Shaders;
+use crate::vertex;
 
 /// Resources needed for rendering that aren't actually specific to any content and so
 /// don't need to be modified under normal circumstances.
@@ -730,7 +732,7 @@ impl Pipelines {
         });
 
         let debug_font = {
-            let image = include_image!("../common/micro-font.png");
+            let image = include_image!("common/micro-font.png");
             device.create_texture_with_data(
                 queue,
                 &wgpu::TextureDescriptor {

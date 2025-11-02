@@ -1,4 +1,4 @@
-//! Miscellaneous conversion functions and trait impls for [`wgpu`].
+//! Miscellaneous helpers built on top of the [`wgpu`] API.
 
 use alloc::alloc::Layout;
 use alloc::string::String;
@@ -376,7 +376,7 @@ impl<T> Default for MapVec<'_, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::in_wgpu::init::map_really_async;
+    use crate::init::map_really_async;
     use alloc::string::ToString;
     use alloc::{vec, vec::Vec};
     use pollster::block_on;

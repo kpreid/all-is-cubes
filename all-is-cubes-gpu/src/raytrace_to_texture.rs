@@ -25,9 +25,9 @@ use all_is_cubes_render::camera::{Camera, ImagePixel, Layers, StandardCameras, V
 use all_is_cubes_render::raytracer::{self, RtRenderer};
 use all_is_cubes_render::{Flaws, RenderError};
 
-use crate::in_wgpu::frame_texture::DrawableTexture;
-use crate::in_wgpu::pipelines::Pipelines;
-use crate::{Identified, Memo};
+use crate::common::{Identified, Memo};
+use crate::frame_texture::DrawableTexture;
+use crate::pipelines::Pipelines;
 
 // -------------------------------------------------------------------------------------------------
 

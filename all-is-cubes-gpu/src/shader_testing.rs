@@ -21,16 +21,16 @@ use all_is_cubes::math::{Face6, FreeVector, GridSize, GridVector, Rgba, ps64};
 use all_is_cubes_mesh::{BlockVertex, Coloring, Vertex as _};
 use all_is_cubes_render::camera::{Camera, GraphicsOptions, ViewTransform, Viewport};
 
-use crate::in_wgpu::pipelines::BlockBufferSlot;
-use crate::in_wgpu::shaders::Shaders;
-use crate::in_wgpu::{
-    self, FramebufferTextures,
-    camera::ShaderSpaceCamera,
-    frame_texture::{FbtConfig, FbtFeatures},
-    init::get_texels_from_gpu,
-    space::SpaceCameraBuffer,
-    vertex,
-};
+use crate::FramebufferTextures;
+use crate::camera::ShaderSpaceCamera;
+use crate::frame_texture::{FbtConfig, FbtFeatures};
+use crate::init::get_texels_from_gpu;
+use crate::pipelines::BlockBufferSlot;
+use crate::shaders::Shaders;
+use crate::space::SpaceCameraBuffer;
+use crate::vertex;
+
+// -------------------------------------------------------------------------------------------------
 
 // TODO: T is bad abstraction since it silently has to be f16
 pub async fn run_shader_test<T>(
@@ -43,7 +43,7 @@ where
     T: bytemuck::Pod,
 {
     let (device, queue) = adapter
-        .request_device(&in_wgpu::EverythingRenderer::device_descriptor(
+        .request_device(&crate::EverythingRenderer::device_descriptor(
             device_label,
             adapter.limits(),
         ))
@@ -77,7 +77,7 @@ where
         ),
     );
 
-    let pipelines = in_wgpu::pipelines::Pipelines::new(
+    let pipelines = crate::pipelines::Pipelines::new(
         &device,
         &queue,
         &shaders,
@@ -137,20 +137,20 @@ where
 
     // Placeholder space data for the bind group
     let texture_allocator =
-        in_wgpu::block_texture::AtlasAllocator::new("shader test space", &device.limits());
+        crate::block_texture::AtlasAllocator::new("shader test space", &device.limits());
     let (texture_view, _) = texture_allocator.flush(&device, &queue);
-    let space_bind_group = in_wgpu::space::create_space_bind_group(
+    let space_bind_group = crate::space::create_space_bind_group(
         "shader test space",
         &device,
         &pipelines,
         &texture_view,
-        &in_wgpu::LightTexture::new(
+        &crate::LightTexture::new(
             "shader test space",
             &device,
             GridSize::splat(1),
             wgpu::TextureUsages::empty(),
         ),
-        in_wgpu::skybox::Skybox::new(&device, "shader test space").texture_view(),
+        crate::skybox::Skybox::new(&device, "shader test space").texture_view(),
     );
 
     // This buffer contains one triangle, that will be full-screen once the camera looks

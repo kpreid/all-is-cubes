@@ -27,16 +27,13 @@ pub(crate) struct Shaders {
 }
 
 static BLOCKS_AND_LINES: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/blocks-and-lines.wgsl"));
-static RESAMPLING: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/resampling.wgsl"));
-static RT_COPY: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/rt-copy.wgsl"));
+    Lazy::new(|| reloadable_str!("src/shaders/blocks-and-lines.wgsl"));
+static RESAMPLING: Lazy<Reloadable> = Lazy::new(|| reloadable_str!("src/shaders/resampling.wgsl"));
+static RT_COPY: Lazy<Reloadable> = Lazy::new(|| reloadable_str!("src/shaders/rt-copy.wgsl"));
 static POSTPROCESS: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/postprocess.wgsl"));
+    Lazy::new(|| reloadable_str!("src/shaders/postprocess.wgsl"));
 #[cfg(feature = "rerun")]
-static RERUN_COPY: Lazy<Reloadable> =
-    Lazy::new(|| reloadable_str!("src/in_wgpu/shaders/rerun-copy.wgsl"));
+static RERUN_COPY: Lazy<Reloadable> = Lazy::new(|| reloadable_str!("src/shaders/rerun-copy.wgsl"));
 
 impl Shaders {
     pub fn new(device: &wgpu::Device) -> Self {

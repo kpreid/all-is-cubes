@@ -18,22 +18,22 @@ use all_is_cubes_render::{Flaws, RenderError};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 
-use crate::in_wgpu::block_texture::AtlasAllocator;
-use crate::in_wgpu::frame_texture::{self, FbtFeatures};
-use crate::in_wgpu::glue::{BeltWritingParts, ResizingBuffer, buffer_size_of, to_wgpu_color};
-use crate::in_wgpu::pipelines::Pipelines;
-use crate::in_wgpu::postprocess;
-use crate::in_wgpu::raytrace_to_texture::RaytraceToTexture;
-use crate::in_wgpu::shaders::Shaders;
-use crate::in_wgpu::vertex::WgpuLinesVertex;
-use crate::in_wgpu::{DrawableTexture, FramebufferTextures, SpaceRenderer};
-use crate::{
+use crate::block_texture::AtlasAllocator;
+use crate::common::{
     DrawInfo, FrameBudget, SpaceDrawInfo, SpaceUpdateInfo, UpdateInfo, gather_debug_lines,
     wireframe_vertices,
 };
+use crate::frame_texture::{self, FbtFeatures};
+use crate::glue::{BeltWritingParts, ResizingBuffer, buffer_size_of, to_wgpu_color};
+use crate::pipelines::Pipelines;
+use crate::postprocess;
+use crate::raytrace_to_texture::RaytraceToTexture;
+use crate::shaders::Shaders;
+use crate::vertex::WgpuLinesVertex;
+use crate::{DrawableTexture, FramebufferTextures, SpaceRenderer};
 
 #[cfg(feature = "rerun")]
-use crate::{RerunFilter, in_wgpu::rerun_image};
+use crate::{RerunFilter, rerun_image};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -50,7 +50,7 @@ pub(super) struct EverythingRenderer {
 
     staging_belt: wgpu::util::StagingBelt,
 
-    pub(in crate::in_wgpu) cameras: StandardCameras,
+    pub(crate) cameras: StandardCameras,
 
     /// Surface configuration maintained to match the viewport.
     config: wgpu::SurfaceConfiguration,

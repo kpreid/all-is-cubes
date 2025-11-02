@@ -8,9 +8,9 @@ use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{GraphicsOptions, ImagePixel};
 
 use super::bloom;
-use crate::in_wgpu::glue::size2d_to_extent;
-use crate::in_wgpu::shaders::Shaders;
-use crate::{EgFramebuffer, Identified};
+use crate::common::{EgFramebuffer, Identified};
+use crate::glue::size2d_to_extent;
+use crate::shaders::Shaders;
 
 /// A RGBA [`wgpu::Texture`] with a CPU-side buffer that can be drawn on.
 pub(crate) struct DrawableTexture<In, Out> {

@@ -14,8 +14,8 @@ use all_is_cubes_render::camera::{ImageSize, Layers, StandardCameras, Viewport};
 use all_is_cubes_render::{Flaws, HeadlessRenderer, RenderError, Rendering};
 
 use crate::common::FrameBudget;
-use crate::in_wgpu::glue::size2d_to_extent;
-use crate::in_wgpu::{self, init};
+use crate::glue::size2d_to_extent;
+use crate::init;
 
 /// Builder for configuring a [headless](HeadlessRenderer) [`Renderer`].
 ///
@@ -36,7 +36,7 @@ impl Builder {
         adapter: wgpu::Adapter,
     ) -> Result<Self, wgpu::RequestDeviceError> {
         let (device, queue) = adapter
-            .request_device(&in_wgpu::EverythingRenderer::device_descriptor(
+            .request_device(&crate::EverythingRenderer::device_descriptor(
                 label,
                 adapter.limits(),
             ))
@@ -59,7 +59,7 @@ impl Builder {
     /// Create a [`Renderer`] from the GPU connection in this builder and the given cameras.
     pub fn build(&self, cameras: StandardCameras) -> Renderer {
         let viewport_source = cameras.viewport_source();
-        let everything = in_wgpu::EverythingRenderer::new(
+        let everything = crate::EverythingRenderer::new(
             self.executor.clone(),
             self.device.clone(),
             &self.queue,

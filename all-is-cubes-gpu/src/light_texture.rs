@@ -20,10 +20,8 @@ use all_is_cubes::{
 };
 use all_is_cubes_render::camera::Camera;
 
-use crate::{
-    Identified,
-    in_wgpu::glue::{extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab},
-};
+use crate::common::Identified;
+use crate::glue::{extent_to_size3d, point_to_origin, size3d_to_extent, write_texture_by_aab};
 
 type Texel = [u8; LightTexture::COMPONENTS];
 type Range = std::ops::Range<GridCoordinate>;
@@ -37,7 +35,7 @@ type Range = std::ops::Range<GridCoordinate>;
 /// which is the farthest possible distance (in chunk sizes) a part of a chunk could be seen from.
 ///
 /// TODO: Find a better solution; perhaps decide that we want to clip geometry more proactively.
-const CAMERA_MARGIN_RADIUS: f64 = crate::in_wgpu::space::CHUNK_SIZE as f64 * 1.75;
+const CAMERA_MARGIN_RADIUS: f64 = crate::space::CHUNK_SIZE as f64 * 1.75;
 
 /// Compute the rendered region for which light data is needed.
 ///

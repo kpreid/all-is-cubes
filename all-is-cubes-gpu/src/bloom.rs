@@ -1,8 +1,8 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 
-use crate::in_wgpu::mip_ping;
-use crate::in_wgpu::shaders::Shaders;
+use crate::mip_ping;
+use crate::shaders::Shaders;
 
 /// Resources for executing bloom on a specific image size.
 pub(crate) type BloomResources = mip_ping::Texture;

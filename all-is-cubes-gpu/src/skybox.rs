@@ -11,7 +11,7 @@ use crate::Identified;
 
 /// GPU resources to render a [`Sky`].
 #[derive(Debug)]
-pub(in crate::in_wgpu) struct Skybox {
+pub(crate) struct Skybox {
     texture_label: String,
     texture: wgpu::Texture,
     texture_view: Identified<wgpu::TextureView>,
@@ -63,7 +63,7 @@ fn resolution_for(sky: &Sky) -> u32 {
     }
 }
 
-pub(in crate::in_wgpu) fn create_skybox_texture(
+pub(crate) fn create_skybox_texture(
     device: &wgpu::Device,
     label: &str,
     resolution: u32,

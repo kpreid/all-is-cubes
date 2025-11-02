@@ -7,10 +7,10 @@ use all_is_cubes::math::PositiveSign;
 use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator};
 
-use crate::in_wgpu::everything::InfoTextTexture;
-use crate::in_wgpu::frame_texture;
-use crate::in_wgpu::shaders::Shaders;
-use crate::{Id, Memo};
+use crate::common::{Id, Memo};
+use crate::everything::InfoTextTexture;
+use crate::frame_texture;
+use crate::shaders::Shaders;
 
 // -------------------------------------------------------------------------------------------------
 

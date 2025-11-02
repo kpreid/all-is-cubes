@@ -11,8 +11,7 @@ use all_is_cubes::util::Executor;
 use all_is_cubes_render::camera::{Layers, StandardCameras};
 use all_is_cubes_render::{Flaws, RenderError};
 
-use crate::in_wgpu::EverythingRenderer;
-use crate::{FrameBudget, RenderInfo, SpaceDrawInfo};
+use crate::{EverythingRenderer, FrameBudget, RenderInfo, SpaceDrawInfo};
 
 #[cfg(feature = "rerun")]
 use {crate::RerunFilter, all_is_cubes::rerun_glue as rg};

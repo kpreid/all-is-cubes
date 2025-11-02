@@ -8,11 +8,11 @@ use futures_core::future::BoxFuture;
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes_render::camera::{Camera, ImageSize, Viewport};
 
-use crate::Memo;
-use crate::in_wgpu::camera::ShaderSpaceCamera;
-use crate::in_wgpu::glue::{buffer_size_of, size2d_to_extent};
-use crate::in_wgpu::init;
-use crate::in_wgpu::pipelines::Pipelines;
+use crate::camera::ShaderSpaceCamera;
+use crate::common::Memo;
+use crate::glue::{buffer_size_of, size2d_to_extent};
+use crate::init;
+use crate::pipelines::Pipelines;
 
 pub(crate) struct RerunImageExport {
     device: wgpu::Device,
