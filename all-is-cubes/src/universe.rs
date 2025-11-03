@@ -9,6 +9,7 @@ use core::fmt;
 
 use bevy_ecs::entity::Entity;
 use bevy_ecs::prelude as ecs;
+use bevy_ecs::world::FromWorld as _;
 use manyfmt::Fmt;
 
 use crate::behavior::BehaviorSetStepInfo;
@@ -36,7 +37,7 @@ pub(crate) use members::*;
 pub use members::{AnyHandle, UniverseMember};
 
 mod ecs_details;
-use ecs_details::{Membership, NameMap};
+use ecs_details::{Membership, NameMap, QueryStateBundle};
 // TODO(ecs): try to eliminate uses of get_one_mut_and_ticket in favor of normal queries
 pub(crate) use ecs_details::get_one_mut_and_ticket;
 
@@ -95,8 +96,8 @@ pub struct Universe {
     /// ECS storage for most of the data of the universe.
     world: ecs::World,
 
-    /// Stuff derived from `world` that we want to construct once.
-    regs: WorldRegistrations,
+    /// [`QueryState`]s derived from `world` that we use manually and therefore need to keep fresh.
+    queries: Queries,
 
     id: UniverseId,
 
@@ -137,7 +138,9 @@ pub struct Universe {
     rerun_destination: crate::rerun_glue::Destination,
 }
 
-struct WorldRegistrations {
+#[derive(ecs::FromWorld)]
+#[macro_rules_attribute::derive(ecs_details::derive_manual_query_bundle!)]
+struct Queries {
     all_members_query: ecs::QueryState<(Entity, &'static Membership)>,
 }
 
@@ -184,15 +187,12 @@ impl Universe {
             );
         }
 
-        let regs = WorldRegistrations {
-            all_members_query: world.query::<(Entity, &Membership)>(),
-        };
-
         Box::write(
             empty_box,
             Universe {
+                queries: Queries::from_world(&mut world),
+
                 world,
-                regs,
                 id,
                 next_anonym: 0,
                 wants_gc: false,
@@ -569,15 +569,14 @@ impl Universe {
     where
         T: UniverseMember,
     {
-        self.regs
-            .all_members_query
-            .iter_manual(&self.world)
-            .filter_map(|(_entity, membership)| {
+        self.queries.all_members_query.iter_manual(&self.world).filter_map(
+            |(_entity, membership)| {
                 Some((
                     membership.name.clone(),
                     membership.handle.downcast_ref::<T>()?.clone(),
                 ))
-            })
+            },
+        )
     }
 
     /// Convert a possibly-[pending](Name::Pending) [`Name`] into a name that may be an
@@ -649,7 +648,7 @@ impl Universe {
     #[cfg(feature = "save")]
     pub(crate) fn validate_deserialized_members(&self) -> Result<(), DeserializeHandlesError> {
         let read_ticket = self.read_ticket();
-        self.regs.all_members_query.iter_manual(&self.world).try_for_each(
+        self.queries.all_members_query.iter_manual(&self.world).try_for_each(
             |(_entity, membership)| {
                 if membership.handle.not_still_deserializing(read_ticket) {
                     Ok(())
@@ -710,10 +709,9 @@ impl Universe {
 
     /// Update stored queries to account for new archetypes.
     ///
-    /// TODO(ecs): Is it possible and needful to avoid doing this if no changes were made?
+    /// This is called whenever [`UniverseMember`]s are added.
     fn update_archetypes(&mut self) {
-        let WorldRegistrations { all_members_query } = &mut self.regs;
-        all_members_query.update_archetypes(&self.world);
+        self.queries.update_archetypes(&self.world);
     }
 
     /// Activate logging this universe's time to a Rerun stream.
@@ -752,7 +750,7 @@ impl fmt::Debug for Universe {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
             world,
-            regs: _,
+            queries: _,
             id: _,
             next_anonym: _,
             wants_gc: _,
@@ -800,7 +798,7 @@ impl fmt::Debug for Universe {
 
         // Print members, sorted by name.
         let members: BTreeMap<&Name, &'static str> = self
-            .regs
+            .queries
             .all_members_query
             .iter_manual(&self.world)
             .map(|(_entity, membership)| (&membership.name, membership.handle.member_type_name()))

@@ -75,3 +75,29 @@ where
         )
     })
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// A collection of [`ecs::QueryState`]s to be updated so they can be used immutably.
+pub(in crate::universe) trait QueryStateBundle: ecs::FromWorld {
+    fn update_archetypes(&mut self, world: &ecs::World);
+}
+
+/// Macro for use with [`macro_rules_attribute::derive`] which derives `ManualQueryBundle`.
+macro_rules! derive_manual_query_bundle {
+    (
+        $(#[$ignored_attr:meta])*
+        $vis:vis struct $struct:ident {
+            $($field_vis:vis $field_name:ident: $query_state_type:ty,)*
+        }
+    ) => {
+        impl $crate::universe::ecs_details::QueryStateBundle for $struct {
+            fn update_archetypes(&mut self, world: &::bevy_ecs::world::World) {
+                $(
+                    self.$field_name.update_archetypes(world);
+                )*
+            }
+        }
+    };
+}
+pub(crate) use derive_manual_query_bundle;
