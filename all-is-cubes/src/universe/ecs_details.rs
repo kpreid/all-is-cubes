@@ -48,29 +48,27 @@ fn remove_membership_hook(
 
 // -------------------------------------------------------------------------------------------------
 
-/// Get mutable access to one component of one entity, and read-only access to all other
-/// entities.
+/// Get mutable access to `QueryData` of one entity, and read-only access to all other entities.
 ///
 /// Returns [`None`] if there is no such entity or component.
 ///
 /// Panics if the world is not configured as a [`Universe`]’s world.
 #[allow(clippy::elidable_lifetime_names)]
-pub(crate) fn get_one_mut_and_ticket<'w, C>(
+pub(crate) fn get_one_mut_and_ticket<'w, D>(
     world: &'w mut ecs::World,
     entity: ecs::Entity,
-) -> Option<(ecs::Mut<'w, C>, ReadTicket<'w>)>
+    query_state: &mut ecs::QueryState<D, ()>,
+) -> Option<(D::Item<'w>, ReadTicket<'w>)>
 where
-    C: ecs::Component<Mutability = bevy_ecs::component::Mutable>,
+    D: bevy_ecs::query::QueryData,
 {
     let universe_id: UniverseId = *world.resource::<UniverseId>();
     let unsafe_world = world.as_unsafe_world_cell();
-    let unsafe_entity_mut = unsafe_world.get_entity(entity).ok()?;
 
-    // SAFETY: `unsafe_entity_mut` and the `everything_but()` ticket are disjoint parts of the
-    // world.
+    // SAFETY: The query and the `everything_but()` ticket access disjoint parts of the world.
     Some(unsafe {
         (
-            unsafe_entity_mut.get_mut::<C>()?,
+            query_state.get_unchecked(unsafe_world, entity).ok()?,
             ReadTicket::everything_but(universe_id, unsafe_world, entity),
         )
     })

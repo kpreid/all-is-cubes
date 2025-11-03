@@ -142,6 +142,7 @@ pub struct Universe {
 #[macro_rules_attribute::derive(ecs_details::derive_manual_query_bundle!)]
 struct Queries {
     all_members_query: ecs::QueryState<(Entity, &'static Membership)>,
+    members: MemberQueries,
 }
 
 impl Universe {
@@ -348,9 +349,12 @@ impl Universe {
             }
 
             for space_handle in spaces {
-                let (mut space, everything_but) = self
-                    .get_one_mut_and_ticket::<Space>(space_handle.as_entity(self.id).unwrap())
-                    .unwrap();
+                let (mut space, everything_but) = get_one_mut_and_ticket(
+                    &mut self.world,
+                    space_handle.as_entity(self.id).unwrap(),
+                    &mut self.queries.members.spaces,
+                )
+                .unwrap();
 
                 let (space_info, transaction) = space.step(
                     everything_but,
@@ -691,20 +695,6 @@ impl Universe {
             panic!("{handle:?}.as_entity() succeeded but entity {entity:?} is missing");
         };
         Ok(function(&mut *component_guard))
-    }
-
-    /// Get mutable access to one component of one entity, and read-only access to all other
-    /// entities.
-    #[allow(clippy::elidable_lifetime_names)]
-    pub(in crate::universe) fn get_one_mut_and_ticket<'u, C>(
-        &'u mut self,
-        // TODO(ecs): review whether this parameter should be a Handle
-        entity: Entity,
-    ) -> Option<(ecs::Mut<'u, C>, ReadTicket<'u>)>
-    where
-        C: ecs::Component<Mutability = bevy_ecs::component::Mutable>,
-    {
-        get_one_mut_and_ticket(&mut self.world, entity)
     }
 
     /// Update stored queries to account for new archetypes.

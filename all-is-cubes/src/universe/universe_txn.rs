@@ -59,12 +59,14 @@ where
         Transaction<Output = transaction::NoOutput, Context<'a> = ReadTicket<'a>>,
 {
     let entity: ecs::Entity = target.as_entity(universe.universe_id()).unwrap();
-    let (mut target_component, everything_but) = universe
-        .get_one_mut_and_ticket::<O>(entity)
-        .expect("component missing; universe state changed between check and commit");
+    let query_state = O::member_mutation_query_state(&mut universe.queries.members);
+
+    let (mut target_mut, everything_but) =
+        super::get_one_mut_and_ticket(&mut universe.world, entity, query_state)
+            .expect("target query failed; universe state changed between check and commit");
 
     transaction.commit(
-        &mut *target_component,
+        &mut *target_mut,
         everything_but,
         check,
         &mut transaction::no_outputs,

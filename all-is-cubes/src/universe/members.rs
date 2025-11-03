@@ -40,6 +40,10 @@ pub(in crate::universe) trait SealedMember:
     fn read_from_standalone(value: &Self) -> Self::Read<'_>
     where
         Self: UniverseMember;
+
+    fn member_mutation_query_state(
+        queries: &mut MemberQueries,
+    ) -> &mut ecs::QueryState<&'static mut Self>;
 }
 
 /// Trait for every type which can be a named member of a universe and be referred to by
@@ -78,6 +82,12 @@ macro_rules! impl_universe_for_member {
                 // It used to be a lock guard, but now it stands in for the fact that
                 // Self::Read != &self in the future.
                 ReadGuard(value)
+            }
+
+            fn member_mutation_query_state(
+                queries: &mut MemberQueries,
+            ) -> &mut ecs::QueryState<&'static mut Self> {
+                &mut queries.$table
             }
         }
 
@@ -465,6 +475,18 @@ macro_rules! member_enums_and_impls {
             }
         }
         impl Eq for AnyPending {}
+
+        /// Queries for mutating members, used by transaction commits.
+        #[derive(ecs::FromWorld)]
+        #[allow(nonstandard_style)]
+        #[macro_rules_attribute::derive($crate::universe::ecs_details::derive_manual_query_bundle!)]
+        pub(in crate::universe) struct MemberQueries {
+            $(
+                pub(in crate::universe) $table_name:
+                    ::bevy_ecs::query::QueryState<&'static mut $member_type>,
+            )*
+        }
+
     }
 }
 

@@ -23,15 +23,17 @@ use crate::{block, time};
 pub(crate) fn execute_tick_actions_system(
     ecs::In(spaces): ecs::In<Vec<Handle<Space>>>,
     world: &mut ecs::World,
+    space_query: &mut ecs::QueryState<&mut Space>,
 ) -> ecs::Result<usize> {
     let universe_id: UniverseId = *world.resource();
     let tick = world.resource::<time::CurrentTick>().get()?;
 
     let mut ticked_cube_count: usize = 0;
     for space_handle in spaces {
-        let (mut space, everything_but) = crate::universe::get_one_mut_and_ticket::<Space>(
+        let (mut space, everything_but) = crate::universe::get_one_mut_and_ticket(
             world,
             space_handle.as_entity(universe_id).unwrap(),
+            space_query,
         )
         .unwrap();
 
