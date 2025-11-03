@@ -9,8 +9,8 @@ use hashbrown::HashMap as HbHashMap;
 use crate::behavior;
 use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
 use crate::universe::{
-    AnyPending, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadGuard, ReadTicket,
-    SealedMember, Universe, UniverseId, UniverseMember,
+    AnyPending, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadTicket, SealedMember,
+    Universe, UniverseId, UniverseMember,
 };
 
 #[cfg(doc)]
@@ -24,6 +24,34 @@ pub(in crate::universe) use crate::universe::members::{
 
 // -------------------------------------------------------------------------------------------------
 
+/// Trait for executing a transaction on a universe member that is placed in a universe.
+///
+/// Such executions cannot use the normal [`Transaction`] trait, because it assumes that
+/// `&T` is avaulable for checking and `&mut` is available for committing, both of which will
+/// eventually be false for universe members when they consist of multiple components.
+// TODO(ecs): update above comment when it is no longer describing the future.
+///
+/// This should have the same behaviors that the [`Transaction`] trait does.
+/// (In the future, it may no longer be required for the type to also implement [`Transaction`].)
+pub(crate) trait TransactionOnEcs: Transaction
+where
+    <Self as Transaction>::Target: UniverseMember,
+{
+    /// See [`Transaction::check()`].
+    fn check(
+        &self,
+        target: <<Self as Transaction>::Target as UniverseMember>::Read<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch>;
+
+    /// See [`Transaction::commit()`].
+    fn commit<'t>(
+        self,
+        target: &'t mut <Self as Transaction>::Target, // TODO: needs to become a QueryData type
+        everything_else: ReadTicket<'t>,
+        check: Self::CommitCheck,
+    ) -> Result<(), CommitError>;
+}
+
 /// Check a transaction against a [`Handle`].
 /// This is a shared helper between [`TransactionInUniverse`] and [`Universe::execute_1()`].
 pub(in crate::universe) fn check_transaction_in_universe<O>(
@@ -33,12 +61,11 @@ pub(in crate::universe) fn check_transaction_in_universe<O>(
 ) -> Result<<O::Transaction as Transaction>::CommitCheck, <O::Transaction as Transaction>::Mismatch>
 where
     O: UniverseMember + Transactional,
-    // TODO(ecs): this bound must go away for <https://github.com/kpreid/all-is-cubes/issues/644>,
-    // which will require an alternate or generalized Transaction trait.
-    for<'t> O: UniverseMember<Read<'t> = ReadGuard<'t, O>>,
+    <O as Transactional>::Transaction: TransactionOnEcs,
 {
-    let check = transaction.check(
-        &target
+    let check = TransactionOnEcs::check(
+        transaction,
+        target
             .read(universe.read_ticket())
             .expect("Attempted to execute transaction with target already borrowed"),
     )?;
@@ -55,8 +82,7 @@ pub(in crate::universe) fn commit_transaction_in_universe<O>(
 ) -> Result<(), CommitError>
 where
     O: UniverseMember + Transactional,
-    for<'a> O::Transaction:
-        Transaction<Output = transaction::NoOutput, Context<'a> = ReadTicket<'a>>,
+    <O as Transactional>::Transaction: TransactionOnEcs,
 {
     let entity: ecs::Entity = target.as_entity(universe.universe_id()).unwrap();
     let query_state = O::member_mutation_query_state(&mut universe.queries.members);
@@ -65,12 +91,7 @@ where
         super::get_one_mut_and_ticket(&mut universe.world, entity, query_state)
             .expect("target query failed; universe state changed between check and commit");
 
-    transaction.commit(
-        &mut *target_mut,
-        everything_but,
-        check,
-        &mut transaction::no_outputs,
-    )
+    TransactionOnEcs::commit(transaction, &mut *target_mut, everything_but, check)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -104,12 +125,7 @@ pub(in crate::universe) struct TransactionInUniverse<O: Transactional + 'static>
 
 impl<O> Transaction for TransactionInUniverse<O>
 where
-    O: UniverseMember + Transactional + 'static,
-    for<'a> O::Transaction:
-        Transaction<Output = transaction::NoOutput, Context<'a> = ReadTicket<'a>>,
-    // TODO(ecs): this bound must go away for <https://github.com/kpreid/all-is-cubes/issues/644>,
-    // which will require an alternate or generalized Transaction trait.
-    for<'t> O: UniverseMember<Read<'t> = ReadGuard<'t, O>>,
+    O: UniverseMember + Transactional<Transaction: TransactionOnEcs> + 'static,
 {
     type Target = Universe;
     type Context<'a> = ();

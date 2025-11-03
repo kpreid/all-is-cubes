@@ -6,7 +6,7 @@ use bevy_ecs::prelude as ecs;
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
 use crate::listen::{self, Gate, IntoListener as _, Listener, Notifier};
 use crate::transaction::{self, Equal, Transaction};
-use crate::universe::{HandleVisitor, ReadTicket, VisitHandles};
+use crate::universe::{self, HandleVisitor, ReadTicket, VisitHandles};
 
 #[cfg(doc)]
 use crate::block::{EvaluatedBlock, Primitive};
@@ -308,6 +308,30 @@ impl Transaction for BlockDefTransaction {
     }
 }
 
+impl universe::TransactionOnEcs for BlockDefTransaction {
+    fn check(
+        &self,
+        target: universe::ReadGuard<'_, BlockDef>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, &*target)
+    }
+
+    fn commit(
+        self,
+        target: &mut BlockDef,
+        read_ticket: ReadTicket<'_>,
+        check: Self::CommitCheck,
+    ) -> Result<(), transaction::CommitError> {
+        Transaction::commit(
+            self,
+            target,
+            read_ticket,
+            check,
+            &mut transaction::no_outputs,
+        )
+    }
+}
+
 impl transaction::Merge for BlockDefTransaction {
     type MergeCheck = ();
     type Conflict = BlockDefConflict;
@@ -447,7 +471,7 @@ pub(crate) enum BlockDefNextValue {
 pub(crate) fn update_phase_1(
     mut info: ecs::InMut<'_, BlockDefStepInfo>,
     mut defs: ecs::Query<'_, '_, (&BlockDef, &mut BlockDefNextValue)>,
-    data_sources: crate::universe::QueryBlockDataSources<'_, '_>,
+    data_sources: universe::QueryBlockDataSources<'_, '_>,
 ) {
     // TODO(ecs): parallel iter
     for (def, mut next) in defs.iter_mut() {

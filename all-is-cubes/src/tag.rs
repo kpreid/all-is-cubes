@@ -127,3 +127,27 @@ impl transaction::Transaction for DefTransaction {
         match self {}
     }
 }
+
+impl universe::TransactionOnEcs for DefTransaction {
+    fn check(
+        &self,
+        target: universe::ReadGuard<'_, TagDef>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+        transaction::Transaction::check(self, &*target)
+    }
+
+    fn commit(
+        self,
+        target: &mut TagDef,
+        read_ticket: universe::ReadTicket<'_>,
+        check: Self::CommitCheck,
+    ) -> Result<(), transaction::CommitError> {
+        transaction::Transaction::commit(
+            self,
+            target,
+            read_ticket,
+            check,
+            &mut transaction::no_outputs,
+        )
+    }
+}

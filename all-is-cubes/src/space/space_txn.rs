@@ -320,6 +320,23 @@ impl Transaction for SpaceTransaction {
     }
 }
 
+impl universe::TransactionOnEcs for SpaceTransaction {
+    fn check(
+        &self,
+        target: universe::ReadGuard<'_, Space>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, &*target)
+    }
+
+    fn commit(
+        self,
+        target: &mut Space,
+        read_ticket: ReadTicket<'_>,
+        check: Self::CommitCheck,
+    ) -> Result<(), CommitError> {
+        Transaction::commit(self, target, read_ticket, check, &mut no_outputs)
+    }
+}
 impl Merge for SpaceTransaction {
     type MergeCheck = <BehaviorSetTransaction<Space> as Merge>::MergeCheck;
     type Conflict = SpaceTransactionConflict;

@@ -247,18 +247,15 @@ impl Universe {
     /// [`ExecuteError::Commit`], because it is a shouldn’t-happen kind of error),
     /// or if the handle does not belong to this universe.
     #[inline(never)]
+    #[expect(private_bounds, reason = "TransactionOnEcs is internal")]
     pub fn execute_1<T>(
         &mut self,
         handle: &Handle<T>,
         transaction: <T as Transactional>::Transaction,
     ) -> Result<(), ExecuteError<<T as Transactional>::Transaction>>
     where
-        T::Transaction:
-            for<'u> Transaction<Output = transaction::NoOutput, Context<'u> = ReadTicket<'u>>,
+        T::Transaction: TransactionOnEcs,
         T: UniverseMember + Transactional,
-        // TODO(ecs): this bound must go away for <https://github.com/kpreid/all-is-cubes/issues/644>,
-        // which will require an alternate or generalized Transaction trait.
-        for<'t> T: UniverseMember<Read<'t> = ReadGuard<'t, T>>,
     {
         let check = check_transaction_in_universe(self, handle, &transaction)
             .map_err(ExecuteError::Check)?;

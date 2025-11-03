@@ -25,9 +25,10 @@ use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
 use crate::save::schema;
 use crate::space::{CubeTransaction, Space};
 use crate::time::Tick;
-use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
-use crate::universe::HandleError;
-use crate::universe::{Handle, HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles};
+use crate::transaction::{self, Equal, Merge, Transaction, Transactional};
+use crate::universe::{
+    self, Handle, HandleError, HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles,
+};
 use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
 // -------------------------------------------------------------------------------------------------
@@ -701,7 +702,7 @@ impl Transaction for CharacterTransaction {
         _read_ticket: Self::Context<'_>,
         (body_check, inventory_check, behaviors_check): Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
-    ) -> Result<(), CommitError> {
+    ) -> Result<(), transaction::CommitError> {
         self.set_space.commit(&mut target.space);
 
         self.body
@@ -719,6 +720,30 @@ impl Transaction for CharacterTransaction {
             .map_err(|e| e.context("behaviors".into()))?;
 
         Ok(())
+    }
+}
+
+impl universe::TransactionOnEcs for CharacterTransaction {
+    fn check(
+        &self,
+        target: universe::ReadGuard<'_, Character>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, &*target)
+    }
+
+    fn commit(
+        self,
+        target: &mut Character,
+        read_ticket: ReadTicket<'_>,
+        check: Self::CommitCheck,
+    ) -> Result<(), transaction::CommitError> {
+        Transaction::commit(
+            self,
+            target,
+            read_ticket,
+            check,
+            &mut transaction::no_outputs,
+        )
     }
 }
 

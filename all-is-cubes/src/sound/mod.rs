@@ -140,6 +140,30 @@ impl Transaction for DefTransaction {
     }
 }
 
+impl universe::TransactionOnEcs for DefTransaction {
+    fn check(
+        &self,
+        target: universe::ReadGuard<'_, SoundDef>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, &*target)
+    }
+
+    fn commit(
+        self,
+        target: &mut SoundDef,
+        read_ticket: universe::ReadTicket<'_>,
+        check: Self::CommitCheck,
+    ) -> Result<(), transaction::CommitError> {
+        Transaction::commit(
+            self,
+            target,
+            read_ticket,
+            check,
+            &mut transaction::no_outputs,
+        )
+    }
+}
+
 impl transaction::Merge for DefTransaction {
     type MergeCheck = ();
     type Conflict = Conflict;
