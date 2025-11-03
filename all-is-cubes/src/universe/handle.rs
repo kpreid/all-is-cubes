@@ -195,7 +195,7 @@ impl<T: 'static> Handle<T> {
 
     /// Add the missing value of a member being deserialized.
     #[cfg(feature = "save")]
-    pub(crate) fn insert_deserialized_value(&self, universe: &mut Universe, value: T)
+    pub(crate) fn insert_deserialized_value(&self, universe: &mut Universe, value: Box<T>)
     where
         T: UniverseMember,
     {
@@ -214,7 +214,7 @@ impl<T: 'static> Handle<T> {
             .world
             .get_entity_mut(entity)
             .expect("handle's entity missing")
-            .insert(value);
+            .insert(SealedMember::into_bundle(value));
         // We may have created a new archetype.
         universe.update_archetypes();
     }
@@ -558,7 +558,7 @@ impl<T: 'static> Handle<T> {
                     name: new_name,
                     handle: T::into_any_handle(self.clone()),
                 },
-                *value, // value was boxed until just now
+                SealedMember::into_bundle(value),
             ))
             .id();
         // We may have created a new archetype.

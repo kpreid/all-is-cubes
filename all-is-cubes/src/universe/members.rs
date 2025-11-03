@@ -29,6 +29,9 @@ use crate::universe::{
 pub(in crate::universe) trait SealedMember:
     Sized + ecs::Component<Mutability = bevy_ecs::component::Mutable>
 {
+    /// Components to spawn when inserting a member of this type into a universe.
+    type Bundle: ecs::Bundle;
+
     /// Generic constructor for [`AnyHandle`].
     fn into_any_handle(handle: Handle<Self>) -> AnyHandle;
 
@@ -40,6 +43,10 @@ pub(in crate::universe) trait SealedMember:
     fn read_from_standalone(value: &Self) -> Self::Read<'_>
     where
         Self: UniverseMember;
+
+    /// Converts `Self` (the form independent of a universe) into a bundle to be part of a
+    /// newly spawned entity.
+    fn into_bundle(value: Box<Self>) -> Self::Bundle;
 
     fn member_mutation_query_state(
         queries: &mut MemberQueries,
@@ -71,6 +78,8 @@ pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember {
 macro_rules! impl_universe_for_member {
     ($member_type:ident, $table:ident) => {
         impl SealedMember for $member_type {
+            type Bundle = (Self,);
+
             fn into_any_handle(handle: Handle<Self>) -> AnyHandle {
                 AnyHandle::$member_type(handle)
             }
@@ -84,6 +93,12 @@ macro_rules! impl_universe_for_member {
                 // It used to be a lock guard, but now it stands in for the fact that
                 // Self::Read != &self in the future.
                 ReadGuard(value)
+            }
+
+            fn into_bundle(value: Box<Self>) -> Self::Bundle {
+                // TODO(ecs): when we have multiple components, this will need to be defined
+                // separately for each member type.
+                (*value,)
             }
 
             fn member_mutation_query_state(

@@ -21,6 +21,7 @@
 )]
 
 use alloc::borrow::Cow;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
 
@@ -561,8 +562,12 @@ pub(crate) type UniverseSer<'t> = UniverseSchema<
     SerializeHandle<'t, space::Space>,
     SerializeHandle<'t, tag::TagDef>,
 >;
-pub(crate) type UniverseDe =
-    UniverseSchema<character::Character, sound::SoundDef, space::Space, tag::TagDef>;
+pub(crate) type UniverseDe = UniverseSchema<
+    Box<character::Character>,
+    Box<sound::SoundDef>,
+    Box<space::Space>,
+    Box<tag::TagDef>,
+>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct MemberEntrySer<T> {
@@ -589,8 +594,13 @@ pub(crate) type MemberSer<'t> = MemberSchema<
     SerializeHandle<'t, space::Space>,
     SerializeHandle<'t, tag::TagDef>,
 >;
-pub(crate) type MemberDe =
-    MemberSchema<character::Character, sound::SoundDef, space::Space, tag::TagDef>;
+pub(crate) type MemberDe = MemberSchema<
+    // the Boxes are not strictly necessary but are expected by other code
+    Box<character::Character>,
+    Box<sound::SoundDef>,
+    Box<space::Space>,
+    Box<tag::TagDef>,
+>;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]

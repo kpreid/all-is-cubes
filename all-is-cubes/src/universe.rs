@@ -532,7 +532,11 @@ impl Universe {
     /// As `insert()`, but for assigning values to names that _might_ have gotten
     /// [`Self::get_or_insert_deserializing()`] called on them.
     #[cfg(feature = "save")]
-    pub(crate) fn insert_deserialized<T>(&mut self, name: Name, value: T) -> Result<(), InsertError>
+    pub(crate) fn insert_deserialized<T>(
+        &mut self,
+        name: Name,
+        value: Box<T>,
+    ) -> Result<(), InsertError>
     where
         T: UniverseMember,
     {

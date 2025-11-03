@@ -1231,7 +1231,7 @@ mod universe {
                         match value {
                             MemberDe::Block { value: block } => universe.insert_deserialized(
                                 name,
-                                BlockDef::new(universe.read_ticket(), block),
+                                Box::new(BlockDef::new(universe.read_ticket(), block)),
                             ),
                             MemberDe::Character { value } => {
                                 universe.insert_deserialized(name, value)
