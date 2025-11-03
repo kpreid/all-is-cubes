@@ -17,7 +17,7 @@ use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
-    ErasedHandle, Handle, InsertError, Name, ReadGuard, Universe, VisitableComponents,
+    self, ErasedHandle, Handle, InsertError, Name, ReadGuard, Universe, VisitableComponents,
     handle::HandlePtr, universe_txn as ut,
 };
 
@@ -43,7 +43,9 @@ pub(in crate::universe) trait SealedMember:
 
     fn member_mutation_query_state(
         queries: &mut MemberQueries,
-    ) -> &mut ecs::QueryState<&'static mut Self>;
+    ) -> &mut ecs::QueryState<<<Self as universe::Transactional>::Transaction as universe::TransactionOnEcs>::WriteQueryData>
+    where
+        Self: UniverseMember + transaction::Transactional<Transaction: universe::TransactionOnEcs>;
 }
 
 /// Trait for every type which can be a named member of a universe and be referred to by
@@ -86,7 +88,7 @@ macro_rules! impl_universe_for_member {
 
             fn member_mutation_query_state(
                 queries: &mut MemberQueries,
-            ) -> &mut ecs::QueryState<&'static mut Self> {
+            ) -> &mut ecs::QueryState<<<Self as universe::Transactional>::Transaction as universe::TransactionOnEcs>::WriteQueryData> {
                 &mut queries.$table
             }
         }
@@ -477,13 +479,20 @@ macro_rules! member_enums_and_impls {
         impl Eq for AnyPending {}
 
         /// Queries for mutating members, used by transaction commits.
+        /// Contains one `QueryState` per member type, whose `QueryData` is that member's
+        /// `TransactionOnEcs::WriteQueryData`.
         #[derive(ecs::FromWorld)]
         #[allow(nonstandard_style)]
         #[macro_rules_attribute::derive($crate::universe::ecs_details::derive_manual_query_bundle!)]
         pub(in crate::universe) struct MemberQueries {
             $(
                 pub(in crate::universe) $table_name:
-                    ::bevy_ecs::query::QueryState<&'static mut $member_type>,
+                    ::bevy_ecs::query::QueryState<
+                        <
+                            <$member_type as universe::Transactional>::Transaction
+                            as universe::TransactionOnEcs
+                        >::WriteQueryData
+                    >,
             )*
         }
 
@@ -559,7 +568,7 @@ impl ErasedHandle for AnyHandle {
     fn as_entity(
         &self,
         expected_universe: super::UniverseId,
-    ) -> Result<ecs::Entity, crate::universe::handle::HandleError> {
+    ) -> Result<ecs::Entity, universe::handle::HandleError> {
         let r: &dyn ErasedHandle = &**self;
         r.as_entity(expected_universe)
     }

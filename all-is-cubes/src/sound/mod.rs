@@ -4,6 +4,7 @@
 
 use core::fmt;
 
+use bevy_ecs::prelude as ecs;
 /// Acts as polyfill for float methods used in synthesis such as `sin()`
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
@@ -141,6 +142,8 @@ impl Transaction for DefTransaction {
 }
 
 impl universe::TransactionOnEcs for DefTransaction {
+    type WriteQueryData = &'static mut Self::Target;
+
     fn check(
         &self,
         target: universe::ReadGuard<'_, SoundDef>,
@@ -150,13 +153,13 @@ impl universe::TransactionOnEcs for DefTransaction {
 
     fn commit(
         self,
-        target: &mut SoundDef,
+        mut target: ecs::Mut<'_, SoundDef>,
         read_ticket: universe::ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
         Transaction::commit(
             self,
-            target,
+            &mut *target,
             read_ticket,
             check,
             &mut transaction::no_outputs,

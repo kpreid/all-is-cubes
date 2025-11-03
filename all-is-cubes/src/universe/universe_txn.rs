@@ -27,9 +27,8 @@ pub(in crate::universe) use crate::universe::members::{
 /// Trait for executing a transaction on a universe member that is placed in a universe.
 ///
 /// Such executions cannot use the normal [`Transaction`] trait, because it assumes that
-/// `&T` is avaulable for checking and `&mut` is available for committing, both of which will
-/// eventually be false for universe members when they consist of multiple components.
-// TODO(ecs): update above comment when it is no longer describing the future.
+/// `&T` is avaulable for checking and `&mut` is available for committing, which are false for
+/// universe members when they consist of multiple components.
 ///
 /// This should have the same behaviors that the [`Transaction`] trait does.
 /// (In the future, it may no longer be required for the type to also implement [`Transaction`].)
@@ -37,6 +36,13 @@ pub(crate) trait TransactionOnEcs: Transaction
 where
     <Self as Transaction>::Target: UniverseMember,
 {
+    /// Mutable data access to fetch from the member entity which is necessary for the transaction
+    /// to be committed to that entity.
+    ///
+    /// For example, if the entity consists of a single component, this should be
+    /// `&'static mut ThatOneComponent`.
+    type WriteQueryData: bevy_ecs::query::QueryData;
+
     /// See [`Transaction::check()`].
     fn check(
         &self,
@@ -46,7 +52,7 @@ where
     /// See [`Transaction::commit()`].
     fn commit<'t>(
         self,
-        target: &'t mut <Self as Transaction>::Target, // TODO: needs to become a QueryData type
+        target: <Self::WriteQueryData as bevy_ecs::query::QueryData>::Item<'t>,
         everything_else: ReadTicket<'t>,
         check: Self::CommitCheck,
     ) -> Result<(), CommitError>;
@@ -87,11 +93,11 @@ where
     let entity: ecs::Entity = target.as_entity(universe.universe_id()).unwrap();
     let query_state = O::member_mutation_query_state(&mut universe.queries.members);
 
-    let (mut target_mut, everything_but) =
+    let (target_query_data, everything_but) =
         super::get_one_mut_and_ticket(&mut universe.world, entity, query_state)
             .expect("target query failed; universe state changed between check and commit");
 
-    TransactionOnEcs::commit(transaction, &mut *target_mut, everything_but, check)
+    TransactionOnEcs::commit(transaction, target_query_data, everything_but, check)
 }
 
 // -------------------------------------------------------------------------------------------------

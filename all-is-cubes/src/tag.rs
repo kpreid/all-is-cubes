@@ -2,6 +2,8 @@
 
 use core::convert::Infallible;
 
+use bevy_ecs::prelude as ecs;
+
 use crate::transaction;
 use crate::universe::{self, Handle};
 
@@ -129,6 +131,8 @@ impl transaction::Transaction for DefTransaction {
 }
 
 impl universe::TransactionOnEcs for DefTransaction {
+    type WriteQueryData = &'static mut Self::Target;
+
     fn check(
         &self,
         target: universe::ReadGuard<'_, TagDef>,
@@ -138,13 +142,13 @@ impl universe::TransactionOnEcs for DefTransaction {
 
     fn commit(
         self,
-        target: &mut TagDef,
+        mut target: ecs::Mut<'_, TagDef>,
         read_ticket: universe::ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
         transaction::Transaction::commit(
             self,
-            target,
+            &mut *target,
             read_ticket,
             check,
             &mut transaction::no_outputs,

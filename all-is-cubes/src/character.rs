@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 use core::fmt;
 use core::ops;
 
+use bevy_ecs::prelude as ecs;
 use euclid::{Angle, Rotation3D, Vector3D};
 use hashbrown::HashSet as HbHashSet;
 use manyfmt::Fmt;
@@ -724,6 +725,8 @@ impl Transaction for CharacterTransaction {
 }
 
 impl universe::TransactionOnEcs for CharacterTransaction {
+    type WriteQueryData = &'static mut Self::Target;
+
     fn check(
         &self,
         target: universe::ReadGuard<'_, Character>,
@@ -733,13 +736,13 @@ impl universe::TransactionOnEcs for CharacterTransaction {
 
     fn commit(
         self,
-        target: &mut Character,
+        mut target: ecs::Mut<'_, Character>,
         read_ticket: ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
         Transaction::commit(
             self,
-            target,
+            &mut *target,
             read_ticket,
             check,
             &mut transaction::no_outputs,

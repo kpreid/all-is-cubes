@@ -309,6 +309,8 @@ impl Transaction for BlockDefTransaction {
 }
 
 impl universe::TransactionOnEcs for BlockDefTransaction {
+    type WriteQueryData = &'static mut Self::Target;
+
     fn check(
         &self,
         target: universe::ReadGuard<'_, BlockDef>,
@@ -318,13 +320,13 @@ impl universe::TransactionOnEcs for BlockDefTransaction {
 
     fn commit(
         self,
-        target: &mut BlockDef,
+        mut target: ecs::Mut<'_, BlockDef>,
         read_ticket: ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
         Transaction::commit(
             self,
-            target,
+            &mut *target,
             read_ticket,
             check,
             &mut transaction::no_outputs,

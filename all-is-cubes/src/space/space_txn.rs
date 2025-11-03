@@ -8,6 +8,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::{fmt, mem};
 
+use bevy_ecs::prelude as ecs;
+
 use crate::behavior::{self, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
@@ -321,6 +323,8 @@ impl Transaction for SpaceTransaction {
 }
 
 impl universe::TransactionOnEcs for SpaceTransaction {
+    type WriteQueryData = &'static mut Self::Target;
+
     fn check(
         &self,
         target: universe::ReadGuard<'_, Space>,
@@ -330,11 +334,11 @@ impl universe::TransactionOnEcs for SpaceTransaction {
 
     fn commit(
         self,
-        target: &mut Space,
+        mut target: ecs::Mut<'_, Space>,
         read_ticket: ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), CommitError> {
-        Transaction::commit(self, target, read_ticket, check, &mut no_outputs)
+        Transaction::commit(self, &mut *target, read_ticket, check, &mut no_outputs)
     }
 }
 impl Merge for SpaceTransaction {
