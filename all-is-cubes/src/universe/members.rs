@@ -21,36 +21,47 @@ use crate::universe::{
     universe_txn as ut,
 };
 
-/// Trait for every type which can be a named member of a universe.
-///
-/// This trait is also public-in-private and thus prevents anything bounded by it from
-/// being called or implemented by an unsupported type (“sealing”). However, because of
-/// that, it also cannot mention anything we don't also want to make public or
-/// public-in-private.
-#[doc(hidden)]
-#[expect(unnameable_types, private_interfaces)]
-// TODO(ecs): make Component not publicly a supertrait, once we figure out what components typed members actually have
-pub trait UniverseMember:
-    Sized + 'static + fmt::Debug + ecs::Component<Mutability = bevy_ecs::component::Mutable>
+// -------------------------------------------------------------------------------------------------
+
+/// Not-externally-implementable supertrait for [`UniverseMember`] to make it sealed and hide
+/// implementation details.
+// TODO(ecs): make Component not a supertrait once we have split members into multiple components.
+pub(in crate::universe) trait SealedMember:
+    Sized + ecs::Component<Mutability = bevy_ecs::component::Mutable>
 {
     /// Generic constructor for [`AnyHandle`].
     fn into_any_handle(handle: Handle<Self>) -> AnyHandle;
+
     /// Generic constructor for [`AnyPending`].
     fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending;
 }
 
+/// Trait for every type which can be a named member of a universe and be referred to by
+/// [`Handle`]s.
+///
+/// This trait provides no operations itself, but is a bound on functions of [`Universe`],
+/// [`Handle`], and [`UniverseTransaction`][ut::UniverseTransaction].
+//---
+// TODO: Give this trait a better name. Some errors refer to this concept as "object", and
+// in a purely abstract architecture sense it’s a sort of “entity” but that conflicts with
+// “is a bevy_ecs entity”.
+#[expect(private_bounds)]
+pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember {}
+
 /// Generates impls for a specific Universe member type.
 macro_rules! impl_universe_for_member {
     ($member_type:ident, $table:ident) => {
-        impl UniverseMember for $member_type {
+        impl SealedMember for $member_type {
             fn into_any_handle(handle: Handle<Self>) -> AnyHandle {
                 AnyHandle::$member_type(handle)
             }
-            #[expect(private_interfaces)]
+
             fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending {
                 AnyPending::$member_type { handle, value }
             }
         }
+
+        impl UniverseMember for $member_type {}
 
         impl ut::UTransactional for $member_type {
             fn bind(

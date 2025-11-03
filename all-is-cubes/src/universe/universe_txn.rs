@@ -11,8 +11,8 @@ use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transacti
 #[cfg(doc)]
 use crate::universe::HandleError;
 use crate::universe::{
-    AnyPending, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadTicket, Universe,
-    UniverseId, UniverseMember,
+    AnyPending, ErasedHandle, Handle, InsertError, InsertErrorKind, Name, ReadTicket, SealedMember,
+    Universe, UniverseId, UniverseMember,
 };
 
 // Reëxports for macro-generated types
@@ -432,7 +432,7 @@ impl UniverseTransaction {
         let handle = Handle::new_pending(Name::Pending);
         self.anonymous_insertions.insert(
             T::into_any_handle(handle.clone()),
-            MemberTxn::Insert(UniverseMember::into_any_pending(
+            MemberTxn::Insert(SealedMember::into_any_pending(
                 handle.clone(),
                 Some(Box::new(value)),
             )),
@@ -481,7 +481,7 @@ impl UniverseTransaction {
         handle: Handle<T>,
     ) -> Result<(), InsertError> {
         let name = handle.name();
-        let insertion = MemberTxn::Insert(UniverseMember::into_any_pending(handle.clone(), None));
+        let insertion = MemberTxn::Insert(SealedMember::into_any_pending(handle.clone(), None));
         match name {
             name @ (Name::Specific(_) | Name::Anonym(_)) => {
                 match self.members.entry(name.clone()) {
@@ -500,7 +500,7 @@ impl UniverseTransaction {
             }
             Name::Pending => {
                 self.anonymous_insertions
-                    .insert(UniverseMember::into_any_handle(handle), insertion);
+                    .insert(SealedMember::into_any_handle(handle), insertion);
                 Ok(())
             }
         }

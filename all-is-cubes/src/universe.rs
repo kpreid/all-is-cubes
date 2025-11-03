@@ -28,8 +28,12 @@ use crate::rerun_glue as rg;
 // Note: Most things in `members` are either an impl, private, or intentionally public-in-private.
 // Therefore, no glob reexport.
 mod members;
-pub use members::AnyHandle;
 pub(crate) use members::*;
+#[allow(
+    clippy::module_name_repetitions,
+    reason = "TODO: rename UniverseMember to Member or something"
+)]
+pub use members::{AnyHandle, UniverseMember};
 
 mod ecs_details;
 use ecs_details::{Membership, NameMap};
@@ -75,7 +79,7 @@ mod tests;
 ///
 /// A [`Universe`] consists of:
 ///
-/// * _members_ of various types, which may be identified using [`Name`]s or [`Handle`]s.
+/// * _members_ of [various types], which may be identified using [`Name`]s or [`Handle`]s.
 /// * [`Behavior`](behavior::Behavior)s that modify the [`Universe`] itself.
 /// * A [`time::Clock`] defining how time is considered to pass in it.
 /// * A [`WhenceUniverse`] defining where its data is persisted, if anywhere.
@@ -83,6 +87,8 @@ mod tests;
 ///
 /// [`Universe`] is a quite large data structure, so it may be desirable to keep it in a
 /// [`Box`], especially when being passed through `async` blocks.
+///
+/// [various types]: UniverseMember
 ///
 #[doc = include_str!("save/serde-warning.md")]
 pub struct Universe {
@@ -481,7 +487,7 @@ impl Universe {
         T: UniverseMember,
     {
         let handle = Handle::new_pending(name);
-        UniverseMember::into_any_pending(handle.clone(), Some(Box::new(value)))
+        SealedMember::into_any_pending(handle.clone(), Some(Box::new(value)))
             .insert_pending_into_universe(self)?;
         Ok(handle)
     }

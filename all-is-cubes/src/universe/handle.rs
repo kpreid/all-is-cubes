@@ -22,7 +22,8 @@ use bevy_platform::sync::{Mutex, MutexGuard};
 
 use crate::universe::{
     AnyHandle, InsertError, InsertErrorKind, Membership, Name, ReadTicket, ReadTicketError,
-    Universe, UniverseId, UniverseMember, VisitHandles, id::OnceUniverseId, name::OnceName,
+    SealedMember, Universe, UniverseId, UniverseMember, VisitHandles, id::OnceUniverseId,
+    name::OnceName,
 };
 
 #[cfg(doc)]
@@ -1080,7 +1081,7 @@ impl<T: UniverseMember> ErasedHandle for Handle<T> {
     }
 
     fn to_any_handle(&self) -> AnyHandle {
-        <T as UniverseMember>::into_any_handle(self.clone())
+        <T as SealedMember>::into_any_handle(self.clone())
     }
 
     fn as_entity(&self, expected_universe: UniverseId) -> Result<ecs::Entity, HandleError> {
@@ -1228,7 +1229,7 @@ mod tests {
             UniverseTransaction::insert("space".into(), Space::empty_positive(1, 1, 1));
         let handle_a_2 = handle_a_1.clone();
         let handle_a_dyn: &dyn ErasedHandle = &handle_a_1;
-        let handle_a_any: AnyHandle = UniverseMember::into_any_handle(handle_a_1.clone());
+        let handle_a_any: AnyHandle = SealedMember::into_any_handle(handle_a_1.clone());
         let handle_a_strong = StrongHandle::new(handle_a_1.clone());
         let (handle_b_1, _insert_b) =
             UniverseTransaction::insert("space".into(), Space::empty_positive(1, 1, 1));
