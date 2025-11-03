@@ -337,17 +337,14 @@ impl<T: 'static> Handle<T> {
         };
 
         // Actually obtain access.
-        match access {
-            Access::Pending => Ok(T::read_from_standalone(
+        Ok(match access {
+            Access::Pending => T::read_from_standalone(
                 read_ticket.borrow_pending(self).map_err(|e| e.into_handle_error(self))?,
-            )),
-            Access::Entity(entity) => {
-                // TODO: this should be going through an ECS-specific path instead of read_from_standalone
-                let component =
-                    read_ticket.get::<T>(entity).map_err(|e| e.into_handle_error(self))?;
-                Ok(T::read_from_standalone(component))
-            }
-        }
+            ),
+            Access::Entity(entity) => read_ticket
+                .read_entity_as_universe_member::<T>(entity)
+                .map_err(|e| e.into_handle_error(self))?,
+        })
     }
 
     /// Like [`Self::read()`], but allows selecting an arbitrary component.

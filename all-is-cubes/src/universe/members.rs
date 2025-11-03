@@ -28,9 +28,7 @@ use crate::universe::{
 /// Not-externally-implementable supertrait for [`UniverseMember`] to make it sealed and hide
 /// implementation details.
 // TODO(ecs): make Component not a supertrait once we have split members into multiple components.
-pub(crate) trait SealedMember:
-    Sized + ecs::Component<Mutability = bevy_ecs::component::Mutable>
-{
+pub(crate) trait SealedMember: Sized {
     /// Components to spawn when inserting a member of this type into a universe.
     type Bundle: ecs::Bundle;
 
@@ -42,18 +40,20 @@ pub(crate) trait SealedMember:
     where
         Self: UniverseMember;
 
-    #[allow(dead_code, reason = "TODO(ecs): will be needed later (maybe)")]
     /// Constructs `Self::Read` from query data.
     fn read_from_query(data: <Self::ReadQueryData as QueryData>::Item<'_>) -> Self::Read<'_>
     where
         Self: UniverseMember;
 
-    #[allow(dead_code, reason = "TODO(ecs): will be needed later (maybe)")]
     /// Constructs `Self::Read` from an [`ecs::EntityRef`].
     /// This may be used when queries are not feasible.
     ///
     /// Returns [`None`] when the entity does not have the components it should have.
     /// No other validation is guaranteed to be performed.
+    #[expect(
+        unused,
+        reason = "TODO(ecs): remove this if we turn out to never need it"
+    )]
     fn read_from_entity_ref(entity: ecs::EntityRef<'_>) -> Option<Self::Read<'_>>
     where
         Self: UniverseMember;
@@ -719,5 +719,22 @@ where
 {
     fn eq(&self, other: &AnyHandle) -> bool {
         *other == *self
+    }
+}
+
+// TODO: we can get rid of this if we arrange to have a version of `MemberReadQueryStates` that carries `Query` instead of `QueryState`
+impl bevy_ecs::system::ExclusiveSystemParam for &mut MemberReadQueryStates {
+    type State = MemberReadQueryStates;
+    type Item<'s> = &'s mut MemberReadQueryStates;
+
+    fn init(world: &mut ecs::World, _: &mut bevy_ecs::system::SystemMeta) -> Self::State {
+        <MemberReadQueryStates as bevy_ecs::world::FromWorld>::from_world(world)
+    }
+
+    fn get_param<'s>(
+        state: &'s mut Self::State,
+        _: &bevy_ecs::system::SystemMeta,
+    ) -> Self::Item<'s> {
+        state
     }
 }

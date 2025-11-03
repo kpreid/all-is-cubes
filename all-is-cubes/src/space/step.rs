@@ -24,6 +24,7 @@ pub(crate) fn execute_tick_actions_system(
     ecs::In(spaces): ecs::In<Vec<Handle<Space>>>,
     world: &mut ecs::World,
     space_query: &mut ecs::QueryState<&mut Space>,
+    read_queries: &mut crate::universe::MemberReadQueryStates,
 ) -> ecs::Result<usize> {
     let universe_id: UniverseId = *world.resource();
     let tick = world.resource::<time::CurrentTick>().get()?;
@@ -34,6 +35,7 @@ pub(crate) fn execute_tick_actions_system(
             world,
             space_handle.as_entity(universe_id).unwrap(),
             space_query,
+            read_queries,
         )
         .unwrap();
 

@@ -58,6 +58,7 @@ pub(crate) fn get_one_mut_and_ticket<'w, D>(
     world: &'w mut ecs::World,
     entity: ecs::Entity,
     query_state: &mut ecs::QueryState<D, ()>,
+    read_queries: &'w super::MemberReadQueryStates,
 ) -> Option<(D::Item<'w>, ReadTicket<'w>)>
 where
     D: bevy_ecs::query::QueryData,
@@ -69,7 +70,7 @@ where
     Some(unsafe {
         (
             query_state.get_unchecked(unsafe_world, entity).ok()?,
-            ReadTicket::everything_but(universe_id, unsafe_world, entity),
+            ReadTicket::everything_but(universe_id, unsafe_world, entity, read_queries),
         )
     })
 }

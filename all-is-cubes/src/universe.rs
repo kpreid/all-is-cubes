@@ -351,6 +351,7 @@ impl Universe {
                     &mut self.world,
                     space_handle.as_entity(self.id).unwrap(),
                     &mut self.queries.write_members.spaces,
+                    &self.queries.read_members,
                 )
                 .unwrap();
 
