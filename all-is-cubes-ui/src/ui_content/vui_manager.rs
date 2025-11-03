@@ -185,7 +185,7 @@ impl Vui {
             pages::new_progress_page(&hud_inputs.hud_blocks.widget_theme, &notif_hub);
 
         let mut new_self = Self {
-            universe,
+            universe: *universe,
 
             current_view: listen::Cell::new(Arc::new(UiViewState::default())),
             current_focus_on_ui: false,

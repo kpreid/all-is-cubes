@@ -673,13 +673,14 @@ mod tests {
     use crate::util::yield_progress_for_testing;
     use crate::{space, transaction};
     use all_is_cubes_base::math::Rgba;
+    use alloc::boxed::Box;
     use arcstr::literal;
     use pretty_assertions::assert_eq;
     use rstest::rstest;
 
     #[derive(Debug)]
     struct ToolTester {
-        universe: Universe,
+        universe: Box<Universe>,
         character_handle: Handle<Character>,
         space_handle: Handle<Space>,
     }

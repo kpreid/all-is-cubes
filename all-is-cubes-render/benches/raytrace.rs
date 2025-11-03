@@ -19,7 +19,7 @@ use all_is_cubes_render::raytracer::RtRenderer;
 
 /// Non-mutated test data shared between benches
 struct TestData {
-    universe: Universe,
+    universe: Box<Universe>,
     character: StrongHandle<Character>,
 }
 impl TestData {

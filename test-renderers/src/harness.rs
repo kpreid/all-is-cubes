@@ -93,10 +93,9 @@ pub struct RenderTestContext {
 }
 
 #[derive(Debug)]
-#[expect(clippy::large_enum_variant)]
 pub(crate) enum TestUniverse {
     Shared(Arc<Universe>),
-    Mutable(Universe),
+    Mutable(Box<Universe>),
 }
 
 // -------------------------------------------------------------------------------------------------

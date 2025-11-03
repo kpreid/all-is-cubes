@@ -664,6 +664,7 @@ pub use arbitrary_handle::ArbitraryWithUniverse;
 mod arbitrary_handle {
     use super::{Handle, Name};
     use crate::universe::{StrongHandle, Universe, UniverseMember, tl};
+    use alloc::boxed::Box;
     use alloc::vec::Vec;
     use arbitrary::size_hint;
 
@@ -675,7 +676,7 @@ mod arbitrary_handle {
     #[allow(clippy::exhaustive_structs)]
     pub struct ArbitraryWithUniverse<T> {
         #[allow(missing_docs)]
-        pub universe: Universe,
+        pub universe: Box<Universe>,
         #[allow(missing_docs)]
         pub contents: T,
     }

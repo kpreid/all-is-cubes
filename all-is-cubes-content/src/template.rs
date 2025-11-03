@@ -148,7 +148,7 @@ impl UniverseTemplate {
         p: YieldProgress,
         params: TemplateParameters,
     ) -> Result<Box<Universe>, GenError> {
-        let mut universe = Box::new(Universe::new());
+        let mut universe = Universe::new();
 
         // TODO: Later we want a "module loading" system that can lazily bring in content.
         // For now, unconditionally add all these blocks.

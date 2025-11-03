@@ -143,7 +143,12 @@ struct WorldRegistrations {
 
 impl Universe {
     /// Constructs an empty [`Universe`].
-    pub fn new() -> Self {
+    ///
+    /// [`Universe`] is a very large struct, and it is often manipulated by `async fn`s; therefore,
+    /// to avoid surprisingly large stack frame or future sizes, and needless memory copies, it is
+    /// returned in a [`Box`]. Feel free to unbox it if appropriate.
+    pub fn new() -> Box<Self> {
+        let empty_box = Box::new_uninit();
         let id = UniverseId::new();
 
         let mut world = bevy_ecs::world::World::new();
@@ -183,19 +188,22 @@ impl Universe {
             all_members_query: world.query::<(Entity, &Membership)>(),
         };
 
-        Universe {
-            world,
-            regs,
-            id,
-            next_anonym: 0,
-            wants_gc: false,
-            whence: Arc::new(()),
-            behaviors: behavior::BehaviorSet::new(),
-            session_step_time: 0,
-            spaces_with_work: 0,
-            #[cfg(feature = "rerun")]
-            rerun_destination: Default::default(),
-        }
+        Box::write(
+            empty_box,
+            Universe {
+                world,
+                regs,
+                id,
+                next_anonym: 0,
+                wants_gc: false,
+                whence: Arc::new(()),
+                behaviors: behavior::BehaviorSet::new(),
+                session_step_time: 0,
+                spaces_with_work: 0,
+                #[cfg(feature = "rerun")]
+                rerun_destination: Default::default(),
+            },
+        )
     }
 
     /// Returns a [`Handle`] for the object in this universe with the given name,
@@ -814,7 +822,7 @@ impl behavior::Host for Universe {
 
 impl Default for Universe {
     fn default() -> Self {
-        Self::new()
+        *Self::new()
     }
 }
 

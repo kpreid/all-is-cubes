@@ -10,6 +10,7 @@
 
 #![cfg(any(feature = "save", feature = "arbitrary"))]
 
+use alloc::boxed::Box;
 use core::cell::RefCell;
 
 use crate::universe::Universe;
@@ -36,7 +37,7 @@ std::thread_local! {
 #[derive(Debug)]
 pub(crate) struct Context {
     pub(crate) purpose: Purpose,
-    pub(crate) universe: Universe,
+    pub(crate) universe: Box<Universe>,
 }
 
 /// Identifies the purpose of the context, to guard against unintended weird reentrant usage.

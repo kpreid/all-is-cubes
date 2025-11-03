@@ -915,7 +915,7 @@ mod tests {
             .collect()
     }
 
-    fn single_block_test_case(text: Text) -> (Universe, Block) {
+    fn single_block_test_case(text: Text) -> (Box<Universe>, Block) {
         // This universe is not really used now except to provide a `ReadTicket`,
         // but I currently expect to add future restrictions on `Block` and `Space` usage
         // that will make it necessary.

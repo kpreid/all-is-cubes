@@ -378,10 +378,12 @@ impl fmt::Display for ReadTicketError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::boxed::Box;
+    use core::array;
 
     #[test]
     fn equality() {
-        let universes: [Universe; 2] = std::array::from_fn(|_| Universe::new());
+        let universes: [Box<Universe>; 2] = array::from_fn(|_| Universe::new());
 
         assert_ne!(
             ReadTicket::stub(),
@@ -389,18 +391,18 @@ mod tests {
             "different by location"
         );
 
-        let stubs: [ReadTicket<'_>; 2] = std::array::from_fn(|_| ReadTicket::stub());
+        let stubs: [ReadTicket<'_>; 2] = array::from_fn(|_| ReadTicket::stub());
         assert_eq!(stubs[0], stubs[1], "identical stub()");
 
         let different_universe_tickets: [ReadTicket<'_>; 2] =
-            std::array::from_fn(|i| universes[i].read_ticket());
+            array::from_fn(|i| universes[i].read_ticket());
         assert_ne!(
             different_universe_tickets[0], different_universe_tickets[1],
             "different universes"
         );
 
         let same_universe_tickets: [ReadTicket<'_>; 2] =
-            std::array::from_fn(|_| universes[0].read_ticket());
+            array::from_fn(|_| universes[0].read_ticket());
         assert_eq!(
             same_universe_tickets[0], same_universe_tickets[1],
             "same universes"

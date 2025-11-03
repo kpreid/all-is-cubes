@@ -874,7 +874,7 @@ impl SessionBuilder {
                     id: game_universe.universe_id(),
                     whence: game_universe.whence.clone(),
                 }),
-                game_universe,
+                game_universe: *game_universe,
                 space_watch_state,
                 cursor_result: None,
                 session_event_notifier: Arc::new(listen::Notifier::new()),
@@ -1426,7 +1426,7 @@ mod tests {
 
         // Create session
         let mut session = Session::builder().build().await;
-        session.set_universe(u);
+        session.set_universe(*u);
         session.set_character(Some(character.clone()));
         let log = listen::Log::<Fluff>::new();
         session.listen_fluff(log.listener());
@@ -1464,14 +1464,14 @@ mod tests {
             .unwrap();
 
         // Set up task (that won't do anything until it's polled as part of stepping)
-        let (send, recv) = oneshot::channel();
+        let (send, recv) = oneshot::channel::<Box<Universe>>();
         let mut cameras = session.create_cameras(listen::constant(Viewport::ARBITRARY));
         session.set_main_task({
             let noticed_step = noticed_step.clone();
             async move |mut ctx: MainTaskContext| {
                 eprintln!("main task: waiting for new universe");
                 let new_universe = recv.await.unwrap();
-                ctx.set_universe(new_universe);
+                ctx.set_universe(*new_universe);
                 eprintln!("main task: have set new universe");
 
                 ctx.with_read_tickets(|read_tickets| cameras.update(read_tickets));

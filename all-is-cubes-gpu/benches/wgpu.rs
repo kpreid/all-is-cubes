@@ -84,7 +84,7 @@ async fn create_updated_renderer(
     device_label: &str,
     instance: &wgpu::Instance,
 ) -> (
-    Universe,
+    Box<Universe>,
     universe::Handle<Space>,
     Arc<Mutex<headless::Renderer>>,
 ) {

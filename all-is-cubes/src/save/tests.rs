@@ -1,5 +1,6 @@
 //! Tests of serialization and deserialization.
 
+use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -849,7 +850,7 @@ fn space_light_queue_remembered() {
 
 /// A universe with one of each type, which we're going to use in a couple tests.
 /// This also helps exercise some of the serialization of those types.
-fn universe_with_one_of_each() -> Universe {
+fn universe_with_one_of_each() -> Box<Universe> {
     let mut universe = Universe::new();
 
     let tag = tag::Tag::Handle(universe.insert("a_tag".into(), tag::TagDef).unwrap());

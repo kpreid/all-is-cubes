@@ -1229,7 +1229,7 @@ async fn antialias_test_universe() -> Arc<Universe> {
         .unwrap();
 
     finish_universe_from_space(&mut universe, space);
-    Arc::new(universe)
+    Arc::from(universe)
 }
 
 // Test scene for bloom (bright objects on a black background).
@@ -1251,7 +1251,7 @@ async fn bloom_test_universe() -> Arc<Universe> {
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
-    Arc::new(universe)
+    Arc::from(universe)
 }
 
 /// Construct a space suitable for testing long-distance rendering (fog).
@@ -1306,7 +1306,7 @@ async fn fog_test_universe() -> Arc<Universe> {
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
-    Arc::new(universe)
+    Arc::from(universe)
 }
 
 // Test scene for lighting from emissive blocks.
@@ -1344,7 +1344,7 @@ async fn light_test_universe() -> Arc<Universe> {
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
-    Arc::new(universe)
+    Arc::from(universe)
 }
 
 /// Options to go with [`light_test_universe`].
@@ -1448,7 +1448,7 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
-    Arc::new(universe)
+    Arc::from(universe)
 }
 
 /// Options to go with [`light_test_universe`].

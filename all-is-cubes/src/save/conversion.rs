@@ -1252,7 +1252,7 @@ mod universe {
             // to pass.
             universe.step(true, time::Deadline::Asap);
 
-            Ok(universe)
+            Ok(*universe)
         }
     }
 

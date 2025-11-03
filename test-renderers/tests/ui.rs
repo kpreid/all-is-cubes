@@ -187,7 +187,7 @@ async fn create_widget_theme_universe() -> Arc<Universe> {
         .await
         .unwrap();
     txn.execute(&mut u, (), &mut transaction::no_outputs).unwrap();
-    Arc::new(u)
+    Arc::from(u)
 }
 
 fn widget_theme(context: &RenderTestContext) -> widgets::WidgetTheme {

@@ -139,14 +139,14 @@ fn todo_ignores_absent_chunks() {
 
 #[derive(Debug)]
 struct CsmTester<const MBM: usize> {
-    universe: Universe,
+    universe: Box<Universe>,
     space: Handle<Space>,
     camera: Camera,
     csm: ChunkedSpaceMesh<Mt<MBM>, CHUNK_SIZE>,
 }
 
 impl<const MBM: usize> CsmTester<MBM> {
-    fn new(mut universe: Universe, space: Space, view_distance: f64) -> Self {
+    fn new(mut universe: Box<Universe>, space: Space, view_distance: f64) -> Self {
         let space_handle = universe.insert_anonymous(space);
         let csm = ChunkedSpaceMesh::new(space_handle.clone(), NoTextures, true);
         let camera = Camera::new(

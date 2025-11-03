@@ -251,9 +251,10 @@ mod tests {
     use all_is_cubes::inv;
     use all_is_cubes::space::Space;
     use all_is_cubes::universe::{Handle, Universe};
+    use alloc::boxed::Box;
 
     struct Tester {
-        universe: Universe,
+        universe: Box<Universe>,
         space: Handle<Space>,
         character: StrongHandle<Character>,
         character_cell: listen::Cell<Option<StrongHandle<Character>>>,

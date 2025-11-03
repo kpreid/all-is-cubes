@@ -54,7 +54,7 @@ fn space_bulk_mutation(c: &mut Criterion) {
                 let [block] = make_some_blocks();
 
                 b.iter_batched_ref(
-                    || -> (Universe, Handle<Space>, Listeners) {
+                    || -> (Box<Universe>, Handle<Space>, Listeners) {
                         let mut universe = Universe::new();
                         let space = universe.insert_anonymous(Space::empty(bigger_bounds));
                         // Multiple nontrivial things that will receive notifications:

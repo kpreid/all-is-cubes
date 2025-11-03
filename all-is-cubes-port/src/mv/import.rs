@@ -104,9 +104,7 @@ pub(crate) async fn dot_vox_data_to_universe(
     let palette: Arc<[Block]> = mv::palette::dot_vox_palette_to_blocks(palette, materials);
     palette_progress.finish().await;
 
-    // Universe is a large struct and boxing it promptly helps us not have large stack usage
-    // and large futures.
-    let mut universe = Box::new(Universe::new());
+    let mut universe = Universe::new();
 
     // Convert the models to `Space`s.
     let models_progress = progress
