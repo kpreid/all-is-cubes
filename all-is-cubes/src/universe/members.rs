@@ -55,6 +55,9 @@ pub(in crate::universe) trait SealedMember:
 pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember {
     /// Type returned by [`Handle::<T>::read()`][Handle::read()] which is the way to read the
     /// `T` value after it has been inserted into the [`Universe`].
+    //---
+    // For serialization, this type must serialize to the universe member type’s serialization
+    // schema. (The simplest way to do this is for it to be `&T`, for example.)
     type Read<'ticket>;
 }
 

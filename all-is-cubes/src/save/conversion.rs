@@ -1309,24 +1309,31 @@ mod universe {
 
     impl<'ticket, T> Serialize for schema::SerializeHandle<'ticket, T>
     where
-        T: Serialize + universe::UniverseMember,
-        // TODO(ecs): this bound must go away for <https://github.com/kpreid/all-is-cubes/issues/644>,
-        // which will require an alternate or generalized Transaction trait.
-        T: universe::UniverseMember<Read<'ticket> = ReadGuard<'ticket, T>>,
+        // Each `Read` implementation must serialize to the serialization of the member.
+        T: universe::UniverseMember<Read<'ticket>: Serialize>,
     {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
             let &schema::SerializeHandle(read_ticket, ref handle) = self;
-            let read_guard: ReadGuard<'_, T> = handle.read(read_ticket).map_err(|e| {
+            let read = handle.read(read_ticket).map_err(|e| {
                 serde::ser::Error::custom(format!(
                     "Failed to read universe member {name}: {e}",
                     name = handle.name()
                 ))
             })?;
-            let value: &T = &read_guard;
-            value.serialize(serializer)
+            read.serialize(serializer)
+        }
+    }
+
+    /// This implementation makes `SerializeHandle` serialization work on `ReadGuard`s.
+    impl<T: Serialize> Serialize for ReadGuard<'_, T> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            T::serialize(self, serializer)
         }
     }
 }
