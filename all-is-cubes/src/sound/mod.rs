@@ -60,6 +60,8 @@ impl SoundDef {
     }
 }
 
+universe::impl_universe_member_for_single_component_type!(SoundDef);
+
 impl universe::VisitHandles for SoundDef {
     fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
         let Self {

@@ -479,6 +479,8 @@ impl Character {
     }
 }
 
+universe::impl_universe_member_for_single_component_type!(Character);
+
 impl VisitHandles for Character {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         // Use pattern matching so that if we add a new field that might contain handles,

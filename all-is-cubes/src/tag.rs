@@ -76,6 +76,8 @@ impl universe::VisitHandles for Is {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct TagDef;
 
+universe::impl_universe_member_for_single_component_type!(TagDef);
+
 impl universe::VisitHandles for TagDef {
     fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
         let &TagDef = self;

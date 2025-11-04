@@ -227,6 +227,8 @@ impl VisitHandles for BlockDef {
     }
 }
 
+universe::impl_universe_member_for_single_component_type!(BlockDef);
+
 impl transaction::Transactional for BlockDef {
     type Transaction = BlockDefTransaction;
 }
@@ -311,10 +313,7 @@ impl Transaction for BlockDefTransaction {
 impl universe::TransactionOnEcs for BlockDefTransaction {
     type WriteQueryData = &'static mut Self::Target;
 
-    fn check(
-        &self,
-        target: &BlockDef,
-    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(&self, target: &BlockDef) -> Result<Self::CommitCheck, Self::Mismatch> {
         Transaction::check(self, target)
     }
 

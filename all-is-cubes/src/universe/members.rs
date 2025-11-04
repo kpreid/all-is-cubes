@@ -28,7 +28,7 @@ use crate::universe::{
 /// Not-externally-implementable supertrait for [`UniverseMember`] to make it sealed and hide
 /// implementation details.
 // TODO(ecs): make Component not a supertrait once we have split members into multiple components.
-pub(in crate::universe) trait SealedMember:
+pub(crate) trait SealedMember:
     Sized + ecs::Component<Mutability = bevy_ecs::component::Mutable>
 {
     /// Components to spawn when inserting a member of this type into a universe.
@@ -107,44 +107,59 @@ pub(in crate::universe) trait MemberBoilerplate: Sized {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Generates impls for a specific Universe member type.
-macro_rules! impl_universe_for_member {
-    ($member_type:ident, $table:ident) => {
-        impl SealedMember for $member_type {
+/// Use this macro to implement [`UniverseMember`] and related traits for any member type whose only
+/// ECS component (that are read through [`Handle`]s) is itself.
+///
+/// TODO(ecs): Remove all uses of this so that public types are not component types.
+macro_rules! impl_universe_member_for_single_component_type {
+    ($member_type:path) => {
+        impl $crate::universe::SealedMember for $member_type {
             type Bundle = (Self,);
             type ReadQueryData = &'static Self;
 
-            fn read_from_standalone(value: &Self) -> <Self as UniverseMember>::Read<'_> {
+            fn read_from_standalone(
+                value: &Self,
+            ) -> <Self as $crate::universe::UniverseMember>::Read<'_> {
                 // TODO(ecs): when we have multiple components, this will need to be defined
                 // separately for each member type.
                 value
             }
 
-            fn read_from_query(data: <Self::ReadQueryData as QueryData>::Item<'_>) -> <Self as UniverseMember>::Read<'_> {
+            fn read_from_query(
+                data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
+            ) -> <Self as $crate::universe::UniverseMember>::Read<'_> {
                 // TODO(ecs): when we have multiple components, this will need to be defined
                 // separately for each member type.
                 data
             }
 
-            fn read_from_entity_ref(entity: ecs::EntityRef<'_>) -> Option<<Self as UniverseMember>::Read<'_>> {
+            fn read_from_entity_ref(
+                entity: ::bevy_ecs::world::EntityRef<'_>,
+            ) -> Option<<Self as $crate::universe::UniverseMember>::Read<'_>> {
                 // TODO(ecs): when we have multiple components, this will need to be defined
                 // separately for each member type.
                 entity.get::<$member_type>()
             }
 
-            fn into_bundle(value: Box<Self>) -> Self::Bundle {
+            fn into_bundle(value: ::alloc::boxed::Box<Self>) -> Self::Bundle {
                 // TODO(ecs): when we have multiple components, this will need to be defined
                 // separately for each member type.
                 (*value,)
             }
         }
 
-        impl UniverseMember for $member_type {
+        impl $crate::universe::UniverseMember for $member_type {
             // TODO(ecs): when we have multiple components, this will need to be defined
             // separately for each member type.
             type Read<'ticket> = &'ticket $member_type;
         }
+    };
+}
+pub(crate) use impl_universe_member_for_single_component_type;
 
+/// Generates boilerplate impls for a specific Universe member type.
+macro_rules! impl_universe_for_member {
+    ($member_type:ident, $table:ident) => {
         impl MemberBoilerplate for $member_type {
             fn into_any_handle(handle: Handle<Self>) -> AnyHandle {
                 AnyHandle::$member_type(handle)

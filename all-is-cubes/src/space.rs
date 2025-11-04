@@ -22,7 +22,7 @@ use crate::math::{Cube, GridAab, GridCoordinate, Gridgid, Vol};
 use crate::time;
 use crate::transaction::{self, Merge, Transaction as _};
 use crate::universe::ReadTicket;
-use crate::universe::{Handle, HandleVisitor, UniverseTransaction, VisitHandles};
+use crate::universe::{self, Handle, HandleVisitor, UniverseTransaction, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
 #[cfg(doc)]
@@ -904,6 +904,8 @@ impl<T: Into<Cube>> ops::Index<T> for Space {
         }
     }
 }
+
+universe::impl_universe_member_for_single_component_type!(Space);
 
 impl VisitHandles for Space {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
