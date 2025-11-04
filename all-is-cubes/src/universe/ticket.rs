@@ -1,7 +1,7 @@
 #![expect(clippy::elidable_lifetime_names, reason = "names for clarity")]
 
-use core::any::Any;
 use core::any::type_name;
+use core::any::{Any, TypeId};
 use core::fmt;
 use core::mem;
 use core::panic::Location;
@@ -61,14 +61,8 @@ enum TicketAccess<'u> {
 #[derive(Debug, bevy_ecs::system::SystemParam)]
 pub(crate) struct QueryBlockDataSources<'w, 's> {
     universe_id: ecs::Res<'w, UniverseId>,
-    query: ecs::Query<
-        'w,
-        's,
-        ecs::AnyOf<(
-            <crate::block::BlockDef as SealedMember>::ReadQueryData,
-            <crate::space::Space as SealedMember>::ReadQueryData,
-        )>,
-    >,
+    block_defs: ecs::Query<'w, 's, <crate::block::BlockDef as SealedMember>::ReadQueryData>,
+    spaces: ecs::Query<'w, 's, <crate::space::Space as SealedMember>::ReadQueryData>,
 }
 
 impl<'universe> ReadTicket<'universe> {
@@ -144,43 +138,55 @@ impl<'universe> ReadTicket<'universe> {
     /// Returns None if any of:
     ///
     /// * entity does not exist
-    /// * entity does not have a `T` component
+    /// * entity does not have a `C` component
     /// * this ticket does not allow access to that component
-    pub(crate) fn get<T: ecs::Component>(
+    pub(crate) fn get<C: ecs::Component>(
         &self,
         entity: ecs::Entity,
-    ) -> Result<&'universe T, ReadTicketError> {
+    ) -> Result<&'universe C, ReadTicketError> {
+        fn convert_query_error<C>(error: bevy_ecs::query::QueryEntityError) -> TicketErrorKind {
+            use bevy_ecs::query::QueryEntityError as E;
+            match error {
+                // This case could also be "the ECS has wrong data" but we assume that doesn't happen
+                E::QueryDoesNotMatch(..) => TicketErrorKind::ComponentNotAllowed {
+                    type_name: type_name::<C>(),
+                },
+                E::EntityDoesNotExist(_) => TicketErrorKind::MissingEntity,
+                E::AliasedMutability(_) => {
+                    unreachable!("not a query for mutable access")
+                }
+            }
+        }
+
         // inner function returns TicketErrorKind
         let inner = || match self.access {
             TicketAccess::World(world) => world.get(entity).ok_or_else(|| {
                 if world.get_entity(entity).is_ok() {
                     TicketErrorKind::MissingComponent {
-                        type_name: type_name::<T>(),
+                        type_name: type_name::<C>(),
                     }
                 } else {
                     TicketErrorKind::MissingEntity
                 }
             }),
-            TicketAccess::BlockDataSources(query) => {
-                let (block_component, space_component) =
-                    query.query.get_inner(entity).map_err(|error| {
-                        use bevy_ecs::query::QueryEntityError as E;
-                        match error {
-                            E::QueryDoesNotMatch(..) => TicketErrorKind::ComponentNotAllowed {
-                                type_name: type_name::<T>(),
-                            },
-                            E::EntityDoesNotExist(_) => TicketErrorKind::MissingEntity,
-                            E::AliasedMutability(_) => {
-                                unreachable!("not a query for mutable access")
-                            }
-                        }
-                    })?;
-                block_component
-                    .and_then(|r| <dyn Any>::downcast_ref(r))
-                    .or_else(|| space_component.and_then(|r| <dyn Any>::downcast_ref(r)))
-                    .ok_or_else(|| TicketErrorKind::MissingComponent {
-                        type_name: type_name::<T>(),
+            TicketAccess::BlockDataSources(queries) => {
+                // Match the component being requested against the one of the queries that will
+                // provide it.
+                if TypeId::of::<C>() == TypeId::of::<crate::block::BlockDef>() {
+                    match queries.block_defs.get_inner(entity) {
+                        Ok(component) => Ok(<dyn Any>::downcast_ref(component).unwrap()),
+                        Err(e) => Err(convert_query_error::<C>(e)),
+                    }
+                } else if TypeId::of::<C>() == TypeId::of::<crate::space::Space>() {
+                    match queries.spaces.get_inner(entity) {
+                        Ok(component) => Ok(<dyn Any>::downcast_ref(component).unwrap()),
+                        Err(e) => Err(convert_query_error::<C>(e)),
+                    }
+                } else {
+                    Err(TicketErrorKind::ComponentNotAllowed {
+                        type_name: type_name::<C>(),
                     })
+                }
             }
             TicketAccess::EverythingBut(world, prohibited_entity) => {
                 if entity == prohibited_entity {
@@ -191,9 +197,9 @@ impl<'universe> ReadTicket<'universe> {
                     // SAFETY:
                     // If [`ReadTicket::everything_but()`]'s safety conditions were met,
                     // this access will not alias.
-                    unsafe { entity_ref.get::<T>() }.ok_or_else(|| {
+                    unsafe { entity_ref.get::<C>() }.ok_or_else(|| {
                         TicketErrorKind::MissingComponent {
-                            type_name: type_name::<T>(),
+                            type_name: type_name::<C>(),
                         }
                     })
                 }
