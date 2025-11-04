@@ -986,7 +986,7 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
             .unwrap()
             .read(universe.read_ticket())
             .unwrap()
-            .space
+            .space()
             .clone();
         universe
             .try_modify(&space_handle, |space| {

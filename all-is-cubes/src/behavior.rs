@@ -1018,7 +1018,7 @@ mod tests {
         let character = character.read(u.read_ticket()).unwrap();
         assert_eq!(
             character
-                .behaviors
+                .behaviors()
                 .query::<SelfModifyingBehavior>()
                 .map(|qi| qi.behavior)
                 .collect::<Vec<_>>(),
@@ -1027,7 +1027,7 @@ mod tests {
                 then: Then::Step,
             }]
         );
-        assert_eq!(character.body.position().x, 2.0);
+        assert_eq!(character.body().position().x, 2.0);
     }
 
     #[test]
@@ -1046,7 +1046,7 @@ mod tests {
             character
                 .read(u.read_ticket())
                 .unwrap()
-                .behaviors
+                .behaviors()
                 .query::<SelfModifyingBehavior>()
                 .count(),
             1
@@ -1056,7 +1056,7 @@ mod tests {
             character
                 .read(u.read_ticket())
                 .unwrap()
-                .behaviors
+                .behaviors()
                 .query::<SelfModifyingBehavior>()
                 .count(),
             0

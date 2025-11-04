@@ -1064,8 +1064,8 @@ fn universe_success() {
     );
 
     assert_eq!(
-        a_character.read(deserialized_universe.read_ticket()).unwrap().space,
-        deserialized_universe.get::<Space>(&"a_space".into()).unwrap()
+        a_character.read(deserialized_universe.read_ticket()).unwrap().space(),
+        &deserialized_universe.get::<Space>(&"a_space".into()).unwrap()
     );
 }
 

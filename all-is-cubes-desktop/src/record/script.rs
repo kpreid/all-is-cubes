@@ -219,8 +219,8 @@ impl ScriptRecorder {
         let character = character.read(read_tickets.world).unwrap();
         self.script.add_frame(
             time_since_start,
-            character.body.position().cast(),
-            character.body.look_direction().cast(),
+            character.body().position().cast(),
+            character.body().look_direction().cast(),
         );
 
         // Script recording is trivial so we can immediately notify success

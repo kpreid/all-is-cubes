@@ -6,7 +6,7 @@ use alloc::sync::Arc;
 use core::{fmt, hash};
 
 use crate::block::{self, AIR, Block, Primitive, RotationPlacementRule};
-use crate::character::{Character, CharacterTransaction, Cursor};
+use crate::character::{self, Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
 use crate::inv::{self, Icons, InventoryTransaction, StackLimit};
 use crate::linking::BlockProvider;
@@ -348,6 +348,7 @@ pub struct ToolInput<'ticket> {
     pub character: Option<Handle<Character>>,
 }
 
+#[allow(clippy::elidable_lifetime_names)]
 impl<'ticket> ToolInput<'ticket> {
     /// Generic handler for a tool that replaces one cube.
     ///
@@ -466,7 +467,7 @@ impl<'ticket> ToolInput<'ticket> {
         // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
 
         let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail if this returns None?
-        let character: Option<&'ticket Character> =
+        let character: Option<character::Read<'_>> =
             self.character.as_ref().map(|c| c.read(self.read_ticket)).transpose()?;
 
         let cube = if in_front {
@@ -760,7 +761,7 @@ mod tests {
         fn space_handle(&self) -> &Handle<Space> {
             &self.space_handle
         }
-        fn character(&self) -> &Character {
+        fn character(&self) -> character::Read<'_> {
             self.character_handle.read(self.universe.read_ticket()).unwrap()
         }
     }

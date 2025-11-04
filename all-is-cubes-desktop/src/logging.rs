@@ -331,7 +331,7 @@ fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::univer
             // as another renderer, sort of.
             let mut rm = crate::glue::rerun_mesh::RerunMesher::new(
                 destination.child(&rg::entity_path!("world-mesh")),
-                character.space.clone(),
+                character.space().clone(),
             );
             rm.update(
                 universe.read_ticket(),

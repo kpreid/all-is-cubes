@@ -69,8 +69,7 @@ const JUMP_SPEED: FreeCoordinate = 8.0;
 pub struct Character {
     /// Position, collision, and look direction.
     pub body: Body,
-    // TODO: the space handle is here instead of on Body on a notion that it might be useful to have
-    // Body be a pure data structure with no handles. Dubious; revisit.
+
     /// Refers to the [`Space`] to be viewed and collided with.
     pub space: Handle<Space>,
 
@@ -78,18 +77,15 @@ pub struct Character {
     /// towards.
     velocity_input: FreeVector,
 
-    #[doc(hidden)] // pub to be used by all-is-cubes-gpu
-    pub colliding_cubes: HbHashSet<Contact>,
+    colliding_cubes: HbHashSet<Contact>,
 
     /// Last body step, for debugging.
     // TODO(ecs): this is not fundamental so it should be a separate component, probably?
-    #[doc(hidden)] // pub to be used by fuzz_physics
     pub last_step_info: Option<BodyStepInfo>,
 
-    // TODO: Figure out what access is needed and add accessors
     inventory: Inventory,
 
-    /// Indices into [`Self::inventory`] slots.
+    /// Indices into [`Self::inventory()`] slots which identify the tools currently in use.
     selected_slots: [inv::Ix; inv::TOOL_SELECTIONS],
 
     /// Notifier for modifications.
@@ -127,17 +123,6 @@ impl fmt::Debug for Character {
             .field("selected_slots", selected_slots)
             .field("behaviors", &behaviors)
             .finish_non_exhaustive()
-    }
-}
-
-impl Fmt<StatusText> for Character {
-    #[mutants::skip] // technically user visible but really debugging
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
-        writeln!(fmt, "{}", self.body.refmt(fopt))?;
-        if let Some(info) = &self.last_step_info {
-            writeln!(fmt, "Last step: {:#?}", info.refmt(&ConciseDebug))?;
-        }
-        write!(fmt, "Colliding: {:?}", self.colliding_cubes.len())
     }
 }
 
@@ -444,7 +429,7 @@ impl Character {
         // This shouldn't happen according to game rules but it might due to a UI/session
         // update glitch, and if it does, we do
         if let Some(cursor_space) = cursor.map(Cursor::space) {
-            let our_space = &tb.space;
+            let our_space = tb.space();
             if cursor_space != our_space {
                 return Err(inv::ToolError::Internal(format!(
                     "space mismatch: cursor {cursor_space:?} != character {our_space:?}"
@@ -452,8 +437,8 @@ impl Character {
             }
         }
 
-        let slot_index = tb.selected_slots.get(button).copied().unwrap_or(tb.selected_slots[0]);
-        tb.inventory.use_tool(read_ticket, cursor, this, slot_index)
+        let slot_index = tb.selected_slots().get(button).copied().unwrap_or(tb.selected_slots()[0]);
+        tb.inventory().use_tool(read_ticket, cursor, this, slot_index)
     }
 
     /// Make the character jump, if they are on ground to jump from as of the last step.
@@ -479,7 +464,29 @@ impl Character {
     }
 }
 
-universe::impl_universe_member_for_single_component_type!(Character);
+impl universe::SealedMember for Character {
+    type Bundle = (Self,);
+    type ReadQueryData = &'static Self;
+    fn read_from_standalone(value: &Self) -> <Self as universe::UniverseMember>::Read<'_> {
+        Read(value)
+    }
+    fn read_from_query(
+        data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
+    ) -> <Self as universe::UniverseMember>::Read<'_> {
+        Read(data)
+    }
+    fn read_from_entity_ref(
+        entity: ::bevy_ecs::world::EntityRef<'_>,
+    ) -> Option<<Self as universe::UniverseMember>::Read<'_>> {
+        entity.get::<Character>().map(Read)
+    }
+    fn into_bundle(value: ::alloc::boxed::Box<Self>) -> Self::Bundle {
+        (*value,)
+    }
+}
+impl universe::UniverseMember for Character {
+    type Read<'ticket> = Read<'ticket>;
+}
 
 impl VisitHandles for Character {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
@@ -522,7 +529,7 @@ impl behavior::Host for Character {
 }
 
 #[cfg(feature = "save")]
-impl serde::Serialize for Character {
+impl serde::Serialize for Read<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -545,7 +552,7 @@ impl serde::Serialize for Character {
             // Not persisted - recomputed info
             colliding_cubes: _,
             last_step_info: _,
-        } = self;
+        } = self.0;
         schema::CharacterSer::CharacterV1 {
             space: space.clone(),
             body: Borrowed(body),
@@ -554,6 +561,16 @@ impl serde::Serialize for Character {
             behaviors: Borrowed(behaviors),
         }
         .serialize(serializer)
+    }
+}
+
+#[cfg(feature = "save")]
+impl serde::Serialize for Character {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Read(self).serialize(serializer)
     }
 }
 
@@ -590,6 +607,81 @@ impl<'de> serde::Deserialize<'de> for Character {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Read access to a [`Character`] that is currently in a [`Universe`][crate::universe::Universe].
+//---
+// TODO(ecs): This type does not do anything interesting yet, but is a proof of concept for the
+// ability to have such distinct types at all, which will eventually be used to support multiple
+// components per member.
+#[derive(Clone, Copy, Debug)]
+#[allow(clippy::module_name_repetitions)]
+pub struct Read<'ticket>(&'ticket Character);
+
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "TODO(ecs): will become larger later when we have multiple components"
+)]
+impl<'t> Read<'t> {
+    /// Position, collision, and look direction.
+    pub fn body(&self) -> &'t Body {
+        &self.0.body
+    }
+
+    /// Returns the character's current inventory.
+    pub fn inventory(&self) -> &'t Inventory {
+        self.0.inventory()
+    }
+
+    /// Refers to the [`Space`] to be viewed and collided with.
+    pub fn space(&self) -> &'t Handle<Space> {
+        &self.0.space
+    }
+
+    /// Returns the character's [`BehaviorSet`] of attached behaviors.
+    pub fn behaviors(&self) -> &'t BehaviorSet<Character> {
+        &self.0.behaviors
+    }
+
+    /// Indices into [`Self::inventory()`] slots which identify the tools selected for use by
+    /// clicking.
+    pub fn selected_slots(&self) -> [inv::Ix; inv::TOOL_SELECTIONS] {
+        self.0.selected_slots
+    }
+
+    #[doc(hidden)] // pub to be used by all-is-cubes-gpu
+    pub fn colliding_cubes(&self) -> &HbHashSet<Contact> {
+        &self.0.colliding_cubes
+    }
+
+    #[doc(hidden)] // pub to be used by fuzz_physics
+    pub fn last_step_info(&self) -> Option<&BodyStepInfo> {
+        self.0.last_step_info.as_ref()
+    }
+}
+
+/// Registers a listener for mutations of this character.
+impl listen::Listen for Read<'_> {
+    type Msg = CharacterChange;
+    type Listener = <listen::Notifier<Self::Msg> as listen::Listen>::Listener;
+    fn listen_raw(&self, listener: Self::Listener) {
+        self.0.notifier.listen_raw(listener)
+    }
+}
+
+impl Fmt<StatusText> for Read<'_> {
+    #[mutants::skip] // technically user visible but really debugging
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
+        writeln!(fmt, "{}", self.body().refmt(fopt))?;
+        if let Some(info) = &self.0.last_step_info {
+            writeln!(fmt, "Last step: {:#?}", info.refmt(&ConciseDebug))?;
+        }
+        write!(fmt, "Colliding: {:?}", self.0.colliding_cubes.len())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 /// Performance data returned by stepping a character.
 ///
@@ -729,8 +821,8 @@ impl Transaction for CharacterTransaction {
 impl universe::TransactionOnEcs for CharacterTransaction {
     type WriteQueryData = &'static mut Self::Target;
 
-    fn check(&self, target: &Character) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, target)
+    fn check(&self, target: Read<'_>) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, target.0)
     }
 
     fn commit(

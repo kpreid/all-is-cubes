@@ -12,7 +12,7 @@ use futures_core::future::BoxFuture;
 use sync_wrapper::SyncWrapper;
 
 use all_is_cubes::arcstr::{self, ArcStr, literal};
-use all_is_cubes::character::{Character, Cursor};
+use all_is_cubes::character::{self, Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
@@ -743,11 +743,12 @@ impl Shuttle {
 
         // Sync space_watch_state.world in case the character changed its universe.
         {
-            let character: Option<&Character> = self.game_character.get().as_ref().map(|cref| {
-                cref.read(self.game_universe.read_ticket())
-                    .expect("TODO: decide how to handle error")
-            });
-            let space: Option<&Handle<Space>> = character.map(|ch| &ch.space);
+            let character: Option<character::Read<'_>> =
+                self.game_character.get().as_ref().map(|cref| {
+                    cref.read(self.game_universe.read_ticket())
+                        .expect("TODO: decide how to handle error")
+                });
+            let space: Option<&Handle<Space>> = character.map(|ch| ch.space());
 
             if space != self.space_watch_state.world.space.as_ref() {
                 self.space_watch_state.world = SpaceWatchState::new(
