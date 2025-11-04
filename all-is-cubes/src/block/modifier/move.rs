@@ -397,7 +397,7 @@ mod tests {
         for _ in 0..257 {
             universe.step(false, time::Deadline::Whenever);
         }
-        checker(&space.read(universe.read_ticket()).unwrap(), &block);
+        checker(space.read(universe.read_ticket()).unwrap(), &block);
     }
 
     #[test]

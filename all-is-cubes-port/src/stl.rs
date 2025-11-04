@@ -36,7 +36,7 @@ pub(crate) fn export_stl(
     for space in spaces {
         items.insert(
             source.member_export_path(destination, &space),
-            space_to_stl_triangles(&*space.read(read_ticket)?),
+            space_to_stl_triangles(space.read(read_ticket)?),
         );
     }
 

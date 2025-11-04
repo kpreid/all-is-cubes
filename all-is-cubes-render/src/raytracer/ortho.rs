@@ -30,7 +30,7 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
     // for "what's the highest resolution that was tested along this ray", we can do adaptive
     // sampling so we can trace whole blocks at once when they're simple, and also detect if
     // the image scale is too low to accurately capture the scene.
-    let space = &*space.read(read_ticket).expect("failed to read space to render");
+    let space = space.read(read_ticket).expect("failed to read space to render");
     let camera = &MultiOrthoCamera::new(Resolution::R32, space.bounds());
     let rt = &raytracer::SpaceRaytracer::new(space, GraphicsOptions::UNALTERED_COLORS, ());
 

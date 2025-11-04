@@ -1002,40 +1002,6 @@ impl<T: UniverseMember> Clone for StrongHandle<T> {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Read access to the referent of a [`Handle`].
-///
-/// You can create this by calling [`Handle::read()`], and must drop it before the next time
-/// the handle's referent is mutated.
-//---
-// TODO(ecs): This type used to serve as a lock guard but is now a placeholder for access to
-// multi-component universe members. It should stop being used gradually as multi-component
-// universe members are introduced, then be deleted — any final uses being replaced with `&T`.
-pub struct ReadGuard<'ticket, T: 'static>(pub(in crate::universe) &'ticket T);
-
-impl<T: fmt::Debug> fmt::Debug for ReadGuard<'_, T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "ReadGuard({:?})", **self)
-    }
-}
-impl<T> Deref for ReadGuard<'_, T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        self.0
-    }
-}
-impl<T> AsRef<T> for ReadGuard<'_, T> {
-    fn as_ref(&self) -> &T {
-        self
-    }
-}
-impl<T> core::borrow::Borrow<T> for ReadGuard<'_, T> {
-    fn borrow(&self) -> &T {
-        self
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
 /// Returns a type-erased pointer which may be used for comparing and hashing handle identities
 /// regardless of their type and state, without downcasting.
 ///

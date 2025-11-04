@@ -325,11 +325,8 @@ impl Transaction for SpaceTransaction {
 impl universe::TransactionOnEcs for SpaceTransaction {
     type WriteQueryData = &'static mut Self::Target;
 
-    fn check(
-        &self,
-        target: universe::ReadGuard<'_, Space>,
-    ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, &*target)
+    fn check(&self, target: &Space) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, target)
     }
 
     fn commit(

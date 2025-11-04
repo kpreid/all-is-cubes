@@ -743,12 +743,11 @@ impl Shuttle {
 
         // Sync space_watch_state.world in case the character changed its universe.
         {
-            let character_read: Option<universe::ReadGuard<'_, Character>> =
-                self.game_character.get().as_ref().map(|cref| {
-                    cref.read(self.game_universe.read_ticket())
-                        .expect("TODO: decide how to handle error")
-                });
-            let space: Option<&Handle<Space>> = character_read.as_ref().map(|ch| &ch.space);
+            let character: Option<&Character> = self.game_character.get().as_ref().map(|cref| {
+                cref.read(self.game_universe.read_ticket())
+                    .expect("TODO: decide how to handle error")
+            });
+            let space: Option<&Handle<Space>> = character.map(|ch| &ch.space);
 
             if space != self.space_watch_state.world.space.as_ref() {
                 self.space_watch_state.world = SpaceWatchState::new(

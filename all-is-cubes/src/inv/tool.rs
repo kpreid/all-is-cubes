@@ -15,7 +15,7 @@ use crate::op::{self, Operation};
 use crate::space::{CubeTransaction, Space, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
 use crate::universe::{
-    Handle, HandleError, HandleVisitor, ReadGuard, ReadTicket, UniverseTransaction, VisitHandles,
+    Handle, HandleError, HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles,
 };
 
 /// A `Tool` is an object which a character can use to have some effect in the game,
@@ -466,7 +466,7 @@ impl<'ticket> ToolInput<'ticket> {
         // TODO: This is a mess; figure out how much impedance-mismatch we want to fix here.
 
         let cursor = self.cursor()?; // TODO: allow op to not be spatial, i.e. not always fail if this returns None?
-        let character_guard: Option<ReadGuard<'ticket, Character>> =
+        let character: Option<&'ticket Character> =
             self.character.as_ref().map(|c| c.read(self.read_ticket)).transpose()?;
 
         let cube = if in_front {
@@ -476,8 +476,8 @@ impl<'ticket> ToolInput<'ticket> {
         };
 
         let (space_txn, inventory_txn) = op.apply(
-            &*cursor.space().read(self.read_ticket)?,
-            character_guard.as_ref().map(|c| c.inventory()),
+            cursor.space().read(self.read_ticket)?,
+            character.map(|c| c.inventory()),
             Gridgid::from_translation(cube.lower_bounds().to_vector())
                 * rotation.to_positive_octant_transform(1),
         )?;
@@ -754,13 +754,13 @@ mod tests {
             Ok(())
         }
 
-        fn space(&self) -> ReadGuard<'_, Space> {
+        fn space(&self) -> &Space {
             self.space_handle.read(self.universe.read_ticket()).unwrap()
         }
         fn space_handle(&self) -> &Handle<Space> {
             &self.space_handle
         }
-        fn character(&self) -> ReadGuard<'_, Character> {
+        fn character(&self) -> &Character {
             self.character_handle.read(self.universe.read_ticket()).unwrap()
         }
     }
@@ -861,7 +861,7 @@ mod tests {
         assert_eq!(actual_transaction, expected_delete);
 
         actual_transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
-        print_space(&tester.space(), [-1., 1., 1.]);
+        print_space(tester.space(), [-1., 1., 1.]);
         assert_eq!(&tester.space()[[1, 0, 0]], &AIR);
     }
 
@@ -917,7 +917,7 @@ mod tests {
         assert_eq!(transaction, expected_cube_transaction);
 
         transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
-        print_space(&tester.space(), [-1., 1., 1.]);
+        print_space(tester.space(), [-1., 1., 1.]);
         assert_eq!(&tester.space()[[1, 0, 0]], &existing);
         assert_eq!(&tester.space()[[0, 0, 0]], &tool_block);
     }
@@ -1053,7 +1053,7 @@ mod tests {
         );
 
         transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
-        print_space(&tester.space(), [-1., 1., 1.]);
+        print_space(tester.space(), [-1., 1., 1.]);
         assert_eq!(
             (&tester.space()[[1, 0, 0]], &tester.space()[[0, 0, 0]]),
             if in_front {
@@ -1102,7 +1102,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));
-        print_space(&tester.space(), [-1., 1., 1.]);
+        print_space(tester.space(), [-1., 1., 1.]);
         assert_eq!(&tester.space()[[1, 0, 0]], &existing);
         assert_eq!(&tester.space()[[0, 0, 0]], &obstacle);
     }

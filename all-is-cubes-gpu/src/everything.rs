@@ -399,14 +399,12 @@ impl EverythingRenderer {
                     .character()
                     .map(|c| c.read(read_tickets.world))
                     .transpose()
-                    .map_err(RenderError::Read)?
-                    .as_deref(),
+                    .map_err(RenderError::Read)?,
                 spaces_to_render
                     .world
                     .map(|s| s.read(read_tickets.world))
                     .transpose()
-                    .map_err(RenderError::Read)?
-                    .as_deref(),
+                    .map_err(RenderError::Read)?,
                 self.cameras.graphics_options(),
                 &mut v,
                 cursor_result,

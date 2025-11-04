@@ -341,7 +341,7 @@ impl Character {
             let info = self.body.step_with_rerun(
                 tick,
                 control_delta_v,
-                Some(&*space),
+                Some(space),
                 |cube| {
                     colliding_cubes.insert(cube);
                 },
@@ -727,11 +727,8 @@ impl Transaction for CharacterTransaction {
 impl universe::TransactionOnEcs for CharacterTransaction {
     type WriteQueryData = &'static mut Self::Target;
 
-    fn check(
-        &self,
-        target: universe::ReadGuard<'_, Character>,
-    ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, &*target)
+    fn check(&self, target: &Character) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, target)
     }
 
     fn commit(

@@ -1136,7 +1136,7 @@ mod universe {
     use crate::save::schema::MemberEntrySer;
     use crate::time;
     use crate::universe::{
-        self, AnyHandle, Handle, HandleSet, Name, PartialUniverse, ReadGuard, Universe, tl,
+        self, AnyHandle, Handle, HandleSet, Name, PartialUniverse, Universe, tl,
     };
     use schema::{HandleSer, MemberDe, NameSer};
 
@@ -1148,7 +1148,7 @@ mod universe {
         }
     }
 
-    impl<'t> Serialize for PartialUniverse<'t> {
+    impl Serialize for PartialUniverse<'_> {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             let &Self {
                 read_ticket,
@@ -1160,13 +1160,13 @@ mod universe {
                 .map(|handle: &AnyHandle| match handle {
                     AnyHandle::BlockDef(member_handle) => {
                         let name = member_handle.name();
-                        let read_guard: ReadGuard<'t, BlockDef> =
+                        let member_repr = schema::MemberSer::from(
                             member_handle.read(read_ticket).map_err(|e| {
                                 serde::ser::Error::custom(format!(
                                     "Failed to read universe member {name}: {e}"
                                 ))
-                            })?;
-                        let member_repr = schema::MemberSer::from(&*read_guard);
+                            })?,
+                        );
                         Ok(MemberEntrySer {
                             name: member_handle.name(),
                             value: member_repr,
@@ -1324,16 +1324,6 @@ mod universe {
                 ))
             })?;
             read.serialize(serializer)
-        }
-    }
-
-    /// This implementation makes `SerializeHandle` serialization work on `ReadGuard`s.
-    impl<T: Serialize> Serialize for ReadGuard<'_, T> {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            T::serialize(self, serializer)
         }
     }
 }

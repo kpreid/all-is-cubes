@@ -17,7 +17,7 @@ use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
-    self, ErasedHandle, Handle, InsertError, Name, ReadGuard, Universe, VisitableComponents,
+    self, ErasedHandle, Handle, InsertError, Name, Universe, VisitableComponents,
     handle::HandlePtr, universe_txn as ut,
 };
 
@@ -89,10 +89,9 @@ macro_rules! impl_universe_for_member {
             }
 
             fn read_from_standalone(value: &Self) -> <Self as UniverseMember>::Read<'_> {
-                // TODO(ecs): using ReadGuard is a placeholder for future work.
-                // It used to be a lock guard, but now it stands in for the fact that
-                // Self::Read != &self in the future.
-                ReadGuard(value)
+                // TODO(ecs): when we have multiple components, this will need to be defined
+                // separately for each member type.
+                value
             }
 
             fn into_bundle(value: Box<Self>) -> Self::Bundle {
@@ -109,7 +108,9 @@ macro_rules! impl_universe_for_member {
         }
 
         impl UniverseMember for $member_type {
-            type Read<'ticket> = ReadGuard<'ticket, $member_type>;
+            // TODO(ecs): when we have multiple components, this will need to be defined
+            // separately for each member type.
+            type Read<'ticket> = &'ticket $member_type;
         }
 
         impl ut::UTransactional for $member_type {

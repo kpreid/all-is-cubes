@@ -646,7 +646,7 @@ mod tests {
         // TODO: also check blocks that are found in `Composite` and directly in `Space`, etc.
         // Use case for `VisitHandles` being more general?
         for (block_def_name, block_def_handle) in universe.iter_by_type::<block::BlockDef>() {
-            let block_def = &*block_def_handle.read(universe.read_ticket()).unwrap();
+            let block_def = block_def_handle.read(universe.read_ticket()).unwrap();
             if let block::Primitive::Recur {
                 space: space_handle,
                 ..

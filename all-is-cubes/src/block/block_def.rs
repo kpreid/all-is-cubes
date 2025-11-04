@@ -313,9 +313,9 @@ impl universe::TransactionOnEcs for BlockDefTransaction {
 
     fn check(
         &self,
-        target: universe::ReadGuard<'_, BlockDef>,
+        target: &BlockDef,
     ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, &*target)
+        Transaction::check(self, target)
     }
 
     fn commit(

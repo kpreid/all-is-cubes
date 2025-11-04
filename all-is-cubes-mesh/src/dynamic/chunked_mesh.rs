@@ -285,9 +285,7 @@ where
 
         let todo: &mut CsmTodo<_> = &mut self.todo.lock();
 
-        let space = &*if let Ok(space) = self.space.read(read_ticket) {
-            space
-        } else {
+        let Ok(space) = self.space.read(read_ticket) else {
             // TODO: report error
             return (
                 CsmUpdateInfo {

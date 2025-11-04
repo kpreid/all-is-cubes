@@ -144,11 +144,8 @@ impl Transaction for DefTransaction {
 impl universe::TransactionOnEcs for DefTransaction {
     type WriteQueryData = &'static mut Self::Target;
 
-    fn check(
-        &self,
-        target: universe::ReadGuard<'_, SoundDef>,
-    ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, &*target)
+    fn check(&self, target: &SoundDef) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, target)
     }
 
     fn commit(

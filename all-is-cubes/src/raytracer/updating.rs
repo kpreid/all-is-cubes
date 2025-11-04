@@ -123,7 +123,7 @@ where
 
         if mem::take(&mut todo.everything) {
             self.state = SpaceRaytracer::new(
-                &space,
+                space,
                 (*self.graphics_options.get()).clone(),
                 (*self.custom_options.get()).clone(),
             );
@@ -278,7 +278,7 @@ mod tests {
                 self.updating.get().to_text::<CharacterBuf>(&self.camera, "\n").to_string();
             #[expect(clippy::unit_arg)]
             let image_fresh = SpaceRaytracer::<CharacterRtData>::new(
-                &self.space.read(read_ticket).unwrap(),
+                self.space.read(read_ticket).unwrap(),
                 (*self.graphics_options.get()).clone(),
                 *self.custom_options.get(),
             )

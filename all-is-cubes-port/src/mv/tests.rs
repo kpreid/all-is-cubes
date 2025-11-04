@@ -65,7 +65,7 @@ async fn export_import_space() {
         .unwrap();
     let export_space = export_universe.insert_anonymous(export_space);
     print_space(
-        &export_space.read(export_universe.read_ticket()).unwrap(),
+        export_space.read(export_universe.read_ticket()).unwrap(),
         [1., 1., 1.],
     );
 
@@ -75,7 +75,7 @@ async fn export_import_space() {
     let import_space: Handle<Space> = import_universe.iter_by_type().next().unwrap().1;
 
     print_space(
-        &import_space.read(import_universe.read_ticket()).unwrap(),
+        import_space.read(import_universe.read_ticket()).unwrap(),
         [1., 1., 1.],
     );
 
@@ -126,7 +126,7 @@ async fn import_materials() {
     .await
     .unwrap();
     let space: Handle<Space> = universe.get(&"model_0".into()).unwrap();
-    let space: &Space = &space.read(universe.read_ticket()).unwrap();
+    let space: &Space = space.read(universe.read_ticket()).unwrap();
     let bounds = GridAab::from_lower_size([0, 0, 0], [6, 1, 1]);
     assert_eq!(space.bounds(), bounds);
     let blocks = space

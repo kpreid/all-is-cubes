@@ -323,7 +323,7 @@ impl SpaceRenderer {
 
             return Ok(SpaceUpdateInfo::default());
         };
-        let space = &*csm.space().read(read_ticket).map_err(RenderError::Read)?;
+        let space = csm.space().read(read_ticket).map_err(RenderError::Read)?;
 
         if mem::take(&mut todo.sky) {
             self.skybox.compute(device, queue, &space.physics().sky);

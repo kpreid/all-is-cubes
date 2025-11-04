@@ -399,13 +399,10 @@ pub(crate) fn export_gltf(
         .map(|space_handle| -> Result<_, ExportError> {
             let name = space_handle.name();
             let space = space_handle.read(read_ticket)?;
-            let block_meshes = block_meshes_for_space::<GltfMt>(
-                &space,
-                &writer.texture_allocator(),
-                &mesh_options,
-            );
+            let block_meshes =
+                block_meshes_for_space::<GltfMt>(space, &writer.texture_allocator(), &mesh_options);
             let mesh: SpaceMesh<GltfMt> =
-                SpaceMesh::new(&space, space.bounds(), &mesh_options, &block_meshes[..]);
+                SpaceMesh::new(space, space.bounds(), &mesh_options, &block_meshes[..]);
             let translation: [f32; 3] = space.bounds().lower_bounds().to_f32().into();
 
             Ok((name, mesh, translation))
