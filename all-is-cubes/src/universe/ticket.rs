@@ -9,7 +9,7 @@ use core::panic::Location;
 use bevy_ecs::prelude as ecs;
 use bevy_ecs::world::unsafe_world_cell::UnsafeWorldCell;
 
-use crate::universe::{self, GoneReason, Handle, HandleError, Universe, UniverseId};
+use crate::universe::{self, GoneReason, Handle, HandleError, SealedMember, Universe, UniverseId};
 
 #[cfg(doc)]
 use crate::block::Block;
@@ -65,8 +65,8 @@ pub(crate) struct QueryBlockDataSources<'w, 's> {
         'w,
         's,
         ecs::AnyOf<(
-            &'static crate::block::BlockDef,
-            &'static crate::space::Space,
+            <crate::block::BlockDef as SealedMember>::ReadQueryData,
+            <crate::space::Space as SealedMember>::ReadQueryData,
         )>,
     >,
 }
