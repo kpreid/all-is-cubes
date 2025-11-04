@@ -9,6 +9,7 @@ use core::any::Any;
 use core::{fmt, hash};
 
 use bevy_ecs::prelude as ecs;
+use bevy_ecs::query::QueryData;
 
 use crate::block::BlockDef;
 use crate::character::Character;
@@ -32,6 +33,8 @@ pub(in crate::universe) trait SealedMember:
     /// Components to spawn when inserting a member of this type into a universe.
     type Bundle: ecs::Bundle;
 
+    type ReadQueryData: bevy_ecs::query::ReadOnlyQueryData;
+
     /// Generic constructor for [`AnyHandle`].
     fn into_any_handle(handle: Handle<Self>) -> AnyHandle;
 
@@ -44,12 +47,35 @@ pub(in crate::universe) trait SealedMember:
     where
         Self: UniverseMember;
 
+    #[allow(dead_code, reason = "TODO(ecs): will be needed later (maybe)")]
+    /// Constructs `Self::Read` from query data.
+    fn read_from_query(data: <Self::ReadQueryData as QueryData>::Item<'_>) -> Self::Read<'_>
+    where
+        Self: UniverseMember;
+
+    #[allow(dead_code, reason = "TODO(ecs): will be needed later (maybe)")]
+    /// Constructs `Self::Read` from an [`ecs::EntityRef`].
+    /// This may be used when queries are not feasible.
+    ///
+    /// Returns [`None`] when the entity does not have the components it should have.
+    /// No other validation is guaranteed to be performed.
+    fn read_from_entity_ref(entity: ecs::EntityRef<'_>) -> Option<Self::Read<'_>>
+    where
+        Self: UniverseMember;
+
     /// Converts `Self` (the form independent of a universe) into a bundle to be part of a
     /// newly spawned entity.
     fn into_bundle(value: Box<Self>) -> Self::Bundle;
 
+    #[allow(dead_code, reason = "TODO(ecs): will be needed later (maybe)")]
+    fn member_read_query_state(
+        queries: &MemberReadQueryStates,
+    ) -> &ecs::QueryState<Self::ReadQueryData>
+    where
+        Self: UniverseMember;
+
     fn member_mutation_query_state(
-        queries: &mut MemberQueries,
+        queries: &mut MemberWriteQueryStates,
     ) -> &mut ecs::QueryState<<<Self as universe::Transactional>::Transaction as universe::TransactionOnEcs>::WriteQueryData>
     where
         Self: UniverseMember + transaction::Transactional<Transaction: universe::TransactionOnEcs>;
@@ -79,6 +105,7 @@ macro_rules! impl_universe_for_member {
     ($member_type:ident, $table:ident) => {
         impl SealedMember for $member_type {
             type Bundle = (Self,);
+            type ReadQueryData = &'static Self;
 
             fn into_any_handle(handle: Handle<Self>) -> AnyHandle {
                 AnyHandle::$member_type(handle)
@@ -94,14 +121,33 @@ macro_rules! impl_universe_for_member {
                 value
             }
 
+            fn read_from_query(data: <Self::ReadQueryData as QueryData>::Item<'_>) -> <Self as UniverseMember>::Read<'_> {
+                // TODO(ecs): when we have multiple components, this will need to be defined
+                // separately for each member type.
+                data
+            }
+
+            fn read_from_entity_ref(entity: ecs::EntityRef<'_>) -> Option<<Self as UniverseMember>::Read<'_>> {
+                // TODO(ecs): when we have multiple components, this will need to be defined
+                // separately for each member type.
+                entity.get::<$member_type>()
+            }
+
             fn into_bundle(value: Box<Self>) -> Self::Bundle {
                 // TODO(ecs): when we have multiple components, this will need to be defined
                 // separately for each member type.
                 (*value,)
             }
 
+
+            fn member_read_query_state(
+                queries: &MemberReadQueryStates,
+            ) -> &ecs::QueryState<Self::ReadQueryData> {
+                &queries.$table
+            }
+
             fn member_mutation_query_state(
-                queries: &mut MemberQueries,
+                queries: &mut MemberWriteQueryStates,
             ) -> &mut ecs::QueryState<<<Self as universe::Transactional>::Transaction as universe::TransactionOnEcs>::WriteQueryData> {
                 &mut queries.$table
             }
@@ -494,13 +540,28 @@ macro_rules! member_enums_and_impls {
         }
         impl Eq for AnyPending {}
 
+        /// Queries for reading members, used by [`Handle::read()`].
+        /// Contains one `QueryState` per member type, whose `QueryData` is that member's
+        /// `UniverseMember::Read`.
+        #[derive(ecs::FromWorld)]
+        #[allow(nonstandard_style)]
+        #[macro_rules_attribute::derive($crate::universe::ecs_details::derive_manual_query_bundle!)]
+        pub(crate) struct MemberReadQueryStates {
+            $(
+                pub(in crate::universe) $table_name:
+                    ::bevy_ecs::query::QueryState<
+                        <$member_type as universe::SealedMember>::ReadQueryData
+                    >,
+            )*
+        }
+
         /// Queries for mutating members, used by transaction commits.
         /// Contains one `QueryState` per member type, whose `QueryData` is that member's
         /// `TransactionOnEcs::WriteQueryData`.
         #[derive(ecs::FromWorld)]
         #[allow(nonstandard_style)]
         #[macro_rules_attribute::derive($crate::universe::ecs_details::derive_manual_query_bundle!)]
-        pub(in crate::universe) struct MemberQueries {
+        pub(in crate::universe) struct MemberWriteQueryStates {
             $(
                 pub(in crate::universe) $table_name:
                     ::bevy_ecs::query::QueryState<

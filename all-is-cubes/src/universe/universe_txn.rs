@@ -91,7 +91,7 @@ where
     <O as Transactional>::Transaction: TransactionOnEcs,
 {
     let entity: ecs::Entity = target.as_entity(universe.universe_id()).unwrap();
-    let query_state = O::member_mutation_query_state(&mut universe.queries.members);
+    let query_state = O::member_mutation_query_state(&mut universe.queries.write_members);
 
     let (target_query_data, everything_but) =
         super::get_one_mut_and_ticket(&mut universe.world, entity, query_state)

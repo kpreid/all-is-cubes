@@ -142,7 +142,8 @@ pub struct Universe {
 #[macro_rules_attribute::derive(ecs_details::derive_manual_query_bundle!)]
 struct Queries {
     all_members_query: ecs::QueryState<(Entity, &'static Membership)>,
-    members: MemberQueries,
+    read_members: MemberReadQueryStates,
+    write_members: MemberWriteQueryStates,
 }
 
 impl Universe {
@@ -349,7 +350,7 @@ impl Universe {
                 let (mut space, everything_but) = get_one_mut_and_ticket(
                     &mut self.world,
                     space_handle.as_entity(self.id).unwrap(),
-                    &mut self.queries.members.spaces,
+                    &mut self.queries.write_members.spaces,
                 )
                 .unwrap();
 
