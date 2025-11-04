@@ -23,6 +23,7 @@ use crate::universe::{
 };
 
 // -------------------------------------------------------------------------------------------------
+// Traits
 
 /// Not-externally-implementable supertrait for [`UniverseMember`] to make it sealed and hide
 /// implementation details.
@@ -34,12 +35,6 @@ pub(in crate::universe) trait SealedMember:
     type Bundle: ecs::Bundle;
 
     type ReadQueryData: bevy_ecs::query::ReadOnlyQueryData;
-
-    /// Generic constructor for [`AnyHandle`].
-    fn into_any_handle(handle: Handle<Self>) -> AnyHandle;
-
-    /// Generic constructor for [`AnyPending`].
-    fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending;
 
     /// Constructs `Self::Read` from a value that has not yet been inserted into the
     /// [`Universe`].
@@ -66,6 +61,35 @@ pub(in crate::universe) trait SealedMember:
     /// Converts `Self` (the form independent of a universe) into a bundle to be part of a
     /// newly spawned entity.
     fn into_bundle(value: Box<Self>) -> Self::Bundle;
+}
+
+/// Trait for every type which can be a named member of a universe and be referred to by
+/// [`Handle`]s.
+///
+/// This trait provides no operations itself, but is a bound on functions of [`Universe`],
+/// [`Handle`], and [`UniverseTransaction`][ut::UniverseTransaction].
+//---
+// TODO: Give this trait a better name. Some errors refer to this concept as "object", and
+// in a purely abstract architecture sense it’s a sort of “entity” but that conflicts with
+// “is a bevy_ecs entity”.
+#[expect(private_bounds)]
+pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember + MemberBoilerplate {
+    /// Type returned by [`Handle::<T>::read()`][Handle::read()] which is the way to read the
+    /// `T` value after it has been inserted into the [`Universe`].
+    //---
+    // For serialization, this type must serialize to the universe member type’s serialization
+    // schema. (The simplest way to do this is for it to be `&T`, for example.)
+    type Read<'ticket>;
+}
+
+/// Trait for operations on [`Handle`]s and queries that must be implemented for each member type.
+/// This trait is implemented by macro and not customized for each member type.
+pub(in crate::universe) trait MemberBoilerplate: Sized {
+    /// Generic constructor for [`AnyHandle`].
+    fn into_any_handle(handle: Handle<Self>) -> AnyHandle;
+
+    /// Generic constructor for [`AnyPending`].
+    fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending;
 
     #[allow(dead_code, reason = "TODO(ecs): will be needed later (maybe)")]
     fn member_read_query_state(
@@ -81,24 +105,7 @@ pub(in crate::universe) trait SealedMember:
         Self: UniverseMember + transaction::Transactional<Transaction: universe::TransactionOnEcs>;
 }
 
-/// Trait for every type which can be a named member of a universe and be referred to by
-/// [`Handle`]s.
-///
-/// This trait provides no operations itself, but is a bound on functions of [`Universe`],
-/// [`Handle`], and [`UniverseTransaction`][ut::UniverseTransaction].
-//---
-// TODO: Give this trait a better name. Some errors refer to this concept as "object", and
-// in a purely abstract architecture sense it’s a sort of “entity” but that conflicts with
-// “is a bevy_ecs entity”.
-#[expect(private_bounds)]
-pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember {
-    /// Type returned by [`Handle::<T>::read()`][Handle::read()] which is the way to read the
-    /// `T` value after it has been inserted into the [`Universe`].
-    //---
-    // For serialization, this type must serialize to the universe member type’s serialization
-    // schema. (The simplest way to do this is for it to be `&T`, for example.)
-    type Read<'ticket>;
-}
+// -------------------------------------------------------------------------------------------------
 
 /// Generates impls for a specific Universe member type.
 macro_rules! impl_universe_for_member {
@@ -106,14 +113,6 @@ macro_rules! impl_universe_for_member {
         impl SealedMember for $member_type {
             type Bundle = (Self,);
             type ReadQueryData = &'static Self;
-
-            fn into_any_handle(handle: Handle<Self>) -> AnyHandle {
-                AnyHandle::$member_type(handle)
-            }
-
-            fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending {
-                AnyPending::$member_type { handle, value }
-            }
 
             fn read_from_standalone(value: &Self) -> <Self as UniverseMember>::Read<'_> {
                 // TODO(ecs): when we have multiple components, this will need to be defined
@@ -138,11 +137,26 @@ macro_rules! impl_universe_for_member {
                 // separately for each member type.
                 (*value,)
             }
+        }
 
+        impl UniverseMember for $member_type {
+            // TODO(ecs): when we have multiple components, this will need to be defined
+            // separately for each member type.
+            type Read<'ticket> = &'ticket $member_type;
+        }
+
+        impl MemberBoilerplate for $member_type {
+            fn into_any_handle(handle: Handle<Self>) -> AnyHandle {
+                AnyHandle::$member_type(handle)
+            }
+
+            fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending {
+                AnyPending::$member_type { handle, value }
+            }
 
             fn member_read_query_state(
                 queries: &MemberReadQueryStates,
-            ) -> &ecs::QueryState<Self::ReadQueryData> {
+            ) -> &ecs::QueryState<<Self as SealedMember>::ReadQueryData> {
                 &queries.$table
             }
 
@@ -153,11 +167,6 @@ macro_rules! impl_universe_for_member {
             }
         }
 
-        impl UniverseMember for $member_type {
-            // TODO(ecs): when we have multiple components, this will need to be defined
-            // separately for each member type.
-            type Read<'ticket> = &'ticket $member_type;
-        }
 
         impl ut::UTransactional for $member_type {
             fn bind(
@@ -593,6 +602,8 @@ member_enums_and_impls!(
     (Space, spaces),
     (TagDef, tags),
 );
+
+// -------------------------------------------------------------------------------------------------
 
 impl AnyHandle {
     /// Downcast to a specific `Handle<T>` type.

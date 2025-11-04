@@ -500,7 +500,7 @@ impl Universe {
         T: UniverseMember,
     {
         let handle = Handle::new_pending(name);
-        SealedMember::into_any_pending(handle.clone(), Some(Box::new(value)))
+        MemberBoilerplate::into_any_pending(handle.clone(), Some(Box::new(value)))
             .insert_pending_into_universe(self)?;
         Ok(handle)
     }
