@@ -486,6 +486,7 @@ impl Space {
             contents: self.contents.as_mut(),
             light: &mut self.light,
             behaviors: &mut self.behaviors,
+            spawn: &mut self.spawn,
             change_buffer: &mut self.change_notifier.buffer(),
             fluff_buffer: &mut self.fluff_notifier.buffer(),
             cubes_wanting_ticks: &mut self.cubes_wanting_ticks,
@@ -1139,6 +1140,7 @@ pub struct Mutation<'m, 'space> {
     light: &'m mut LightStorage,
     palette: &'m mut Palette,
     cubes_wanting_ticks: &'m mut HbHashSet<Cube>,
+    spawn: &'m mut Spawn,
     behaviors: &'m mut BehaviorSet<Space>,
 
     // Buffers outgoing notifications; flushed as needed and on drop.
@@ -1400,6 +1402,18 @@ impl<'space> Mutation<'_, 'space> {
             },
             &mut self.change_buffer,
         )
+    }
+
+    /// Returns the current default [`Spawn`], which determines where new [`Character`]s
+    /// are placed in the space if no alternative applies.
+    pub fn spawn(&self) -> &Spawn {
+        self.spawn
+    }
+
+    /// Sets the default [`Spawn`], which determines where new [`Character`]s are placed
+    /// in the space if no alternative applies.
+    pub fn set_spawn(&mut self, spawn: Spawn) {
+        *self.spawn = spawn;
     }
 }
 
