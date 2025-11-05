@@ -475,10 +475,10 @@ impl Space {
     // In the future, there may also be ways in which the space can be in a temporarily invalid
     // state (e.g. allocating a block index before it is used anywhere).
     #[inline] // a non-inlined monomorphization of this function will basically never be a benefit
-    pub fn mutate<R>(
-        &mut self,
-        read_ticket: ReadTicket<'_>,
-        f: impl FnOnce(&mut Mutation<'_, '_>) -> R,
+    pub fn mutate<'space, R>(
+        &'space mut self,
+        read_ticket: ReadTicket<'space>,
+        f: impl FnOnce(&mut Mutation<'_, 'space>) -> R,
     ) -> R {
         f(&mut Mutation {
             read_ticket,
@@ -729,48 +729,6 @@ impl Space {
         &self.fluff_notifier
     }
 
-    /// Perform lighting updates until there are none left to do. Returns the number of
-    /// updates performed.
-    ///
-    /// This may take a while. It is appropriate for when the goal is to
-    /// render a fully lit scene non-interactively.
-    ///
-    /// `epsilon` specifies a threshold at which to stop doing updates.
-    /// Zero means to run to full completion; one is the smallest unit of light level
-    /// difference; and so on.
-    pub fn evaluate_light(
-        &mut self,
-        epsilon: u8,
-        mut progress_callback: impl FnMut(LightUpdatesInfo),
-    ) -> usize {
-        let (light, uc, mut change_buffer) = self.borrow_light_update_context();
-        let epsilon = light::Priority::from_difference(epsilon);
-
-        let mut total = 0;
-        loop {
-            let info = light.update_lighting_from_queue(
-                uc,
-                &mut change_buffer,
-                Some(Duration::from_secs_f32(0.25)),
-            );
-
-            progress_callback(info);
-
-            let LightUpdatesInfo {
-                update_count,
-                max_queue_priority,
-                ..
-            } = info;
-            total += update_count;
-            if max_queue_priority <= epsilon {
-                // Stop when we have nothing worth updating as decided by epsilon
-                // (or if the queue is empty).
-                break;
-            }
-        }
-        total
-    }
-
     /// Returns the current [`SpacePhysics`] data, which determines global characteristics
     /// such as the behavior of light and gravity.
     pub fn physics(&self) -> &SpacePhysics {
@@ -819,24 +777,6 @@ impl Space {
     pub fn behaviors(&self) -> &BehaviorSet<Space> {
         &self.behaviors
     }
-
-    /// Clear and recompute light data and update queue, in a way which gets fast approximate
-    /// results suitable for flat landscapes mostly lit from above (the +Y axis).
-    ///
-    /// TODO: Revisit whether this is a good public API.
-    pub fn fast_evaluate_light(&mut self) {
-        let (light, uc, _change_buffer) = self.borrow_light_update_context();
-        light.fast_evaluate_light(uc);
-
-        // TODO: change_buffer.push(SpaceChange::EveryBlock), or something
-    }
-
-    #[doc(hidden)] // kludge used by session for tool usage
-    pub fn evaluate_light_for_time(&mut self, budget: Duration) -> LightUpdatesInfo {
-        let (light, uc, mut change_buffer) = self.borrow_light_update_context();
-        light.update_lighting_from_queue(uc, &mut change_buffer, Some(budget))
-    }
-
     /// Compute the new lighting value for a cube.
     ///
     /// The returned vector of points lists those cubes which the computed value depends on
@@ -846,7 +786,7 @@ impl Space {
     where
         D: light::LightComputeOutput,
     {
-        // Unlike borrow_light_update_context(), this returns only &s
+        // Unlike borrow_light_update_context(), this returns only references
         let (light, uc) = {
             (
                 &self.light,
@@ -1207,7 +1147,7 @@ pub struct Mutation<'m, 'space> {
 }
 
 #[allow(missing_docs, reason = "TODO")]
-impl Mutation<'_, '_> {
+impl<'space> Mutation<'_, 'space> {
     /// Same as [`Space::bounds()`].
     pub fn bounds(&self) -> GridAab {
         self.contents.bounds()
@@ -1381,6 +1321,85 @@ impl Mutation<'_, '_> {
     /// [`all_is_cubes::drawing`](crate::drawing).
     pub fn draw_target<C>(&mut self, transform: Gridgid) -> DrawingPlane<'_, Self, C> {
         DrawingPlane::new(self, transform)
+    }
+
+    /// Perform lighting updates until there are none left to do. Returns the number of
+    /// updates performed.
+    ///
+    /// This may take a while. It is appropriate for when the goal is to
+    /// render a fully lit scene non-interactively.
+    ///
+    /// `epsilon` specifies a threshold at which to stop doing updates.
+    /// Zero means to run to full completion; one is the smallest unit of light level
+    /// difference; and so on.
+    pub fn evaluate_light(
+        &mut self,
+        epsilon: u8,
+        mut progress_callback: impl FnMut(LightUpdatesInfo),
+    ) -> usize {
+        let (light, uc, change_buffer) = self.borrow_light_update_context();
+        let epsilon = light::Priority::from_difference(epsilon);
+
+        let mut total = 0;
+        loop {
+            let info = light.update_lighting_from_queue(
+                uc,
+                change_buffer,
+                Some(Duration::from_secs_f32(0.25)),
+            );
+
+            progress_callback(info);
+
+            let LightUpdatesInfo {
+                update_count,
+                max_queue_priority,
+                ..
+            } = info;
+            total += update_count;
+            if max_queue_priority <= epsilon {
+                // Stop when we have nothing worth updating as decided by epsilon
+                // (or if the queue is empty).
+                break;
+            }
+        }
+        total
+    }
+
+    /// Clear and recompute light data and update queue, in a way which gets fast approximate
+    /// results suitable for flat landscapes mostly lit from above (the +Y axis).
+    ///
+    /// This function is useful immeduately after filling a [`Space`] with its initial contents.
+    ///
+    /// TODO: Revisit whether this is a good public API.
+    pub fn fast_evaluate_light(&mut self) {
+        let (light, uc, _change_buffer) = self.borrow_light_update_context();
+        light.fast_evaluate_light(uc);
+
+        // TODO: change_buffer.push(SpaceChange::EveryBlock), or something
+    }
+
+    #[doc(hidden)] // kludge used by session for tool usage
+    pub fn evaluate_light_for_time(&mut self, budget: Duration) -> LightUpdatesInfo {
+        let (light, uc, change_buffer) = self.borrow_light_update_context();
+        light.update_lighting_from_queue(uc, change_buffer, Some(budget))
+    }
+
+    /// Produce a bundle of borrows to run light updating functions.
+    fn borrow_light_update_context<'this>(
+        &'this mut self,
+    ) -> (
+        &'this mut LightStorage,
+        light::UpdateCtx<'this>,
+        &'this mut ChangeBuffer<'space>,
+    ) {
+        (
+            &mut *self.light,
+            light::UpdateCtx {
+                contents: self.contents.as_ref(),
+                palette: self.palette,
+            },
+            &mut self.change_buffer,
+        )
     }
 }
 

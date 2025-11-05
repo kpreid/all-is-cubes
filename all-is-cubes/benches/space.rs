@@ -81,13 +81,8 @@ fn space_bulk_mutation(c: &mut Criterion) {
                     },
                     |(universe, space_handle, _listening_things)| {
                         universe
-                            .try_modify(space_handle, |space| {
-                                space
-                                    .mutate(ReadTicket::stub(), |m| {
-                                        m.fill(bounds, |_| Some(&block))
-                                    })
-                                    .unwrap()
-                            })
+                            .mutate_space(space_handle, |m| m.fill(bounds, |_| Some(&block)))
+                            .unwrap()
                             .unwrap();
                     },
                     BatchSize::SmallInput,

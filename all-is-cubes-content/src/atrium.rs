@@ -321,10 +321,10 @@ fn atrium_non_async(
             )?;
         }
 
+        m.fast_evaluate_light();
+
         Ok::<(), InGenError>(())
     })?;
-
-    space.fast_evaluate_light();
 
     Ok(space)
 }

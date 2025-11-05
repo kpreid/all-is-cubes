@@ -8,7 +8,7 @@ use indicatif::ProgressBar;
 use rand::Rng as _;
 
 use all_is_cubes::arcstr::literal;
-use all_is_cubes::space::{LightUpdatesInfo, Space};
+use all_is_cubes::space;
 use all_is_cubes::universe::Universe;
 use all_is_cubes_content::{TemplateParameters, UniverseTemplate};
 use all_is_cubes_ui::notification::{self, Notification};
@@ -130,22 +130,22 @@ impl UniverseSource {
 
         if precompute_light && let Some(c) = universe.get_default_character() {
             let space_handle = c.read(universe.read_ticket()).unwrap().space().clone();
-            universe.try_modify(&space_handle, evaluate_light_with_progress).unwrap();
+            universe.mutate_space(&space_handle, evaluate_light_with_progress).unwrap();
         }
 
         Ok(universe)
     }
 }
 
-fn evaluate_light_with_progress(space: &mut Space) {
+fn evaluate_light_with_progress(m: &mut space::Mutation<'_, '_>) {
     let light_progress = logging::new_progress_bar(100).with_prefix("Lighting");
-    space.evaluate_light(1, lighting_progress_adapter(&light_progress));
+    m.evaluate_light(1, lighting_progress_adapter(&light_progress));
     light_progress.finish();
 }
 
 /// Convert `LightUpdatesInfo` data to an approximate completion progress.
 /// TODO: Improve this and put it in the lighting module (independent of indicatif).
-fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(LightUpdatesInfo) + '_ {
+fn lighting_progress_adapter(progress: &ProgressBar) -> impl FnMut(space::LightUpdatesInfo) + '_ {
     let mut worst = 1;
     move |info| {
         worst = worst.max(info.queue_count);

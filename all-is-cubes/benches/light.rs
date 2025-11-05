@@ -50,13 +50,15 @@ pub fn evaluate_light_bench(c: &mut Criterion) {
                         .unwrap();
                     (u, space)
                 },
-                |(_u, space)| {
-                    if matches!(mode, EvalMode::Fast | EvalMode::Both) {
-                        space.fast_evaluate_light();
-                    }
-                    if matches!(mode, EvalMode::Full | EvalMode::Both) {
-                        space.evaluate_light(1, drop);
-                    }
+                |(u, space)| {
+                    space.mutate(u.read_ticket(), |m| {
+                        if matches!(mode, EvalMode::Fast | EvalMode::Both) {
+                            m.fast_evaluate_light();
+                        }
+                        if matches!(mode, EvalMode::Full | EvalMode::Both) {
+                            m.evaluate_light(1, drop);
+                        }
+                    })
                 },
                 BatchSize::LargeInput,
             )

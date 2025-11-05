@@ -306,7 +306,7 @@ mod tests {
         tester.update_and_assert(universe.read_ticket()).unwrap();
 
         // Make some light changes
-        universe.try_modify(&space, |space| space.fast_evaluate_light()).unwrap();
+        universe.mutate_space(&space, |m| m.fast_evaluate_light()).unwrap();
         tester.update_and_assert(universe.read_ticket()).unwrap();
 
         // Add a second block

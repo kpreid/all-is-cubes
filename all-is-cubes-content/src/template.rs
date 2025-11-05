@@ -510,12 +510,13 @@ fn cornell_box(requested_size: GridSize) -> Result<Space, InGenError> {
         // Block #2
         m.fill_uniform(GridAab::from_lower_size([10, 0, 13], [18, 33, 15]).multiply(box_size_c).divide(55), &white)?;
 
+        // This won't figure out the correct light values, but it will reset everything to
+        // uninitialized, which will help the updater get going faster.
+        m.fast_evaluate_light();
+
+
         Ok::<(), InGenError>(())
     })?;
-
-    // This won't figure out the correct light values, but it will reset everything to
-    // uninitialized, which will help the updater get going faster.
-    space.fast_evaluate_light();
 
     Ok(space)
 }

@@ -113,7 +113,9 @@ async fn binary_fractal(
     }
 
     light_progress.progress(0.0).await;
-    space.fast_evaluate_light();
+    space.mutate(universe.read_ticket(), |m| {
+        m.fast_evaluate_light();
+    });
     light_progress.finish().await;
 
     Ok(space)

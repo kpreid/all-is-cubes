@@ -577,7 +577,7 @@ async fn follow_options_change(mut context: RenderTestContext) {
 async fn furnace(mut context: RenderTestContext) {
     let white_block = block::from_color!(Rgba::WHITE);
     let bounds = GridAab::from_lower_size([-1, -1, -1], [3, 3, 3]);
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         .sky(space::Sky::Uniform(Rgb::ONE * 0.75))
         .spawn({
             let mut spawn = Spawn::default_for_new_space(GridAab::ORIGIN_CUBE);
@@ -591,10 +591,10 @@ async fn furnace(mut context: RenderTestContext) {
             m.set([-1, -1, 1], &white_block).unwrap();
             m.set([1, -1, 0], &white_block).unwrap();
             m.set([-1, 1, -1], &white_block).unwrap();
+            m.evaluate_light(0, drop);
             Ok(())
         })
         .unwrap();
-    space.evaluate_light(0, drop);
     finish_universe_from_space(context.universe_mut(), space);
 
     // Unlike other test cases we are not using UNALTERED_COLORS, because the entire point of this
@@ -757,7 +757,7 @@ async fn icons(mut context: RenderTestContext) {
     );
 
     // Fill space with blocks
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         .read_ticket(context.universe().read_ticket())
         .spawn_position(point3(
             FreeCoordinate::from(bounds.size().width) / 2.,
@@ -775,6 +775,7 @@ async fn icons(mut context: RenderTestContext) {
                     block,
                 )?;
             }
+            m.evaluate_light(1, drop);
             Ok(())
         })
         .unwrap();
@@ -782,7 +783,6 @@ async fn icons(mut context: RenderTestContext) {
     let aspect_ratio =
         f64::from(space.bounds().size().height) / f64::from(space.bounds().size().width);
 
-    space.evaluate_light(1, drop);
     finish_universe_from_space(context.universe_mut(), space);
 
     let mut options = GraphicsOptions::UNALTERED_COLORS;
@@ -989,8 +989,8 @@ async fn template(mut context: RenderTestContext, template_name: &'static str) {
             .space()
             .clone();
         universe
-            .try_modify(&space_handle, |space| {
-                space.evaluate_light(1, drop);
+            .mutate_space(&space_handle, |m| {
+                m.evaluate_light(1, drop);
             })
             .unwrap();
     }
@@ -1258,7 +1258,7 @@ async fn bloom_test_universe() -> Arc<Universe> {
 async fn fog_test_universe() -> Arc<Universe> {
     let z_length = 60;
     let bounds = GridAab::from_lower_upper([-30, 0, -z_length], [30, 20, 0]);
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         .spawn({
             let mut spawn = Spawn::default_for_new_space(bounds);
             spawn.set_eye_position(point3(0., 10., 0.));
@@ -1297,12 +1297,12 @@ async fn fog_test_universe() -> Arc<Universe> {
                 m.set([x, 8, z + 1], &pillar_lamp_block).unwrap();
             }
 
+            m.fast_evaluate_light();
+            m.evaluate_light(1, drop);
+
             Ok(())
         })
         .unwrap();
-
-    space.fast_evaluate_light();
-    space.evaluate_light(1, drop);
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
@@ -1312,7 +1312,7 @@ async fn fog_test_universe() -> Arc<Universe> {
 // Test scene for lighting from emissive blocks.
 async fn light_test_universe() -> Arc<Universe> {
     let bounds = GridAab::from_lower_size([-10, -10, -1], [20, 20, 5]);
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         .spawn_position(point3(0., 0., 8.))
         .build_and_mutate(|m| {
             // Back wall
@@ -1335,12 +1335,12 @@ async fn light_test_universe() -> Arc<Universe> {
                 m.set([i, i, 0], &pillar_block).unwrap();
                 m.set([i, i, 0], &pillar_block).unwrap();
             }
+
+            m.fast_evaluate_light();
+            m.evaluate_light(1, drop);
             Ok(())
         })
         .unwrap();
-
-    space.fast_evaluate_light();
-    space.evaluate_light(1, drop);
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);
@@ -1400,7 +1400,7 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
         )
         .to_u32(),
     );
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         // Solid layer we will put holes in, to prevent different compartments from spilling
         // light into each other.
         .filled_with(block::from_color!(palette::ALMOST_BLACK))
@@ -1439,12 +1439,13 @@ async fn tone_mapping_test_universe() -> Arc<Universe> {
                     m.set([x + 1, y, 0], light_source_block).unwrap();
                 }
             }
+
+            m.fast_evaluate_light();
+            m.evaluate_light(1, drop);
+
             Ok(())
         })
         .unwrap();
-
-    space.fast_evaluate_light();
-    space.evaluate_light(1, drop);
 
     let mut universe = Universe::new();
     finish_universe_from_space(&mut universe, space);

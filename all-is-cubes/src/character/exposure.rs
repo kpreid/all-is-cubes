@@ -179,17 +179,15 @@ mod tests {
         //     .build();
 
         let space = universe.insert_anonymous({
-            let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [10, 10, 10]))
+            Space::builder(GridAab::from_lower_size([0, 0, 0], [10, 10, 10]))
                 .sky_color(light)
-                .build();
-
-            // space.fill_uniform(space.bounds(), light_block).unwrap();
-            // space
-            //     .fill_uniform(space.bounds().shrink(FaceMap::splat(1)), AIR)
-            //     .unwrap();
-
-            space.evaluate_light(0, drop);
-            space
+                .build_and_mutate(|m| {
+                    // m.fill_uniform(m.bounds(), light_block).unwrap();
+                    // m.fill_uniform(m.bounds().shrink(FaceMap::splat(1)), AIR).unwrap();
+                    m.evaluate_light(0, drop);
+                    Ok(())
+                })
+                .unwrap()
         });
         let mut character = Character::spawn_default(universe.read_ticket(), space);
         character.body.set_position(point3(5., 5., 5.));

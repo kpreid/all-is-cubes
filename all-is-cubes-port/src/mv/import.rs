@@ -124,7 +124,7 @@ pub(crate) async fn dot_vox_data_to_universe(
                 &models_yoked.get()[model_index],
                 mode.treat_models_as_blocks(),
             )?;
-            space.fast_evaluate_light();
+            space.mutate(ReadTicket::stub(), |m| m.fast_evaluate_light());
             Ok(space)
         },
     )

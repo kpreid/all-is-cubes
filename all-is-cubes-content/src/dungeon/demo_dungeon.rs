@@ -723,9 +723,11 @@ pub(crate) async fn demo_dungeon(
     space.set_physics(physics);
     light_progress.progress(0.01).await;
     // Make a rough lighting pass so that we don't have completely black rooms on start.
-    space.evaluate_light(254, |_i| {
-        // TODO: report progress
-        // light_progress.progress(i.max_queue_priority as f32 / 255.0)
+    space.mutate(universe.read_ticket(), |m| {
+        m.evaluate_light(254, |_i| {
+            // TODO: report progress
+            // light_progress.progress(i.max_queue_priority as f32 / 255.0)
+        })
     });
     light_progress.finish().await;
 

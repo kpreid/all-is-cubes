@@ -303,9 +303,9 @@ impl PageInst {
 
         // Initialize lighting
         universe
-            .try_modify(&space, |space| {
-                space.fast_evaluate_light();
-                space.evaluate_light(10, drop);
+            .mutate_space(&space, |m| {
+                m.fast_evaluate_light();
+                m.evaluate_light(10, drop);
             })
             .unwrap();
 

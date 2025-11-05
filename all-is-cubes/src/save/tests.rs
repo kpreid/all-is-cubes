@@ -647,7 +647,7 @@ fn space_success() {
     // TODO: Specify spawn explicitly, so these tests do not rely on the default spawn value
     let bounds = GridAab::from_lower_upper([1, 2, 3], [4, 5, 6]);
     let [block] = make_some_blocks();
-    let mut space = Space::builder(bounds)
+    let space = Space::builder(bounds)
         .physics(SpacePhysics {
             gravity: vec3(notnan!(0.0), notnan!(0.25), notnan!(1.0)),
             sky: space::Sky::Uniform(Rgb::ONE),
@@ -657,11 +657,10 @@ fn space_success() {
         })
         .build_and_mutate(|m| {
             m.set([1, 2, 5], block)?;
+            m.evaluate_light(0, drop);
             Ok(())
         })
         .unwrap();
-
-    space.evaluate_light(0, drop);
 
     // These values are the byte serialization of `PackedLight`.
     // We’re repeating them here rather than calling `PackedLight` functions to remind ourselves

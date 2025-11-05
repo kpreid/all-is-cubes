@@ -6,7 +6,9 @@ use super::{LightUpdatesInfo, PackedLight, Priority, data::LightStatus};
 use crate::block::{self, AIR, Block};
 use crate::listen::{Listen as _, Listener, Log};
 use crate::math::{Cube, Face6, FaceMap, GridPoint, Rgb, Rgb01, Rgba, rgb_const};
-use crate::space::{CubeTransaction, GridAab, LightPhysics, Sky, Space, SpaceChange, SpacePhysics};
+use crate::space::{
+    CubeTransaction, GridAab, LightPhysics, SetCubeError, Sky, Space, SpaceChange, SpacePhysics,
+};
 use crate::time;
 use crate::universe::{ReadTicket, Universe};
 
@@ -137,14 +139,15 @@ fn step() {
 #[test]
 fn evaluate_light() {
     let mut space = Space::empty_positive(3, 1, 1);
-    assert_eq!(0, space.evaluate_light(0, drop));
     space
         .mutate(ReadTicket::stub(), |m| {
-            m.set([1, 0, 0], block::from_color!(Rgb01::WHITE))
+            assert_eq!(0, m.evaluate_light(0, drop));
+            m.set([1, 0, 0], block::from_color!(Rgb01::WHITE))?;
+            assert_eq!(2, m.evaluate_light(0, drop));
+            assert_eq!(0, m.evaluate_light(0, drop));
+            Ok::<(), SetCubeError>(())
         })
         .unwrap();
-    assert_eq!(2, space.evaluate_light(0, drop));
-    assert_eq!(0, space.evaluate_light(0, drop));
     // This is just a smoke test, "is it plausible that it's working".
     // Ideally we'd confirm identical results from repeated step() and single evaluate_light().
 }
@@ -183,8 +186,14 @@ fn light_source_test_space(block: Block) -> Space {
     let mut space = Space::builder(GridAab::from_lower_upper([0, 0, 0], [3, 3, 3]))
         .sky_color(Rgb::ZERO)
         .build();
-    space.mutate(ReadTicket::stub(), |m| m.set([1, 1, 1], block)).unwrap();
-    space.evaluate_light(0, drop);
+    space
+        .mutate(ReadTicket::stub(), |m| {
+            m.set([1, 1, 1], block)?;
+            m.evaluate_light(0, drop);
+            Ok::<(), SetCubeError>(())
+        })
+        .unwrap();
+
     space
 }
 
@@ -238,8 +247,14 @@ fn light_source_self_illumination_opaque() {
 fn animation_treated_as_visible() {
     fn eval_mid_block(block: Block) -> [LightStatus; 2] {
         let mut space = Space::empty_positive(3, 3, 3);
-        space.mutate(ReadTicket::stub(), |m| m.set([1, 1, 1], block)).unwrap();
-        space.evaluate_light(0, drop);
+        space
+            .mutate(ReadTicket::stub(), |m| {
+                m.set([1, 1, 1], block)?;
+                m.evaluate_light(0, drop);
+                Ok::<(), SetCubeError>(())
+            })
+            .unwrap();
+
         [
             space.get_lighting([1, 1, 1]).status(),
             space.get_lighting([0, 1, 1]).status(),
@@ -269,15 +284,15 @@ fn animation_treated_as_visible() {
 fn reflectance_is_clamped() {
     let over_unity_block = block::from_color!(16.0, 1.0, 0.0, 1.0);
     let sky_color = rgb_const!(0.5, 0.5, 0.5);
-    let mut space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 3, 3]))
+    let space = Space::builder(GridAab::from_lower_size([0, 0, 0], [5, 3, 3]))
         .sky_color(sky_color)
         .build_and_mutate(|m| {
             m.set([1, 1, 1], &over_unity_block).unwrap();
             m.set([3, 1, 1], &over_unity_block).unwrap();
+            m.evaluate_light(0, drop);
             Ok(())
         })
         .unwrap();
-    space.evaluate_light(0, drop);
 
     let light = space.get_lighting([2, 1, 1]).value();
     dbg!(light);

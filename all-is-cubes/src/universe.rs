@@ -679,8 +679,6 @@ impl Universe {
     /// or does not belong to this universe.
     ///
     /// TODO: If possible, completely replace this operation with transactions.
-    // TODO: We're going to need to make this take `&mut self`, and `InputProcessor` will have
-    // trouble with that but we will want to rework it anyway.
     #[inline(never)]
     pub fn try_modify<T: UniverseMember, F, Out>(
         &mut self,
@@ -697,6 +695,29 @@ impl Universe {
             panic!("{handle:?}.as_entity() succeeded but entity {entity:?} is missing");
         };
         Ok(function(&mut *component_guard))
+    }
+
+    /// Obtain a [`space::Mutation`] to modify a [`Space`].
+    ///
+    /// This is useful for efficient bulk mutations and to call operations that cannot be expressed
+    /// as transactions, such as [`space::Mutation::fast_evaluate_light()`].
+    ///
+    /// Returns an error if the given [`Handle`] does not belong to this universe.
+    #[inline(never)]
+    pub fn mutate_space<'u, Out>(
+        &'u mut self,
+        handle: &Handle<Space>,
+        function: impl FnOnce(&mut space::Mutation<'_, 'u>) -> Out,
+    ) -> Result<Out, HandleError> {
+        let entity = handle.as_entity(self.id)?;
+        let Some(space_mut): Option<ecs::Mut<'_, Space>> = self.world.get_mut::<Space>(entity)
+        else {
+            // This should never happen even with concurrent access, because as_entity() checks
+            // all cases that would lead to the entity being absent.
+            panic!("{handle:?}.as_entity() succeeded but entity {entity:?} is missing");
+        };
+        // TODO(ecs): non-stub ticket using `get_one_mut_and_ticket()`
+        Ok(space_mut.into_inner().mutate::<Out>(ReadTicket::stub(), function))
     }
 
     /// Update stored queries to account for new archetypes.
