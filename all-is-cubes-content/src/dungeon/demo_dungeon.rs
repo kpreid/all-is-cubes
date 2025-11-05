@@ -705,8 +705,8 @@ pub(crate) async fn demo_dungeon(
     build_dungeon(
         universe.read_ticket(),
         &mut space,
-        &theme,
-        dungeon_map.as_ref(),
+        Arc::new(theme),
+        dungeon_map.clone(),
         build_progress,
     )
     .await?;
@@ -743,7 +743,7 @@ fn generate_dungeon_map(
     requested_rooms: GridSize,
     grantable_items: &[Tool],
     key_item: &Tool,
-) -> Vol<Box<[Option<DemoRoom>]>> {
+) -> Vol<Arc<[Option<DemoRoom>]>> {
     let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed);
 
     let (maze, path_length) = generate_maze(seed, requested_rooms);

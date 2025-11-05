@@ -1,3 +1,9 @@
+use alloc::boxed::Box;
+use alloc::sync::Arc;
+
+use itertools::Itertools;
+
+use all_is_cubes::arcstr;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::linking::InGenError;
@@ -8,6 +14,8 @@ use all_is_cubes::math::{
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::YieldProgress;
+
+use crate::framework;
 
 /// Defines the dimensions that dungeon room construction must live within.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -111,38 +119,47 @@ pub trait Theme<R> {
     ) -> Result<Option<Spawn>, InGenError>;
 }
 
-pub async fn build_dungeon<Room, ThemeT: Theme<Room>>(
+pub fn build_dungeon<Room, ThemeT>(
     read_ticket: ReadTicket<'_>,
     space: &mut Space,
-    theme: &ThemeT,
-    map: Vol<&[Room]>,
+    theme: Arc<ThemeT>,
+    map: Vol<Arc<[Room]>>,
     progress: YieldProgress,
-) -> Result<(), InGenError> {
-    let passes = theme.passes();
-    for (pass, mut progress) in (0..passes).zip(progress.split_evenly(passes)) {
-        progress.set_label(format_args!("pass {pass}/{passes}", pass = pass + 1));
-        progress.progress(0.0).await;
-        for (room_position, mut progress) in
-            map.bounds().interior_iter().zip(progress.split_evenly(map.volume()))
-        {
-            progress.set_label(format_args!(
-                "pass {pass} @ {room_position:?}",
-                pass = pass + 1
-            ));
-            progress.progress(0.0).await;
+) -> impl Future<Output = Result<(), InGenError>>
+where
+    Room: Send + Sync + 'static,
+    ThemeT: Theme<Room> + Send + Sync + 'static,
+{
+    let region = space.bounds(); // TODO: compute individual room regions
 
-            // TODO: spawn as return value is a quick kludge to organize mutations,
-            // but there is probably some more general thing that is appropriate.
-            let maybe_spawn = space.mutate(read_ticket, |m| {
-                theme.place_room(m, pass, map, room_position, map.get(room_position).unwrap())
-            })?;
-            if let Some(spawn) = maybe_spawn {
-                space.set_spawn(spawn);
-            }
+    framework::Queue::from_iter(
+        Itertools::cartesian_product(0..theme.passes(), map.bounds().interior_iter()).map(
+            move |(pass, room_position)| {
+                let theme = theme.clone();
+                let map = map.clone();
+                framework::Task {
+                    label: arcstr::format!("pass {pass} @ {room_position:?}", pass = pass + 1),
+                    time_estimate: 1.0,
+                    region,
+                    operation: framework::Operation::Custom(Box::new(move |m| {
+                        // TODO: spawn as return value is a quick kludge to organize mutations,
+                        // but there is probably some more general thing that is appropriate.
+                        let maybe_spawn = theme.place_room(
+                            m,
+                            pass,
+                            map.as_ref(),
+                            room_position,
+                            map.get(room_position).unwrap(),
+                        )?;
 
-            progress.progress(1.0).await;
-        }
-    }
-
-    Ok(())
+                        if let Some(spawn) = maybe_spawn {
+                            m.set_spawn(spawn);
+                        }
+                        Ok(())
+                    })),
+                }
+            },
+        ),
+    )
+    .run(progress, read_ticket, space)
 }
