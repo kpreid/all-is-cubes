@@ -222,7 +222,7 @@ fn no_superjumping() {
     universe.step(false, time::Deadline::Whenever); // initial settling
 
     universe
-        .try_modify(&character, |character| {
+        .mutate_character(&character, |character| {
             assert!(
                 character.is_on_ground(),
                 "should be on ground; current position = {:?}",

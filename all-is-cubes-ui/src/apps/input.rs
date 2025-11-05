@@ -310,7 +310,7 @@ impl InputProcessor {
         // Direct character controls
         if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt) {
             universe
-                .try_modify(character_handle, |character| {
+                .mutate_character(character_handle, |character| {
                     let movement = self.movement();
                     character.set_velocity_input(movement);
 
@@ -426,7 +426,7 @@ impl InputProcessor {
                     if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt)
                     {
                         universe
-                            .try_modify(character_handle, |c| c.set_selected_slot(1, slot))
+                            .mutate_character(character_handle, |c| c.set_selected_slot(1, slot))
                             .expect("character was borrowed during apply_input()");
                     }
                 }

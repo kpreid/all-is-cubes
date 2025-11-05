@@ -316,7 +316,7 @@ fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::univer
         universe.log_to_rerun(destination.clone());
         if let Some(c) = universe.get_default_character() {
             universe
-                .try_modify(&c, |c| {
+                .mutate_character(&c, |c| {
                     c.log_to_rerun(destination.child(&rg::entity_path!["character"]));
                 })
                 .unwrap();

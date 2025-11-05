@@ -667,34 +667,24 @@ impl Universe {
         )
     }
 
-    /// Apply the given function to the referent of the given handle.
-    ///
-    /// **Warning:** Misusing this operation can disrupt connections between objects in
-    /// the [`Universe`]; prefer [`Universe::execute_1()`] if the desired mutation can be
-    /// expressed as a [`Transaction`]. If you must use this, the requirement for
-    /// correctness is that you must not replace the referent with a different value;
-    /// only use the mutation operations provided by `T`.
-    ///
-    /// Returns an error if the value is currently being accessed, does not exist,
-    /// or does not belong to this universe.
-    ///
-    /// TODO: If possible, completely replace this operation with transactions.
+    // TODO(ecs): Remove this entirely after figuring out what to replace it with.
+    // We don't (yet) have anything analogous to `space::Mutation` for characters.
+    #[doc(hidden)]
     #[inline(never)]
-    pub fn try_modify<T: UniverseMember, F, Out>(
+    pub fn mutate_character<Out>(
         &mut self,
-        handle: &Handle<T>,
-        function: F,
-    ) -> Result<Out, HandleError>
-    where
-        F: FnOnce(&mut T) -> Out,
-    {
+        handle: &Handle<Character>,
+        function: impl FnOnce(&mut Character) -> Out,
+    ) -> Result<Out, HandleError> {
         let entity = handle.as_entity(self.id)?;
-        let Some(mut component_guard) = self.world.get_mut(entity) else {
+        let Some(character_mut): Option<ecs::Mut<'_, Character>> =
+            self.world.get_mut::<Character>(entity)
+        else {
             // This should never happen even with concurrent access, because as_entity() checks
             // all cases that would lead to the entity being absent.
             panic!("{handle:?}.as_entity() succeeded but entity {entity:?} is missing");
         };
-        Ok(function(&mut *component_guard))
+        Ok(function(character_mut.into_inner()))
     }
 
     /// Obtain a [`space::Mutation`] to modify a [`Space`].
