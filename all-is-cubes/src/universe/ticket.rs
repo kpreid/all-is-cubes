@@ -10,8 +10,8 @@ use bevy_ecs::prelude as ecs;
 use bevy_ecs::world::unsafe_world_cell::UnsafeWorldCell;
 
 use crate::universe::{
-    self, GoneReason, Handle, HandleError, MemberReadQueryStates, SealedMember, Universe,
-    UniverseId,
+    self, GoneReason, Handle, HandleError, MemberReadQueries, MemberReadQueryStates, SealedMember,
+    Universe, UniverseId,
 };
 
 #[cfg(doc)]
@@ -54,7 +54,11 @@ enum TicketAccess<'u> {
         read_queries: &'u MemberReadQueryStates,
     },
 
+    /// Access to all or a subset of possible member types.
+    SelectedTypes(&'u MemberReadQueries<'u, 'u>),
+
     /// Access only to things required for [`Block::evaluate()`].
+    /// TODO: Replace this with `Selected`
     BlockDataSources(&'u QueryBlockDataSources<'u, 'u>),
 
     /// Access to all but one entity.
@@ -113,6 +117,20 @@ impl<'universe> ReadTicket<'universe> {
         }
     }
 
+    /// Create a [`ReadTicket`] from [`MemberReadQueries`].
+    #[track_caller]
+    pub(crate) fn from_queries(
+        queries: &'universe MemberReadQueries<'universe, 'universe>,
+    ) -> Self {
+        ReadTicket {
+            access: TicketAccess::SelectedTypes(queries),
+            transaction_access: None,
+            universe_id: Some(queries.universe_id),
+            origin: Location::caller(),
+            expect_may_fail: false,
+        }
+    }
+
     #[track_caller]
     pub(crate) fn from_block_data_sources(
         data_sources: &'universe QueryBlockDataSources<'universe, 'universe>,
@@ -127,6 +145,8 @@ impl<'universe> ReadTicket<'universe> {
     }
 
     /// Create a [`ReadTicket`] allowing access to every entity in the world except the specified one.
+    ///
+    /// The provided [`MemberReadQueryStates`] must have had `update_archetypes()` called.
     ///
     /// # Safety
     ///
@@ -187,6 +207,9 @@ impl<'universe> ReadTicket<'universe> {
                         TicketErrorKind::MissingEntity
                     }
                 }),
+                TicketAccess::SelectedTypes(_queries) => {
+                    todo!("cannot do arbitrary component access via SelectedTypes")
+                }
                 TicketAccess::BlockDataSources(queries) => {
                     // Match the component being requested against the one of the queries that will
                     // provide it.
@@ -308,15 +331,17 @@ impl<'universe> ReadTicket<'universe> {
                     Ok(T::read_from_query(
                         query.get_inner(entity).map_err(convert_query_error)?,
                     ))
-                    //
-                    // Ok(T::read_from_entity_ref(
-                    // world
-                    //     .get_entity(entity)
-                    //     .map_err(|_entity_not_found| TicketErrorKind::MissingEntity)?,
-                    // )
-                    // .ok_or_else(
-                    //     || TicketErrorKind::MissingComponent { type_name: "?" }, // TODO: better debug
-                    // )?)
+                }
+                TicketAccess::SelectedTypes(queries) => {
+                    let query = T::member_read_query(queries).ok_or_else(|| {
+                        // TODO: should be "member type not allowed"
+                        TicketErrorKind::ComponentNotAllowed {
+                            type_name: type_name::<T>(),
+                        }
+                    })?;
+                    Ok(T::read_from_query(
+                        query.get_inner(entity).map_err(convert_query_error)?,
+                    ))
                 }
                 TicketAccess::BlockDataSources(queries) => {
                     // Match the component being requested against the one of the queries that will
@@ -392,6 +417,8 @@ impl<'u> fmt::Debug for TicketAccess<'u> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::World { .. } => f.debug_tuple("World").finish_non_exhaustive(),
+            // TODO: print which types
+            Self::SelectedTypes { .. } => f.debug_tuple("SelectedTypes").finish_non_exhaustive(),
             Self::BlockDataSources(_) => f.debug_tuple("BlockDataSources").finish_non_exhaustive(),
             Self::EverythingBut { excluded, .. } => {
                 f.debug_tuple("EverythingBut").field(excluded).finish()

@@ -159,12 +159,14 @@ pub(crate) fn get_one_mut_and_ticket<'w, D>(
     world: &'w mut ecs::World,
     entity: ecs::Entity,
     query_state: &mut ecs::QueryState<D, ()>,
-    read_queries: &'w super::MemberReadQueryStates,
+    read_queries: &'w mut super::MemberReadQueryStates,
 ) -> Option<(D::Item<'w>, ReadTicket<'w>)>
 where
     D: bevy_ecs::query::QueryData,
 {
     let universe_id: UniverseId = *world.resource::<UniverseId>();
+    read_queries.update_archetypes(world);
+
     let unsafe_world = world.as_unsafe_world_cell();
 
     // SAFETY: The query and the `everything_but()` ticket access disjoint parts of the world.

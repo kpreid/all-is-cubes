@@ -93,7 +93,6 @@ pub(in crate::universe) trait MemberBoilerplate: Sized {
     /// Generic constructor for [`AnyPending`].
     fn into_any_pending(handle: Handle<Self>, value: Option<Box<Self>>) -> AnyPending;
 
-    #[allow(dead_code, reason = "TODO(ecs): will be needed later (maybe)")]
     fn member_read_query_state(
         queries: &MemberReadQueryStates,
     ) -> &ecs::QueryState<Self::ReadQueryData>
@@ -105,6 +104,14 @@ pub(in crate::universe) trait MemberBoilerplate: Sized {
     ) -> &mut ecs::QueryState<<<Self as universe::Transactional>::Transaction as universe::TransactionOnEcs>::WriteQueryData>
     where
         Self: UniverseMember + transaction::Transactional<Transaction: universe::TransactionOnEcs>;
+
+    /// Fetch the query for for this member tyype from [`MemberReadQueries`].
+    /// May fail if such a query was not provided.
+    fn member_read_query<'q, 'w, 's>(
+        queries: &'q MemberReadQueries<'w, 's>,
+    ) -> Option<&'q ecs::Query<'w, 's, Self::ReadQueryData>>
+    where
+        Self: UniverseMember;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -185,6 +192,13 @@ macro_rules! impl_universe_for_member {
                 queries: &mut MemberWriteQueryStates,
             ) -> &mut ecs::QueryState<<<Self as universe::Transactional>::Transaction as universe::TransactionOnEcs>::WriteQueryData> {
                 &mut queries.$table
+            }
+
+            fn member_read_query<'q, 'w, 's>(
+                queries: &'q MemberReadQueries<'w, 's>,
+            ) -> Option<&'q ecs::Query<'w, 's, <Self as SealedMember>::ReadQueryData>>
+            {
+                queries.$table.as_ref()
             }
         }
 
@@ -569,11 +583,10 @@ macro_rules! member_enums_and_impls {
         }
         impl Eq for AnyPending {}
 
-        /// Queries for reading members, used by [`Handle::read()`].
+        /// Queries for reading members, sometimes used by [`Handle::read()`].
         /// Contains one `QueryState` per member type, whose `QueryData` is that member's
         /// `UniverseMember::Read`.
         #[derive(ecs::FromWorld)]
-        #[allow(nonstandard_style)]
         #[macro_rules_attribute::derive($crate::universe::ecs_details::derive_manual_query_bundle!)]
         pub(crate) struct MemberReadQueryStates {
             $(
@@ -584,11 +597,26 @@ macro_rules! member_enums_and_impls {
             )*
         }
 
+        impl MemberReadQueryStates {
+        #[expect(dead_code, reason = "TODO(ecs): going to use this in systems")]
+            pub fn query_manual<'w, 's>(
+                &'s self,
+                world: &'w ecs::World,
+            ) -> MemberReadQueries<'w, 's> {
+                MemberReadQueries {
+                    universe_id: *world.resource(),
+                    $(
+                        $table_name:
+                            Some(self.$table_name.query_manual(world)),
+                    )*
+                }
+            }
+        }
+
         /// Queries for mutating members, used by transaction commits.
         /// Contains one `QueryState` per member type, whose `QueryData` is that member's
         /// `TransactionOnEcs::WriteQueryData`.
         #[derive(ecs::FromWorld)]
-        #[allow(nonstandard_style)]
         #[macro_rules_attribute::derive($crate::universe::ecs_details::derive_manual_query_bundle!)]
         pub(in crate::universe) struct MemberWriteQueryStates {
             $(
@@ -602,6 +630,49 @@ macro_rules! member_enums_and_impls {
             )*
         }
 
+        /// Queries for reading members, sometimes used by [`Handle::read()`].
+        /// Contains one optional `Query` per member type, whose `QueryData` is that member's
+        /// `UniverseMember::Read`.
+        ///
+        /// Each query is optional so as to enable constructing this with a variety of different
+        /// amounts of access from different systems.
+        ///
+        /// To obtain this, either:
+        ///
+        /// * Use [`AllMemberReadQueries`] as a system parameter, or
+        /// * Call [`MemberReadQueries::query_manuql()`].
+        pub(crate) struct MemberReadQueries<'w, 's> {
+            pub(crate) universe_id: universe::UniverseId,
+            $(
+                pub(crate) $table_name:
+                    ::core::option::Option<::bevy_ecs::prelude::Query<'w, 's,
+                        <$member_type as universe::SealedMember>::ReadQueryData
+                    >>,
+            )*
+        }
+
+        /// System parameter that constructs a [`MemberReadQueries`].
+        #[derive(bevy_ecs::system::SystemParam)]
+        pub(crate) struct AllMemberReadQueries<'w, 's> {
+            pub(crate) universe_id: ecs::Res<'w, universe::UniverseId>,
+            $(
+                pub(crate) $table_name:
+                    ::bevy_ecs::prelude::Query<'w, 's,
+                        <$member_type as universe::SealedMember>::ReadQueryData
+                    >,
+            )*
+        }
+
+        impl<'w, 's> AllMemberReadQueries<'w, 's> {
+            pub fn get(self) -> MemberReadQueries<'w, 's> {
+                MemberReadQueries {
+                    universe_id: *self.universe_id,
+                    $(
+                        $table_name: Some(self.$table_name),
+                    )*
+                }
+            }
+        }
     }
 }
 

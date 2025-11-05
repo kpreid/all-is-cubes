@@ -96,7 +96,7 @@ where
         &mut universe.world,
         entity,
         query_state,
-        &universe.queries.read_members,
+        &mut universe.queries.read_members,
     )
     .expect("target query failed; universe state changed between check and commit");
 
