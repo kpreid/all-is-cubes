@@ -1,7 +1,11 @@
 use alloc::vec::Vec;
 use core::fmt;
 
+use bevy_ecs::prelude as ecs;
+
 use crate::math::{self, Axis, Rgb, Rgba, lines, rgba_const};
+
+// -------------------------------------------------------------------------------------------------
 
 // To support concise conditional debugging, this module re-exports many items from rerun.
 pub use re_log_types::{EntityPath, EntityPathPart, TimelineName, entity_path};
@@ -10,9 +14,11 @@ pub use re_types::datatypes;
 // pub use re_types::external::arrow::types::f16;
 pub use re_types::{archetypes, components, view_coordinates};
 
+// -------------------------------------------------------------------------------------------------
+
 /// Information that an entity or parent of entities can store in order to know where to
 /// send their Rerun logging data.
-#[derive(Clone)]
+#[derive(Clone, ecs::Component)]
 #[expect(clippy::exhaustive_structs)]
 pub struct Destination {
     pub stream: RecordingStream,

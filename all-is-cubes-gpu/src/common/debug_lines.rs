@@ -68,13 +68,15 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
                 &character.body().collision_box_abs(),
             );
             // What it collided with
-            for contact in character.colliding_cubes() {
-                let color = if contact.normal() == Face7::Within {
-                    palette::DEBUG_COLLISION_CUBE_WITHIN
-                } else {
-                    palette::DEBUG_COLLISION_CUBE_AGAINST
-                };
-                wireframe_vertices(v, color, contact);
+            if let Some(physics) = character.physics() {
+                for contact in &physics.colliding_cubes {
+                    let color = if contact.normal() == Face7::Within {
+                        palette::DEBUG_COLLISION_CUBE_WITHIN
+                    } else {
+                        palette::DEBUG_COLLISION_CUBE_AGAINST
+                    };
+                    wireframe_vertices(v, color, contact);
+                }
             }
         }
     }

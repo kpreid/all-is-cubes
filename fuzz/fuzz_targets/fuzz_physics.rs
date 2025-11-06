@@ -57,7 +57,12 @@ fuzz_target!(|input: (
 
         // dbg!((i, character.body.position));
         universe.step(false, time::Deadline::Whenever);
-        let body_info = character.read(universe.read_ticket()).unwrap().last_step_info().copied();
+        let body_info = character
+            .read(universe.read_ticket())
+            .unwrap()
+            .physics()
+            .unwrap()
+            .last_step_info;
         // dbg!(info);
 
         // Check for no push out, but not on the first step, which might have been due to initial

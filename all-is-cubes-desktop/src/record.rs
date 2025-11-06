@@ -20,7 +20,9 @@ mod options;
 pub use options::*;
 mod rmain;
 pub(crate) use rmain::{configure_session_for_recording, configure_universe_for_recording};
+#[cfg(false)] // TODO(ecs): reimplement Script on top of whatever the successor to Behavior is.
 mod script;
+#[cfg(false)]
 pub use script::Script;
 mod write_gltf;
 mod write_png;

@@ -12,9 +12,9 @@ use bevy_ecs::schedule::IntoScheduleConfigs;
 use euclid::Vector3D;
 
 use crate::camera::ViewTransform;
-use crate::character::{Character, exposure};
+use crate::character::{ParentSpace, exposure};
 use crate::math::{Cube, FreeCoordinate, FreeVector};
-use crate::physics::Velocity;
+use crate::physics::{Body, Velocity};
 use crate::space::Space;
 use crate::time;
 use crate::universe::UniverseId;
@@ -76,20 +76,20 @@ pub(crate) fn add_eye_systems(world: &mut ecs::World) {
     schedules.add_systems(time::schedule::AfterStep, update_eye_view_transform);
 }
 
-fn record_previous_velocity(query: ecs::Query<'_, '_, (&Character, &mut PreviousBodyVelocity)>) {
-    for (character, mut pbv) in query {
-        pbv.0 = character.body.velocity();
+fn record_previous_velocity(query: ecs::Query<'_, '_, (&Body, &mut PreviousBodyVelocity)>) {
+    for (body, mut pbv) in query {
+        pbv.0 = body.velocity();
     }
 }
 
 /// System function to update [`CharacterEye`]'s dynamics.
 fn step_eye_position(
     tick: ecs::Res<'_, time::CurrentTick>,
-    characters: ecs::Query<'_, '_, (&Character, &PreviousBodyVelocity, &mut CharacterEye)>,
+    characters: ecs::Query<'_, '_, (&Body, &PreviousBodyVelocity, &mut CharacterEye)>,
 ) -> ecs::Result {
     let tick = tick.get()?;
     let dt = tick.delta_t().as_secs_f64();
-    for (character, &PreviousBodyVelocity(previous_body_velocity), mut eye) in characters {
+    for (body, &PreviousBodyVelocity(previous_body_velocity), mut eye) in characters {
         let eye = &mut *eye;
 
         // Apply accelerations on the body inversely to the eye displacement.
@@ -98,7 +98,7 @@ fn step_eye_position(
         // other such events.
         // TODO: Try applying velocity_input to this positively, "leaning forward".
         // First, update velocity.
-        let body_delta_v_this_frame = character.body.velocity() - previous_body_velocity;
+        let body_delta_v_this_frame = body.velocity() - previous_body_velocity;
         eye.displacement_vel -= body_delta_v_this_frame.cast_unit() * 0.04;
         // Return-to-center force — linear near zero and increasing quadratically
         eye.displacement_vel -= eye.displacement_pos.cast_unit()
@@ -117,7 +117,7 @@ fn step_eye_position(
 fn step_exposure(
     universe_id: ecs::Res<'_, UniverseId>,
     tick: ecs::Res<'_, time::CurrentTick>,
-    characters: ecs::Query<'_, '_, (&Character, &mut CharacterEye)>,
+    characters: ecs::Query<'_, '_, (&ParentSpace, &mut CharacterEye)>,
     spaces: ecs::Query<'_, '_, &Space>,
 ) -> ecs::Result {
     let tick = tick.get()?;
@@ -128,9 +128,9 @@ fn step_exposure(
     // In any case, maybe hold off until we have reconciled Bevy and Rayon’s thread pools, or
     // have some profiling available to see how it performs.
 
-    for (character, mut eye) in characters {
+    for (ParentSpace(space_handle), mut eye) in characters {
         let eye = &mut *eye;
-        let Ok(space_entity) = character.space.as_entity(universe_id) else {
+        let Ok(space_entity) = space_handle.as_entity(universe_id) else {
             continue;
         };
         let Some(view_transform) = eye.view_transform else {
@@ -145,17 +145,14 @@ fn step_exposure(
 }
 
 /// System function to update [`CharacterEye::view_transform`].
-fn update_eye_view_transform(query: ecs::Query<'_, '_, (&Character, &mut CharacterEye)>) {
-    for (character, mut eye) in query {
-        eye.view_transform = Some(compute_view_transform(
-            &character.body,
-            eye.displacement_pos,
-        ));
+fn update_eye_view_transform(query: ecs::Query<'_, '_, (&Body, &mut CharacterEye)>) {
+    for (body, mut eye) in query {
+        eye.view_transform = Some(compute_view_transform(body, eye.displacement_pos));
     }
 }
 
 pub(super) fn compute_view_transform(
-    body: &crate::physics::Body,
+    body: &Body,
     displacement_from_body_origin: FreeVector,
 ) -> ViewTransform {
     ViewTransform {

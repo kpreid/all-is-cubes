@@ -2,11 +2,12 @@ use alloc::vec::Vec;
 use core::time::Duration;
 use std::collections::{HashMap, HashSet};
 
-use all_is_cubes::character::Character;
+use all_is_cubes::character::{self, Character};
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::inv;
 use all_is_cubes::listen;
 use all_is_cubes::math::{FreeCoordinate, FreeVector, zo32};
+use all_is_cubes::physics;
 use all_is_cubes::time::Tick;
 use all_is_cubes::universe::{self, Handle, Universe};
 use all_is_cubes_render::camera::{
@@ -315,25 +316,28 @@ impl InputProcessor {
 
         // Direct character controls
         if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt) {
-            universe.mutate_component(character_handle, |character: &mut Character| {
-                let movement = self.movement();
-                character.set_velocity_input(movement);
+            let movement = self.movement();
 
-                let turning = Vector2D::<_, ()>::new(
-                    key_turning_step.mul_add(
-                        self.net_movement(Key::Left, Key::Right),
-                        self.mouselook_buffer.x,
-                    ),
-                    key_turning_step.mul_add(
-                        self.net_movement(Key::Up, Key::Down),
-                        self.mouselook_buffer.y,
-                    ),
-                );
-                character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
-                character.body.pitch = (character.body.pitch + turning.y).clamp(-90.0, 90.0);
+            let turning = Vector2D::<_, ()>::new(
+                key_turning_step.mul_add(
+                    self.net_movement(Key::Left, Key::Right),
+                    self.mouselook_buffer.x,
+                ),
+                key_turning_step.mul_add(
+                    self.net_movement(Key::Up, Key::Down),
+                    self.mouselook_buffer.y,
+                ),
+            );
 
+            universe.mutate_component(character_handle, |body: &mut physics::Body| {
+                body.yaw = (body.yaw + turning.x).rem_euclid(360.0);
+                body.pitch = (body.pitch + turning.y).clamp(-90.0, 90.0);
+            })?;
+
+            universe.mutate_component(character_handle, |input: &mut character::Input| {
+                input.velocity_input = movement;
                 if self.keys_held.contains(&Key::Character(' ')) {
-                    character.jump_if_able();
+                    input.jump = true;
                 }
             })?;
         }
@@ -429,9 +433,12 @@ impl InputProcessor {
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
                     if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt)
                     {
-                        universe.mutate_component(character_handle, |c: &mut Character| {
-                            c.set_selected_slot(1, slot)
-                        })?;
+                        universe.mutate_component(
+                            character_handle,
+                            |c: &mut character::Input| {
+                                c.set_selected_slots[1] = Some(slot);
+                            },
+                        )?;
                     }
                 }
                 _ => {}
@@ -638,15 +645,16 @@ mod tests {
 
     #[test]
     fn slot_selection() {
-        // TODO: Awful lot of setup boilerplate...
         let u = &mut Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
-        let character = u.insert_anonymous(Character::spawn_default(u.read_ticket(), space));
+        let character =
+            u.insert("c".into(), Character::spawn_default(u.read_ticket(), space)).unwrap();
         let mut input = InputProcessor::new();
 
         input.key_down(Key::Character('5'));
         input.key_up(Key::Character('5'));
         apply_input_helper(&mut input, u, &character);
+        u.step(false, time::Deadline::Whenever);
         assert_eq!(
             character.read(u.read_ticket()).unwrap().selected_slots()[1],
             4
@@ -656,6 +664,7 @@ mod tests {
         input.key_down(Key::Character('0'));
         input.key_up(Key::Character('0'));
         apply_input_helper(&mut input, u, &character);
+        u.step(false, time::Deadline::Whenever);
         assert_eq!(
             character.read(u.read_ticket()).unwrap().selected_slots()[1],
             9

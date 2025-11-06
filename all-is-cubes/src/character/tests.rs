@@ -3,7 +3,9 @@ use alloc::sync::Arc;
 use euclid::{Vector3D, point3};
 
 use crate::block::{self, AIR};
-use crate::character::{Character, CharacterChange, CharacterTransaction, Spawn, cursor_raycast};
+use crate::character::{
+    Character, CharacterChange, CharacterTransaction, Input, Spawn, cursor_raycast,
+};
 use crate::inv::{InventoryChange, InventoryTransaction, Slot, Tool, ToolError};
 use crate::listen::{Listen as _, Log};
 use crate::math::{Face6, GridAab, Rgb01};
@@ -84,8 +86,8 @@ fn inventory_transaction() {
     let space_handle = universe.insert_anonymous(space);
     let character = Character::spawn_default(universe.read_ticket(), space_handle.clone());
     let log = Log::new();
-    character.listen(log.listener());
     let character_handle = universe.insert_anonymous(character);
+    character_handle.read(universe.read_ticket()).unwrap().listen(log.listener());
 
     let item = Tool::InfiniteBlocks(AIR);
     universe
@@ -204,7 +206,9 @@ fn transaction_systematic() {
 }
 
 #[test]
-fn no_superjumping() {
+fn jumping() {
+    use super::is_on_ground;
+
     let mut universe = Universe::new();
     let space = universe.insert_anonymous(
         Space::builder(GridAab::ORIGIN_CUBE)
@@ -221,25 +225,51 @@ fn no_superjumping() {
     let character = universe.insert("character".into(), character).unwrap();
     universe.step(false, time::Deadline::Whenever); // initial settling
 
+    // check initial state
+    {
+        let read = character.read(universe.read_ticket()).unwrap();
+        assert!(
+            is_on_ground(read.body(), read.physics().unwrap()),
+            "should be on ground; body = {:#?}, physics = {:#?}",
+            read.body(),
+            read.physics()
+        );
+        assert_eq!(read.body().velocity().y, 0.0);
+    }
+
     universe
-        .mutate_component(&character, |character: &mut Character| {
-            assert!(
-                character.is_on_ground(),
-                "should be on ground; current position = {:?}",
-                character.body.position()
-            );
-            assert_eq!(character.body.velocity().y, 0.0);
-
-            character.jump_if_able();
-            assert!(!character.is_on_ground());
-            let velocity = character.body.velocity();
-            assert!(velocity.y > 0.0);
-
-            // Second jump without ticking should do nothing
-            character.jump_if_able();
-            assert_eq!(character.body.velocity(), velocity);
+        .mutate_component(&character, |input: &mut Input| {
+            input.jump = true;
         })
         .unwrap();
+
+    universe.step(false, time::Deadline::Whenever);
+
+    // check state after initial jump
+    let first_step_velocity;
+    {
+        let read = character.read(universe.read_ticket()).unwrap();
+        assert!(!is_on_ground(read.body(), read.physics().unwrap()));
+        first_step_velocity = read.body().velocity().y;
+        assert!(first_step_velocity > 0.0);
+    }
+
+    universe
+        .mutate_component(&character, |input: &mut Input| {
+            assert_eq!(input.jump, false);
+
+            // Second jump input should *not* cause additional velocity
+            input.jump = true;
+        })
+        .unwrap();
+
+    universe.step(false, time::Deadline::Whenever);
+
+    {
+        let read = character.read(universe.read_ticket()).unwrap();
+        assert!(!is_on_ground(read.body(), read.physics().unwrap()));
+        assert!(read.body().velocity().y < first_step_velocity);
+    }
 }
 
 #[test]

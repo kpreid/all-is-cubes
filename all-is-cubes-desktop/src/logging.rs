@@ -300,7 +300,6 @@ fn log_renderer_to_rerun<Ren: crate::glue::Renderer>(this: &LateLogging, rendere
 
 #[cfg(feature = "rerun")]
 fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::universe::Universe) {
-    use all_is_cubes::character::Character;
     use all_is_cubes_render::camera::{Camera, GraphicsOptions, Viewport};
 
     let LateLogging {
@@ -315,11 +314,12 @@ fn log_universe_to_rerun(this: &LateLogging, universe: &mut all_is_cubes::univer
     // TODO: We need a solution for worlds loaded after app start
     if kinds.contains(&RerunDataKind::World) {
         universe.log_to_rerun(destination.clone());
-        if let Some(c) = universe.get_default_character() {
+        if let Some(character) = universe.get_default_character() {
             universe
-                .mutate_component(&c, |c: &mut Character| {
-                    c.log_to_rerun(destination.child(&rg::entity_path!["character"]));
-                })
+                .log_member_to_rerun(
+                    &character,
+                    destination.child(&rg::entity_path!["character"]),
+                )
                 .unwrap();
         }
     }

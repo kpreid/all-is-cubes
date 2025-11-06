@@ -304,8 +304,6 @@ pub(crate) enum CharacterSer<'a> {
         body: Cow<'a, crate::physics::Body>,
         inventory: Cow<'a, inv::Inventory>,
         selected_slots: [inv::Ix; 3],
-        #[serde(default, skip_serializing_if = "behavior::BehaviorSet::is_empty")]
-        behaviors: Cow<'a, behavior::BehaviorSet<character::Character>>,
     },
 }
 

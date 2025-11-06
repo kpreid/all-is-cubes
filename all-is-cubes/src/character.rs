@@ -1,7 +1,8 @@
 //! Player-character stuff.
 
-use alloc::sync::Arc;
+use alloc::boxed::Box;
 use core::fmt;
+use core::mem;
 use core::ops;
 
 use bevy_ecs::prelude as ecs;
@@ -15,13 +16,14 @@ use ordered_float::NotNan;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::behavior::{self, Behavior, BehaviorSet, BehaviorSetTransaction};
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
 use crate::listen;
 use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, notnan};
 use crate::physics;
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
+#[cfg(feature = "rerun")]
+use crate::rerun_glue as rg;
 #[cfg(feature = "save")]
 use crate::save::schema;
 use crate::space::{CubeTransaction, Space};
@@ -64,64 +66,100 @@ const JUMP_SPEED: FreeCoordinate = 8.0;
 ///   (controlling velocity, holding tools).
 ///
 #[doc = include_str!("save/serde-warning.md")]
-#[derive(bevy_ecs::component::Component)]
-#[require(eye::CharacterEye)]
+// TODO: derive(ecs::Bundle) eventually?
 pub struct Character {
+    core: CharacterCore,
+
     /// Position, collision, and look direction.
     pub body: Body,
 
     /// Refers to the [`Space`] to be viewed and collided with.
     pub space: Handle<Space>,
 
-    /// Velocity specified by user input, which the actual velocity is smoothly adjusted
-    /// towards.
-    velocity_input: FreeVector,
-
-    colliding_cubes: HbHashSet<Contact>,
-
-    /// Last body step, for debugging.
-    // TODO(ecs): this is not fundamental so it should be a separate component, probably?
-    pub last_step_info: Option<BodyStepInfo>,
-
     inventory: Inventory,
+}
 
-    /// Indices into [`Self::inventory()`] slots which identify the tools currently in use.
+/// Every piece of data in a [`Character`] that is not (yet) split into its own separate
+/// ECS component. TODO(ecs): get rid of this?
+#[derive(Debug, ecs::Component)]
+#[require(eye::CharacterEye, PhysicsOutputs, Input)]
+#[cfg_attr(feature = "rerun", require(rg::Destination))]
+pub(crate) struct CharacterCore {
+    /// Indices into the [`Inventory`] slots of this character, which identify the tools currently
+    /// in use / “in hand”.
+    ///
+    /// If the indices are out of range, this is considered equivalent to selecting an empty slot.
     selected_slots: [inv::Ix; inv::TOOL_SELECTIONS],
 
     /// Notifier for modifications.
     notifier: listen::Notifier<CharacterChange>,
-
-    // TODO: not crate access: we need something like the listen() method for Notifier
-    pub(crate) behaviors: BehaviorSet<Character>,
-
-    // TODO(ecs): this should be a separate component so it is least intrusive
-    #[cfg(feature = "rerun")]
-    rerun_destination: crate::rerun_glue::Destination,
 }
+
+/// Component defining what [`Space`] a [`Body`] exists in.
+// TODO(ecs): Should this be optional? It's already fallible anyway via invalid handles.
+// TODO(ecs): This should probably be in the body module.
+#[derive(Clone, Debug, ecs::Component)]
+pub(crate) struct ParentSpace(pub Handle<Space>);
+
+/// Data produced by running [`Body`] physics for debugging and reactions.
+/// TODO(ecs): this should be part of the body module instead.
+#[derive(Clone, Debug, Default, ecs::Component)]
+#[doc(hidden)]
+#[non_exhaustive]
+pub struct PhysicsOutputs {
+    pub colliding_cubes: HbHashSet<Contact>,
+
+    /// Last body step, for debugging.
+    pub last_step_info: Option<BodyStepInfo>,
+}
+
+/// Commands produced by the player’s input and executed by the character.
+///
+/// This data is not persisted.
+#[derive(Clone, Debug, Default, ecs::Component)]
+#[non_exhaustive]
+pub struct Input {
+    /// Velocity specified by user input, which the actual velocity is smoothly adjusted
+    /// towards.
+    ///
+    /// Maximum range for normal keyboard input should be -1 to 1
+    pub velocity_input: FreeVector,
+
+    /// Set this to true to jump during the next step.
+    pub jump: bool,
+
+    /// Indices into the [`Inventory`] slots of this character, which identify the tools currently
+    /// in use / “in hand”.
+    ///
+    /// Set elements to [`Some`] to change which slots are selected.
+    /// [`None`] means no change from the current value.
+    pub set_selected_slots: [Option<inv::Ix>; inv::TOOL_SELECTIONS],
+}
+
+// TODO(ecs): decide whether `Inventory` should implement `Component` itself, and if so,
+// how change notifications work. For now, this is tied to `Character`s only.
+#[derive(Clone, Debug, ecs::Component)]
+pub(crate) struct InventoryComponent(Inventory);
+
+// -------------------------------------------------------------------------------------------------
 
 impl fmt::Debug for Character {
     #[mutants::skip]
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self {
+            core:
+                CharacterCore {
+                    selected_slots,
+                    notifier: _,
+                },
             body,
             space: _,
-            velocity_input,
-            colliding_cubes,
-            last_step_info: _,
             inventory,
-            selected_slots,
-            notifier: _,
-            behaviors,
-            #[cfg(feature = "rerun")]
-                rerun_destination: _,
         } = self;
         fmt.debug_struct("Character")
             .field("body", &body)
-            .field("velocity_input", &velocity_input.refmt(&ConciseDebug))
-            .field("colliding_cubes", &colliding_cubes)
             .field("inventory", &inventory)
             .field("selected_slots", selected_slots)
-            .field("behaviors", &behaviors)
             .finish_non_exhaustive()
     }
 }
@@ -196,17 +234,12 @@ impl Character {
                 body.pitch = pitch;
                 body
             },
+            core: CharacterCore {
+                selected_slots,
+                notifier: listen::Notifier::new(),
+            },
             space,
-            velocity_input: Vector3D::zero(),
-            colliding_cubes: HbHashSet::new(),
-            last_step_info: None,
             inventory: Inventory::from_slots(inventory),
-            selected_slots,
-            notifier: listen::Notifier::new(),
-            behaviors: BehaviorSet::new(),
-
-            #[cfg(feature = "rerun")]
-            rerun_destination: Default::default(),
         }
     }
 
@@ -235,12 +268,12 @@ impl Character {
         handle: &Handle<Self>,
         read_ticket: ReadTicket<'t>,
     ) -> Result<(&'t Handle<Space>, ViewTransform, f32), HandleError> {
-        let character = handle.query::<Character>(read_ticket)?;
-        let space = &character.space;
+        let body = handle.query::<Body>(read_ticket)?;
+        let space = &handle.query::<ParentSpace>(read_ticket)?.0;
         let eye = handle.query::<eye::CharacterEye>(read_ticket)?; // TODO(ecs): need to distinguish "missing component"
         let transform = eye
             .view_transform
-            .unwrap_or_else(|| eye::compute_view_transform(&character.body, FreeVector::zero()));
+            .unwrap_or_else(|| eye::compute_view_transform(body, FreeVector::zero()));
         Ok((space, transform, eye.exposure()))
     }
 
@@ -249,39 +282,33 @@ impl Character {
         &self.inventory
     }
 
-    // TODO: delete this and stick to BehaviorSetTransactions
-    #[allow(missing_docs)]
-    #[doc(hidden)]
-    pub fn add_behavior<B>(&mut self, behavior: B)
-    where
-        B: Behavior<Character> + 'static,
-    {
-        BehaviorSetTransaction::insert((), Arc::new(behavior))
-            .execute(&mut self.behaviors, (), &mut transaction::no_outputs)
-            .unwrap();
-    }
-
     /// Returns the character's currently selected inventory slots.
     ///
     /// The indices of this array are buttons (e.g. mouse buttons), and the values are
     /// inventory slot indices.
     pub fn selected_slots(&self) -> [inv::Ix; inv::TOOL_SELECTIONS] {
-        self.selected_slots
+        self.core.selected_slots
     }
 
     /// Changes which inventory slot is currently selected.
     pub fn set_selected_slot(&mut self, which_selection: usize, slot: inv::Ix) {
-        if which_selection < self.selected_slots.len()
-            && slot != self.selected_slots[which_selection]
-        {
-            self.selected_slots[which_selection] = slot;
-            self.notifier.notify(&CharacterChange::Selections);
+        let s = &mut self.core.selected_slots;
+        if which_selection < s.len() && slot != s[which_selection] {
+            s[which_selection] = slot;
+            self.core.notifier.notify(&CharacterChange::Selections);
         }
     }
 
     // TODO(ecs): replace all of this with systems
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn step(
-        &mut self,
+        core: &mut CharacterCore,
+        body: &mut Body,
+        ParentSpace(space_handle): &mut ParentSpace,
+        input: &mut Input,
+        InventoryComponent(inventory): &mut InventoryComponent,
+        output: &mut PhysicsOutputs,
+        #[cfg(feature = "rerun")] rerun_destination: &rg::Destination,
         read_ticket: ReadTicket<'_>,
         self_handle: Option<&Handle<Character>>,
         tick: Tick,
@@ -291,21 +318,38 @@ impl Character {
             return (result_transaction, CharacterStepInfo::default(), None);
         }
 
+        let mut any_slots_changed = false;
+        for (i, new_selection) in mem::take(&mut input.set_selected_slots).into_iter().enumerate() {
+            if let Some(new_selection) = new_selection
+                && new_selection != core.selected_slots[i]
+            {
+                core.selected_slots[i] = new_selection;
+                any_slots_changed = true;
+            }
+        }
+        if any_slots_changed {
+            core.notifier.notify(&CharacterChange::Selections);
+        }
+
+        if mem::take(&mut input.jump) && is_on_ground(body, output) {
+            body.add_velocity(Vector3D::new(0., JUMP_SPEED, 0.));
+        }
+
         // Override flying state using state of jetpack from inventory.
         // TODO: Eliminate body.flying flag entirely, in favor of an external context?
         // (The idea being that Body should have no more things in it than are necessary
         // for, say, a single particle in a particle system.)
-        let flying = find_jetpacks(&self.inventory).any(|(_slot_index, active)| active);
-        self.body.flying = flying;
+        let flying = find_jetpacks(inventory).any(|(_slot_index, active)| active);
+        body.flying = flying;
 
         let dt = tick.delta_t().as_secs_f64();
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
-        let control_orientation = Rotation3D::around_y(-Angle::radians(self.body.yaw.to_radians()));
-        let initial_body_velocity = self.body.velocity();
+        let control_orientation = Rotation3D::around_y(-Angle::radians(body.yaw.to_radians()));
+        let initial_body_velocity = body.velocity();
 
         let speed = if flying { FLYING_SPEED } else { WALKING_SPEED };
         let mut velocity_target =
-            control_orientation.transform_vector3d(self.velocity_input * speed);
+            control_orientation.transform_vector3d(input.velocity_input * speed);
         if !flying {
             velocity_target.y = 0.0;
         }
@@ -320,10 +364,10 @@ impl Character {
             * dt)
             .map(|c| NotNan::new(c).unwrap_or(notnan!(0.0)));
 
-        self.last_step_info = if let Ok(space) = self.space.read(read_ticket) {
-            let colliding_cubes = &mut self.colliding_cubes;
+        output.last_step_info = if let Ok(space) = space_handle.read(read_ticket) {
+            let colliding_cubes = &mut output.colliding_cubes;
             colliding_cubes.clear();
-            let info = self.body.step_with_rerun(
+            let info = body.step_with_rerun(
                 tick,
                 control_delta_v,
                 Some(space),
@@ -331,19 +375,19 @@ impl Character {
                     colliding_cubes.insert(cube);
                 },
                 #[cfg(feature = "rerun")]
-                &self.rerun_destination,
+                rerun_destination,
             );
 
             // TODO(ecs): report push_out in a way that `CharacterEye` can receive it
             // if let Some(push_out_displacement) = info.push_out {
             //     // Smooth out camera effect of push-outs
-            //     self.eye_displacement_pos -= push_out_displacement;
+            //     eye.eye_displacement_pos -= push_out_displacement;
             // }
 
             if let Some(fluff_txn) = info.impact_fluff().and_then(|fluff| {
-                Some(CubeTransaction::fluff(fluff).at(Cube::containing(self.body.position())?))
+                Some(CubeTransaction::fluff(fluff).at(Cube::containing(body.position())?))
             }) {
-                result_transaction.merge_from(fluff_txn.bind(self.space.clone())).unwrap(); // cannot fail
+                result_transaction.merge_from(fluff_txn.bind(space_handle.clone())).unwrap(); // cannot fail
             }
 
             Some(info)
@@ -356,22 +400,18 @@ impl Character {
         // TODO: lazy clone
         {
             let mut inventory_transaction = None;
-            if self.velocity_input.y > 0. {
-                if let Some((slot_index, false)) = find_jetpacks(&self.inventory).next()
-                    && let Ok((it, ut)) = self.inventory.use_tool_it(
-                        read_ticket,
-                        None,
-                        self_handle.cloned(),
-                        slot_index,
-                    )
+            if input.velocity_input.y > 0. {
+                if let Some((slot_index, false)) = find_jetpacks(inventory).next()
+                    && let Ok((it, ut)) =
+                        inventory.use_tool_it(read_ticket, None, self_handle.cloned(), slot_index)
                 {
                     debug_assert!(ut.is_empty());
                     inventory_transaction = Some(it);
                 }
-            } else if self.is_on_ground() {
-                for (slot_index, active) in find_jetpacks(&self.inventory) {
+            } else if is_on_ground(body, output) {
+                for (slot_index, active) in find_jetpacks(inventory) {
                     if active
-                        && let Ok((it, ut)) = self.inventory.use_tool_it(
+                        && let Ok((it, ut)) = inventory.use_tool_it(
                             read_ticket,
                             None,
                             self_handle.cloned(),
@@ -385,45 +425,18 @@ impl Character {
                 }
             }
             if let Some(it) = inventory_transaction {
-                it.execute(&mut self.inventory, (), &mut |change| {
-                    self.notifier.notify(&CharacterChange::Inventory(change))
+                it.execute(inventory, (), &mut |change| {
+                    core.notifier.notify(&CharacterChange::Inventory(change))
                 })
                 .unwrap();
             }
         }
 
-        // TODO: Think about what order we want sequence of effects to be in. In particular,
-        // combining behavior calls with step() means behaviors on different characters
-        // see other characters as not having been stepped yet.
-        let behavior_step_info = if let Some(self_handle) = self_handle {
-            let (t, info) = self.behaviors.step(
-                read_ticket,
-                self,
-                &(|t: CharacterTransaction| t.bind(self_handle.clone())),
-                CharacterTransaction::behaviors,
-                tick,
-            );
-            result_transaction
-                .merge_from(t)
-                .expect("TODO: we should be applying these transactions separately");
-            info
-        } else {
-            behavior::BehaviorSetStepInfo::default()
-        };
-
         (
             result_transaction,
-            CharacterStepInfo {
-                count: 1,
-                behaviors: behavior_step_info,
-            },
-            self.last_step_info,
+            CharacterStepInfo { count: 1 },
+            output.last_step_info,
         )
-    }
-
-    /// Maximum range for normal keyboard input should be -1 to 1
-    pub fn set_velocity_input(&mut self, velocity: FreeVector) {
-        self.velocity_input = velocity;
     }
 
     /// Use this character's selected tool on the given cursor.
@@ -454,100 +467,128 @@ impl Character {
         let slot_index = tb.selected_slots().get(button).copied().unwrap_or(tb.selected_slots()[0]);
         tb.inventory().use_tool(read_ticket, cursor, this, slot_index)
     }
-
-    /// Make the character jump, if they are on ground to jump from as of the last step.
-    ///
-    /// TODO: this code's location is driven by `colliding_cubes` being here, which is probably wrong.
-    /// If nothing else, the jump height probably belongs elsewhere.
-    /// Figure out what the correct overall thing is.
-    pub fn jump_if_able(&mut self) {
-        if self.is_on_ground() {
-            self.body.add_velocity(Vector3D::new(0., JUMP_SPEED, 0.));
-        }
-    }
-
-    fn is_on_ground(&self) -> bool {
-        self.body.velocity().y <= 0.0
-            && self.colliding_cubes.iter().any(|contact| contact.normal() == Face7::PY)
-    }
-
-    /// Activate logging this character's state to a Rerun stream.
-    #[cfg(feature = "rerun")]
-    pub fn log_to_rerun(&mut self, destination: crate::rerun_glue::Destination) {
-        self.rerun_destination = destination;
-    }
 }
 
 impl universe::SealedMember for Character {
-    type Bundle = (Self,);
-    type ReadQueryData = &'static Self;
+    type Bundle = (CharacterCore, Body, ParentSpace, InventoryComponent);
+    type ReadQueryData = (
+        &'static CharacterCore,
+        &'static Body,
+        &'static ParentSpace,
+        &'static InventoryComponent,
+        &'static PhysicsOutputs,
+    );
 
     fn register_all_member_components(world: &mut ecs::World) {
-        universe::VisitableComponents::register::<Self>(world);
+        universe::VisitableComponents::register::<CharacterCore>(world);
+        universe::VisitableComponents::register::<ParentSpace>(world);
+        universe::VisitableComponents::register::<InventoryComponent>(world);
+        // skipping other components which have nothing visitable
     }
 
     fn read_from_standalone(value: &Self) -> <Self as universe::UniverseMember>::Read<'_> {
-        Read(value)
+        Read {
+            core: &value.core,
+            body: &value.body,
+            space: &value.space,
+            inventory: &value.inventory,
+            physics: None,
+        }
     }
     fn read_from_query(
         data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
     ) -> <Self as universe::UniverseMember>::Read<'_> {
-        Read(data)
+        let (core, body, ParentSpace(space), InventoryComponent(inventory), physics) = data;
+        Read {
+            core,
+            body,
+            space,
+            inventory,
+            physics: Some(physics),
+        }
     }
     fn read_from_entity_ref(
         entity: ::bevy_ecs::world::EntityRef<'_>,
     ) -> Option<<Self as universe::UniverseMember>::Read<'_>> {
-        entity.get::<Character>().map(Read)
+        Some(Read {
+            core: entity.get()?,
+            body: entity.get()?,
+            space: &entity.get::<ParentSpace>()?.0,
+            inventory: &entity.get::<InventoryComponent>()?.0,
+            physics: entity.get::<PhysicsOutputs>(),
+        })
     }
-    fn into_bundle(value: ::alloc::boxed::Box<Self>) -> Self::Bundle {
-        (*value,)
+    fn into_bundle(value: Box<Self>) -> Self::Bundle {
+        let Self {
+            core,
+            body,
+            space,
+            inventory,
+        } = *value;
+        (
+            core,
+            body,
+            ParentSpace(space),
+            InventoryComponent(inventory),
+        )
     }
 }
 impl universe::UniverseMember for Character {
     type Read<'ticket> = Read<'ticket>;
 }
 
-// TODO: replace uses of this
-impl universe::PubliclyMutableComponent<Character> for Character {}
+// TODO: stop making Body directly mutable
+impl universe::PubliclyMutableComponent<Character> for Body {}
+impl universe::PubliclyMutableComponent<Character> for Input {}
 
 impl VisitHandles for Character {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         // Use pattern matching so that if we add a new field that might contain handles,
         // we are reminded to traverse it here.
         let Self {
+            core,
             body: _,
             space,
-            velocity_input: _,
-            colliding_cubes: _,
-            last_step_info: _,
             inventory,
-            selected_slots: _,
-            notifier: _,
-            behaviors,
-            #[cfg(feature = "rerun")]
-                rerun_destination: _,
         } = self;
+        core.visit_handles(visitor);
         visitor.visit(space);
         inventory.visit_handles(visitor);
-        behaviors.visit_handles(visitor);
+    }
+}
+impl VisitHandles for CharacterCore {
+    fn visit_handles(&self, _visitor: &mut dyn HandleVisitor) {
+        let Self {
+            selected_slots: _,
+            notifier: _,
+        } = self;
+    }
+}
+impl VisitHandles for ParentSpace {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        let Self(handle) = self;
+        visitor.visit(handle);
+    }
+}
+impl VisitHandles for InventoryComponent {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        let Self(inventory) = self;
+        inventory.visit_handles(visitor);
     }
 }
 
 /// Registers a listener for mutations of this character.
+// TODO(ecs): keep this? or only allow listening once in the Universe
 impl listen::Listen for Character {
     type Msg = CharacterChange;
     type Listener = <listen::Notifier<Self::Msg> as listen::Listen>::Listener;
     fn listen_raw(&self, listener: Self::Listener) {
-        self.notifier.listen_raw(listener)
+        self.core.notifier.listen_raw(listener)
     }
 }
 
 impl Transactional for Character {
     type Transaction = CharacterTransaction;
-}
-
-impl behavior::Host for Character {
-    type Attachment = ();
 }
 
 #[cfg(feature = "save")]
@@ -558,29 +599,23 @@ impl serde::Serialize for Read<'_> {
     {
         use alloc::borrow::Cow::Borrowed;
 
-        let &Character {
-            ref body,
-            ref space,
-            ref inventory,
-            selected_slots,
-            ref behaviors,
-
-            // Not persisted - run-time connections to other things
-            notifier: _,
-            velocity_input: _,
-            #[cfg(feature = "rerun")]
-                rerun_destination: _,
-
-            // Not persisted - recomputed info
-            colliding_cubes: _,
-            last_step_info: _,
-        } = self.0;
+        let &Read {
+            core:
+                &CharacterCore {
+                    selected_slots,
+                    // Not persisted - run-time connections to other things
+                    notifier: _,
+                },
+            body,
+            space,
+            inventory,
+            physics: _,
+        } = self;
         schema::CharacterSer::CharacterV1 {
             space: space.clone(),
             body: Borrowed(body),
             inventory: Borrowed(inventory),
             selected_slots,
-            behaviors: Borrowed(behaviors),
         }
         .serialize(serializer)
     }
@@ -592,7 +627,7 @@ impl serde::Serialize for Character {
     where
         S: serde::Serializer,
     {
-        Read(self).serialize(serializer)
+        universe::SealedMember::read_from_standalone(self).serialize(serializer)
     }
 }
 
@@ -608,23 +643,14 @@ impl<'de> serde::Deserialize<'de> for Character {
                 body,
                 inventory,
                 selected_slots,
-                behaviors,
             } => Ok(Character {
+                core: CharacterCore {
+                    selected_slots,
+                    notifier: listen::Notifier::new(),
+                },
                 body: body.into_owned(),
                 space,
                 inventory: inventory.into_owned(),
-                selected_slots,
-                behaviors: behaviors.into_owned(),
-
-                // Not persisted - run-time connections to other things
-                notifier: listen::Notifier::new(),
-                velocity_input: Vector3D::zero(),
-                #[cfg(feature = "rerun")]
-                rerun_destination: Default::default(),
-
-                // Not persisted - recomputed info
-                colliding_cubes: HbHashSet::new(),
-                last_step_info: None,
             }),
         }
     }
@@ -633,53 +659,41 @@ impl<'de> serde::Deserialize<'de> for Character {
 // -------------------------------------------------------------------------------------------------
 
 /// Read access to a [`Character`] that is currently in a [`Universe`][crate::universe::Universe].
-//---
-// TODO(ecs): This type does not do anything interesting yet, but is a proof of concept for the
-// ability to have such distinct types at all, which will eventually be used to support multiple
-// components per member.
 #[derive(Clone, Copy, Debug)]
 #[allow(clippy::module_name_repetitions)]
-pub struct Read<'ticket>(&'ticket Character);
+pub struct Read<'ticket> {
+    core: &'ticket CharacterCore,
+    body: &'ticket Body,
+    space: &'ticket Handle<Space>,
+    inventory: &'ticket Inventory,
+    physics: Option<&'ticket PhysicsOutputs>,
+}
 
-#[expect(
-    clippy::trivially_copy_pass_by_ref,
-    reason = "TODO(ecs): will become larger later when we have multiple components"
-)]
 impl<'t> Read<'t> {
     /// Position, collision, and look direction.
     pub fn body(&self) -> &'t Body {
-        &self.0.body
+        self.body
     }
 
     /// Returns the character's current inventory.
     pub fn inventory(&self) -> &'t Inventory {
-        self.0.inventory()
+        self.inventory
     }
 
     /// Refers to the [`Space`] to be viewed and collided with.
     pub fn space(&self) -> &'t Handle<Space> {
-        &self.0.space
-    }
-
-    /// Returns the character's [`BehaviorSet`] of attached behaviors.
-    pub fn behaviors(&self) -> &'t BehaviorSet<Character> {
-        &self.0.behaviors
+        self.space
     }
 
     /// Indices into [`Self::inventory()`] slots which identify the tools selected for use by
     /// clicking.
     pub fn selected_slots(&self) -> [inv::Ix; inv::TOOL_SELECTIONS] {
-        self.0.selected_slots
+        self.core.selected_slots
     }
 
-    #[doc(hidden)] // pub to be used by all-is-cubes-gpu
-    pub fn colliding_cubes(&self) -> &HbHashSet<Contact> {
-        &self.0.colliding_cubes
-    }
-
-    #[doc(hidden)] // pub to be used by fuzz_physics
-    pub fn last_step_info(&self) -> Option<&BodyStepInfo> {
-        self.0.last_step_info.as_ref()
+    #[doc(hidden)] // pub to be used by all-is-cubes-gpu and fuzz_physics
+    pub fn physics(&self) -> Option<&PhysicsOutputs> {
+        self.physics
     }
 }
 
@@ -688,18 +702,22 @@ impl listen::Listen for Read<'_> {
     type Msg = CharacterChange;
     type Listener = <listen::Notifier<Self::Msg> as listen::Listen>::Listener;
     fn listen_raw(&self, listener: Self::Listener) {
-        self.0.notifier.listen_raw(listener)
+        self.core.notifier.listen_raw(listener)
     }
 }
 
 impl Fmt<StatusText> for Read<'_> {
     #[mutants::skip] // technically user visible but really debugging
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
-        writeln!(fmt, "{}", self.body().refmt(fopt))?;
-        if let Some(info) = &self.0.last_step_info {
-            writeln!(fmt, "Last step: {:#?}", info.refmt(&ConciseDebug))?;
+        write!(fmt, "{}", self.body().refmt(fopt))?;
+        if let Some(physics) = self.physics {
+            writeln!(fmt, "\n")?;
+            if let Some(info) = &physics.last_step_info {
+                writeln!(fmt, "Last step: {:#?}", info.refmt(&ConciseDebug))?;
+            }
+            write!(fmt, "Colliding: {:?}", physics.colliding_cubes.len())?;
         }
-        write!(fmt, "Colliding: {:?}", self.0.colliding_cubes.len())
+        Ok(())
     }
 }
 
@@ -712,26 +730,19 @@ impl Fmt<StatusText> for Read<'_> {
 pub(crate) struct CharacterStepInfo {
     /// Number of characters whose updates were aggregated into this value.
     count: usize,
-
-    behaviors: behavior::BehaviorSetStepInfo,
 }
 
 impl Fmt<StatusText> for CharacterStepInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
-        let Self { count, behaviors } = self;
-        write!(
-            f,
-            "{count} characters' steps:\nBehaviors: {}",
-            behaviors.refmt(fopt)
-        )
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        let Self { count } = self;
+        write!(f, "{count} characters' steps")
     }
 }
 
 impl ops::AddAssign for CharacterStepInfo {
     fn add_assign(&mut self, other: Self) {
-        let Self { count, behaviors } = self;
+        let Self { count } = self;
         *count += other.count;
-        *behaviors += other.behaviors;
     }
 }
 
@@ -743,7 +754,6 @@ pub struct CharacterTransaction {
     set_space: Equal<Handle<Space>>,
     body: BodyTransaction,
     inventory: InventoryTransaction,
-    behaviors: BehaviorSetTransaction<Character>,
 }
 
 impl CharacterTransaction {
@@ -773,14 +783,6 @@ impl CharacterTransaction {
             ..Default::default()
         }
     }
-
-    /// Modify the character's [`BehaviorSet`].
-    pub fn behaviors(t: BehaviorSetTransaction<Character>) -> Self {
-        Self {
-            behaviors: t,
-            ..Default::default()
-        }
-    }
 }
 
 impl Transaction for CharacterTransaction {
@@ -790,7 +792,6 @@ impl Transaction for CharacterTransaction {
     type CommitCheck = (
         <BodyTransaction as Transaction>::CommitCheck,
         <InventoryTransaction as Transaction>::CommitCheck,
-        <BehaviorSetTransaction<Character> as Transaction>::CommitCheck,
     );
     type Output = transaction::NoOutput;
     type Mismatch = CharacterTransactionMismatch;
@@ -800,16 +801,12 @@ impl Transaction for CharacterTransaction {
             set_space: _, // no check needed
             body,
             inventory,
-            behaviors,
         } = self;
         Ok((
             body.check(&target.body).map_err(CharacterTransactionMismatch::Body)?,
             inventory
                 .check(&target.inventory)
                 .map_err(CharacterTransactionMismatch::Inventory)?,
-            behaviors
-                .check(&target.behaviors)
-                .map_err(CharacterTransactionMismatch::Behaviors)?,
         ))
     }
 
@@ -817,7 +814,7 @@ impl Transaction for CharacterTransaction {
         self,
         target: &mut Character,
         _read_ticket: Self::Context<'_>,
-        (body_check, inventory_check, behaviors_check): Self::CommitCheck,
+        (body_check, inventory_check): Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
         self.set_space.commit(&mut target.space);
@@ -828,38 +825,60 @@ impl Transaction for CharacterTransaction {
 
         self.inventory
             .commit(&mut target.inventory, (), inventory_check, &mut |change| {
-                target.notifier.notify(&CharacterChange::Inventory(change));
+                target.core.notifier.notify(&CharacterChange::Inventory(change));
             })
             .map_err(|e| e.context("inventory".into()))?;
-
-        self.behaviors
-            .commit(&mut target.behaviors, (), behaviors_check, outputs)
-            .map_err(|e| e.context("behaviors".into()))?;
 
         Ok(())
     }
 }
 
 impl universe::TransactionOnEcs for CharacterTransaction {
-    type WriteQueryData = &'static mut Self::Target;
+    type WriteQueryData = (
+        &'static CharacterCore,
+        &'static mut Body,
+        &'static mut InventoryComponent,
+        &'static mut ParentSpace,
+    );
 
     fn check(&self, target: Read<'_>) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, target.0)
+        let Self {
+            set_space: _, // no check needed
+            body,
+            inventory,
+        } = self;
+        Ok((
+            body.check(target.body).map_err(CharacterTransactionMismatch::Body)?,
+            inventory
+                .check(target.inventory)
+                .map_err(CharacterTransactionMismatch::Inventory)?,
+        ))
     }
 
     fn commit(
         self,
-        mut target: ecs::Mut<'_, Character>,
-        read_ticket: ReadTicket<'_>,
-        check: Self::CommitCheck,
+        (core, mut body, mut inventory, mut space): (
+            &CharacterCore,
+            ecs::Mut<'_, Body>,
+            ecs::Mut<'_, InventoryComponent>,
+            ecs::Mut<'_, ParentSpace>,
+        ),
+        _read_ticket: ReadTicket<'_>,
+        (body_check, inventory_check): Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
-        Transaction::commit(
-            self,
-            &mut *target,
-            read_ticket,
-            check,
-            &mut transaction::no_outputs,
-        )
+        self.set_space.commit(&mut space.0);
+
+        self.body
+            .commit(&mut *body, (), body_check, &mut transaction::no_outputs)
+            .map_err(|e| e.context("body".into()))?;
+
+        self.inventory
+            .commit(&mut inventory.0, (), inventory_check, &mut |change| {
+                core.notifier.notify(&CharacterChange::Inventory(change));
+            })
+            .map_err(|e| e.context("inventory".into()))?;
+
+        Ok(())
     }
 }
 
@@ -867,7 +886,6 @@ impl Merge for CharacterTransaction {
     type MergeCheck = (
         <BodyTransaction as Merge>::MergeCheck,
         <InventoryTransaction as Merge>::MergeCheck,
-        <BehaviorSetTransaction<Character> as Merge>::MergeCheck,
     );
     type Conflict = CharacterTransactionConflict;
 
@@ -879,25 +897,18 @@ impl Merge for CharacterTransaction {
         Ok((
             self.body.check_merge(&other.body).map_err(C::Body)?,
             self.inventory.check_merge(&other.inventory).map_err(C::Inventory)?,
-            self.behaviors.check_merge(&other.behaviors).map_err(C::Behaviors)?,
         ))
     }
 
-    fn commit_merge(
-        &mut self,
-        other: Self,
-        (body_check, inventory_check, behaviors_check): Self::MergeCheck,
-    ) {
+    fn commit_merge(&mut self, other: Self, (body_check, inventory_check): Self::MergeCheck) {
         let Self {
             set_space,
             body,
             inventory,
-            behaviors,
         } = self;
         set_space.commit_merge(other.set_space, ());
         body.commit_merge(other.body, body_check);
         inventory.commit_merge(other.inventory, inventory_check);
-        behaviors.commit_merge(other.behaviors, behaviors_check);
     }
 }
 
@@ -910,8 +921,6 @@ pub enum CharacterTransactionMismatch {
     Body(<BodyTransaction as Transaction>::Mismatch),
     /// in character inventory
     Inventory(<InventoryTransaction as Transaction>::Mismatch),
-    /// in character behaviors
-    Behaviors(<BehaviorSetTransaction<Character> as Transaction>::Mismatch),
 }
 
 /// Transaction conflict error type for a [`CharacterTransaction`].
@@ -925,8 +934,6 @@ pub enum CharacterTransactionConflict {
     Body(physics::BodyConflict),
     /// conflict in character inventory
     Inventory(inv::InventoryConflict),
-    /// conflict in character behaviors
-    Behaviors(behavior::BehaviorTransactionConflict),
 }
 
 impl core::error::Error for CharacterTransactionMismatch {
@@ -934,7 +941,6 @@ impl core::error::Error for CharacterTransactionMismatch {
         match self {
             CharacterTransactionMismatch::Body(e) => Some(e),
             CharacterTransactionMismatch::Inventory(e) => Some(e),
-            CharacterTransactionMismatch::Behaviors(e) => Some(e),
         }
     }
 }
@@ -945,7 +951,6 @@ impl core::error::Error for CharacterTransactionConflict {
             CharacterTransactionConflict::SetSpace => None,
             CharacterTransactionConflict::Body(_) => None,
             CharacterTransactionConflict::Inventory(e) => Some(e),
-            CharacterTransactionConflict::Behaviors(e) => Some(e),
         }
     }
 }
@@ -969,4 +974,9 @@ fn find_jetpacks(inventory: &Inventory) -> impl Iterator<Item = (inv::Ix, bool)>
             None
         }
     })
+}
+
+fn is_on_ground(body: &Body, po: &PhysicsOutputs) -> bool {
+    body.velocity().y <= 0.0
+        && po.colliding_cubes.iter().any(|contact| contact.normal() == Face7::PY)
 }

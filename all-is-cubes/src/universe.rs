@@ -14,12 +14,12 @@ use manyfmt::Fmt;
 
 use crate::behavior::BehaviorSetStepInfo;
 use crate::block::{self, BlockDefStepInfo};
-use crate::character::{Character, CharacterStepInfo};
+use crate::character::{self, Character, CharacterStepInfo};
 use crate::save::WhenceUniverse;
 use crate::space::{self, Space, SpaceStepInfo};
 use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::util::{ConciseDebug, Refmt as _, ShowStatus, StatusText};
-use crate::{behavior, time};
+use crate::{behavior, physics, time};
 
 #[cfg(feature = "rerun")]
 use crate::rerun_glue as rg;
@@ -179,7 +179,7 @@ impl Universe {
 
             // Add systems.
             gc::add_gc(&mut world);
-            crate::character::add_eye_systems(&mut world);
+            character::add_eye_systems(&mut world);
 
             // Finally, insist on no ambiguous scheduling.
             world.resource_mut::<ecs::Schedules>().configure_schedules(
@@ -382,18 +382,57 @@ impl Universe {
         }
         self.sync_space_blocks();
 
+        #[cfg(feature = "rerun")]
+        type MaybeDestination<'a> = &'a rg::Destination;
+        #[cfg(not(feature = "rerun"))]
+        type MaybeDestination<'a> = ();
+
         // TODO(ecs): pre-register this system after getting rid of the inputs
         self.world
             .run_system_cached_with(
                 |mut si: ecs::InMut<'_, StepInput>,
                  current_tick: ecs::Res<'_, time::CurrentTick>,
                  data_sources: QueryBlockDataSources<'_, '_>,
-                 characters: ecs::Query<'_, '_, (&Membership, &mut Character)>| {
+                 characters: ecs::Query<
+                    '_,
+                    '_,
+                    (
+                        &Membership,
+                        &mut character::CharacterCore,
+                        &mut physics::Body,
+                        &mut character::ParentSpace,
+                        &mut character::Input,
+                        &mut character::InventoryComponent,
+                        &mut character::PhysicsOutputs,
+                        MaybeDestination<'_>,
+                    ),
+                >| {
                     #[expect(clippy::shadow_unrelated, reason = "mid-refactoring")]
                     let tick = current_tick.get().unwrap();
-                    // TODO(ecs): convert this to run in parallel
-                    for (membership, mut ch) in characters {
-                        let (transaction, character_info, _body_info) = ch.step(
+                    // TODO(ecs): convert this to normal systems and also run in parallel
+                    for (
+                        membership,
+                        core,
+                        body,
+                        space_handle,
+                        input,
+                        inventory,
+                        output,
+                        rerun_destination,
+                    ) in characters
+                    {
+                        #[cfg(not(feature = "rerun"))]
+                        let () = rerun_destination;
+
+                        let (transaction, character_info, _body_info) = Character::step(
+                            core.into_inner(),
+                            body.into_inner(),
+                            space_handle.into_inner(),
+                            input.into_inner(),
+                            inventory.into_inner(),
+                            output.into_inner(),
+                            #[cfg(feature = "rerun")]
+                            rerun_destination,
                             // TODO(ecs): using QueryBlockDataSources as an approximation of what is actually needed here
                             ReadTicket::from_block_data_sources(&data_sources),
                             membership.handle.downcast_ref(),
@@ -743,6 +782,20 @@ impl Universe {
 
         // Write current timepoint
         self.log_rerun_time();
+    }
+
+    /// Activate logging some member's actions to a Rerun stream.
+    ///
+    /// What exact information this means depends on the specific member type.
+    #[cfg(feature = "rerun")]
+    pub fn log_member_to_rerun<T: UniverseMember>(
+        &mut self,
+        handle: &Handle<T>,
+        destination: crate::rerun_glue::Destination,
+    ) -> Result<(), HandleError> {
+        self.world.entity_mut(handle.as_entity(self.id)?).insert(destination);
+        self.update_archetypes();
+        Ok(())
     }
 
     #[allow(clippy::unused_self)]

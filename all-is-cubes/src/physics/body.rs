@@ -2,6 +2,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
+use bevy_ecs::prelude as ecs;
 use euclid::{Point3D, Vector3D};
 use ordered_float::NotNan;
 
@@ -51,7 +52,7 @@ pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
 
 /// An object with a position, velocity, and collision volume.
 /// What it collides with is determined externally.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, ecs::Component)]
 #[non_exhaustive]
 pub struct Body {
     /// Position.
@@ -222,6 +223,7 @@ impl Body {
     ///
     /// This method is private because the exact details of what inputs are required are
     /// unstable.
+    // TODO(ecs): make this a system function instead
     pub(crate) fn step_with_rerun<CC>(
         &mut self,
         tick: Tick,

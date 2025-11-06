@@ -60,12 +60,6 @@ impl RecordOptions {
     }
 }
 
-impl RecordAnimationOptions {
-    pub(crate) fn total_duration(&self) -> Duration {
-        self.frame_period * u32::try_from(self.frame_count).unwrap_or(u32::MAX)
-    }
-}
-
 impl RecordFormat {
     /// Whether this format is capable of including [`Space`] light data.
     ///

@@ -1,14 +1,9 @@
 use std::fmt;
-use std::sync::Arc;
 use std::time::Duration;
 
-use all_is_cubes::character::{self, Character};
-use all_is_cubes::euclid::{self, num::Zero as _, vec3};
-use all_is_cubes::math::{Cube, NotNan};
-use all_is_cubes::physics::BodyTransaction;
-use all_is_cubes::transaction::{Merge, Transaction as _};
+use all_is_cubes::character::Character;
+use all_is_cubes::listen;
 use all_is_cubes::universe::{Handle, UniverseTransaction};
-use all_is_cubes::{behavior, listen, universe};
 
 use crate::record::RecordOptions;
 use crate::session::{ClockSource, DesktopSession};
@@ -49,72 +44,13 @@ where
 
 pub(crate) fn configure_universe_for_recording(
     character_handle: Option<&Handle<Character>>,
-    options: &RecordOptions,
+    _options: &RecordOptions,
 ) -> UniverseTransaction {
-    // Add some motion to animation recordings.
-    // TODO: replace this with a general camera scripting mechanism
-    if let Some(character_handle) = character_handle {
-        if let Some(anim) = &options.animation {
-            return character::CharacterTransaction::behaviors(
-                behavior::BehaviorSetTransaction::insert(
-                    (),
-                    Arc::new(AutoRotate {
-                        angle: NotNan::zero(),
-                        rate: NotNan::new(360.0 / anim.total_duration().as_secs_f64()).unwrap(),
-                    }),
-                ),
-            )
-            .bind(character_handle.clone());
-        }
-    } else {
+    // TODO(ecs): this is where we used to add camera movement animation and it should be put back
+    if character_handle.is_none() {
         log::warn!("Recording universe contains no character.");
     }
     UniverseTransaction::default()
-}
-
-/// A simple behavior which causes a `Character`'s viewpoint to rotate without user input,
-/// currently used so that recording animations does more than nothing.
-///
-/// TODO: Replace this with a more general camera movement scripting mechanism.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-struct AutoRotate {
-    pub angle: NotNan<f64>,
-    pub rate: NotNan<f64>,
-}
-impl behavior::Behavior<Character> for AutoRotate {
-    fn step(
-        &self,
-        context: &behavior::Context<'_, Character>,
-    ) -> (UniverseTransaction, behavior::Then) {
-        let mut new_self = *self;
-        new_self.angle =
-            NotNan::new(new_self.angle + new_self.rate * context.tick.delta_t().as_secs_f64())
-                .unwrap();
-
-        let body_txn = BodyTransaction::default().with_look_direction(
-            euclid::Rotation3D::<f64, Cube, Cube>::around_y(euclid::Angle::degrees(
-                -new_self.angle.into_inner(),
-            ))
-            .transform_vector3d(vec3(0., 0., -1.)),
-        );
-
-        (
-            context
-                .bind_host(character::CharacterTransaction::body(body_txn))
-                .merge(context.replace_self(new_self))
-                .unwrap(),
-            behavior::Then::Step,
-        )
-    }
-
-    fn persistence(&self) -> Option<behavior::Persistence> {
-        None
-    }
-}
-
-impl universe::VisitHandles for AutoRotate {
-    // No handles
-    fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {}
 }
 
 /// Adapt [`async_channel::Sender`] to [`Listener`][listen::Listener].
