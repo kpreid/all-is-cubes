@@ -343,17 +343,23 @@ impl Session {
 
                 self.frame_clock.did_step(u_clock.schedule());
 
-                self.input_processor.apply_input(
-                    InputTargets {
-                        universe: Some(&mut shuttle.game_universe),
-                        character: shuttle.game_character.get().as_ref().map(StrongHandle::as_ref),
-                        paused: Some(&self.paused),
-                        settings: Some(&shuttle.settings),
-                        control_channel: Some(&self.control_channel_sender),
-                        ui: shuttle.ui.as_ref(),
-                    },
-                    game_tick,
-                );
+                self.input_processor
+                    .apply_input(
+                        InputTargets {
+                            universe: Some(&mut shuttle.game_universe),
+                            character: shuttle
+                                .game_character
+                                .get()
+                                .as_ref()
+                                .map(StrongHandle::as_ref),
+                            paused: Some(&self.paused),
+                            settings: Some(&shuttle.settings),
+                            control_channel: Some(&self.control_channel_sender),
+                            ui: shuttle.ui.as_ref(),
+                        },
+                        game_tick,
+                    )
+                    .expect("applying input failed");
                 // TODO: switch from FrameClock tick to asking the universe for its tick
                 self.input_processor.step(game_tick);
 

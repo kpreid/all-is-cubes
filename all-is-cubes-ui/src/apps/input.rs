@@ -8,7 +8,7 @@ use all_is_cubes::inv;
 use all_is_cubes::listen;
 use all_is_cubes::math::{FreeCoordinate, FreeVector, zo32};
 use all_is_cubes::time::Tick;
-use all_is_cubes::universe::{Handle, Universe};
+use all_is_cubes::universe::{self, Handle, Universe};
 use all_is_cubes_render::camera::{
     FogOption, LightingOption, NdcPoint2, NominalPixel, RenderMethod, TransparencyOption, Viewport,
 };
@@ -283,7 +283,13 @@ impl InputProcessor {
 
     /// Applies the accumulated input from previous events.
     /// `targets` specifies the objects it should be applied to.
-    pub(crate) fn apply_input(&mut self, targets: InputTargets<'_>, tick: Tick) {
+    ///
+    /// Returns an error if `targets` contains inaccessible handles.
+    pub(crate) fn apply_input(
+        &mut self,
+        targets: InputTargets<'_>,
+        tick: Tick,
+    ) -> Result<(), universe::HandleError> {
         let InputTargets {
             mut universe,
             character: character_opt,
@@ -309,29 +315,27 @@ impl InputProcessor {
 
         // Direct character controls
         if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt) {
-            universe
-                .mutate_character(character_handle, |character| {
-                    let movement = self.movement();
-                    character.set_velocity_input(movement);
+            universe.mutate_character(character_handle, |character| {
+                let movement = self.movement();
+                character.set_velocity_input(movement);
 
-                    let turning = Vector2D::<_, ()>::new(
-                        key_turning_step.mul_add(
-                            self.net_movement(Key::Left, Key::Right),
-                            self.mouselook_buffer.x,
-                        ),
-                        key_turning_step.mul_add(
-                            self.net_movement(Key::Up, Key::Down),
-                            self.mouselook_buffer.y,
-                        ),
-                    );
-                    character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
-                    character.body.pitch = (character.body.pitch + turning.y).clamp(-90.0, 90.0);
+                let turning = Vector2D::<_, ()>::new(
+                    key_turning_step.mul_add(
+                        self.net_movement(Key::Left, Key::Right),
+                        self.mouselook_buffer.x,
+                    ),
+                    key_turning_step.mul_add(
+                        self.net_movement(Key::Up, Key::Down),
+                        self.mouselook_buffer.y,
+                    ),
+                );
+                character.body.yaw = (character.body.yaw + turning.x).rem_euclid(360.0);
+                character.body.pitch = (character.body.pitch + turning.y).clamp(-90.0, 90.0);
 
-                    if self.keys_held.contains(&Key::Character(' ')) {
-                        character.jump_if_able();
-                    }
-                })
-                .expect("character was borrowed during apply_input()");
+                if self.keys_held.contains(&Key::Character(' ')) {
+                    character.jump_if_able();
+                }
+            })?;
         }
 
         for key in self.command_buffer.drain(..) {
@@ -426,13 +430,14 @@ impl InputProcessor {
                     if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt)
                     {
                         universe
-                            .mutate_character(character_handle, |c| c.set_selected_slot(1, slot))
-                            .expect("character was borrowed during apply_input()");
+                            .mutate_character(character_handle, |c| c.set_selected_slot(1, slot))?;
                     }
                 }
                 _ => {}
             }
         }
+
+        Ok(())
     }
 
     /// Returns a source which reports whether the mouselook mode (mouse movement is
@@ -532,17 +537,19 @@ mod tests {
         universe: &mut Universe,
         character: &Handle<Character>,
     ) {
-        input.apply_input(
-            InputTargets {
-                universe: Some(universe),
-                character: Some(character),
-                paused: None,
-                settings: None,
-                control_channel: None,
-                ui: None,
-            },
-            Tick::arbitrary(),
-        );
+        input
+            .apply_input(
+                InputTargets {
+                    universe: Some(universe),
+                    character: Some(character),
+                    paused: None,
+                    settings: None,
+                    control_channel: None,
+                    ui: None,
+                },
+                Tick::arbitrary(),
+            )
+            .unwrap();
     }
 
     #[test]
@@ -602,25 +609,29 @@ mod tests {
         assert!(input.mouselook_mode().get());
 
         // No effect when unpaused...
-        input.apply_input(
-            InputTargets {
-                ui: Some(&ui),
-                ..InputTargets::default()
-            },
-            Tick::arbitrary(),
-        );
+        input
+            .apply_input(
+                InputTargets {
+                    ui: Some(&ui),
+                    ..InputTargets::default()
+                },
+                Tick::arbitrary(),
+            )
+            .unwrap();
         assert!(input.mouselook_mode().get());
 
         // But when paused, the UI enters the pause menu and, as a consequence, cancels mouselook.
         paused.set(true);
         ui.step(Tick::arbitrary(), time::Deadline::Asap, ReadTicket::stub());
-        input.apply_input(
-            InputTargets {
-                ui: Some(&ui),
-                ..InputTargets::default()
-            },
-            Tick::arbitrary(),
-        );
+        input
+            .apply_input(
+                InputTargets {
+                    ui: Some(&ui),
+                    ..InputTargets::default()
+                },
+                Tick::arbitrary(),
+            )
+            .unwrap();
         assert!(!input.mouselook_mode().get());
     }
 
