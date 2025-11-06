@@ -48,6 +48,16 @@ fn remove_membership_hook(
 
 // -------------------------------------------------------------------------------------------------
 
+/// Trait implemented for components which are exposed for arbitrary mutation
+/// using [`Universe::mutate_component()`]. This is used, for example, to implement character
+/// control.
+///
+/// `O` is the `UniverseMember` type of the entity the component is on.
+#[doc(hidden)] // not sure if good public API yet
+pub trait PubliclyMutableComponent<O> {}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Get mutable access to `QueryData` of one entity, and read-only access to all other entities.
 ///
 /// Returns [`None`] if there is no such entity or component.

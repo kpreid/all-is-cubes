@@ -39,6 +39,7 @@ pub use members::{AnyHandle, UniverseMember};
 mod ecs_details;
 use ecs_details::{Membership, NameMap, QueryStateBundle};
 // TODO(ecs): try to eliminate uses of get_one_mut_and_ticket in favor of normal queries
+pub use ecs_details::PubliclyMutableComponent;
 pub(crate) use ecs_details::get_one_mut_and_ticket;
 
 mod gc;
@@ -668,24 +669,29 @@ impl Universe {
         )
     }
 
-    // TODO(ecs): Remove this entirely after figuring out what to replace it with.
-    // We don't (yet) have anything analogous to `space::Mutation` for characters.
+    /// An escape hatch from the [`Transaction`] and [`Handle`] system: allows mutating components
+    /// directly, if they permit this type of access.
     #[doc(hidden)]
     #[inline(never)]
-    pub fn mutate_character<Out>(
+    pub fn mutate_component<C, T, Out>(
         &mut self,
-        handle: &Handle<Character>,
-        function: impl FnOnce(&mut Character) -> Out,
-    ) -> Result<Out, HandleError> {
+        handle: &Handle<T>,
+        function: impl FnOnce(&mut C) -> Out,
+    ) -> Result<Out, HandleError>
+    where
+        C: PubliclyMutableComponent<T> + ecs::Component<Mutability = bevy_ecs::component::Mutable>,
+        T: UniverseMember,
+    {
         let entity = handle.as_entity(self.id)?;
-        let Some(character_mut): Option<ecs::Mut<'_, Character>> =
-            self.world.get_mut::<Character>(entity)
-        else {
+        if let Some(component_mut) = self.world.get_mut::<C>(entity).map(ecs::Mut::into_inner) {
+            Ok(function(component_mut))
+        } else {
             // This should never happen even with concurrent access, because as_entity() checks
             // all cases that would lead to the entity being absent.
-            panic!("{handle:?}.as_entity() succeeded but entity {entity:?} is missing");
-        };
-        Ok(function(character_mut.into_inner()))
+            panic!(
+                "{handle:?}.as_entity() succeeded but entity {entity:?} or component is missing"
+            );
+        }
     }
 
     /// Obtain a [`space::Mutation`] to modify a [`Space`].

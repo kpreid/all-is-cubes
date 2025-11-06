@@ -315,7 +315,7 @@ impl InputProcessor {
 
         // Direct character controls
         if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt) {
-            universe.mutate_character(character_handle, |character| {
+            universe.mutate_component(character_handle, |character: &mut Character| {
                 let movement = self.movement();
                 character.set_velocity_input(movement);
 
@@ -429,8 +429,9 @@ impl InputProcessor {
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
                     if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt)
                     {
-                        universe
-                            .mutate_character(character_handle, |c| c.set_selected_slot(1, slot))?;
+                        universe.mutate_component(character_handle, |c: &mut Character| {
+                            c.set_selected_slot(1, slot)
+                        })?;
                     }
                 }
                 _ => {}

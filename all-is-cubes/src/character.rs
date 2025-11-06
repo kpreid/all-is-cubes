@@ -507,6 +507,9 @@ impl universe::UniverseMember for Character {
     type Read<'ticket> = Read<'ticket>;
 }
 
+// TODO: replace uses of this
+impl universe::PubliclyMutableComponent<Character> for Character {}
+
 impl VisitHandles for Character {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
         // Use pattern matching so that if we add a new field that might contain handles,
