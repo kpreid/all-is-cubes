@@ -106,12 +106,12 @@ pub(crate) fn list_handles<T: VisitHandles + 'static>(target: &T) -> Vec<super::
 // Note: If we find ourselves wanting this for more traits, or with less unsafe code,
 // try <https://docs.rs/bevy-trait-query/>.
 #[derive(Default, ecs::Resource)]
-pub(in crate::universe) struct VisitableComponents(
+pub(crate) struct VisitableComponents(
     hashbrown::HashMap<bevy_ecs::component::ComponentId, unsafe fn(Ptr<'_>) -> &dyn VisitHandles>,
 );
 
 impl VisitableComponents {
-    pub(in crate::universe) fn register<C: ecs::Component + VisitHandles>(world: &mut ecs::World) {
+    pub(crate) fn register<C: ecs::Component + VisitHandles>(world: &mut ecs::World) {
         let component_id = world.register_component::<C>();
         world.get_resource_or_init::<Self>().0.insert(
             component_id,

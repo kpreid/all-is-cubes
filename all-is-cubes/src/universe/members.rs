@@ -18,8 +18,7 @@ use crate::space::Space;
 use crate::tag::TagDef;
 use crate::transaction;
 use crate::universe::{
-    self, ErasedHandle, Handle, InsertError, Name, Universe, VisitableComponents,
-    handle::HandlePtr, universe_txn as ut,
+    self, ErasedHandle, Handle, InsertError, Name, Universe, handle::HandlePtr, universe_txn as ut,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -33,6 +32,9 @@ pub(crate) trait SealedMember: Sized {
     type Bundle: ecs::Bundle;
 
     type ReadQueryData: bevy_ecs::query::ReadOnlyQueryData;
+
+    /// Register `VisitableComponents` and anything else needed.
+    fn register_all_member_components(world: &mut ecs::World);
 
     /// Constructs `Self::Read` from a value that has not yet been inserted into the
     /// [`Universe`].
@@ -116,6 +118,10 @@ macro_rules! impl_universe_member_for_single_component_type {
         impl $crate::universe::SealedMember for $member_type {
             type Bundle = (Self,);
             type ReadQueryData = &'static Self;
+
+            fn register_all_member_components(world: &mut ::bevy_ecs::world::World) {
+                $crate::universe::VisitableComponents::register::<$member_type>(world);
+            }
 
             fn read_from_standalone(
                 value: &Self,
@@ -216,8 +222,7 @@ macro_rules! member_enums_and_impls {
 
             pub(in crate::universe) fn register_all_member_components(world: &mut ecs::World) {
                 $(
-                    // This also registers the components themselves as a side benefit.
-                    VisitableComponents::register::<$member_type>(world);
+                    <$member_type as SealedMember>::register_all_member_components(world);
                 )*
             }
         }

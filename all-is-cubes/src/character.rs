@@ -467,6 +467,11 @@ impl Character {
 impl universe::SealedMember for Character {
     type Bundle = (Self,);
     type ReadQueryData = &'static Self;
+
+    fn register_all_member_components(world: &mut ecs::World) {
+        universe::VisitableComponents::register::<Self>(world);
+    }
+
     fn read_from_standalone(value: &Self) -> <Self as universe::UniverseMember>::Read<'_> {
         Read(value)
     }
