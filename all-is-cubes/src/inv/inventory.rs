@@ -396,6 +396,22 @@ impl InventoryTransaction {
             insert: vec![],
         }
     }
+
+    /// Returns whether this transaction does nothing and checks nothing.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use all_is_cubes::inv;
+    ///
+    /// assert!(inv::InventoryTransaction::default().is_empty());
+    ///
+    /// assert!(!inv::InventoryTransaction::insert([inv::Tool::Activate]).is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        let Self { replace, insert } = self;
+        replace.is_empty() && insert.is_empty()
+    }
 }
 
 impl Transaction for InventoryTransaction {

@@ -650,6 +650,29 @@ impl UniverseTransaction {
             _ => None,
         }
     }
+
+    /// Returns `true` if this transaction does nothing and checks nothing.
+    ///
+    /// May not necessarily return `true` in all such cases, but will always return `true` for
+    /// [`UniverseTransaction::default()`].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use all_is_cubes::universe::UniverseTransaction;
+    /// assert!(UniverseTransaction::default().is_empty());
+    /// ```
+    // TODO: example/test of non-empty
+    pub fn is_empty(&self) -> bool {
+        let Self {
+            members,
+            anonymous_insertions,
+            behaviors,
+            universe_id: _,
+        } = self;
+        // TODO: for more precise results, ask each member transaction if it is empty
+        members.is_empty() && anonymous_insertions.is_empty() && behaviors.is_empty()
+    }
 }
 
 impl From<AnyTransaction> for UniverseTransaction {

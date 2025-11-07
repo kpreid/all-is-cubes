@@ -31,6 +31,7 @@ In order to resolve various design problems interfering with development, the `a
     - `block::Block::find_inventory()`
     - `inv::Ix`
     - `inv::InvInBlock` and `inv::IconRow` now have public `new()` functions.
+    - `inv::InventoryTransaction::is_empty()`
     - `math::BoxPart::centered_on()`
     - `math::Face6::{clockwise, counterclockwise, r180}` for constructing rotations.
     - `math::FaceMap::sum()`
@@ -40,6 +41,7 @@ In order to resolve various design problems interfering with development, the `a
     - New universe member type `sound::SoundDef` allows defining synthesized sounds as game content.
     - `impl IntoIterator for math::FaceMap`
     - `math::PositiveSign::INFINITY`
+    - `universe::UniverseTransaction::is_empty()`
 
 - `all-is-cubes-mesh` library:
     - `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` now return the new type `Aabbs` which provides separate boxes for opaque and transparent geometry. This allows precise culling when rendering in separate opaque and transparent passes.

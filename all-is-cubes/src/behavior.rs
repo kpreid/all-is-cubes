@@ -243,7 +243,7 @@ impl<H: Host> BehaviorSet<H> {
             };
             info.stepped += 1;
             let (txn, then) = entry.behavior.step(context);
-            if txn != UniverseTransaction::default() {
+            if !txn.is_empty() {
                 info.acted += 1;
                 transactions.push(txn);
             }
