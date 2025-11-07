@@ -174,8 +174,8 @@ pub mod physics;
 pub mod raycast;
 #[doc(hidden)] // Exported only for use by all_is_cubes_render
 pub mod raytracer;
-#[cfg(feature = "rerun")]
 #[doc(hidden)]
+#[cfg_attr(not(feature = "rerun"), path = "rerun_glue_disabled.rs")]
 pub mod rerun_glue;
 pub mod save;
 pub mod sound;
