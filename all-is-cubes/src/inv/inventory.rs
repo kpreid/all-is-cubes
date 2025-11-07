@@ -83,14 +83,16 @@ impl Inventory {
 
     /// Use a tool stored in this inventory.
     ///
-    /// `character` must be the character containing the inventory. TODO: Bad API
-    pub fn use_tool(
+    /// Returns a [`inv::InventoryTransaction`] for the change to the inventory, if any,
+    /// and a [`UniverseTransaction`] for the outside effects of the tool.
+    /// The caller should commit both or neither.
+    pub(crate) fn use_tool_it(
         &self,
         read_ticket: ReadTicket<'_>,
         cursor: Option<&Cursor>,
-        character: Handle<Character>,
+        character: Option<Handle<Character>>,
         slot_index: Ix,
-    ) -> Result<UniverseTransaction, ToolError> {
+    ) -> Result<(InventoryTransaction, UniverseTransaction), ToolError> {
         let original_slot = self.get(slot_index);
         match original_slot {
             None | Some(Slot::Empty) => Err(ToolError::NoTool),
@@ -98,9 +100,9 @@ impl Inventory {
                 let input = ToolInput {
                     read_ticket,
                     cursor: cursor.cloned(),
-                    character: Some(character.clone()),
+                    character,
                 };
-                let (new_tool, transaction) = original_tool.clone().use_tool(&input)?;
+                let (new_tool, effect_transaction) = original_tool.clone().use_tool(&input)?;
 
                 // TODO: This is way too long. Inventory-stacking logic should be in InventoryTransaction, probably?
                 let tool_transaction = match (count, new_tool) {
@@ -142,13 +144,30 @@ impl Inventory {
                     }
                 };
 
-                Ok(match tool_transaction {
-                    Some(tool_transaction) => transaction
-                        .merge(CharacterTransaction::inventory(tool_transaction).bind(character))
-                        .expect("failed to merge tool self-update"),
-                    None => transaction,
-                })
+                Ok((tool_transaction.unwrap_or_default(), effect_transaction))
             }
+        }
+    }
+
+    /// Use a tool stored in this inventory.
+    ///
+    /// `character` must be the character containing the inventory. TODO: Bad API
+    pub fn use_tool(
+        &self,
+        read_ticket: ReadTicket<'_>,
+        cursor: Option<&Cursor>,
+        character: Handle<Character>,
+        slot_index: Ix,
+    ) -> Result<UniverseTransaction, ToolError> {
+        let (tool_transaction, effect_transaction) =
+            self.use_tool_it(read_ticket, cursor, Some(character.clone()), slot_index)?;
+
+        if tool_transaction.is_empty() {
+            Ok(effect_transaction)
+        } else {
+            effect_transaction
+                .merge(CharacterTransaction::inventory(tool_transaction).bind(character))
+                .map_err(|_| ToolError::Internal("failed to merge tool self-update".into()))
         }
     }
 

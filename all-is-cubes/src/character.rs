@@ -354,27 +354,41 @@ impl Character {
 
         // Automatic flying controls
         // TODO: lazy clone
-        if let Some(self_handle) = self_handle.cloned() {
+        {
+            let mut inventory_transaction = None;
             if self.velocity_input.y > 0. {
                 if let Some((slot_index, false)) = find_jetpacks(&self.inventory).next()
-                    && let Ok(t) =
-                        self.inventory.use_tool(read_ticket, None, self_handle, slot_index)
+                    && let Ok((it, ut)) = self.inventory.use_tool_it(
+                        read_ticket,
+                        None,
+                        self_handle.cloned(),
+                        slot_index,
+                    )
                 {
-                    result_transaction.merge_from(t).unwrap();
+                    debug_assert!(ut.is_empty());
+                    inventory_transaction = Some(it);
                 }
             } else if self.is_on_ground() {
                 for (slot_index, active) in find_jetpacks(&self.inventory) {
                     if active
-                        && let Ok(t) = self.inventory.use_tool(
+                        && let Ok((it, ut)) = self.inventory.use_tool_it(
                             read_ticket,
                             None,
-                            self_handle.clone(),
+                            self_handle.cloned(),
                             slot_index,
                         )
                     {
-                        result_transaction.merge_from(t).unwrap();
+                        debug_assert!(ut.is_empty());
+                        inventory_transaction = Some(it);
+                        break;
                     }
                 }
+            }
+            if let Some(it) = inventory_transaction {
+                it.execute(&mut self.inventory, (), &mut |change| {
+                    self.notifier.notify(&CharacterChange::Inventory(change))
+                })
+                .unwrap();
             }
         }
 
