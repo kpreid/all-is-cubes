@@ -1,12 +1,10 @@
 use alloc::string::ToString;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::any::TypeId;
 
 use futures_util::FutureExt as _;
 use indoc::indoc;
 
-use crate::behavior;
 use crate::block::{self, AIR, Block, BlockDef, BlockDefTransaction, Resolution, TickAction};
 use crate::character::{Character, CharacterTransaction};
 use crate::content::make_some_blocks;
@@ -34,7 +32,6 @@ fn universe_debug_empty() {
         format!("{:?}", Universe::new()),
         "Universe { \
             clock: Clock(0/60 of 1s), \
-            behaviors: BehaviorSet({}), \
             session_step_time: 0, \
             spaces_with_work: 0, \
             .. \
@@ -45,7 +42,6 @@ fn universe_debug_empty() {
         indoc! {"
             Universe {
                 clock: Clock(0/60 of 1s),
-                behaviors: BehaviorSet({}),
                 session_step_time: 0,
                 spaces_with_work: 0,
                 ..
@@ -64,7 +60,6 @@ fn universe_debug_elements() {
         format!("{u:?}"),
         "Universe { \
             clock: Clock(0/60 of 1s), \
-            behaviors: BehaviorSet({}), \
             session_step_time: 0, \
             spaces_with_work: 0, \
             'foo': all_is_cubes::space::Space, \
@@ -77,7 +72,6 @@ fn universe_debug_elements() {
         indoc! {"
             Universe {
                 clock: Clock(0/60 of 1s),
-                behaviors: BehaviorSet({}),
                 session_step_time: 0,
                 spaces_with_work: 0,
                 'foo': all_is_cubes::space::Space,
@@ -363,48 +357,6 @@ fn set_clock() {
 
     u.step(false, time::Deadline::Whenever);
     assert_eq!(u.clock(), time::Clock::new(new_schedule, 8));
-}
-
-#[test]
-fn universe_behavior() {
-    #[derive(Clone, Debug, PartialEq)]
-    struct UTestBehavior {}
-    impl behavior::Behavior<Universe> for UTestBehavior {
-        fn step(
-            &self,
-            _context: &behavior::Context<'_, Universe>,
-        ) -> (UniverseTransaction, behavior::Then) {
-            let (_, txn) =
-                UniverseTransaction::insert("foo".into(), BlockDef::new(ReadTicket::stub(), AIR));
-            (txn, behavior::Then::Drop)
-        }
-        fn persistence(&self) -> Option<behavior::Persistence> {
-            None
-        }
-    }
-    impl universe::VisitHandles for UTestBehavior {
-        // No handles.
-        fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {}
-    }
-
-    // Setup
-    let mut u = Universe::new();
-    UniverseTransaction::behaviors(behavior::BehaviorSetTransaction::insert(
-        (),
-        Arc::new(UTestBehavior {}),
-    ))
-    .execute(&mut u, (), &mut transaction::no_outputs)
-    .unwrap();
-    dbg!(&u);
-    assert!(u.get_any(&"foo".into()).is_none());
-
-    u.step(false, time::Deadline::Whenever);
-
-    // After stepping, the behavior should have done its thing
-    assert!(u.get_any(&"foo".into()).is_some());
-
-    // A further step should not fail since the behavior removed itself
-    u.step(false, time::Deadline::Whenever);
 }
 
 #[test]

@@ -6,7 +6,6 @@ use core::fmt;
 use bevy_ecs::prelude as ecs;
 use hashbrown::HashMap as HbHashMap;
 
-use crate::behavior;
 use crate::transaction::{self, CommitError, Equal, Merge, Transaction, Transactional};
 use crate::universe::{
     AnyPending, ErasedHandle, Handle, InsertError, InsertErrorKind, MemberBoilerplate, Name,
@@ -280,8 +279,6 @@ pub struct UniverseTransaction {
     /// when values are stored in `MemberTxn` outside the handle.
     anonymous_insertions: HbHashMap<AnyHandle, MemberTxn>,
 
-    behaviors: behavior::BehaviorSetTransaction<Universe>,
-
     /// Invariant: Has a universe ID if any of the `members` do.
     universe_id: Equal<UniverseId>,
 }
@@ -291,14 +288,12 @@ pub struct UniverseTransaction {
 #[derive(Debug)]
 pub struct UniverseMergeCheck {
     members: HbHashMap<Name, MemberMergeCheck>,
-    behaviors: behavior::MergeCheck,
 }
 #[doc(hidden)] // Almost certainly will never need to be used explicitly
 #[derive(Debug)]
 pub struct UniverseCommitCheck {
     members: HbHashMap<Name, MemberCommitCheck>,
     anonymous_insertions: HbHashMap<AnyHandle, MemberCommitCheck>,
-    behaviors: behavior::CommitCheck,
 }
 
 /// Transaction precondition error type for [`UniverseTransaction`].
@@ -318,9 +313,6 @@ pub enum UniverseMismatch {
 
     /// Universe transactions may not modify handles that are in the [`Name::Pending`] state.
     InvalidPending,
-
-    /// The behavior set is not in an appropriate state.
-    Behaviors(<behavior::BehaviorSetTransaction<Universe> as Transaction>::Mismatch),
 }
 
 /// Transaction conflict error type for [`UniverseTransaction`].
@@ -332,9 +324,6 @@ pub enum UniverseConflict {
 
     /// The two transactions attempt to modify a member in conflicting ways.
     Member(transaction::MapConflict<Name, MemberConflict>),
-
-    /// The two transactions attempt to modify a behavior in conflicting ways.
-    Behaviors(behavior::BehaviorTransactionConflict),
 }
 
 impl core::error::Error for UniverseMismatch {
@@ -342,7 +331,6 @@ impl core::error::Error for UniverseMismatch {
         match self {
             UniverseMismatch::DifferentUniverse { .. } => None,
             UniverseMismatch::Member(mc) => Some(&mc.mismatch),
-            UniverseMismatch::Behaviors(c) => Some(c),
             UniverseMismatch::InvalidPending => None,
         }
     }
@@ -352,7 +340,6 @@ impl core::error::Error for UniverseConflict {
         match self {
             UniverseConflict::DifferentUniverse(_, _) => None,
             UniverseConflict::Member(mc) => Some(&mc.conflict),
-            UniverseConflict::Behaviors(c) => Some(c),
         }
     }
 }
@@ -382,10 +369,6 @@ impl fmt::Display for UniverseMismatch {
                         are in the [`Name::Pending`] state"
                 )
             }
-            UniverseMismatch::Behaviors(_) => {
-                // details reported via source()
-                write!(f, "transaction precondition not met in behaviors")
-            }
         }
     }
 }
@@ -399,7 +382,6 @@ impl fmt::Display for UniverseConflict {
             UniverseConflict::Member(c) => {
                 write!(f, "transaction conflict at member {key}", key = c.key)
             }
-            UniverseConflict::Behaviors(_) => write!(f, "conflict in behaviors"),
         }
     }
 }
@@ -423,7 +405,6 @@ impl UniverseTransaction {
             universe_id: Equal(transaction.universe_id()),
             members: HbHashMap::from([(name, transaction)]),
             anonymous_insertions: HbHashMap::new(),
-            behaviors: Default::default(),
         }
     }
 
@@ -557,16 +538,6 @@ impl UniverseTransaction {
         Self::from_member_txn(member_handle.name(), MemberTxn::Delete)
     }
 
-    /// Modify the [`Behavior`](behavior::Behavior)s of the universe.
-    pub fn behaviors(t: behavior::BehaviorSetTransaction<Universe>) -> Self {
-        Self {
-            behaviors: t,
-            members: HbHashMap::new(),
-            anonymous_insertions: HbHashMap::new(),
-            universe_id: Equal(None),
-        }
-    }
-
     /// If this transaction contains any operations that are on a specific member of a
     /// universe, then returns the ID of that universe.
     // TODO: make public?
@@ -667,11 +638,10 @@ impl UniverseTransaction {
         let Self {
             members,
             anonymous_insertions,
-            behaviors,
             universe_id: _,
         } = self;
         // TODO: for more precise results, ask each member transaction if it is empty
-        members.is_empty() && anonymous_insertions.is_empty() && behaviors.is_empty()
+        members.is_empty() && anonymous_insertions.is_empty()
     }
 }
 
@@ -740,10 +710,6 @@ impl Transaction for UniverseTransaction {
         Ok(UniverseCommitCheck {
             members: member_checks,
             anonymous_insertions: insert_checks,
-            behaviors: self
-                .behaviors
-                .check(&target.behaviors)
-                .map_err(UniverseMismatch::Behaviors)?,
         })
     }
 
@@ -757,13 +723,11 @@ impl Transaction for UniverseTransaction {
         let Self {
             mut members,
             mut anonymous_insertions,
-            behaviors,
             universe_id,
         } = self;
         let UniverseCommitCheck {
             members: check_members,
             anonymous_insertions: check_anon,
-            behaviors: check_behaviors,
         } = checks;
 
         // final sanity check so we can't ever modify the wrong universe
@@ -792,13 +756,6 @@ impl Transaction for UniverseTransaction {
             )?;
         }
 
-        behaviors.commit(
-            &mut target.behaviors,
-            (),
-            check_behaviors,
-            &mut transaction::no_outputs,
-        )?;
-
         Ok(())
     }
 }
@@ -816,10 +773,6 @@ impl Merge for UniverseTransaction {
         }
         Ok(UniverseMergeCheck {
             members: self.members.check_merge(&other.members).map_err(UniverseConflict::Member)?,
-            behaviors: self
-                .behaviors
-                .check_merge(&other.behaviors)
-                .map_err(UniverseConflict::Behaviors)?,
         })
     }
 
@@ -827,13 +780,11 @@ impl Merge for UniverseTransaction {
         let Self {
             members,
             anonymous_insertions,
-            behaviors,
             universe_id,
         } = self;
 
         members.commit_merge(other.members, check.members);
         anonymous_insertions.extend(other.anonymous_insertions);
-        behaviors.commit_merge(other.behaviors, check.behaviors);
         universe_id.commit_merge(other.universe_id, ());
     }
 }
@@ -844,7 +795,6 @@ impl fmt::Debug for UniverseTransaction {
         let Self {
             members,
             anonymous_insertions,
-            behaviors,
             universe_id: _, // not printed because it is effectively nondeterministic
         } = self;
 
@@ -856,9 +806,6 @@ impl fmt::Debug for UniverseTransaction {
         }
         for txn in anonymous_insertions.values() {
             ds.field("[anonymous pending]", txn.transaction_as_debug());
-        }
-        if !behaviors.is_empty() {
-            ds.field("behaviors", behaviors);
         }
         ds.finish()
     }
@@ -1173,8 +1120,6 @@ mod tests {
     use crate::space::SpaceTransaction;
     use crate::space::SpaceTransactionConflict;
     use crate::transaction::{ExecuteError, MapConflict};
-    use crate::universe;
-    use alloc::sync::Arc;
     use indoc::indoc;
 
     #[test]
@@ -1185,7 +1130,6 @@ mod tests {
                 members: HbHashMap::new(),
                 anonymous_insertions: HbHashMap::new(),
                 universe_id: Equal(None),
-                behaviors: behavior::BehaviorSetTransaction::default()
             }
         )
     }
@@ -1203,36 +1147,11 @@ mod tests {
         let mut u = Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
 
-        // a UniverseBehavior to test inserting it
-        #[derive(Clone, Debug, PartialEq)]
-        struct UTestBehavior {}
-        impl behavior::Behavior<Universe> for UTestBehavior {
-            fn step(
-                &self,
-                _: &behavior::Context<'_, Universe>,
-            ) -> (UniverseTransaction, behavior::Then) {
-                unimplemented!()
-            }
-            fn persistence(&self) -> Option<behavior::Persistence> {
-                None
-            }
-        }
-        impl universe::VisitHandles for UTestBehavior {
-            // No handles.
-            fn visit_handles(&self, _visitor: &mut dyn universe::HandleVisitor) {}
-        }
-
         // Transaction has all of:
         // * a member-modifying part
         let mut transaction = SpaceTransaction::set_cube([0, 0, 0], None, Some(block)).bind(space);
         // * an anonymous insertion part
         transaction.insert_anonymous(BlockDef::new(u.read_ticket(), AIR));
-        // * a behavior set part
-        transaction
-            .merge_from(UniverseTransaction::behaviors(
-                behavior::BehaviorSetTransaction::insert((), Arc::new(UTestBehavior {})),
-            ))
-            .unwrap();
 
         println!("{transaction:#?}");
         pretty_assertions::assert_str_eq!(
@@ -1269,12 +1188,6 @@ mod tests {
                         ..
                     },
                 ),
-                behaviors: BehaviorSetTransaction {
-                    replace: {},
-                    insert: [
-                        UTestBehavior @ (),
-                    ],
-                },
             }
             "#}
             .to_string()

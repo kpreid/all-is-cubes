@@ -12,7 +12,6 @@ use bevy_ecs::prelude as ecs;
 use bevy_ecs::world::FromWorld as _;
 use manyfmt::Fmt;
 
-use crate::behavior::{self, BehaviorSetStepInfo};
 use crate::block::{self, BlockDefStepInfo};
 use crate::character::{self, Character, CharacterStepInfo};
 use crate::save::WhenceUniverse;
@@ -82,7 +81,6 @@ mod tests;
 /// A [`Universe`] consists of:
 ///
 /// * _members_ of [various types], which may be identified using [`Name`]s or [`Handle`]s.
-/// * [`Behavior`](behavior::Behavior)s that modify the [`Universe`] itself.
 /// * A [`time::Clock`] defining how time is considered to pass in it.
 /// * A [`WhenceUniverse`] defining where its data is persisted, if anywhere.
 /// * A [`UniverseId`] unique within this process.
@@ -116,8 +114,6 @@ pub struct Universe {
     ///
     /// For universes created by [`Universe::new()`], this is equal to `Arc::new(())`.
     pub whence: Arc<dyn WhenceUniverse>,
-
-    behaviors: behavior::BehaviorSet<Universe>,
 
     /// Number of [`step()`]s which have occurred since this [`Universe`] was created.
     ///
@@ -202,7 +198,6 @@ impl Universe {
                 next_anonym: 0,
                 wants_gc: false,
                 whence: Arc::new(()),
-                behaviors: behavior::BehaviorSet::new(),
                 session_step_time: 0,
                 spaces_with_work: 0,
                 #[cfg(feature = "rerun")]
@@ -271,7 +266,6 @@ impl Universe {
     ///
     /// * `deadline` is when to stop computing flexible things such as light transport.
     pub fn step(&mut self, paused: bool, deadline: time::Deadline) -> UniverseStepInfo {
-        let mut info = UniverseStepInfo::default();
         let start_time = time::Instant::now();
 
         self.world.run_schedule(time::schedule::BeforeStepReset);
@@ -298,21 +292,6 @@ impl Universe {
         // latest updates.
         self.sync_block_defs();
 
-        // Run behaviors attached to the universe itself.
-        let (behavior_txn, behavior_info) = self.behaviors.step(
-            self.read_ticket(),
-            self,
-            &core::convert::identity,
-            &UniverseTransaction::behaviors,
-            tick,
-        );
-        info.behaviors += behavior_info;
-        if let Err(e) = behavior_txn.execute(self, (), &mut transaction::no_outputs) {
-            // TODO: Need to report these failures back to the source
-            // ... and perhaps in the UniverseStepInfo
-            log::info!("Transaction failure: {e}");
-        }
-
         self.sync_space_blocks();
 
         // Bundle all our relevant state so we can pass it to systems.
@@ -329,7 +308,7 @@ impl Universe {
             budget_per_space: deadline
                 .remaining_since(start_time)
                 .map(|dur| dur / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1)),
-            info,
+            info: UniverseStepInfo::default(),
             transactions: Vec::new(),
             spaces_with_work: 0,
         };
@@ -764,7 +743,6 @@ impl fmt::Debug for Universe {
             next_anonym: _,
             wants_gc: _,
             whence,
-            behaviors,
             session_step_time,
             spaces_with_work,
             #[cfg(feature = "rerun")]
@@ -782,7 +760,6 @@ impl fmt::Debug for Universe {
             ds.field("whence", &whence);
         }
         ds.field("clock", &self.clock());
-        ds.field("behaviors", &behaviors);
         ds.field("session_step_time", &session_step_time);
         ds.field("spaces_with_work", &spaces_with_work);
 
@@ -821,10 +798,6 @@ impl fmt::Debug for Universe {
 
         ds.finish_non_exhaustive()
     }
-}
-
-impl behavior::Host for Universe {
-    type Attachment = (); // TODO: store a `BTreeSet<Name>` or something to define a scope
 }
 
 impl Default for Universe {
@@ -950,7 +923,6 @@ pub struct UniverseStepInfo {
     pub(crate) block_def_step: BlockDefStepInfo,
     pub(crate) character_step: CharacterStepInfo,
     pub(crate) space_step: SpaceStepInfo,
-    pub(crate) behaviors: BehaviorSetStepInfo,
 }
 impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
     fn add_assign(&mut self, other: Self) {
@@ -960,7 +932,6 @@ impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
         self.block_def_step += other.block_def_step;
         self.character_step += other.character_step;
         self.space_step += other.space_step;
-        self.behaviors += other.behaviors;
     }
 }
 impl Fmt<StatusText> for UniverseStepInfo {
@@ -972,7 +943,6 @@ impl Fmt<StatusText> for UniverseStepInfo {
             block_def_step,
             character_step,
             space_step,
-            behaviors,
         } = self;
         writeln!(
             fmt,
@@ -988,7 +958,6 @@ impl Fmt<StatusText> for UniverseStepInfo {
         if fopt.show.contains(ShowStatus::SPACE) {
             writeln!(fmt, "{}", space_step.refmt(fopt))?;
         }
-        write!(fmt, "Universe behaviors: {}", behaviors.refmt(fopt))?;
         Ok(())
     }
 }
