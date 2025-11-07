@@ -2,11 +2,9 @@
 
 use alloc::boxed::Box;
 use core::fmt;
-use core::mem;
 use core::ops;
 
 use bevy_ecs::prelude as ecs;
-use euclid::{Angle, Rotation3D, Vector3D};
 use hashbrown::HashSet as HbHashSet;
 use manyfmt::Fmt;
 use ordered_float::NotNan;
@@ -19,15 +17,13 @@ use num_traits::float::Float as _;
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
 use crate::listen;
-use crate::math::{Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, notnan};
+use crate::math::{Aab, Face6, Face7, FreePoint, FreeVector};
 use crate::physics;
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
-#[cfg(feature = "rerun")]
 use crate::rerun_glue as rg;
 #[cfg(feature = "save")]
 use crate::save::schema;
-use crate::space::{CubeTransaction, Space};
-use crate::time::Tick;
+use crate::space::Space;
 use crate::transaction::{self, Equal, Merge, Transaction, Transactional};
 use crate::universe::{
     self, Handle, HandleError, HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles,
@@ -47,15 +43,13 @@ pub(crate) use eye::add_eye_systems;
 mod spawn;
 pub use spawn::*;
 
+mod main_systems;
+pub(crate) use main_systems::add_main_systems;
+
 #[cfg(test)]
 mod tests;
 
 // -------------------------------------------------------------------------------------------------
-
-// Control characteristics.
-const WALKING_SPEED: FreeCoordinate = 4.0;
-const FLYING_SPEED: FreeCoordinate = 10.0;
-const JUMP_SPEED: FreeCoordinate = 8.0;
 
 /// A `Character`:
 ///
@@ -82,8 +76,7 @@ pub struct Character {
 /// Every piece of data in a [`Character`] that is not (yet) split into its own separate
 /// ECS component. TODO(ecs): get rid of this?
 #[derive(Debug, ecs::Component)]
-#[require(eye::CharacterEye, PhysicsOutputs, Input)]
-#[cfg_attr(feature = "rerun", require(rg::Destination))]
+#[require(eye::CharacterEye, PhysicsOutputs, Input, rg::Destination)]
 pub(crate) struct CharacterCore {
     /// Indices into the [`Inventory`] slots of this character, which identify the tools currently
     /// in use / “in hand”.
@@ -297,146 +290,6 @@ impl Character {
             s[which_selection] = slot;
             self.core.notifier.notify(&CharacterChange::Selections);
         }
-    }
-
-    // TODO(ecs): replace all of this with systems
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn step(
-        core: &mut CharacterCore,
-        body: &mut Body,
-        ParentSpace(space_handle): &mut ParentSpace,
-        input: &mut Input,
-        InventoryComponent(inventory): &mut InventoryComponent,
-        output: &mut PhysicsOutputs,
-        #[cfg(feature = "rerun")] rerun_destination: &rg::Destination,
-        read_ticket: ReadTicket<'_>,
-        self_handle: Option<&Handle<Character>>,
-        tick: Tick,
-    ) -> (UniverseTransaction, CharacterStepInfo, Option<BodyStepInfo>) {
-        let mut result_transaction = UniverseTransaction::default();
-        if tick.paused() {
-            return (result_transaction, CharacterStepInfo::default(), None);
-        }
-
-        let mut any_slots_changed = false;
-        for (i, new_selection) in mem::take(&mut input.set_selected_slots).into_iter().enumerate() {
-            if let Some(new_selection) = new_selection
-                && new_selection != core.selected_slots[i]
-            {
-                core.selected_slots[i] = new_selection;
-                any_slots_changed = true;
-            }
-        }
-        if any_slots_changed {
-            core.notifier.notify(&CharacterChange::Selections);
-        }
-
-        if mem::take(&mut input.jump) && is_on_ground(body, output) {
-            body.add_velocity(Vector3D::new(0., JUMP_SPEED, 0.));
-        }
-
-        // Override flying state using state of jetpack from inventory.
-        // TODO: Eliminate body.flying flag entirely, in favor of an external context?
-        // (The idea being that Body should have no more things in it than are necessary
-        // for, say, a single particle in a particle system.)
-        let flying = find_jetpacks(inventory).any(|(_slot_index, active)| active);
-        body.flying = flying;
-
-        let dt = tick.delta_t().as_secs_f64();
-        // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
-        let control_orientation = Rotation3D::around_y(-Angle::radians(body.yaw.to_radians()));
-        let initial_body_velocity = body.velocity();
-
-        let speed = if flying { FLYING_SPEED } else { WALKING_SPEED };
-        let mut velocity_target =
-            control_orientation.transform_vector3d(input.velocity_input * speed);
-        if !flying {
-            velocity_target.y = 0.0;
-        }
-        // TODO should have an on-ground condition...
-        let stiffness = if flying {
-            Vector3D::new(10.8, 10.8, 10.8)
-        } else {
-            Vector3D::new(10.8, 0., 10.8)
-        }; // TODO constants/tables...
-
-        let control_delta_v = ((velocity_target - initial_body_velocity).component_mul(stiffness)
-            * dt)
-            .map(|c| NotNan::new(c).unwrap_or(notnan!(0.0)));
-
-        output.last_step_info = if let Ok(space) = space_handle.read(read_ticket) {
-            let colliding_cubes = &mut output.colliding_cubes;
-            colliding_cubes.clear();
-            let info = body.step_with_rerun(
-                tick,
-                control_delta_v,
-                Some(space),
-                |cube| {
-                    colliding_cubes.insert(cube);
-                },
-                #[cfg(feature = "rerun")]
-                rerun_destination,
-            );
-
-            // TODO(ecs): report push_out in a way that `CharacterEye` can receive it
-            // if let Some(push_out_displacement) = info.push_out {
-            //     // Smooth out camera effect of push-outs
-            //     eye.eye_displacement_pos -= push_out_displacement;
-            // }
-
-            if let Some(fluff_txn) = info.impact_fluff().and_then(|fluff| {
-                Some(CubeTransaction::fluff(fluff).at(Cube::containing(body.position())?))
-            }) {
-                result_transaction.merge_from(fluff_txn.bind(space_handle.clone())).unwrap(); // cannot fail
-            }
-
-            Some(info)
-        } else {
-            // TODO: set a warning flag
-            None
-        };
-
-        // Automatic flying controls
-        // TODO: lazy clone
-        {
-            let mut inventory_transaction = None;
-            if input.velocity_input.y > 0. {
-                if let Some((slot_index, false)) = find_jetpacks(inventory).next()
-                    && let Ok((it, ut)) =
-                        inventory.use_tool_it(read_ticket, None, self_handle.cloned(), slot_index)
-                {
-                    debug_assert!(ut.is_empty());
-                    inventory_transaction = Some(it);
-                }
-            } else if is_on_ground(body, output) {
-                for (slot_index, active) in find_jetpacks(inventory) {
-                    if active
-                        && let Ok((it, ut)) = inventory.use_tool_it(
-                            read_ticket,
-                            None,
-                            self_handle.cloned(),
-                            slot_index,
-                        )
-                    {
-                        debug_assert!(ut.is_empty());
-                        inventory_transaction = Some(it);
-                        break;
-                    }
-                }
-            }
-            if let Some(it) = inventory_transaction {
-                it.execute(inventory, (), &mut |change| {
-                    core.notifier.notify(&CharacterChange::Inventory(change))
-                })
-                .unwrap();
-            }
-        }
-
-        (
-            result_transaction,
-            CharacterStepInfo { count: 1 },
-            output.last_step_info,
-        )
     }
 
     /// Use this character's selected tool on the given cursor.
@@ -964,16 +817,6 @@ pub enum CharacterChange {
     Inventory(inv::InventoryChange),
     /// Which inventory slots are selected.
     Selections,
-}
-
-fn find_jetpacks(inventory: &Inventory) -> impl Iterator<Item = (inv::Ix, bool)> + '_ {
-    inventory.slots.iter().zip(0..).filter_map(|(slot, index)| {
-        if let Slot::Stack(_, Tool::Jetpack { active }) = *slot {
-            Some((index, active))
-        } else {
-            None
-        }
-    })
 }
 
 fn is_on_ground(body: &Body, po: &PhysicsOutputs) -> bool {

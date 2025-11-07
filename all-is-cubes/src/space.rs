@@ -730,6 +730,10 @@ impl Space {
         &self.fluff_notifier
     }
 
+    pub(crate) fn fluff_notifier(&self) -> &Notifier<SpaceFluff> {
+        &self.fluff_notifier
+    }
+
     /// Returns the current [`SpacePhysics`] data, which determines global characteristics
     /// such as the behavior of light and gravity.
     pub fn physics(&self) -> &SpacePhysics {

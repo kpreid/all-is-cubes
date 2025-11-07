@@ -112,6 +112,11 @@ enum State {
     Gone { reason: GoneReason },
 }
 
+/// System parameter which allows reading a specific type of universe member.
+/// Used with [`Handle::read_from_query()`].
+pub(crate) type HandleReadQuery<'w, 's, T> =
+    ecs::Query<'w, 's, (&'static Membership, <T as SealedMember>::ReadQueryData)>;
+
 // -------------------------------------------------------------------------------------------------
 
 impl<T: 'static> Handle<T> {
@@ -267,6 +272,31 @@ impl<T: 'static> Handle<T> {
         }
     }
 
+    /// Obtains the [`ecs::Entity`] for this handle, without checking a universe ID up front.
+    ///
+    /// Returns an error if the handle does not correspond to an entity.
+    fn as_entity_in_some_universe(&self) -> Result<ecs::Entity, HandleError> {
+        match &*self.inner.state.lock().expect("Handle::state lock error") {
+            &State::Member { entity, .. } => Ok(entity),
+
+            // Ignore universe mismatch so that Handle::new_gone() takes this branch.
+            &State::Gone { reason } => Err(HandleError::Gone {
+                name: self.name(),
+                reason,
+            }),
+            #[cfg(feature = "save")]
+            State::Deserializing { .. } => Err(HandleError::NotReady(self.name())),
+            // TODO: WrongUniverse *really* isn't the clearest error for this.
+            // It should have a dedicated error
+            State::Pending => Err(HandleError::WrongUniverse {
+                ticket_universe_id: None,
+                handle_universe_id: self.universe_id(),
+                name: self.name(),
+                ticket_origin: Location::caller(),
+            }),
+        }
+    }
+
     /// Returns the unique ID of the universe this handle belongs to.
     ///
     /// Returns [`None`] if this [`Handle`] is not yet associated with a universe, or if
@@ -345,6 +375,38 @@ impl<T: 'static> Handle<T> {
                 .read_entity_as_universe_member::<T>(entity)
                 .map_err(|e| e.into_handle_error(self))?,
         })
+    }
+
+    /// As [`Handle::read()`] but reads the data from an [`ecs::Query`] instead of a [`ReadTicket`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// * The [`Handle`] is defunct.
+    /// * Components are missing from the entity in the world queried.
+    #[inline(never)]
+    #[track_caller]
+    pub(crate) fn read_from_query<'w>(
+        &self,
+        query: &'w HandleReadQuery<'w, 'w, T>,
+    ) -> Result<T::Read<'w>, HandleError>
+    where
+        T: UniverseMember,
+    {
+        let (membership, data) = query
+            .get(self.as_entity_in_some_universe()?)
+            .map_err(|error| panic!("TODO(ecs): precisely report query error {error:?}"))?;
+        if membership.handle == *self {
+            Ok(T::read_from_query(data))
+        } else {
+            Err(HandleError::WrongUniverse {
+                ticket_universe_id: self.universe_id(),
+                handle_universe_id: membership.handle.universe_id(),
+                name: self.name(),
+                ticket_origin: Location::caller(),
+            })
+        }
     }
 
     /// Like [`Self::read()`], but allows selecting an arbitrary component.

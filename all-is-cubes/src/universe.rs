@@ -12,14 +12,14 @@ use bevy_ecs::prelude as ecs;
 use bevy_ecs::world::FromWorld as _;
 use manyfmt::Fmt;
 
-use crate::behavior::BehaviorSetStepInfo;
+use crate::behavior::{self, BehaviorSetStepInfo};
 use crate::block::{self, BlockDefStepInfo};
 use crate::character::{self, Character, CharacterStepInfo};
 use crate::save::WhenceUniverse;
 use crate::space::{self, Space, SpaceStepInfo};
+use crate::time;
 use crate::transaction::{self, ExecuteError, Transaction, Transactional};
 use crate::util::{ConciseDebug, Refmt as _, ShowStatus, StatusText};
-use crate::{behavior, physics, time};
 
 #[cfg(feature = "rerun")]
 use crate::rerun_glue as rg;
@@ -37,10 +37,10 @@ pub(crate) use members::*;
 pub use members::{AnyHandle, UniverseMember};
 
 mod ecs_details;
-use ecs_details::{Membership, NameMap, QueryStateBundle};
+use ecs_details::{NameMap, QueryStateBundle};
 // TODO(ecs): try to eliminate uses of get_one_mut_and_ticket in favor of normal queries
 pub use ecs_details::PubliclyMutableComponent;
-pub(crate) use ecs_details::get_one_mut_and_ticket;
+pub(crate) use ecs_details::{Membership, get_one_mut_and_ticket};
 
 mod gc;
 
@@ -179,6 +179,7 @@ impl Universe {
 
             // Add systems.
             gc::add_gc(&mut world);
+            character::add_main_systems(&mut world);
             character::add_eye_systems(&mut world);
 
             // Finally, insist on no ambiguous scheduling.
@@ -381,71 +382,6 @@ impl Universe {
             }
         }
         self.sync_space_blocks();
-
-        #[cfg(feature = "rerun")]
-        type MaybeDestination<'a> = &'a rg::Destination;
-        #[cfg(not(feature = "rerun"))]
-        type MaybeDestination<'a> = ();
-
-        // TODO(ecs): pre-register this system after getting rid of the inputs
-        self.world
-            .run_system_cached_with(
-                |mut si: ecs::InMut<'_, StepInput>,
-                 current_tick: ecs::Res<'_, time::CurrentTick>,
-                 data_sources: QueryBlockDataSources<'_, '_>,
-                 characters: ecs::Query<
-                    '_,
-                    '_,
-                    (
-                        &Membership,
-                        &mut character::CharacterCore,
-                        &mut physics::Body,
-                        &mut character::ParentSpace,
-                        &mut character::Input,
-                        &mut character::InventoryComponent,
-                        &mut character::PhysicsOutputs,
-                        MaybeDestination<'_>,
-                    ),
-                >| {
-                    #[expect(clippy::shadow_unrelated, reason = "mid-refactoring")]
-                    let tick = current_tick.get().unwrap();
-                    // TODO(ecs): convert this to normal systems and also run in parallel
-                    for (
-                        membership,
-                        core,
-                        body,
-                        space_handle,
-                        input,
-                        inventory,
-                        output,
-                        rerun_destination,
-                    ) in characters
-                    {
-                        #[cfg(not(feature = "rerun"))]
-                        let () = rerun_destination;
-
-                        let (transaction, character_info, _body_info) = Character::step(
-                            core.into_inner(),
-                            body.into_inner(),
-                            space_handle.into_inner(),
-                            input.into_inner(),
-                            inventory.into_inner(),
-                            output.into_inner(),
-                            #[cfg(feature = "rerun")]
-                            rerun_destination,
-                            // TODO(ecs): using QueryBlockDataSources as an approximation of what is actually needed here
-                            ReadTicket::from_block_data_sources(&data_sources),
-                            membership.handle.downcast_ref(),
-                            tick,
-                        );
-                        si.transactions.push(transaction);
-                        si.info.character_step += character_info;
-                        si.info.total_members += 1;
-                    }
-                },
-                &mut si,
-            )
-            .unwrap();
 
         if !tick.paused() {
             self.world.run_schedule(time::schedule::Step);

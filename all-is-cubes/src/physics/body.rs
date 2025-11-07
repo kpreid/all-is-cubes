@@ -209,7 +209,6 @@ impl Body {
             Vector3D::zero(),
             colliding_space,
             collision_callback,
-            #[cfg(feature = "rerun")]
             &Default::default(),
         )
     }
@@ -230,11 +229,14 @@ impl Body {
         external_delta_v: Vector3D<NotNan<FreeCoordinate>, Velocity>,
         mut colliding_space: Option<&Space>,
         mut collision_callback: CC,
-        #[cfg(feature = "rerun")] rerun_destination: &crate::rerun_glue::Destination,
+        rerun_destination: &crate::rerun_glue::Destination,
     ) -> BodyStepInfo
     where
         CC: FnMut(Contact),
     {
+        #[cfg(not(feature = "rerun"))]
+        let _ = rerun_destination;
+
         let velocity_before_gravity_and_collision = self.velocity;
         let dt = NotNan::new(tick.delta_t().as_secs_f64()).unwrap();
         let mut move_segments = [MoveSegment::default(); 3];

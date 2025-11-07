@@ -66,12 +66,21 @@ struct PreviousBodyVelocity(Vector3D<FreeCoordinate, Velocity>);
 /// Install [`CharacterEye`] support in the world.
 pub(crate) fn add_eye_systems(world: &mut ecs::World) {
     let mut schedules = world.resource_mut::<ecs::Schedules>();
-    schedules.add_systems(time::schedule::BeforeStep, record_previous_velocity);
+    schedules.add_systems(
+        time::schedule::BeforeStep,
+        record_previous_velocity.before(super::main_systems::early_character_input_system),
+    );
     schedules.add_systems(
         time::schedule::Step,
-        // This ordering relation doesn’t matter semantically but we have to pick one.
+        // This chain relation doesn’t matter semantically but we have to pick one.
         // TODO(ecs): Consider splitting into more components so we can let them be independent.
-        (step_eye_position.before(step_exposure), step_exposure),
+        (
+            step_eye_position
+                .after(super::main_systems::character_physics_step_system)
+                .before(step_exposure),
+            step_exposure,
+        )
+            .chain(),
     );
     schedules.add_systems(time::schedule::AfterStep, update_eye_view_transform);
 }

@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 
 use bevy_ecs::prelude as ecs;
 
-use crate::universe::{AnyHandle, Name, ReadTicket, UniverseId};
+use crate::universe::{AnyHandle, Handle, Name, ReadTicket, UniverseId, UniverseMember};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -13,13 +13,14 @@ pub(in crate::universe) struct NameMap {
 }
 
 /// Component attached to all entities that are universe members.
-/// All such entities are also automatically indexed in the [`NameMap`] resource.
+//
+// All such entities are also automatically indexed in the [`NameMap`] resource.
 #[derive(Clone, ecs::Component)]
 #[component(on_add = add_membership_hook)]
 #[component(on_remove = remove_membership_hook)]
 #[component(immutable)]
 #[require(super::gc::GcState)]
-pub(in crate::universe) struct Membership {
+pub(crate) struct Membership {
     /// The name of this entity.
     /// The reverse relationship is kept in [`NameMap`].
     pub(in crate::universe) name: Name,
@@ -44,6 +45,15 @@ fn remove_membership_hook(
 ) {
     let name: Name = world.get::<Membership>(context.entity).unwrap().name.clone();
     world.resource_mut::<NameMap>().map.remove(&name);
+}
+
+impl Membership {
+    /// Returns this member’s handle.
+    ///
+    /// Panics if `T` is not the correct handle type.
+    pub fn handle<T: UniverseMember>(&self) -> Handle<T> {
+        self.handle.clone().downcast().unwrap()
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
