@@ -1,7 +1,11 @@
+#![allow(elided_lifetimes_in_paths, reason = "Bevy systems")]
+
 use alloc::collections::BTreeMap;
+use core::ops;
 
 use bevy_ecs::prelude as ecs;
 
+use crate::time;
 use crate::universe::{AnyHandle, Handle, Name, ReadTicket, UniverseId, UniverseMember};
 
 // -------------------------------------------------------------------------------------------------
@@ -65,6 +69,45 @@ impl Membership {
 /// `O` is the `UniverseMember` type of the entity the component is on.
 #[doc(hidden)] // not sure if good public API yet
 pub trait PubliclyMutableComponent<O> {}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Resource used for gathering and summing `Info` structs (counters, timings, averages)
+/// during universe stepping.
+///
+/// This is generic so that separate systems can have their own info collectors to
+/// write to without conflicts.
+#[derive(Clone, Copy, Debug, ecs::Resource)]
+pub(crate) struct InfoCollector<T> {
+    value: Option<T>,
+}
+
+impl<T: Default + ops::AddAssign + Send + Sync + 'static> InfoCollector<T> {
+    /// Add the resource and necessary systems.
+    pub(crate) fn register(world: &mut ecs::World) {
+        world.insert_resource(Self { value: None });
+        let mut schedules = world.resource_mut::<ecs::Schedules>();
+        schedules.add_systems(
+            time::schedule::BeforeStepReset,
+            |mut collector: ecs::ResMut<Self>| {
+                collector.value = Some(T::default());
+            },
+        );
+    }
+
+    pub fn record(&mut self, addition: T) {
+        *self
+            .value
+            .as_mut()
+            .expect("cannot call InfoCollector::record() while not in a step") += addition;
+    }
+
+    pub fn finish_collection(&mut self) -> T {
+        self.value
+            .take()
+            .expect("cannot call InfoCollector::take() while not in a step")
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 

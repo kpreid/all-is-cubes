@@ -10,8 +10,8 @@ use bevy_ecs::prelude as ecs;
 use euclid::Vector3D;
 
 use crate::character::{
-    CharacterChange, CharacterCore, Input, InventoryComponent, ParentSpace, PhysicsOutputs,
-    is_on_ground,
+    CharacterChange, CharacterCore, CharacterStepInfo, Input, InventoryComponent, ParentSpace,
+    PhysicsOutputs, is_on_ground,
 };
 use crate::inv;
 use crate::math::{Cube, FreeCoordinate, NotNan, notnan};
@@ -79,6 +79,7 @@ pub(super) fn early_character_input_system(
 /// TODO(ecs): Disentangle characters from body physics.
 pub(super) fn character_physics_step_system(
     tick: ecs::Res<time::CurrentTick>,
+    mut info_collector: ecs::ResMut<universe::InfoCollector<CharacterStepInfo>>,
     characters: ecs::Query<(
         &universe::Membership,
         &ParentSpace,
@@ -94,6 +95,8 @@ pub(super) fn character_physics_step_system(
     let tick = tick.get()?;
     debug_assert!(!tick.paused());
     let dt = tick.delta_t().as_secs_f64();
+
+    let mut info = CharacterStepInfo::default();
 
     for (
         membership,
@@ -134,7 +137,7 @@ pub(super) fn character_physics_step_system(
         physics_output.last_step_info = if let Ok(space) = space_handle.read_from_query(&spaces) {
             let colliding_cubes = &mut physics_output.colliding_cubes;
             colliding_cubes.clear();
-            let info = body.step_with_rerun(
+            let body_info = body.step_with_rerun(
                 tick,
                 control_delta_v,
                 Some(space),
@@ -150,7 +153,7 @@ pub(super) fn character_physics_step_system(
             //     eye.eye_displacement_pos -= push_out_displacement;
             // }
 
-            if let Some(fluff) = info.impact_fluff().and_then(|fluff| {
+            if let Some(fluff) = body_info.impact_fluff().and_then(|fluff| {
                 Some(space::SpaceFluff {
                     fluff,
                     position: Cube::containing(body.position())?,
@@ -159,7 +162,7 @@ pub(super) fn character_physics_step_system(
                 space.fluff_notifier().notify(&fluff)
             }
 
-            Some(info)
+            Some(body_info)
         } else {
             if cfg!(debug_assertions) {
                 panic!("failed to read space handle for physics");
@@ -206,7 +209,11 @@ pub(super) fn character_physics_step_system(
                 .unwrap();
             }
         }
+
+        info += CharacterStepInfo { count: 1 };
     }
+
+    info_collector.record(info);
 
     Ok(())
 }

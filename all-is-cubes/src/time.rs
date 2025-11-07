@@ -287,6 +287,13 @@ impl CurrentTick {
 pub(crate) mod schedule {
     use bevy_ecs::schedule::ScheduleLabel;
 
+    /// Schedule label for systems executed before any of the actual simulation logic.
+    ///
+    /// This is intended for use strictly by [`Universe`] internal bookkeeping.
+    // TODO: So move it to the universe module...?
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ScheduleLabel)]
+    pub(crate) struct BeforeStepReset;
+
     /// Schedule label for systems executed immediately before [`Step`].
     ///
     /// Use this schedule to collect information about the current state
@@ -303,6 +310,13 @@ pub(crate) mod schedule {
     /// Executed immediately after [`Step`].
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ScheduleLabel)]
     pub struct AfterStep;
+
+    // TODO(ecs): not used yet
+    // /// Schedule label for systems executed after all of the actual simulation logic.
+    // ///
+    // /// This is intended for use strictly by [`Universe`] internal bookkeeping.
+    // #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ScheduleLabel)]
+    // pub(crate) struct AfterStepReset;
 }
 
 // -------------------------------------------------------------------------------------------------

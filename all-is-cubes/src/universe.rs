@@ -40,7 +40,7 @@ mod ecs_details;
 use ecs_details::{NameMap, QueryStateBundle};
 // TODO(ecs): try to eliminate uses of get_one_mut_and_ticket in favor of normal queries
 pub use ecs_details::PubliclyMutableComponent;
-pub(crate) use ecs_details::{Membership, get_one_mut_and_ticket};
+pub(crate) use ecs_details::{InfoCollector, Membership, get_one_mut_and_ticket};
 
 mod gc;
 
@@ -161,7 +161,15 @@ impl Universe {
 
         // Configure the World state.
         {
-            world.init_resource::<ecs::Schedules>();
+            // Configure schedules.
+            {
+                let mut schedules = world.get_resource_or_init::<ecs::Schedules>();
+                // Insist on no ambiguous scheduling.
+                schedules.configure_schedules(bevy_ecs::schedule::ScheduleBuildSettings {
+                    ambiguity_detection: bevy_ecs::schedule::LogLevel::Error,
+                    ..Default::default()
+                });
+            }
 
             // Register various components and resources which are *not* visible state of the
             // universe, but have data derived from others or are used temporarily.
@@ -169,6 +177,7 @@ impl Universe {
             world.init_resource::<time::CurrentTick>();
             world.register_component::<Membership>();
             Self::register_all_member_components(&mut world);
+            InfoCollector::<CharacterStepInfo>::register(&mut world);
 
             // Register things that are user-visible state of the universe.
             // When new such resources are added, also mention them in the documentation when
@@ -181,14 +190,6 @@ impl Universe {
             gc::add_gc(&mut world);
             character::add_main_systems(&mut world);
             character::add_eye_systems(&mut world);
-
-            // Finally, insist on no ambiguous scheduling.
-            world.resource_mut::<ecs::Schedules>().configure_schedules(
-                bevy_ecs::schedule::ScheduleBuildSettings {
-                    ambiguity_detection: bevy_ecs::schedule::LogLevel::Error,
-                    ..Default::default()
-                },
-            );
         }
 
         Box::write(
@@ -272,6 +273,8 @@ impl Universe {
     pub fn step(&mut self, paused: bool, deadline: time::Deadline) -> UniverseStepInfo {
         let mut info = UniverseStepInfo::default();
         let start_time = time::Instant::now();
+
+        self.world.run_schedule(time::schedule::BeforeStepReset);
 
         let tick = self.world.resource_mut::<time::Clock>().advance(paused);
         self.world.resource_mut::<time::CurrentTick>().0 = Some(tick);
@@ -405,8 +408,15 @@ impl Universe {
 
         self.world.run_schedule(time::schedule::AfterStep);
 
-        // Post-step cleanup
+        // Gather info
+        si.info.character_step += self
+            .world
+            .resource_mut::<InfoCollector<CharacterStepInfo>>()
+            .finish_collection();
+
+        // Post-step state cleanup
         self.world.resource_mut::<time::CurrentTick>().0 = None;
+        //self.world.run_schedule(time::schedule::AfterStepReset); // TODO(ecs): move things into this
 
         si.info.computation_time = time::Instant::now().saturating_duration_since(start_time);
         si.info
