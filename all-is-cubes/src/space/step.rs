@@ -2,15 +2,20 @@
 //!
 //! TODO(ecs): Figure out if this module makes sense after we finish the ECS migration.
 
-#![allow(clippy::needless_pass_by_value)]
+#![allow(
+    elided_lifetimes_in_paths,
+    clippy::needless_pass_by_value,
+    reason = "Bevy systems"
+)]
 
 use alloc::vec::Vec;
 
 use bevy_ecs::prelude as ecs;
+use bevy_platform::time::Instant;
 use hashbrown::HashMap;
 
 use crate::block;
-use crate::space::{BlockIndex, Space};
+use crate::space::{BlockIndex, LightUpdatesInfo, Space};
 use crate::universe::{self, Handle, ReadTicket, UniverseId};
 
 // -------------------------------------------------------------------------------------------------
@@ -61,6 +66,31 @@ pub(crate) fn execute_tick_actions_system(
         ticked_cube_count += space.execute_tick_actions(everything_but, tick);
     }
     Ok(ticked_cube_count)
+}
+
+pub(crate) fn update_light_system(
+    current_step: ecs::Res<'_, universe::CurrentStep>,
+    info_collector: ecs::ResMut<universe::InfoCollector<LightUpdatesInfo>>,
+    mut spaces_query: ecs::Query<&mut Space>,
+) -> ecs::Result {
+    let step_input = current_step.get()?;
+
+    // for access from par_iter
+    let info_collector = bevy_platform::sync::Mutex::new(info_collector);
+
+    spaces_query.par_iter_mut().for_each(|mut space: ecs::Mut<Space>| {
+        let (light_storage, uc, mut change_buffer) = space.borrow_light_update_context();
+        let info = light_storage.update_lighting_from_queue(
+            uc,
+            &mut change_buffer,
+            // TODO: check whether we are actually running in parallel and give either subdivided or non-subdivided deadlines?
+            step_input.deadline_for_space().remaining_since(Instant::now()),
+        );
+
+        info_collector.lock().unwrap().record(info);
+    });
+
+    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------

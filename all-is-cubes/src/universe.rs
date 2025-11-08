@@ -176,6 +176,7 @@ impl Universe {
             InfoCollector::<BlockDefStepInfo>::register(&mut world);
             InfoCollector::<CharacterStepInfo>::register(&mut world);
             InfoCollector::<SpaceStepInfo>::register(&mut world);
+            InfoCollector::<space::LightUpdatesInfo>::register(&mut world);
 
             // Register things that are user-visible state of the universe.
             // When new such resources are added, also mention them in the documentation when
@@ -344,12 +345,8 @@ impl Universe {
                 )
                 .unwrap();
 
-                let (space_info, transaction) = space.step(
-                    everything_but,
-                    Some(&space_handle),
-                    tick,
-                    step_input.deadline_for_space(),
-                );
+                let (space_info, transaction) =
+                    space.step(everything_but, Some(&space_handle), tick);
 
                 si.transactions.push(transaction);
 
@@ -363,7 +360,9 @@ impl Universe {
                 total_members += 1;
             }
         }
-        self.sync_space_blocks();
+        self.sync_space_blocks(); // TODO: justify this happening here
+
+        self.world.run_system_cached(space::step::update_light_system).unwrap().unwrap();
 
         if !tick.paused() {
             self.world.run_schedule(time::schedule::Step);
@@ -405,10 +404,17 @@ impl Universe {
                 .world
                 .resource_mut::<InfoCollector<CharacterStepInfo>>()
                 .finish_collection(),
-            space_step: self
-                .world
-                .resource_mut::<InfoCollector<SpaceStepInfo>>()
-                .finish_collection(),
+            space_step: {
+                // TODO: this combination is an awkward kludge; we should probably stop putting
+                // SpaceStepInfo into InfoCollector and collect its parts separately.
+                let mut info =
+                    self.world.resource_mut::<InfoCollector<SpaceStepInfo>>().finish_collection();
+                info.light = self
+                    .world
+                    .resource_mut::<InfoCollector<space::LightUpdatesInfo>>()
+                    .finish_collection();
+                info
+            },
         }
     }
 

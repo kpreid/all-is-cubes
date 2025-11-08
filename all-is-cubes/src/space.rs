@@ -527,7 +527,6 @@ impl Space {
         read_ticket: ReadTicket<'_>,
         self_handle: Option<&Handle<Space>>,
         tick: time::Tick,
-        deadline: time::Deadline,
     ) -> (SpaceStepInfo, UniverseTransaction) {
         let start_space_behaviors = time::Instant::now();
 
@@ -547,15 +546,6 @@ impl Space {
 
         let space_behaviors_to_lighting = time::Instant::now();
 
-        let light = {
-            let (light_storage, uc, mut change_buffer) = self.borrow_light_update_context();
-            light_storage.update_lighting_from_queue(
-                uc,
-                &mut change_buffer,
-                deadline.remaining_since(space_behaviors_to_lighting),
-            )
-        };
-
         (
             SpaceStepInfo {
                 spaces: 1,
@@ -565,7 +555,7 @@ impl Space {
                 behaviors: behavior_step_info,
                 behaviors_time: space_behaviors_to_lighting
                     .saturating_duration_since(start_space_behaviors),
-                light,
+                light: LightUpdatesInfo::default(), // will be filled with nonzero separately -- TODO(ecs): clarify
             },
             transaction,
         )
