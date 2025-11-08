@@ -1,3 +1,9 @@
+#![allow(
+    elided_lifetimes_in_paths,
+    clippy::needless_pass_by_value,
+    reason = "Bevy systems"
+)]
+
 use alloc::sync::Arc;
 use core::{fmt, mem, ops};
 
@@ -470,10 +476,11 @@ pub(crate) enum BlockDefNextValue {
 /// evaluations into `BlockDefNextValue`.
 #[allow(clippy::needless_pass_by_value)]
 pub(crate) fn update_phase_1(
-    mut info: ecs::InMut<'_, BlockDefStepInfo>,
-    mut defs: ecs::Query<'_, '_, (&BlockDef, &mut BlockDefNextValue)>,
-    data_sources: universe::QueryBlockDataSources<'_, '_>,
+    mut info_collector: ecs::ResMut<universe::InfoCollector<BlockDefStepInfo>>,
+    mut defs: ecs::Query<(&BlockDef, &mut BlockDefNextValue)>,
+    data_sources: universe::QueryBlockDataSources,
 ) {
+    let mut info = BlockDefStepInfo::default();
     // TODO(ecs): parallel iter
     for (def, mut next) in defs.iter_mut() {
         debug_assert!(
@@ -521,6 +528,7 @@ pub(crate) fn update_phase_1(
             info.was_in_use += 1;
         }
     }
+    info_collector.record(info);
 }
 
 /// ECS system function that moves new evaluations from `BlockDefNextValue` to `BlockDef`.

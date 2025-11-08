@@ -173,7 +173,9 @@ impl Universe {
             world.init_resource::<time::CurrentTick>();
             world.register_component::<Membership>();
             Self::register_all_member_components(&mut world);
+            InfoCollector::<BlockDefStepInfo>::register(&mut world);
             InfoCollector::<CharacterStepInfo>::register(&mut world);
+            InfoCollector::<SpaceStepInfo>::register(&mut world);
 
             // Register things that are user-visible state of the universe.
             // When new such resources are added, also mention them in the documentation when
@@ -284,6 +286,9 @@ impl Universe {
             self.session_step_time += 1;
         }
 
+        let mut active_members = 0; // TODO: use InfoCollector
+        let mut total_members = 0;
+
         // --- End of setup; now advance time for our contents. ---
 
         self.world.run_schedule(time::schedule::BeforeStep);
@@ -292,6 +297,7 @@ impl Universe {
         // latest updates.
         self.sync_block_defs();
 
+        // Update spaces’ block evaluations
         self.sync_space_blocks();
 
         // Bundle all our relevant state so we can pass it to systems.
@@ -299,7 +305,6 @@ impl Universe {
             deadline: time::Deadline,
             /// How to divide light calculation time among spaces, based on the previous step
             budget_per_space: Option<time::Duration>,
-            info: UniverseStepInfo,
             transactions: Vec<UniverseTransaction>,
             spaces_with_work: usize,
         }
@@ -308,7 +313,6 @@ impl Universe {
             budget_per_space: deadline
                 .remaining_since(start_time)
                 .map(|dur| dur / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1)),
-            info: UniverseStepInfo::default(),
             transactions: Vec::new(),
             spaces_with_work: 0,
         };
@@ -354,13 +358,13 @@ impl Universe {
                 si.transactions.push(transaction);
 
                 if space_info.light.queue_count > 0 {
-                    si.info.active_members += 1;
+                    active_members += 1;
                 }
                 if space_info.light.queue_count > 0 {
                     si.spaces_with_work += 1;
                 }
-                si.info.space_step += space_info;
-                si.info.total_members += 1;
+                self.world.resource_mut::<InfoCollector<SpaceStepInfo>>().record(space_info);
+                total_members += 1;
             }
         }
         self.sync_space_blocks();
@@ -387,18 +391,29 @@ impl Universe {
 
         self.world.run_schedule(time::schedule::AfterStep);
 
-        // Gather info
-        si.info.character_step += self
-            .world
-            .resource_mut::<InfoCollector<CharacterStepInfo>>()
-            .finish_collection();
-
         // Post-step state cleanup
         self.world.resource_mut::<time::CurrentTick>().0 = None;
         //self.world.run_schedule(time::schedule::AfterStepReset); // TODO(ecs): move things into this
 
-        si.info.computation_time = time::Instant::now().saturating_duration_since(start_time);
-        si.info
+        // Gather info
+        let computation_time = time::Instant::now().saturating_duration_since(start_time);
+        UniverseStepInfo {
+            computation_time,
+            active_members,
+            total_members,
+            block_def_step: self
+                .world
+                .resource_mut::<InfoCollector<BlockDefStepInfo>>()
+                .finish_collection(),
+            character_step: self
+                .world
+                .resource_mut::<InfoCollector<CharacterStepInfo>>()
+                .finish_collection(),
+            space_step: self
+                .world
+                .resource_mut::<InfoCollector<SpaceStepInfo>>()
+                .finish_collection(),
+        }
     }
 
     fn sync_space_blocks(&mut self) {
@@ -406,12 +421,10 @@ impl Universe {
         self.world.run_system_cached(space::step::update_palette_phase_2).unwrap();
     }
 
-    fn sync_block_defs(&mut self) -> BlockDefStepInfo {
-        let mut info = BlockDefStepInfo::default();
+    fn sync_block_defs(&mut self) {
         // TODO(ecs): register these systems
-        self.world.run_system_cached_with(block::update_phase_1, &mut info).unwrap();
+        self.world.run_system_cached(block::update_phase_1).unwrap();
         self.world.run_system_cached(block::update_phase_2).unwrap();
-        info
     }
 
     /// Returns the [`time::Clock`] that is used to advance time when [`step()`](Self::step)
