@@ -1,5 +1,6 @@
 #![allow(elided_lifetimes_in_paths, reason = "Bevy systems")]
 
+use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use core::ops;
 
@@ -69,6 +70,43 @@ impl Membership {
 /// `O` is the `UniverseMember` type of the entity the component is on.
 #[doc(hidden)] // not sure if good public API yet
 pub trait PubliclyMutableComponent<O> {}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Resource which contains information about the current [`Universe::step()`] being executed.
+//---
+#[derive(Default, ecs::Resource)]
+pub(crate) struct CurrentStep(pub Option<StepInput>);
+
+impl CurrentStep {
+    pub(crate) fn get(&self) -> Result<&StepInput, ecs::BevyError> {
+        self.0.as_ref().ok_or_else(|| {
+            ecs::BevyError::from(Box::<dyn core::error::Error + Send + Sync>::from(
+                "attempted to get current Tick when there is no step in progress",
+            ))
+        })
+    }
+}
+
+#[derive(Clone)]
+#[non_exhaustive]
+pub(crate) struct StepInput {
+    /// The current tick, which describes what span of time is passing.
+    pub tick: time::Tick,
+    /// Deadline for computing the entire step.
+    pub deadline: time::Deadline,
+    /// How to divide light calculation time among spaces, based on the previous step
+    pub(crate) budget_per_space: Option<time::Duration>,
+}
+
+impl StepInput {
+    pub(crate) fn deadline_for_space(&self) -> all_is_cubes_base::time::Deadline {
+        match self.budget_per_space {
+            Some(budget) => self.deadline.min(time::Deadline::At(time::Instant::now() + budget)),
+            None => self.deadline,
+        }
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 

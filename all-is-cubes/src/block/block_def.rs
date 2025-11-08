@@ -459,10 +459,28 @@ impl manyfmt::Fmt<crate::util::StatusText> for BlockDefStepInfo {
 
 // -------------------------------------------------------------------------------------------------
 
+// TODO(ecs): use this when we can in fact migrate things
+// #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, bevy_ecs::schedule::SystemSet)]
+// pub(crate) struct BlockDefUpdateSet;
+
+/// Install systems related to keeping [`BlockDef`]s updated.
+pub(crate) fn add_block_def_systems(world: &mut ecs::World) {
+    let schedules = world.resource_mut::<ecs::Schedules>();
+
+    // TODO(ecs): block def systems are not yet run using a schedule because they need to be
+    // ordered relative to Space systems, which are not yet run using a schedule
+    _ = schedules;
+
+    // schedules.add_systems(
+    //     time::schedule::Step,
+    //     (update_phase_1, update_phase_2).chain().in_set(BlockDefUpdateSet),
+    // );
+}
+
 /// When updating block definitions, this temporarily stores the value that should be written
 /// into the `BlockDef` component.
 ///
-#[derive(bevy_ecs::component::Component, Default)]
+#[derive(ecs::Component, Default)]
 // TODO(ecs): make this private once the system fn types are no longer exposed
 pub(crate) enum BlockDefNextValue {
     #[default]

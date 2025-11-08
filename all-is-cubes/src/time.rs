@@ -267,22 +267,6 @@ impl fmt::Debug for Clock {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Resource which contains a `Tick` when, and only when, the [`Universe`] is being stepped.
-//---
-#[derive(Clone, Copy, Default, ecs::Resource)]
-pub(crate) struct CurrentTick(pub Option<Tick>);
-
-impl CurrentTick {
-    pub(crate) fn get(
-        self,
-    ) -> Result<Tick, alloc::boxed::Box<dyn core::error::Error + Send + Sync>> {
-        self.0
-            .ok_or_else(|| "attempted to get current Tick when there is no step in progress".into())
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
 /// [`ScheduleLabel`]s relating to time passing in a [`Universe`].
 pub(crate) mod schedule {
     use bevy_ecs::schedule::ScheduleLabel;

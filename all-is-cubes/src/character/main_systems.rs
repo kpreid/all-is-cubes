@@ -78,7 +78,7 @@ pub(super) fn early_character_input_system(
 ///
 /// TODO(ecs): Disentangle characters from body physics.
 pub(super) fn character_physics_step_system(
-    tick: ecs::Res<time::CurrentTick>,
+    current_step: ecs::Res<universe::CurrentStep>,
     mut info_collector: ecs::ResMut<universe::InfoCollector<CharacterStepInfo>>,
     characters: ecs::Query<(
         &universe::Membership,
@@ -92,7 +92,7 @@ pub(super) fn character_physics_step_system(
     )>,
     spaces: universe::HandleReadQuery<Space>,
 ) -> ecs::Result {
-    let tick = tick.get()?;
+    let tick = current_step.get()?.tick;
     debug_assert!(!tick.paused());
     let dt = tick.delta_t().as_secs_f64();
 

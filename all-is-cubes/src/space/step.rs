@@ -9,9 +9,22 @@ use alloc::vec::Vec;
 use bevy_ecs::prelude as ecs;
 use hashbrown::HashMap;
 
+use crate::block;
 use crate::space::{BlockIndex, Space};
-use crate::universe::{Handle, ReadTicket, UniverseId};
-use crate::{block, time};
+use crate::universe::{self, Handle, ReadTicket, UniverseId};
+
+// -------------------------------------------------------------------------------------------------
+
+// TODO(ecs): Create and use this system set so that eventual plug-ins can choose when they run
+// #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, bevy_ecs::schedule::SystemSet)]
+// pub(crate) struct SpacePaletteUpdateSet;
+
+/// Install systems related to `Space`s.
+pub(crate) fn add_space_systems(world: &mut ecs::World) {
+    let schedules = world.resource_mut::<ecs::Schedules>();
+    // TODO(ecs): space updating is currently hardcoded in `Universe::step()`
+    _ = schedules;
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -24,14 +37,14 @@ pub(crate) fn execute_tick_actions_system(
     ecs::In(spaces): ecs::In<Vec<Handle<Space>>>,
     world: &mut ecs::World,
     space_query: &mut ecs::QueryState<&mut Space>,
-    read_queries: &mut crate::universe::MemberReadQueryStates,
+    read_queries: &mut universe::MemberReadQueryStates,
 ) -> ecs::Result<usize> {
     let universe_id: UniverseId = *world.resource();
-    let tick = world.resource::<time::CurrentTick>().get()?;
+    let tick = world.resource::<universe::CurrentStep>().get()?.tick;
 
     let mut ticked_cube_count: usize = 0;
     for space_handle in spaces {
-        let (mut space, everything_but) = crate::universe::get_one_mut_and_ticket(
+        let (mut space, everything_but) = universe::get_one_mut_and_ticket(
             world,
             space_handle.as_entity(universe_id).unwrap(),
             space_query,
@@ -58,7 +71,7 @@ pub(crate) struct SpacePaletteNextValue(pub(crate) HashMap<BlockIndex, block::Ev
 /// TODO: this is basically a copy of similar code for `BlockDef`
 pub(crate) fn update_palette_phase_1(
     mut spaces: ecs::Query<'_, '_, (&Space, &mut SpacePaletteNextValue)>,
-    data_sources: crate::universe::QueryBlockDataSources<'_, '_>,
+    data_sources: universe::QueryBlockDataSources<'_, '_>,
 ) {
     let read_ticket = ReadTicket::from_block_data_sources(&data_sources);
 

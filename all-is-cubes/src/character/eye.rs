@@ -17,7 +17,7 @@ use crate::math::{Cube, FreeCoordinate, FreeVector};
 use crate::physics::{Body, Velocity};
 use crate::space::Space;
 use crate::time;
-use crate::universe::UniverseId;
+use crate::universe::{self, UniverseId};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -93,10 +93,10 @@ fn record_previous_velocity(query: ecs::Query<'_, '_, (&Body, &mut PreviousBodyV
 
 /// System function to update [`CharacterEye`]'s dynamics.
 fn step_eye_position(
-    tick: ecs::Res<'_, time::CurrentTick>,
+    current_step: ecs::Res<'_, universe::CurrentStep>,
     characters: ecs::Query<'_, '_, (&Body, &PreviousBodyVelocity, &mut CharacterEye)>,
 ) -> ecs::Result {
-    let tick = tick.get()?;
+    let tick = current_step.get()?.tick;
     let dt = tick.delta_t().as_secs_f64();
     for (body, &PreviousBodyVelocity(previous_body_velocity), mut eye) in characters {
         let eye = &mut *eye;
@@ -125,11 +125,11 @@ fn step_eye_position(
 
 fn step_exposure(
     universe_id: ecs::Res<'_, UniverseId>,
-    tick: ecs::Res<'_, time::CurrentTick>,
+    current_step: ecs::Res<'_, universe::CurrentStep>,
     characters: ecs::Query<'_, '_, (&ParentSpace, &mut CharacterEye)>,
     spaces: ecs::Query<'_, '_, &Space>,
 ) -> ecs::Result {
-    let tick = tick.get()?;
+    let tick = current_step.get()?.tick;
     let dt = tick.delta_t().as_secs_f64();
     let universe_id = *universe_id;
 

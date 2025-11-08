@@ -39,7 +39,7 @@ mod ecs_details;
 use ecs_details::{NameMap, QueryStateBundle};
 // TODO(ecs): try to eliminate uses of get_one_mut_and_ticket in favor of normal queries
 pub use ecs_details::PubliclyMutableComponent;
-pub(crate) use ecs_details::{InfoCollector, Membership, get_one_mut_and_ticket};
+pub(crate) use ecs_details::{CurrentStep, InfoCollector, Membership, get_one_mut_and_ticket};
 
 mod gc;
 
@@ -170,7 +170,7 @@ impl Universe {
             // Register various components and resources which are *not* visible state of the
             // universe, but have data derived from others or are used temporarily.
             world.init_resource::<NameMap>();
-            world.init_resource::<time::CurrentTick>();
+            world.init_resource::<CurrentStep>();
             world.register_component::<Membership>();
             Self::register_all_member_components(&mut world);
             InfoCollector::<BlockDefStepInfo>::register(&mut world);
@@ -186,8 +186,10 @@ impl Universe {
 
             // Add systems.
             gc::add_gc(&mut world);
+            block::add_block_def_systems(&mut world);
             character::add_main_systems(&mut world);
             character::add_eye_systems(&mut world);
+            space::step::add_space_systems(&mut world);
         }
 
         Box::write(
@@ -273,7 +275,14 @@ impl Universe {
         self.world.run_schedule(time::schedule::BeforeStepReset);
 
         let tick = self.world.resource_mut::<time::Clock>().advance(paused);
-        self.world.resource_mut::<time::CurrentTick>().0 = Some(tick);
+        let step_input = ecs_details::StepInput {
+            tick,
+            deadline,
+            budget_per_space: deadline
+                .remaining_since(start_time)
+                .map(|dur| dur / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1)),
+        };
+        self.world.resource_mut::<CurrentStep>().0 = Some(step_input.clone());
 
         self.log_rerun_time();
 
@@ -300,19 +309,12 @@ impl Universe {
         // Update spaces’ block evaluations
         self.sync_space_blocks();
 
-        // Bundle all our relevant state so we can pass it to systems.
-        struct StepInput {
-            deadline: time::Deadline,
-            /// How to divide light calculation time among spaces, based on the previous step
-            budget_per_space: Option<time::Duration>,
+        // TODO(ecs): get rid of this so that space stepping can be normal transactions
+        struct SpaceStepTransactions {
             transactions: Vec<UniverseTransaction>,
             spaces_with_work: usize,
         }
-        let mut si = StepInput {
-            deadline,
-            budget_per_space: deadline
-                .remaining_since(start_time)
-                .map(|dur| dur / u32::try_from(self.spaces_with_work).unwrap_or(1).max(1)),
+        let mut si = SpaceStepTransactions {
             transactions: Vec::new(),
             spaces_with_work: 0,
         };
@@ -347,12 +349,7 @@ impl Universe {
                     everything_but,
                     Some(&space_handle),
                     tick,
-                    match si.budget_per_space {
-                        Some(budget) => {
-                            si.deadline.min(time::Deadline::At(time::Instant::now() + budget))
-                        }
-                        None => si.deadline,
-                    },
+                    step_input.deadline_for_space(),
                 );
 
                 si.transactions.push(transaction);
@@ -392,7 +389,7 @@ impl Universe {
         self.world.run_schedule(time::schedule::AfterStep);
 
         // Post-step state cleanup
-        self.world.resource_mut::<time::CurrentTick>().0 = None;
+        self.world.resource_mut::<CurrentStep>().0 = None;
         //self.world.run_schedule(time::schedule::AfterStepReset); // TODO(ecs): move things into this
 
         // Gather info
