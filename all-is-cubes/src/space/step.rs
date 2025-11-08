@@ -34,17 +34,23 @@ pub(crate) fn add_space_systems(world: &mut ecs::World) {
 /// This will require changing `SpaceTransaction` and the transaction system to be able to evaluate
 /// new blocks during the check phase instead of the commit phase.
 pub(crate) fn execute_tick_actions_system(
-    ecs::In(spaces): ecs::In<Vec<Handle<Space>>>,
     world: &mut ecs::World,
-    space_query: &mut ecs::QueryState<&mut Space>,
+    space_query: &mut ecs::QueryState<(&universe::Membership, &mut Space)>,
     read_queries: &mut universe::MemberReadQueryStates,
 ) -> ecs::Result<usize> {
     let universe_id: UniverseId = *world.resource();
     let tick = world.resource::<universe::CurrentStep>().get()?.tick;
 
+    // TODO(ecs): we're collecting this so that we can take exclusive access to the world
+    // to make a ticket, but we should instead not do that.
+    let spaces: Vec<Handle<Space>> = space_query
+        .iter(world)
+        .map(|(membership, _space)| membership.handle())
+        .collect();
+
     let mut ticked_cube_count: usize = 0;
     for space_handle in spaces {
-        let (mut space, everything_but) = universe::get_one_mut_and_ticket(
+        let ((_membership, mut space), everything_but) = universe::get_one_mut_and_ticket(
             world,
             space_handle.as_entity(universe_id).unwrap(),
             space_query,

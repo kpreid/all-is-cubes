@@ -309,6 +309,15 @@ impl Universe {
         // Update spaces’ block evaluations
         self.sync_space_blocks();
 
+        // Execute the tick actions of blocks in spaces.
+        if !paused {
+            // TODO: put this system in a schedule once there are no obstacles to doing so.
+            self.world
+                .run_system_cached(space::step::execute_tick_actions_system)
+                .unwrap()
+                .unwrap();
+        }
+
         // TODO(ecs): get rid of this so that space stepping can be normal transactions
         struct SpaceStepTransactions {
             transactions: Vec<UniverseTransaction>,
@@ -325,16 +334,6 @@ impl Universe {
             // used to allow Space block changes to evaluate blocks).
             let spaces: Vec<Handle<Space>> =
                 self.iter_by_type::<Space>().map(|(_, handle)| handle).collect();
-
-            if !paused {
-                self.world
-                    .run_system_cached_with(
-                        space::step::execute_tick_actions_system,
-                        spaces.clone(),
-                    )
-                    .unwrap()
-                    .unwrap();
-            }
 
             for space_handle in spaces {
                 let (mut space, everything_but) = get_one_mut_and_ticket(
