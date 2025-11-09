@@ -398,7 +398,7 @@ pub(crate) fn export_gltf(
         .into_iter()
         .map(|space_handle| -> Result<_, ExportError> {
             let name = space_handle.name();
-            let space = space_handle.read(read_ticket)?;
+            let space = &space_handle.read(read_ticket)?;
             let block_meshes =
                 block_meshes_for_space::<GltfMt>(space, &writer.texture_allocator(), &mesh_options);
             let mesh: SpaceMesh<GltfMt> =

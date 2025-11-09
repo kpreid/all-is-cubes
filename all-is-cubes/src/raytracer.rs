@@ -35,8 +35,13 @@ use crate::math::{
     Rgba, Vol, ZeroOne, rgb_const, smoothstep,
 };
 use crate::raycast::{self, Ray, RayIsh};
-use crate::space::{BlockIndex, BlockSky, PackedLight, Sky, Space, SpaceBlockData};
+use crate::space::{self, BlockIndex, BlockSky, PackedLight, Sky, SpaceBlockData};
 use crate::util::StatusText;
+
+#[cfg(doc)]
+use crate::space::Space;
+
+// -------------------------------------------------------------------------------------------------
 
 mod accum;
 pub use accum::*;
@@ -67,7 +72,7 @@ pub struct SpaceRaytracer<D: RtBlockData> {
 impl<D: RtBlockData> SpaceRaytracer<D> {
     /// Snapshots the given [`Space`] to prepare for raytracing it.
     pub fn new(
-        space: &Space,
+        space: &space::Read<'_>,
         graphics_options: GraphicsOptions,
         custom_options: D::Options,
     ) -> Self {
@@ -515,7 +520,7 @@ impl Fmt<StatusText> for RaytraceInfo {
 
 /// Get cube data out of [`Space`].
 #[inline]
-fn prepare_cubes(space: &Space) -> Vol<Box<[TracingCubeData]>> {
+fn prepare_cubes(space: &space::Read<'_>) -> Vol<Box<[TracingCubeData]>> {
     space.extract(space.bounds(), |e| TracingCubeData {
         block_index: e.block_index(),
         lighting: e.light(),

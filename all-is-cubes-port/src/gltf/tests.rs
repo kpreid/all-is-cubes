@@ -22,6 +22,7 @@ pub(crate) fn gltf_mesh(
     space: &Space,
     writer: &mut GltfWriter,
 ) -> (SpaceMesh<GltfMt>, Option<Index<gltf_json::Mesh>>) {
+    let space = &space.read();
     let options = &MeshOptions::new(&GraphicsOptions::default());
     let blocks = block_meshes_for_space(space, &writer.texture_allocator(), options);
     let mesh: SpaceMesh<GltfMt> = SpaceMesh::new(space, space.bounds(), options, &*blocks);

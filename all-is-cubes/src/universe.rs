@@ -36,10 +36,12 @@ pub(crate) use members::*;
 pub use members::{AnyHandle, UniverseMember};
 
 mod ecs_details;
-use ecs_details::{NameMap, QueryStateBundle};
+use ecs_details::NameMap;
 // TODO(ecs): try to eliminate uses of get_one_mut_and_ticket in favor of normal queries
 pub use ecs_details::PubliclyMutableComponent;
-pub(crate) use ecs_details::{CurrentStep, InfoCollector, Membership, get_one_mut_and_ticket};
+pub(crate) use ecs_details::{
+    CurrentStep, InfoCollector, Membership, QueryStateBundle, ReadMember, get_one_mut_and_ticket,
+};
 
 mod gc;
 
@@ -647,14 +649,19 @@ impl Universe {
         function: impl FnOnce(&mut space::Mutation<'_, 'u>) -> Out,
     ) -> Result<Out, HandleError> {
         let entity = handle.as_entity(self.id)?;
-        let Some(space_mut): Option<ecs::Mut<'_, Space>> = self.world.get_mut::<Space>(entity)
+        let Ok(write_query_data) =
+            self.queries.write_members.spaces.get_mut(&mut self.world, entity)
         else {
             // This should never happen even with concurrent access, because as_entity() checks
             // all cases that would lead to the entity being absent.
-            panic!("{handle:?}.as_entity() succeeded but entity {entity:?} is missing");
+            panic!("{handle:?}.as_entity() succeeded but query failed");
         };
         // TODO(ecs): non-stub ticket using `get_one_mut_and_ticket()`
-        Ok(space_mut.into_inner().mutate::<Out>(ReadTicket::stub(), function))
+        Ok(space::Mutation::with_write_query(
+            ReadTicket::stub(),
+            write_query_data,
+            function,
+        ))
     }
 
     /// Update stored queries to account for new archetypes.

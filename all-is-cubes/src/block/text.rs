@@ -934,7 +934,7 @@ mod tests {
                 .read_ticket(universe.read_ticket())
                 .filled_with(block.clone())
                 .build();
-            print_space(&space, [0., 0., 1.]);
+            print_space(&space.read(), [0., 0., 1.]);
         }
 
         (universe, block)

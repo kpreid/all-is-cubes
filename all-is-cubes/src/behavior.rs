@@ -11,6 +11,7 @@ use core::ops;
 #[cfg(doc)]
 use core::task::Waker;
 
+use bevy_ecs::prelude as ecs;
 use bevy_platform::sync::Mutex;
 
 use crate::time::Tick;
@@ -132,6 +133,7 @@ pub enum Then {
 ///
 #[doc = include_str!("save/serde-warning.md")]
 #[expect(clippy::module_name_repetitions)] // TODO: rename to Set?
+#[derive(ecs::Component)]
 pub struct BehaviorSet<H: Host> {
     /// Note that this map is deterministically ordered, so any incidental things
     /// depending on ordering, such as [`Self::query()`] will be deterministic.

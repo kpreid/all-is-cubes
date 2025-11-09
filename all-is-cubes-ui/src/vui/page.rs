@@ -203,7 +203,7 @@ impl PageLayout {
     /// Calculate the camera view transform that should be used for a page with this layout.
     pub(crate) fn view_transform(
         self,
-        space: &Space,
+        space: &space::Read<'_>,
         fov_y_degrees: FreeCoordinate,
     ) -> ViewTransform {
         let bounds = space.bounds();

@@ -8,7 +8,7 @@ use bitvec::vec::BitVec;
 use exhaust::Exhaust;
 
 use all_is_cubes::math::{Cube, Face6, FaceMap, GridAab, Vol};
-use all_is_cubes::space::{BlockIndex, Space};
+use all_is_cubes::space::{self, BlockIndex, Space};
 use all_is_cubes_render::Flaws;
 
 #[cfg(doc)]
@@ -47,7 +47,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// <code>[SpaceMesh::default()].[compute][SpaceMesh::compute](space, bounds, options, block_meshes)</code>.
     #[inline]
     pub fn new<'p, P>(
-        space: &Space,
+        space: &space::Read<'_>,
         bounds: GridAab,
         options: &MeshOptions,
         block_meshes: P,
@@ -189,7 +189,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
     /// [`block_meshes_for_space`]: super::block_meshes_for_space
     pub fn compute<'p, P>(
         &mut self,
-        space: &Space,
+        space: &space::Read<'_>,
         bounds: GridAab,
         options: &MeshOptions,
         block_meshes: P,
@@ -1323,9 +1323,9 @@ mod tests {
 
         let mesh_region = GridAab::from_lower_upper([1, 1, 1], [3, 3, 3]);
         let options = &MeshOptions::new(&GraphicsOptions::default());
-        let block_meshes = block_meshes_for_space(&space, &NoTextures, options);
+        let block_meshes = block_meshes_for_space(&space.read(), &NoTextures, options);
         let space_mesh: SpaceMesh<NoTextureMt> =
-            SpaceMesh::new(&space, mesh_region, options, &*block_meshes);
+            SpaceMesh::new(&space.read(), mesh_region, options, &*block_meshes);
 
         // The mesh generated with these bounds has only a +Y face,
         // so the bounding box should reflect that, not including hidden faces.

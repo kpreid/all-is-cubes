@@ -12,9 +12,14 @@ use core::mem;
 use crate::block::{self, AIR, Block};
 use crate::inv::{self, Inventory, InventoryTransaction};
 use crate::math::{Cube, Face6, GridAab, GridRotation, Gridgid};
-use crate::space::{CubeTransaction, Space, SpaceTransaction};
+use crate::space::{self, CubeTransaction, SpaceTransaction};
 use crate::transaction::{Merge, Transaction};
 use crate::universe::VisitHandles;
+
+#[cfg(doc)]
+use crate::space::Space;
+
+// -------------------------------------------------------------------------------------------------
 
 type OpTxn = (SpaceTransaction, InventoryTransaction);
 
@@ -144,7 +149,7 @@ impl Operation {
     /// succeed. TODO: Explain how the two kinds of errors should be reported.
     pub(crate) fn apply(
         &self,
-        space: &Space,
+        space: &space::Read<'_>,
         inventory: Option<&Inventory>,
         transform: Gridgid,
     ) -> Result<OpTxn, OperationError> {
@@ -558,6 +563,7 @@ mod tests {
     use super::*;
     use crate::block::AIR;
     use crate::content::{make_some_blocks, make_some_voxel_blocks};
+    use crate::space::Space;
     use crate::universe::Universe;
     use all_is_cubes_base::math::Face6;
     use pretty_assertions::assert_eq;
@@ -567,24 +573,31 @@ mod tests {
         let move_x = Operation::StartMove(block::Move::new(Face6::PX, 1, 1));
         let move_y = Operation::StartMove(block::Move::new(Face6::PY, 1, 1));
         let move_z = Operation::StartMove(block::Move::new(Face6::PZ, 1, 1));
-        let op = Operation::Alt([move_x.clone(), move_y.clone(), move_z.clone()].into());
+        let alt = Operation::Alt([move_x.clone(), move_y.clone(), move_z.clone()].into());
 
         // Control which `StartMove` succeeds by changing the size of the space.
+        let apply_to_size = |op: &Operation, x, y, z| {
+            op.apply(
+                &Space::empty_positive(x, y, z).read(),
+                None,
+                Gridgid::IDENTITY,
+            )
+        };
         assert_eq!(
-            op.apply(&Space::empty_positive(1, 1, 1), None, Gridgid::IDENTITY),
+            apply_to_size(&alt, 1, 1, 1),
             Err(OperationError::Unmatching),
         );
         assert_eq!(
-            op.apply(&Space::empty_positive(2, 1, 1), None, Gridgid::IDENTITY),
-            Ok(move_x.apply(&Space::empty_positive(2, 1, 1), None, Gridgid::IDENTITY).unwrap()),
+            apply_to_size(&alt, 2, 1, 1),
+            Ok(apply_to_size(&move_x, 2, 1, 1).unwrap()),
         );
         assert_eq!(
-            op.apply(&Space::empty_positive(1, 2, 1), None, Gridgid::IDENTITY),
-            Ok(move_y.apply(&Space::empty_positive(1, 2, 1), None, Gridgid::IDENTITY).unwrap()),
+            apply_to_size(&alt, 1, 2, 1),
+            Ok(apply_to_size(&move_y, 1, 2, 1).unwrap()),
         );
         assert_eq!(
-            op.apply(&Space::empty_positive(1, 1, 2), None, Gridgid::IDENTITY),
-            Ok(move_z.apply(&Space::empty_positive(1, 1, 2), None, Gridgid::IDENTITY).unwrap()),
+            apply_to_size(&alt, 1, 1, 2),
+            Ok(apply_to_size(&move_z, 1, 1, 2).unwrap()),
         );
     }
 
@@ -603,7 +616,7 @@ mod tests {
         let op = Operation::Become(block.clone());
 
         assert_eq!(
-            op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
+            op.apply(&space.read(), None, Gridgid::IDENTITY).unwrap(),
             (
                 CubeTransaction::replacing(Some(AIR), Some(block)).at(Cube::ORIGIN),
                 InventoryTransaction::default()
@@ -619,7 +632,7 @@ mod tests {
         let op = Operation::DestroyTo(block.clone());
 
         assert_eq!(
-            op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
+            op.apply(&space.read(), None, Gridgid::IDENTITY).unwrap(),
             (
                 CubeTransaction::replacing(Some(AIR), Some(block))
                     .at(Cube::ORIGIN)
@@ -645,7 +658,7 @@ mod tests {
         let op = Operation::AddModifiers([block::Modifier::Rotate(Face6::PY.clockwise())].into());
 
         assert_eq!(
-            op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
+            op.apply(&space.read(), None, Gridgid::IDENTITY).unwrap(),
             (
                 CubeTransaction::replacing(
                     Some(block.clone()),
@@ -658,7 +671,7 @@ mod tests {
 
         // Test effect on AIR; it should do nothing because the block is symmetric
         assert_eq!(
-            op.apply(&space, None, Gridgid::from_translation([1, 0, 0])).unwrap(),
+            op.apply(&space.read(), None, Gridgid::from_translation([1, 0, 0])).unwrap(),
             (SpaceTransaction::default(), InventoryTransaction::default())
         );
     }
@@ -676,7 +689,7 @@ mod tests {
         let op = Operation::AddModifiers([modifier.clone()].into());
 
         assert_eq!(
-            op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
+            op.apply(&space.read(), None, Gridgid::IDENTITY).unwrap(),
             (
                 CubeTransaction::replacing(
                     Some(block.clone()),
@@ -701,7 +714,7 @@ mod tests {
         let space = Space::empty_positive(2, 2, 2);
 
         assert_eq!(
-            op.apply(&space, None, Gridgid::IDENTITY).unwrap(),
+            op.apply(&space.read(), None, Gridgid::IDENTITY).unwrap(),
             (
                 {
                     let mut txn = SpaceTransaction::default();
@@ -717,7 +730,7 @@ mod tests {
 
         assert_eq!(
             op.apply(
-                &space,
+                &space.read(),
                 None,
                 Face6::PY.clockwise().to_positive_octant_transform(1)
             )
@@ -750,7 +763,7 @@ mod tests {
         let character_inventory = Inventory::new(2);
 
         assert_eq!(
-            op.apply(&space, Some(&character_inventory), Gridgid::IDENTITY).unwrap(),
+            op.apply(&space.read(), Some(&character_inventory), Gridgid::IDENTITY).unwrap(),
             (
                 {
                     let mut txn = SpaceTransaction::default();
@@ -777,7 +790,7 @@ mod tests {
         let character_inventory = Inventory::new(2);
 
         assert_eq!(
-            op.apply(&space, Some(&character_inventory), Gridgid::IDENTITY).unwrap(),
+            op.apply(&space.read(), Some(&character_inventory), Gridgid::IDENTITY).unwrap(),
             (
                 {
                     let mut txn = SpaceTransaction::default();
@@ -808,9 +821,13 @@ mod tests {
             })
             .unwrap();
 
-        let txns_transform = op.apply(&space, None, rotation.to_positive_octant_transform(1));
+        let txns_transform = op.apply(
+            &space.read(),
+            None,
+            rotation.to_positive_octant_transform(1),
+        );
         let rotated_op = op.rotate(rotation);
-        let txns_rotate = dbg!(rotated_op).apply(&space, None, Gridgid::IDENTITY);
+        let txns_rotate = dbg!(rotated_op).apply(&space.read(), None, Gridgid::IDENTITY);
 
         assert_eq!(dbg!(&txns_transform), dbg!(&txns_rotate));
         assert!(

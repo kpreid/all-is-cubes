@@ -9,14 +9,23 @@
 )]
 
 use alloc::vec::Vec;
+use core::time::Duration;
 
 use bevy_ecs::prelude as ecs;
 use bevy_platform::time::Instant;
-use hashbrown::HashMap;
+use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
 
 use crate::block;
-use crate::space::{BlockIndex, LightUpdatesInfo, Space, SpaceStepInfo};
-use crate::universe::{self, Handle, ReadTicket, SealedMember, UniverseId, UniverseTransaction};
+use crate::fluff::{self, Fluff};
+use crate::inv;
+use crate::math::{Cube, GridCoordinate, Gridgid};
+use crate::space::{
+    self, BlockIndex, Contents, LightStorage, LightUpdatesInfo, Notifiers, Palette, Space,
+    SpacePhysics, SpaceStepInfo, SpaceTransaction, Ticks,
+};
+use crate::transaction::{Merge as _, Transaction as _};
+use crate::universe::{self, QueryStateBundle as _, ReadTicket, SealedMember as _, UniverseId};
+use crate::util::TimeStats;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -40,30 +49,217 @@ pub(crate) fn add_space_systems(world: &mut ecs::World) {
 /// new blocks during the check phase instead of the commit phase.
 pub(crate) fn execute_tick_actions_system(
     world: &mut ecs::World,
-    space_query: &mut ecs::QueryState<(&universe::Membership, &mut Space)>,
+    space_write_query_state: &mut ecs::QueryState<(
+        ecs::Entity,
+        &universe::Membership,
+        <SpaceTransaction as universe::TransactionOnEcs>::WriteQueryData,
+    )>,
     read_queries: &mut universe::MemberReadQueryStates,
 ) -> ecs::Result<usize> {
     let universe_id: UniverseId = *world.resource();
+    read_queries.update_archetypes(world);
     let tick = world.resource::<universe::CurrentStep>().get()?.tick;
 
-    // TODO(ecs): we're collecting this so that we can take exclusive access to the world
-    // to make a ticket, but we should instead not do that.
-    let spaces: Vec<Handle<Space>> = space_query
-        .iter(world)
-        .map(|(membership, _space)| membership.handle())
-        .collect();
+    // // TODO(ecs): we're collecting this so that we can take exclusive access to the world
+    // // to make a ticket, but we should instead not do that.
+    // let spaces: Vec<Handle<Space>> = space_query
+    //     .iter(world)
+    //     .map(|(membership, _space)| membership.handle())
+    //     .collect();
+
+    // Need unsafe cell to create "except for this" read tickets.
+    // TODO(ecs): Redesign transactions / space mutations so we can avoid this.
+    let world_cell = world.as_unsafe_world_cell();
 
     let mut ticked_cube_count: usize = 0;
-    for space_handle in spaces {
-        let ((_membership, mut space), everything_but) = universe::get_one_mut_and_ticket(
-            world,
-            space_handle.as_entity(universe_id).unwrap(),
-            space_query,
-            read_queries,
-        )
-        .unwrap();
+    for (
+        space_entity,
+        _membership,
+        (palette, contents, light, behaviors, default_spawn, notifiers, mut ticks_component),
+    ) in
+        // SAFETY: no other accesses exist outside this loop
+        unsafe { space_write_query_state.iter_unchecked(world_cell) }
+    {
+        let Ticks {
+            cubes_wanting_ticks,
+        } = &mut *ticks_component;
 
-        ticked_cube_count += space.execute_tick_actions(everything_but, tick);
+        // SAFETY: this ticket is for everything but `space_entity` and the rest of
+        // this loop iteration will only access `space_entity`.
+        let everything_but_read_ticket = unsafe {
+            ReadTicket::everything_but(universe_id, world_cell, space_entity, read_queries)
+        };
+
+        // Review self.cubes_wanting_ticks, and filter out actions that shouldn't
+        // happen this tick.
+        // TODO: Use a schedule-aware structure for cubes_wanting_ticks so we can iterate over
+        // fewer cubes.
+        let mut to_remove: Vec<Cube> = Vec::new();
+        let mut cubes_to_tick: Vec<Cube> = cubes_wanting_ticks
+            .iter()
+            .copied()
+            .filter(|&cube| {
+                if let Some(block::TickAction {
+                    operation: _,
+                    schedule,
+                }) = palette.entry(contents.0[cube]).evaluated.attributes().tick_action
+                {
+                    if schedule.contains(tick) {
+                        // Don't tick yet.
+                        false
+                    } else {
+                        true
+                    }
+                } else {
+                    // Doesn't actually have an action.
+                    to_remove.push(cube);
+                    false
+                }
+            })
+            .collect();
+        // Sort the list so our results are deterministic (in particular, in the order of the
+        // emitted `Fluff`).
+        // TODO: Maybe it would be more efficient to use a `BTreeMap` for storage? Benchmark.
+        cubes_to_tick.sort_unstable_by_key(|&cube| <[GridCoordinate; 3]>::from(cube));
+
+        // Remove cubes that don't actually need ticks now or later.
+        for cube in to_remove {
+            cubes_wanting_ticks.remove(&cube);
+        }
+
+        // TODO: need to construct Read from our queries
+        let read: space::Read = space::Read {
+            palette: &palette,
+            contents: contents.0.as_ref(),
+            light: &light,
+            physics: &SpacePhysics::DEFAULT, // TODO: wrong
+            behaviors: &behaviors,
+            default_spawn: &default_spawn.0,
+            notifiers,
+        };
+
+        let mut first_pass_txn = SpaceTransaction::default();
+        let mut first_pass_cubes = HbHashSet::new();
+        let mut first_pass_conflicts: HbHashMap<Cube, SpaceTransaction> = HbHashMap::new();
+        for cube in cubes_to_tick.iter().copied() {
+            let Some(block::TickAction {
+                operation,
+                schedule: _,
+            }) = palette.entry(contents.0[cube]).evaluated.attributes().tick_action.as_ref()
+            else {
+                continue;
+            };
+
+            // Obtain the transaction.
+            let txn: SpaceTransaction = match operation.apply(
+                &read,
+                None,
+                Gridgid::from_translation(cube.lower_bounds().to_vector()),
+            ) {
+                Ok((space_txn, inventory_txn)) => {
+                    assert_eq!(inventory_txn, inv::InventoryTransaction::default());
+
+                    match universe::TransactionOnEcs::check(&space_txn, read) {
+                        Err(_e) => {
+                            // The operation produced a transaction which, itself, cannot execute
+                            // against the state of the Space. Omit it from the set.
+                            notifiers.fluff_notifier.notify(&space::SpaceFluff {
+                                position: cube,
+                                fluff: Fluff::BlockFault(fluff::BlockFault::TickPrecondition(
+                                    space_txn.bounds().unwrap_or_else(|| cube.grid_aab()),
+                                )),
+                            });
+                            SpaceTransaction::default()
+                        }
+                        Ok(_) => space_txn,
+                    }
+                }
+                Err(_) => {
+                    // The operation failed to apply. This is normal if it just isn't the right
+                    // conditions yet.
+                    notifiers.fluff_notifier.notify(&space::SpaceFluff {
+                        position: cube,
+                        fluff: Fluff::BlockFault(fluff::BlockFault::TickPrecondition(
+                            cube.grid_aab(),
+                        )),
+                    });
+                    SpaceTransaction::default()
+                }
+            };
+
+            // TODO: if we have already hit a conflict, we shouldn't be executing first_pass_txn,
+            // so we should just do a merge check and not a full merge.
+            match first_pass_txn.check_merge(&txn) {
+                Ok(check) => {
+                    // This cube's transaction successfully merged with the first_pass_txn.
+                    // Therefore, either it will be successful, *or* it will turn out that the
+                    // first pass set includes a conflict.
+                    first_pass_txn.commit_merge(txn, check);
+                    first_pass_cubes.insert(cube);
+                }
+                Err(_conflict) => {
+                    // This cube's transaction conflicts with something in the first pass set.
+                    // We now know that:
+                    // * we're not going to commit this cube's transaction
+                    // * we're not going to commit some or all of the first_pass_txn,
+                    // but we still need to continue to refine the conflict detection.
+                    first_pass_conflicts.insert(cube, txn);
+                }
+            }
+        }
+
+        // TODO: What we should be doing now is identifying which transactions do not conflict with
+        // *any* other transaction. That will require a spatial data structure to compute
+        // efficiently. Instead, we'll just stop *all* tick actions, which is correct-in-a-sense
+        // even if it's very suboptimal game mechanics.
+        if first_pass_conflicts.is_empty() {
+            super::Mutation::with_write_query(
+                everything_but_read_ticket,
+                (
+                    palette,
+                    contents,
+                    light,
+                    behaviors,
+                    default_spawn,
+                    notifiers,
+                    ticks_component,
+                ),
+                |mutation| {
+                    if let Err(e) = first_pass_txn.execute_m(mutation) {
+                        // This really shouldn't happen, because we already check()ed every part of
+                        // first_pass_txn, but we don't want it to be fatal.
+                        // TODO: this logging should use util::ErrorChain
+                        log::error!("cube tick transaction could not be executed: {e:#?}");
+                    }
+                },
+            );
+
+            ticked_cube_count += first_pass_cubes.len();
+        } else {
+            // Don't run the transaction. Instead, report conflicts.
+            for cube in first_pass_cubes {
+                notifiers.fluff_notifier.notify(&space::SpaceFluff {
+                    position: cube,
+                    fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(
+                        // pick an arbitrary conflicting txn — best we can do for now till we
+                        // hqve the proper fine-grained conflict detector.
+                        {
+                            let (other_cube, other_txn) =
+                                first_pass_conflicts.iter().next().unwrap();
+                            other_txn.bounds().unwrap_or_else(|| other_cube.grid_aab())
+                        },
+                    )),
+                });
+            }
+            for cube in first_pass_conflicts.keys().copied() {
+                notifiers.fluff_notifier.notify(&space::SpaceFluff {
+                    position: cube,
+                    fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(
+                        first_pass_txn.bounds().unwrap_or_else(|| cube.grid_aab()),
+                    )),
+                });
+            }
+        }
     }
     Ok(ticked_cube_count)
 }
@@ -71,24 +267,27 @@ pub(crate) fn execute_tick_actions_system(
 pub(crate) fn update_light_system(
     current_step: ecs::Res<'_, universe::CurrentStep>,
     info_collector: ecs::ResMut<universe::InfoCollector<LightUpdatesInfo>>,
-    mut spaces_query: ecs::Query<&mut Space>,
+    mut spaces_query: ecs::Query<(&Palette, &mut LightStorage, &mut Contents, &Notifiers)>,
 ) -> ecs::Result {
     let step_input = current_step.get()?;
 
     // for access from par_iter
     let info_collector = bevy_platform::sync::Mutex::new(info_collector);
 
-    spaces_query.par_iter_mut().for_each(|mut space: ecs::Mut<Space>| {
-        let (light_storage, uc, mut change_buffer) = space.borrow_light_update_context();
-        let info = light_storage.update_lighting_from_queue(
-            uc,
-            &mut change_buffer,
-            // TODO: check whether we are actually running in parallel and give either subdivided or non-subdivided deadlines?
-            step_input.deadline_for_space().remaining_since(Instant::now()),
-        );
+    spaces_query.par_iter_mut().for_each(
+        |(palette, mut light_storage, mut contents, notifiers)| {
+            let (uc, mut change_buffer) =
+                Space::borrow_light_update_context_ecs(palette, &mut contents, notifiers);
+            let info = light_storage.update_lighting_from_queue(
+                uc,
+                &mut change_buffer,
+                // TODO: check whether we are actually running in parallel and give either subdivided or non-subdivided deadlines?
+                step_input.deadline_for_space().remaining_since(Instant::now()),
+            );
 
-        info_collector.lock().unwrap().record(info);
-    });
+            info_collector.lock().unwrap().record(info);
+        },
+    );
 
     Ok(())
 }
@@ -98,23 +297,55 @@ pub(crate) fn step_behaviors_system(
     mut info_collector: ecs::ResMut<universe::InfoCollector<SpaceStepInfo>>,
     spaces: ecs::Query<(
         &universe::Membership,
-        <Space as SealedMember>::ReadQueryData,
+        <Space as universe::SealedMember>::ReadQueryData,
     )>,
     everything: universe::AllMemberReadQueries,
-) -> Result<(Vec<UniverseTransaction>, usize, usize), ecs::BevyError> {
+) -> Result<(Vec<universe::UniverseTransaction>, usize, usize), ecs::BevyError> {
+    // TODO(ecs): This is entangled with SpaceStepInfo for historical reasons.
+
     let step_input = current_step.get()?;
+    let tick = step_input.tick;
     let everything = everything.get();
     let read_ticket = ReadTicket::from_queries(&everything);
 
-    let mut transactions: Vec<UniverseTransaction> = Vec::new();
+    let mut transactions: Vec<universe::UniverseTransaction> = Vec::new();
     let mut active_spaces = 0;
     let mut total_spaces = 0;
 
     for (membership, data) in spaces {
         let space_handle = membership.handle();
-        let space_read: &Space = Space::read_from_query(data);
-        let (space_info, transaction) =
-            space_read.step_behaviors(read_ticket, Some(&space_handle), step_input.tick);
+        let space_read = Space::read_from_query(data);
+        let (space_info, transaction) = {
+            let start_space_behaviors = Instant::now();
+
+            let (transaction, behavior_step_info) = if !tick.paused() {
+                space_read.behaviors.step(
+                    read_ticket,
+                    &space_read,
+                    &(|t: SpaceTransaction| t.bind(space_handle.clone())),
+                    SpaceTransaction::behaviors,
+                    tick,
+                )
+            } else {
+                Default::default()
+            };
+
+            let space_behaviors_to_lighting = Instant::now();
+
+            (
+                SpaceStepInfo {
+                    spaces: 1,
+                    evaluations: TimeStats::default(), // TODO(ecs): re-hookup our time stats
+                    cube_ticks: 0,                     // TODO(ecs): re-hookup
+                    cube_time: Duration::ZERO,         // TODO(ecs): re-hookup
+                    behaviors: behavior_step_info,
+                    behaviors_time: space_behaviors_to_lighting
+                        .saturating_duration_since(start_space_behaviors),
+                    light: LightUpdatesInfo::default(), // will be filled with nonzero separately -- TODO(ecs): clarify
+                },
+                transaction,
+            )
+        };
 
         if !transaction.is_empty() {
             transactions.push(transaction);
@@ -138,20 +369,20 @@ pub(crate) fn step_behaviors_system(
 ///
 /// It is used only between [`update_palette_phase_1`] and [`update_palette_phase_2`].
 #[derive(bevy_ecs::component::Component, Default)]
-pub(crate) struct SpacePaletteNextValue(pub(crate) HashMap<BlockIndex, block::EvaluatedBlock>);
+pub(crate) struct SpacePaletteNextValue(pub(crate) HbHashMap<BlockIndex, block::EvaluatedBlock>);
 
 /// ECS system that computes but does not apply updates to [`Space`]'s `Palette`.
 ///
 /// TODO: this is basically a copy of similar code for `BlockDef`
 pub(crate) fn update_palette_phase_1(
-    mut spaces: ecs::Query<'_, '_, (&Space, &mut SpacePaletteNextValue)>,
+    mut spaces: ecs::Query<'_, '_, (&Palette, &mut SpacePaletteNextValue)>,
     data_sources: universe::QueryBlockDataSources<'_, '_>,
 ) {
     let data_sources = data_sources.get();
     let read_ticket = ReadTicket::from_queries(&data_sources);
 
     // TODO: parallel iter, + pipe out update info
-    for (space, mut next_palette) in spaces.iter_mut() {
+    for (current_palette, mut next_palette) in spaces.iter_mut() {
         debug_assert!(
             next_palette.0.is_empty(),
             "SpacePaletteNextValue should have been cleared"
@@ -159,7 +390,7 @@ pub(crate) fn update_palette_phase_1(
 
         // TODO: Only run this update on dirty flag.
 
-        space.palette.prepare_update(read_ticket, &mut next_palette);
+        current_palette.prepare_update(read_ticket, &mut next_palette);
     }
 }
 
@@ -169,13 +400,13 @@ pub(crate) fn update_palette_phase_1(
 /// This system being separate resolves the borrow conflict between writing to a [`Space`]
 /// and block evaluation (which may read from any [`Space`]).
 pub(crate) fn update_palette_phase_2(
-    mut spaces: ecs::Query<'_, '_, (&mut Space, &mut SpacePaletteNextValue)>,
+    mut spaces: ecs::Query<'_, '_, (&mut Palette, &mut SpacePaletteNextValue, &Notifiers)>,
 ) {
     // TODO(ecs): run this only on entities that need it, somehow
-    spaces.par_iter_mut().for_each(|(mut space, mut next_palette)| {
-        let space: &mut Space = &mut space; // deref for borrow splitting
-        space
-            .palette
-            .apply_update(&mut next_palette, &mut space.change_notifier.buffer());
-    });
+    spaces
+        .par_iter_mut()
+        .for_each(|(mut current_palette, mut next_palette, notifiers)| {
+            current_palette
+                .apply_update(&mut next_palette, &mut notifiers.change_notifier.buffer());
+        });
 }

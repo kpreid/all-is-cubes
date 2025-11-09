@@ -350,7 +350,7 @@ impl From<InstallVuiError> for all_is_cubes::linking::InGenError {
 pub(crate) fn synchronize_widgets(
     world_read_ticket: ReadTicket<'_>,
     ui_read_ticket: ReadTicket<'_>,
-    space: &Space,
+    space: &space::Read<'_>,
 ) {
     for item in space.behaviors().query::<WidgetBehavior>() {
         item.behavior

@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::{fmt, mem};
 
+use bevy_ecs::prelude as ecs;
 use manyfmt::Fmt;
 
 #[cfg(feature = "auto-threads")]
@@ -28,8 +29,9 @@ use crate::util::StatusText;
 
 /// Storage and update queue for a [`Space`]'s light.
 ///
-/// Design note: Currently this is simply owned by the [`Space`], but eventually we want to make
+/// Design note: Currently this is simply owned by the ECS, but eventually we want to make
 /// it accessible by a background thread which can continuously update it.
+#[derive(ecs::Component)]
 pub(crate) struct LightStorage {
     /// Per-cube light data.
     ///

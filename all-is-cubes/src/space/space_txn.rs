@@ -1,6 +1,3 @@
-//! TODO: Maybe this file is too small
-
-use all_is_cubes_base::math::Vol;
 use alloc::collections::BTreeMap;
 use alloc::collections::btree_map::Entry::*;
 use alloc::string::ToString;
@@ -14,7 +11,7 @@ use crate::behavior::{self, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
-use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid};
+use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid, Vol};
 use crate::space::{self, ActivatableRegion, GridAab, Mutation, SetCubeError, Space};
 use crate::transaction::{
     CommitError, Equal, ExecuteError, Merge, NoOutput, Transaction, Transactional, no_outputs,
@@ -323,19 +320,35 @@ impl Transaction for SpaceTransaction {
 }
 
 impl universe::TransactionOnEcs for SpaceTransaction {
-    type WriteQueryData = &'static mut Self::Target;
+    type WriteQueryData = (
+        &'static mut space::Palette,
+        &'static mut space::Contents,
+        &'static mut space::LightStorage,
+        &'static mut space::BehaviorSet<Space>,
+        &'static mut space::DefaultSpawn,
+        &'static space::Notifiers,
+        &'static mut space::Ticks,
+    );
 
-    fn check(&self, target: &Space) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, target)
+    fn check(&self, target: space::Read<'_>) -> Result<Self::CommitCheck, Self::Mismatch> {
+        self.check_common(target.palette, target.contents, target.behaviors)
     }
 
     fn commit(
         self,
-        mut target: ecs::Mut<'_, Space>,
+        target: (
+            ecs::Mut<'_, space::Palette>,
+            ecs::Mut<'_, space::Contents>,
+            ecs::Mut<'_, space::LightStorage>,
+            ecs::Mut<'_, space::BehaviorSet<Space>>,
+            ecs::Mut<'_, space::DefaultSpawn>,
+            &space::Notifiers,
+            ecs::Mut<'_, space::Ticks>,
+        ),
         read_ticket: ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), CommitError> {
-        Transaction::commit(self, &mut *target, read_ticket, check, &mut no_outputs)
+        Mutation::with_write_query(read_ticket, target, |m| self.commit_common(m, check))
     }
 }
 impl Merge for SpaceTransaction {

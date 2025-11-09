@@ -15,11 +15,11 @@ use crate::block::{BlockCollision, EvaluatedBlock, Evoxel, Resolution, Resolutio
 use crate::math::{Aab, Cube, CubeFace, Face6, Face7, FreeCoordinate, GridAab, Vol, lines};
 use crate::physics::POSITION_EPSILON;
 use crate::raycast::{Ray, Raycaster};
-use crate::space::Space;
+use crate::space;
 use crate::util::{ConciseDebug, MapExtend, Refmt as _};
 
 #[cfg(doc)]
-use crate::raycast::RaycastStep;
+use crate::{raycast::RaycastStep, space::Space};
 
 /// Conditional debug prints used for development of `escape_along_ray`.
 /// Hard-disabled by default.
@@ -513,11 +513,11 @@ pub(crate) trait CollisionSpace {
     -> Option<CollisionRayEnd>;
 }
 
-impl CollisionSpace for Space {
+impl CollisionSpace for space::Read<'_> {
     type Cell = EvaluatedBlock;
 
     fn bounds(&self) -> GridAab {
-        Space::bounds(self)
+        space::Read::bounds(self)
     }
 
     #[inline]
@@ -688,6 +688,7 @@ mod tests {
     use crate::block::{AIR, Block};
     use crate::content::{make_slab, make_some_blocks};
     use crate::raytracer::print_space;
+    use crate::space::Space;
     use crate::universe::Universe;
     use rand::{Rng, SeedableRng as _};
     use std::eprintln;
@@ -788,7 +789,7 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        print_space(&space, [1., 1., 1.]);
+        print_space(&space.read(), [1., 1., 1.]);
 
         // Set up to collide with the block such that the ray doesn't pass through it, to
         // make sure the right cube is returned.
@@ -799,7 +800,7 @@ mod tests {
         let aab = Cube::ORIGIN.aab();
         let ray = Ray::new([0.5, initial_y, 0.], [0., -2., 0.]);
 
-        let result = collide_along_ray(&space, ray, aab, drop, StopAt::NotAlreadyColliding);
+        let result = collide_along_ray(&space.read(), ray, aab, drop, StopAt::NotAlreadyColliding);
         assert_eq!(result, expected_end);
     }
 
@@ -824,7 +825,7 @@ mod tests {
 
         let mut contacts = Vec::new();
         let result = collide_along_ray(
-            &space,
+            &space.read(),
             ray,
             aab,
             |c| contacts.push(c),
@@ -968,7 +969,7 @@ mod tests {
             );
             // No assertion of the expected result; just not triggering any assertion.
             escape_along_ray(
-                &space,
+                &space.read(),
                 ray,
                 Aab::from_lower_upper([0., 0., 0.], [1.5, 1.5, 1.5]),
             );
@@ -991,11 +992,11 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        print_space(&space, [1., 1., 1.]);
+        print_space(&space.read(), [1., 1., 1.]);
 
         let aab = Aab::from_lower_upper([0., 0., 0.], [1.5, 1.5, 1.5]);
 
-        let result = escape_along_ray(&space, ray, aab);
+        let result = escape_along_ray(&space.read(), ray, aab);
         assert_eq!(result, expected_end);
     }
 

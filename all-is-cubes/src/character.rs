@@ -513,7 +513,6 @@ impl<'de> serde::Deserialize<'de> for Character {
 
 /// Read access to a [`Character`] that is currently in a [`Universe`][crate::universe::Universe].
 #[derive(Clone, Copy, Debug)]
-#[allow(clippy::module_name_repetitions)]
 pub struct Read<'ticket> {
     core: &'ticket CharacterCore,
     body: &'ticket Body,

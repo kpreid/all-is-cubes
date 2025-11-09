@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 use core::fmt;
 
+use bevy_ecs::prelude as ecs;
 use bevy_platform::sync::Mutex;
 use itertools::Itertools as _;
 
@@ -28,7 +29,9 @@ cfg_if::cfg_if! {
 }
 
 /// Table of the [`Block`]s in a [`Space`](super::Space) independent of their location.
-pub(super) struct Palette {
+#[derive(ecs::Component)]
+// Note: visibility must be pub(crate) to work with ECS, but only manipulated by `space` code
+pub(crate) struct Palette {
     /// Lookup from arbitrarily assigned indices to blocks.
     entries: Vec<SpaceBlockData>,
 

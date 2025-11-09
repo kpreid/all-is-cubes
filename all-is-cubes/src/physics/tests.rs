@@ -46,9 +46,9 @@ fn freefall_with_gravity() {
     body.set_velocity(vec3(2.0, 0.0, 0.0));
     body.flying = false;
 
-    body.step(Tick::from_seconds(1.5), Some(&space), collision_noop);
+    body.step(Tick::from_seconds(1.5), Some(&space.read()), collision_noop);
     assert_eq!(body.position(), point3(3.0, -43.0, 0.0));
-    body.step(Tick::from_seconds(1.5), Some(&space), collision_noop);
+    body.step(Tick::from_seconds(1.5), Some(&space.read()), collision_noop);
     assert_eq!(body.position(), point3(6.0, -133.0, 0.0));
 }
 
@@ -74,7 +74,9 @@ fn falling_collision() {
     body.flying = false;
 
     let mut contacts = Vec::new();
-    body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
+    body.step(Tick::from_seconds(1.0), Some(&space.read()), |c| {
+        contacts.push(c)
+    });
 
     assert_eq!(body.position().x, 2.0);
     assert_eq!(body.position().z, 0.0);
@@ -106,7 +108,10 @@ fn falling_collision_partial_block() {
     body.flying = false;
 
     let mut contacts = Vec::new();
-    dbg!(body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c)));
+    dbg!(
+        body.step(Tick::from_seconds(1.0), Some(&space.read()), |c| contacts
+            .push(c))
+    );
 
     dbg!(body.collision_box_abs());
 
@@ -141,7 +146,7 @@ fn falling_collision_partial_block() {
 
     for t in 1..=1000 {
         eprintln!("--- step {t}");
-        body.step(Tick::from_seconds(1.0), Some(&space), drop);
+        body.step(Tick::from_seconds(1.0), Some(&space.read()), drop);
         assert!(
             (body.position().y - 1.0).abs() < 1e-6,
             "not touching surface on step {:?}: {:?}",
@@ -163,7 +168,9 @@ fn push_out_simple() {
     body.flying = true;
 
     let mut contacts = Vec::new();
-    let info = body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
+    let info = body.step(Tick::from_seconds(1.0), Some(&space.read()), |c| {
+        contacts.push(c)
+    });
     dbg!(info);
 
     assert_eq!(body.position(), point3(1.5 + POSITION_EPSILON, 0.5, 0.5));
@@ -186,7 +193,9 @@ fn push_out_voxels() {
     body.flying = true;
 
     let mut contacts = Vec::new();
-    let info = body.step(Tick::from_seconds(1.0), Some(&space), |c| contacts.push(c));
+    let info = body.step(Tick::from_seconds(1.0), Some(&space.read()), |c| {
+        contacts.push(c)
+    });
     dbg!(info);
 
     assert_eq!(body.position(), point3(0.5, 1.0 + POSITION_EPSILON, 0.5));
@@ -241,7 +250,11 @@ fn no_passing_through_blocks() {
             // Reset velocity every frame as an approximation of the effect of player input.
             body.set_velocity(velocity);
             position_history.push_front(body.position());
-            body.step(Tick::from_seconds(1.0 / 60.0), Some(&space), |_contact| {});
+            body.step(
+                Tick::from_seconds(1.0 / 60.0),
+                Some(&space.read()),
+                |_contact| {},
+            );
 
             let distance_from_start = chebyshev_length(body.position() - start);
             assert!(

@@ -31,7 +31,7 @@ use crate::math::{
 };
 use crate::physics::{POSITION_EPSILON, StopAt, Velocity};
 use crate::raycast::Ray;
-use crate::space::Space;
+use crate::space;
 use crate::time::Tick;
 use crate::transaction::{self, Equal, Transaction};
 use crate::util::{ConciseDebug, Fmt, Refmt as _, StatusText};
@@ -198,7 +198,7 @@ impl Body {
     pub(crate) fn step<CC>(
         &mut self,
         tick: Tick,
-        colliding_space: Option<&Space>,
+        colliding_space: Option<&space::Read<'_>>,
         collision_callback: CC,
     ) -> BodyStepInfo
     where
@@ -227,7 +227,7 @@ impl Body {
         &mut self,
         tick: Tick,
         external_delta_v: Vector3D<NotNan<FreeCoordinate>, Velocity>,
-        mut colliding_space: Option<&Space>,
+        mut colliding_space: Option<&space::Read<'_>>,
         mut collision_callback: CC,
         rerun_destination: &crate::rerun_glue::Destination,
     ) -> BodyStepInfo
@@ -486,7 +486,7 @@ impl Body {
     /// Returns the remainder of `delta_position` that should be retried for sliding movement.
     fn collide_and_advance<CC>(
         &mut self,
-        space: &Space,
+        space: &space::Read<'_>,
         collision_callback: &mut CC,
         mut delta_position: FreeVector,
     ) -> (FreeVector, MoveSegment)
@@ -552,7 +552,7 @@ impl Body {
     }
 
     /// Check if we're intersecting any blocks and fix that if so.
-    fn push_out(&mut self, space: &Space) -> Option<FreeVector> {
+    fn push_out(&mut self, space: &space::Read<'_>) -> Option<FreeVector> {
         // TODO: need to unsquash the `occupying` box if possible
 
         let colliding = find_colliding_cubes(space, self.collision_box_abs()).next().is_some();
@@ -589,7 +589,7 @@ impl Body {
     /// return the new position and distance to it.
     fn attempt_push_out(
         &self,
-        space: &Space,
+        space: &space::Read<'_>,
         direction: FreeVector,
     ) -> Option<(FreePoint, NotNan<FreeCoordinate>)> {
         if false {

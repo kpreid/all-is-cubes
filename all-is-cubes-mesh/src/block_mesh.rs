@@ -8,13 +8,14 @@ use core::fmt;
 
 use all_is_cubes::block::{EvaluatedBlock, VoxelOpacityMask};
 use all_is_cubes::math::{Face6, FaceMap};
-use all_is_cubes::space::Space;
+use all_is_cubes::space;
 use all_is_cubes_render::Flaws;
 
-#[cfg(doc)]
-use crate::SpaceMesh;
 use crate::texture::{self, Tile as _};
 use crate::{Aabbs, IndexVec, MeshOptions, MeshTypes, Vertex};
+
+#[cfg(doc)]
+use {crate::SpaceMesh, all_is_cubes::space::Space};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -451,7 +452,7 @@ impl<V: Vertex> Default for SubMesh<V> {
 /// The resulting array is indexed by the `Space`'s
 /// [`BlockIndex`](all_is_cubes::space::BlockIndex) values.
 pub fn block_meshes_for_space<M: MeshTypes>(
-    space: &Space,
+    space: &space::Read<'_>,
     texture_allocator: &M::Alloc,
     options: &MeshOptions,
 ) -> BlockMeshes<M>

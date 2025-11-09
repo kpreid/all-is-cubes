@@ -8,7 +8,7 @@ use futures_channel::oneshot::Canceled;
 
 use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
 use all_is_cubes::math::Cube;
-use all_is_cubes::space::{BlockIndex, Space};
+use all_is_cubes::space::{self, BlockIndex};
 use all_is_cubes::time;
 use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
@@ -71,7 +71,7 @@ where
     pub(crate) fn update<F>(
         &mut self,
         todo: &mut hashbrown::HashSet<BlockIndex>,
-        space: &Space,
+        space: &space::Read<'_>,
         mesh_options: &MeshOptions,
         deadline: time::Deadline,
         render_data_updater: &F,

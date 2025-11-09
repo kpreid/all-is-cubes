@@ -15,7 +15,7 @@ use crate::math::Euclid as _;
 use crate::camera;
 use crate::math::FreeCoordinate;
 use crate::raycast::Ray;
-use crate::space::{LightPhysics, Space};
+use crate::space;
 
 /// What average luminance of the exposed scene to try to match
 const TARGET_LUMINANCE: f32 = 0.9;
@@ -54,7 +54,7 @@ impl State {
         self.exposure_log.exp()
     }
 
-    pub(crate) fn step(&mut self, space: &Space, vt: camera::ViewTransform, dt: f64) {
+    pub(crate) fn step(&mut self, space: &space::Read<'_>, vt: camera::ViewTransform, dt: f64) {
         #![allow(clippy::cast_lossless, reason = "lossiness depends on size of usize")]
 
         if dt == 0. {
@@ -67,8 +67,8 @@ impl State {
         // raytracing renderer and/or the light updator.
         {
             let max_steps = match space.physics().light {
-                LightPhysics::None => 0,
-                LightPhysics::Rays { maximum_distance } => {
+                space::LightPhysics::None => 0,
+                space::LightPhysics::Rays { maximum_distance } => {
                     usize::from(maximum_distance).saturating_mul(2)
                 }
             };
@@ -143,6 +143,7 @@ mod tests {
     use crate::character::Character;
     use crate::character::eye::CharacterEye;
     use crate::math::{GridAab, Rgb};
+    use crate::space::Space;
     use crate::time;
     use crate::universe::Universe;
     use euclid::point3;

@@ -613,7 +613,7 @@ mod tests {
             let chart = ChunkChart::<16>::new(distance_in_chunks * 16.);
 
             println!("distance {distance_in_chunks}, expected count {count}");
-            print_space(&chart.visualization(), [1., 1., 1.]);
+            print_space(&chart.visualization().read(), [1., 1., 1.]);
 
             let chunks: Vec<_> = chart.chunks(ChunkPos::new(0, 0, 0), OctantMask::ALL).collect();
             assert_eq!(

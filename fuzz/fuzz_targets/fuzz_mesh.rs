@@ -21,9 +21,9 @@ libfuzzer_sys::fuzz_target!(|input: ArbitraryWithUniverse<(
     let space = construct_space(sing);
 
     let tex = mesh::testing::Allocator::new();
-    let block_meshes = mesh::block_meshes_for_space(&space, &tex, &options);
+    let block_meshes = mesh::block_meshes_for_space(&space.read(), &tex, &options);
     let mut space_mesh: mesh::SpaceMesh<mesh::testing::TextureMt> =
-        mesh::SpaceMesh::new(&space, space.bounds(), &options, &*block_meshes);
+        mesh::SpaceMesh::new(&space.read(), space.bounds(), &options, &*block_meshes);
 
     // We have implicitly exercised the consistency_check()s of BlockMesh and SpaceMesh, which run
     // automatically when debug assertions are set.

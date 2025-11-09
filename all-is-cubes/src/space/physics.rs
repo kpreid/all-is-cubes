@@ -1,5 +1,6 @@
 use core::fmt;
 
+use bevy_ecs::prelude as ecs;
 use euclid::{Vector3D, vec3};
 
 use crate::math::{FreeCoordinate, NotNan, notnan, rgb_const};
@@ -20,7 +21,7 @@ use crate::{block::Block, space::Space};
 /// [`DEFAULT_FOR_BLOCK`](Self::DEFAULT_FOR_BLOCK)).
 //---
 // TODO: Consider renaming this struct to avoid `space::Space*` naming pattern
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq, ecs::Component)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct SpacePhysics {

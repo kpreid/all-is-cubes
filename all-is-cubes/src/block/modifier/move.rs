@@ -242,7 +242,7 @@ mod tests {
     use crate::block::{Composite, EvaluatedBlock, Resolution::*, VoxelOpacityMask};
     use crate::content::make_some_blocks;
     use crate::math::{FaceMap, GridPoint, OpacityCategory, Rgb, Rgba, rgba_const, zo32};
-    use crate::space::Space;
+    use crate::space::{self, Space};
     use crate::universe::{ReadTicket, Universe};
     use pretty_assertions::assert_eq;
 
@@ -377,7 +377,11 @@ mod tests {
     }
 
     /// Set up a `Modifier::Move`, let it run, and then allow assertions to be made about the result.
-    fn move_block_test(direction: Face6, velocity: i16, checker: impl FnOnce(&Space, &Block)) {
+    fn move_block_test(
+        direction: Face6,
+        velocity: i16,
+        checker: impl FnOnce(space::Read<'_>, &Block),
+    ) {
         let [block] = make_some_blocks();
         let [move_out, move_in] = Move::new(direction, 0, velocity).into_paired();
         let space = Space::builder(GridAab::from_lower_upper([-1, -1, -1], [2, 2, 2]))

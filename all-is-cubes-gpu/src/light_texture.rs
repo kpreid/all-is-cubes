@@ -13,7 +13,7 @@ use all_is_cubes::math::{
     Aab, Axis, Cube, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord,
     PositiveSign,
 };
-use all_is_cubes::space::Space;
+use all_is_cubes::space;
 use all_is_cubes::{
     euclid::{Box3D, Point3D, Size3D, Vector3D, vec3},
     math::VectorOps,
@@ -243,7 +243,7 @@ impl LightTexture {
     pub fn ensure_visible_is_mapped(
         &mut self,
         queue: &wgpu::Queue,
-        space: &Space,
+        space: &space::Read<'_>,
         camera: &Camera,
     ) -> usize {
         self.ensure_mapped(queue, space, visible_light_volume(space.bounds(), camera))
@@ -254,7 +254,12 @@ impl LightTexture {
     /// The region must be no larger than the texture.
     ///
     /// Returns the volume (number of cubes) that needed to be copied to the texture.
-    pub fn ensure_mapped(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
+    pub fn ensure_mapped(
+        &mut self,
+        queue: &wgpu::Queue,
+        space: &space::Read<'_>,
+        region: GridAab,
+    ) -> usize {
         let Some(region) = region.intersection_cubes(space.bounds().expand(FaceMap::splat(1)))
         else {
             return 0;
@@ -323,7 +328,12 @@ impl LightTexture {
     /// The region must be no larger than the texture.
     ///
     /// This method does *not* update `mapped_region`; that's the caller's job.
-    fn copy_region(&mut self, queue: &wgpu::Queue, space: &Space, region: GridAab) -> usize {
+    fn copy_region(
+        &mut self,
+        queue: &wgpu::Queue,
+        space: &space::Read<'_>,
+        region: GridAab,
+    ) -> usize {
         let size = extent_to_size3d(self.texture.size());
         let buffer = &mut Vec::new();
         split_axis(region.x_range(), size.width, buffer, |x_range, buffer| {
@@ -348,7 +358,7 @@ impl LightTexture {
     fn copy_contiguous_region(
         &self,
         queue: &wgpu::Queue,
-        space: &Space,
+        space: &space::Read<'_>,
         region: GridAab,
         buffer: &mut Vec<Texel>,
     ) -> usize {
@@ -422,7 +432,7 @@ impl LightTexture {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        space: &Space,
+        space: &space::Read<'_>,
         chunks: impl IntoIterator<Item = LightChunk>,
     ) -> usize {
         let mut total_count = 0;

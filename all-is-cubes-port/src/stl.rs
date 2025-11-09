@@ -9,7 +9,7 @@ use stl_io::Triangle;
 use all_is_cubes::block;
 use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::math::zo32;
-use all_is_cubes::space::Space;
+use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe;
 use all_is_cubes::util::YieldProgress;
 use all_is_cubes_mesh::{
@@ -36,7 +36,7 @@ pub(crate) fn export_stl(
     for space in spaces {
         items.insert(
             source.member_export_path(destination, &space),
-            space_to_stl_triangles(space.read(read_ticket)?),
+            space_to_stl_triangles(&space.read(read_ticket)?),
         );
     }
 
@@ -64,7 +64,7 @@ pub(crate) fn export_stl(
     })
 }
 
-pub(crate) fn space_to_stl_triangles(space: &Space) -> Vec<Triangle> {
+pub(crate) fn space_to_stl_triangles(space: &space::Read<'_>) -> Vec<Triangle> {
     let mesh_options = mesh_options_for_stl();
     let block_meshes: Box<[mesh::BlockMesh<StlMt>]> =
         mesh::block_meshes_for_space(space, &NoTextures, &mesh_options);
@@ -141,7 +141,7 @@ mod tests {
         let space = lighting_bench_space(&mut u, yield_progress_for_testing(), size3(54, 16, 54))
             .await
             .unwrap();
-        let mesh = space_to_stl_triangles(&space);
+        let mesh = space_to_stl_triangles(&space.read());
         assert!(mesh.len() > 30_000, "{}", mesh.len());
     }
 

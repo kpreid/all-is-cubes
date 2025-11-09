@@ -1,6 +1,10 @@
 //! Things relating to viewing the world through a specific [`Character`].
 
-#![expect(clippy::needless_pass_by_value, reason = "false positives from Res")]
+#![allow(
+    elided_lifetimes_in_paths,
+    clippy::needless_pass_by_value,
+    reason = "Bevy systems"
+)]
 
 /// Acts as polyfill for float methods such as `powf()`
 #[cfg(not(feature = "std"))]
@@ -15,7 +19,7 @@ use crate::camera::ViewTransform;
 use crate::character::{ParentSpace, exposure};
 use crate::math::{Cube, FreeCoordinate, FreeVector};
 use crate::physics::{Body, Velocity};
-use crate::space::Space;
+use crate::space;
 use crate::time;
 use crate::universe::{self, UniverseId};
 
@@ -124,10 +128,10 @@ fn step_eye_position(
 }
 
 fn step_exposure(
-    universe_id: ecs::Res<'_, UniverseId>,
-    current_step: ecs::Res<'_, universe::CurrentStep>,
-    characters: ecs::Query<'_, '_, (&ParentSpace, &mut CharacterEye)>,
-    spaces: ecs::Query<'_, '_, &Space>,
+    universe_id: ecs::Res<UniverseId>,
+    current_step: ecs::Res<universe::CurrentStep>,
+    characters: ecs::Query<(&ParentSpace, &mut CharacterEye)>,
+    spaces: ecs::Query<universe::ReadMember<space::Space>>,
 ) -> ecs::Result {
     let tick = current_step.get()?.tick;
     let dt = tick.delta_t().as_secs_f64();
@@ -145,9 +149,9 @@ fn step_exposure(
         let Some(view_transform) = eye.view_transform else {
             continue;
         };
-        let space = spaces.get(space_entity)?;
+        let space = spaces.get(space_entity)?.read();
 
-        eye.exposure.step(space, view_transform, dt);
+        eye.exposure.step(&space, view_transform, dt);
     }
 
     Ok(())

@@ -900,6 +900,15 @@ mod space {
         where
             S: Serializer,
         {
+            self.read().serialize(serializer)
+        }
+    }
+
+    impl Serialize for space::Read<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
             schema::SpaceSer::SpaceV1 {
                 bounds: self.bounds(),
                 physics: self.physics().into(),

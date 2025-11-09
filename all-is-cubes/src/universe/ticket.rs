@@ -148,7 +148,7 @@ impl<'universe> ReadTicket<'universe> {
     /// There must be no concurrent access to any entity other than `excluded`,
     /// until the lifetime `'u` expires.
     #[track_caller]
-    pub(in crate::universe) unsafe fn everything_but<'u>(
+    pub(crate) unsafe fn everything_but<'u>(
         universe_id: UniverseId,
         world: UnsafeWorldCell<'u>,
         excluded: ecs::Entity,

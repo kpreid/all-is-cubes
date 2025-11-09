@@ -10,14 +10,16 @@ use all_is_cubes::math::{
     Aab, Cube, FreeCoordinate, FreePoint, GridCoordinate, Rgba, lines, lines::Wireframe as _,
     rgba_const,
 };
-use all_is_cubes::space::{BlockIndex, Space};
+use all_is_cubes::space::{self, BlockIndex};
 use all_is_cubes_render::camera::Camera;
 
 use crate::dynamic::{self, DynamicMeshTypes};
 use crate::{BlockMesh, DepthOrdering, GetBlockMesh, MeshOptions, MeshRel, Position, SpaceMesh};
 
 #[cfg(doc)]
-use crate::dynamic::ChunkedSpaceMesh;
+use {crate::dynamic::ChunkedSpaceMesh, all_is_cubes::space::Space};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Hash set that stores chunk-relative cubes.
 type MeshCubeSet = hashbrown::HashSet<Point3D<u8, MeshRel>>;
@@ -148,7 +150,7 @@ impl<M: DynamicMeshTypes, const CHUNK_SIZE: GridCoordinate> ChunkMesh<M, CHUNK_S
     pub(crate) fn recompute(
         &mut self,
         chunk_todo: &mut ChunkTodo,
-        space: &Space,
+        space: &space::Read<'_>,
         options: &MeshOptions,
         block_meshes: &dynamic::VersionedBlockMeshes<M>,
     ) -> bool {

@@ -114,16 +114,16 @@ fn light_texture_write_read(
 
         if use_scatter {
             // First initialize with black from dark_space, then refresh it using update_scatter().
-            lt.ensure_mapped(&queue, &dark_space, space.bounds());
+            lt.ensure_mapped(&queue, &dark_space.read(), space.bounds());
 
             lt.update_scatter(
                 &device,
                 &queue,
-                &space,
+                &space.read(),
                 LightChunk::all_in_region(space.bounds()).into_iter(),
             );
         } else {
-            lt.ensure_mapped(&queue, &space, space.bounds());
+            lt.ensure_mapped(&queue, &space.read(), space.bounds());
         }
 
         let texture_size = extent_to_size3d(lt.texture().size()).to_i32();

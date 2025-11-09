@@ -433,7 +433,7 @@ struct SpaceMeshIngredients {
 
 impl SpaceMeshIngredients {
     fn new(options: MeshOptions, space: Space) -> Self {
-        let block_meshes = mesh::block_meshes_for_space(&space, &Allocator::new(), &options);
+        let block_meshes = mesh::block_meshes_for_space(&space.read(), &Allocator::new(), &options);
 
         SpaceMeshIngredients {
             space,
@@ -444,7 +444,7 @@ impl SpaceMeshIngredients {
 
     fn do_new(&self) -> SpaceMesh<Mt> {
         SpaceMesh::new(
-            &self.space,
+            &self.space.read(),
             self.space.bounds(),
             &self.options,
             &*self.block_meshes,
@@ -454,7 +454,7 @@ impl SpaceMeshIngredients {
     fn do_compute(&self, mesh: &mut SpaceMesh<Mt>) {
         SpaceMesh::compute(
             mesh,
-            &self.space,
+            &self.space.read(),
             self.space.bounds(),
             &self.options,
             &*self.block_meshes,

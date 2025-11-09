@@ -140,7 +140,7 @@ pub(super) fn character_physics_step_system(
             let body_info = body.step_with_rerun(
                 tick,
                 control_delta_v,
-                Some(space),
+                Some(&space),
                 |cube| {
                     colliding_cubes.insert(cube);
                 },

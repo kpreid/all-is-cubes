@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use all_is_cubes::character::{self, Cursor};
 use all_is_cubes::content::palette;
 use all_is_cubes::math::{Face7, FreePoint, Rgba, lines};
-use all_is_cubes::space::Space;
+use all_is_cubes::space;
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::MapExtend;
 use all_is_cubes_render::camera::GraphicsOptions;
@@ -16,8 +16,8 @@ pub(crate) trait DebugLineVertex {
 /// The `Character`'s space should be the given `Space` if both are present
 pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
     read_ticket: ReadTicket<'_>,
-    character: Option<character::Read<'_>>,
-    space: Option<&Space>,
+    character: Option<&character::Read<'_>>,
+    space: Option<&space::Read<'_>>,
     graphics_options: &GraphicsOptions,
     v: &mut Vec<[V; 2]>,
     cursor_result: Option<&Cursor>,
@@ -44,16 +44,16 @@ pub(crate) fn gather_debug_lines<V: DebugLineVertex>(
         if graphics_options.debug_light_rays_at_cursor
             && let Some(cursor) = cursor_result
         {
-            // TODO: kludged test
+            // TODO: kludged test which should be expressed in some other way such as
+            // by comparing handles
             let is_same_space = if let Ok(cursor_space) = cursor.space().read(read_ticket) {
-                std::ptr::eq(&raw const *cursor_space, space)
+                std::ptr::eq(&raw const *cursor_space.spawn(), &raw const *space.spawn())
             } else {
                 false
             };
             if is_same_space {
-                let result = space.compute_lighting::<all_is_cubes::space::LightUpdateCubeInfo>(
-                    cursor.preceding_cube(),
-                );
+                let result =
+                    space.compute_light::<space::LightUpdateCubeInfo>(cursor.preceding_cube());
                 wireframe_vertices(v, Rgba::new(0.8, 0.8, 1.0, 1.0), &result.debug);
             }
         }

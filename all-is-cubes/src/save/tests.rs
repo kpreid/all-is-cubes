@@ -798,7 +798,7 @@ fn space_with_sparse_indices() {
         vec![&AIR, &block0, &AIR, &block2],
     );
 
-    let space2: Space = from_value(to_value(&space).unwrap()).unwrap();
+    let space2: Space = from_value(to_value(space.read()).unwrap()).unwrap();
 
     // We do not require the new space to have exactly the same indices as the old space,
     // but the blocks should match.
@@ -824,7 +824,7 @@ fn space_light_queue_remembered() {
         [Opaque, NoRays, NoRays]
     );
 
-    let serialized = to_value(&space).unwrap();
+    let serialized = to_value(space.read()).unwrap();
     let mut universe2 = Universe::new();
     let space2: Space = from_value(serialized).unwrap();
 

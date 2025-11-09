@@ -88,7 +88,7 @@ mod tests {
             .read_ticket(universe.read_ticket())
             .filled_with(slab)
             .build();
-        let rt = &SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
+        let rt = &SpaceRaytracer::<()>::new(&space.read(), GraphicsOptions::default(), ());
 
         #[track_caller]
         fn assert_depth(rt: &SpaceRaytracer<()>, expected_depth: f64, ray: Ray, label: &str) {

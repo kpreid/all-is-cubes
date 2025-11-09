@@ -32,7 +32,7 @@ pub fn render_orthographic(read_ticket: ReadTicket<'_>, space: &Handle<Space>) -
     // the image scale is too low to accurately capture the scene.
     let space = space.read(read_ticket).expect("failed to read space to render");
     let camera = &MultiOrthoCamera::new(Resolution::R32, space.bounds());
-    let rt = &raytracer::SpaceRaytracer::new(space, GraphicsOptions::UNALTERED_COLORS, ());
+    let rt = &raytracer::SpaceRaytracer::new(&space, GraphicsOptions::UNALTERED_COLORS, ());
 
     // TODO: The caching logic here saves time by skipping tracing pixels that are
     // predictably equal to previous ones. However, the optimal solution would be 2D rather

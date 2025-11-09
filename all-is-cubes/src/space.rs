@@ -7,26 +7,28 @@ use core::fmt;
 use core::ops;
 use core::time::Duration;
 
-use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
+use bevy_ecs::prelude as ecs;
+use hashbrown::HashSet as HbHashSet;
 use manyfmt::Fmt;
 
 use crate::behavior::BehaviorSet;
 use crate::behavior::BehaviorSetStepInfo;
-use crate::block::{AIR, AIR_EVALUATED_REF, Block, EvaluatedBlock, Resolution, TickAction};
+use crate::block::{AIR, AIR_EVALUATED_REF, Block, EvaluatedBlock, Resolution};
 use crate::character::Spawn;
 use crate::drawing::DrawingPlane;
-use crate::fluff::{self, Fluff};
-use crate::inv::InventoryTransaction;
+use crate::fluff::Fluff;
 use crate::listen::{self, Listen, Notifier};
-use crate::math::{Cube, GridAab, GridCoordinate, Gridgid, Vol};
-use crate::time;
-use crate::transaction::{self, Merge, Transaction as _};
-use crate::universe::ReadTicket;
-use crate::universe::{self, Handle, HandleVisitor, UniverseTransaction, VisitHandles};
+use crate::math::{Cube, GridAab, Gridgid, Vol};
+use crate::universe::SealedMember as _;
+use crate::universe::{self, HandleVisitor, ReadTicket, VisitHandles};
 use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
 
 #[cfg(doc)]
-use crate::{block::BlockDef, character::Character, universe::Universe};
+use crate::{
+    block::BlockDef,
+    character::Character,
+    universe::{Handle, Universe},
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -71,6 +73,9 @@ mod tests;
 
 // -------------------------------------------------------------------------------------------------
 
+/// Number used to identify distinct blocks within a [`Space`].
+pub type BlockIndex = u16;
+
 /// A physical space consisting mostly of [`Block`]s arranged in a grid.
 /// The main “game world” data structure.
 ///
@@ -94,8 +99,6 @@ mod tests;
 ///   Set using [`SpaceTransaction::behaviors()`].
 ///
 #[doc = include_str!("save/serde-warning.md")]
-#[derive(bevy_ecs::component::Component)]
-#[require(step::SpacePaletteNextValue)]
 pub struct Space {
     palette: Palette,
 
@@ -119,11 +122,23 @@ pub struct Space {
     // search for behaviors in specific regions
     behaviors: BehaviorSet<Space>,
 
+    ticks: Ticks,
+
     spawn: Spawn,
 
-    /// Cubes that should be checked for `tick_action`s on the next call to [`Self::step()`].
-    cubes_wanting_ticks: HbHashSet<Cube>,
+    notifiers: Notifiers,
+}
 
+/// Component of [`Space`] storing which block is in each cube within the bounds.
+///
+/// Also serves as the component that requires other components not included in the bundle.
+#[derive(ecs::Component)]
+#[require(step::SpacePaletteNextValue, Notifiers, Ticks)]
+pub(crate) struct Contents(Vol<Box<[BlockIndex]>>);
+
+/// Component of [`Space`] storing which block is in each cube within the bounds.
+#[derive(Debug, Default, ecs::Component)]
+pub(crate) struct Notifiers {
     /// Notifier of changes to Space data.
     change_notifier: Notifier<SpaceChange>,
 
@@ -131,21 +146,78 @@ pub struct Space {
     fluff_notifier: Notifier<SpaceFluff>,
 }
 
+/// Component of [`Space`] storing where characters spawn by default.
+#[derive(Debug, ecs::Component)]
+pub(crate) struct DefaultSpawn(Spawn);
+
+#[derive(Debug, Default, ecs::Component)]
+pub(crate) struct Ticks {
+    /// Cubes that should be checked for `tick_action`s on the next step.
+    ///
+    /// TODO: Need to track which *phase* the action applies to.
+    cubes_wanting_ticks: HbHashSet<Cube>,
+}
+
+/// Read access to a [`Space`] that may be currently in a [`Universe`].
+///
+/// Obtain this using [`Handle::read()`] or [`Space::read()`].
+#[derive(Clone, Copy)]
+pub struct Read<'ticket> {
+    palette: &'ticket Palette,
+    contents: Vol<&'ticket [BlockIndex]>,
+    light: &'ticket LightStorage,
+    physics: &'ticket SpacePhysics,
+    behaviors: &'ticket BehaviorSet<Space>,
+    default_spawn: &'ticket Spawn,
+    notifiers: &'ticket Notifiers,
+}
+
+// -------------------------------------------------------------------------------------------------
+
 impl fmt::Debug for Space {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            palette,
+            contents,
+            light: _,
+            physics,
+            behaviors,
+            ticks: _,
+            spawn,
+            notifiers: _,
+        } = self;
         // Make the assumption that a Space is too big to print in its entirety.
+        // (What's left out is kind of arbitrary, though.)
         fmt.debug_struct("Space")
-            .field("bounds", &self.contents.bounds())
-            .field("palette", &self.palette)
-            .field("physics", &self.physics)
-            .field("behaviors", &self.behaviors)
-            .field("cubes_wanting_ticks", &self.cubes_wanting_ticks) // TODO: truncate?
+            .field("bounds", &contents.bounds())
+            .field("palette", palette)
+            .field("physics", physics)
+            .field("behaviors", behaviors)
+            .field("default_spawn", spawn)
             .finish_non_exhaustive()
     }
 }
 
-/// Number used to identify distinct blocks within a [`Space`].
-pub type BlockIndex = u16;
+impl fmt::Debug for Read<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            palette,
+            contents,
+            light: _,
+            physics,
+            behaviors,
+            default_spawn,
+            notifiers: _,
+        } = self;
+        fmt.debug_struct("space::Read")
+            .field("bounds", &contents.bounds())
+            .field("palette", palette)
+            .field("physics", physics)
+            .field("behaviors", behaviors)
+            .field("default_spawn", default_spawn)
+            .finish_non_exhaustive()
+    }
+}
 
 impl Space {
     /// Returns a space [`Builder`] configured for a [recursive] block,
@@ -260,9 +332,8 @@ impl Space {
             physics,
             behaviors,
             spawn: spawn.unwrap_or_else(|| Spawn::default_for_new_space(bounds.bounds())),
-            cubes_wanting_ticks: Default::default(),
-            change_notifier: Notifier::new(),
-            fluff_notifier: Notifier::new(),
+            ticks: Ticks::default(),
+            notifiers: Notifiers::default(),
         })
     }
 
@@ -303,28 +374,11 @@ impl Space {
     /// Copy data out of a portion of the space in a caller-chosen format.
     ///
     /// The given `bounds` must be fully contained within `self.bounds()`.
-    pub fn extract<'s, C, V>(
-        &'s self,
-        bounds: GridAab,
-        mut extractor: impl FnMut(Extract<'s>) -> V,
-    ) -> Vol<C>
+    pub fn extract<C, V>(&self, bounds: GridAab, extractor: impl FnMut(Extract<'_>) -> V) -> Vol<C>
     where
         C: ops::Deref<Target = [V]> + FromIterator<V>,
     {
-        assert!(self.bounds().contains_box(bounds));
-
-        // TODO: Implement an iterator over the indexes (which is not just
-        // interior_iter().enumerate() because it's a sub-region) so that we don't
-        // have to run independent self.bounds.index() calculations per cube.
-        // (But before that, we can optimize the case given bounds are the whole space.)
-        Vol::from_fn(bounds, |cube| {
-            extractor(Extract {
-                space: self,
-                cube,
-                cube_index: self.contents.index(cube).unwrap(),
-                block_index: Default::default(),
-            })
-        })
+        Space::read_from_standalone(self).extract(bounds, extractor)
     }
 
     /// Returns the [`EvaluatedBlock`] of the block in this space at the given position.
@@ -354,7 +408,7 @@ impl Space {
         self.light.get(cube.into())
     }
 
-    #[allow(unused, reason = "currently only used on feature=save and tests")]
+    #[cfg_attr(not(test), allow(unused))]
     pub(crate) fn in_light_update_queue(&self, cube: Cube) -> bool {
         self.light.in_light_update_queue(cube)
     }
@@ -461,6 +515,11 @@ impl Space {
         });
     }
 
+    /// Converts `&Space` into [`Read`] for when you need it.
+    pub fn read(&self) -> Read<'_> {
+        Self::read_from_standalone(self)
+    }
+
     /// Begins a batch of mutations to the contents of this space.
     ///
     /// `read_ticket` should be a [`ReadTicket`] obtained from the [`Universe`] which contains
@@ -487,9 +546,9 @@ impl Space {
             light: &mut self.light,
             behaviors: &mut self.behaviors,
             spawn: &mut self.spawn,
-            change_buffer: &mut self.change_notifier.buffer(),
-            fluff_buffer: &mut self.fluff_notifier.buffer(),
-            cubes_wanting_ticks: &mut self.cubes_wanting_ticks,
+            change_buffer: &mut self.notifiers.change_notifier.buffer(),
+            fluff_buffer: &mut self.notifiers.fluff_notifier.buffer(),
+            cubes_wanting_ticks: &mut self.ticks.cubes_wanting_ticks,
         })
     }
 
@@ -516,211 +575,11 @@ impl Space {
         self.palette.entries()
     }
 
-    /// Step the space's behaviors.
-    ///
-    /// * `tick` is how much time is to pass in the simulation.
-    ///
-    /// TODO(ecs): This function is residue of non-ECS implementation
-    pub(crate) fn step_behaviors(
-        &self,
-        read_ticket: ReadTicket<'_>,
-        self_handle: Option<&Handle<Space>>,
-        tick: time::Tick,
-    ) -> (SpaceStepInfo, UniverseTransaction) {
-        let start_space_behaviors = time::Instant::now();
-
-        // this should be an if-let-chain
-        let (transaction, behavior_step_info) =
-            if let Some(self_handle) = self_handle.filter(|_| !tick.paused()) {
-                self.behaviors.step(
-                    read_ticket,
-                    &self,
-                    &(|t: SpaceTransaction| t.bind(self_handle.clone())),
-                    SpaceTransaction::behaviors,
-                    tick,
-                )
-            } else {
-                Default::default()
-            };
-
-        let space_behaviors_to_lighting = time::Instant::now();
-
-        (
-            SpaceStepInfo {
-                spaces: 1,
-                evaluations: TimeStats::default(), // TODO(ecs): re-hookup our time stats
-                cube_ticks: 0,                     // TODO(ecs): re-hookup
-                cube_time: Duration::ZERO,         // TODO(ecs): re-hookup
-                behaviors: behavior_step_info,
-                behaviors_time: space_behaviors_to_lighting
-                    .saturating_duration_since(start_space_behaviors),
-                light: LightUpdatesInfo::default(), // will be filled with nonzero separately -- TODO(ecs): clarify
-            },
-            transaction,
-        )
-    }
-
-    /// Process the block `tick_action` part of a [`Self::step()`].
-    fn execute_tick_actions(&mut self, read_ticket: ReadTicket<'_>, tick: time::Tick) -> usize {
-        // Review self.cubes_wanting_ticks, and filter out actions that shouldn't
-        // happen this tick.
-        // TODO: Use a schedule-aware structure for cubes_wanting_ticks so we can iterate over
-        // fewer cubes.
-        let mut to_remove: Vec<Cube> = Vec::new();
-        let mut cubes_to_tick: Vec<Cube> = self
-            .cubes_wanting_ticks
-            .iter()
-            .copied()
-            .filter(|&cube| {
-                if let Some(TickAction {
-                    operation: _,
-                    schedule,
-                }) = self.get_evaluated(cube).attributes().tick_action
-                {
-                    if schedule.contains(tick) {
-                        // Don't tick yet.
-                        false
-                    } else {
-                        true
-                    }
-                } else {
-                    // Doesn't actually have an action.
-                    to_remove.push(cube);
-                    false
-                }
-            })
-            .collect();
-        // Sort the list so our results are deterministic (in particular, in the order of the
-        // emitted `Fluff`).
-        // TODO: Maybe it would be more efficient to use a `BTreeMap` for storage? Benchmark.
-        cubes_to_tick.sort_unstable_by_key(|&cube| <[GridCoordinate; 3]>::from(cube));
-
-        // Remove cubes that don't actually need ticks now or later.
-        for cube in to_remove {
-            self.cubes_wanting_ticks.remove(&cube);
-        }
-
-        let mut first_pass_txn = SpaceTransaction::default();
-        let mut first_pass_cubes = HbHashSet::new();
-        let mut first_pass_conflicts: HbHashMap<Cube, SpaceTransaction> = HbHashMap::new();
-        for cube in cubes_to_tick.iter().copied() {
-            let Some(TickAction {
-                operation,
-                schedule: _,
-            }) = self.get_evaluated(cube).attributes().tick_action.as_ref()
-            else {
-                continue;
-            };
-
-            // Obtain the transaction.
-            let txn: SpaceTransaction = match operation.apply(
-                self,
-                None,
-                Gridgid::from_translation(cube.lower_bounds().to_vector()),
-            ) {
-                Ok((space_txn, inventory_txn)) => {
-                    assert_eq!(inventory_txn, InventoryTransaction::default());
-
-                    match space_txn.check(self) {
-                        Err(_e) => {
-                            // The operation produced a transaction which, itself, cannot execute
-                            // against the state of the Space. Omit it from the set.
-                            self.fluff_notifier.notify(&SpaceFluff {
-                                position: cube,
-                                fluff: Fluff::BlockFault(fluff::BlockFault::TickPrecondition(
-                                    space_txn.bounds().unwrap_or_else(|| cube.grid_aab()),
-                                )),
-                            });
-                            SpaceTransaction::default()
-                        }
-                        Ok(_) => space_txn,
-                    }
-                }
-                Err(_) => {
-                    // The operation failed to apply. This is normal if it just isn't the right
-                    // conditions yet.
-                    self.fluff_notifier.notify(&SpaceFluff {
-                        position: cube,
-                        fluff: Fluff::BlockFault(fluff::BlockFault::TickPrecondition(
-                            cube.grid_aab(),
-                        )),
-                    });
-                    SpaceTransaction::default()
-                }
-            };
-
-            // TODO: if we have already hit a conflict, we shouldn't be executing first_pass_txn,
-            // so we should just do a merge check and not a full merge.
-            match first_pass_txn.check_merge(&txn) {
-                Ok(check) => {
-                    // This cube's transaction successfully merged with the first_pass_txn.
-                    // Therefore, either it will be successful, *or* it will turn out that the
-                    // first pass set includes a conflict.
-                    first_pass_txn.commit_merge(txn, check);
-                    first_pass_cubes.insert(cube);
-                }
-                Err(_conflict) => {
-                    // This cube's transaction conflicts with something in the first pass set.
-                    // We now know that:
-                    // * we're not going to commit this cube's transaction
-                    // * we're not going to commit some or all of the first_pass_txn,
-                    // but we still need to continue to refine the conflict detection.
-                    first_pass_conflicts.insert(cube, txn);
-                }
-            }
-        }
-
-        // TODO: What we should be doing now is identifying which transactions do not conflict with
-        // *any* other transaction. That will require a spatial data structure to compute
-        // efficiently. Instead, we'll just stop *all* tick actions, which is correct-in-a-sense
-        // even if it's very suboptimal game mechanics.
-        if first_pass_conflicts.is_empty() {
-            if let Err(e) = first_pass_txn.execute(self, read_ticket, &mut transaction::no_outputs)
-            {
-                // This really shouldn't happen, because we already check()ed every part of
-                // first_pass_txn, but we don't want it to be fatal.
-                // TODO: this logging should use util::ErrorChain
-                log::error!("cube tick transaction could not be executed: {e:#?}");
-            }
-            first_pass_cubes.len()
-        } else {
-            // Don't run the transaction. Instead, report conflicts.
-            for cube in first_pass_cubes {
-                self.fluff_notifier.notify(&SpaceFluff {
-                    position: cube,
-                    fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(
-                        // pick an arbitrary conflicting txn — best we can do for now till we
-                        // hqve the proper fine-grained conflict detector.
-                        {
-                            let (other_cube, other_txn) =
-                                first_pass_conflicts.iter().next().unwrap();
-                            other_txn.bounds().unwrap_or_else(|| other_cube.grid_aab())
-                        },
-                    )),
-                });
-            }
-            for cube in first_pass_conflicts.keys().copied() {
-                self.fluff_notifier.notify(&SpaceFluff {
-                    position: cube,
-                    fluff: Fluff::BlockFault(fluff::BlockFault::TickConflict(
-                        first_pass_txn.bounds().unwrap_or_else(|| cube.grid_aab()),
-                    )),
-                });
-            }
-
-            0
-        }
-    }
-
     /// Returns the source of [fluff](Fluff) occurring in this space.
     pub fn fluff(
         &self,
     ) -> impl Listen<Msg = SpaceFluff, Listener = listen::DynListener<SpaceFluff>> + '_ {
-        &self.fluff_notifier
-    }
-
-    pub(crate) fn fluff_notifier(&self) -> &Notifier<SpaceFluff> {
-        &self.fluff_notifier
+        &self.notifiers.fluff_notifier
     }
 
     /// Returns the current [`SpacePhysics`] data, which determines global characteristics
@@ -771,32 +630,6 @@ impl Space {
     pub fn behaviors(&self) -> &BehaviorSet<Space> {
         &self.behaviors
     }
-    /// Compute the new lighting value for a cube.
-    ///
-    /// The returned vector of points lists those cubes which the computed value depends on
-    /// (imprecisely; empty cubes passed through are not listed).
-    #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging
-    pub fn compute_lighting<D>(&self, cube: Cube) -> light::ComputedLight<D>
-    where
-        D: light::LightComputeOutput,
-    {
-        // Unlike borrow_light_update_context(), this returns only references
-        let (light, uc) = {
-            (
-                &self.light,
-                light::UpdateCtx {
-                    contents: self.contents.as_ref(),
-                    palette: &self.palette,
-                },
-            )
-        };
-        light.compute_lighting(uc, cube)
-    }
-
-    #[doc(hidden)] // pub to be used by all-is-cubes-gpu
-    pub fn last_light_updates(&self) -> impl ExactSizeIterator<Item = Cube> + '_ {
-        self.light.last_light_updates.iter().copied()
-    }
 
     /// Produce split borrows of `self` to run light updating functions.
     fn borrow_light_update_context(
@@ -808,7 +641,22 @@ impl Space {
                 contents: self.contents.as_ref(),
                 palette: &self.palette,
             },
-            self.change_notifier.buffer(),
+            self.notifiers.change_notifier.buffer(),
+        )
+    }
+
+    /// Transform ECS components into what light updating functions need.
+    fn borrow_light_update_context_ecs<'w, 'n>(
+        palette: &'w Palette,
+        contents: &'w mut Contents,
+        notifiers: &'n Notifiers,
+    ) -> (light::UpdateCtx<'w>, ChangeBuffer<'n>) {
+        (
+            light::UpdateCtx {
+                contents: contents.0.as_ref(),
+                palette,
+            },
+            notifiers.change_notifier.buffer(),
         )
     }
 
@@ -817,6 +665,150 @@ impl Space {
     pub(crate) fn consistency_check(&self) {
         self.palette.consistency_check(self.contents.as_linear());
         self.light.consistency_check();
+    }
+}
+
+impl Read<'_> {
+    // TODO(ecs): Read should have a complete set of getter functions and does not yet
+
+    /// Returns the [`GridAab`] describing the bounds of this space; no blocks may exist
+    /// outside it.
+    pub fn bounds(&self) -> GridAab {
+        self.contents.bounds()
+    }
+
+    /// Returns the internal unstable numeric ID for the block at the given position,
+    /// which may be mapped to a [`Block`] by [`Read::block_data()`].
+    /// If you are looking for *simple* access, use `space[position]` (the
+    /// [`core::ops::Index`] trait) instead.
+    ///
+    /// These IDs may be used to perform efficient processing of many blocks, but they
+    /// may be renumbered after any mutation.
+    #[inline(always)]
+    pub fn get_block_index(&self, position: impl Into<Cube>) -> Option<BlockIndex> {
+        self.contents.get(position.into()).copied()
+    }
+
+    /// Returns the [`EvaluatedBlock`] of the block in this space at the given position.
+    ///
+    /// If out of bounds, returns the evaluation of [`AIR`].
+    #[inline(always)]
+    pub fn get_evaluated(&self, position: impl Into<Cube>) -> &EvaluatedBlock {
+        if let Some(block_index) = self.get_block_index(position.into()) {
+            self.palette.entry(block_index).evaluated()
+        } else {
+            AIR_EVALUATED_REF
+        }
+    }
+
+    /// Returns the light occupying the given cube.
+    ///
+    /// This value may be considered as representing the average of the light reflecting
+    /// off of all surfaces within, or immediately adjacent to and facing toward, this cube.
+    /// If there are no such surfaces, or if the given position is out of bounds, the result
+    /// is arbitrary. If the position is within an opaque block, the result is black.
+    ///
+    /// Lighting is updated asynchronously after modifications, so all above claims about
+    /// the meaning of this value are actually “will eventually be, if no more changes are
+    /// made”.
+    #[inline(always)]
+    pub fn get_lighting(&self, cube: impl Into<Cube>) -> PackedLight {
+        self.light.get(cube.into())
+    }
+
+    /// Copy data out of a portion of the space in a caller-chosen format.
+    ///
+    /// The given `bounds` must be fully contained within `self.bounds()`.
+    pub fn extract<'s, C, V>(
+        &'s self,
+        bounds: GridAab,
+        mut extractor: impl FnMut(Extract<'s>) -> V,
+    ) -> Vol<C>
+    where
+        C: ops::Deref<Target = [V]> + FromIterator<V>,
+    {
+        assert!(self.bounds().contains_box(bounds));
+
+        // TODO: Implement an iterator over the indexes (which is not just
+        // interior_iter().enumerate() because it's a sub-region) so that we don't
+        // have to run independent self.bounds.index() calculations per cube.
+        // (But before that, we can optimize the case given bounds are the whole space.)
+        Vol::from_fn(bounds, |cube| {
+            extractor(Extract {
+                space: self,
+                cube,
+                cube_index: self.contents.index(cube).unwrap(),
+                block_index: Default::default(),
+            })
+        })
+    }
+
+    /// Returns data about all the blocks assigned internal IDs (indices) in the space,
+    /// as well as placeholder data for any deallocated indices.
+    ///
+    /// The indices of this slice correspond to the results of [`Space::get_block_index()`].
+    pub fn block_data(&self) -> &[SpaceBlockData] {
+        self.palette.entries()
+    }
+
+    /// Returns the source of [fluff](Fluff) occurring in this space.
+    pub fn fluff(
+        &self,
+    ) -> impl Listen<Msg = SpaceFluff, Listener = listen::DynListener<SpaceFluff>> + '_ {
+        &self.notifiers.fluff_notifier
+    }
+
+    pub(crate) fn fluff_notifier(&self) -> &Notifier<SpaceFluff> {
+        &self.notifiers.fluff_notifier
+    }
+
+    /// Returns the current [`SpacePhysics`] data, which determines global characteristics
+    /// such as the behavior of light and gravity.
+    pub fn physics(&self) -> &SpacePhysics {
+        self.physics
+    }
+
+    /// Returns the current default [`Spawn`], which determines where new [`Character`]s
+    /// are placed in the space if no alternative applies.
+    pub fn spawn(&self) -> &Spawn {
+        self.default_spawn
+    }
+
+    /// Returns the [`BehaviorSet`] of behaviors attached to this space.
+    pub fn behaviors(&self) -> &BehaviorSet<Space> {
+        self.behaviors
+    }
+
+    #[cfg_attr(not(feature = "save"), allow(unused))]
+    pub(crate) fn in_light_update_queue(&self, cube: Cube) -> bool {
+        self.light.in_light_update_queue(cube)
+    }
+
+    /// Compute the new light value for a cube.
+    ///
+    /// The returned vector of points lists those cubes which the computed value depends on
+    /// (imprecisely; empty cubes passed through are not listed).
+    #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging visualization
+    pub fn compute_light<D>(&self, cube: Cube) -> light::ComputedLight<D>
+    where
+        D: light::LightComputeOutput,
+    {
+        // Unlike borrow_light_update_context(), this returns only references
+        let (light, uc) = {
+            (
+                &self.light,
+                light::UpdateCtx {
+                    contents: self.contents.as_ref(),
+                    palette: self.palette,
+                },
+            )
+        };
+        light.compute_lighting(uc, cube)
+    }
+
+    #[doc(hidden)] // pub to be used by all-is-cubes-gpu for debugging visualization
+    pub fn last_light_updates(&self) -> impl ExactSizeIterator<Item = Cube> + '_ {
+        self.light.last_light_updates.iter().copied()
     }
 }
 
@@ -839,7 +831,120 @@ impl<T: Into<Cube>> ops::Index<T> for Space {
     }
 }
 
-universe::impl_universe_member_for_single_component_type!(Space);
+impl<T: Into<Cube>> ops::Index<T> for Read<'_> {
+    type Output = Block;
+
+    /// Gets a reference to the block in this space at the given position.
+    ///
+    /// If the position is out of bounds, returns [`AIR`].
+    ///
+    /// There is no corresponding [`IndexMut`](core::ops::IndexMut) implementation;
+    /// use [`Mutation::set()`] or [`Mutation::fill()`] to modify blocks.
+    #[inline(always)]
+    fn index(&self, position: T) -> &Self::Output {
+        if let Some(&block_index) = self.contents.get(position.into()) {
+            self.palette.entry(block_index).block()
+        } else {
+            &AIR
+        }
+    }
+}
+
+impl universe::SealedMember for Space {
+    type Bundle = (
+        Palette,
+        Contents,
+        LightStorage,
+        SpacePhysics,
+        BehaviorSet<Space>,
+        Ticks,
+        DefaultSpawn,
+        Notifiers,
+    );
+    type ReadQueryData = (
+        &'static Palette,
+        &'static Contents,
+        &'static LightStorage,
+        &'static SpacePhysics,
+        &'static BehaviorSet<Space>,
+        &'static DefaultSpawn,
+        &'static Notifiers,
+    );
+
+    fn register_all_member_components(world: &mut ecs::World) {
+        universe::VisitableComponents::register::<Palette>(world);
+        // no handles in Contents
+        // no handles in LightStorage
+        // no handles in SpacePhysics
+        universe::VisitableComponents::register::<BehaviorSet<Space>>(world);
+        universe::VisitableComponents::register::<DefaultSpawn>(world);
+        // no relevant handles in Notifiers
+    }
+
+    fn read_from_standalone(value: &Self) -> <Self as universe::UniverseMember>::Read<'_> {
+        Read {
+            palette: &value.palette,
+            contents: value.contents.as_ref(),
+            light: &value.light,
+            physics: &value.physics,
+            behaviors: &value.behaviors,
+            default_spawn: &value.spawn,
+            notifiers: &value.notifiers,
+        }
+    }
+    fn read_from_query(
+        data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
+    ) -> <Self as universe::UniverseMember>::Read<'_> {
+        let (palette, contents, light, physics, behaviors, default_spawn, notifiers) = data;
+        Read {
+            palette,
+            contents: contents.0.as_ref(),
+            light,
+            physics,
+            behaviors,
+            default_spawn: &default_spawn.0,
+            notifiers,
+        }
+    }
+    fn read_from_entity_ref(
+        entity: ::bevy_ecs::world::EntityRef<'_>,
+    ) -> Option<<Self as universe::UniverseMember>::Read<'_>> {
+        Some(Read {
+            palette: entity.get()?,
+            contents: entity.get::<Contents>()?.0.as_ref(),
+            light: entity.get()?,
+            physics: entity.get()?,
+            behaviors: entity.get()?,
+            default_spawn: &entity.get::<DefaultSpawn>()?.0,
+            notifiers: entity.get()?,
+        })
+    }
+    fn into_bundle(value: Box<Self>) -> Self::Bundle {
+        let Self {
+            palette,
+            contents,
+            light,
+            physics,
+            behaviors,
+            spawn,
+            ticks,
+            notifiers,
+        } = *value;
+        (
+            palette,
+            Contents(contents),
+            light,
+            physics,
+            behaviors,
+            ticks,
+            DefaultSpawn(spawn),
+            notifiers,
+        )
+    }
+}
+impl universe::UniverseMember for Space {
+    type Read<'ticket> = Read<'ticket>;
+}
 
 impl VisitHandles for Space {
     fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
@@ -849,13 +954,19 @@ impl VisitHandles for Space {
             light: _,
             physics: _,
             behaviors,
+            ticks: _,
             spawn,
-            cubes_wanting_ticks: _,
-            change_notifier: _,
-            fluff_notifier: _,
+            notifiers: _,
         } = self;
         palette.visit_handles(visitor);
         behaviors.visit_handles(visitor);
+        spawn.visit_handles(visitor);
+    }
+}
+
+impl VisitHandles for DefaultSpawn {
+    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
+        let Self(spawn) = self;
         spawn.visit_handles(visitor);
     }
 }
@@ -865,7 +976,16 @@ impl Listen for Space {
     type Msg = SpaceChange;
     type Listener = <Notifier<Self::Msg> as Listen>::Listener;
     fn listen_raw(&self, listener: Self::Listener) {
-        self.change_notifier.listen_raw(listener)
+        self.notifiers.change_notifier.listen_raw(listener)
+    }
+}
+
+/// Registers a listener for mutations of this space.
+impl Listen for Read<'_> {
+    type Msg = SpaceChange;
+    type Listener = <Notifier<Self::Msg> as Listen>::Listener;
+    fn listen_raw(&self, listener: Self::Listener) {
+        self.notifiers.change_notifier.listen_raw(listener)
     }
 }
 
@@ -1077,7 +1197,7 @@ impl Fmt<StatusText> for SpaceStepInfo {
 /// other but not if called more than once.
 #[derive(Clone, Debug)]
 pub struct Extract<'s> {
-    space: &'s Space,
+    space: &'s Read<'s>,
     cube: Cube,
     cube_index: usize,
     block_index: core::cell::OnceCell<BlockIndex>,
@@ -1143,6 +1263,29 @@ pub struct Mutation<'m, 'space> {
 
 #[allow(missing_docs, reason = "TODO")]
 impl<'space> Mutation<'_, 'space> {
+    pub(crate) fn with_write_query<Out>(
+        read_ticket: ReadTicket<'space>,
+        q: bevy_ecs::query::QueryItem<
+            'space,
+            <SpaceTransaction as universe::TransactionOnEcs>::WriteQueryData,
+        >,
+        f: impl FnOnce(&mut Mutation<'_, 'space>) -> Out,
+    ) -> Out {
+        let (mut palette, mut contents, mut light, mut behaviors, mut spawn, notifiers, mut ticks) =
+            q;
+        f(&mut Mutation {
+            read_ticket,
+            palette: &mut palette,
+            contents: contents.0.as_mut(),
+            light: &mut light,
+            behaviors: &mut behaviors,
+            spawn: &mut spawn.0,
+            change_buffer: &mut notifiers.change_notifier.buffer(),
+            fluff_buffer: &mut notifiers.fluff_notifier.buffer(),
+            cubes_wanting_ticks: &mut ticks.cubes_wanting_ticks,
+        })
+    }
+
     /// Same as [`Space::bounds()`].
     pub fn bounds(&self) -> GridAab {
         self.contents.bounds()

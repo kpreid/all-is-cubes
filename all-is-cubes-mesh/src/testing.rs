@@ -50,9 +50,9 @@ pub fn mesh_blocks_and_space(
 ) -> (Allocator, BlockMeshes<TextureMt>, SpaceMesh<TextureMt>) {
     let options = &crate::MeshOptions::new(&GraphicsOptions::default());
     let tex = Allocator::new();
-    let block_meshes = block_meshes_for_space(space, &tex, options);
+    let block_meshes = block_meshes_for_space(&space.read(), &tex, options);
     let space_mesh: SpaceMesh<TextureMt> =
-        SpaceMesh::new(space, space.bounds(), options, &*block_meshes);
+        SpaceMesh::new(&space.read(), space.bounds(), options, &*block_meshes);
     (tex, block_meshes, space_mesh)
 }
 

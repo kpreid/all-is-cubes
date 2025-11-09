@@ -152,7 +152,7 @@ fn light_benches(c: &mut Criterion, instance: &wgpu::Instance) {
 
         b.iter_with_large_drop(|| {
             texture.forget_mapped();
-            texture.ensure_mapped(&queue, &space, bounds);
+            texture.ensure_mapped(&queue, &space.read(), bounds);
 
             scopeguard::guard((), |()| {
                 // flush wgpu's buffering of copy commands (not sure if this is effective).
@@ -169,10 +169,10 @@ fn light_benches(c: &mut Criterion, instance: &wgpu::Instance) {
         let updates = LightChunk::all_in_region(bounds);
 
         // update_scatter() will do nothing if not mapped first
-        texture.ensure_mapped(&queue, &space, bounds);
+        texture.ensure_mapped(&queue, &space.read(), bounds);
 
         b.iter_with_large_drop(|| {
-            texture.update_scatter(&device, &queue, &space, updates.iter().copied());
+            texture.update_scatter(&device, &queue, &space.read(), updates.iter().copied());
 
             scopeguard::guard((), |()| {
                 // flush wgpu's buffering of copy commands (not sure if this is effective).

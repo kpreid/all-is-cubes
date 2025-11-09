@@ -31,7 +31,7 @@ pub(crate) trait SealedMember: Sized {
     /// Components to spawn when inserting a member of this type into a universe.
     type Bundle: ecs::Bundle;
 
-    type ReadQueryData: bevy_ecs::query::ReadOnlyQueryData;
+    type ReadQueryData: bevy_ecs::query::ReadOnlyQueryData + Clone;
 
     /// Register `VisitableComponents` and anything else needed.
     fn register_all_member_components(world: &mut ecs::World);
@@ -81,7 +81,7 @@ pub trait UniverseMember: Sized + 'static + fmt::Debug + SealedMember + MemberBo
     //---
     // For serialization, this type must serialize to the universe member type’s serialization
     // schema. (The simplest way to do this is for it to be `&T`, for example.)
-    type Read<'ticket>;
+    type Read<'ticket>: Clone;
 }
 
 /// Trait for operations on [`Handle`]s and queries that must be implemented for each member type.

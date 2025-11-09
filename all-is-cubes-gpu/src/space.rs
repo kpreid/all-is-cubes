@@ -342,14 +342,15 @@ impl SpaceRenderer {
             if let Some(set) = &mut todo.light {
                 // Update individual cubes.
                 light_update_count +=
-                    self.light_texture.update_scatter(device, queue, space, set.drain());
+                    self.light_texture.update_scatter(device, queue, &space, set.drain());
             } else {
                 self.light_texture.forget_mapped();
                 todo.light = Some(HashSet::new());
             }
 
             // Ensure the texture covers the right region for the camera.
-            light_update_count += self.light_texture.ensure_visible_is_mapped(queue, space, camera);
+            light_update_count +=
+                self.light_texture.ensure_visible_is_mapped(queue, &space, camera);
         }
         let end_light_update = time::Instant::now();
 

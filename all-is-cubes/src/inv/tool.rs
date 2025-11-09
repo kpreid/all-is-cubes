@@ -477,7 +477,7 @@ impl<'ticket> ToolInput<'ticket> {
         };
 
         let (space_txn, inventory_txn) = op.apply(
-            cursor.space().read(self.read_ticket)?,
+            &cursor.space().read(self.read_ticket)?,
             character.map(|c| c.inventory()),
             Gridgid::from_translation(cube.lower_bounds().to_vector())
                 * rotation.to_positive_octant_transform(1),
@@ -755,7 +755,7 @@ mod tests {
             Ok(())
         }
 
-        fn space(&self) -> &Space {
+        fn space(&self) -> space::Read<'_> {
             self.space_handle.read(self.universe.read_ticket()).unwrap()
         }
         fn space_handle(&self) -> &Handle<Space> {
@@ -862,7 +862,7 @@ mod tests {
         assert_eq!(actual_transaction, expected_delete);
 
         actual_transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
-        print_space(tester.space(), [-1., 1., 1.]);
+        print_space(&tester.space(), [-1., 1., 1.]);
         assert_eq!(&tester.space()[[1, 0, 0]], &AIR);
     }
 
@@ -918,7 +918,7 @@ mod tests {
         assert_eq!(transaction, expected_cube_transaction);
 
         transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
-        print_space(tester.space(), [-1., 1., 1.]);
+        print_space(&tester.space(), [-1., 1., 1.]);
         assert_eq!(&tester.space()[[1, 0, 0]], &existing);
         assert_eq!(&tester.space()[[0, 0, 0]], &tool_block);
     }
@@ -1054,7 +1054,7 @@ mod tests {
         );
 
         transaction.execute(&mut tester.universe, (), &mut drop).unwrap();
-        print_space(tester.space(), [-1., 1., 1.]);
+        print_space(&tester.space(), [-1., 1., 1.]);
         assert_eq!(
             (&tester.space()[[1, 0, 0]], &tester.space()[[0, 0, 0]]),
             if in_front {
@@ -1103,7 +1103,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(tester.equip_and_use_tool(tool), Err(ToolError::Obstacle));
-        print_space(tester.space(), [-1., 1., 1.]);
+        print_space(&tester.space(), [-1., 1., 1.]);
         assert_eq!(&tester.space()[[1, 0, 0]], &existing);
         assert_eq!(&tester.space()[[0, 0, 0]], &obstacle);
     }

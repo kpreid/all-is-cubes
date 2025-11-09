@@ -12,7 +12,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::camera::{Camera, GraphicsOptions, Viewport, eye_for_look_at};
 use crate::math::FreeVector;
 use crate::raytracer::{Accumulate, Exception, RtBlockData, RtOptionsRef, SpaceRaytracer};
-use crate::space::{Space, SpaceBlockData};
+#[cfg(any(feature = "std", test))]
+use crate::space::{self, SpaceBlockData};
 
 /// If you are using [`CharacterBuf`], use this [`RtBlockData`] implementation.
 // TODO: better name
@@ -131,7 +132,7 @@ impl From<CharacterBuf> for String {
 /// `direction` specifies the direction from which the camera will be looking towards
 /// the center of the space. The text output will be 80 columns wide.
 #[cfg(any(feature = "std", test))]
-pub fn print_space(space: &Space, direction: impl Into<FreeVector>) {
+pub fn print_space(space: &space::Read<'_>, direction: impl Into<FreeVector>) {
     std::print!(
         "{}",
         PrintSpace {
@@ -144,8 +145,8 @@ pub fn print_space(space: &Space, direction: impl Into<FreeVector>) {
 /// Wrapper struct for the implementation of [`print_space()`].
 /// and which allows testing its output.
 #[cfg(any(feature = "std", test))]
-struct PrintSpace<'a> {
-    space: &'a Space,
+struct PrintSpace<'s> {
+    space: &'s space::Read<'s>,
     direction: FreeVector,
 }
 
@@ -180,6 +181,7 @@ mod tests {
     use crate::block::{self, Block, Resolution::R4};
     use crate::content::make_some_blocks;
     use crate::math::{GridAab, Rgba};
+    use crate::space::Space;
     use crate::universe::Universe;
     use euclid::vec3;
     use std::string::ToString;
@@ -200,7 +202,7 @@ mod tests {
         .unwrap();
 
         let output = PrintSpace {
-            space: &space,
+            space: &space.read(),
             direction: vec3(1., 1., 1.),
         }
         .to_string();
@@ -280,7 +282,7 @@ mod tests {
         .unwrap();
 
         let output = PrintSpace {
-            space: &space,
+            space: &space.read(),
             direction: vec3(1., 1., 1.),
         }
         .to_string();

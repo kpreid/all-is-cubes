@@ -539,7 +539,7 @@ mod tests {
             })
             .unwrap();
 
-        let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
+        let rt = SpaceRaytracer::<()>::new(&space.read(), GraphicsOptions::default(), ());
         let ray = Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]);
 
         assert_eq!(
@@ -659,7 +659,7 @@ mod tests {
             .filled_with(Block::from(solid_test_color))
             .build();
 
-        let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
+        let rt = SpaceRaytracer::<()>::new(&space.read(), GraphicsOptions::default(), ());
 
         assert_eq!(
             SurfaceIterR::new(&rt, Ray::new([-0.5, 0.5, 0.5], [1., 0., 0.]))
@@ -691,7 +691,7 @@ mod tests {
             .read_ticket(universe.read_ticket())
             .filled_with(slab)
             .build();
-        let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
+        let rt = SpaceRaytracer::<()>::new(&space.read(), GraphicsOptions::default(), ());
         let ray = Ray::new([-0.5, 0.75, 0.25], [1., 0., 0.]);
 
         assert_eq!(
@@ -749,7 +749,7 @@ mod tests {
             })
             .unwrap();
 
-        let rt = SpaceRaytracer::<()>::new(&space, GraphicsOptions::default(), ());
+        let rt = SpaceRaytracer::<()>::new(&space.read(), GraphicsOptions::default(), ());
         let ray = Ray::new([0.25, -0.5, 0.25], [0., 1., 0.]);
 
         assert_eq!(

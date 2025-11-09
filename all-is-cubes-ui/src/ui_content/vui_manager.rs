@@ -288,7 +288,7 @@ impl Vui {
 
         let new_view_state = UiViewState {
             view_transform: page_layout.view_transform(
-                next_space.read(universe.read_ticket()).unwrap(), // TODO: eliminate this unwrap
+                &next_space.read(universe.read_ticket()).unwrap(), // TODO: eliminate this unwrap
                 graphics_options.fov_y.into_inner(),
             ),
             space: Some(next_space),
@@ -403,7 +403,7 @@ impl Vui {
 
         if let Some(space_handle) = self.view().get().space.as_ref() {
             if let Ok(space) = space_handle.read(self.universe.read_ticket()) {
-                vui::synchronize_widgets(world_read_ticket, self.universe.read_ticket(), space);
+                vui::synchronize_widgets(world_read_ticket, self.universe.read_ticket(), &space);
             } else {
                 log::error!("failed to synchronize widgets");
             }

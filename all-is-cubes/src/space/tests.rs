@@ -359,7 +359,7 @@ fn extract() {
 fn extract_out_of_bounds() {
     let space = Space::empty_positive(2, 1, 1);
     let extract_bounds = GridAab::from_lower_size([1, 0, 0], [1, 2, 1]);
-    let _: Vol<Box<[()]>> = space.extract(extract_bounds, drop);
+    let _: Vol<Box<[()]>> = space.extract(extract_bounds, |_| ());
 }
 
 #[test]
@@ -554,7 +554,74 @@ fn space_debug() {
                     light: None,
                 },
                 behaviors: BehaviorSet({}),
-                cubes_wanting_ticks: {},
+                default_spawn: Spawn {
+                    bounds: GridAab(
+                        0..1 (1),
+                        0..1 (1),
+                        1..41 (40),
+                    ),
+                    eye_position: None,
+                    look_direction: (
+                        0.0,
+                        0.0,
+                        -1.0,
+                    ),
+                    inventory: [],
+                },
+                ..
+            }
+        "}
+    );
+}
+
+#[test]
+fn read_debug() {
+    let mut space = Space::empty_positive(1, 1, 1);
+    space.set_physics(SpacePhysics {
+        light: LightPhysics::None,
+        ..SpacePhysics::default()
+    });
+    println!("{space:#?}");
+    pretty_assertions::assert_str_eq!(
+        format!("{:#?}\n", space.read()),
+        indoc! {"
+            space::Read {
+                bounds: GridAab(
+                    0..1 (1),
+                    0..1 (1),
+                    0..1 (1),
+                ),
+                palette: Palette([
+                    SpaceBlockData {
+                        count: 1,
+                        block: Block {
+                            primitive: Air,
+                        },
+                        ..
+                    },
+                ]),
+                physics: SpacePhysics {
+                    gravity: (+0.000, -20.000, +0.000),
+                    sky: Uniform(
+                        Rgb(0.89626944, 0.89626944, 1.0),
+                    ),
+                    light: None,
+                },
+                behaviors: BehaviorSet({}),
+                default_spawn: Spawn {
+                    bounds: GridAab(
+                        0..1 (1),
+                        0..1 (1),
+                        1..41 (40),
+                    ),
+                    eye_position: None,
+                    look_direction: (
+                        0.0,
+                        0.0,
+                        -1.0,
+                    ),
+                    inventory: [],
+                },
                 ..
             }
         "}

@@ -130,7 +130,7 @@ fn no_panic_on_missing_blocks() {
     let [block] = make_some_blocks();
     let mut space = Space::empty_positive(2, 1, 1);
     let block_meshes: BlockMeshes<TextureMt> = block_meshes_for_space(
-        &space,
+        &space.read(),
         &Allocator::new(),
         &MeshOptions::dont_care_for_test(),
     );
@@ -140,7 +140,7 @@ fn no_panic_on_missing_blocks() {
 
     // This should not panic; visual glitches are preferable to failure.
     let space_mesh = SpaceMesh::new(
-        &space,
+        &space.read(),
         space.bounds(),
         &MeshOptions::dont_care_for_test(),
         &*block_meshes,
@@ -703,7 +703,7 @@ fn handling_allocation_failure() {
     let mut tex = Allocator::new();
     tex.set_capacity(0);
     let block_meshes: BlockMeshes<TextureMt> =
-        block_meshes_for_space(&space, &tex, &MeshOptions::dont_care_for_test());
+        block_meshes_for_space(&space.read(), &tex, &MeshOptions::dont_care_for_test());
 
     // Check results.
     assert_eq!(tex.count_allocated(), 0);
