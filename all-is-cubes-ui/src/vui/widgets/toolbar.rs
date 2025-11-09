@@ -220,7 +220,7 @@ impl ToolbarController {
 impl WidgetController for ToolbarController {
     fn initialize(
         &mut self,
-        _: &vui::WidgetContext<'_>,
+        _: &vui::WidgetContext<'_, '_>,
     ) -> Result<WidgetTransaction, InstallVuiError> {
         let slot_count = self.definition.slot_count();
 
@@ -286,7 +286,7 @@ impl WidgetController for ToolbarController {
 
     fn step(
         &mut self,
-        context: &vui::WidgetContext<'_>,
+        context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
         // Extract button pressed state from todo (don't hold the lock more than necessary)
         let mut pressed_buttons: [bool; inv::TOOL_SELECTIONS] = [false; inv::TOOL_SELECTIONS];

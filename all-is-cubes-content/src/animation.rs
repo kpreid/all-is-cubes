@@ -57,7 +57,7 @@ impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavi
 {
     fn step(
         &self,
-        context: &behavior::Context<'_, Space>,
+        context: &behavior::Context<'_, '_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
         let txn = if context.tick.prev_phase().rem_euclid(self.frame_period) == 0 {
             let mut mut_self: AnimatedVoxels<F> = self.clone();
@@ -179,7 +179,7 @@ impl Fire {
 impl behavior::Behavior<Space> for Fire {
     fn step(
         &self,
-        context: &behavior::Context<'_, Space>,
+        context: &behavior::Context<'_, '_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
         let mut mut_self = self.clone();
         let txn = if mut_self.tick_state(context.tick) {
@@ -278,7 +278,7 @@ impl Clock {
 impl behavior::Behavior<Space> for Clock {
     fn step(
         &self,
-        context: &behavior::Context<'_, Space>,
+        context: &behavior::Context<'_, '_, Space>,
     ) -> (UniverseTransaction, behavior::Then) {
         let mut mut_self = self.clone();
         mut_self.ticks += 1;

@@ -244,7 +244,7 @@ impl WidgetController for TooltipController {
 
     fn step(
         &mut self,
-        context: &vui::WidgetContext<'_>,
+        context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
         // None if no update is needed
         let new_contents: Option<TooltipContents> =

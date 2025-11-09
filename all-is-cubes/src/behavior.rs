@@ -15,7 +15,7 @@ use bevy_platform::sync::Mutex;
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
-use crate::universe::{HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles};
+use crate::universe::{self, HandleVisitor, ReadTicket, UniverseTransaction, VisitHandles};
 
 #[cfg(doc)]
 use crate::universe::Universe;
@@ -29,7 +29,7 @@ pub trait Behavior<H: Host>: fmt::Debug + Any + Send + Sync + VisitHandles + 'st
     /// and specifies when next to step the behavior again (if ever).
     ///
     /// TODO: Define what happens if the transaction fails.
-    fn step(&self, context: &Context<'_, H>) -> (UniverseTransaction, Then);
+    fn step(&self, context: &Context<'_, '_, H>) -> (UniverseTransaction, Then);
 
     /// If `None`, then the behavior should not be persisted/saved to disk, because it will be
     /// reconstructed as needed (e.g. collision, occupancy, user interaction, particles).
@@ -42,35 +42,38 @@ pub trait Behavior<H: Host>: fmt::Debug + Any + Send + Sync + VisitHandles + 'st
 }
 
 /// A type that can have attached behaviors.
-pub trait Host: transaction::Transactional + 'static {
+pub trait Host: universe::UniverseMember + transaction::Transactional + 'static {
     /// Additional data about “where” the behavior is attached to the host; what part of
     /// the host should be affected by the behavior.
     type Attachment: fmt::Debug + Clone + Eq + 'static;
 }
 
 /// Items available to a [`Behavior`] during [`Behavior::step()`].
+///
+// Design note: The sole reason this struct has two lifetimes is that in Rust, trait associated
+// types are always invariant, so we cannot have `&'ctx H::Read<'ctx>`.`
 #[non_exhaustive]
-pub struct Context<'a, H: Host> {
+pub struct Context<'ctx, 'read, H: Host> {
     /// The time tick that is currently passing, causing this step.
     pub tick: Tick,
 
     /// [`ReadTicket`] for the universe this behavior is contained in.
-    pub read_ticket: ReadTicket<'a>,
+    pub read_ticket: ReadTicket<'ctx>,
 
     /// The current state of the behavior's host object.
-    pub host: &'a H,
+    pub host: &'ctx H::Read<'read>,
 
     /// Additional data about “where” the behavior is attached to the host; what part of
     /// the host should be affected by the behavior.
-    pub attachment: &'a H::Attachment,
+    pub attachment: &'ctx H::Attachment,
 
-    waker: &'a BehaviorWaker,
+    waker: &'ctx BehaviorWaker,
 
-    host_transaction_binder: &'a dyn Fn(H::Transaction) -> UniverseTransaction,
-    self_transaction_binder: &'a dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
+    host_transaction_binder: &'ctx dyn Fn(H::Transaction) -> UniverseTransaction,
+    self_transaction_binder: &'ctx dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
 }
 
-impl<'a, H: Host> Context<'a, H> {
+impl<'a, H: Host> Context<'a, '_, H> {
     /// Returns a waker that should be used to signal when the behavior's
     /// [`step()`](Behavior::step) should be called again, in the case where it
     /// returns [`Then::Sleep`].
@@ -96,10 +99,10 @@ impl<'a, H: Host> Context<'a, H> {
     }
 }
 
-impl<H: Host + fmt::Debug> fmt::Debug for Context<'_, H> {
+impl<H: Host + fmt::Debug> fmt::Debug for Context<'_, '_, H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // binder functions are not debuggable
-        f.debug_struct("Context").field("host", &self.host).finish_non_exhaustive()
+        f.debug_struct("Context").finish_non_exhaustive()
     }
 }
 
@@ -193,7 +196,7 @@ impl<H: Host> BehaviorSet<H> {
     pub(crate) fn step(
         &self,
         read_ticket: ReadTicket<'_>,
-        host: &H,
+        host: &H::Read<'_>,
         host_transaction_binder: &dyn Fn(H::Transaction) -> UniverseTransaction,
         // This is not `dyn` because it doesn't need to be stored, and there's no advantage
         // to monomorphizing because this function is only going to be called once per `H`
@@ -862,7 +865,7 @@ mod testing {
     }
 
     impl<H: Host, D: fmt::Debug + Send + Sync + 'static> Behavior<H> for NoopBehavior<D> {
-        fn step(&self, _context: &Context<'_, H>) -> (UniverseTransaction, Then) {
+        fn step(&self, _context: &Context<'_, '_, H>) -> (UniverseTransaction, Then) {
             (UniverseTransaction::default(), Then::Step)
         }
         fn persistence(&self) -> Option<Persistence> {
@@ -1117,7 +1120,7 @@ mod tests {
             tx: mpsc::Sender<BehaviorWaker>,
         }
         impl Behavior<Space> for SleepBehavior {
-            fn step(&self, context: &Context<'_, Space>) -> (UniverseTransaction, Then) {
+            fn step(&self, context: &Context<'_, '_, Space>) -> (UniverseTransaction, Then) {
                 self.tx.send(context.waker().clone()).unwrap();
                 (UniverseTransaction::default(), Then::Sleep)
             }

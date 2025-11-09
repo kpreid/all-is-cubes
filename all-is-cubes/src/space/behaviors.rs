@@ -75,7 +75,7 @@ impl ActivatableRegion {
 impl behavior::Behavior<Space> for ActivatableRegion {
     fn step(
         &self,
-        _context: &behavior::Context<'_, Space>,
+        _context: &behavior::Context<'_, '_, Space>,
     ) -> (universe::UniverseTransaction, behavior::Then) {
         // TODO: Give a way for this to be deleted automatically when
         // its effect is gone

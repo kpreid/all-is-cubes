@@ -93,7 +93,7 @@ pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     /// This is called at most once.
     fn initialize(
         &mut self,
-        context: &WidgetContext<'_>,
+        context: &WidgetContext<'_, '_>,
     ) -> Result<WidgetTransaction, InstallVuiError> {
         let _ = context;
         Ok(WidgetTransaction::default())
@@ -117,7 +117,7 @@ pub trait WidgetController: Debug + VisitHandles + Send + Sync + 'static {
     /// the widget's data sources or user interaction.
     ///
     /// If this is not overridden, it will do nothing and the controller will be dropped.
-    fn step(&mut self, context: &WidgetContext<'_>) -> Result<StepSuccess, StepError> {
+    fn step(&mut self, context: &WidgetContext<'_, '_>) -> Result<StepSuccess, StepError> {
         let _ = context;
         Ok((WidgetTransaction::default(), Then::Drop))
     }
@@ -140,13 +140,13 @@ impl WidgetController for Box<dyn WidgetController> {
         (**self).synchronize(world_read_ticket, ui_read_ticket)
     }
 
-    fn step(&mut self, context: &WidgetContext<'_>) -> Result<StepSuccess, StepError> {
+    fn step(&mut self, context: &WidgetContext<'_, '_>) -> Result<StepSuccess, StepError> {
         (**self).step(context)
     }
 
     fn initialize(
         &mut self,
-        context: &WidgetContext<'_>,
+        context: &WidgetContext<'_, '_>,
     ) -> Result<WidgetTransaction, InstallVuiError> {
         (**self).initialize(context)
     }
@@ -212,7 +212,7 @@ impl VisitHandles for WidgetBehavior {
 }
 
 impl Behavior<Space> for WidgetBehavior {
-    fn step(&self, context: &behavior::Context<'_, Space>) -> (UniverseTransaction, Then) {
+    fn step(&self, context: &behavior::Context<'_, '_, Space>) -> (UniverseTransaction, Then) {
         let (txn, then) = self
             .controller
             .lock()
@@ -236,14 +236,14 @@ impl Behavior<Space> for WidgetBehavior {
 
 /// Context passed to [`WidgetController::step()`].
 #[derive(Debug)]
-pub struct WidgetContext<'a> {
-    behavior_context: Option<&'a behavior::Context<'a, Space>>,
+pub struct WidgetContext<'ctx, 'read> {
+    behavior_context: Option<&'ctx behavior::Context<'ctx, 'read, Space>>,
     /// [`ReadTicket`] for the universe the widget is UI for, not the one it is in.
-    read_ticket: ReadTicket<'a>,
-    grant: &'a LayoutGrant,
+    read_ticket: ReadTicket<'ctx>,
+    grant: &'ctx LayoutGrant,
 }
 
-impl<'a> WidgetContext<'a> {
+impl<'a> WidgetContext<'a, '_> {
     /// The time tick that is currently passing, causing this step.
     pub fn tick(&self) -> Tick {
         match self.behavior_context {

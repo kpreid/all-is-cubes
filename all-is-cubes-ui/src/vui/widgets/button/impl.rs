@@ -126,7 +126,7 @@ struct ButtonActivity {
 }
 
 impl ButtonActivity {
-    fn add_fluff(&self, context: &vui::WidgetContext<'_>, txn: &mut SpaceTransaction) {
+    fn add_fluff(&self, context: &vui::WidgetContext<'_, '_>, txn: &mut SpaceTransaction) {
         if self.changed && self.state.pressed {
             // TODO: dedicated button press fluff/sounds
             if let Some(cube) = context.grant().shrink_to_cube() {
@@ -141,7 +141,7 @@ impl ButtonActivity {
 impl vui::WidgetController for ActionButtonController {
     fn initialize(
         &mut self,
-        context: &vui::WidgetContext<'_>,
+        context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let grant = self.definition.common.shrink_bounds(*context.grant());
 
@@ -157,7 +157,7 @@ impl vui::WidgetController for ActionButtonController {
 
     fn step(
         &mut self,
-        context: &vui::WidgetContext<'_>,
+        context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
         let activity = self.common.step();
         let mut txn = if activity.changed {
@@ -179,7 +179,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
 {
     fn initialize(
         &mut self,
-        context: &vui::WidgetContext<'_>,
+        context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let grant = self.definition.common.shrink_bounds(*context.grant());
 
@@ -194,7 +194,7 @@ impl<D: Clone + fmt::Debug + Send + Sync + 'static> vui::WidgetController
 
     fn step(
         &mut self,
-        context: &vui::WidgetContext<'_>,
+        context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
         let activity = self.common.step();
         let mut txn = if self.todo.get_and_clear() || activity.changed {

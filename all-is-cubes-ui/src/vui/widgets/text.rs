@@ -270,12 +270,12 @@ impl TextBoxController {
 impl WidgetController for TextBoxController {
     fn initialize(
         &mut self,
-        _: &vui::WidgetContext<'_>,
+        _: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         Ok(self.draw_txn())
     }
 
-    fn step(&mut self, _: &vui::WidgetContext<'_>) -> Result<vui::StepSuccess, vui::StepError> {
+    fn step(&mut self, _: &vui::WidgetContext<'_, '_>) -> Result<vui::StepSuccess, vui::StepError> {
         Ok((
             if self.todo.get_and_clear() {
                 self.draw_txn()

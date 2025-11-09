@@ -184,7 +184,7 @@ impl ProgressBarController {
 impl vui::WidgetController for ProgressBarController {
     fn initialize(
         &mut self,
-        _: &vui::WidgetContext<'_>,
+        _: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::WidgetTransaction, vui::InstallVuiError> {
         let new_state = self.convert_state(&self.definition.source.get());
         let txn = self.paint_txn(&new_state);
@@ -194,7 +194,7 @@ impl vui::WidgetController for ProgressBarController {
 
     fn step(
         &mut self,
-        _context: &vui::WidgetContext<'_>,
+        _context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
         if !self.todo.get_and_clear() {
             return Ok((SpaceTransaction::default(), vui::Then::Step));

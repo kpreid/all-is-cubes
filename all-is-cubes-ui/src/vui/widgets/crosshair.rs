@@ -50,7 +50,7 @@ pub(crate) struct CrosshairController {
 impl vui::WidgetController for CrosshairController {
     fn step(
         &mut self,
-        context: &vui::WidgetContext<'_>,
+        context: &vui::WidgetContext<'_, '_>,
     ) -> Result<vui::StepSuccess, vui::StepError> {
         let Some(position) = context.grant().shrink_to_cube() else {
             return Ok((vui::WidgetTransaction::default(), vui::Then::Drop));

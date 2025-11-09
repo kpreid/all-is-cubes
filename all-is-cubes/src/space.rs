@@ -535,7 +535,7 @@ impl Space {
             if let Some(self_handle) = self_handle.filter(|_| !tick.paused()) {
                 self.behaviors.step(
                     read_ticket,
-                    &*self,
+                    &&*self,
                     &(|t: SpaceTransaction| t.bind(self_handle.clone())),
                     SpaceTransaction::behaviors,
                     tick,
