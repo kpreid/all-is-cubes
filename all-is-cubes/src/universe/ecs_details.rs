@@ -65,6 +65,14 @@ fn remove_membership_hook(
 }
 
 impl NameMap {
+    /// Returns whether universe contains a member with this name.
+    ///
+    /// This is equivalent to [`universe::Universe::get_any()`] except that it does not
+    /// handle [`Name::Builtin`].
+    pub(crate) fn contains_key(&self, name: &Name) -> bool {
+        self.map.contains_key(name)
+    }
+
     /// Convert a possibly-[pending](Name::Pending) [`Name`] into a name that may be an
     /// actual name in this universe (which is always either [`Name::Specific`] or
     /// [`Name::Anonym`] if it succeeds).

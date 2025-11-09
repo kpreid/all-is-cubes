@@ -299,8 +299,9 @@ impl Universe {
         T::Transaction: TransactionOnEcs,
         T: UniverseMember + Transactional,
     {
-        let check = check_transaction_in_universe(self, handle, &transaction)?;
-        let result = commit_transaction_in_universe(self, handle, transaction, check)
+        let check =
+            check_transaction_in_universe(self.read_ticket(), &self.world, handle, &transaction)?;
+        let result = commit_transaction_in_universe(&mut self.world, handle, transaction, check)
             .map_err(ExecuteError::Commit);
         self.update_archetypes();
         result

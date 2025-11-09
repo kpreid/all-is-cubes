@@ -60,7 +60,8 @@ where
 /// Check a transaction against a [`Handle`].
 /// This is a shared helper between [`TransactionInUniverse`] and [`Universe::execute_1()`].
 pub(in crate::universe) fn check_transaction_in_universe<O>(
-    universe: &Universe,
+    read_ticket: ReadTicket<'_>,
+    world: &ecs::World,
     target: &Handle<O>,
     transaction: &<O as Transactional>::Transaction,
 ) -> Result<<O::Transaction as Transaction>::CommitCheck, MismatchOrHandleError<O::Transaction>>
@@ -74,10 +75,9 @@ where
     //   (We could return the entity ID in the check value, but that would be exposing the potential
     //   for exciting misbehaviors if the wrong check value gets here, so better to do it twice.)
     let _: ecs::Entity = target
-        .as_entity(universe.universe_id())
+        .as_entity(*world.resource::<UniverseId>())
         .map_err(MismatchOrHandleError::Handle)?;
 
-    let read_ticket = universe.read_ticket();
     let read = target.read(read_ticket).map_err(MismatchOrHandleError::Handle)?;
     TransactionOnEcs::check(transaction, read, read_ticket).map_err(MismatchOrHandleError::Check)
 }
@@ -85,7 +85,7 @@ where
 /// Commit a transaction to a [`Handle`].
 /// This is a shared helper between [`TransactionInUniverse`] and [`Universe::execute_1()`].
 pub(in crate::universe) fn commit_transaction_in_universe<O>(
-    universe: &mut Universe,
+    world: &mut ecs::World,
     target: &Handle<O>,
     transaction: <O as Transactional>::Transaction,
     check: <O::Transaction as Transaction>::CommitCheck,
@@ -94,8 +94,7 @@ where
     O: UniverseMember + Transactional,
     <O as Transactional>::Transaction: TransactionOnEcs,
 {
-    universe
-        .world
+    world
         .run_system_cached_with(commit_system::<O>, (target, transaction, check))
         .unwrap()
 }
@@ -203,27 +202,27 @@ impl<O> Transaction for TransactionInUniverse<O>
 where
     O: UniverseMember + Transactional<Transaction: TransactionOnEcs> + 'static,
 {
-    type Target = Universe;
-    type Context<'a> = ();
+    type Target = ecs::World;
+    type Context<'a> = ReadTicket<'a>;
     type CommitCheck = <O::Transaction as Transaction>::CommitCheck;
     type Output = transaction::NoOutput;
     type Mismatch = MismatchOrHandleError<O::Transaction>;
 
     fn check(
         &self,
-        universe: &Universe,
-        (): Self::Context<'_>,
+        world: &ecs::World,
+        read_ticket: Self::Context<'_>,
     ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        check_transaction_in_universe(universe, &self.target, &self.transaction)
+        check_transaction_in_universe(read_ticket, world, &self.target, &self.transaction)
     }
 
     fn commit(
         self,
-        universe: &mut Universe,
+        world: &mut ecs::World,
         tu_check: Self::CommitCheck,
         _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        commit_transaction_in_universe(universe, &self.target, self.transaction, tu_check)
+        commit_transaction_in_universe(world, &self.target, self.transaction, tu_check)
     }
 }
 
@@ -307,19 +306,19 @@ pub(in crate::universe) fn anytxn_merge_helper<O>(
 /// Called from `impl Transaction for AnyTransaction`
 pub(in crate::universe) fn anytxn_commit_helper<'c, O>(
     transaction: TransactionInUniverse<O>,
-    universe: &mut Universe,
+    world: &mut ecs::World,
     check: AnyTransactionCheck,
     outputs: &mut dyn FnMut(<TransactionInUniverse<O> as Transaction>::Output),
 ) -> Result<(), CommitError>
 where
     O: Transactional,
-    TransactionInUniverse<O>: Transaction<Target = Universe, Context<'c> = ()>,
+    TransactionInUniverse<O>: Transaction<Target = ecs::World, Context<'c> = ReadTicket<'c>>,
 {
     let check: <TransactionInUniverse<O> as Transaction>::CommitCheck =
         *(check.downcast().map_err(|_| {
             CommitError::message::<AnyTransaction>("type mismatch in check data".into())
         })?);
-    transaction.commit(universe, check, outputs)
+    transaction.commit(world, check, outputs)
 }
 
 /// A [`Transaction`] which operates on one or more objects in a [`Universe`]
@@ -719,6 +718,107 @@ impl UniverseTransaction {
         // TODO: for more precise results, ask each member transaction if it is empty
         members.is_empty() && anonymous_insertions.is_empty()
     }
+
+    /// Check this transaction without requiring an `&Universe`.
+    ///
+    /// This can be used together with [`Self::commit_in_world()`].
+    ///
+    /// TODO: Ideally, `ecs::World` would not be needed and we would use only the ticket.
+    /// This requires giving up on using the `Transaction` trait for the innards.
+    fn check_with_world(
+        &self,
+        world: &ecs::World,
+        read_ticket: ReadTicket<'_>,
+    ) -> Result<UniverseCommitCheck, UniverseMismatch> {
+        // TODO: enforce world matches ticket
+
+        if let Some(txn_id) = self.universe_id()
+            && let Some(ticket_id) = self.universe_id()
+            && txn_id != ticket_id
+        {
+            return Err(UniverseMismatch::DifferentUniverse {
+                transaction: txn_id,
+                target: ticket_id,
+            });
+        }
+        let mut member_checks = HbHashMap::with_capacity(self.members.len());
+        for (name, member) in self.members.iter() {
+            member_checks.insert(
+                name.clone(),
+                member.check(self, world, read_ticket, name).map_err(|e| {
+                    UniverseMismatch::Member(transaction::MapMismatch {
+                        key: name.clone(),
+                        mismatch: e,
+                    })
+                })?,
+            );
+        }
+
+        let mut insert_checks = HbHashMap::with_capacity(self.anonymous_insertions.len());
+        for (handle, insert_txn) in &self.anonymous_insertions {
+            insert_checks.insert(
+                handle.clone(),
+                insert_txn.check(self, world, read_ticket, &Name::Pending).map_err(|mismatch| {
+                    UniverseMismatch::Member(transaction::MapMismatch {
+                        key: Name::Pending,
+                        mismatch,
+                    })
+                })?,
+            );
+        }
+
+        Ok(UniverseCommitCheck {
+            members: member_checks,
+            anonymous_insertions: insert_checks,
+        })
+    }
+
+    /// Commit this transaction to a [`ecs::World`] belonging to a universe,
+    /// without requiring an `&mut Universe`.
+    fn commit_to_world(
+        self,
+        world: &mut ecs::World,
+        checks: UniverseCommitCheck,
+        outputs: &mut dyn FnMut(core::convert::Infallible),
+    ) -> Result<(), CommitError> {
+        let Self {
+            mut members,
+            mut anonymous_insertions,
+            universe_id: txn_universe_id,
+        } = self;
+        let UniverseCommitCheck {
+            members: check_members,
+            anonymous_insertions: check_anon,
+        } = checks;
+
+        // final sanity check so we can't ever modify the wrong universe
+        if txn_universe_id.check(world.resource::<UniverseId>()).is_err() {
+            return Err(CommitError::message::<Self>(
+                "cannot commit a transaction to a different universe \
+                        than it was constructed for"
+                    .into(),
+            ));
+        }
+
+        for (name, check) in check_members {
+            members
+                .remove(&name)
+                .expect("invalid check value")
+                .commit(world, &name, check, outputs)
+                .map_err(|e| e.context(format!("universe member {name}")))?;
+        }
+
+        for (handle, check) in check_anon {
+            anonymous_insertions.remove(&handle).expect("invalid check value").commit(
+                world,
+                &Name::Pending,
+                check,
+                outputs,
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 impl From<AnyTransaction> for UniverseTransaction {
@@ -743,44 +843,7 @@ impl Transaction for UniverseTransaction {
         target: &Universe,
         (): Self::Context<'_>,
     ) -> Result<Self::CommitCheck, UniverseMismatch> {
-        if let Some(universe_id) = self.universe_id()
-            && universe_id != target.id
-        {
-            return Err(UniverseMismatch::DifferentUniverse {
-                transaction: universe_id,
-                target: target.id,
-            });
-        }
-        let mut member_checks = HbHashMap::with_capacity(self.members.len());
-        for (name, member) in self.members.iter() {
-            member_checks.insert(
-                name.clone(),
-                member.check(self, target, name).map_err(|e| {
-                    UniverseMismatch::Member(transaction::MapMismatch {
-                        key: name.clone(),
-                        mismatch: e,
-                    })
-                })?,
-            );
-        }
-
-        let mut insert_checks = HbHashMap::with_capacity(self.anonymous_insertions.len());
-        for (handle, insert_txn) in &self.anonymous_insertions {
-            insert_checks.insert(
-                handle.clone(),
-                insert_txn.check(self, target, &Name::Pending).map_err(|mismatch| {
-                    UniverseMismatch::Member(transaction::MapMismatch {
-                        key: Name::Pending,
-                        mismatch,
-                    })
-                })?,
-            );
-        }
-
-        Ok(UniverseCommitCheck {
-            members: member_checks,
-            anonymous_insertions: insert_checks,
-        })
+        self.check_with_world(&target.world, target.read_ticket())
     }
 
     fn commit(
@@ -789,44 +852,8 @@ impl Transaction for UniverseTransaction {
         checks: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        let Self {
-            mut members,
-            mut anonymous_insertions,
-            universe_id,
-        } = self;
-        let UniverseCommitCheck {
-            members: check_members,
-            anonymous_insertions: check_anon,
-        } = checks;
-
-        // final sanity check so we can't ever modify the wrong universe
-        if universe_id.check(&target.id).is_err() {
-            return Err(CommitError::message::<Self>(
-                "cannot commit a transaction to a different universe \
-                        than it was constructed for"
-                    .into(),
-            ));
-        }
-
-        for (name, check) in check_members {
-            members
-                .remove(&name)
-                .expect("invalid check value")
-                .commit(target, &name, check, outputs)
-                .map_err(|e| e.context(format!("universe member {name}")))?;
-        }
-
-        for (handle, check) in check_anon {
-            anonymous_insertions.remove(&handle).expect("invalid check value").commit(
-                target,
-                &Name::Pending,
-                check,
-                outputs,
-            )?;
-        }
-
+        self.commit_to_world(&mut target.world, checks, outputs)?;
         target.update_archetypes();
-
         Ok(())
     }
 }
@@ -913,12 +940,13 @@ struct MemberCommitCheck(Option<AnyTransactionCheck>);
 
 impl MemberTxn {
     /// Checks that the operation in `self` applies to the member with name `name`
-    /// in `universe`. Also checks that the `name` is one that can be affected by
+    /// in the universe of `world`. Also checks that the `name` is one that can be affected by
     /// a transaction at all.
     fn check(
         &self,
         whole_transaction: &UniverseTransaction, // Note: we could avoid this with another ReadTicket variant for MemberTxn. Should we?
-        universe: &Universe,
+        world: &ecs::World,
+        universe_read_ticket: ReadTicket<'_>,
         name: &Name,
     ) -> Result<MemberCommitCheck, MemberMismatch> {
         match (self, name) {
@@ -938,9 +966,10 @@ impl MemberTxn {
             // Kludge: The individual `AnyTransaction`s embed the `Handle<T>` they operate on --
             // so we don't actually pass anything here.
             (MemberTxn::Modify(txn), Name::Specific(_) | Name::Anonym(_)) => {
-                Ok(MemberCommitCheck(Some(txn.check(universe, ()).map_err(
-                    |e| MemberMismatch::Modify(ModifyMemberMismatch(e)),
-                )?)))
+                Ok(MemberCommitCheck(Some(
+                    txn.check(world, universe_read_ticket)
+                        .map_err(|e| MemberMismatch::Modify(ModifyMemberMismatch(e)))?,
+                )))
             }
 
             // Note: this check is also present in Universe::allocate_name.
@@ -962,14 +991,17 @@ impl MemberTxn {
                     }
                 }
 
-                if universe.get_any(name).is_some() {
+                if world.resource::<universe::NameMap>().contains_key(name) {
                     return Err(MemberMismatch::Insert(InsertError {
                         name: name.clone(),
                         kind: InsertErrorKind::AlreadyExists,
                     }));
                 }
                 pending
-                    .check_upgrade_pending(whole_transaction.read_ticket(), universe.id)
+                    .check_upgrade_pending(
+                        whole_transaction.read_ticket(),
+                        *world.resource::<UniverseId>(),
+                    )
                     .map_err(MemberMismatch::Insert)?;
                 Ok(MemberCommitCheck(None))
             }
@@ -979,7 +1011,7 @@ impl MemberTxn {
             }
 
             (MemberTxn::Delete, Name::Specific(_)) => {
-                if universe.get_any(name).is_some() {
+                if world.resource::<universe::NameMap>().contains_key(name) {
                     Ok(MemberCommitCheck(None))
                 } else {
                     Err(MemberMismatch::DeleteNonexistent(name.clone()))
@@ -990,10 +1022,10 @@ impl MemberTxn {
 
     fn commit(
         self,
-        universe: &mut Universe,
+        world: &mut ecs::World,
         name: &Name,
         MemberCommitCheck(check): MemberCommitCheck,
-        outputs: &mut dyn FnMut(core::convert::Infallible), // TODO: placeholder for actual Fluff output
+        outputs: &mut dyn FnMut(core::convert::Infallible),
     ) -> Result<(), CommitError> {
         match self {
             MemberTxn::Noop => {
@@ -1001,17 +1033,17 @@ impl MemberTxn {
                 Ok(())
             }
             MemberTxn::Modify(txn) => {
-                txn.commit(universe, check.expect("missing check value"), outputs)
+                txn.commit(world, check.expect("missing check value"), outputs)
             }
             MemberTxn::Insert(pending) => {
                 pending
-                    .insert_pending_into_world(&mut universe.world)
+                    .insert_pending_into_world(world)
                     .map_err(CommitError::catch::<UniverseTransaction, InsertError>)?;
                 Ok(())
             }
             MemberTxn::Delete => {
                 assert!(check.is_none());
-                universe::ecs_details::delete(&mut universe.world, name);
+                universe::ecs_details::delete(world, name);
                 Ok(())
             }
         }
