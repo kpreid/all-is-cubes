@@ -449,7 +449,7 @@ impl InventoryTransaction {
 impl Transaction for InventoryTransaction {
     type Target = Inventory;
     type Context<'a> = ();
-    type CommitCheck = Option<InventoryCheck>;
+    type CommitCheck = impl fmt::Debug;
     type Output = InventoryChange;
     type Mismatch = InventoryMismatch;
 
@@ -460,7 +460,7 @@ impl Transaction for InventoryTransaction {
     ) -> Result<Self::CommitCheck, Self::Mismatch> {
         // Don't do the expensive copy if we have one already
         if self.replace.is_empty() && self.insert.is_empty() {
-            return Ok(None);
+            return Ok(None::<InventoryCheck>);
         }
 
         // The simplest bulletproof algorithm to ensure we're stacking everything right
@@ -528,7 +528,7 @@ impl Transaction for InventoryTransaction {
 }
 
 impl Merge for InventoryTransaction {
-    type MergeCheck = ();
+    type MergeCheck = impl fmt::Debug;
     type Conflict = InventoryConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -538,7 +538,8 @@ impl Merge for InventoryTransaction {
         Ok(())
     }
 
-    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
+    fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
+        let (): () = check; // https://github.com/rust-lang/rust/issues/113596
         self.replace.extend(other.replace);
         self.insert.extend(other.insert);
     }
