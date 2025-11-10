@@ -99,7 +99,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
         logging
             .finish(&mut startup_universe)
             .unwrap_or_else(|e| report_error_and_exit(&ctx, e));
-        ctx.set_universe(*startup_universe);
+        ctx.set_universe(startup_universe);
         _ = universe_ready_signal.send(Ok(()));
 
         #[cfg(feature = "record")]
@@ -171,7 +171,7 @@ pub fn inner_main<Ren: Renderer, Win: Window>(
                     let mut task = UniverseTask::new(&executor, source, false);
                     task.attach_to_main_task(&mut ctx);
                     // TODO: this should use set_universe_async but the progress reporting is not compatible
-                    ctx.set_universe(*task.future.await.unwrap());
+                    ctx.set_universe(task.future.await.unwrap());
                 }
                 ReplaceUniverseCommand::Reload => {
                     let whence = ctx.with_universe(|u| u.whence.clone());

@@ -315,7 +315,7 @@ impl WebSession {
                                 )
                                 .await
                                 .unwrap();
-                                this.set_universe(*universe);
+                                this.set_universe(universe);
                             }
                             Err(e) => {
                                 // TODO: present error to UI
@@ -384,7 +384,7 @@ impl WebSession {
             .unwrap();
     }
 
-    pub fn set_universe(&self, universe: Universe) {
+    pub fn set_universe(&self, universe: Box<Universe>) {
         self.inner_cell.borrow_mut().session.set_universe(universe)
     }
 

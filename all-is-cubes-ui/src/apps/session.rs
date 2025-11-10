@@ -215,7 +215,7 @@ impl Session {
     /// Replaces the game universe, such as for initial setup or because the player
     /// chose to load a new one.
     /// This also resets the character to be the new universe's default character.
-    pub fn set_universe(&mut self, universe: Universe) {
+    pub fn set_universe(&mut self, universe: Box<Universe>) {
         self.shuttle_mut().set_universe(universe);
     }
 
@@ -668,8 +668,8 @@ impl Session {
 /// Methods on `Shuttle` are those operations that can be called from both [`Session`] and
 /// [ `MainTaskContext`].
 impl Shuttle {
-    fn set_universe(&mut self, universe: Universe) {
-        self.game_universe = universe;
+    fn set_universe(&mut self, universe: Box<Universe>) {
+        self.game_universe = *universe;
         self.game_character
             .set(self.game_universe.get_default_character().map(StrongHandle::new));
 
@@ -1218,7 +1218,7 @@ impl MainTaskContext {
     /// This also resets the character to be the new universe's default character.
     ///
     /// Panics if called while the main task is suspended.
-    pub fn set_universe(&mut self, universe: Universe) {
+    pub fn set_universe(&mut self, universe: Box<Universe>) {
         self.with_mut(|shuttle| {
             shuttle.set_universe(universe);
         })
@@ -1268,7 +1268,7 @@ impl MainTaskContext {
 
         match f(progress).await {
             Ok(universe) => {
-                self.set_universe(*universe);
+                self.set_universe(universe);
             }
             Err(error_message) => {
                 self.show_modal_message(error_message);
@@ -1431,7 +1431,7 @@ mod tests {
 
         // Create session
         let mut session = Session::builder().build().await;
-        session.set_universe(*u);
+        session.set_universe(u);
         session.set_character(Some(character.clone()));
         let log = listen::Log::<Fluff>::new();
         session.listen_fluff(log.listener());
@@ -1476,7 +1476,7 @@ mod tests {
             async move |mut ctx: MainTaskContext| {
                 eprintln!("main task: waiting for new universe");
                 let new_universe = recv.await.unwrap();
-                ctx.set_universe(*new_universe);
+                ctx.set_universe(new_universe);
                 eprintln!("main task: have set new universe");
 
                 ctx.with_read_tickets(|read_tickets| cameras.update(read_tickets));
