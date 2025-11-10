@@ -516,14 +516,13 @@ impl Space {
         self.palette.entries()
     }
 
-    /// Advance time in the space.
+    /// Step the space's behaviors.
     ///
     /// * `tick` is how much time is to pass in the simulation.
-    /// * `deadline` is when to stop computing flexible things such as light transport.
     ///
-    /// TODO(ecs): Replace this with systems. It is partially replaced already
-    pub(crate) fn step(
-        &mut self,
+    /// TODO(ecs): This function is residue of non-ECS implementation
+    pub(crate) fn step_behaviors(
+        &self,
         read_ticket: ReadTicket<'_>,
         self_handle: Option<&Handle<Space>>,
         tick: time::Tick,
@@ -535,7 +534,7 @@ impl Space {
             if let Some(self_handle) = self_handle.filter(|_| !tick.paused()) {
                 self.behaviors.step(
                     read_ticket,
-                    &&*self,
+                    &self,
                     &(|t: SpaceTransaction| t.bind(self_handle.clone())),
                     SpaceTransaction::behaviors,
                     tick,

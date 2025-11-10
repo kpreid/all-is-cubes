@@ -330,23 +330,16 @@ impl Universe {
         };
 
         {
-            // TODO(ecs): convert Space::step() to a series of systems
-            // (this will require stopping using get_one_mut_and_ticket, which is currently
-            // used to allow Space block changes to evaluate blocks).
+            // TODO(ecs): convert this fully to a system
             let spaces: Vec<Handle<Space>> =
                 self.iter_by_type::<Space>().map(|(_, handle)| handle).collect();
 
             for space_handle in spaces {
-                let (mut space, everything_but) = get_one_mut_and_ticket(
-                    &mut self.world,
-                    space_handle.as_entity(self.id).unwrap(),
-                    &mut self.queries.write_members.spaces,
-                    &self.queries.read_members,
-                )
-                .unwrap();
-
-                let (space_info, transaction) =
-                    space.step(everything_but, Some(&space_handle), tick);
+                let read_ticket = self.read_ticket();
+                let (space_info, transaction) = space_handle
+                    .read(read_ticket)
+                    .unwrap()
+                    .step_behaviors(read_ticket, Some(&space_handle), tick);
 
                 si.transactions.push(transaction);
 
