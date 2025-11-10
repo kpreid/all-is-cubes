@@ -74,7 +74,7 @@ pub struct Animation(BTreeMap<time::Phase, Block>);
 ///
 /// The visibility of `pub(crate)` is necessary for the `SealedMember` implementation.
 /// This type is not actually used outside the module.
-#[derive(ecs::Component)]
+#[derive(Debug, ecs::Component)]
 #[require(CacheUpdate, NotifierComponent)]
 pub(crate) struct BlockDefState {
     /// Animation frames.
@@ -546,7 +546,7 @@ impl BlockDefTransaction {
     }
 }
 
-#[expect(missing_debug_implementations)]
+#[derive(Debug)]
 #[doc(hidden)] // would be impl Trait if we could
 pub struct Check {
     /// May be `None` if the transaction has no new definition and was only comparing the old
@@ -591,7 +591,8 @@ impl Transaction for BlockDefTransaction {
         check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        match (self.new, check.new_state) {
+        let Check { new_state } = check;
+        match (self.new, new_state) {
             (Equal(Some(_)), Some(new_state)) => {
                 target.state = new_state;
                 target.notifier.notify(&BlockChange::new());
@@ -647,7 +648,7 @@ impl universe::TransactionOnEcs for BlockDefTransaction {
 }
 
 impl transaction::Merge for BlockDefTransaction {
-    type MergeCheck = ();
+    type MergeCheck = impl fmt::Debug;
     type Conflict = BlockDefConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -668,7 +669,8 @@ impl transaction::Merge for BlockDefTransaction {
         }
     }
 
-    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
+    fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
+        let (): () = check; // https://github.com/rust-lang/rust/issues/113596
         let Self { old, new } = self;
         old.commit_merge(other.old, ());
         new.commit_merge(other.new, ());
