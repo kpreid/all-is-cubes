@@ -3,6 +3,7 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::{vec, vec::Vec};
+use core::fmt;
 
 use crate::inv::{Inventory, InventoryChange, Ix, Slot};
 use crate::transaction::{CommitError, Merge, Transaction};
@@ -94,7 +95,7 @@ impl InventoryTransaction {
 impl Transaction for InventoryTransaction {
     type Target = Inventory;
     type Context<'a> = ();
-    type CommitCheck = Option<InventoryCheck>;
+    type CommitCheck = impl fmt::Debug;
     type Output = InventoryChange;
     type Mismatch = InventoryMismatch;
 
