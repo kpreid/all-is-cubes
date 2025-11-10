@@ -55,7 +55,7 @@ pub trait Transaction: Merge {
     /// This may be used to pass precalculated values to speed up the commit phase,
     /// or even lock guards or similar, but also makes it slightly harder to accidentally
     /// call `commit` without `check`.
-    type CommitCheck: 'static;
+    type CommitCheck: fmt::Debug + 'static;
 
     /// Data which must be passed when checking the transaction.
     /// Use `()` if none is needed.
@@ -170,7 +170,7 @@ pub trait Merge: Sized {
     /// Type of a value passed from [`Merge::check_merge`] to [`Merge::commit_merge`].
     /// This may be used to pass precalculated values to speed up the merge phase,
     /// but also makes it difficult to accidentally merge without checking.
-    type MergeCheck: 'static;
+    type MergeCheck: fmt::Debug + 'static;
 
     /// Error type giving the reason why a merge was not possible.
     ///
