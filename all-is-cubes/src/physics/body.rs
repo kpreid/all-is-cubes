@@ -993,7 +993,7 @@ impl transaction::Transactional for Body {
 impl Transaction for BodyTransaction {
     type Target = Body;
     type Context<'a> = ();
-    type CommitCheck = ();
+    type CommitCheck = impl fmt::Debug;
     type Output = transaction::NoOutput;
     type Mismatch = BodyMismatch;
 
@@ -1010,9 +1010,10 @@ impl Transaction for BodyTransaction {
         self,
         body: &mut Body,
         (): Self::Context<'_>,
-        (): Self::CommitCheck,
+        check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
+        let (): () = check; // https://github.com/rust-lang/rust/issues/113596
         let Self {
             set_position,
             set_look_direction,
@@ -1028,7 +1029,7 @@ impl Transaction for BodyTransaction {
 }
 
 impl transaction::Merge for BodyTransaction {
-    type MergeCheck = ();
+    type MergeCheck = impl fmt::Debug;
     type Conflict = BodyConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -1052,7 +1053,8 @@ impl transaction::Merge for BodyTransaction {
         Ok(())
     }
 
-    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
+    fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
+        let (): () = check; // https://github.com/rust-lang/rust/issues/113596
         let Self {
             set_position,
             set_look_direction,
