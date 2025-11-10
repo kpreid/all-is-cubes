@@ -1,3 +1,4 @@
+#![feature(impl_trait_in_assoc_type)]
 #![feature(never_type)]
 
 //! All is Cubes is a game/engine for worlds made of cubical blocks, where the blocks
