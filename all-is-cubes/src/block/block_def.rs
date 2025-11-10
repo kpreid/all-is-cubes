@@ -50,6 +50,7 @@ pub struct BlockDef {
 }
 
 /// Subset of [`BlockDef`] that is constructed anew when its block is replaced.
+#[derive(Debug)]
 struct BlockDefState {
     /// The current value.
     block: Block,
@@ -296,7 +297,7 @@ impl BlockDefTransaction {
     }
 }
 
-#[expect(missing_debug_implementations)]
+#[derive(Debug)]
 #[doc(hidden)] // would be impl Trait if we could
 pub struct Check {
     /// May be `None` if the transaction has no new block and was only comparing the old block.
@@ -306,7 +307,7 @@ pub struct Check {
 impl Transaction for BlockDefTransaction {
     type Target = BlockDef;
     type Context<'a> = ReadTicket<'a>;
-    type CommitCheck = Check;
+    type CommitCheck = impl fmt::Debug;
     type Output = transaction::NoOutput;
     type Mismatch = BlockDefMismatch;
 
@@ -335,7 +336,8 @@ impl Transaction for BlockDefTransaction {
         check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        match (self.new, check.new_state) {
+        let Check { new_state } = check;
+        match (self.new, new_state) {
             (Equal(Some(_)), Some(new_state)) => {
                 target.state = new_state;
                 target.notifier.notify(&BlockChange::new());
@@ -368,7 +370,7 @@ impl universe::TransactionOnEcs for BlockDefTransaction {
 }
 
 impl transaction::Merge for BlockDefTransaction {
-    type MergeCheck = ();
+    type MergeCheck = impl fmt::Debug;
     type Conflict = BlockDefConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -389,7 +391,8 @@ impl transaction::Merge for BlockDefTransaction {
         }
     }
 
-    fn commit_merge(&mut self, other: Self, (): Self::MergeCheck) {
+    fn commit_merge(&mut self, other: Self, check: Self::MergeCheck) {
+        let (): () = check; // https://github.com/rust-lang/rust/issues/113596
         let Self { old, new } = self;
         old.commit_merge(other.old, ());
         new.commit_merge(other.new, ());
