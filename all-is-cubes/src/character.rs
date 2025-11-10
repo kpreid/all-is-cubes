@@ -713,10 +713,7 @@ impl universe::TransactionOnEcs for CharacterTransaction {
 }
 
 impl Merge for CharacterTransaction {
-    type MergeCheck = (
-        <BodyTransaction as Merge>::MergeCheck,
-        <InventoryTransaction as Merge>::MergeCheck,
-    );
+    type MergeCheck = impl fmt::Debug;
     type Conflict = CharacterTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
