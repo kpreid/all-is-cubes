@@ -296,9 +296,6 @@ impl Universe {
             self.session_step_time += 1;
         }
 
-        let mut active_members = 0; // TODO: use InfoCollector
-        let mut total_members = 0;
-
         // --- End of setup; now advance time for our contents. ---
 
         self.world.run_schedule(time::schedule::BeforeStep);
@@ -319,40 +316,11 @@ impl Universe {
                 .unwrap();
         }
 
-        // TODO(ecs): get rid of this so that space stepping can be normal transactions
-        struct SpaceStepTransactions {
-            transactions: Vec<UniverseTransaction>,
-            spaces_with_work: usize,
-        }
-        let mut si = SpaceStepTransactions {
-            transactions: Vec::new(),
-            spaces_with_work: 0,
-        };
-
-        {
-            // TODO(ecs): convert this fully to a system
-            let spaces: Vec<Handle<Space>> =
-                self.iter_by_type::<Space>().map(|(_, handle)| handle).collect();
-
-            for space_handle in spaces {
-                let read_ticket = self.read_ticket();
-                let (space_info, transaction) = space_handle
-                    .read(read_ticket)
-                    .unwrap()
-                    .step_behaviors(read_ticket, Some(&space_handle), tick);
-
-                si.transactions.push(transaction);
-
-                if space_info.light.queue_count > 0 {
-                    active_members += 1;
-                }
-                if space_info.light.queue_count > 0 {
-                    si.spaces_with_work += 1;
-                }
-                self.world.resource_mut::<InfoCollector<SpaceStepInfo>>().record(space_info);
-                total_members += 1;
-            }
-        }
+        let (transactions_from_space_behaviors, spaces_with_work, total_spaces) = self
+            .world
+            .run_system_cached(space::step::step_behaviors_system)
+            .unwrap()
+            .unwrap();
         self.sync_space_blocks(); // TODO: justify this happening here
 
         self.world.run_system_cached(space::step::update_light_system).unwrap().unwrap();
@@ -361,12 +329,12 @@ impl Universe {
             self.world.run_schedule(time::schedule::Step);
         }
 
-        // Finalize `StepInput`'s stuff
+        // Finalize behavior stuff
         {
-            self.spaces_with_work = si.spaces_with_work;
+            self.spaces_with_work = spaces_with_work;
 
             // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
-            for t in si.transactions {
+            for t in transactions_from_space_behaviors {
                 if let Err(e) = t.execute(self, (), &mut transaction::no_outputs) {
                     // TODO: Need to report these failures back to the source
                     // ... and perhaps in the UniverseStepInfo
@@ -387,8 +355,8 @@ impl Universe {
         let computation_time = time::Instant::now().saturating_duration_since(start_time);
         UniverseStepInfo {
             computation_time,
-            active_members,
-            total_members,
+            active_members: spaces_with_work, // TODO: incomplete
+            total_members: total_spaces,
             block_def_step: self
                 .world
                 .resource_mut::<InfoCollector<BlockDefStepInfo>>()

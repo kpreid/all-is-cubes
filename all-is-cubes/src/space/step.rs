@@ -15,8 +15,8 @@ use bevy_platform::time::Instant;
 use hashbrown::HashMap;
 
 use crate::block;
-use crate::space::{BlockIndex, LightUpdatesInfo, Space};
-use crate::universe::{self, Handle, ReadTicket, UniverseId};
+use crate::space::{BlockIndex, LightUpdatesInfo, Space, SpaceStepInfo};
+use crate::universe::{self, Handle, ReadTicket, SealedMember, UniverseId, UniverseTransaction};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -91,6 +91,44 @@ pub(crate) fn update_light_system(
     });
 
     Ok(())
+}
+
+pub(crate) fn step_behaviors_system(
+    current_step: ecs::Res<universe::CurrentStep>,
+    mut info_collector: ecs::ResMut<universe::InfoCollector<SpaceStepInfo>>,
+    spaces: ecs::Query<(
+        &universe::Membership,
+        <Space as SealedMember>::ReadQueryData,
+    )>,
+    everything: universe::AllMemberReadQueries,
+) -> Result<(Vec<UniverseTransaction>, usize, usize), ecs::BevyError> {
+    let step_input = current_step.get()?;
+    let everything = everything.get();
+    let read_ticket = ReadTicket::from_queries(&everything);
+
+    let mut transactions: Vec<UniverseTransaction> = Vec::new();
+    let mut active_spaces = 0;
+    let mut total_spaces = 0;
+
+    for (membership, data) in spaces {
+        let space_handle = membership.handle();
+        let space_read: &Space = Space::read_from_query(data);
+        let (space_info, transaction) =
+            space_read.step_behaviors(read_ticket, Some(&space_handle), step_input.tick);
+
+        if !transaction.is_empty() {
+            transactions.push(transaction);
+        }
+
+        // TODO: this is irrelevant to behviors and is left over from previous architecture
+        if space_info.light.queue_count > 0 {
+            active_spaces += 1;
+        }
+        total_spaces += 1;
+        info_collector.record(space_info);
+    }
+
+    Ok((transactions, active_spaces, total_spaces))
 }
 
 // -------------------------------------------------------------------------------------------------
