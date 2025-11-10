@@ -406,7 +406,7 @@ impl universe::TransactionOnEcs for SpaceTransaction {
     }
 }
 impl Merge for SpaceTransaction {
-    type MergeCheck = <BehaviorSetTransaction<Space> as Merge>::MergeCheck;
+    type MergeCheck = impl fmt::Debug;
     type Conflict = SpaceTransactionConflict;
 
     fn check_merge(&self, other: &Self) -> Result<Self::MergeCheck, Self::Conflict> {
@@ -683,6 +683,7 @@ impl CubeTransaction {
 }
 
 impl Merge for CubeTransaction {
+    /// Not opaque because [`SpaceTransaction`] uses it
     type MergeCheck = CubeMergeCheck;
     type Conflict = CubeConflict;
 
