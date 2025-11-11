@@ -44,10 +44,10 @@ skip-tree = [
     { name = "criterion" }, # criterion is rarely updated but only used for benching
     { name = "bitflags", version = "=1.3.2", depth = 1 },
     { name = "hashbrown", version = "0.15", depth = 2 }, # waiting for bevy, ratatui, wgpu to catch up
-    { name = "ndk", depth = 3 }, # winit and wgpu use different versions
     { name = "windows", depth = 3 },
     { name = "windows-sys", depth = 2 },
     { name = "windows-targets", depth = 2 },
+    { name = "winit", depth = 4 }, # winit often has older system interface deps and we live with it
     { name = "proc-macro-crate" },
     { name = "test-renderers" }, # test-only code not published
 ]
