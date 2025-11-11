@@ -498,6 +498,8 @@ pub(crate) fn update_phase_1(
     mut defs: ecs::Query<(&BlockDef, &mut BlockDefNextValue)>,
     data_sources: universe::QueryBlockDataSources,
 ) {
+    let mq = data_sources.get();
+    let read_ticket = ReadTicket::from_queries(&mq);
     let mut info = BlockDefStepInfo::default();
     // TODO(ecs): parallel iter
     for (def, mut next) in defs.iter_mut() {
@@ -505,8 +507,6 @@ pub(crate) fn update_phase_1(
             matches!(*next, BlockDefNextValue::None),
             "BlockDefNextValue should have been cleared",
         );
-
-        let read_ticket = ReadTicket::from_block_data_sources(&data_sources);
 
         if !def.state.listeners_ok {
             info.attempted += 1;
