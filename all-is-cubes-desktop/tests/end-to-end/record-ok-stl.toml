@@ -1,0 +1,2 @@
+bin.name = "all-is-cubes"
+args = "--no-config-files --template lighting-bench --template-size=16x6x16 --graphics record -o test-record-lighting-bench.stl"
