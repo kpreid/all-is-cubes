@@ -56,6 +56,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 version = "0.22.9"
 
+[[audits.float-cmp]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.9.0 -> 0.10.0"
+
 [[audits.foldhash]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
@@ -175,6 +180,11 @@ version = "0.7.0"
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-deploy"
 delta = "0.7.0 -> 0.8.1"
+
+[[audits.stl_io]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-deploy"
+delta = "0.8.1 -> 0.10.0"
 
 [[audits.sync_wrapper]]
 who = "Kevin Reid <kpreid@switchb.org>"
