@@ -278,6 +278,11 @@ pub(crate) mod schedule {
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ScheduleLabel)]
     pub(crate) struct BeforeStepReset;
 
+    /// Schedule label for systems executed multiple times during a step to apply idempotent
+    /// updates to derived data that has no direct effects, such as block evaluations.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, ScheduleLabel)]
+    pub(crate) struct Synchronize;
+
     /// Schedule label for systems executed immediately before [`Step`].
     ///
     /// Use this schedule to collect information about the current state

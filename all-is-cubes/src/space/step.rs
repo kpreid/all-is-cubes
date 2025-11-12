@@ -11,7 +11,6 @@
 use alloc::vec::Vec;
 use core::time::Duration;
 
-use bevy_ecs::change_detection::DetectChangesMut as _;
 use bevy_ecs::prelude as ecs;
 use bevy_platform::time::Instant;
 use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
@@ -21,8 +20,8 @@ use crate::fluff::{self, Fluff};
 use crate::inv;
 use crate::math::{Cube, GridCoordinate, Gridgid};
 use crate::space::{
-    self, BlockIndex, Contents, LightStorage, LightUpdatesInfo, Notifiers, Palette, Space,
-    SpacePhysics, SpaceStepInfo, SpaceTransaction, Ticks,
+    self, Contents, LightStorage, LightUpdatesInfo, Notifiers, Palette, Space, SpacePhysics,
+    SpaceStepInfo, SpaceTransaction, Ticks,
 };
 use crate::transaction::{Merge as _, Transaction as _};
 use crate::universe::{self, QueryStateBundle as _, ReadTicket, SealedMember as _, UniverseId};
@@ -36,9 +35,9 @@ use crate::util::TimeStats;
 
 /// Install systems related to `Space`s.
 pub(crate) fn add_space_systems(world: &mut ecs::World) {
-    let schedules = world.resource_mut::<ecs::Schedules>();
-    // TODO(ecs): space updating is currently hardcoded in `Universe::step()`
-    _ = schedules;
+    // TODO(ecs): large portions of space updating are currently hardcoded in `Universe::step()`
+
+    super::palette::add_palette_systems(world);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -361,60 +360,4 @@ pub(crate) fn step_behaviors_system(
     }
 
     Ok((transactions, active_spaces, total_spaces))
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// When updating spaces' palettes, this temporarily stores the new block evaluations.
-/// into the `SpacePaletteNextValue` component.
-///
-/// It is used only between [`update_palette_phase_1`] and [`update_palette_phase_2`].
-#[derive(bevy_ecs::component::Component, Default)]
-pub(crate) struct SpacePaletteNextValue(pub(crate) HbHashMap<BlockIndex, block::EvaluatedBlock>);
-
-/// ECS system that computes but does not apply updates to [`Space`]'s `Palette`.
-///
-/// TODO: this is basically a copy of similar code for `BlockDef`
-pub(crate) fn update_palette_phase_1(
-    mut spaces: ecs::Query<'_, '_, (&Palette, &mut SpacePaletteNextValue)>,
-    data_sources: universe::QueryBlockDataSources<'_, '_>,
-) {
-    let data_sources = data_sources.get();
-    let read_ticket = ReadTicket::from_queries(&data_sources);
-
-    // TODO: parallel iter, + pipe out update info
-    // TODO: Somehow filter only to palettes with any dirty flag.
-    for (current_palette, next_palette) in spaces.iter_mut() {
-        debug_assert!(
-            next_palette.0.is_empty(),
-            "SpacePaletteNextValue should have been cleared"
-        );
-
-        current_palette.prepare_update(read_ticket, next_palette);
-    }
-}
-
-/// ECS system that moves new block evaluations from `SpacePaletteNextValue` to [`Space`]'s
-/// [`Palette`].
-///
-/// This system being separate resolves the borrow conflict between writing to a [`Space`]
-/// and block evaluation (which may read from any [`Space`]).
-pub(crate) fn update_palette_phase_2(
-    mut spaces: ecs::Query<
-        (&mut Palette, &mut SpacePaletteNextValue, &Notifiers),
-        ecs::Changed<SpacePaletteNextValue>,
-    >,
-) {
-    // TODO(ecs): run this only on entities that need it, somehow
-    spaces
-        .par_iter_mut()
-        .for_each(|(mut current_palette, mut next_palette, notifiers)| {
-            // By bypassing change detection, we avoid detecting this consumption of the change.
-            // (This means that change detection no longer strictly functions as change detection,
-            // but that is okay because `SpacePaletteNextValue` is *only* for palette updates.)
-            current_palette.apply_update(
-                next_palette.bypass_change_detection(),
-                &mut notifiers.change_notifier.buffer(),
-            );
-        });
 }

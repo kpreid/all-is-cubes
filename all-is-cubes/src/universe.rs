@@ -300,14 +300,14 @@ impl Universe {
 
         // --- End of setup; now advance time for our contents. ---
 
+        // We run Synchronize between each overall stage of stepping.
+        // TODO: Rethink exactly how much of this is needed.
+        self.world.run_schedule(time::schedule::Synchronize);
+
         self.world.run_schedule(time::schedule::BeforeStep);
 
-        // Update block def caches. This must be done before spaces so that spaces can see the
-        // latest updates.
-        self.sync_block_defs();
-
-        // Update spaces’ block evaluations
-        self.sync_space_blocks();
+        // Synchronize in case BeforeStep did anything.
+        self.world.run_schedule(time::schedule::Synchronize);
 
         // Execute the tick actions of blocks in spaces.
         if !paused {
@@ -323,7 +323,8 @@ impl Universe {
             .run_system_cached(space::step::step_behaviors_system)
             .unwrap()
             .unwrap();
-        self.sync_space_blocks(); // TODO: justify this happening here
+
+        self.world.run_schedule(time::schedule::Synchronize);
 
         self.world.run_system_cached(space::step::update_light_system).unwrap().unwrap();
 
@@ -345,9 +346,11 @@ impl Universe {
             }
         }
 
-        self.sync_space_blocks();
+        self.world.run_schedule(time::schedule::Synchronize);
 
         self.world.run_schedule(time::schedule::AfterStep);
+
+        self.world.run_schedule(time::schedule::Synchronize);
 
         // Post-step state cleanup
         self.world.resource_mut::<CurrentStep>().0 = None;
@@ -379,17 +382,6 @@ impl Universe {
                 info
             },
         }
-    }
-
-    fn sync_space_blocks(&mut self) {
-        self.world.run_system_cached(space::step::update_palette_phase_1).unwrap();
-        self.world.run_system_cached(space::step::update_palette_phase_2).unwrap();
-    }
-
-    fn sync_block_defs(&mut self) {
-        // TODO(ecs): register these systems
-        self.world.run_system_cached(block::update_phase_1).unwrap();
-        self.world.run_system_cached(block::update_phase_2).unwrap();
     }
 
     /// Returns the [`time::Clock`] that is used to advance time when [`step()`](Self::step)

@@ -1,18 +1,29 @@
+//! [`Palette`] and related.
+
+#![allow(
+    elided_lifetimes_in_paths,
+    clippy::needless_pass_by_value,
+    reason = "Bevy systems"
+)]
+
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::Cell;
 use core::fmt;
 
+use bevy_ecs::change_detection::DetectChangesMut as _;
 use bevy_ecs::prelude as ecs;
+use bevy_ecs::schedule::IntoScheduleConfigs as _;
 use bevy_platform::sync::Mutex;
+use hashbrown::HashMap as HbHashMap;
 use itertools::Itertools as _;
 
 use crate::block::{self, AIR, AIR_EVALUATED, Block, BlockChange, EvaluatedBlock};
 use crate::listen::{self, IntoListener as _, Listener as _};
 use crate::math::{self, OpacityCategory};
-use crate::space::step::SpacePaletteNextValue;
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
-use crate::universe::ReadTicket;
+use crate::time;
+use crate::universe::{self, ReadTicket};
 
 #[cfg(doc)]
 use crate::space;
@@ -28,8 +39,11 @@ cfg_if::cfg_if! {
 
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Table of the [`Block`]s in a [`Space`](super::Space) independent of their location.
 #[derive(ecs::Component)]
+#[require(PaletteUpdates)]
 // Note: visibility must be pub(crate) to work with ECS, but only manipulated by `space` code
 pub(crate) struct Palette {
     /// Lookup from arbitrarily assigned indices to blocks.
@@ -253,62 +267,6 @@ impl Palette {
         }
     }
 
-    /// First half of palette updates based on block change notifications.
-    ///
-    /// Calculates updates that are needed and writes the results, if any, to `output`.
-    pub(crate) fn prepare_update(
-        &self,
-        read_ticket: ReadTicket<'_>,
-        mut output: ecs::Mut<'_, SpacePaletteNextValue>,
-    ) {
-        //let mut last_start_time = time::Instant::now();
-        //let evaluations = TimeStats::default();
-        {
-            let mut try_eval_again = hashbrown::HashSet::new();
-            let mut todo = self.todo.lock().unwrap();
-            for block_index in todo.blocks.drain() {
-                let data: &SpaceBlockData = &self.entries[usize::from(block_index)];
-
-                // TODO: We may want to have a higher-level error handling by pausing the Space
-                // and giving the user choices like reverting to save, editing to fix, or
-                // continuing with a partly broken world. Right now, we just continue with the
-                // placeholder, which may have cascading effects despite the placeholder's
-                // design to be innocuous.
-                output.0.insert(
-                    block_index,
-                    data.block.evaluate(read_ticket).unwrap_or_else(|e| {
-                        // Trigger retrying evaluation at next step.
-                        try_eval_again.insert(block_index);
-
-                        e.to_placeholder()
-                    }),
-                );
-
-                // TODO: Process side effects on individual cubes such as reevaluating the
-                // lighting influenced by the block.
-
-                //evaluations.record_consecutive_interval(&mut last_start_time, time::Instant::now());
-            }
-            if !try_eval_again.is_empty() {
-                todo.blocks = try_eval_again;
-            }
-        }
-
-        // TODO(ecs): restore these TimeStats and send them somewhere they can be read out and reported
-        //_ = evaluations;
-    }
-    /// Second half of palette updates based on block change notifications.
-    pub(crate) fn apply_update(
-        &mut self,
-        updates: &mut SpacePaletteNextValue,
-        change_buffer: &mut ChangeBuffer<'_>,
-    ) {
-        for (block_index, evaluation) in updates.0.drain() {
-            self.entries[usize::from(block_index)].evaluated = evaluation;
-            change_buffer.push(SpaceChange::BlockEvaluation(block_index));
-        }
-    }
-
     /// Check that this palette is self-consistent and has `count`s that accurately count the
     /// `contents`.
     #[cfg(test)]
@@ -397,8 +355,8 @@ impl fmt::Debug for Palette {
     }
 }
 
-impl crate::universe::VisitHandles for Palette {
-    fn visit_handles(&self, visitor: &mut dyn crate::universe::HandleVisitor) {
+impl universe::VisitHandles for Palette {
+    fn visit_handles(&self, visitor: &mut dyn universe::HandleVisitor) {
         for SpaceBlockData { block, .. } in self.entries.iter() {
             block.visit_handles(visitor);
         }
@@ -657,6 +615,111 @@ impl From<TooManyBlocks> for SetCubeError {
         SetCubeError::TooManyBlocks()
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Palette ECS pieces
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, bevy_ecs::schedule::SystemSet)]
+pub(crate) struct SpacePaletteUpdateSet;
+
+pub(super) fn add_palette_systems(world: &mut ecs::World) {
+    let mut schedules = world.resource_mut::<ecs::Schedules>();
+
+    schedules.add_systems(
+        time::schedule::Synchronize,
+        (update_palette_phase_1, update_palette_phase_2).in_set(SpacePaletteUpdateSet),
+    );
+}
+
+/// When updating spaces' palettes, this temporarily stores the new block evaluations.
+/// into the `PaletteUpdates` component.
+///
+/// It is used only between [`update_palette_phase_1`] and [`update_palette_phase_2`].
+#[derive(bevy_ecs::component::Component, Default)]
+pub(in crate::space) struct PaletteUpdates(HbHashMap<BlockIndex, EvaluatedBlock>);
+
+/// ECS system that computes but does not apply updates to [`Space`]'s `Palette`.
+///
+/// TODO: this is basically a copy of similar code for `BlockDef`
+pub(crate) fn update_palette_phase_1(
+    mut spaces: ecs::Query<'_, '_, (&Palette, &mut PaletteUpdates)>,
+    data_sources: universe::QueryBlockDataSources<'_, '_>,
+) {
+    let data_sources = data_sources.get();
+    let read_ticket = ReadTicket::from_queries(&data_sources);
+
+    // TODO: parallel iter, + pipe out update info
+    // TODO: Somehow filter only to palettes with any dirty flag.
+    for (current_palette, mut next_palette) in spaces.iter_mut() {
+        debug_assert!(
+            next_palette.0.is_empty(),
+            "PaletteUpdates should have been cleared"
+        );
+
+        //let mut last_start_time = time::Instant::now();
+        //let evaluations = TimeStats::default();
+
+        let mut try_eval_again = hashbrown::HashSet::new();
+        let mut todo = current_palette.todo.lock().unwrap();
+        for block_index in todo.blocks.drain() {
+            let data: &SpaceBlockData = &current_palette.entries[usize::from(block_index)];
+
+            // TODO: We may want to have a higher-level error handling by pausing the Space
+            // and giving the user choices like reverting to save, editing to fix, or
+            // continuing with a partly broken world. Right now, we just continue with the
+            // placeholder, which may have cascading effects despite the placeholder's
+            // design to be innocuous.
+            next_palette.0.insert(
+                block_index,
+                data.block.evaluate(read_ticket).unwrap_or_else(|e| {
+                    // Trigger retrying evaluation at next step.
+                    try_eval_again.insert(block_index);
+
+                    e.to_placeholder()
+                }),
+            );
+
+            // TODO: Process side effects on individual cubes such as reevaluating the
+            // lighting influenced by the block.
+
+            //evaluations.record_consecutive_interval(&mut last_start_time, time::Instant::now());
+        }
+        if !try_eval_again.is_empty() {
+            todo.blocks = try_eval_again;
+        }
+
+        // TODO(ecs): restore these TimeStats and send them somewhere they can be read out and reported
+        //_ = evaluations;
+    }
+}
+
+/// ECS system that moves new block evaluations from `PaletteUpdates` to [`Space`]'s
+/// [`Palette`].
+///
+/// This system being separate resolves the borrow conflict between writing to a [`Space`]
+/// and block evaluation (which may read from any [`Space`]).
+pub(crate) fn update_palette_phase_2(
+    mut spaces: ecs::Query<
+        (&mut Palette, &mut PaletteUpdates, &super::Notifiers),
+        ecs::Changed<PaletteUpdates>,
+    >,
+) {
+    spaces
+        .par_iter_mut()
+        .for_each(|(mut current_palette, mut next_palette, notifiers)| {
+            let change_buffer: &mut ChangeBuffer<'_> = &mut notifiers.change_notifier.buffer();
+
+            // By bypassing change detection, we avoid detecting this consumption of the change.
+            // (This means that change detection no longer strictly functions as change detection,
+            // but that is okay because `PaletteUpdates` is *only* for palette updates.)
+            for (block_index, evaluation) in next_palette.bypass_change_detection().0.drain() {
+                current_palette.entries[usize::from(block_index)].evaluated = evaluation;
+                change_buffer.push(SpaceChange::BlockEvaluation(block_index));
+            }
+        });
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

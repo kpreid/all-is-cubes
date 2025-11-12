@@ -133,7 +133,7 @@ pub struct Space {
 ///
 /// Also serves as the component that requires other components not included in the bundle.
 #[derive(ecs::Component)]
-#[require(step::SpacePaletteNextValue, Notifiers, Ticks)]
+#[require(Notifiers, Ticks)]
 pub(crate) struct Contents(Vol<Box<[BlockIndex]>>);
 
 /// Component of [`Space`] storing which block is in each cube within the bounds.
