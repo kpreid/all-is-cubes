@@ -121,6 +121,8 @@ fn step() {
     assert_eq!(
         info.space_step.light,
         LightUpdatesInfo {
+            total_spaces: 1,
+            active_spaces: 1,
             update_count: 1,
             max_update_difference: sky_light.difference_priority(PackedLight::NO_RAYS),
             queue_count: 0,

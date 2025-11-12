@@ -2,6 +2,7 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use core::marker::PhantomData;
 use core::ops;
 
 use bevy_ecs::prelude as ecs;
@@ -115,32 +116,45 @@ impl StepInput {
 ///
 /// This is generic so that separate systems can have their own info collectors to
 /// write to without conflicts.
+///
+/// # Generic parameters
+///
+/// * `Val` is the value that is recorded.
+/// * `Tag` is not stored but may be used to create distinct `InfoCollector` resources.
 #[derive(Clone, Copy, Debug, ecs::Resource)]
-pub(crate) struct InfoCollector<T> {
-    value: Option<T>,
+pub(crate) struct InfoCollector<Val, Tag: ?Sized = ()> {
+    value: Option<Val>,
+    _phantom: PhantomData<fn(Tag) -> Tag>, // invariant but not owning
 }
 
-impl<T: Default + ops::AddAssign + Send + Sync + 'static> InfoCollector<T> {
+impl<Val, Tag> InfoCollector<Val, Tag>
+where
+    Val: Default + ops::AddAssign + Send + Sync + 'static,
+    Tag: ?Sized + 'static,
+{
     /// Add the resource and necessary systems.
     pub(crate) fn register(world: &mut ecs::World) {
-        world.insert_resource(Self { value: None });
+        world.insert_resource(Self {
+            value: None,
+            _phantom: PhantomData,
+        });
         let mut schedules = world.resource_mut::<ecs::Schedules>();
         schedules.add_systems(
             time::schedule::BeforeStepReset,
             |mut collector: ecs::ResMut<Self>| {
-                collector.value = Some(T::default());
+                collector.value = Some(Val::default());
             },
         );
     }
 
-    pub fn record(&mut self, addition: T) {
+    pub fn record(&mut self, addition: Val) {
         *self
             .value
             .as_mut()
             .expect("cannot call InfoCollector::record() while not in a step") += addition;
     }
 
-    pub fn finish_collection(&mut self) -> T {
+    pub fn finish_collection(&mut self) -> Val {
         self.value
             .take()
             .expect("cannot call InfoCollector::take() while not in a step")

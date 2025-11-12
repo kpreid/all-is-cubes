@@ -9,12 +9,14 @@
 )]
 
 use alloc::vec::Vec;
+use core::ops;
 use core::time::Duration;
 
 use bevy_ecs::prelude as ecs;
 use bevy_platform::time::Instant;
 use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
 
+use crate::behavior;
 use crate::block;
 use crate::fluff::{self, Fluff};
 use crate::inv;
@@ -24,8 +26,12 @@ use crate::space::{
     SpaceStepInfo, SpaceTransaction, Ticks,
 };
 use crate::transaction::{Merge as _, Transaction as _};
-use crate::universe::{self, QueryStateBundle as _, ReadTicket, SealedMember as _, UniverseId};
+use crate::universe::{
+    self, InfoCollector, QueryStateBundle as _, ReadTicket, SealedMember as _, UniverseId,
+};
 use crate::util::TimeStats;
+
+use super::palette;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -37,10 +43,52 @@ use crate::util::TimeStats;
 pub(crate) fn add_space_systems(world: &mut ecs::World) {
     // TODO(ecs): large portions of space updating are currently hardcoded in `Universe::step()`
 
-    super::palette::add_palette_systems(world);
+    // Must be the same list of resources in `collect_space_step_info()`.
+    InfoCollector::<TimeStats, palette::PaletteStatsTag>::register(world);
+    InfoCollector::<TickActionsInfo>::register(world);
+    InfoCollector::<LightUpdatesInfo>::register(world);
+    InfoCollector::<behavior::BehaviorSetStepInfo, Space>::register(world);
+
+    palette::add_palette_systems(world);
+}
+
+/// System that assembles the info from individual systems’ runs into a [`SpaceStepInfo`].
+/// This should be called at the end of a universe step.
+pub(crate) fn collect_space_step_info(
+    // Each of these resources is added in `add_space_systems()`.
+    mut evaluations: ecs::ResMut<InfoCollector<TimeStats, palette::PaletteStatsTag>>,
+    mut cubes: ecs::ResMut<InfoCollector<TickActionsInfo>>,
+    mut light: ecs::ResMut<InfoCollector<LightUpdatesInfo>>,
+    mut behaviors: ecs::ResMut<InfoCollector<behavior::BehaviorSetStepInfo, Space>>,
+) -> SpaceStepInfo {
+    let TickActionsInfo { count, time } = cubes.finish_collection();
+    SpaceStepInfo {
+        spaces: 1, // blatant lie
+        evaluations: evaluations.finish_collection(),
+        cube_ticks: count,
+        cube_time: time,
+        behaviors: behaviors.finish_collection(),
+        light: light.finish_collection(),
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, Default)]
+// must be pub only because this is indirectly mentioned in Universe::step
+pub(crate) struct TickActionsInfo {
+    /// Number of cubes ticked.
+    count: usize,
+    /// Time spent on cube ticks.
+    time: Duration,
+}
+impl ops::AddAssign for TickActionsInfo {
+    fn add_assign(&mut self, rhs: Self) {
+        let Self { count, time } = self;
+        *count += rhs.count;
+        *time += rhs.time;
+    }
+}
 
 /// ECS system that handles the [`block::BlockAttributes::tick_action`]s of blocks in [`Space`]s.
 ///
@@ -55,23 +103,17 @@ pub(crate) fn execute_tick_actions_system(
         <SpaceTransaction as universe::TransactionOnEcs>::WriteQueryData,
     )>,
     read_queries: &mut universe::MemberReadQueryStates,
-) -> ecs::Result<usize> {
+) -> ecs::Result {
     let universe_id: UniverseId = *world.resource();
     read_queries.update_archetypes(world);
     let tick = world.resource::<universe::CurrentStep>().get()?.tick;
-
-    // // TODO(ecs): we're collecting this so that we can take exclusive access to the world
-    // // to make a ticket, but we should instead not do that.
-    // let spaces: Vec<Handle<Space>> = space_query
-    //     .iter(world)
-    //     .map(|(membership, _space)| membership.handle())
-    //     .collect();
 
     // Need unsafe cell to create "except for this" read tickets.
     // TODO(ecs): Redesign transactions / space mutations so we can avoid this.
     let world_cell = world.as_unsafe_world_cell();
 
     let mut ticked_cube_count: usize = 0;
+    let start_time = Instant::now();
     for (
         space_entity,
         _membership,
@@ -261,12 +303,18 @@ pub(crate) fn execute_tick_actions_system(
             }
         }
     }
-    Ok(ticked_cube_count)
+
+    world.resource_mut::<InfoCollector<TickActionsInfo>>().record(TickActionsInfo {
+        count: ticked_cube_count,
+        time: start_time.elapsed(),
+    });
+
+    Ok(())
 }
 
 pub(crate) fn update_light_system(
     current_step: ecs::Res<'_, universe::CurrentStep>,
-    info_collector: ecs::ResMut<universe::InfoCollector<LightUpdatesInfo>>,
+    info_collector: ecs::ResMut<InfoCollector<LightUpdatesInfo>>,
     mut spaces_query: ecs::Query<(&Palette, &mut LightStorage, &mut Contents, &Notifiers)>,
 ) -> ecs::Result {
     let step_input = current_step.get()?;
@@ -294,70 +342,38 @@ pub(crate) fn update_light_system(
 
 pub(crate) fn step_behaviors_system(
     current_step: ecs::Res<universe::CurrentStep>,
-    mut info_collector: ecs::ResMut<universe::InfoCollector<SpaceStepInfo>>,
+    mut info_collector: ecs::ResMut<InfoCollector<behavior::BehaviorSetStepInfo, Space>>,
     spaces: ecs::Query<(
         &universe::Membership,
         <Space as universe::SealedMember>::ReadQueryData,
     )>,
     everything: universe::AllMemberReadQueries,
-) -> Result<(Vec<universe::UniverseTransaction>, usize, usize), ecs::BevyError> {
-    // TODO(ecs): This is entangled with SpaceStepInfo for historical reasons.
-
+) -> Result<Vec<universe::UniverseTransaction>, ecs::BevyError> {
     let step_input = current_step.get()?;
     let tick = step_input.tick;
     let everything = everything.get();
     let read_ticket = ReadTicket::from_queries(&everything);
 
     let mut transactions: Vec<universe::UniverseTransaction> = Vec::new();
-    let mut active_spaces = 0;
-    let mut total_spaces = 0;
 
     for (membership, data) in spaces {
         let space_handle = membership.handle();
         let space_read = Space::read_from_query(data);
-        let (space_info, transaction) = {
-            let start_space_behaviors = Instant::now();
 
-            let (transaction, behavior_step_info) = if !tick.paused() {
-                space_read.behaviors.step(
-                    read_ticket,
-                    &space_read,
-                    &(|t: SpaceTransaction| t.bind(space_handle.clone())),
-                    SpaceTransaction::behaviors,
-                    tick,
-                )
-            } else {
-                Default::default()
-            };
-
-            let space_behaviors_to_lighting = Instant::now();
-
-            (
-                SpaceStepInfo {
-                    spaces: 1,
-                    evaluations: TimeStats::default(), // TODO(ecs): re-hookup our time stats
-                    cube_ticks: 0,                     // TODO(ecs): re-hookup
-                    cube_time: Duration::ZERO,         // TODO(ecs): re-hookup
-                    behaviors: behavior_step_info,
-                    behaviors_time: space_behaviors_to_lighting
-                        .saturating_duration_since(start_space_behaviors),
-                    light: LightUpdatesInfo::default(), // will be filled with nonzero separately -- TODO(ecs): clarify
-                },
-                transaction,
-            )
-        };
-
-        if !transaction.is_empty() {
-            transactions.push(transaction);
+        if !tick.paused() {
+            let (transaction, behavior_step_info) = space_read.behaviors.step(
+                read_ticket,
+                &space_read,
+                &(|t: SpaceTransaction| t.bind(space_handle.clone())),
+                SpaceTransaction::behaviors,
+                tick,
+            );
+            info_collector.record(behavior_step_info);
+            if !transaction.is_empty() {
+                transactions.push(transaction);
+            }
         }
-
-        // TODO: this is irrelevant to behviors and is left over from previous architecture
-        if space_info.light.queue_count > 0 {
-            active_spaces += 1;
-        }
-        total_spaces += 1;
-        info_collector.record(space_info);
     }
 
-    Ok((transactions, active_spaces, total_spaces))
+    Ok(transactions)
 }

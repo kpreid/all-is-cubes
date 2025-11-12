@@ -24,6 +24,7 @@ use crate::math::{self, OpacityCategory};
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::time;
 use crate::universe::{self, ReadTicket};
+use crate::util::TimeStats;
 
 #[cfg(doc)]
 use crate::space;
@@ -622,6 +623,9 @@ impl From<TooManyBlocks> for SetCubeError {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, bevy_ecs::schedule::SystemSet)]
 pub(crate) struct SpacePaletteUpdateSet;
 
+/// [`InfoCollector`] tag for palette evaluations.
+pub(crate) struct PaletteStatsTag;
+
 pub(super) fn add_palette_systems(world: &mut ecs::World) {
     let mut schedules = world.resource_mut::<ecs::Schedules>();
 
@@ -642,6 +646,7 @@ pub(in crate::space) struct PaletteUpdates(HbHashMap<BlockIndex, EvaluatedBlock>
 ///
 /// TODO: this is basically a copy of similar code for `BlockDef`
 pub(crate) fn update_palette_phase_1(
+    mut info_collector: ecs::ResMut<universe::InfoCollector<TimeStats, PaletteStatsTag>>,
     mut spaces: ecs::Query<'_, '_, (&Palette, &mut PaletteUpdates)>,
     data_sources: universe::QueryBlockDataSources<'_, '_>,
 ) {
@@ -656,8 +661,8 @@ pub(crate) fn update_palette_phase_1(
             "PaletteUpdates should have been cleared"
         );
 
-        //let mut last_start_time = time::Instant::now();
-        //let evaluations = TimeStats::default();
+        let mut last_start_time = time::Instant::now();
+        let mut evaluations = TimeStats::default();
 
         let mut try_eval_again = hashbrown::HashSet::new();
         let mut todo = current_palette.todo.lock().unwrap();
@@ -682,14 +687,13 @@ pub(crate) fn update_palette_phase_1(
             // TODO: Process side effects on individual cubes such as reevaluating the
             // lighting influenced by the block.
 
-            //evaluations.record_consecutive_interval(&mut last_start_time, time::Instant::now());
+            evaluations.record_consecutive_interval(&mut last_start_time, time::Instant::now());
         }
         if !try_eval_again.is_empty() {
             todo.blocks = try_eval_again;
         }
 
-        // TODO(ecs): restore these TimeStats and send them somewhere they can be read out and reported
-        //_ = evaluations;
+        info_collector.record(evaluations);
     }
 }
 

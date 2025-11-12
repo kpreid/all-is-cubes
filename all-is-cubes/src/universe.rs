@@ -177,7 +177,6 @@ impl Universe {
             Self::register_all_member_components(&mut world);
             InfoCollector::<BlockDefStepInfo>::register(&mut world);
             InfoCollector::<CharacterStepInfo>::register(&mut world);
-            InfoCollector::<SpaceStepInfo>::register(&mut world);
             InfoCollector::<space::LightUpdatesInfo>::register(&mut world);
 
             // Register things that are user-visible state of the universe.
@@ -318,7 +317,7 @@ impl Universe {
                 .unwrap();
         }
 
-        let (transactions_from_space_behaviors, spaces_with_work, total_spaces) = self
+        let transactions_from_space_behaviors = self
             .world
             .run_system_cached(space::step::step_behaviors_system)
             .unwrap()
@@ -333,16 +332,13 @@ impl Universe {
         }
 
         // Finalize behavior stuff
-        {
-            self.spaces_with_work = spaces_with_work;
 
-            // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
-            for t in transactions_from_space_behaviors {
-                if let Err(e) = t.execute(self, (), &mut transaction::no_outputs) {
-                    // TODO: Need to report these failures back to the source
-                    // ... and perhaps in the UniverseStepInfo
-                    log::info!("Transaction failure: {e}");
-                }
+        // TODO: Quick hack -- we would actually like to execute non-conflicting transactions and skip conflicting ones...
+        for t in transactions_from_space_behaviors {
+            if let Err(e) = t.execute(self, (), &mut transaction::no_outputs) {
+                // TODO: Need to report these failures back to the source
+                // ... and perhaps in the UniverseStepInfo
+                log::info!("Transaction failure: {e}");
             }
         }
 
@@ -358,10 +354,13 @@ impl Universe {
 
         // Gather info
         let computation_time = time::Instant::now().saturating_duration_since(start_time);
+        let space_step =
+            self.world.run_system_cached(space::step::collect_space_step_info).unwrap();
+        self.spaces_with_work = space_step.light.active_spaces;
         UniverseStepInfo {
             computation_time,
-            active_members: spaces_with_work, // TODO: incomplete
-            total_members: total_spaces,
+            active_members: self.spaces_with_work, // TODO: incomplete
+            total_members: space_step.light.total_spaces, // TODO: incomplete
             block_def_step: self
                 .world
                 .resource_mut::<InfoCollector<BlockDefStepInfo>>()
@@ -370,17 +369,7 @@ impl Universe {
                 .world
                 .resource_mut::<InfoCollector<CharacterStepInfo>>()
                 .finish_collection(),
-            space_step: {
-                // TODO: this combination is an awkward kludge; we should probably stop putting
-                // SpaceStepInfo into InfoCollector and collect its parts separately.
-                let mut info =
-                    self.world.resource_mut::<InfoCollector<SpaceStepInfo>>().finish_collection();
-                info.light = self
-                    .world
-                    .resource_mut::<InfoCollector<space::LightUpdatesInfo>>()
-                    .finish_collection();
-                info
-            },
+            space_step,
         }
     }
 

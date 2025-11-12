@@ -7,12 +7,14 @@ use core::any::{Any, TypeId};
 use core::fmt;
 use core::mem;
 use core::ops;
+use core::time::Duration;
+use manyfmt::Refmt as _;
 
 #[cfg(doc)]
 use core::task::Waker;
 
 use bevy_ecs::prelude as ecs;
-use bevy_platform::sync::Mutex;
+use bevy_platform::{sync::Mutex, time::Instant};
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
@@ -210,8 +212,10 @@ impl<H: Host> BehaviorSet<H> {
         let mut info = BehaviorSetStepInfo {
             stepped: 0,
             acted: 0,
-            total: self.members.len(),
+            total_count: self.members.len(),
+            total_time: Duration::ZERO, // placeholder
         };
+        let start_time = Instant::now();
 
         // TODO: Find a way to drain the set without holding the lock and without
         // reallocating.
@@ -268,6 +272,7 @@ impl<H: Host> BehaviorSet<H> {
             .reduce(|a, b| a.merge(b).expect("TODO: handle merge failure"))
             .unwrap_or_default();
 
+        info.total_time = start_time.elapsed();
         (transaction, info)
     }
 
@@ -897,7 +902,9 @@ pub struct Persistence(
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct BehaviorSetStepInfo {
     /// Number of behaviors in the set.
-    total: usize,
+    total_count: usize,
+    /// Time spent performing behavior stepping.
+    total_time: Duration,
     /// Number of behaviors stepped this tick.
     stepped: usize,
     /// Of the stepped behaviors, how many returned a nonempty transaction.
@@ -907,24 +914,31 @@ pub(crate) struct BehaviorSetStepInfo {
 impl ops::AddAssign for BehaviorSetStepInfo {
     fn add_assign(&mut self, other: Self) {
         let Self {
-            total,
+            total_count,
+            total_time,
             stepped,
             acted,
         } = self;
-        *total += other.total;
+        *total_count += other.total_count;
+        *total_time += other.total_time;
         *stepped += other.stepped;
         *acted += other.acted;
     }
 }
 
 impl crate::util::Fmt<StatusText> for BehaviorSetStepInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, fopt: &StatusText) -> fmt::Result {
         let Self {
-            total,
+            total_count,
+            total_time,
             stepped,
             acted,
         } = self;
-        write!(f, "{acted} acted of {stepped} stepped of {total}")
+        write!(
+            f,
+            "{acted} acted of {stepped} stepped of {total_count} in {total_time}",
+            total_time = total_time.refmt(fopt)
+        )
     }
 }
 

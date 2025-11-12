@@ -1125,9 +1125,6 @@ pub struct SpaceStepInfo {
 
     behaviors: BehaviorSetStepInfo,
 
-    /// Time spent on processing behaviors.
-    behaviors_time: Duration,
-
     /// Performance data about light updates within the space.
     pub light: LightUpdatesInfo,
 }
@@ -1143,7 +1140,6 @@ impl ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
             cube_ticks,
             cube_time,
             behaviors,
-            behaviors_time,
             light,
         } = self;
         *spaces += other.spaces;
@@ -1151,7 +1147,6 @@ impl ops::AddAssign<SpaceStepInfo> for SpaceStepInfo {
         *cube_ticks += other.cube_ticks;
         *cube_time += other.cube_time;
         *behaviors += other.behaviors;
-        *behaviors_time += other.behaviors_time;
         *light += other.light;
     }
 }
@@ -1163,21 +1158,19 @@ impl Fmt<StatusText> for SpaceStepInfo {
             cube_ticks,
             cube_time,
             behaviors,
-            behaviors_time,
             light,
         } = self;
         if self.spaces > 0 {
             let light = light.refmt(fopt);
             let cube_time = cube_time.refmt(&ConciseDebug);
             let behaviors = behaviors.refmt(fopt);
-            let behaviors_time = behaviors_time.refmt(&ConciseDebug);
             write!(
                 fmt,
                 "\
                 {spaces} spaces' steps:\n\
                 Block reeval: {evaluations}\n\
-                Cubes: {cube_ticks} cubes ticked in {cube_time}\n\
-                Behaviors: {behaviors_time} for {behaviors}\n\
+                Cubes: {cube_ticks:3} cubes ticked in {cube_time}\n\
+                Behaviors: {behaviors}\n\
                 Light: {light}\
                 "
             )?;

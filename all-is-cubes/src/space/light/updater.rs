@@ -275,7 +275,10 @@ impl LightStorage {
             }
         }
 
+        #[allow(clippy::bool_to_int_with_if)]
         LightUpdatesInfo {
+            total_spaces: 1,
+            active_spaces: if light_update_count > 0 { 1 } else { 0 },
             update_count: light_update_count,
             max_update_difference: max_difference,
             queue_count: self.light_update_queue.len(),
@@ -969,7 +972,11 @@ pub struct ComputedLight<D> {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub struct LightUpdatesInfo {
-    /// Number of blocks whose light data updates are aggregated in this data.
+    /// Number of spaces whose light data updates are aggregated in this data.
+    pub total_spaces: usize,
+    /// Number of spaces which had any light updates at all.
+    pub active_spaces: usize,
+    /// Number of cubes whose light data updates are aggregated in this data.
     pub update_count: usize,
     /// The largest change in light value that occurred.
     pub max_update_difference: u8,
@@ -983,11 +990,15 @@ impl core::ops::AddAssign<LightUpdatesInfo> for LightUpdatesInfo {
     #[mutants::skip] // hard to test completely
     fn add_assign(&mut self, other: Self) {
         let Self {
+            total_spaces,
+            active_spaces,
             update_count,
             max_update_difference,
             queue_count,
             max_queue_priority,
         } = self;
+        *total_spaces += other.total_spaces;
+        *active_spaces += other.active_spaces;
         *update_count += other.update_count;
         *max_update_difference = (*max_update_difference).max(other.max_update_difference);
         *queue_count += other.queue_count;
@@ -996,13 +1007,19 @@ impl core::ops::AddAssign<LightUpdatesInfo> for LightUpdatesInfo {
 }
 impl Fmt<StatusText> for LightUpdatesInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        let Self {
+            total_spaces,
+            active_spaces,
+            update_count,
+            max_update_difference,
+            queue_count,
+            max_queue_priority,
+        } = self;
         write!(
             fmt,
-            "{:4} (max diff {:3}) of {:4} (max pri {:3?})",
-            self.update_count,
-            self.max_update_difference,
-            self.queue_count,
-            self.max_queue_priority
+            "{update_count:4} (max diff {max_update_difference:3}) of {queue_count:4} cubes \
+            (max pri {max_queue_priority:3?}) \
+            in {active_spaces}/{total_spaces} spaces",
         )?;
         Ok(())
     }
