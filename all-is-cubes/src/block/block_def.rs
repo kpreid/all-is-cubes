@@ -5,6 +5,7 @@
 )]
 
 use alloc::sync::Arc;
+use bevy_ecs::change_detection::DetectChangesMut;
 use core::{fmt, mem, ops};
 
 use bevy_ecs::prelude as ecs;
@@ -550,19 +551,28 @@ pub(crate) fn update_phase_1(
 /// This system being separate resolves the borrow conflict between different `BlockDef`s reading
 /// each other (possibly circularly) and writing themselves.
 pub(crate) fn update_phase_2(
-    mut defs: ecs::Query<'_, '_, (&mut BlockDef, &mut BlockDefNextValue)>,
+    mut defs: ecs::Query<
+        '_,
+        '_,
+        (&mut BlockDef, &mut BlockDefNextValue),
+        ecs::Changed<BlockDefNextValue>,
+    >,
 ) {
-    // TODO: run this only on entities that need it, somehow
-    defs.par_iter_mut().for_each(|(mut def, mut next)| match mem::take(&mut *next) {
-        BlockDefNextValue::NewEvaluation(result) => {
-            def.state.cache = result;
-            def.notifier.notify(&BlockChange::new());
+    defs.par_iter_mut().for_each(|(mut def, mut next)| {
+        // By bypassing change detection, we avoid detecting this consumption of the change.
+        // (This means that change detection no longer strictly functions as change detection,
+        // but that is okay because `BlockDefNextValue` is *only* for this.)
+        match mem::take(next.bypass_change_detection()) {
+            BlockDefNextValue::NewEvaluation(result) => {
+                def.state.cache = result;
+                def.notifier.notify(&BlockChange::new());
+            }
+            BlockDefNextValue::NewState(result) => {
+                def.state = result;
+                def.notifier.notify(&BlockChange::new());
+            }
+            BlockDefNextValue::None => {}
         }
-        BlockDefNextValue::NewState(result) => {
-            def.state = result;
-            def.notifier.notify(&BlockChange::new());
-        }
-        BlockDefNextValue::None => {}
     });
 }
 
