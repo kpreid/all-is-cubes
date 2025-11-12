@@ -13,7 +13,7 @@ use crate::math::{Face6, GridRotation, Rgba};
 use crate::space::{Space, SpaceTransaction};
 use crate::time;
 use crate::transaction::{self, Transaction as _};
-use crate::universe::{self, HandleError, Name, Universe, UniverseTransaction};
+use crate::universe::{Universe, UniverseTransaction};
 
 /// Just install a listener and discard the [`EvaluatedBlock`].
 ///
@@ -233,33 +233,27 @@ fn self_referential_evaluate(#[values(false, true)] via_mutation: bool) {
     let mut universe = Universe::new();
     let block = self_referential_block(&mut universe, via_mutation);
 
-    let error = block.evaluate(universe.read_ticket()).unwrap_err();
+    let result = block.evaluate(universe.read_ticket());
 
     if via_mutation {
+        // In this case we end up with a successful evaluation of the initial value (`AIR`).
+        // TODO: There should be some sort of error flag that doesn't stop simulation but alerts
+        // users, because in this case the block value now has cached state that will be lost
+        // on reload.
         assert_eq!(
-            error,
-            EvalBlockError {
-                block,
-                budget: block::Budget::default().to_cost(),
-                used: block::Cost {
-                    components: 1,
-                    voxels: 0,
-                    recursion: 0
-                },
-                kind: block::ErrorKind::Handle(HandleError {
-                    name: Name::Specific("self_referential".into()),
-                    handle_universe_id: Some(universe.universe_id()),
-                    kind: universe::HandleErrorKind::InUse
-                })
-            }
+            result,
+            Ok(block::EvaluatedBlock {
+                block: block.clone(),
+                ..block::AIR_EVALUATED
+            })
         );
     } else {
         // TODO: the HandleError details are not presented clearly (it is a WrongUniverse).
         // Arrange so that this situation has a clear error and match it.
         assert!(
             matches!(
-                error,
-                EvalBlockError {
+                result,
+                Err(EvalBlockError {
                     block: _,
                     budget: _,
                     used: block::Cost {
@@ -268,9 +262,9 @@ fn self_referential_evaluate(#[values(false, true)] via_mutation: bool) {
                         recursion: 0
                     },
                     kind: block::ErrorKind::Handle(_)
-                }
+                })
             ),
-            "{error:#?}"
+            "{result:#?}"
         );
     }
 }

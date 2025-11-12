@@ -22,6 +22,10 @@ use crate::block::{EvaluatedBlock, Primitive};
 #[cfg(doc)]
 use crate::universe::Universe;
 
+// -------------------------------------------------------------------------------------------------
+
+type EvalResult = Result<MinEval, EvalBlockError>;
+
 /// Contains a [`Block`] and can be stored in a [`Universe`].
 /// Together with [`Primitive::Indirect`], this allows mutation of a block definition such
 /// that all its existing usages follow.
@@ -64,7 +68,7 @@ pub(crate) struct BlockDefState {
     /// * Fewer chains of forwarded notifications, improving data and instruction cache locality.
     /// * Breaking data dependency cycles, so that if a `Space` contains itself
     ///   via a block definition, this results in iterative convergence rather than an error.
-    cache: Result<MinEval, EvalBlockError>,
+    cache: EvalResult,
 
     /// Whether the cache needs to be updated.
     cache_dirty: listen::Flag,
@@ -293,31 +297,53 @@ impl BlockDefTransaction {
     }
 }
 
+#[expect(missing_debug_implementations)]
+#[doc(hidden)] // would be impl Trait if we could
+pub struct Check {
+    /// May be `None` if the transaction has no new block and was only comparing the old block.
+    new_state: Option<BlockDefState>,
+}
+
 impl Transaction for BlockDefTransaction {
     type Target = BlockDef;
     type Context<'a> = ReadTicket<'a>;
-    type CommitCheck = ();
+    type CommitCheck = Check;
     type Output = transaction::NoOutput;
     type Mismatch = BlockDefMismatch;
 
     fn check(
         &self,
         target: &BlockDef,
-        _: Self::Context<'_>,
+        read_ticket: Self::Context<'_>,
     ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        self.old.check(&target.state.block).map_err(|_| BlockDefMismatch::Unexpected)
+        // Check the transaction precondition
+        self.old.check(&target.state.block).map_err(|_| BlockDefMismatch::Unexpected)?;
+
+        // Perform evaluation now, while we have the read ticket.
+        //
+        // Evaluation errors are not transaction errors, to ensure that editing the world is always
+        // possible even when in a situation with multiple errors that need to be fixed separately.
+        //
+        // TODO: Maybe add an option to the transaction to be strict?
+        Ok(Check {
+            new_state: self.new.0.clone().map(|block| BlockDefState::new(block, read_ticket)),
+        })
     }
 
     fn commit(
         self,
         target: &mut BlockDef,
-        read_ticket: Self::Context<'_>,
-        (): Self::CommitCheck,
+        _: Self::Context<'_>,
+        check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
-        if let Equal(Some(new)) = self.new {
-            target.state = BlockDefState::new(new, read_ticket);
-            target.notifier.notify(&BlockChange::new());
+        match (self.new, check.new_state) {
+            (Equal(Some(_)), Some(new_state)) => {
+                target.state = new_state;
+                target.notifier.notify(&BlockChange::new());
+            }
+            (Equal(None), None) => {}
+            _ => panic!("BlockDefTransaction check value is inconsistent"),
         }
         Ok(())
     }
@@ -490,7 +516,7 @@ pub(crate) fn add_block_def_systems(world: &mut ecs::World) {
 pub(crate) enum BlockDefNextValue {
     #[default]
     None,
-    NewEvaluation(Result<MinEval, EvalBlockError>),
+    NewEvaluation(EvalResult),
     /// Used when the prior attempt to add listeners failed.
     NewState(BlockDefState),
 }
