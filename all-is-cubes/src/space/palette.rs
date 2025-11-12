@@ -254,10 +254,12 @@ impl Palette {
     }
 
     /// First half of palette updates based on block change notifications.
+    ///
+    /// Calculates updates that are needed and writes the results, if any, to `output`.
     pub(crate) fn prepare_update(
         &self,
         read_ticket: ReadTicket<'_>,
-        output: &mut SpacePaletteNextValue,
+        mut output: ecs::Mut<'_, SpacePaletteNextValue>,
     ) {
         //let mut last_start_time = time::Instant::now();
         //let evaluations = TimeStats::default();

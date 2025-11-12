@@ -11,6 +11,7 @@
 use alloc::vec::Vec;
 use core::time::Duration;
 
+use bevy_ecs::change_detection::DetectChangesMut as _;
 use bevy_ecs::prelude as ecs;
 use bevy_platform::time::Instant;
 use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
@@ -365,7 +366,7 @@ pub(crate) fn step_behaviors_system(
 // -------------------------------------------------------------------------------------------------
 
 /// When updating spaces' palettes, this temporarily stores the new block evaluations.
-/// into the `BlockDef` component.
+/// into the `SpacePaletteNextValue` component.
 ///
 /// It is used only between [`update_palette_phase_1`] and [`update_palette_phase_2`].
 #[derive(bevy_ecs::component::Component, Default)]
@@ -382,15 +383,14 @@ pub(crate) fn update_palette_phase_1(
     let read_ticket = ReadTicket::from_queries(&data_sources);
 
     // TODO: parallel iter, + pipe out update info
-    for (current_palette, mut next_palette) in spaces.iter_mut() {
+    // TODO: Somehow filter only to palettes with any dirty flag.
+    for (current_palette, next_palette) in spaces.iter_mut() {
         debug_assert!(
             next_palette.0.is_empty(),
             "SpacePaletteNextValue should have been cleared"
         );
 
-        // TODO: Only run this update on dirty flag.
-
-        current_palette.prepare_update(read_ticket, &mut next_palette);
+        current_palette.prepare_update(read_ticket, next_palette);
     }
 }
 
@@ -400,13 +400,21 @@ pub(crate) fn update_palette_phase_1(
 /// This system being separate resolves the borrow conflict between writing to a [`Space`]
 /// and block evaluation (which may read from any [`Space`]).
 pub(crate) fn update_palette_phase_2(
-    mut spaces: ecs::Query<'_, '_, (&mut Palette, &mut SpacePaletteNextValue, &Notifiers)>,
+    mut spaces: ecs::Query<
+        (&mut Palette, &mut SpacePaletteNextValue, &Notifiers),
+        ecs::Changed<SpacePaletteNextValue>,
+    >,
 ) {
     // TODO(ecs): run this only on entities that need it, somehow
     spaces
         .par_iter_mut()
         .for_each(|(mut current_palette, mut next_palette, notifiers)| {
-            current_palette
-                .apply_update(&mut next_palette, &mut notifiers.change_notifier.buffer());
+            // By bypassing change detection, we avoid detecting this consumption of the change.
+            // (This means that change detection no longer strictly functions as change detection,
+            // but that is okay because `SpacePaletteNextValue` is *only* for palette updates.)
+            current_palette.apply_update(
+                next_palette.bypass_change_detection(),
+                &mut notifiers.change_notifier.buffer(),
+            );
         });
 }
