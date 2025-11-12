@@ -1,5 +1,8 @@
 //! Tools that we could imagine being in the Rust standard library, but aren't.
 
+// -------------------------------------------------------------------------------------------------
+// Re-exports
+
 #[doc(no_inline)]
 pub use yield_progress::{Builder as YieldProgressBuilder, YieldProgress};
 
@@ -16,8 +19,15 @@ pub use all_is_cubes_base::util::{
     assert_send_sync, log,
 };
 
+// -------------------------------------------------------------------------------------------------
+// Modules from this crate
+
+pub(crate) mod atomic_cell;
+
 mod status_text;
 pub use status_text::*;
+
+// -------------------------------------------------------------------------------------------------
 
 #[doc(hidden)]
 pub fn yield_progress_for_testing() -> YieldProgress {

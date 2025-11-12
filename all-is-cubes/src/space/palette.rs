@@ -10,6 +10,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::cell::Cell;
 use core::fmt;
+use core::sync::atomic::Ordering;
 
 use bevy_ecs::change_detection::DetectChangesMut as _;
 use bevy_ecs::prelude as ecs;
@@ -24,6 +25,7 @@ use crate::math::{self, OpacityCategory};
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::time::{self, TimeStats};
 use crate::universe::{self, ReadTicket};
+use crate::util::atomic_cell::{AtomicCell32 as AtomicCell, ZERO, ZERO3, Zero, Zero3};
 
 #[cfg(doc)]
 use crate::space;
@@ -79,7 +81,7 @@ impl Palette {
             Arc::new(BlockListener {
                 gate: Arc::downgrade(&gate),
                 todo: Arc::downgrade(&todo),
-                index: 0,
+                index: AtomicCell::new(ListenerIndexState::Set(ZERO, 0)),
             }),
             gate,
         );
@@ -119,7 +121,12 @@ impl Palette {
         let mut remapping = hashbrown::HashMap::new();
         for (original_index, block) in (0..=BlockIndex::MAX).zip(blocks) {
             let new_index = new_self
-                .ensure_index(read_ticket, &block, dummy_buffer, false)
+                .ensure_index(
+                    &mut EvaluationMethod::Ticket(read_ticket),
+                    &block,
+                    dummy_buffer,
+                    false,
+                )
                 .expect("palette iterator lied about its length");
             if new_index != original_index {
                 remapping.insert(original_index, new_index);
@@ -161,7 +168,7 @@ impl Palette {
     #[inline]
     pub(super) fn ensure_index(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        evaluation_method: &mut EvaluationMethod<'_>,
         block: &Block,
         change_buffer: &mut ChangeBuffer<'_>,
         use_zeroed_entries: bool,
@@ -176,7 +183,7 @@ impl Palette {
                 for new_index in 0..high_mark {
                     if self.entries[new_index].count == 0 {
                         self.entries[new_index] = self.create_pending_entry(
-                            read_ticket,
+                            evaluation_method,
                             block.clone(),
                             new_index as BlockIndex,
                         );
@@ -191,7 +198,7 @@ impl Palette {
             }
             let new_index = high_mark as BlockIndex;
             // Evaluate the new block type.
-            let new_data = self.create_pending_entry(read_ticket, block.clone(), new_index);
+            let new_data = self.create_pending_entry(evaluation_method, block.clone(), new_index);
             // Grow the vector.
             self.entries.push(new_data);
             self.block_to_index.insert(block.clone(), new_index);
@@ -204,7 +211,7 @@ impl Palette {
     /// [`Block`] for that index with `new_block`
     pub(super) fn try_replace_unique(
         &mut self,
-        read_ticket: ReadTicket<'_>,
+        evaluation_method: &mut EvaluationMethod<'_>,
         old_block_index: BlockIndex,
         new_block: &Block,
         change_buffer: &mut ChangeBuffer<'_>,
@@ -214,8 +221,11 @@ impl Palette {
         {
             // Swap out the block_data entry.
             let old_block = {
-                let mut data =
-                    self.create_pending_entry(read_ticket, new_block.clone(), old_block_index);
+                let mut data = self.create_pending_entry(
+                    evaluation_method,
+                    new_block.clone(),
+                    old_block_index,
+                );
                 data.count = 1;
                 core::mem::swap(&mut data, &mut self.entries[old_block_index as usize]);
                 data.block
@@ -260,24 +270,39 @@ impl Palette {
     /// hooked up.
     fn create_pending_entry(
         &self,
-        read_ticket: ReadTicket<'_>,
+        evaluation_method: &mut EvaluationMethod<'_>,
         block: Block,
         index: BlockIndex,
     ) -> SpaceBlockData {
-        let (listener, gate) = self.listener_for_block(index);
-        SpaceBlockData::new(read_ticket, block, listener, gate)
+        match evaluation_method {
+            &mut EvaluationMethod::Ticket(read_ticket) => {
+                let (listener, gate) =
+                    self.listener_for_block(ListenerIndexState::Set(ZERO, index));
+                SpaceBlockData::new(read_ticket, block, listener, gate)
+            }
+            EvaluationMethod::AlreadyEvaluated(data) => {
+                let PendingEvaluation { entry, listener } =
+                    data.take().expect("shouldn’t happen: new entry already taken");
+                let already_changed = listener.set_index(index);
+                if already_changed {
+                    self.todo.lock().unwrap().blocks.insert(index);
+                }
+                entry
+            }
+        }
     }
 
-    /// Creates the [`BlockListener`] communicating with this palette for a particular index.
+    /// Creates the [`BlockListener`] communicating with this palette for a particular index
+    /// (or the index is not yet known).
     ///
     /// This is used when a new block is to be inserted into the palette,
     /// in order to be notified of changes to the block definition.
-    fn listener_for_block(&self, index: BlockIndex) -> (Arc<BlockListener>, Arc<()>) {
+    fn listener_for_block(&self, index_state: ListenerIndexState) -> (Arc<BlockListener>, Arc<()>) {
         let gate = Arc::new(());
         let listener = Arc::new(BlockListener {
             gate: Arc::downgrade(&gate),
             todo: Arc::downgrade(&self.todo),
-            index,
+            index: AtomicCell::new(index_state),
         });
         (listener, gate)
     }
@@ -350,6 +375,16 @@ impl Palette {
                 problems.join("\n • ")
             );
         }
+    }
+
+    /// Returns whether the given block in this space’s palette is to be reevaluated
+    /// (such as because of having received a change notification).
+    ///
+    /// Panics if the block is not in the palette.
+    #[cfg(test)]
+    pub(crate) fn block_is_to_be_reevaluated(&self, block: &Block) -> bool {
+        let index = self.block_to_index[block];
+        self.todo.lock().unwrap().blocks.contains(&index)
     }
 }
 
@@ -517,14 +552,35 @@ impl SpaceBlockData {
     // but might be interesting 'statistics'.
 }
 
+// -------------------------------------------------------------------------------------------------
+
+/// A means of evaluating new blocks entering the palette.
+#[allow(clippy::large_enum_variant)]
+pub(in crate::space) enum EvaluationMethod<'t> {
+    /// Use the given [`ReadTicket`] to evaluate the block.
+    Ticket(ReadTicket<'t>),
+
+    /// The block has already been evaluated; use the given [`SpaceBlockData`] as the evaluation
+    /// result, and tell the [`BlockListener`] what index it is being assigned.
+    ///
+    /// All this is wrapped in [`Option`] so that it can be used in cases where the data may or
+    /// may not be consumed.
+    AlreadyEvaluated(Option<PendingEvaluation>),
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// [`Palette`]'s todo list for the next `step()`.
 #[derive(Debug, Default)]
 struct PaletteTodo {
     blocks: hashbrown::HashSet<BlockIndex>,
 }
 
-/// [`PaletteTodo`]'s listener for block change notifications.
-#[derive(Clone, Debug)]
+// -------------------------------------------------------------------------------------------------
+
+/// [`PaletteTodo`]'s listener for block change notifications, installed on blocks when they
+/// are inserted into the palette.
+#[derive(Debug)]
 struct BlockListener {
     /// This weak reference breaks when our entry is removed from the palette,
     /// telling us to stop sending changes even though `todo` may be still alive.
@@ -533,8 +589,45 @@ struct BlockListener {
     /// Way we write notifications to the palette.
     todo: Weak<Mutex<PaletteTodo>>,
 
-    /// Which index of the palette this block is in.
-    index: BlockIndex,
+    /// Index in the palette this listener is for, and related state.
+    index: AtomicCell<ListenerIndexState>,
+}
+
+/// Association of a [`BlockListener`] with a specific palette entry, or lack thereof.
+///
+/// This enum can be stored in an [`AtomicCell`] and is crufty in order to support that.
+#[repr(u8, align(4))]
+#[derive(Debug, Clone, Copy, bytemuck::NoUninit, bytemuck::CheckedBitPattern)]
+enum ListenerIndexState {
+    /// The listener does not yet know the palette entry’s index,
+    /// AND has not yet received any messages.
+    ///
+    /// `Zero3` is just padding-filler to enable our atomic operations.
+    Unset(Zero3),
+
+    /// The listener does not yet know the palette entry’s index,
+    /// AND has received a message.
+    ///
+    /// `Zero3` is just padding-filler to enable our atomic operations.
+    AlreadyChanged(Zero3),
+
+    /// The listener knows the palette entry’s index.
+    /// Messages are forwarded to [`super::PaletteTodo`].
+    ///
+    /// `Zero` is just padding-filler to enable our atomic operations.
+    Set(Zero, BlockIndex),
+}
+
+impl BlockListener {
+    /// Sets the index, and returns whether any change notifications arrived before then.
+    #[must_use]
+    fn set_index(&self, index: BlockIndex) -> bool {
+        match self.index.swap(ListenerIndexState::Set(ZERO, index), Ordering::Release) {
+            ListenerIndexState::Unset(ZERO3) => false,
+            ListenerIndexState::AlreadyChanged(ZERO3) => true,
+            ListenerIndexState::Set(ZERO, _index) => panic!("index should only be set once"),
+        }
+    }
 }
 
 impl listen::Listener<BlockChange> for BlockListener {
@@ -543,8 +636,25 @@ impl listen::Listener<BlockChange> for BlockListener {
             false
         } else if let Some(todo_mutex) = self.todo.upgrade() {
             if !messages.is_empty() {
+                // Obtain the index, if we have one; else record that we got a notification without
+                // an index to record it in the todo.
+                let index = match self.index.compare_exchange(
+                    ListenerIndexState::Unset(ZERO3),
+                    ListenerIndexState::AlreadyChanged(ZERO3),
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) | Err(ListenerIndexState::AlreadyChanged(ZERO3)) => {
+                        // The exchange either succeeded or was already performed, which constitutes
+                        // delivery of our change notification despite the lack of an index value.
+                        return true;
+                    }
+                    Err(ListenerIndexState::Set(ZERO, index)) => index,
+                    Err(ListenerIndexState::Unset(ZERO3)) => unreachable!(),
+                };
+
                 if let Ok(mut todo) = todo_mutex.lock() {
-                    todo.blocks.insert(self.index);
+                    todo.blocks.insert(index);
                 } else {
                     // If the mutex is poisoned, don't panic but do die
                     return false;
@@ -553,6 +663,26 @@ impl listen::Listener<BlockChange> for BlockListener {
             true
         } else {
             false
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Block evaluation and listener which has not yet been inserted into a [`Palette`].
+/// Used by transactions.
+#[derive(Debug)]
+pub(in crate::space) struct PendingEvaluation {
+    entry: SpaceBlockData,
+    listener: Arc<BlockListener>,
+}
+
+impl PendingEvaluation {
+    pub fn new(read_ticket: ReadTicket<'_>, palette: &Palette, block: Block) -> Self {
+        let (listener, gate) = palette.listener_for_block(ListenerIndexState::Unset(ZERO3));
+        Self {
+            entry: SpaceBlockData::new(read_ticket, block, listener.clone(), gate),
+            listener,
         }
     }
 }
