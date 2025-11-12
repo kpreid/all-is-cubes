@@ -52,10 +52,10 @@ use light::{LightStorage, LightUpdateQueue, PackedLightScalar};
 pub use light::{LightUpdatesInfo, PackedLight};
 
 mod palette;
-use palette::Palette;
 pub use palette::PaletteError;
 #[expect(clippy::module_name_repetitions)] // TODO: consider renaming
 pub use palette::SpaceBlockData;
+use palette::{Palette, PendingEvaluation};
 
 mod physics;
 pub use physics::*;
@@ -415,12 +415,20 @@ impl Space {
 
     /// Implementation of replacing the block in a single cube, as in [`Mutation::set()`].
     /// Monomorphic to keep codegen costs low.
-    /// Takes individual borrowed fields to enable use of `ChangeBuffer`.
+    ///
+    /// `prepared_entry`, if `Some`, is the new palette entry already created by a
+    /// [`SpaceTransaction`] check.
     fn set_impl(
         m: &mut Mutation<'_, '_>,
         position: Cube,
         block: &Block,
+        prepared_entry: Option<PendingEvaluation>,
     ) -> Result<bool, SetCubeError> {
+        let mut evaluation_method = match prepared_entry {
+            None => palette::EvaluationMethod::Ticket(m.read_ticket),
+            Some(entry) => palette::EvaluationMethod::AlreadyEvaluated(Some(entry)),
+        };
+
         if let Some(contents_index) = m.contents.index(position) {
             let old_block_index = m.contents.as_linear()[contents_index];
             let old_block = m.palette.entry(old_block_index).block();
@@ -437,9 +445,12 @@ impl Space {
             //
             // It also means that the externally observable block index behavior is easier
             // to characterize and won't create unnecessary holes.
-            if m.palette
-                .try_replace_unique(m.read_ticket, old_block_index, block, m.change_buffer)
-            {
+            if m.palette.try_replace_unique(
+                &mut evaluation_method,
+                old_block_index,
+                block,
+                m.change_buffer,
+            ) {
                 Self::side_effects_of_set(
                     m,
                     old_block_index,
@@ -452,7 +463,7 @@ impl Space {
 
             // Find or allocate index for new block. This must be done before other mutations since it can fail.
             let new_block_index =
-                m.palette.ensure_index(m.read_ticket, block, m.change_buffer, true)?;
+                m.palette.ensure_index(&mut evaluation_method, block, m.change_buffer, true)?;
 
             // Update counts
             m.palette.decrement_maybe_free(old_block_index);
@@ -1326,7 +1337,7 @@ impl<'space> Mutation<'_, 'space> {
         position: impl Into<Cube>,
         block: impl Into<Cow<'block, Block>>,
     ) -> Result<bool, SetCubeError> {
-        Space::set_impl(self, position.into(), &block.into())
+        Space::set_impl(self, position.into(), &block.into(), None)
     }
 
     /// Replace blocks in `region` with a block computed by the function.
@@ -1376,7 +1387,7 @@ impl<'space> Mutation<'_, 'space> {
             if let Some(block) = function(cube) {
                 // TODO: Optimize side effect processing by batching lighting updates for
                 // when we know what's now opaque or not.
-                Space::set_impl(self, cube, block.borrow())?;
+                Space::set_impl(self, cube, block.borrow(), None)?;
             }
         }
         Ok(())

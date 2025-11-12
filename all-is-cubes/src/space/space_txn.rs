@@ -6,13 +6,16 @@ use alloc::vec::Vec;
 use core::{fmt, mem};
 
 use bevy_ecs::prelude as ecs;
+use hashbrown::HashMap as HbHashMap;
 
 use crate::behavior::{self, BehaviorSetTransaction};
 use crate::block::Block;
 use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
 use crate::math::{Cube, GridCoordinate, GridPoint, Gridgid, Vol};
-use crate::space::{self, ActivatableRegion, GridAab, Mutation, SetCubeError, Space};
+use crate::space::{
+    self, ActivatableRegion, GridAab, Mutation, PendingEvaluation, SetCubeError, Space,
+};
 use crate::transaction::{
     CommitError, Equal, ExecuteError, Merge, NoOutput, Transaction, Transactional, no_outputs,
 };
@@ -171,27 +174,41 @@ impl SpaceTransaction {
         bounds
     }
 
-    /// As [`SpaceTransaction::check()`], but does not require borrowing the whole `Space`.
-    ///
-    /// This cannot practically be a [`Transaction`] implementation due to the lifetime
-    /// parameters. TODO: Consider if there is a `Transaction` redesign to be had here.
+    /// Shared implementation of transaction traits.
     fn check_common(
         &self,
+        read_ticket: ReadTicket<'_>,
         palette: &space::Palette,
         contents: Vol<&[space::BlockIndex]>,
         behaviors: &behavior::BehaviorSet<Space>,
     ) -> Result<CommitCheck, SpaceTransactionMismatch> {
+        let mut new_block_evaluations: HbHashMap<Block, PendingEvaluation> = HbHashMap::new();
+
         for (
             &cube,
             CubeTransaction {
                 old,
-                new: _,
+                new,
                 conserved,
                 activate_behavior: _,
                 fluff: _,
             },
         ) in &self.cubes
         {
+            // TODO: This is a lot of possibly redundant hash lookups.
+            // `SpaceTransaction`s should use their own palettes to aovid this.
+            if let Equal(Some(new_block)) = new {
+                if let hashbrown::hash_map::Entry::Vacant(ve) =
+                    new_block_evaluations.entry(new_block.clone())
+                {
+                    ve.insert(PendingEvaluation::new(
+                        read_ticket,
+                        palette,
+                        new_block.clone(),
+                    ));
+                }
+            }
+
             let cube = Cube::from(cube);
             if let Some(cube_index) = contents.index(cube) {
                 if let Equal(Some(old)) = old {
@@ -220,13 +237,14 @@ impl SpaceTransaction {
                 .behaviors
                 .check(behaviors, ())
                 .map_err(SpaceTransactionMismatch::Behaviors)?,
+            new_block_evaluations,
         })
     }
 
     fn commit_common(
         self,
         m: &mut Mutation<'_, '_>,
-        check: CommitCheck,
+        mut check: CommitCheck,
     ) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
 
@@ -244,7 +262,7 @@ impl SpaceTransaction {
             let cube = Cube::from(cube);
 
             if let Equal(Some(new)) = new {
-                match Space::set_impl(m, cube, &new) {
+                match Space::set_impl(m, cube, &new, check.new_block_evaluations.remove(&new)) {
                     Ok(_) => Ok(()),
                     Err(SetCubeError::OutOfBounds { .. }) if !conserved => {
                         // ignore
@@ -295,18 +313,22 @@ impl SpaceTransaction {
     // TODO: better name
     pub fn execute_m(self, target: &mut Mutation<'_, '_>) -> Result<(), ExecuteError<Self>> {
         let check = self
-            .check_common(target.palette, target.contents.as_ref(), target.behaviors)
+            .check_common(
+                target.read_ticket,
+                target.palette,
+                target.contents.as_ref(),
+                target.behaviors,
+            )
             .map_err(ExecuteError::Check)?;
         self.commit_common(target, check).map_err(ExecuteError::Commit)
     }
 }
 
-#[doc(hidden)] // would be opaque if we could
+#[doc(hidden)] // would be impl Trait if we could
 #[derive(Debug)]
 pub struct CommitCheck {
     behaviors: <BehaviorSetTransaction<Space> as Transaction>::CommitCheck,
-    // TODO(ecs) TODO(read_ticket): implement evaluating blocks at check time instead of commit.
-    // new_block_evaluations: hashbrown::HashMap<Block, SpaceBlockData>,
+    new_block_evaluations: hashbrown::HashMap<Block, PendingEvaluation>,
 }
 
 impl Transaction for SpaceTransaction {
@@ -319,9 +341,14 @@ impl Transaction for SpaceTransaction {
     fn check(
         &self,
         space: &Space,
-        _: Self::Context<'_>,
+        read_ticket: Self::Context<'_>,
     ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        self.check_common(&space.palette, space.contents.as_ref(), &space.behaviors)
+        self.check_common(
+            read_ticket,
+            &space.palette,
+            space.contents.as_ref(),
+            &space.behaviors,
+        )
     }
 
     fn commit(
@@ -349,9 +376,14 @@ impl universe::TransactionOnEcs for SpaceTransaction {
     fn check(
         &self,
         target: space::Read<'_>,
-        _: ReadTicket<'_>,
+        read_ticket: ReadTicket<'_>,
     ) -> Result<Self::CommitCheck, Self::Mismatch> {
-        self.check_common(target.palette, target.contents, target.behaviors)
+        self.check_common(
+            read_ticket,
+            target.palette,
+            target.contents,
+            target.behaviors,
+        )
     }
 
     fn commit(
@@ -762,7 +794,7 @@ impl fmt::Display for CubeConflict {
 mod tests {
     use super::*;
     use crate::behavior::NoopBehavior;
-    use crate::block::AIR;
+    use crate::block::{self, AIR};
     use crate::content::make_some_blocks;
     use crate::inv::EphemeralOpaque;
     use crate::transaction::TransactionTester;
@@ -806,6 +838,47 @@ mod tests {
             .nonconserved()
             .check(&Space::empty_positive(1, 1, 1), ReadTicket::stub())
             .unwrap_err();
+    }
+
+    /// Test that when a block is modified during the check phase of the transaction and the
+    /// commit phase — as might happen if the transaction also modifies a block definition —
+    /// the space knows that it must reevaluate the block, even though it was evaluated during
+    /// the check phase.
+    ///
+    /// Also test the outcome when there is no such change.
+    #[rstest::rstest]
+    fn block_changed_between_check_and_commit(#[values(false, true)] actually_change: bool) {
+        let mut u = universe::Universe::new();
+        let [initial_block_value, final_block_value] = make_some_blocks();
+        let block_handle = u.insert_anonymous(block::BlockDef::new(
+            u.read_ticket(),
+            initial_block_value.clone(),
+        ));
+        let indirect_block = Block::from(block_handle.clone());
+        let mut space = Space::builder(GridAab::ORIGIN_CUBE).build();
+
+        let space_txn =
+            SpaceTransaction::set_cube([0, 0, 0], Some(AIR), Some(indirect_block.clone()));
+        let check = space_txn.check(&space, u.read_ticket()).unwrap();
+        if actually_change {
+            u.execute_1(
+                &block_handle,
+                block::BlockDefTransaction::overwrite(final_block_value.clone()),
+            )
+            .unwrap();
+        }
+        space_txn.commit(&mut space, u.read_ticket(), check, &mut no_outputs).unwrap();
+
+        assert_eq!(
+            space.get_evaluated([0, 0, 0]).color(),
+            initial_block_value.color(),
+            "evaluation should always be from check time, regardless of change"
+        );
+        assert_eq!(
+            space.palette.block_is_to_be_reevaluated(&indirect_block),
+            actually_change,
+            "space todo ≠ actual change"
+        );
     }
 
     #[test]
