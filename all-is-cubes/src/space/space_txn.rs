@@ -180,8 +180,7 @@ impl SpaceTransaction {
         palette: &space::Palette,
         contents: Vol<&[space::BlockIndex]>,
         behaviors: &behavior::BehaviorSet<Space>,
-    ) -> Result<<BehaviorSetTransaction<Space> as Transaction>::CommitCheck, SpaceTransactionMismatch>
-    {
+    ) -> Result<CommitCheck, SpaceTransactionMismatch> {
         for (
             &cube,
             CubeTransaction {
@@ -216,13 +215,18 @@ impl SpaceTransaction {
                 }
             }
         }
-        self.behaviors.check(behaviors, ()).map_err(SpaceTransactionMismatch::Behaviors)
+        Ok(CommitCheck {
+            behaviors: self
+                .behaviors
+                .check(behaviors, ())
+                .map_err(SpaceTransactionMismatch::Behaviors)?,
+        })
     }
 
     fn commit_common(
         self,
         m: &mut Mutation<'_, '_>,
-        check: behavior::CommitCheck,
+        check: CommitCheck,
     ) -> Result<(), CommitError> {
         let mut to_activate = Vec::new();
 
@@ -268,7 +272,7 @@ impl SpaceTransaction {
         }
 
         self.behaviors
-            .commit(m.behaviors, (), check, &mut no_outputs)
+            .commit(m.behaviors, (), check.behaviors, &mut no_outputs)
             .map_err(|e| e.context("behaviors".into()))?;
 
         if !to_activate.is_empty() {
@@ -297,10 +301,18 @@ impl SpaceTransaction {
     }
 }
 
+#[doc(hidden)] // would be opaque if we could
+#[derive(Debug)]
+pub struct CommitCheck {
+    behaviors: <BehaviorSetTransaction<Space> as Transaction>::CommitCheck,
+    // TODO(ecs) TODO(read_ticket): implement evaluating blocks at check time instead of commit.
+    // new_block_evaluations: hashbrown::HashMap<Block, SpaceBlockData>,
+}
+
 impl Transaction for SpaceTransaction {
     type Target = Space;
     type Context<'a> = ReadTicket<'a>;
-    type CommitCheck = <BehaviorSetTransaction<Space> as Transaction>::CommitCheck;
+    type CommitCheck = CommitCheck;
     type Output = NoOutput;
     type Mismatch = SpaceTransactionMismatch;
 
