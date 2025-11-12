@@ -121,7 +121,11 @@ impl Transaction for DefTransaction {
     type Output = transaction::NoOutput;
     type Mismatch = Mismatch;
 
-    fn check(&self, target: &SoundDef) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        target: &SoundDef,
+        _read_ticket: universe::ReadTicket<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         self.old.check(target).map_err(|_| Mismatch::Unexpected)
     }
 
@@ -146,8 +150,12 @@ impl Transaction for DefTransaction {
 impl universe::TransactionOnEcs for DefTransaction {
     type WriteQueryData = &'static mut Self::Target;
 
-    fn check(&self, target: &SoundDef) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, target)
+    fn check(
+        &self,
+        target: &SoundDef,
+        read_ticket: universe::ReadTicket<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, target, read_ticket)
     }
 
     fn commit(

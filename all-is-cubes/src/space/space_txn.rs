@@ -216,7 +216,7 @@ impl SpaceTransaction {
                 }
             }
         }
-        self.behaviors.check(behaviors).map_err(SpaceTransactionMismatch::Behaviors)
+        self.behaviors.check(behaviors, ()).map_err(SpaceTransactionMismatch::Behaviors)
     }
 
     fn commit_common(
@@ -304,7 +304,11 @@ impl Transaction for SpaceTransaction {
     type Output = NoOutput;
     type Mismatch = SpaceTransactionMismatch;
 
-    fn check(&self, space: &Space) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        space: &Space,
+        _: Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         self.check_common(&space.palette, space.contents.as_ref(), &space.behaviors)
     }
 
@@ -330,7 +334,11 @@ impl universe::TransactionOnEcs for SpaceTransaction {
         &'static mut space::Ticks,
     );
 
-    fn check(&self, target: space::Read<'_>) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        target: space::Read<'_>,
+        _: ReadTicket<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         self.check_common(target.palette, target.contents, target.behaviors)
     }
 
@@ -754,7 +762,7 @@ mod tests {
         let [block] = make_some_blocks();
         // Note: by using .check() we validate that it doesn't fail in the commit phase
         SpaceTransaction::set_cube([1, 0, 0], None, Some(block))
-            .check(&Space::empty_positive(1, 1, 1))
+            .check(&Space::empty_positive(1, 1, 1), ReadTicket::stub())
             .unwrap_err();
     }
 
@@ -775,7 +783,7 @@ mod tests {
     fn compare_out_of_bounds_conserved_fails() {
         let [block] = make_some_blocks();
         SpaceTransaction::set_cube([1, 0, 0], Some(block), None)
-            .check(&Space::empty_positive(1, 1, 1))
+            .check(&Space::empty_positive(1, 1, 1), ReadTicket::stub())
             .unwrap_err();
     }
 
@@ -784,7 +792,7 @@ mod tests {
         let [block] = make_some_blocks();
         SpaceTransaction::set_cube([1, 0, 0], Some(block), None)
             .nonconserved()
-            .check(&Space::empty_positive(1, 1, 1))
+            .check(&Space::empty_positive(1, 1, 1), ReadTicket::stub())
             .unwrap_err();
     }
 

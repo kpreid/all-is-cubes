@@ -300,7 +300,11 @@ impl Transaction for BlockDefTransaction {
     type Output = transaction::NoOutput;
     type Mismatch = BlockDefMismatch;
 
-    fn check(&self, target: &BlockDef) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        target: &BlockDef,
+        _: Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         self.old.check(&target.state.block).map_err(|_| BlockDefMismatch::Unexpected)
     }
 
@@ -322,8 +326,12 @@ impl Transaction for BlockDefTransaction {
 impl universe::TransactionOnEcs for BlockDefTransaction {
     type WriteQueryData = &'static mut Self::Target;
 
-    fn check(&self, target: &BlockDef) -> Result<Self::CommitCheck, Self::Mismatch> {
-        Transaction::check(self, target)
+    fn check(
+        &self,
+        target: &BlockDef,
+        read_ticket: ReadTicket<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+        Transaction::check(self, target, read_ticket)
     }
 
     fn commit(

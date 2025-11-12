@@ -117,7 +117,11 @@ impl transaction::Transaction for DefTransaction {
     type Output = transaction::NoOutput;
     type Mismatch = Infallible;
 
-    fn check(&self, _: &Self::Target) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        _: &Self::Target,
+        _: Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         match *self {}
     }
 
@@ -135,8 +139,12 @@ impl transaction::Transaction for DefTransaction {
 impl universe::TransactionOnEcs for DefTransaction {
     type WriteQueryData = &'static mut Self::Target;
 
-    fn check(&self, target: &TagDef) -> Result<Self::CommitCheck, Self::Mismatch> {
-        transaction::Transaction::check(self, target)
+    fn check(
+        &self,
+        target: &TagDef,
+        read_ticket: universe::ReadTicket<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
+        transaction::Transaction::check(self, target, read_ticket)
     }
 
     fn commit(

@@ -440,7 +440,11 @@ impl Transaction for InventoryTransaction {
     type Output = InventoryChange;
     type Mismatch = InventoryMismatch;
 
-    fn check(&self, inventory: &Inventory) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        inventory: &Inventory,
+        (): Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         // Don't do the expensive copy if we have one already
         if self.replace.is_empty() && self.insert.is_empty() {
             return Ok(None);
@@ -650,7 +654,7 @@ mod tests {
 
         assert_eq!(inventory.slots, contents);
         InventoryTransaction::insert([new_item.clone()])
-            .check(&inventory)
+            .check(&inventory, ())
             .expect_err("should have failed");
         assert_eq!(inventory.slots, contents);
     }

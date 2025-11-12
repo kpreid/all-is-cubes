@@ -201,7 +201,11 @@ pub(crate) fn execute_tick_actions_system(
                 Ok((space_txn, inventory_txn)) => {
                     assert_eq!(inventory_txn, inv::InventoryTransaction::default());
 
-                    match universe::TransactionOnEcs::check(&space_txn, read) {
+                    match universe::TransactionOnEcs::check(
+                        &space_txn,
+                        read,
+                        everything_but_read_ticket,
+                    ) {
                         Err(_e) => {
                             // The operation produced a transaction which, itself, cannot execute
                             // against the state of the Space. Omit it from the set.

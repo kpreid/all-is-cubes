@@ -605,7 +605,11 @@ impl<H: Host> Transaction for BehaviorSetTransaction<H> {
     type Output = transaction::NoOutput;
     type Mismatch = BehaviorTransactionMismatch;
 
-    fn check(&self, target: &BehaviorSet<H>) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        target: &BehaviorSet<H>,
+        (): Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         let Self { replace, insert } = self;
         // TODO: need to compare replacement preconditions
         for (&key, Replace { old, new: _ }) in replace {
@@ -1241,7 +1245,7 @@ mod tests {
                 },
             );
             assert_eq!(
-                transaction.check(&set).unwrap_err(),
+                transaction.check(&set, ()).unwrap_err(),
                 BehaviorTransactionMismatch {
                     key,
                     key_not_found: false,
@@ -1273,7 +1277,7 @@ mod tests {
                 },
             );
             assert_eq!(
-                transaction.check(&set).unwrap_err(),
+                transaction.check(&set, ()).unwrap_err(),
                 BehaviorTransactionMismatch {
                     key,
                     key_not_found: false,

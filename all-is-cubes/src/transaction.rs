@@ -57,9 +57,9 @@ pub trait Transaction: Merge {
     /// call `commit` without `check`.
     type CommitCheck: 'static;
 
-    /// Data which must be passed when committing the transaction.
+    /// Data which must be passed when executing the transaction.
     /// Use `()` if none is needed.
-    type Context<'a>;
+    type Context<'a>: Copy;
 
     /// The results of a [`Transaction::commit()`] or [`Transaction::execute()`].
     /// Each commit may produce any number of these messages.
@@ -85,7 +85,11 @@ pub trait Transaction: Merge {
     ///
     /// If the preconditions are met, returns [`Ok`] containing data to be passed to
     /// [`Transaction::commit`].
-    fn check(&self, target: &Self::Target) -> Result<Self::CommitCheck, Self::Mismatch>;
+    fn check(
+        &self,
+        target: &Self::Target,
+        context: Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch>;
 
     /// Perform the mutations specified by this transaction. The `check` value should have
     /// been created by a prior call to [`Transaction::check()`].
@@ -106,7 +110,7 @@ pub trait Transaction: Merge {
     fn commit(
         self,
         target: &mut Self::Target,
-        context: Self::Context<'_>,
+        context: Self::Context<'_>, // TODO(ecs): this should become unused in order to stop wanting awkward everything-else read tickets
         check: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError>;
@@ -133,7 +137,7 @@ pub trait Transaction: Merge {
         context: Self::Context<'_>,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), ExecuteError<Self>> {
-        let check = self.check(target).map_err(ExecuteError::Check)?;
+        let check = self.check(target, context).map_err(ExecuteError::Check)?;
         self.commit(target, context, check, outputs).map_err(ExecuteError::Commit)
     }
 

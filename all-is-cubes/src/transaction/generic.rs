@@ -190,19 +190,21 @@ macro_rules! impl_transaction_for_tuple {
                 );
                 type Output = NoOutput;
                 type Mismatch = [< TupleError $count >]<
-                $( <[<Tr $name >] as Transaction>::Mismatch, )*
-            >;
+                    $( <[<Tr $name >] as Transaction>::Mismatch, )*
+                >;
 
+                #[allow(unused_variables, reason = "empty tuple case")]
                 fn check(
                     &self,
-                    #[allow(unused_variables, reason = "empty tuple case")]
                     target: &($( [<Tr $name>]::Target, )*),
+                    context: ($( [<Tr $name>]::Context<'_>, )*),
                 ) -> Result<Self::CommitCheck, Self::Mismatch> {
                     let ($( [<txn_ $name>], )*) = self;
                     let ($( [<target_ $name>], )*) = target;
+                    let ($( [<context_ $name>], )*) = context;
                     Ok((
                         $(
-                            [<txn_ $name>].check([<target_ $name>])
+                            [<txn_ $name>].check([<target_ $name>], [<context_ $name>])
                                 .map_err([< TupleError $count >]::[<At $name>])?,
                         )*
                     ))
@@ -334,7 +336,7 @@ impl Transaction for () {
     type Output = core::convert::Infallible;
     type Mismatch = core::convert::Infallible;
 
-    fn check(&self, (): &()) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(&self, (): &(), (): Self::Context<'_>) -> Result<Self::CommitCheck, Self::Mismatch> {
         Ok(())
     }
 

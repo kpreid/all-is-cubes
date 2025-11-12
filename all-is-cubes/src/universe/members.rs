@@ -345,12 +345,12 @@ macro_rules! member_enums_and_impls {
 
             fn check(
                 &self,
-                universe: &Universe,
+                universe: &Universe, (): Self::Context<'_>
             ) -> Result<Self::CommitCheck, Self::Mismatch> {
                 Ok::<Self::CommitCheck, Self::Mismatch>(match self {
                     Self::Noop => Box::new(()),
                     $(
-                        Self::$member_type(t) => Box::new(t.check(universe)
+                        Self::$member_type(t) => Box::new(t.check(universe, ())
                             .map_err(AnyTransactionMismatch::$member_type)?),
                     )*
                 })

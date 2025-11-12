@@ -43,9 +43,10 @@ where
     type WriteQueryData: bevy_ecs::query::QueryData;
 
     /// See [`Transaction::check()`].
-    fn check(
+    fn check<'t>(
         &self,
-        target: <<Self as Transaction>::Target as UniverseMember>::Read<'_>,
+        target: <<Self as Transaction>::Target as UniverseMember>::Read<'t>,
+        read_ticket: ReadTicket<'t>,
     ) -> Result<Self::CommitCheck, Self::Mismatch>;
 
     /// See [`Transaction::commit()`].
@@ -68,11 +69,13 @@ where
     O: UniverseMember + Transactional,
     <O as Transactional>::Transaction: TransactionOnEcs,
 {
+    let read_ticket = universe.read_ticket();
     let check = TransactionOnEcs::check(
         transaction,
         target
-            .read(universe.read_ticket())
+            .read(read_ticket)
             .expect("Attempted to execute transaction with target already borrowed"),
+        read_ticket,
     )?;
     Ok(check)
 }
@@ -142,7 +145,11 @@ where
     type Output = transaction::NoOutput;
     type Mismatch = <O::Transaction as Transaction>::Mismatch;
 
-    fn check(&self, universe: &Universe) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        universe: &Universe,
+        (): Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         check_transaction_in_universe(universe, &self.target, &self.transaction)
     }
 
@@ -662,7 +669,11 @@ impl Transaction for UniverseTransaction {
     type Output = transaction::NoOutput;
     type Mismatch = UniverseMismatch;
 
-    fn check(&self, target: &Universe) -> Result<Self::CommitCheck, UniverseMismatch> {
+    fn check(
+        &self,
+        target: &Universe,
+        (): Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, UniverseMismatch> {
         if let Some(universe_id) = self.universe_id()
             && universe_id != target.id
         {
@@ -852,7 +863,7 @@ impl MemberTxn {
             // Kludge: The individual `AnyTransaction`s embed the `Handle<T>` they operate on --
             // so we don't actually pass anything here.
             MemberTxn::Modify(txn) => Ok(MemberCommitCheck(Some(
-                txn.check(universe)
+                txn.check(universe, ())
                     .map_err(|e| MemberMismatch::Modify(ModifyMemberMismatch(e)))?,
             ))),
             MemberTxn::Insert(pending) => {
@@ -1300,7 +1311,7 @@ mod tests {
 
         // Without a value, the transaction is temporarily invalid.
         assert_eq!(
-            txn.check(&u).expect_err("should not succeed without value").to_string(),
+            txn.check(&u, ()).expect_err("should not succeed without value").to_string(),
             // TODO: this is a lazy incomplete check of the full error
             "transaction precondition not met in member 'foo'",
         );

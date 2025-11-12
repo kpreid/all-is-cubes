@@ -387,7 +387,7 @@ impl Operation {
                     new_block
                 };
 
-                if to_insert.check(destination_inventory).is_err() {
+                if to_insert.check(destination_inventory, ()).is_err() {
                     return Err(OperationError::CharacterInventoryFull);
                 }
 

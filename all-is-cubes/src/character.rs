@@ -648,16 +648,20 @@ impl Transaction for CharacterTransaction {
     type Output = transaction::NoOutput;
     type Mismatch = CharacterTransactionMismatch;
 
-    fn check(&self, target: &Character) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        target: &Character,
+        _: Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         let Self {
             set_space: _, // no check needed
             body,
             inventory,
         } = self;
         Ok((
-            body.check(&target.body).map_err(CharacterTransactionMismatch::Body)?,
+            body.check(&target.body, ()).map_err(CharacterTransactionMismatch::Body)?,
             inventory
-                .check(&target.inventory)
+                .check(&target.inventory, ())
                 .map_err(CharacterTransactionMismatch::Inventory)?,
         ))
     }
@@ -693,16 +697,20 @@ impl universe::TransactionOnEcs for CharacterTransaction {
         &'static mut ParentSpace,
     );
 
-    fn check(&self, target: Read<'_>) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        target: Read<'_>,
+        _: ReadTicket<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         let Self {
             set_space: _, // no check needed
             body,
             inventory,
         } = self;
         Ok((
-            body.check(target.body).map_err(CharacterTransactionMismatch::Body)?,
+            body.check(target.body, ()).map_err(CharacterTransactionMismatch::Body)?,
             inventory
-                .check(target.inventory)
+                .check(target.inventory, ())
                 .map_err(CharacterTransactionMismatch::Inventory)?,
         ))
     }
