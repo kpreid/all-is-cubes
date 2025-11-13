@@ -14,8 +14,10 @@ cargo-fuzz = true
 all-is-cubes = { path = "../all-is-cubes", features = ["arbitrary", "_special_testing"] }
 all-is-cubes-gpu = { path = "../all-is-cubes-gpu", features = ["_special_testing"] }
 all-is-cubes-mesh = { path = "../all-is-cubes-mesh", features = ["arbitrary", "_special_testing"] }
+all-is-cubes-port = { path = "../all-is-cubes-port", features = ["import", "all-formats"] }
 arbitrary = { version = "1.4.1", features = ["derive"] }
 libfuzzer-sys = "0.4"
+pollster = { version = "0.4.0" }
 pretty_assertions = { version = "1.2.0" }
 
 [patch.crates-io]
@@ -32,6 +34,12 @@ doc = false
 [[bin]]
 name = "fuzz_octree"
 path = "fuzz_targets/fuzz_octree.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_import"
+path = "fuzz_targets/fuzz_import.rs"
 test = false
 doc = false
 
