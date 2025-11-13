@@ -70,8 +70,10 @@ pub(crate) async fn dot_vox_data_to_universe(
         ImportMode::Scene
     } else if models.len() == 1 {
         ImportMode::OneModelAsSpace
-    } else {
+    } else if models.len() > 0 {
         ImportMode::ManyModelsAsBlocks
+    } else {
+        return Err(DotVoxConversionError::FileEmpty);
     };
 
     let model_phase_cost_relative_to_scene_phase = match mode {
@@ -194,6 +196,8 @@ fn view_all_models_as_blocks(
     models: &[dot_vox::Model],
     space_handles: Vec<Handle<Space>>,
 ) -> Result<Space, DotVoxConversionError> {
+    assert!(!models.is_empty(), "zero models not supported");
+
     let row_length = space_handles.len().isqrt();
     let row_length_g = i32::try_from(row_length).unwrap();
     let maximum_size_of_model_in_blocks = 4u32;

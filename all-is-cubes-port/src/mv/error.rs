@@ -7,6 +7,8 @@ use all_is_cubes::space::SetCubeError;
 pub(crate) enum DotVoxConversionError {
     #[error("{0}")]
     Parse(&'static str),
+    #[error("file contains no models or scenes to import")]
+    FileEmpty,
     #[error("file refers to scene node with ID {0} but does not define it")]
     MissingSceneNode(u32),
     #[error("file refers to model with ID {0} but does not define it")]
