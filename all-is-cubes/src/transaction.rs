@@ -125,7 +125,7 @@ pub trait Transaction: Merge {
     /// # let target = &mut Universe::new();
     /// # let context = ();
     /// # let outputs = &mut no_outputs;
-    /// let check = transaction.check(target).map_err(ExecuteError::Check)?;
+    /// let check = transaction.check(target, context).map_err(ExecuteError::Check)?;
     /// transaction.commit(target, context, check, outputs).map_err(ExecuteError::Commit)?;
     /// # Ok::<(), ExecuteError<UniverseTransaction>>(())
     /// ```
