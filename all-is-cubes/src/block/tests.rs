@@ -12,7 +12,8 @@ use crate::listen::{self, Log, NullListener};
 use crate::math::{Face6, GridRotation, Rgba};
 use crate::space::{Space, SpaceTransaction};
 use crate::time;
-use crate::universe::{self, HandleError, Name, Universe};
+use crate::transaction::{self, Transaction as _};
+use crate::universe::{self, HandleError, Name, Universe, UniverseTransaction};
 
 /// Just install a listener and discard the [`EvaluatedBlock`].
 ///
@@ -227,51 +228,91 @@ fn overflow_evaluate() {
     );
 }
 
-#[test]
-fn self_referential_evaluate() {
+#[rstest::rstest]
+fn self_referential_evaluate(#[values(false, true)] via_mutation: bool) {
     let mut universe = Universe::new();
-    let block = self_referential_block(&mut universe);
-    assert_eq!(
-        block.evaluate(universe.read_ticket()),
-        Err(EvalBlockError {
-            block,
-            budget: block::Budget::default().to_cost(),
-            used: block::Cost {
-                components: 1,
-                voxels: 0,
-                recursion: 0
-            },
-            kind: block::ErrorKind::Handle(HandleError {
-                name: Name::Specific("self_referential".into()),
-                handle_universe_id: Some(universe.universe_id()),
-                kind: universe::HandleErrorKind::InUse
-            })
-        })
-    );
+    let block = self_referential_block(&mut universe, via_mutation);
+
+    let error = block.evaluate(universe.read_ticket()).unwrap_err();
+
+    if via_mutation {
+        assert_eq!(
+            error,
+            EvalBlockError {
+                block,
+                budget: block::Budget::default().to_cost(),
+                used: block::Cost {
+                    components: 1,
+                    voxels: 0,
+                    recursion: 0
+                },
+                kind: block::ErrorKind::Handle(HandleError {
+                    name: Name::Specific("self_referential".into()),
+                    handle_universe_id: Some(universe.universe_id()),
+                    kind: universe::HandleErrorKind::InUse
+                })
+            }
+        );
+    } else {
+        // TODO: the HandleError details are not presented clearly (it is a WrongUniverse).
+        // Arrange so that this situation has a clear error and match it.
+        assert!(
+            matches!(
+                error,
+                EvalBlockError {
+                    block: _,
+                    budget: _,
+                    used: block::Cost {
+                        components: 1,
+                        voxels: 0,
+                        recursion: 0
+                    },
+                    kind: block::ErrorKind::Handle(_)
+                }
+            ),
+            "{error:#?}"
+        );
+    }
 }
 
-#[test]
-fn self_referential_listen() {
+#[rstest::rstest]
+fn self_referential_listen(#[values(false, true)] via_mutation: bool) {
     let mut universe = Universe::new();
-    let block = self_referential_block(&mut universe);
+    let block = self_referential_block(&mut universe, via_mutation);
     // This should *not* produce an error, because BlockDef manages its own notifier and we want
     // it to be possible to listen to a currently-erring BlockDef.
     assert_eq!(listen(&universe, &block, NullListener), Ok(()));
 }
 
-/// Helper for overflow_ tests
-fn self_referential_block(universe: &mut Universe) -> Block {
-    let block_def = universe
-        .insert(
-            "self_referential".into(),
-            BlockDef::new(universe.read_ticket(), AIR),
-        )
-        .unwrap();
-    let indirect = Block::from(block_def.clone());
-    universe
-        .execute_1(&block_def, BlockDefTransaction::overwrite(indirect.clone()))
-        .unwrap();
-    indirect
+/// Helper for `self_referential_` tests producing a `BlockDef` which refers to itself.
+///
+/// * `via_mutation: true`: the `BlockDef` is created with another value and then made
+///   self-referential.
+/// * `via_mutation: false`: the `BlockDef` never has a non-self-referential value.
+fn self_referential_block(universe: &mut Universe, via_mutation: bool) -> Block {
+    if via_mutation {
+        let block_def = universe
+            .insert(
+                "self_referential".into(),
+                BlockDef::new(universe.read_ticket(), AIR),
+            )
+            .unwrap();
+        let indirect = Block::from(block_def.clone());
+        universe
+            .execute_1(&block_def, BlockDefTransaction::overwrite(indirect.clone()))
+            .unwrap();
+        indirect
+    } else {
+        let mut txn = UniverseTransaction::default();
+        let block_def_handle = txn.insert_without_value("self_referential".into()).unwrap();
+        let indirect_block = Block::from(block_def_handle.clone());
+        txn.set_pending_value(
+            &block_def_handle,
+            BlockDef::new(universe.read_ticket(), indirect_block.clone()),
+        );
+        txn.execute(universe, (), &mut transaction::no_outputs).unwrap();
+        indirect_block
+    }
 }
 
 /// Tests for the behavior of `with_modifier()` and `rotate()` and such.
