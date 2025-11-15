@@ -66,14 +66,13 @@ pub(crate) async fn dot_vox_data_to_universe(
         yoke::Yoke::<&[dot_vox::Model], _>::attach_to_cart(data.clone(), |data| &data.models);
 
     // TODO: this should be a user-selectable option, not solely automatic
-    let mode = if !scenes.is_empty() {
-        ImportMode::Scene
-    } else if models.len() == 1 {
-        ImportMode::OneModelAsSpace
-    } else if models.len() > 0 {
-        ImportMode::ManyModelsAsBlocks
-    } else {
-        return Err(DotVoxConversionError::FileEmpty);
+    let mode = match (scenes.len(), models.len()) {
+        (1.., _) => ImportMode::Scene,
+        (0, 1) => ImportMode::OneModelAsSpace,
+        (0, 2..) => ImportMode::ManyModelsAsBlocks,
+        (0, 0) => {
+            return Err(DotVoxConversionError::FileEmpty);
+        }
     };
 
     let model_phase_cost_relative_to_scene_phase = match mode {
