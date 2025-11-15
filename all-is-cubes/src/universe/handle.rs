@@ -261,8 +261,8 @@ impl<T: 'static> Handle<T> {
             }
             #[cfg(feature = "save")]
             (_, State::Deserializing { .. }) => Err(self.create_error(HandleErrorKind::NotReady)),
-            // TODO: WrongUniverse isn't the clearest error for this
-            (_, State::Pending) => Err(self.create_error(HandleErrorKind::WrongUniverse {
+
+            (_, State::Pending) => Err(self.create_error(HandleErrorKind::NotYetInserted {
                 ticket_universe_id: Some(expected_universe),
                 ticket_origin: Location::caller(),
             })),
@@ -278,11 +278,11 @@ impl<T: 'static> Handle<T> {
 
             // Ignore universe mismatch so that Handle::new_gone() takes this branch.
             &State::Gone { reason } => Err(self.create_error(HandleErrorKind::Gone { reason })),
+
             #[cfg(feature = "save")]
             State::Deserializing { .. } => Err(self.create_error(HandleErrorKind::NotReady)),
-            // TODO: WrongUniverse *really* isn't the clearest error for this.
-            // It should have a dedicated error
-            State::Pending => Err(self.create_error(HandleErrorKind::WrongUniverse {
+
+            State::Pending => Err(self.create_error(HandleErrorKind::NotYetInserted {
                 ticket_universe_id: None,
                 ticket_origin: Location::caller(),
             })),
@@ -390,8 +390,8 @@ impl<T: 'static> Handle<T> {
             Err(HandleError {
                 name: self.name(),
                 handle_universe_id: membership.handle.universe_id(),
-                kind: HandleErrorKind::WrongUniverse {
-                    ticket_universe_id: self.universe_id(),
+                kind: HandleErrorKind::NotYetInserted {
+                    ticket_universe_id: None,
                     ticket_origin: Location::caller(),
                 },
             })
@@ -559,7 +559,9 @@ impl<T: 'static> Handle<T> {
                         kind: InsertErrorKind::AlreadyInserted,
                     });
                 }
-                e @ (HandleErrorKind::InvalidTicket { .. } | HandleErrorKind::Gone { .. }) => {
+                e @ (HandleErrorKind::NotYetInserted { .. }
+                | HandleErrorKind::InvalidTicket { .. }
+                | HandleErrorKind::Gone { .. }) => {
                     unreachable!("unexpected handle error while deserializing {name}: {e:?}")
                 }
             },
@@ -905,7 +907,18 @@ pub(crate) enum HandleErrorKind {
     WrongUniverse {
         /// ID of the universe the ticket is for, or [`None`] in the case of [`ReadTicket::stub()`].
         ticket_universe_id: Option<UniverseId>,
-        /// Call site where this ticket was created.
+        /// Call site where the ticket was created.
+        ticket_origin: &'static Location<'static>,
+    },
+
+    /// The handle is not yet associated with a universe, and the operation being performed
+    /// is one that requires that it is.
+    #[non_exhaustive]
+    NotYetInserted {
+        /// ID of the universe the handle should have been in,
+        /// or [`None`] if that information is not available.
+        ticket_universe_id: Option<UniverseId>,
+        /// Call site where the ticket was created or the operation was initiated.
         ticket_origin: &'static Location<'static>,
     },
 
@@ -940,6 +953,7 @@ impl HandleError {
             HandleErrorKind::ValueMissing => None,
             HandleErrorKind::NotReady => None,
             HandleErrorKind::WrongUniverse { .. } => None,
+            HandleErrorKind::NotYetInserted { .. } => None,
         }
     }
     /// Returns whether the failed access might succeed at a later time,
@@ -949,6 +963,7 @@ impl HandleError {
             // Ticket problems.
             HandleErrorKind::InUse => true,
             HandleErrorKind::InvalidTicket { .. } => true,
+            HandleErrorKind::NotYetInserted { .. } => true,
 
             // Transient problems with the handle’s own state.
             HandleErrorKind::ValueMissing => true,
@@ -996,6 +1011,21 @@ impl fmt::Display for HandleError {
                     or universe ({ticket_universe_id:?}); ticket created at {ticket_origin}"
                 )
             }
+            HandleErrorKind::NotYetInserted {
+                ticket_universe_id: Some(ticket_universe_id),
+                ticket_origin: _,
+            } => {
+                write!(
+                    f,
+                    "object {handle_name} is not yet part of universe {ticket_universe_id:?})"
+                )
+            }
+            HandleErrorKind::NotYetInserted {
+                ticket_universe_id: None,
+                ticket_origin: _,
+            } => {
+                write!(f, "object {handle_name} is not yet part of a universe")
+            }
             HandleErrorKind::InvalidTicket { error: _ } => {
                 write!(
                     f,
@@ -1014,6 +1044,7 @@ impl core::error::Error for HandleError {
             HandleErrorKind::NotReady => None,
             HandleErrorKind::ValueMissing => None,
             HandleErrorKind::WrongUniverse { .. } => None,
+            HandleErrorKind::NotYetInserted { .. } => None,
             HandleErrorKind::InvalidTicket { ref error } => Some(error),
         }
     }
