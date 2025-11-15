@@ -4,15 +4,15 @@
 //! "derived information from a `listen::DynSource` that requires computation" and should become
 //! general code that handles the re-listening problem.
 
-use all_is_cubes::linking::BlockProvider;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::character::{Character, CharacterChange};
 use all_is_cubes::inv;
+use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen::{self, Listen as _, Listener as _};
-use all_is_cubes::universe::{HandleError, ReadTicket, StrongHandle};
+use all_is_cubes::universe::{ReadTicket, StrongHandle};
 
 use crate::vui;
 
@@ -142,24 +142,18 @@ impl InventoryWatcher {
                             character_guard.selected_slots(),
                         )
                     }
-                    Err(HandleError::InUse(_) | HandleError::NotReady(_)) => {
-                        if listener_to_install.is_some() {
-                            // spin until we can successfully write the listener
-                            // TODO: send some kind of deduplicated warning on this case...
-                            // or even better, give Handles a way to notify when they become ready
-                            // to read.
-                            self.dirty.set();
-                            self.notifier.notify(&WatcherChange::NeedsUpdate);
+                    Err(handle_error) => {
+                        if handle_error.is_transient() {
+                            if listener_to_install.is_some() {
+                                // spin until we can successfully write the listener
+                                // TODO: send some kind of deduplicated warning on this case...
+                                // or even better, give Handles a way to notify when they become ready
+                                // to read.
+                                self.dirty.set();
+                                self.notifier.notify(&WatcherChange::NeedsUpdate);
+                            }
                         }
                         empty_inventory
-                    }
-                    Err(HandleError::Gone { .. }) => {
-                        // No inventory exists any more, so nothing to do.
-                        empty_inventory
-                    }
-                    Err(e) => {
-                        // TODO: … perhaps the enum should be exhaustive.
-                        unreachable!("unknown HandleError: {e:?}");
                     }
                 }
             }

@@ -9,8 +9,8 @@ use bevy_ecs::prelude as ecs;
 use bevy_ecs::world::unsafe_world_cell::UnsafeWorldCell;
 
 use crate::universe::{
-    self, GoneReason, Handle, HandleError, MemberReadQueries, MemberReadQueryStates, SealedMember,
-    Universe, UniverseId,
+    self, GoneReason, Handle, HandleError, HandleErrorKind, MemberReadQueries,
+    MemberReadQueryStates, SealedMember, Universe, UniverseId,
 };
 
 #[cfg(doc)]
@@ -38,7 +38,7 @@ pub struct ReadTicket<'universe> {
 
     universe_id: Option<UniverseId>,
 
-    /// Where this ticket was created.
+    /// Call site where this ticket was created.
     pub(in crate::universe) origin: &'static Location<'static>,
 
     /// If true, don't log failures.
@@ -423,35 +423,34 @@ impl ReadTicketError {
     /// Depending on the specific case, the resulting [`HandleError`]
     /// may be a [`HandleError::InvalidTicket`] or something more specific.
     pub(crate) fn into_handle_error(self, handle: &dyn universe::ErasedHandle) -> HandleError {
-        match self.kind {
-            TicketErrorKind::MissingEntity => HandleError::Gone {
-                name: handle.name(),
-                // TODO(ecs): we don't know that this is the true reason.
-                // Should this be panicking instead?
-                reason: GoneReason::Deleted {},
+        HandleError::from_erased(
+            handle,
+            match self.kind {
+                TicketErrorKind::MissingEntity => HandleErrorKind::Gone {
+                    // TODO(ecs): we don't know that this is the true reason.
+                    // Should this be panicking instead?
+                    reason: GoneReason::Deleted {},
+                },
+                TicketErrorKind::MissingComponent { type_name: _ } => panic!("{self:?}"), // TODO: improve
+                TicketErrorKind::ComponentNotAllowed { type_name: _ } => {
+                    HandleErrorKind::InvalidTicket { error: self }
+                }
+                TicketErrorKind::BeingMutated => HandleErrorKind::InUse,
+                TicketErrorKind::Transaction => HandleErrorKind::WrongUniverse {
+                    ticket_universe_id: None,
+                    ticket_origin: self.ticket_origin,
+                },
+                TicketErrorKind::NotTransaction => HandleErrorKind::WrongUniverse {
+                    // TODO: details are missing here
+                    ticket_universe_id: None,
+                    ticket_origin: self.ticket_origin,
+                },
+                TicketErrorKind::ValueMissing => HandleErrorKind::ValueMissing,
+                TicketErrorKind::Stub => {
+                    unreachable!("universe ID should already have been checked")
+                }
             },
-            TicketErrorKind::MissingComponent { type_name: _ } => panic!("{self:?}"), // TODO: improve
-            TicketErrorKind::ComponentNotAllowed { type_name: _ } => HandleError::InvalidTicket {
-                name: handle.name(),
-                error: self,
-            },
-            TicketErrorKind::BeingMutated => HandleError::InUse(handle.name()),
-            TicketErrorKind::Transaction => HandleError::WrongUniverse {
-                ticket_universe_id: None,
-                handle_universe_id: handle.universe_id(),
-                name: handle.name(),
-                ticket_origin: self.ticket_origin,
-            },
-            TicketErrorKind::NotTransaction => HandleError::WrongUniverse {
-                // TODO: details are missing here
-                ticket_universe_id: None,
-                handle_universe_id: None,
-                name: handle.name(),
-                ticket_origin: self.ticket_origin,
-            },
-            TicketErrorKind::ValueMissing => HandleError::ValueMissing(handle.name()),
-            TicketErrorKind::Stub => unreachable!("universe ID should already have been checked"),
-        }
+        )
     }
 }
 

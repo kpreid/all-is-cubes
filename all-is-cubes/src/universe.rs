@@ -575,7 +575,9 @@ impl Universe {
         self.world.run_schedule(gc::Gc);
     }
 
-    /// Validate
+    /// Validate handles in a universe after deserializing it.
+    ///
+    /// If this finds a handle which was used but not defined, deserialization will fail.
     #[cfg(feature = "save")]
     pub(crate) fn validate_deserialized_members(&self) -> Result<(), DeserializeHandlesError> {
         let read_ticket = self.read_ticket();

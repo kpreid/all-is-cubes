@@ -12,7 +12,7 @@ use crate::listen::{self, Log, NullListener};
 use crate::math::{Face6, GridRotation, Rgba};
 use crate::space::{Space, SpaceTransaction};
 use crate::time;
-use crate::universe::{HandleError, Name, Universe};
+use crate::universe::{self, HandleError, Name, Universe};
 
 /// Just install a listener and discard the [`EvaluatedBlock`].
 ///
@@ -241,9 +241,11 @@ fn self_referential_evaluate() {
                 voxels: 0,
                 recursion: 0
             },
-            kind: block::ErrorKind::Handle(HandleError::InUse(Name::Specific(
-                "self_referential".into()
-            )))
+            kind: block::ErrorKind::Handle(HandleError {
+                name: Name::Specific("self_referential".into()),
+                handle_universe_id: Some(universe.universe_id()),
+                kind: universe::HandleErrorKind::InUse
+            })
         })
     );
 }

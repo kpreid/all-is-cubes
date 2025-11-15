@@ -358,7 +358,7 @@ impl EvalBlockError {
     pub fn is_wrong_universe(&self) -> bool {
         matches!(
             self.kind,
-            ErrorKind::Handle(HandleError::WrongUniverse { .. })
+            ErrorKind::Handle(ref e) if e.is_wrong_universe()
         )
     }
 
@@ -368,19 +368,9 @@ impl EvalBlockError {
     /// If `true`, then reevaluating later or with a more proper [`ReadTicket`] may succeed.
     pub(crate) fn is_transient(&self) -> bool {
         match self.kind {
-            ErrorKind::Handle(HandleError::InUse { .. }) => true,
-            ErrorKind::Handle(HandleError::InvalidTicket { .. }) => true,
-            ErrorKind::Handle(HandleError::ValueMissing { .. }) => true,
-
+            ErrorKind::Handle(ref h) => h.is_transient(),
             ErrorKind::BudgetExceeded => false,
             ErrorKind::PriorBudgetExceeded { .. } => false,
-            ErrorKind::Handle(HandleError::WrongUniverse { .. }) => false,
-            ErrorKind::Handle(HandleError::Gone { .. }) => false,
-
-            // TODO: Arguably NotReady is transient, but we just don't have a good way to
-            // make use of this either way. Revisit when we have a better story about failing to
-            // install listeners.
-            ErrorKind::Handle(HandleError::NotReady(..)) => false,
         }
     }
 

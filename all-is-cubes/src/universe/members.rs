@@ -264,6 +264,7 @@ macro_rules! member_enums_and_impls {
                 }
             }
 
+            /// Used as part of checking whether a deserialized Universe contains bad handles.
             #[cfg(feature = "save")]
             pub(crate) fn not_still_deserializing(
                 &self,
@@ -271,7 +272,13 @@ macro_rules! member_enums_and_impls {
             ) -> bool {
                 match self {
                     $( AnyHandle::$member_type(h) => {
-                        !matches!(h.read(read_ticket), Err($crate::universe::HandleError::NotReady(_)))
+                        !matches!(
+                            h.read(read_ticket),
+                            Err(handle_error) if matches!(
+                                handle_error.kind,
+                                $crate::universe::HandleErrorKind::NotReady,
+                            )
+                        )
                     } )*
                 }
             }

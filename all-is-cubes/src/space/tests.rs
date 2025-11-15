@@ -96,9 +96,12 @@ fn set_success_despite_eval_error_gone() {
                 voxels: 0,
                 recursion: 0
             },
-            kind: block::ErrorKind::Handle(HandleError::Gone {
+            kind: block::ErrorKind::Handle(HandleError {
                 name: "bs".into(),
-                reason: universe::GoneReason::CreatedGone {}
+                handle_universe_id: None,
+                kind: universe::HandleErrorKind::Gone {
+                    reason: universe::GoneReason::CreatedGone {}
+                }
             })
         }
         .to_placeholder()

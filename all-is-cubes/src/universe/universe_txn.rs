@@ -534,8 +534,8 @@ impl UniverseTransaction {
 
     /// Delete this member from the universe.
     ///
-    /// All existing handles will become [`HandleError::Gone`], even if a new member by
-    /// the same name is later added.
+    /// All existing handles will start producing [`HandleError::gone()`] errors,
+    /// even if a new member by the same name is later added.
     ///
     /// This transaction will fail if the member is already gone, is anonymous
     /// (only named entries can be deleted), or belongs to another universe.
@@ -1371,10 +1371,11 @@ mod tests {
 
     // This panic is not specifically desirable, but more work will be needed to avoid it.
     #[test]
-    #[should_panic = "Attempted to execute transaction with target already borrowed: Gone { name: Specific(\"foo\"), reason: CreatedGone }"]
+    #[should_panic = "Attempted to execute transaction with target already borrowed: HandleError { name: Specific(\"foo\"), handle_universe_id: None, kind: Gone { reason: CreatedGone } }"]
     fn handle_error_from_universe_txn() {
         let mut u = Universe::new();
-        let txn = SpaceTransaction::default().bind(Handle::<Space>::new_gone("foo".into()));
+        let txn: UniverseTransaction =
+            SpaceTransaction::default().bind(Handle::<Space>::new_gone("foo".into()));
 
         _ = txn.execute(&mut u, (), &mut transaction::no_outputs);
     }

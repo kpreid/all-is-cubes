@@ -153,7 +153,7 @@ impl<T: 'static> Handle<T> {
     /// Constructs a [`Handle`] that does not refer to a value, as if it used to but
     /// is now defunct.
     ///
-    /// When dereferenced, this will always produce the error [`HandleError::Gone`].
+    /// When accessed, this will always produce errors with [`HandleError::gone()`].
     /// When compared, this will be equal only to clones of itself.
     ///
     /// This may be used in tests to exercise error handling.
@@ -249,26 +249,23 @@ impl<T: 'static> Handle<T> {
             (true, &State::Member { entity, .. }) => Ok(entity),
 
             // Ignore universe mismatch so that Handle::new_gone() takes this branch.
-            (_, &State::Gone { reason }) => Err(HandleError::Gone {
-                name: self.name(),
-                reason,
-            }),
+            (_, &State::Gone { reason }) => {
+                Err(self.create_error(HandleErrorKind::Gone { reason }))
+            }
 
-            (false, State::Member { .. }) => Err(HandleError::WrongUniverse {
-                name: self.name(),
-                ticket_universe_id: Some(expected_universe),
-                handle_universe_id: self.universe_id(),
-                ticket_origin: Location::caller(),
-            }),
+            (false, State::Member { .. }) => {
+                Err(self.create_error(HandleErrorKind::WrongUniverse {
+                    ticket_universe_id: Some(expected_universe),
+                    ticket_origin: Location::caller(),
+                }))
+            }
             #[cfg(feature = "save")]
-            (_, State::Deserializing { .. }) => Err(HandleError::NotReady(self.name())),
+            (_, State::Deserializing { .. }) => Err(self.create_error(HandleErrorKind::NotReady)),
             // TODO: WrongUniverse isn't the clearest error for this
-            (_, State::Pending) => Err(HandleError::WrongUniverse {
+            (_, State::Pending) => Err(self.create_error(HandleErrorKind::WrongUniverse {
                 ticket_universe_id: Some(expected_universe),
-                handle_universe_id,
-                name: self.name(),
                 ticket_origin: Location::caller(),
-            }),
+            })),
         }
     }
 
@@ -280,20 +277,15 @@ impl<T: 'static> Handle<T> {
             &State::Member { entity, .. } => Ok(entity),
 
             // Ignore universe mismatch so that Handle::new_gone() takes this branch.
-            &State::Gone { reason } => Err(HandleError::Gone {
-                name: self.name(),
-                reason,
-            }),
+            &State::Gone { reason } => Err(self.create_error(HandleErrorKind::Gone { reason })),
             #[cfg(feature = "save")]
-            State::Deserializing { .. } => Err(HandleError::NotReady(self.name())),
+            State::Deserializing { .. } => Err(self.create_error(HandleErrorKind::NotReady)),
             // TODO: WrongUniverse *really* isn't the clearest error for this.
             // It should have a dedicated error
-            State::Pending => Err(HandleError::WrongUniverse {
+            State::Pending => Err(self.create_error(HandleErrorKind::WrongUniverse {
                 ticket_universe_id: None,
-                handle_universe_id: self.universe_id(),
-                name: self.name(),
                 ticket_origin: Location::caller(),
-            }),
+            })),
         }
     }
 
@@ -332,7 +324,7 @@ impl<T: 'static> Handle<T> {
             State::Pending => Access::Pending,
             #[cfg(feature = "save")]
             State::Deserializing { entity: _ } => {
-                return Err(HandleError::NotReady(self.name()));
+                return Err(self.create_error(HandleErrorKind::NotReady));
             }
             State::Member { entity } => {
                 let handle_universe_id = self.inner.universe_id.get(atomic::Ordering::Relaxed);
@@ -348,21 +340,16 @@ impl<T: 'static> Handle<T> {
                             in {handle_universe_id:?}",
                         );
                     }
-                    return Err(HandleError::WrongUniverse {
+                    return Err(self.create_error(HandleErrorKind::WrongUniverse {
                         ticket_universe_id,
-                        handle_universe_id,
-                        name,
                         ticket_origin: read_ticket.origin,
-                    });
+                    }));
                 }
 
                 Access::Entity(entity)
             }
             State::Gone { reason } => {
-                return Err(HandleError::Gone {
-                    name: self.name(),
-                    reason,
-                });
+                return Err(self.create_error(HandleErrorKind::Gone { reason }));
             }
         };
 
@@ -400,11 +387,13 @@ impl<T: 'static> Handle<T> {
         if membership.handle == *self {
             Ok(T::read_from_query(data))
         } else {
-            Err(HandleError::WrongUniverse {
-                ticket_universe_id: self.universe_id(),
-                handle_universe_id: membership.handle.universe_id(),
+            Err(HandleError {
                 name: self.name(),
-                ticket_origin: Location::caller(),
+                handle_universe_id: membership.handle.universe_id(),
+                kind: HandleErrorKind::WrongUniverse {
+                    ticket_universe_id: self.universe_id(),
+                    ticket_origin: Location::caller(),
+                },
             })
         }
     }
@@ -426,7 +415,9 @@ impl<T: 'static> Handle<T> {
                 panic!("cannot use query() on pending handles")
             }
             #[cfg(feature = "save")]
-            State::Deserializing { entity: _ } => return Err(HandleError::NotReady(self.name())),
+            State::Deserializing { entity: _ } => {
+                return Err(self.create_error(HandleErrorKind::NotReady));
+            }
             State::Member { entity } => {
                 let handle_universe_id = self.inner.universe_id.get(atomic::Ordering::Relaxed);
                 debug_assert!(handle_universe_id.is_some());
@@ -441,21 +432,16 @@ impl<T: 'static> Handle<T> {
                             in {handle_universe_id:?}",
                         );
                     }
-                    return Err(HandleError::WrongUniverse {
+                    return Err(self.create_error(HandleErrorKind::WrongUniverse {
                         ticket_universe_id,
-                        handle_universe_id,
-                        name,
                         ticket_origin: read_ticket.origin,
-                    });
+                    }));
                 }
 
                 entity
             }
             State::Gone { reason } => {
-                return Err(HandleError::Gone {
-                    name: self.name(),
-                    reason,
-                });
+                return Err(self.create_error(HandleErrorKind::Gone { reason }));
             }
         };
 
@@ -539,39 +525,44 @@ impl<T: 'static> Handle<T> {
                     });
                 }
             }
-            Err(HandleError::InUse(name)) => {
-                return Err(InsertError {
-                    name,
-                    kind: InsertErrorKind::InUse,
-                });
-            }
-            Err(HandleError::NotReady(_)) => {
-                unreachable!("tried to insert a Handle from deserialization via transaction")
-            }
-            Err(HandleError::ValueMissing(name)) => {
-                return Err(InsertError {
-                    name,
-                    kind: InsertErrorKind::ValueMissing,
-                });
-            }
-            Err(HandleError::Gone {
+            Err(HandleError {
                 name,
-                reason: GoneReason::CreatedGone {},
-            }) => {
-                return Err(InsertError {
-                    name,
-                    kind: InsertErrorKind::Gone,
-                });
-            }
-            Err(HandleError::WrongUniverse { name, .. }) => {
-                return Err(InsertError {
-                    name,
-                    kind: InsertErrorKind::AlreadyInserted,
-                });
-            }
-            Err(e @ (HandleError::InvalidTicket { .. } | HandleError::Gone { .. })) => {
-                unreachable!("unexpected handle error while deserializing: {e:?}")
-            }
+                handle_universe_id: _,
+                kind,
+            }) => match kind {
+                HandleErrorKind::InUse => {
+                    return Err(InsertError {
+                        name,
+                        kind: InsertErrorKind::InUse,
+                    });
+                }
+                HandleErrorKind::NotReady => {
+                    unreachable!("tried to insert a Handle from deserialization via transaction")
+                }
+                HandleErrorKind::ValueMissing => {
+                    return Err(InsertError {
+                        name,
+                        kind: InsertErrorKind::ValueMissing,
+                    });
+                }
+                HandleErrorKind::Gone {
+                    reason: GoneReason::CreatedGone {},
+                } => {
+                    return Err(InsertError {
+                        name,
+                        kind: InsertErrorKind::Gone,
+                    });
+                }
+                HandleErrorKind::WrongUniverse { .. } => {
+                    return Err(InsertError {
+                        name,
+                        kind: InsertErrorKind::AlreadyInserted,
+                    });
+                }
+                e @ (HandleErrorKind::InvalidTicket { .. } | HandleErrorKind::Gone { .. }) => {
+                    unreachable!("unexpected handle error while deserializing {name}: {e:?}")
+                }
+            },
         }
 
         Ok(())
@@ -647,6 +638,15 @@ impl<T: 'static> Handle<T> {
 
     pub(in crate::universe) fn has_strong_handles(&self) -> bool {
         self.inner.strong_handle_count.load(atomic::Ordering::Acquire) > 0
+    }
+
+    /// Constructs a [`HandleError`] using this handle’s information and the given `kind`.
+    pub(in crate::universe) fn create_error(&self, kind: HandleErrorKind) -> HandleError {
+        HandleError {
+            name: self.name(),
+            handle_universe_id: self.universe_id(),
+            kind,
+        }
     }
 }
 
@@ -845,28 +845,44 @@ mod arbitrary_handle {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Errors resulting from attempting to read or write the referent of a [`Handle`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq, displaydoc::Display)]
+/// Error resulting from attempting to read or write the referent of a [`Handle`].
+///
+/// Handle errors generally fall into one of these categories.
+///
+/// * The handle is defunct (from deletion or garbage collection); accessing it will always fail.
+/// * The handle is not ready to use yet (such as if it was created by
+///   [`UniverseTransaction::insert_without_value()`]).
+/// * The [`ReadTicket`] provided to [`Handle::read()`] is not for the correct universe.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum HandleError {
+pub struct HandleError {
+    /// Name of the member which was being accessed.
+    pub name: Name,
+
+    /// ID of the universe the handle is associated with, if any.
+    pub handle_universe_id: Option<UniverseId>,
+
+    /// Details of the specific problem.
+    /// `kind` is private so that we can freely add and remove variants.
+    pub(crate) kind: HandleErrorKind,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum HandleErrorKind {
     /// Referent was explicitly deleted (if named) or garbage-collected (if anonymous)
     /// from the universe.
-    #[displaydoc("object {name} was deleted")] // TODO: print reason
     #[non_exhaustive]
     Gone {
-        /// Name of the member which was being accessed.
-        name: Name,
         /// Further details for diagnosing why the member may be unexpectedly gone.
         reason: GoneReason,
     },
 
-    /// Referent is currently incompatibly borrowed (read/write or write/write conflict).
+    /// Referent is being mutated and is not possible to access.
     ///
     /// This can only happen inside of transactions or when working with a handle which is not
     /// yet inserted into a universe. Outside of those cases, borrow checking of the universe
     /// as a whole prevents it.
-    #[displaydoc("object is currently in use: {0}")]
-    InUse(Name),
+    InUse,
 
     /// Referent does not have its data yet, which means that a serialized universe had
     /// a handle to it but not its definition.
@@ -874,59 +890,136 @@ pub enum HandleError {
     /// This can only happen during deserialization (and the error text will not actually
     /// appear because it is adjusted elsewhere).
     #[doc(hidden)]
-    #[displaydoc("object was referenced but not defined: {0}")]
-    NotReady(Name),
+    NotReady,
 
     /// The handle has no value because [`UniverseTransaction::set_pending_value()`] has not yet
     /// been called.
-    #[displaydoc("handle {0} has no value yet")]
-    ValueMissing(Name),
+    ValueMissing,
 
     /// The given [`ReadTicket`] is for a different universe,
     /// or a mutation function was called on a [`Universe`] which does not contain the given handle.
-    #[displaydoc(
-        // TODO: avoid use of Debug formatting
-        "object {name} is from a different universe ({handle_universe_id:?}) \
-        than the given ReadTicket or universe ({handle_universe_id:?})"
-    )]
+    //---
+    // TODO: this is conflating "ticket is stub" with "ticket is for a different universe",
+    // which should be distinct, because replacing stub with non-stub is generally more feasible.
     #[non_exhaustive]
     WrongUniverse {
         /// ID of the universe the ticket is for, or [`None`] in the case of [`ReadTicket::stub()`].
         ticket_universe_id: Option<UniverseId>,
-        /// ID of the universe the handle belongs to, or [`None`] if the handle has not been
-        /// inserted into a universe.
-        handle_universe_id: Option<UniverseId>,
-        /// Name of the member which was being accessed.
-        name: Name,
-        // TODO: make this a properly hidden field. fold this error into InvalidTicket?
-        #[doc(hidden)]
+        /// Call site where this ticket was created.
         ticket_origin: &'static Location<'static>,
     },
 
     /// The presented [`ReadTicket`] does not have sufficient access for the requested data.
-    #[displaydoc("given ReadTicket does not have sufficient access to {name}")]
     InvalidTicket {
-        /// Name of the member which was being accessed.
-        name: Name,
         /// Opaque description of the exact restriction.
         error: ReadTicketError,
     },
 }
 
-impl core::error::Error for HandleError {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match self {
-            HandleError::Gone { .. } => None,
-            HandleError::InUse(..) => None,
-            HandleError::NotReady(..) => None,
-            HandleError::ValueMissing(..) => None,
-            HandleError::WrongUniverse { .. } => None,
-            HandleError::InvalidTicket { name: _, error } => Some(error),
+impl HandleError {
+    /// Constructs a [`HandleError`] using `handle`’s identification and the given `kind`.
+    pub(in crate::universe) fn from_erased(
+        handle: &dyn ErasedHandle,
+        kind: HandleErrorKind,
+    ) -> HandleError {
+        Self {
+            name: handle.name(),
+            handle_universe_id: handle.universe_id(),
+            kind,
+        }
+    }
+
+    /// Returns whether this error indicates that the handle’s referent no longer exists and the
+    /// handle will never again be usable.
+    pub fn gone(&self) -> Option<GoneReason> {
+        match self.kind {
+            HandleErrorKind::Gone { reason } => Some(reason),
+
+            HandleErrorKind::InUse => None,
+            HandleErrorKind::InvalidTicket { .. } => None,
+            HandleErrorKind::ValueMissing => None,
+            HandleErrorKind::NotReady => None,
+            HandleErrorKind::WrongUniverse { .. } => None,
+        }
+    }
+    /// Returns whether the failed access might succeed at a later time,
+    /// or with a strictly broader [`ReadTicket`].
+    pub fn is_transient(&self) -> bool {
+        match self.kind {
+            // Ticket problems.
+            HandleErrorKind::InUse => true,
+            HandleErrorKind::InvalidTicket { .. } => true,
+
+            // Transient problems with the handle’s own state.
+            HandleErrorKind::ValueMissing => true,
+            HandleErrorKind::NotReady => true,
+
+            // Permanent failures.
+            HandleErrorKind::WrongUniverse { .. } => false,
+            HandleErrorKind::Gone { .. } => false,
+        }
+    }
+
+    #[doc(hidden)] // TODO(read_ticket): eventually stop needing this
+    pub fn is_wrong_universe(&self) -> bool {
+        matches!(self.kind, HandleErrorKind::WrongUniverse { .. })
+    }
+}
+
+impl fmt::Display for HandleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            name: handle_name,
+            handle_universe_id,
+            kind,
+        } = self;
+        match kind {
+            HandleErrorKind::Gone { reason: _ } => {
+                write!(f, "object {handle_name} was deleted")
+            }
+            HandleErrorKind::InUse => {
+                write!(f, "object {handle_name} is currently in use")
+            }
+            HandleErrorKind::NotReady => {
+                write!(f, "object {handle_name} was referenced but not defined")
+            }
+            HandleErrorKind::ValueMissing => {
+                write!(f, "handle {handle_name} has no value yet")
+            }
+            HandleErrorKind::WrongUniverse {
+                ticket_universe_id,
+                ticket_origin,
+            } => {
+                write!(
+                    f,
+                    "object {handle_name} is from a different universe ({handle_universe_id:?}) than the given ReadTicket \
+                    or universe ({ticket_universe_id:?}); ticket created at {ticket_origin}"
+                )
+            }
+            HandleErrorKind::InvalidTicket { error: _ } => {
+                write!(
+                    f,
+                    "given ReadTicket does not have sufficient access to {handle_name}",
+                )
+            }
         }
     }
 }
 
-/// Details of [`HandleError::Gone`].
+impl core::error::Error for HandleError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self.kind {
+            HandleErrorKind::Gone { .. } => None,
+            HandleErrorKind::InUse => None,
+            HandleErrorKind::NotReady => None,
+            HandleErrorKind::ValueMissing => None,
+            HandleErrorKind::WrongUniverse { .. } => None,
+            HandleErrorKind::InvalidTicket { ref error } => Some(error),
+        }
+    }
+}
+
+/// Details reported by [`HandleError::gone()`].
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum GoneReason {
@@ -967,7 +1060,7 @@ impl<T: UniverseMember> StrongHandle<T> {
     /// not be subject to garbage collection.
     pub fn new(handle: Handle<T>) -> Self {
         // We don't worry about integer overflow here, because it's unlikely to happen and
-        // if it does, the result will at worst be an unintended `HandleError::Gone` or an
+        // if it does, the result will at worst be an unintended `HandleErrorKind::Gone` or an
         // unintended retention, neither of which is a soundness issue.
         //
         // TODO: Think about the optimal choice of atomic ordering
@@ -1193,23 +1286,19 @@ mod tests {
     #[test]
     fn new_gone_properties() {
         let name = Name::from("foo");
+        let expected_error = HandleError {
+            name: name.clone(),
+            handle_universe_id: None,
+            kind: HandleErrorKind::Gone {
+                reason: GoneReason::CreatedGone {},
+            },
+        };
+
         let handle: Handle<Space> = Handle::new_gone(name.clone());
         assert_eq!(handle.name(), name);
         assert_eq!(handle.universe_id(), None);
-        assert_eq!(
-            handle.read(ReadTicket::stub()).unwrap_err(),
-            HandleError::Gone {
-                name: name.clone(),
-                reason: GoneReason::CreatedGone {}
-            }
-        );
-        assert_eq!(
-            handle.as_entity(UniverseId::new()),
-            Err(HandleError::Gone {
-                name: name.clone(),
-                reason: GoneReason::CreatedGone {}
-            }),
-        );
+        assert_eq!(handle.read(ReadTicket::stub()).unwrap_err(), expected_error);
+        assert_eq!(handle.as_entity(UniverseId::new()), Err(expected_error));
     }
 
     /// Note: It is unclear what the best behavior is. The current one is that every
@@ -1227,21 +1316,32 @@ mod tests {
     #[test]
     fn handle_error_format() {
         assert_eq!(
-            HandleError::InUse("foo".into()).to_string(),
-            "object is currently in use: 'foo'"
+            HandleError {
+                name: "foo".into(),
+                handle_universe_id: None,
+                kind: HandleErrorKind::InUse
+            }
+            .to_string(),
+            "object 'foo' is currently in use"
         );
         assert_eq!(
-            HandleError::Gone {
+            HandleError {
                 name: "foo".into(),
-                reason: GoneReason::Deleted {}
+                handle_universe_id: None,
+                kind: HandleErrorKind::Gone {
+                    reason: GoneReason::Deleted {}
+                }
             }
             .to_string(),
             "object 'foo' was deleted"
         );
         assert_eq!(
-            HandleError::Gone {
+            HandleError {
                 name: Name::Anonym(123),
-                reason: GoneReason::Deleted {}
+                handle_universe_id: None,
+                kind: HandleErrorKind::Gone {
+                    reason: GoneReason::Deleted {}
+                }
             }
             .to_string(),
             "object [anonymous #123] was deleted"

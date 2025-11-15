@@ -18,9 +18,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes::space::{self, LightPhysics, Space};
 use all_is_cubes::transaction::{self, Merge, Transaction as _};
-use all_is_cubes::universe::{
-    Handle, HandleError, ReadTicket, StrongHandle, Universe, UniverseTransaction,
-};
+use all_is_cubes::universe::{Handle, ReadTicket, StrongHandle, Universe, UniverseTransaction};
 use all_is_cubes::util::yield_progress_for_testing;
 use all_is_cubes_content::{UniverseTemplate, make_some_voxel_blocks, palette};
 use all_is_cubes_render::camera::{
@@ -389,6 +387,17 @@ async fn voxel_shape_test(
         .await;
 }
 
+fn error_is_gone(error: &RenderError) -> bool {
+    if let RenderError::Read(handle_error) = error
+        && (handle_error.gone().is_some()
+            && (handle_error.name == "character".into() || handle_error.name == "space".into()))
+    {
+        true
+    } else {
+        false
+    }
+}
+
 /// Test what happens when the renderer's character goes away *after* the first frame.
 ///
 /// TODO: also test case of space gone but character not gone
@@ -416,16 +425,14 @@ async fn error_character_gone(mut context: RenderTestContext) {
     // Updating may fail, or it may succeed because there were no change notifications.
     match renderer.update(Layers::splat(context.universe().read_ticket()), None) {
         Ok(()) => {}
-        Err(RenderError::Read(HandleError::Gone { name, .. }))
-            if name == "character".into() || name == "space".into() => {}
+        Err(e) if error_is_gone(&e) => {}
         Err(e) => panic!("unexpected other error from update(): {e:?}"),
     }
     // Drawing should succeed with no data.
     // TODO: We temporarily also allow failure. Stop that.
     match renderer.draw("").await {
         Ok(_) => {}
-        Err(RenderError::Read(HandleError::Gone { name, .. }))
-            if name == "character".into() || name == "space".into() => {}
+        Err(e) if error_is_gone(&e) => {}
         res => panic!("unexpected result from draw(): {res:?}"),
     }
 }
@@ -449,16 +456,14 @@ async fn error_character_unavailable(mut context: RenderTestContext) {
         .unwrap();
 
     match renderer.update(Layers::splat(context.universe().read_ticket()), None) {
-        Err(RenderError::Read(HandleError::Gone { name, .. }))
-            if name == "character".into() || name == "space".into() => {}
+        Err(e) if error_is_gone(&e) => {}
         res => panic!("unexpected result from update(): {res:?}"),
     }
     // Drawing should always succeed anyway.
     // TODO: We temporarily also allow failure. Stop that.
     match renderer.draw("").await {
         Ok(_image) => {}
-        Err(RenderError::Read(HandleError::Gone { name, .. }))
-            if name == "character".into() || name == "space".into() => {}
+        Err(e) if error_is_gone(&e) => {}
         res => panic!("unexpected result from draw(): {res:?}"),
     }
 }

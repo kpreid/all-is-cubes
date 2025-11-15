@@ -255,6 +255,13 @@ fn delete_success() {
     let mut u = Universe::new();
     let name: Name = "test_thing".into();
     let blocks: [Block; 2] = make_some_blocks();
+    let expected_error = HandleError {
+        name: name.clone(),
+        handle_universe_id: Some(u.universe_id()),
+        kind: universe::HandleErrorKind::Gone {
+            reason: GoneReason::Deleted {},
+        },
+    };
 
     let handle_1 = u
         .insert(
@@ -269,12 +276,9 @@ fn delete_success() {
         .unwrap();
     assert_eq!(
         handle_1
-            .read(u.read_ticket(),)
-            .expect_err("should be no longer reachable by ref"),
-        HandleError::Gone {
-            name: name.clone(),
-            reason: GoneReason::Deleted {}
-        },
+            .read(u.read_ticket())
+            .expect_err("should be no longer reachable by handle"),
+        expected_error,
     );
 
     // Now insert a new thing under the same name, and it should not be considered the same.
@@ -287,11 +291,8 @@ fn delete_success() {
         )
         .unwrap();
     assert_eq!(
-        handle_1.read(u.read_ticket(),).expect_err("should not be resurrected"),
-        HandleError::Gone {
-            name: name.clone(),
-            reason: GoneReason::Deleted {}
-        },
+        handle_1.read(u.read_ticket()).expect_err("should not be resurrected"),
+        expected_error
     );
     let _ = handle_2.read(u.read_ticket()).unwrap();
 }
