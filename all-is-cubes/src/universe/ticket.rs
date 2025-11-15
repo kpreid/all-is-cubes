@@ -215,6 +215,7 @@ impl<'universe> ReadTicket<'universe> {
 
         inner().map_err(|kind: TicketErrorKind| ReadTicketError {
             kind,
+            ticket_universe_id: self.universe_id,
             ticket_origin: self.origin,
         })
     }
@@ -246,6 +247,7 @@ impl<'universe> ReadTicket<'universe> {
         let Some(txn) = self.transaction_access else {
             return Err(ReadTicketError {
                 kind: TicketErrorKind::Transaction,
+                ticket_universe_id: self.universe_id,
                 ticket_origin: self.origin,
             });
         };
@@ -253,11 +255,13 @@ impl<'universe> ReadTicket<'universe> {
             .get_pending(handle)
             .ok_or(ReadTicketError {
                 ticket_origin: self.origin,
+                ticket_universe_id: self.universe_id,
                 kind: TicketErrorKind::NotTransaction,
             })?
             .as_ref()
             .ok_or(ReadTicketError {
                 ticket_origin: self.origin,
+                ticket_universe_id: self.universe_id,
                 kind: TicketErrorKind::ValueMissing,
             })?;
         Ok(value)
@@ -333,6 +337,7 @@ impl<'universe> ReadTicket<'universe> {
 
         inner().map_err(|kind: TicketErrorKind| ReadTicketError {
             kind,
+            ticket_universe_id: self.universe_id,
             ticket_origin: self.origin,
         })
     }
@@ -378,6 +383,10 @@ impl<'u> fmt::Debug for TicketAccess<'u> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ReadTicketError {
     kind: TicketErrorKind,
+
+    /// ID of the universe this ticket is from, if there is one.
+    ticket_universe_id: Option<UniverseId>,
+
     /// Code location which constructed the unsuitable ticket.
     ticket_origin: &'static Location<'static>,
 }
@@ -423,27 +432,31 @@ impl ReadTicketError {
     /// Depending on the specific case, the resulting [`HandleError`]
     /// may be a [`HandleError::InvalidTicket`] or something more specific.
     pub(crate) fn into_handle_error(self, handle: &dyn universe::ErasedHandle) -> HandleError {
+        let Self {
+            ref kind, // ref so we can still use self if we decide to
+            ticket_universe_id,
+            ticket_origin,
+        } = self;
         HandleError::from_erased(
             handle,
-            match self.kind {
+            match kind {
                 TicketErrorKind::MissingEntity => HandleErrorKind::Gone {
                     // TODO(ecs): we don't know that this is the true reason.
                     // Should this be panicking instead?
                     reason: GoneReason::Deleted {},
                 },
-                TicketErrorKind::MissingComponent { type_name: _ } => panic!("{self:?}"), // TODO: improve
+                TicketErrorKind::MissingComponent { type_name: _ } => panic!("{self:?}"), // TODO(ecs): improve
                 TicketErrorKind::ComponentNotAllowed { type_name: _ } => {
                     HandleErrorKind::InvalidTicket { error: self }
                 }
                 TicketErrorKind::BeingMutated => HandleErrorKind::InUse,
                 TicketErrorKind::Transaction => HandleErrorKind::WrongUniverse {
-                    ticket_universe_id: None,
-                    ticket_origin: self.ticket_origin,
+                    ticket_universe_id,
+                    ticket_origin,
                 },
                 TicketErrorKind::NotTransaction => HandleErrorKind::WrongUniverse {
-                    // TODO: details are missing here
-                    ticket_universe_id: None,
-                    ticket_origin: self.ticket_origin,
+                    ticket_universe_id,
+                    ticket_origin,
                 },
                 TicketErrorKind::ValueMissing => HandleErrorKind::ValueMissing,
                 TicketErrorKind::Stub => {
