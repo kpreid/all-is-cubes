@@ -891,7 +891,7 @@ pub(crate) enum HandleErrorKind {
     ///
     /// This can only happen during deserialization (and the error text will not actually
     /// appear because it is adjusted elsewhere).
-    #[doc(hidden)]
+    #[cfg_attr(not(feature = "save"), allow(dead_code))]
     NotReady,
 
     /// The handle has no value because [`UniverseTransaction::set_pending_value()`] has not yet
