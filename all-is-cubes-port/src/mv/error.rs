@@ -11,6 +11,10 @@ pub(crate) enum DotVoxConversionError {
     FileEmpty,
     #[error("file refers to scene node with ID {0} but does not define it")]
     MissingSceneNode(u32),
+    #[error("scene graph contains cycle (involving node with ID {0})")]
+    SceneGraphCycle(u32),
+    #[error("scene graph is too complex")]
+    SceneGraphRecursion,
     #[error("file refers to model with ID {0} but does not define it")]
     MissingModel(u32),
     #[error("palette of {len} colors too short to contain index {index}")]

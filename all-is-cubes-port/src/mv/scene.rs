@@ -24,7 +24,7 @@ pub(crate) async fn scene_to_space(
     progress.progress(0.0).await;
 
     let mut leaves: Vec<SceneElement<'_>> = Vec::new();
-    walk_scene_graph(&data, 0, Gridgid::IDENTITY, &mut leaves)?;
+    walk_scene_graph(&data, 0, Gridgid::IDENTITY, None, &mut leaves)?;
 
     let scene_voxel_bounding_box: GridAab = leaves
         .iter()
@@ -126,8 +126,14 @@ fn walk_scene_graph<'data>(
     data: &'data dot_vox::DotVoxData,
     scene_index: u32,
     parent_transform: Gridgid,
+    parent_node_list: Option<&ParentList<'_>>,
     output: &mut Vec<SceneElement<'data>>,
 ) -> Result<(), mv::DotVoxConversionError> {
+    let parent_node_list = Some(&ParentList::cycle_and_depth_check(
+        parent_node_list,
+        scene_index,
+    )?);
+
     match data
         .scenes
         .get(usize::try_from(scene_index).unwrap())
@@ -185,6 +191,7 @@ fn walk_scene_graph<'data>(
                 parent_transform
                     * Gridgid::from_translation(translation)
                     * Gridgid::from_rotation_about_origin(mv::coord::mv_to_aic_rotation(rotation)),
+                parent_node_list,
                 output,
             )?;
         }
@@ -198,7 +205,7 @@ fn walk_scene_graph<'data>(
                 &[],
             );
             for &child in children {
-                walk_scene_graph(data, child, parent_transform, output)?;
+                walk_scene_graph(data, child, parent_transform, parent_node_list, output)?;
             }
         }
         dot_vox::SceneNode::Shape { attributes, models } => {
@@ -227,6 +234,41 @@ fn walk_scene_graph<'data>(
         }
     }
     Ok(())
+}
+
+/// Used for cycle detection when walking the scene graph.
+struct ParentList<'a> {
+    index: u32,
+    parent: Option<&'a ParentList<'a>>,
+}
+impl<'a> ParentList<'a> {
+    fn cycle_and_depth_check(
+        list: Option<&'a Self>,
+        index: u32,
+    ) -> Result<Self, mv::DotVoxConversionError> {
+        if let Some(list) = list {
+            list.check_inner(index, 100)?;
+        }
+        Ok(ParentList {
+            index,
+            parent: list,
+        })
+    }
+
+    fn check_inner(&self, index: u32, max_depth: u32) -> Result<(), mv::DotVoxConversionError> {
+        if self.index == index {
+            Err(mv::DotVoxConversionError::SceneGraphCycle(index))
+        } else if let Some(parent) = self.parent {
+            parent.check_inner(
+                index,
+                max_depth
+                    .checked_sub(1)
+                    .ok_or_else(|| mv::DotVoxConversionError::SceneGraphRecursion)?,
+            )
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// Results of processing the [`dot_vox::Scene`] graph.
