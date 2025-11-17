@@ -237,10 +237,13 @@ fn walk_scene_graph<'data>(
 }
 
 /// Used for cycle detection when walking the scene graph.
+#[cfg(feature = "import")]
 struct ParentList<'a> {
     index: u32,
     parent: Option<&'a ParentList<'a>>,
 }
+
+#[cfg(feature = "import")]
 impl<'a> ParentList<'a> {
     fn cycle_and_depth_check(
         list: Option<&'a Self>,
