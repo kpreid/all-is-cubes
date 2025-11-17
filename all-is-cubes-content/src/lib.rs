@@ -45,6 +45,7 @@ mod template;
 pub use template::*;
 mod dungeon;
 mod fractal;
+mod islands;
 mod landscape;
 pub use landscape::*;
 mod menu;

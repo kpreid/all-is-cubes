@@ -11,11 +11,10 @@ use paste::paste;
 
 use all_is_cubes::block::Block;
 use all_is_cubes::character::{Character, Spawn};
-use all_is_cubes::euclid::{Point3D, Size3D};
-use all_is_cubes::linking::{BlockProvider, GenError, InGenError};
+use all_is_cubes::euclid::Point3D;
+use all_is_cubes::linking::{GenError, InGenError};
 use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord, GridVector,
-    Rgb, Rgba,
+    Face6, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridSizeCoord, Rgb, Rgba,
 };
 use all_is_cubes::save::WhenceUniverse;
 use all_is_cubes::space::{LightPhysics, Space};
@@ -24,9 +23,10 @@ use all_is_cubes::universe::{Handle, Name, ReadTicket, Universe, UniverseTransac
 use all_is_cubes::util::YieldProgress;
 
 use crate::fractal::menger_sponge_from_size;
-use crate::landscape::{self, LandscapeBlocks, wavy_landscape};
+use crate::free_editing_starter_inventory;
 use crate::{atrium::atrium, demo_city, dungeon::demo_dungeon, install_demo_blocks};
-use crate::{free_editing_starter_inventory, palette};
+
+// -------------------------------------------------------------------------------------------------
 
 /// Generate a `#[test]` function for each element of [`UniverseTemplate`].
 /// This macro is used as a derive macro via [`macro_rules_derive`].
@@ -181,7 +181,9 @@ impl UniverseTemplate {
                 ))),
                 DemoCity => Some(demo_city(&mut universe, p.take().unwrap(), params).await),
                 Dungeon => Some(demo_dungeon(&mut universe, p.take().unwrap(), params).await),
-                Islands => Some(islands(&mut universe, p.take().unwrap(), params).await),
+                Islands => {
+                    Some(crate::islands::islands(&mut universe, p.take().unwrap(), params).await)
+                }
                 Atrium => Some(atrium(&mut universe, p.take().unwrap()).await),
                 CornellBox => Some(cornell_box(params.size.unwrap_or(GridSize::splat(57)))),
                 MengerSponge => Some(
@@ -248,6 +250,8 @@ fn insert_generated_space(
         Err(e) => Err(GenError::failure(e, name)),
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 /// Configuration for exactly what a [`UniverseTemplate`] should produce.
 ///
@@ -376,76 +380,8 @@ async fn lukewarm_reload(
     Ok::<_, Box<dyn Error + Send + Sync>>(universe)
 }
 
-// -- Specific templates below this point ---
-
-async fn islands(
-    universe: &mut Universe,
-    p: YieldProgress,
-    params: TemplateParameters,
-) -> Result<Space, InGenError> {
-    let landscape_blocks = landscape::create_landscape_blocks_and_variants(&BlockProvider::<
-        LandscapeBlocks,
-    >::using(universe)?);
-
-    let TemplateParameters { size, seed: _ } = params;
-    let size = size.unwrap_or(GridSize::new(1000, 400, 1000));
-
-    // Set up dimensions
-    let bounds = GridAab::checked_from_lower_size(
-        [
-            -((size.width / 2).cast_signed()),
-            -((size.height / 2).cast_signed()),
-            size.depth.cast_signed(),
-        ],
-        size,
-    )
-    .map_err(InGenError::other)?; // TODO: add automatic error conversion?
-
-    let mut space = Space::builder(bounds)
-        .sky_color(palette::DAY_SKY_COLOR)
-        .spawn({
-            let mut spawn = Spawn::default_for_new_space(bounds);
-            spawn.set_inventory(free_editing_starter_inventory(true));
-            spawn.set_eye_position(bounds.center());
-            // TODO: Make this tidier by having a "shrink to centermost point or cube" operation on GridAab
-            let cp = bounds.center().map(|c| c as GridCoordinate);
-            spawn.set_bounds(GridAab::from_lower_size(
-                cp - GridVector::new(30, 30, 30),
-                [60, 60, 60],
-            ));
-            spawn
-        })
-        .build();
-
-    // Set up grid in which islands are placed
-    let island_stride = 50;
-    let island_grid = bounds.divide(island_stride);
-
-    for (i, island_pos) in island_grid.interior_iter().enumerate() {
-        let cell_bounds = GridAab::from_lower_size(
-            (island_pos.lower_bounds().to_vector() * island_stride).to_point(),
-            Size3D::splat(island_stride).to_u32(),
-        )
-        .intersection_cubes(bounds)
-        .expect("island outside space bounds");
-        // TODO: randomize island location in cell?
-        let margin = 10;
-        // TODO: non-panicking expand() will be a better solution than this conditional here
-        if cell_bounds.size().width >= margin * 2
-            && cell_bounds.size().height >= margin + 25
-            && cell_bounds.size().depth >= margin * 2
-        {
-            let occupied_bounds =
-                cell_bounds.shrink(FaceMap::splat(10).with(Face6::PY, 25)).unwrap();
-            space.mutate(universe.read_ticket(), |m| {
-                wavy_landscape(occupied_bounds, m, &landscape_blocks, 0.5)
-            })?;
-        }
-        p.progress(i as f32 / island_grid.volume_f64() as f32).await;
-    }
-
-    Ok(space)
-}
+// -------------------------------------------------------------------------------------------------
+// Specific templates
 
 #[rustfmt::skip]
 fn cornell_box(requested_size: GridSize) -> Result<Space, InGenError> {
@@ -528,6 +464,7 @@ async fn arbitrary_space(
     seed: u64,
 ) -> Result<Space, InGenError> {
     use all_is_cubes::euclid::Vector3D;
+    use all_is_cubes::math::FaceMap;
     use arbitrary::{Arbitrary, Error, Unstructured};
     use rand::{RngCore, SeedableRng};
 
@@ -541,6 +478,7 @@ async fn arbitrary_space(
         match r {
             Ok(mut space) => {
                 // Patch spawn position to be reasonable
+
                 let bounds = space.bounds();
                 let mut spawn = space.spawn().clone();
                 spawn.set_bounds(bounds.expand(FaceMap::splat(20)));
@@ -566,6 +504,8 @@ async fn arbitrary_space(
         progress = progress.finish_and_cut(0.1).await; // mostly nonsense but we do want to yield
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

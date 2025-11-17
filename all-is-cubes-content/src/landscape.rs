@@ -13,8 +13,8 @@ use all_is_cubes::block::{
 use all_is_cubes::euclid::{Point2D, point2};
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgb01, ZeroOne,
-    chebyshev_length, zo32,
+    Cube, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgb01, ZeroOne, chebyshev_length,
+    zo32,
 };
 use all_is_cubes::space::{self, SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
@@ -394,34 +394,6 @@ pub(crate) fn create_landscape_blocks_and_variants(
 }
 
 // -------------------------------------------------------------------------------------------------
-
-/// Generate a landscape of grass-on-top-of-rock with some bumps to it.
-/// Replaces all blocks in the specified region except for those intended to be “air”.
-pub(crate) fn wavy_landscape(
-    region: GridAab,
-    m: &mut space::Mutation<'_, '_>,
-    blocks: &BlockProvider<LandscapeBlocksAndVariants>,
-    max_slope: FreeCoordinate,
-) -> Result<(), SetCubeError> {
-    // TODO: justify this constant (came from cubes v1 code).
-    let slope_scaled = max_slope / 0.904087;
-    let middle_y = region.lower_bounds().y.midpoint(region.upper_bounds().y) + 1;
-
-    fill_with_height_function(
-        m,
-        region,
-        |column| -> GridCoordinate {
-            let fx = FreeCoordinate::from(column.x);
-            let fz = FreeCoordinate::from(column.y);
-            let terrain_variation = slope_scaled
-                * (((fx / 8.0).sin() + (fz / 8.0).sin()) * 1.0
-                    + ((fx / 14.0).sin() + (fz / 14.0).sin()) * 3.0
-                    + ((fx / 2.0).sin() + (fz / 2.0).sin()) * 0.6);
-            middle_y + (terrain_variation as GridCoordinate)
-        },
-        grass_covered_stone_terrain_function(blocks),
-    )
-}
 
 /// Returns a function which, given cubes in some region, produces a grass-covered stone terrain
 /// which has its solid surface at exactly y = 0.
