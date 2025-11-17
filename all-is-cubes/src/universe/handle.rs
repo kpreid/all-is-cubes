@@ -199,21 +199,34 @@ impl<T: 'static> Handle<T> {
     }
 
     /// Add the missing value of a member being deserialized.
+    ///
+    /// Returns `Err(())` if the value already exists.
     #[cfg(feature = "save")]
-    pub(crate) fn insert_deserialized_value(&self, universe: &mut Universe, value: Box<T>)
+    pub(crate) fn insert_deserialized_value(
+        &self,
+        universe: &mut Universe,
+        value: Box<T>,
+    ) -> Result<(), ()>
     where
         T: UniverseMember,
     {
-        let entity = {
-            let mut state_guard: MutexGuard<'_, State> =
-                self.inner.state.lock().expect("Handle::state lock error");
+        let mut state_guard: MutexGuard<'_, State> =
+            self.inner.state.lock().expect("Handle::state lock error");
 
-            let State::Deserializing { entity } = *state_guard else {
-                panic!("incorrect state {:?}", *state_guard);
-            };
-            *state_guard = State::Member { entity };
-            entity
+        let entity = match *state_guard {
+            State::Deserializing { entity } => entity,
+            State::Member { entity: _ } => return Err(()),
+            ref state => {
+                panic!(
+                    "unexpected state while attempting to complete deserialization of \
+                        {name:?}: {state:?}",
+                    name = self.name(),
+                );
+            }
         };
+
+        *state_guard = State::Member { entity };
+        drop(state_guard);
 
         universe
             .world
@@ -222,6 +235,7 @@ impl<T: 'static> Handle<T> {
             .insert(SealedMember::into_bundle(value));
         // We may have created a new archetype.
         universe.update_archetypes();
+        Ok(())
     }
 
     /// Name by which the [`Universe`] knows this handle.

@@ -1249,7 +1249,7 @@ mod universe {
                             MemberDe::Space { value } => universe.insert_deserialized(name, value),
                             MemberDe::Tag { value } => universe.insert_deserialized(name, value),
                         }
-                        .expect("insertion from deserialization failed");
+                        .map_err(serde::de::Error::custom)?;
                     }
                 }
             }

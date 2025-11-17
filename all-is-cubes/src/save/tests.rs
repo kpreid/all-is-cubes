@@ -1081,6 +1081,32 @@ fn partial_universe() {
 }
 
 #[test]
+fn universe_de_duplicate_member() {
+    assert_de_error::<Universe>(
+        json!({
+            "type": "UniverseV1",
+            "members": [
+                {
+                    "name": {"Specific": "a_tag"},
+                    "member_type": "Tag",
+                    "value": {
+                        "type": "TagDefV1",
+                    }
+                },
+                {
+                    "name": {"Specific": "a_tag"},
+                    "member_type": "Tag",
+                    "value": {
+                        "type": "TagDefV1",
+                    }
+                }
+            ],
+        }),
+        "duplicate definition of object 'a_tag'",
+    );
+}
+
+#[test]
 fn universe_de_missing_member() {
     assert_de_error::<Universe>(
         json!({

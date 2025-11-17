@@ -466,8 +466,12 @@ impl Universe {
     where
         T: UniverseMember,
     {
-        self.get_or_insert_deserializing(name)?.insert_deserialized_value(self, value);
-        Ok(())
+        self.get_or_insert_deserializing(name.clone())?
+            .insert_deserialized_value(self, value)
+            .map_err(|()| InsertError {
+                name,
+                kind: InsertErrorKind::DeserializeMultipleValues,
+            })
     }
 
     /// Iterate over all of the objects of type `T`.
@@ -813,6 +817,9 @@ pub enum InsertErrorKind {
     /// The provided [`Handle`] was already inserted into some universe.
     AlreadyInserted,
 
+    /// A serialized [`Universe`] contained multiple definitions for this name.
+    DeserializeMultipleValues,
+
     /// The provided value contains handles to a different universe.
     CrossUniverse,
 
@@ -849,6 +856,9 @@ impl fmt::Display for InsertError {
                 "the object {name} is being mutated during this insertion attempt"
             ),
             InsertErrorKind::AlreadyInserted => write!(f, "the object {name} is already inserted"),
+            InsertErrorKind::DeserializeMultipleValues => {
+                write!(f, "duplicate definition of object {name}")
+            }
             InsertErrorKind::CrossUniverse => {
                 write!(f, "the object {name} contains handles to another universe")
             }
