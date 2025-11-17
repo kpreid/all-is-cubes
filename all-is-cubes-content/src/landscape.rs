@@ -401,10 +401,10 @@ pub(crate) fn create_landscape_blocks_and_variants(
 /// This function can be used with [`fill_with_height_function()`].
 pub(crate) fn grass_covered_stone_terrain_function<'b>(
     blocks: &'b BlockProvider<LandscapeBlocksAndVariants>,
-) -> impl Fn(Cube) -> Option<&'b Block> {
+) -> impl Fn(Cube, &()) -> Option<&'b Block> {
     let grass_at = grass_placement_function(0x21b5cc6b);
 
-    move |y_rel_cube| {
+    move |y_rel_cube, ()| {
         use LandscapeBlocks::*;
         use LandscapeBlocksAndVariants::{Base, Grass};
         let altitude = y_rel_cube.y;
@@ -432,22 +432,23 @@ pub(crate) fn grass_covered_stone_terrain_function<'b>(
 ///
 /// * `region` is the region filled.
 /// * `height_function` is a function of the [`Cube`] X and Z coordinates (lower corner coordinates)
-///   within the region, which returns the vertical displacement at this position.
+///   within the region, which returns the vertical displacement at this position, and an auxiliary
+///   value which `block_function` may use.
 /// * `block_function` defines what blocks to place, given cube positions **displaced vertically**
 ///   by the output of `height_function`.
-pub(crate) fn fill_with_height_function<'b>(
+pub(crate) fn fill_with_height_function<'b, Aux>(
     m: &mut space::Mutation<'_, '_>,
     region: GridAab,
-    height_function: impl Fn(Point2D<GridCoordinate, Cube>) -> GridCoordinate,
-    block_function: impl Fn(Cube) -> Option<&'b Block>,
+    height_function: impl Fn(Point2D<GridCoordinate, Cube>) -> (GridCoordinate, Aux),
+    block_function: impl Fn(Cube, &Aux) -> Option<&'b Block>,
 ) -> Result<(), SetCubeError> {
     // We don't use region.interior_iter() because we want to call the height function once per
     // (x, z) pair, not once per cube.
     for x in region.x_range() {
         for z in region.z_range() {
-            let surface_y = height_function(point2(x, z));
+            let (surface_y, aux) = height_function(point2(x, z));
             for y in region.y_range() {
-                if let Some(block) = block_function(Cube::new(x, y - surface_y, z)) {
+                if let Some(block) = block_function(Cube::new(x, y - surface_y, z), &aux) {
                     m.set(Cube::new(x, y, z), block)?;
                 }
             }
@@ -507,7 +508,7 @@ mod tests {
                 fill_with_height_function(
                     m,
                     bounds,
-                    |xz| xz.x + 102,
+                    |xz| (xz.x + 102, ()),
                     grass_covered_stone_terrain_function(&blocks),
                 )
             })

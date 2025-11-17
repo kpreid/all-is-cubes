@@ -82,7 +82,7 @@ pub(crate) async fn islands(
     Ok(space)
 }
 
-/// Generate a landscape of grass-on-top-of-rock with some bumps to it.
+/// Generate a single floating island.
 /// Replaces all blocks in the specified region except for those intended to be “air”.
 fn fill_with_island(
     region: GridAab,
@@ -97,14 +97,14 @@ fn fill_with_island(
     landscape::fill_with_height_function(
         m,
         region,
-        |column| -> GridCoordinate {
+        |column| -> (GridCoordinate, ()) {
             let fx = FreeCoordinate::from(column.x);
             let fz = FreeCoordinate::from(column.y);
             let terrain_variation = slope_scaled
                 * (((fx / 8.0).sin() + (fz / 8.0).sin()) * 1.0
                     + ((fx / 14.0).sin() + (fz / 14.0).sin()) * 3.0
                     + ((fx / 2.0).sin() + (fz / 2.0).sin()) * 0.6);
-            middle_y + (terrain_variation as GridCoordinate)
+            (middle_y + (terrain_variation as GridCoordinate), ())
         },
         landscape::grass_covered_stone_terrain_function(blocks),
     )

@@ -193,7 +193,7 @@ impl<'u> State<'u> {
 
     fn terrain_height_function(
         &self,
-    ) -> impl Fn(Point2D<GridCoordinate, Cube>) -> GridCoordinate + use<> {
+    ) -> impl Fn(Point2D<GridCoordinate, Cube>) -> (GridCoordinate, ()) + use<> {
         let start_terrain_radius = FreeCoordinate::from(self.planner.city_radius) - 2.5;
         let terrain_noise_fn =
             noise::ScalePoint::new(noise::OpenSimplex::new(0x2e24bb62)).set_scale(0.1);
@@ -223,7 +223,9 @@ impl<'u> State<'u> {
             let noise_value = terrain_noise_fn.at_cube(Cube::new(xz_cube.x, 0, xz_cube.y));
 
             // adding radial_scale creates surrounding wall of mountains
-            1 + (scale * noise_value + radial_scale).round() as GridCoordinate
+            let output = 1 + (scale * noise_value + radial_scale).round() as GridCoordinate;
+
+            (output, ())
         }
     }
 
@@ -290,7 +292,7 @@ impl<'u> State<'u> {
         for progress in progress.split_evenly(attempts) {
             let mut tree_origin = possible_tree_origins.random_cube(&mut rng).unwrap();
             // compensate for terrain even though the planner doesn't
-            tree_origin.y = terrain_height_function(tree_origin.lower_bounds().xz());
+            tree_origin.y = terrain_height_function(tree_origin.lower_bounds().xz()).0;
 
             let height = rng.random_range(1..8);
             let tree_bounds = GridAab::single_cube(tree_origin).expand(FaceMap {
