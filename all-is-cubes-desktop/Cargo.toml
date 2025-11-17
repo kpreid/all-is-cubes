@@ -41,11 +41,11 @@ required-features = ["record"]
 default = ["audio", "import", "record", "terminal"]
 # Producing image or video recording, or any exported/saved data.
 record = [
+    "dep:euclid", # TODO: stop depending on euclid’s serde impls for record::Script
     "dep:png",
     "dep:all-is-cubes-mesh", # used in glTF recording
     "all-is-cubes-port/export",
     "all-is-cubes-port/all-formats",
-    "euclid/serde", # TODO: stop depending on euclid’s serde impls for record::Script
 ]
 # Importing non-native data formats.
 import = ["all-is-cubes-port/import", "all-is-cubes-port/all-formats"]
@@ -82,7 +82,7 @@ anyhow = { workspace = true }
 cfg-if = { workspace = true }
 clap = { workspace = true }
 directories-next = "2.0.0"
-euclid = { workspace = true, optional = true }
+euclid = { workspace = true, optional = true, features = ["serde"] } # only exists to enable feature
 futures-channel = { workspace = true }
 futures-core = { workspace = true }
 gilrs = { workspace = true }
