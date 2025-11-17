@@ -1,5 +1,5 @@
 use all_is_cubes::character::Spawn;
-use all_is_cubes::euclid::Size3D;
+use all_is_cubes::euclid::{Size3D, Vector2D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
 use all_is_cubes::math::{
     Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridVector,
@@ -71,7 +71,7 @@ pub(crate) async fn islands(
             && cell_bounds.size().depth >= margin * 2
         {
             let occupied_bounds =
-                cell_bounds.shrink(FaceMap::splat(10).with(Face6::PY, 25)).unwrap();
+                cell_bounds.shrink(FaceMap::splat(8).with(Face6::PY, 10)).unwrap();
             space.mutate(universe.read_ticket(), |m| {
                 fill_with_island(occupied_bounds, m, &landscape_blocks, 0.5)
             })?;
@@ -93,19 +93,48 @@ fn fill_with_island(
     // TODO: justify this constant (came from cubes v1 code).
     let slope_scaled = max_slope / 0.904087;
     let middle_y = region.lower_bounds().y.midpoint(region.upper_bounds().y) + 1;
+    let center_minus_half = region.center().xz() - Vector2D::splat(0.5);
+    let radius_of_region = FreeCoordinate::from(region.size().width.min(region.size().depth)) * 0.5;
+    let vertical_radius = FreeCoordinate::from(region.size().height) / 2.0;
 
     landscape::fill_with_height_function(
         m,
         region,
-        |column| -> (GridCoordinate, ()) {
+        |column| -> (GridCoordinate, GridCoordinate) {
+            let distance_from_island_center = (column.to_f64()).distance_to(center_minus_half);
+            if distance_from_island_center > radius_of_region {
+                // nothing
+                return (0, 0);
+            }
+            let scaled_radius = distance_from_island_center / radius_of_region;
+
             let fx = FreeCoordinate::from(column.x);
             let fz = FreeCoordinate::from(column.y);
             let terrain_variation = slope_scaled
                 * (((fx / 8.0).sin() + (fz / 8.0).sin()) * 1.0
                     + ((fx / 14.0).sin() + (fz / 14.0).sin()) * 3.0
                     + ((fx / 2.0).sin() + (fz / 2.0).sin()) * 0.6);
-            (middle_y + (terrain_variation as GridCoordinate), ())
+
+            // Top surface relative to middle_y.
+            let relative_top = terrain_variation as GridCoordinate;
+
+            // Bottom surface relative to middle_y.
+            // Inverted hemisphere-except-for-the-power
+            let power = 4.0;
+            let relative_bottom = ((1.0f64 - scaled_radius.powf(power)).powf(power.recip())
+                * -vertical_radius) as GridCoordinate;
+
+            (middle_y + relative_top, relative_bottom - relative_top)
         },
-        landscape::grass_covered_stone_terrain_function(blocks),
+        {
+            let basic = landscape::grass_covered_stone_terrain_function(blocks);
+            move |cube, &rel_bottom| {
+                if cube.y < rel_bottom {
+                    None
+                } else {
+                    basic(cube, &())
+                }
+            }
+        },
     )
 }

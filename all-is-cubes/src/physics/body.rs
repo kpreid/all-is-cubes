@@ -967,7 +967,11 @@ impl Transaction for BodyTransaction {
     type Output = transaction::NoOutput;
     type Mismatch = BodyMismatch;
 
-    fn check(&self, _body: &Body, (): Self::Context<'_>) -> Result<Self::CommitCheck, Self::Mismatch> {
+    fn check(
+        &self,
+        _body: &Body,
+        (): Self::Context<'_>,
+    ) -> Result<Self::CommitCheck, Self::Mismatch> {
         // No mismatches currently possible.
         Ok(())
     }
