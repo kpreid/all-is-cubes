@@ -1,9 +1,9 @@
+use rand::{Rng, SeedableRng as _};
+
 use all_is_cubes::character::Spawn;
 use all_is_cubes::euclid::{Size3D, Vector2D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{
-    Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridSize, GridVector,
-};
+use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate, GridSize, GridVector};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
@@ -22,8 +22,9 @@ pub(crate) async fn islands(
         LandscapeBlocks,
     >::using(universe)?);
 
-    let TemplateParameters { size, seed: _ } = params;
+    let TemplateParameters { size, seed } = params;
     let size = size.unwrap_or(GridSize::new(1000, 400, 1000));
+    let mut rng = rand_xoshiro::Xoshiro256Plus::seed_from_u64(seed.unwrap_or(0));
 
     // Set up dimensions
     let bounds = GridAab::checked_from_lower_size(
@@ -63,19 +64,30 @@ pub(crate) async fn islands(
         )
         .intersection_cubes(bounds)
         .expect("island outside space bounds");
-        // TODO: randomize island location in cell?
-        let margin = 10;
-        // TODO: non-panicking expand() will be a better solution than this conditional here
-        if cell_bounds.size().width >= margin * 2
-            && cell_bounds.size().height >= margin + 25
-            && cell_bounds.size().depth >= margin * 2
-        {
-            let occupied_bounds =
-                cell_bounds.shrink(FaceMap::splat(8).with(Face6::PY, 10)).unwrap();
+
+        // TODO: generating random ranges not crossing the center is just a way to make sure we
+        // generate reasonable ranges, but leads to a bias of sorts that all islands touch the
+        // center line.
+        let cell_center = cell_bounds.center().to_i32();
+        let occupied_bounds = GridAab::from_lower_upper(
+            [
+                rng.random_range(cell_bounds.lower_bounds().x..=cell_center.x),
+                rng.random_range(cell_bounds.lower_bounds().y..=cell_center.y),
+                rng.random_range(cell_bounds.lower_bounds().z..=cell_center.z),
+            ],
+            [
+                rng.random_range(cell_center.x..=cell_bounds.upper_bounds().x),
+                rng.random_range(cell_center.y..=cell_bounds.upper_bounds().y),
+                rng.random_range(cell_center.z..=cell_bounds.upper_bounds().z),
+            ],
+        );
+
+        if !occupied_bounds.is_empty() {
             space.mutate(universe.read_ticket(), |m| {
                 fill_with_island(occupied_bounds, m, &landscape_blocks, 0.5)
             })?;
         }
+
         p.progress(i as f32 / island_grid.volume_f64() as f32).await;
     }
 
