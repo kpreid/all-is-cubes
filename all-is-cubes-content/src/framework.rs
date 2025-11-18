@@ -52,13 +52,15 @@ pub(crate) struct Task {
 
 /// Specifies what a [`Task`] does to a region of a [`Space`].
 pub(crate) enum Operation {
-    // TODO: Implement this operation and/or `Custom` tasks generating new tasks.
-    //
-    // /// Replace this task with the tasks previded by the iterator.
-    // Splat(Box<dyn Iterator<Item = Task>>),
-    //
-    #[expect(dead_code, reason = "don’t have the tools for fine-grained meshes yet")]
+    /// Replace this task with the tasks previded by the iterator.
+    #[expect(dead_code, reason = "TODO: unfinished and untested")]
+    Splat(Box<dyn Iterator<Item = Task> + Send + Sync>),
+
     /// Fill the region with the given block.
+    #[expect(
+        dead_code,
+        reason = "TODO: don’t have the tools for fine-grained tasks yet"
+    )]
     Fill(Block),
 
     /// Execute the given function.
@@ -72,8 +74,11 @@ impl Operation {
         self,
         mutation: &mut space::Mutation<'_, '_>,
         region: GridAab,
+        queue: &mut Queue,
+        replacing_time_estimate: PositiveSign<f32>,
     ) -> Result<(), InGenError> {
         match self {
+            Operation::Splat(iterator) => queue.extend_front(iterator, replacing_time_estimate),
             Operation::Fill(block) => mutation.fill_uniform(region, &block)?,
             Operation::Custom(function) => function(mutation)?,
         }
@@ -98,21 +103,37 @@ pub(crate) struct Queue {
 }
 
 impl Queue {
-    // TODO: Figure out how we want to support extending the queue after initial creation.
-    // Something like this, but accessible from `Operation::Custom` and updating the time estimate:
-    //
-    //   /// Add a task to be executed after existing tasks.
-    //   pub fn push_back(&mut self, task: Task) {
-    //       self.tasks.push_back(task);
-    //   }
-    //
-    //   /// Add a task to be executed before existing tasks.
-    //   pub fn push_front(&mut self, task: Task) {
-    //       self.tasks.push_front(task);
-    //   }
+    /// Add the given tasks to the queue, to be executed before existing tasks.
+    ///
+    /// `replacing_time_estimate` is the time estimate from an already-existing task that these
+    /// tasks are replacing.
+    fn extend_front(
+        &mut self,
+        additional_tasks: impl Iterator<Item = Task>,
+        replacing_time_estimate: PositiveSign<f32>,
+    ) {
+        self.tasks.reserve(additional_tasks.size_hint().0);
+        let mut count: usize = 0;
+        let mut total_time_estimate: PositiveSign<f32> = ps32(0.0);
+        for task in additional_tasks {
+            total_time_estimate += task.time_estimate;
+            count += 1;
+            self.tasks.push_front(task);
+        }
+
+        let time_scale = PositiveSign::<f32>::try_from(
+            replacing_time_estimate.into_inner() / total_time_estimate.into_inner(),
+        )
+        .unwrap_or(ps32(1.0));
+        for task in self.tasks.iter_mut().take(count) {
+            task.time_estimate *= time_scale;
+        }
+        self.future_time_estimate += replacing_time_estimate;
+    }
 
     // TODO: write a "run one step" method for debugging and testing;
     // preferably, non-async.
+
     pub async fn run(
         mut self,
         mut progress: YieldProgress,
@@ -131,7 +152,7 @@ impl Queue {
 
             // TODO: attach the task’s label to the error (needs InGenError to support that properly)
             space.mutate(read_ticket, |mutation| {
-                task.operation.execute(mutation, task.region)
+                task.operation.execute(mutation, task.region, &mut self, task.time_estimate)
             })?;
         }
         progress.finish().await;
