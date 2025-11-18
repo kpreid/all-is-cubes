@@ -6,7 +6,7 @@ use all_is_cubes::arcstr::literal;
 use all_is_cubes::character::Spawn;
 use all_is_cubes::euclid::{Size3D, Vector2D};
 use all_is_cubes::linking::{BlockProvider, InGenError};
-use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate, GridSize, GridVector};
+use all_is_cubes::math::{FreeCoordinate, GridAab, GridCoordinate, GridSize, GridVector, ps32};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::Universe;
 use all_is_cubes::util::YieldProgress;
@@ -79,7 +79,7 @@ pub(crate) async fn islands(
                     Some(framework::Task {
                         label: literal!(""), // we could number them but it would not be very useful
                         region: occupied_bounds,
-                        time_estimate: 1.0,
+                        time_estimate: ps32(1.0),
                         operation: framework::Operation::Custom(Box::new({
                             let landscape_blocks = landscape_blocks.clone();
                             move |m| {

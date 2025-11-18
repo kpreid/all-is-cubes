@@ -9,7 +9,7 @@ use alloc::collections::VecDeque;
 use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::block::Block;
 use all_is_cubes::linking::InGenError;
-use all_is_cubes::math::GridAab;
+use all_is_cubes::math::{GridAab, PositiveSign, ps32};
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::ReadTicket;
 use all_is_cubes::util::YieldProgress;
@@ -38,7 +38,7 @@ pub(crate) struct Task {
     ///
     /// This value is dimensionless and compared only to other `time_estimate` values originating
     /// from the same source.
-    pub time_estimate: f32,
+    pub time_estimate: PositiveSign<f32>,
 
     /// Region of space this task will affect.
     /// This is not a strict boundary; the task may have effects outside of it, and spawn other
@@ -91,10 +91,10 @@ pub(crate) struct Queue {
     tasks: VecDeque<Task>,
 
     /// Sum of `time_estimate`s of tasks already executed.
-    past_time_estimate: f32,
+    past_time_estimate: PositiveSign<f32>,
 
     /// Sum of `time_estimate`s of tasks not yet executed.
-    future_time_estimate: f32,
+    future_time_estimate: PositiveSign<f32>,
 }
 
 impl Queue {
@@ -122,7 +122,8 @@ impl Queue {
         while let Some(task) = self.tasks.pop_front() {
             let progress_fraction_at_task_start = self.progress_fraction();
 
-            self.future_time_estimate = (self.future_time_estimate - task.time_estimate).max(0.0);
+            self.future_time_estimate =
+                self.future_time_estimate.saturating_sub(task.time_estimate);
             self.past_time_estimate += task.time_estimate;
 
             progress.set_label(task.label);
@@ -138,8 +139,8 @@ impl Queue {
     }
 
     fn progress_fraction(&self) -> f32 {
-        let fraction =
-            self.past_time_estimate / (self.past_time_estimate + self.future_time_estimate);
+        let fraction = self.past_time_estimate.into_inner()
+            / (self.past_time_estimate + self.future_time_estimate).into_inner();
         if !fraction.is_finite() {
             // guard against getting given all-zero estimates and dividing by zero
             0.0
@@ -153,7 +154,7 @@ impl FromIterator<Task> for Queue {
     fn from_iter<T: IntoIterator<Item = Task>>(iter: T) -> Self {
         let tasks = VecDeque::from_iter(iter);
         Self {
-            past_time_estimate: 0.0,
+            past_time_estimate: ps32(0.0),
             future_time_estimate: tasks.iter().map(|t| t.time_estimate).sum(),
             tasks,
         }
@@ -164,8 +165,8 @@ impl Default for Queue {
     fn default() -> Self {
         Self {
             tasks: VecDeque::new(),
-            past_time_estimate: 0.0,
-            future_time_estimate: 0.0,
+            past_time_estimate: ps32(0.0),
+            future_time_estimate: ps32(0.0),
         }
     }
 }

@@ -9,7 +9,7 @@ use all_is_cubes::euclid::Size3D;
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::math::{
     Cube, Face6, FaceMap, GridAab, GridCoordinate, GridSize, GridSizeCoord, GridVector,
-    VectorOps as _, Vol,
+    VectorOps as _, Vol, ps32,
 };
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::universe::ReadTicket;
@@ -139,7 +139,7 @@ where
                 let map = map.clone();
                 framework::Task {
                     label: arcstr::format!("pass {pass} @ {room_position:?}", pass = pass + 1),
-                    time_estimate: 1.0,
+                    time_estimate: ps32(1.0),
                     region,
                     operation: framework::Operation::Custom(Box::new(move |m| {
                         // TODO: spawn as return value is a quick kludge to organize mutations,
