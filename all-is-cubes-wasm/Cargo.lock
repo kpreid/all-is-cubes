@@ -1284,8 +1284,9 @@ checksum = "610a5acd306ec67f907abe5567859a3c693fb9886eb1f012ab8f2a47bef3db51"
 
 [[package]]
 name = "nosy"
-version = "0.3.0-alpha"
-source = "git+https://github.com/kpreid/nosy/#70695ecbc4f7ea0cb7c827eef32c43b3ab3b8750"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f9322faff6b8196cfe6876f760b395dc86932ea9ab9d944da4b13bd50cd841f"
 dependencies = [
  "arrayvec",
  "cfg-if",
