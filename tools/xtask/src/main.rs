@@ -545,7 +545,7 @@ fn do_for_all_packages(
                 }
 
                 {
-                    // Check no_std compatiblepackages with default features disabled, because
+                    // Check no_std compatible packages with default features disabled, because
                     // that's more easily broken by accident (such as by introducing an unintended
                     // `Send` bound) then our other features.
                     //

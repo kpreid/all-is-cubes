@@ -439,16 +439,9 @@ impl<H: Host> VisitHandles for BehaviorSetEntry<H> {
 type WokenSet = Mutex<BTreeSet<Key>>;
 
 /// Handle to wake up a [`Behavior`].
-///
-/// We use this custom type rather than the standard [`Waker`], which
-/// would otherwise be suitable, because [`Waker`] is required to be `Send + Sync`, which is
-/// incompatible with our `no_std` support.
-///
-/// In future versions, this may be replaced with a `LocalWaker` if the standard library
-/// ever includes such a type.
-///
-/// This type is [`Send`] and [`Sync`] if the `std` feature of `all-is-cubes` is enabled,
-/// and not otherwise.
+//
+// TODO: This is distinct from `core::task::Waker` for obsolete no_std reasons.
+// Use it instead if we don't replace Behavior with something else first.
 #[derive(Clone, Debug)]
 #[expect(clippy::module_name_repetitions)] // TODO: rename to Waker? Or would that be confusing?
 pub struct BehaviorWaker(Arc<BehaviorWakerInner>);
