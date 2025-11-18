@@ -561,8 +561,9 @@ jobs:
         cargo +nightly miri test --no-default-features -p all-is-cubes universe:: --features std
     
     - name: Run Miri tests, no_std
+      # need bevy_platform/std so it doesn't try to call an unsupported intrinsic for time
       run: |
-        cargo +nightly miri test --no-default-features -p all-is-cubes universe::
+        cargo +nightly miri test --no-default-features -p all-is-cubes universe:: --features bevy_platform/std
 
   no_std:
     runs-on: ubuntu-latest
