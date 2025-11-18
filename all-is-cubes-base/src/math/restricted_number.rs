@@ -1,6 +1,7 @@
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash;
+use core::iter;
 use core::ops;
 
 use num_traits::{ConstOne as _, ConstZero as _};
@@ -58,6 +59,12 @@ impl<T: FloatCore> PositiveSign<T> {
         Self(value)
     }
 
+    /// Unwraps the value without modifying it.
+    #[inline]
+    pub const fn into_inner(self) -> T {
+        self.0
+    }
+
     pub(crate) const fn into_nn(self) -> NotNan<T> {
         // SAFETY: `PositiveSign`’s restrictions are a superset of `NotNan`’s.
         unsafe { NotNan::new_unchecked(self.0) }
@@ -106,6 +113,12 @@ impl<T: FloatCore> ZeroOne<T> {
     #[inline]
     pub const unsafe fn new_unchecked(value: T) -> Self {
         Self(value)
+    }
+
+    /// Unwraps the value without modifying it.
+    #[inline]
+    pub const fn into_inner(self) -> T {
+        self.0
     }
 
     pub(crate) const fn into_nn(self) -> NotNan<T> {
@@ -210,13 +223,6 @@ macro_rules! non_generic_impls {
                 }
             }
 
-            /// Unwraps the value without modifying it.
-            // TODO: When #![feature(const_precise_live_drops)] becomes stable, we can make this generic.
-            #[inline]
-            pub const fn into_inner(self) -> $t {
-                self.0
-            }
-
             /// Subtract `other` from `self`; if the result would be negative, it is zero instead.
             #[inline]
             #[must_use]
@@ -276,13 +282,6 @@ macro_rules! non_generic_impls {
                 } else {
                     Err(NotZeroOne(value))
                 }
-            }
-
-            /// Unwraps the value without modifying it.
-            // TODO: When #![feature(const_precise_live_drops)] becomes stable, we can make this generic.
-            #[inline]
-            pub const fn into_inner(self) -> $t {
-                self.0
             }
 
             /// Const version of `self == ZeroOne::ZERO`
@@ -624,6 +623,20 @@ where
     }
 }
 
+impl<T: FloatCore + iter::Sum> iter::Sum for PositiveSign<T>
+where
+    Self: TryFrom<T>,
+{
+    #[allow(clippy::missing_inline_in_public_items)]
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        let inner_sum: T = <T as iter::Sum>::sum(iter.map(PositiveSign::<T>::into_inner));
+        // Note: we could in principle use new_clamped here, but not new_unchecked,
+        // because std `Sum` impls return -0.0 for empty lists!
+        Self::try_from(inner_sum).unwrap_or_else(|_| panic!("sum returned non-positive result"))
+    }
+}
+// cannot implement Sum for ZeroOne, but could implement Product
+
 impl<T> AsRef<T> for PositiveSign<T> {
     #[inline]
     fn as_ref(&self) -> &T {
@@ -943,6 +956,23 @@ mod tests {
         assert_eq!(ps32(0.9).clamp_01(), zo32(0.9));
         assert_eq!(ps32(1.0).clamp_01(), zo32(1.0));
         assert_eq!(ps32(1.1).clamp_01(), zo32(1.0));
+    }
+
+    #[test]
+
+    fn ps_sum() {
+        assert_eq!(
+            iter::empty::<PositiveSign<f32>>().sum::<PositiveSign<f32>>(),
+            ps32(0.0)
+        );
+        assert_eq!(
+            [ps32(0.0)].into_iter().sum::<PositiveSign<f32>>(),
+            ps32(0.0)
+        );
+        assert_eq!(
+            [ps32(1.0), ps32(2.0)].into_iter().sum::<PositiveSign<f32>>(),
+            ps32(3.0)
+        );
     }
 
     #[test]
