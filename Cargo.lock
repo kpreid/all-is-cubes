@@ -303,6 +303,7 @@ dependencies = [
  "stl_io",
  "tempfile",
  "thiserror 2.0.17",
+ "yield-progress",
  "yoke",
 ]
 
@@ -1406,7 +1407,7 @@ checksum = "fe6d2e5af09e8c8ad56c969f2157a3d4238cebc7c55f0a517728c38f7b200f81"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -4271,7 +4272,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.45.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7693,9 +7694,9 @@ checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
 name = "yield-progress"
-version = "0.1.7"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6a42dba597da5dc59841799b16dda7c254ad91a497aab4c594ba7a785eef688"
+checksum = "24996429902908da9462e1f50ca861397a983a24841b39cfe64a51b9119ca464"
 dependencies = [
  "log",
  "web-time",

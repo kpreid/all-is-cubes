@@ -158,7 +158,7 @@ rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true, features = ["alloc", "derive", "rc"] }
 unicode-segmentation = { workspace = true }
 visibility = { workspace = true, optional = true }
-yield-progress = { workspace = true, features = ["sync"] } # TODO(no_std): make "std" conditional on our std feature again when possible
+yield-progress = { workspace = true }
 
 [dev-dependencies]
 allocation-counter = { workspace = true }
