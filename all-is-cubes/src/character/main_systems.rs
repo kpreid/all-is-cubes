@@ -32,6 +32,7 @@ pub(crate) fn add_main_systems(world: &mut ecs::World) {
     let mut schedules = world.resource_mut::<ecs::Schedules>();
     schedules.add_systems(time::schedule::BeforeStep, early_character_input_system);
     schedules.add_systems(time::schedule::Step, character_physics_step_system);
+    schedules.add_systems(time::schedule::AfterStep, auto_fly_system);
 }
 
 /// System function to update [`Character`]’s state from its [`Input`], before the actual physics
@@ -81,12 +82,9 @@ pub(super) fn character_physics_step_system(
     current_step: ecs::Res<universe::CurrentStep>,
     mut info_collector: ecs::ResMut<universe::InfoCollector<CharacterStepInfo>>,
     characters: ecs::Query<(
-        &universe::Membership,
         &ParentSpace,
-        &CharacterCore,
         &Input,
         &mut Body,
-        &mut InventoryComponent,
         &mut PhysicsOutputs,
         &rg::Destination,
     )>,
@@ -98,18 +96,9 @@ pub(super) fn character_physics_step_system(
 
     let mut info = CharacterStepInfo::default();
 
-    for (
-        membership,
-        ParentSpace(space_handle),
-        core,
-        input,
-        mut body,
-        mut inventory,
-        mut physics_output,
-        rerun_destination,
-    ) in characters
+    for (ParentSpace(space_handle), input, mut body, mut physics_output, rerun_destination) in
+        characters
     {
-        let InventoryComponent(inventory) = &mut *inventory;
         let flying = body.flying;
 
         // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
@@ -172,50 +161,63 @@ pub(super) fn character_physics_step_system(
             }
         };
 
-        // Automatic flying controls
-        // TODO(ecs): split this out into a separate system.
-        {
-            let read_ticket = ReadTicket::stub(); // not needed for jetpack
-            let self_handle = Some(membership.handle());
-            let mut inventory_transaction = None;
-            if input.velocity_input.y > 0. {
-                if let Some((slot_index, false)) = find_jetpacks(inventory).next()
-                    && let Ok((it, ut)) =
-                        inventory.use_tool_it(read_ticket, None, self_handle.clone(), slot_index)
-                {
-                    debug_assert!(ut.is_empty());
-                    inventory_transaction = Some(it);
-                }
-            } else if is_on_ground(&body, &physics_output) {
-                for (slot_index, active) in find_jetpacks(inventory) {
-                    if active
-                        && let Ok((it, ut)) = inventory.use_tool_it(
-                            read_ticket,
-                            None,
-                            self_handle.clone(),
-                            slot_index,
-                        )
-                    {
-                        debug_assert!(ut.is_empty());
-                        inventory_transaction = Some(it);
-                        break;
-                    }
-                }
-            }
-            if let Some(it) = inventory_transaction {
-                it.execute(inventory, (), &mut |change| {
-                    core.notifier.notify(&CharacterChange::Inventory(change))
-                })
-                .unwrap();
-            }
-        }
-
         info += CharacterStepInfo { count: 1 };
     }
 
     info_collector.record(info);
 
     Ok(())
+}
+
+/// System function for automatic flying controls.
+/// Turns on and off the [`inv::tool::Jetpack`] if the character has one.
+fn auto_fly_system(
+    characters: ecs::Query<(
+        &universe::Membership,
+        // TODO(ecs): Get rid of CharacterCore by making the inventory component responsible for
+        // its own notifications?
+        &CharacterCore,
+        &Input,
+        &Body,
+        &mut InventoryComponent,
+        &PhysicsOutputs,
+    )>,
+) {
+    let read_ticket = ReadTicket::stub(); // not needed for jetpack
+    for (membership, core, input, body, mut inventory, physics_output) in characters {
+        let InventoryComponent(inventory) = &mut *inventory;
+        let mut inventory_transaction = None;
+        if input.velocity_input.y > 0. {
+            if let Some((slot_index, false)) = find_jetpacks(inventory).next()
+                && let Ok((it, ut)) =
+                    inventory.use_tool_it(read_ticket, None, Some(membership.handle()), slot_index)
+            {
+                debug_assert!(ut.is_empty());
+                inventory_transaction = Some(it);
+            }
+        } else if is_on_ground(body, physics_output) {
+            for (slot_index, active) in find_jetpacks(inventory) {
+                if active
+                    && let Ok((it, ut)) = inventory.use_tool_it(
+                        read_ticket,
+                        None,
+                        Some(membership.handle()),
+                        slot_index,
+                    )
+                {
+                    debug_assert!(ut.is_empty());
+                    inventory_transaction = Some(it);
+                    break;
+                }
+            }
+        }
+        if let Some(it) = inventory_transaction {
+            it.execute(inventory, (), &mut |change| {
+                core.notifier.notify(&CharacterChange::Inventory(change))
+            })
+            .unwrap();
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
