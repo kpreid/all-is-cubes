@@ -86,13 +86,8 @@ impl Cube {
     /// assert_eq!(Cube::containing(FreePoint::new(1.0, 1.5, -2.5)), Some(Cube::new(1, 1, -3)));
     /// ```
     //---
-    // We'd like this to be a `const fn`, but there is no const no_std `floor()` yet.
     #[inline]
-    pub fn containing(point: FreePoint) -> Option<Self> {
-        #[cold]
-        const fn unlikely_none() -> Option<Cube> {
-            None
-        }
+    pub const fn containing(point: FreePoint) -> Option<Self> {
         const MIN_INCLUSIVE: FreeCoordinate = GridCoordinate::MIN as FreeCoordinate;
         const MAX_EXCLUSIVE: FreeCoordinate = GridCoordinate::MAX as FreeCoordinate + 1.0;
 
@@ -112,7 +107,7 @@ impl Cube {
                 z: z.floor() as GridCoordinate,
             })
         } else {
-            unlikely_none()
+            None
         }
     }
 
