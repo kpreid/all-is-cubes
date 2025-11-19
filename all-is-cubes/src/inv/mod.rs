@@ -9,6 +9,8 @@ mod inventory;
 pub use inventory::*;
 mod inv_in_block;
 pub use inv_in_block::*;
+mod inv_in_ecs;
+pub(crate) use inv_in_ecs::InventoryComponent;
 mod tool;
 pub use tool::*;
 

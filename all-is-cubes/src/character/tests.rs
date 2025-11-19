@@ -53,8 +53,9 @@ fn spawn_inventory() {
         spawn
     });
 
-    assert_eq!(character.inventory.slots[0], inventory_data[0]);
-    assert_eq!(character.inventory.slots[1], Slot::Empty);
+    let i = character.inventory.inventory();
+    assert_eq!(i.slots[0], inventory_data[0]);
+    assert_eq!(i.slots[1], Slot::Empty);
     // TODO: Either test the special slot contents or eliminate that mechanism
 }
 

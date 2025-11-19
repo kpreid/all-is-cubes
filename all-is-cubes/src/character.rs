@@ -15,8 +15,8 @@ use ordered_float::NotNan;
 use num_traits::float::Float as _;
 
 use crate::camera::ViewTransform;
-use crate::inv::{self, Inventory, InventoryTransaction, Slot, Tool};
-use crate::listen;
+use crate::inv::{self, Inventory, InventoryComponent, InventoryTransaction, Slot, Tool};
+use crate::listen::{self, IntoListener};
 use crate::math::{Aab, Face6, Face7, FreePoint, FreeVector};
 use crate::physics;
 use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
@@ -70,7 +70,7 @@ pub struct Character {
     /// Refers to the [`Space`] to be viewed and collided with.
     pub space: Handle<Space>,
 
-    inventory: Inventory,
+    inventory: InventoryComponent,
 }
 
 /// Every piece of data in a [`Character`] that is not (yet) split into its own separate
@@ -85,6 +85,8 @@ pub(crate) struct CharacterCore {
     selected_slots: [inv::Ix; inv::TOOL_SELECTIONS],
 
     /// Notifier for modifications.
+    ///
+    /// Note: `InventoryComponent` has its own notifier.
     notifier: listen::Notifier<CharacterChange>,
 }
 
@@ -128,11 +130,6 @@ pub struct Input {
     /// [`None`] means no change from the current value.
     pub set_selected_slots: [Option<inv::Ix>; inv::TOOL_SELECTIONS],
 }
-
-// TODO(ecs): decide whether `Inventory` should implement `Component` itself, and if so,
-// how change notifications work. For now, this is tied to `Character`s only.
-#[derive(Clone, Debug, ecs::Component)]
-pub(crate) struct InventoryComponent(Inventory);
 
 // -------------------------------------------------------------------------------------------------
 
@@ -232,7 +229,7 @@ impl Character {
                 notifier: listen::Notifier::new(),
             },
             space,
-            inventory: Inventory::from_slots(inventory),
+            inventory: InventoryComponent::new(Inventory::from_slots(inventory)),
         }
     }
 
@@ -272,7 +269,7 @@ impl Character {
 
     /// Returns the character's current inventory.
     pub fn inventory(&self) -> &Inventory {
-        &self.inventory
+        self.inventory.inventory()
     }
 
     /// Returns the character's currently selected inventory slots.
@@ -351,7 +348,7 @@ impl universe::SealedMember for Character {
     fn read_from_query(
         data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
     ) -> <Self as universe::UniverseMember>::Read<'_> {
-        let (core, body, ParentSpace(space), InventoryComponent(inventory), physics) = data;
+        let (core, body, ParentSpace(space), inventory, physics) = data;
         Read {
             core,
             body,
@@ -367,7 +364,7 @@ impl universe::SealedMember for Character {
             core: entity.get()?,
             body: entity.get()?,
             space: &entity.get::<ParentSpace>()?.0,
-            inventory: &entity.get::<InventoryComponent>()?.0,
+            inventory: entity.get::<InventoryComponent>()?,
             physics: entity.get::<PhysicsOutputs>(),
         })
     }
@@ -378,12 +375,7 @@ impl universe::SealedMember for Character {
             space,
             inventory,
         } = *value;
-        (
-            core,
-            body,
-            ParentSpace(space),
-            InventoryComponent(inventory),
-        )
+        (core, body, ParentSpace(space), inventory)
     }
 }
 impl universe::UniverseMember for Character {
@@ -423,20 +415,13 @@ impl VisitHandles for ParentSpace {
         visitor.visit(handle);
     }
 }
-impl VisitHandles for InventoryComponent {
-    fn visit_handles(&self, visitor: &mut dyn HandleVisitor) {
-        let Self(inventory) = self;
-        inventory.visit_handles(visitor);
-    }
-}
-
 /// Registers a listener for mutations of this character.
 // TODO(ecs): keep this? or only allow listening once in the Universe
 impl listen::Listen for Character {
     type Msg = CharacterChange;
     type Listener = <listen::Notifier<Self::Msg> as listen::Listen>::Listener;
     fn listen_raw(&self, listener: Self::Listener) {
-        self.core.notifier.listen_raw(listener)
+        universe::SealedMember::read_from_standalone(self).listen_raw(listener);
     }
 }
 
@@ -467,7 +452,7 @@ impl serde::Serialize for Read<'_> {
         schema::CharacterSer::CharacterV1 {
             space: space.clone(),
             body: Borrowed(body),
-            inventory: Borrowed(inventory),
+            inventory: Borrowed(inventory.inventory()),
             selected_slots,
         }
         .serialize(serializer)
@@ -503,7 +488,7 @@ impl<'de> serde::Deserialize<'de> for Character {
                 },
                 body: body.into_owned(),
                 space,
-                inventory: inventory.into_owned(),
+                inventory: InventoryComponent::new(inventory.into_owned()),
             }),
         }
     }
@@ -517,7 +502,7 @@ pub struct Read<'ticket> {
     core: &'ticket CharacterCore,
     body: &'ticket Body,
     space: &'ticket Handle<Space>,
-    inventory: &'ticket Inventory,
+    inventory: &'ticket InventoryComponent,
     physics: Option<&'ticket PhysicsOutputs>,
 }
 
@@ -529,7 +514,7 @@ impl<'t> Read<'t> {
 
     /// Returns the character's current inventory.
     pub fn inventory(&self) -> &'t Inventory {
-        self.inventory
+        self.inventory.inventory()
     }
 
     /// Refers to the [`Space`] to be viewed and collided with.
@@ -554,7 +539,16 @@ impl listen::Listen for Read<'_> {
     type Msg = CharacterChange;
     type Listener = <listen::Notifier<Self::Msg> as listen::Listen>::Listener;
     fn listen_raw(&self, listener: Self::Listener) {
-        self.core.notifier.listen_raw(listener)
+        use listen::Listener; // trait must be in scope to get the non-trait-object impl
+
+        self.core.notifier.listen_raw(listener.clone());
+        self.inventory.listen_raw(
+            listener
+                .filter(|change: &inv::InventoryChange| {
+                    Some(CharacterChange::Inventory(change.clone()))
+                })
+                .into_listener(),
+        );
     }
 }
 
@@ -661,7 +655,7 @@ impl Transaction for CharacterTransaction {
         Ok((
             body.check(&target.body, ()).map_err(CharacterTransactionMismatch::Body)?,
             inventory
-                .check(&target.inventory, ())
+                .check(target.inventory.inventory(), ())
                 .map_err(CharacterTransactionMismatch::Inventory)?,
         ))
     }
@@ -679,10 +673,9 @@ impl Transaction for CharacterTransaction {
             .commit(&mut target.body, (), body_check, outputs)
             .map_err(|e| e.context("body".into()))?;
 
-        self.inventory
-            .commit(&mut target.inventory, (), inventory_check, &mut |change| {
-                target.core.notifier.notify(&CharacterChange::Inventory(change));
-            })
+        target
+            .inventory
+            .commit_inventory_transaction(self.inventory, inventory_check)
             .map_err(|e| e.context("inventory".into()))?;
 
         Ok(())
@@ -691,7 +684,6 @@ impl Transaction for CharacterTransaction {
 
 impl universe::TransactionOnEcs for CharacterTransaction {
     type WriteQueryData = (
-        &'static CharacterCore,
         &'static mut Body,
         &'static mut InventoryComponent,
         &'static mut ParentSpace,
@@ -710,15 +702,14 @@ impl universe::TransactionOnEcs for CharacterTransaction {
         Ok((
             body.check(target.body, ()).map_err(CharacterTransactionMismatch::Body)?,
             inventory
-                .check(target.inventory, ())
+                .check(target.inventory(), ())
                 .map_err(CharacterTransactionMismatch::Inventory)?,
         ))
     }
 
     fn commit(
         self,
-        (core, mut body, mut inventory, mut space): (
-            &CharacterCore,
+        (mut body, mut inventory, mut space): (
             ecs::Mut<'_, Body>,
             ecs::Mut<'_, InventoryComponent>,
             ecs::Mut<'_, ParentSpace>,
@@ -732,10 +723,8 @@ impl universe::TransactionOnEcs for CharacterTransaction {
             .commit(&mut *body, (), body_check, &mut transaction::no_outputs)
             .map_err(|e| e.context("body".into()))?;
 
-        self.inventory
-            .commit(&mut inventory.0, (), inventory_check, &mut |change| {
-                core.notifier.notify(&CharacterChange::Inventory(change));
-            })
+        inventory
+            .commit_inventory_transaction(self.inventory, inventory_check)
             .map_err(|e| e.context("inventory".into()))?;
 
         Ok(())

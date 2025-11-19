@@ -19,7 +19,6 @@ use crate::physics::Body;
 use crate::rerun_glue as rg;
 use crate::space::{self, Space};
 use crate::time;
-use crate::transaction::Transaction as _;
 use crate::universe::{self, ReadTicket};
 
 #[cfg(doc)]
@@ -70,7 +69,7 @@ pub(super) fn early_character_input_system(
         // TODO: Eliminate body.flying flag entirely, in favor of an external context?
         // (The idea being that Body should have no more things in it than are necessary
         // for simple moving objects.)
-        let flying = find_jetpacks(&inventory.0).any(|(_slot_index, active)| active);
+        let flying = find_jetpacks(inventory.inventory()).any(|(_slot_index, active)| active);
         body.flying = flying;
     }
 }
@@ -174,9 +173,6 @@ pub(super) fn character_physics_step_system(
 fn auto_fly_system(
     characters: ecs::Query<(
         &universe::Membership,
-        // TODO(ecs): Get rid of CharacterCore by making the inventory component responsible for
-        // its own notifications?
-        &CharacterCore,
         &Input,
         &Body,
         &mut InventoryComponent,
@@ -184,8 +180,8 @@ fn auto_fly_system(
     )>,
 ) {
     let read_ticket = ReadTicket::stub(); // not needed for jetpack
-    for (membership, core, input, body, mut inventory, physics_output) in characters {
-        let InventoryComponent(inventory) = &mut *inventory;
+    for (membership, input, body, mut inventory_component, physics_output) in characters {
+        let inventory = inventory_component.inventory();
         let mut inventory_transaction = None;
         if input.velocity_input.y > 0. {
             if let Some((slot_index, false)) = find_jetpacks(inventory).next()
@@ -212,10 +208,7 @@ fn auto_fly_system(
             }
         }
         if let Some(it) = inventory_transaction {
-            it.execute(inventory, (), &mut |change| {
-                core.notifier.notify(&CharacterChange::Inventory(change))
-            })
-            .unwrap();
+            inventory_component.execute(it).unwrap();
         }
     }
 }
