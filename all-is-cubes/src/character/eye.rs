@@ -80,7 +80,7 @@ pub(crate) fn add_eye_systems(world: &mut ecs::World) {
         // TODO(ecs): Consider splitting into more components so we can let them be independent.
         (
             step_eye_position
-                .after(super::main_systems::character_physics_step_system)
+                .after(crate::physics::step::BodyPhysicsSet)
                 .before(step_exposure),
             step_exposure,
         )

@@ -1,6 +1,7 @@
 #[cfg(feature = "rerun")]
 use alloc::vec::Vec;
 use core::fmt;
+use core::ops;
 
 use bevy_ecs::prelude as ecs;
 use euclid::{Point3D, Vector3D};
@@ -29,15 +30,16 @@ use crate::math::Euclid as _;
 use crate::math::{
     Aab, Cube, Face6, Face7, FreeCoordinate, FreePoint, FreeVector, PositiveSign, notnan,
 };
+use crate::physics::step::PhysicsOutputs;
 use crate::physics::{POSITION_EPSILON, StopAt, Velocity};
 use crate::raycast::Ray;
+use crate::rerun_glue as rg;
 use crate::space;
 use crate::time::Tick;
 use crate::transaction::{self, Equal, Transaction};
 use crate::util::{ConciseDebug, Fmt, Refmt as _, StatusText};
 
-#[cfg(feature = "rerun")]
-use crate::rerun_glue as rg;
+// -------------------------------------------------------------------------------------------------
 
 /// Velocities shorter than this are treated as zero, to allow things to come to unchanging rest sooner.
 const VELOCITY_EPSILON_SQUARED: NotNan<FreeCoordinate> = notnan!(1e-12);
@@ -53,6 +55,7 @@ pub(crate) const VELOCITY_MAGNITUDE_LIMIT_SQUARED: FreeCoordinate =
 /// An object with a position, velocity, and collision volume.
 /// What it collides with is determined externally.
 #[derive(Clone, PartialEq, ecs::Component)]
+#[require(PhysicsOutputs, rg::Destination)]
 #[non_exhaustive]
 pub struct Body {
     /// Position.
@@ -200,7 +203,7 @@ impl Body {
         tick: Tick,
         colliding_space: Option<&space::Read<'_>>,
         collision_callback: CC,
-    ) -> BodyStepInfo
+    ) -> BodyStepDetails
     where
         CC: FnMut(Contact),
     {
@@ -222,7 +225,7 @@ impl Body {
     ///
     /// This method is private because the exact details of what inputs are required are
     /// unstable.
-    // TODO(ecs): make this a system function instead
+    // TODO(ecs): make this part of the stepping system instead, after updating tests to permit it
     pub(crate) fn step_with_rerun<CC>(
         &mut self,
         tick: Tick,
@@ -230,7 +233,7 @@ impl Body {
         mut colliding_space: Option<&space::Read<'_>>,
         mut collision_callback: CC,
         rerun_destination: &crate::rerun_glue::Destination,
-    ) -> BodyStepInfo
+    ) -> BodyStepDetails
     where
         CC: FnMut(Contact),
     {
@@ -263,7 +266,7 @@ impl Body {
 
         if !self.position.to_vector().square_length().is_finite() {
             // If position is NaN or infinite, can't do anything, but don't panic
-            return BodyStepInfo {
+            return BodyStepDetails {
                 quiescent: false,
                 already_colliding,
                 push_out: None,
@@ -293,7 +296,7 @@ impl Body {
         if !velocity_magnitude_squared.is_finite() {
             self.velocity = Vector3D::zero();
         } else if velocity_magnitude_squared <= VELOCITY_EPSILON_SQUARED || tick.paused() {
-            return BodyStepInfo {
+            return BodyStepDetails {
                 quiescent: true,
                 already_colliding,
                 push_out: push_out_info,
@@ -340,7 +343,7 @@ impl Body {
 
         // TODO: after gravity, falling-below-the-world protection
 
-        let info = BodyStepInfo {
+        let info = BodyStepDetails {
             quiescent: false,
             already_colliding,
             push_out: push_out_info,
@@ -775,6 +778,12 @@ impl Body {
         self.yaw = (180.0 - (direction.x).atan2(direction.z).to_degrees()).rem_euclid(360.0);
         self.pitch = -(direction.y).atan2(horizontal_distance).to_degrees();
     }
+
+    // TODO: should this be able to compute its answer without needing `PhysicsOutputs`?
+    pub(crate) fn is_on_ground(&self, po: &PhysicsOutputs) -> bool {
+        self.velocity().y <= 0.0
+            && po.colliding_cubes.iter().any(|contact| contact.normal() == Face7::PY)
+    }
 }
 
 #[cfg(feature = "save")]
@@ -837,18 +846,34 @@ impl<'de> serde::Deserialize<'de> for Body {
     }
 }
 
-/// Diagnostic data returned by `Body::step()`.
+/// Performance data produced by stepping a [`Body`].
 ///
-/// The exact contents of this structure
-/// are unstable; use only [`Debug`] formatting to examine its contents unless you have
-/// a specific need for one of the values.
-///
-/// Note: Unlike most `*StepInfo` types, this one cannot be meaningfully aggregated,
-/// because it contains specific spatial details of the body step.
+/// Use [`fmt::Debug`] or [`StatusText`] formatting to examine this.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct BodyStepInfo {
+    /// Number of bodies whose updates were aggregated into this value.
+    pub(crate) count: usize,
+}
+
+impl Fmt<StatusText> for BodyStepInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
+        let Self { count } = self;
+        write!(f, "{count} bodies' steps")
+    }
+}
+
+impl ops::AddAssign for BodyStepInfo {
+    fn add_assign(&mut self, other: Self) {
+        let Self { count } = self;
+        *count += other.count;
+    }
+}
+
+/// Diagnostic data produced by stepping a [`Body`] about how it moved and collided.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 #[doc(hidden)] // public only for all-is-cubes-gpu debug visualization, and testing
-pub struct BodyStepInfo {
+pub struct BodyStepDetails {
     /// Whether movement computation was skipped due to approximately zero velocity.
     quiescent: bool,
 
@@ -867,9 +892,9 @@ pub struct BodyStepInfo {
     delta_v: Vector3D<NotNan<f64>, Velocity>,
 }
 
-impl Fmt<ConciseDebug> for BodyStepInfo {
+impl Fmt<ConciseDebug> for BodyStepDetails {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>, fopt: &ConciseDebug) -> fmt::Result {
-        fmt.debug_struct("BodyStepInfo")
+        fmt.debug_struct("BodyStepDetails")
             .field("quiescent", &self.quiescent)
             .field("already_colliding", &self.already_colliding)
             .field("push_out", &self.push_out.as_ref().map(|v| v.refmt(fopt)))
@@ -879,7 +904,7 @@ impl Fmt<ConciseDebug> for BodyStepInfo {
     }
 }
 
-impl BodyStepInfo {
+impl BodyStepDetails {
     pub(crate) fn impact_fluff(&self) -> Option<Fluff> {
         let velocity = self.delta_v.map(NotNan::into_inner).length();
         // don't emit anything for slow change or movement in the air
@@ -893,7 +918,7 @@ impl BodyStepInfo {
     }
 }
 
-/// One of the individual straight-line movement segments of a [`BodyStepInfo`].
+/// One of the individual straight-line movement segments of a [`BodyStepDetails`].
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
 pub(crate) struct MoveSegment {

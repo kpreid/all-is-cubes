@@ -9,15 +9,10 @@ use core::mem;
 use bevy_ecs::prelude as ecs;
 use euclid::Vector3D;
 
-use crate::character::{
-    CharacterChange, CharacterCore, CharacterStepInfo, Input, InventoryComponent, ParentSpace,
-    PhysicsOutputs, is_on_ground,
-};
+use crate::character::{CharacterChange, CharacterCore, Input, InventoryComponent, PhysicsOutputs};
 use crate::inv;
-use crate::math::{Cube, FreeCoordinate, NotNan, notnan};
-use crate::physics::Body;
-use crate::rerun_glue as rg;
-use crate::space::{self, Space};
+use crate::math::{FreeCoordinate, NotNan, notnan};
+use crate::physics::{self, Body};
 use crate::time;
 use crate::universe::{self, ReadTicket};
 
@@ -30,7 +25,7 @@ use crate::character::Character;
 pub(crate) fn add_main_systems(world: &mut ecs::World) {
     let mut schedules = world.resource_mut::<ecs::Schedules>();
     schedules.add_systems(time::schedule::BeforeStep, early_character_input_system);
-    schedules.add_systems(time::schedule::Step, character_physics_step_system);
+    // in time::schedule::Step, body physics runs
     schedules.add_systems(time::schedule::AfterStep, auto_fly_system);
 }
 
@@ -61,7 +56,7 @@ pub(super) fn early_character_input_system(
 
         // TODO: this is executed even if paused. good or bad?
         // And should we be re-evaluating collisions rather than using previous frame results?
-        if mem::take(&mut input.jump) && is_on_ground(&body, previous_physics_step) {
+        if mem::take(&mut input.jump) && body.is_on_ground(previous_physics_step) {
             body.add_velocity(Vector3D::new(0., JUMP_SPEED, 0.));
         }
 
@@ -72,100 +67,6 @@ pub(super) fn early_character_input_system(
         let flying = find_jetpacks(inventory.inventory()).any(|(_slot_index, active)| active);
         body.flying = flying;
     }
-}
-
-/// System function to run physics.
-///
-/// TODO(ecs): Disentangle characters from body physics.
-pub(super) fn character_physics_step_system(
-    current_step: ecs::Res<universe::CurrentStep>,
-    mut info_collector: ecs::ResMut<universe::InfoCollector<CharacterStepInfo>>,
-    characters: ecs::Query<(
-        &ParentSpace,
-        &Input,
-        &mut Body,
-        &mut PhysicsOutputs,
-        &rg::Destination,
-    )>,
-    spaces: universe::HandleReadQuery<Space>,
-) -> ecs::Result {
-    let tick = current_step.get()?.tick;
-    debug_assert!(!tick.paused());
-    let dt = tick.delta_t().as_secs_f64();
-
-    let mut info = CharacterStepInfo::default();
-
-    for (ParentSpace(space_handle), input, mut body, mut physics_output, rerun_destination) in
-        characters
-    {
-        let flying = body.flying;
-
-        // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
-        let control_orientation =
-            euclid::Rotation3D::around_y(-euclid::Angle::radians(body.yaw.to_radians()));
-        let initial_body_velocity = body.velocity();
-
-        let speed = if flying { FLYING_SPEED } else { WALKING_SPEED };
-        let mut velocity_target =
-            control_orientation.transform_vector3d(input.velocity_input * speed);
-        if !flying {
-            velocity_target.y = 0.0;
-        }
-        // TODO should have an on-ground condition...
-        let stiffness = if flying {
-            Vector3D::new(10.8, 10.8, 10.8)
-        } else {
-            Vector3D::new(10.8, 0., 10.8)
-        }; // TODO constants/tables...
-
-        let control_delta_v = ((velocity_target - initial_body_velocity).component_mul(stiffness)
-            * dt)
-            .map(|c| NotNan::new(c).unwrap_or(notnan!(0.0)));
-
-        physics_output.last_step_info = if let Ok(space) = space_handle.read_from_query(&spaces) {
-            let colliding_cubes = &mut physics_output.colliding_cubes;
-            colliding_cubes.clear();
-            let body_info = body.step_with_rerun(
-                tick,
-                control_delta_v,
-                Some(&space),
-                |cube| {
-                    colliding_cubes.insert(cube);
-                },
-                rerun_destination,
-            );
-
-            // TODO(ecs): report push_out in a way that `CharacterEye` can receive it
-            // if let Some(push_out_displacement) = info.push_out {
-            //     // Smooth out camera effect of push-outs
-            //     eye.eye_displacement_pos -= push_out_displacement;
-            // }
-
-            if let Some(fluff) = body_info.impact_fluff().and_then(|fluff| {
-                Some(space::SpaceFluff {
-                    fluff,
-                    position: Cube::containing(body.position())?,
-                })
-            }) {
-                space.fluff_notifier().notify(&fluff)
-            }
-
-            Some(body_info)
-        } else {
-            if cfg!(debug_assertions) {
-                panic!("failed to read space handle for physics");
-            } else {
-                // TODO: set a warning flag that we failed to step
-                None
-            }
-        };
-
-        info += CharacterStepInfo { count: 1 };
-    }
-
-    info_collector.record(info);
-
-    Ok(())
 }
 
 /// System function for automatic flying controls.
@@ -191,7 +92,7 @@ fn auto_fly_system(
                 debug_assert!(ut.is_empty());
                 inventory_transaction = Some(it);
             }
-        } else if is_on_ground(body, physics_output) {
+        } else if body.is_on_ground(physics_output) {
             for (slot_index, active) in find_jetpacks(inventory) {
                 if active
                     && let Ok((it, ut)) = inventory.use_tool_it(
@@ -230,4 +131,40 @@ fn find_jetpacks(inventory: &inv::Inventory) -> impl Iterator<Item = (inv::Ix, b
             None
         }
     })
+}
+
+impl Input {
+    /// Computes the change in velocity over one step that should be applied to the character’s
+    /// physics body.
+    ///
+    /// This is called by the [`Body`] stepping system.
+    pub(crate) fn control_delta_v(
+        &self,
+        body: &Body,
+        tick: &time::Tick,
+    ) -> Vector3D<NotNan<f64>, physics::Velocity> {
+        let dt = tick.delta_t().as_secs_f64();
+        let flying = body.flying;
+
+        // TODO: apply pitch too, but only if wanted for flying (once we have not-flying)
+        let control_orientation =
+            euclid::Rotation3D::around_y(-euclid::Angle::radians(body.yaw.to_radians()));
+        let initial_body_velocity = body.velocity();
+
+        let speed = if flying { FLYING_SPEED } else { WALKING_SPEED };
+        let mut velocity_target =
+            control_orientation.transform_vector3d(self.velocity_input * speed);
+        if !flying {
+            velocity_target.y = 0.0;
+        }
+        // TODO should have an on-ground condition...
+        let stiffness = if flying {
+            Vector3D::new(10.8, 10.8, 10.8)
+        } else {
+            Vector3D::new(10.8, 0., 10.8)
+        }; // TODO constants/tables...
+
+        ((velocity_target - initial_body_velocity).component_mul(stiffness) * dt)
+            .map(|c| NotNan::new(c).unwrap_or(notnan!(0.0)))
+    }
 }

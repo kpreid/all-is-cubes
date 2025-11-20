@@ -208,8 +208,6 @@ fn transaction_systematic() {
 
 #[test]
 fn jumping() {
-    use super::is_on_ground;
-
     let mut universe = Universe::new();
     let space = universe.insert_anonymous(
         Space::builder(GridAab::ORIGIN_CUBE)
@@ -230,7 +228,7 @@ fn jumping() {
     {
         let read = character.read(universe.read_ticket()).unwrap();
         assert!(
-            is_on_ground(read.body(), read.physics().unwrap()),
+            read.body().is_on_ground(read.physics().unwrap()),
             "should be on ground; body = {:#?}, physics = {:#?}",
             read.body(),
             read.physics()
@@ -250,7 +248,7 @@ fn jumping() {
     let first_step_velocity;
     {
         let read = character.read(universe.read_ticket()).unwrap();
-        assert!(!is_on_ground(read.body(), read.physics().unwrap()));
+        assert!(!read.body().is_on_ground(read.physics().unwrap()));
         first_step_velocity = read.body().velocity().y;
         assert!(first_step_velocity > 0.0);
     }
@@ -268,7 +266,7 @@ fn jumping() {
 
     {
         let read = character.read(universe.read_ticket()).unwrap();
-        assert!(!is_on_ground(read.body(), read.physics().unwrap()));
+        assert!(!read.body().is_on_ground(read.physics().unwrap()));
         assert!(read.body().velocity().y < first_step_velocity);
     }
 }

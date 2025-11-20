@@ -13,7 +13,8 @@ use bevy_ecs::world::FromWorld as _;
 use manyfmt::Fmt;
 
 use crate::block::{self, BlockDefStepInfo};
-use crate::character::{self, Character, CharacterStepInfo};
+use crate::character::{self, Character};
+use crate::physics::{self, BodyStepInfo};
 use crate::save::WhenceUniverse;
 use crate::space::{self, Space, SpaceStepInfo};
 use crate::time;
@@ -176,7 +177,7 @@ impl Universe {
             world.register_component::<Membership>();
             Self::register_all_member_components(&mut world);
             InfoCollector::<BlockDefStepInfo>::register(&mut world);
-            InfoCollector::<CharacterStepInfo>::register(&mut world);
+            InfoCollector::<BodyStepInfo>::register(&mut world);
             InfoCollector::<space::LightUpdatesInfo>::register(&mut world);
 
             // Register things that are user-visible state of the universe.
@@ -191,6 +192,7 @@ impl Universe {
             block::add_block_def_systems(&mut world);
             character::add_main_systems(&mut world);
             character::add_eye_systems(&mut world);
+            physics::step::add_systems(&mut world);
             space::step::add_space_systems(&mut world);
         }
 
@@ -365,10 +367,7 @@ impl Universe {
                 .world
                 .resource_mut::<InfoCollector<BlockDefStepInfo>>()
                 .finish_collection(),
-            character_step: self
-                .world
-                .resource_mut::<InfoCollector<CharacterStepInfo>>()
-                .finish_collection(),
+            body_step: self.world.resource_mut::<InfoCollector<BodyStepInfo>>().finish_collection(),
             space_step,
         }
     }
@@ -897,7 +896,7 @@ pub struct UniverseStepInfo {
     /// Number of members which were processed at all.
     pub(crate) total_members: usize,
     pub(crate) block_def_step: BlockDefStepInfo,
-    pub(crate) character_step: CharacterStepInfo,
+    pub(crate) body_step: BodyStepInfo,
     pub(crate) space_step: SpaceStepInfo,
 }
 impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
@@ -906,7 +905,7 @@ impl core::ops::AddAssign<UniverseStepInfo> for UniverseStepInfo {
         self.active_members += other.active_members;
         self.total_members += other.total_members;
         self.block_def_step += other.block_def_step;
-        self.character_step += other.character_step;
+        self.body_step += other.body_step;
         self.space_step += other.space_step;
     }
 }
@@ -917,7 +916,7 @@ impl Fmt<StatusText> for UniverseStepInfo {
             active_members,
             total_members,
             block_def_step,
-            character_step,
+            body_step,
             space_step,
         } = self;
         writeln!(
@@ -929,7 +928,7 @@ impl Fmt<StatusText> for UniverseStepInfo {
             writeln!(fmt, "Block defs: {}", block_def_step.refmt(fopt))?;
         }
         if fopt.show.contains(ShowStatus::CHARACTER) {
-            writeln!(fmt, "{}", character_step.refmt(fopt))?;
+            writeln!(fmt, "{}", body_step.refmt(fopt))?;
         }
         if fopt.show.contains(ShowStatus::SPACE) {
             writeln!(fmt, "{}", space_step.refmt(fopt))?;

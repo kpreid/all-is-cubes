@@ -2,10 +2,8 @@
 
 use alloc::boxed::Box;
 use core::fmt;
-use core::ops;
 
 use bevy_ecs::prelude as ecs;
-use hashbrown::HashSet as HbHashSet;
 use manyfmt::Fmt;
 use ordered_float::NotNan;
 
@@ -17,9 +15,8 @@ use num_traits::float::Float as _;
 use crate::camera::ViewTransform;
 use crate::inv::{self, Inventory, InventoryComponent, InventoryTransaction, Slot, Tool};
 use crate::listen::{self, IntoListener};
-use crate::math::{Aab, Face6, Face7, FreePoint, FreeVector};
-use crate::physics;
-use crate::physics::{Body, BodyStepInfo, BodyTransaction, Contact};
+use crate::math::{Aab, Face6, FreePoint, FreeVector};
+use crate::physics::{self, Body, BodyTransaction, step::PhysicsOutputs};
 use crate::rerun_glue as rg;
 #[cfg(feature = "save")]
 use crate::save::schema;
@@ -76,7 +73,7 @@ pub struct Character {
 /// Every piece of data in a [`Character`] that is not (yet) split into its own separate
 /// ECS component. TODO(ecs): get rid of this?
 #[derive(Debug, ecs::Component)]
-#[require(eye::CharacterEye, PhysicsOutputs, Input, rg::Destination)]
+#[require(eye::CharacterEye, Input, rg::Destination)]
 pub(crate) struct CharacterCore {
     /// Indices into the [`Inventory`] slots of this character, which identify the tools currently
     /// in use / “in hand”.
@@ -95,18 +92,6 @@ pub(crate) struct CharacterCore {
 // TODO(ecs): This should probably be in the body module.
 #[derive(Clone, Debug, ecs::Component)]
 pub(crate) struct ParentSpace(pub Handle<Space>);
-
-/// Data produced by running [`Body`] physics for debugging and reactions.
-/// TODO(ecs): this should be part of the body module instead.
-#[derive(Clone, Debug, Default, ecs::Component)]
-#[doc(hidden)] // public for all-is-cubes-gpu debug visualizations
-#[non_exhaustive]
-pub struct PhysicsOutputs {
-    pub colliding_cubes: HbHashSet<Contact>,
-
-    /// Last body step, for debugging.
-    pub last_step_info: Option<BodyStepInfo>,
-}
 
 /// Commands produced by the player’s input and executed by the character.
 ///
@@ -569,29 +554,6 @@ impl Fmt<StatusText> for Read<'_> {
 
 // -------------------------------------------------------------------------------------------------
 
-/// Performance data returned by stepping a character.
-///
-/// Use `Debug` or [`StatusText`] formatting to examine this.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub(crate) struct CharacterStepInfo {
-    /// Number of characters whose updates were aggregated into this value.
-    count: usize,
-}
-
-impl Fmt<StatusText> for CharacterStepInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>, _: &StatusText) -> fmt::Result {
-        let Self { count } = self;
-        write!(f, "{count} characters' steps")
-    }
-}
-
-impl ops::AddAssign for CharacterStepInfo {
-    fn add_assign(&mut self, other: Self) {
-        let Self { count } = self;
-        *count += other.count;
-    }
-}
-
 /// A [`Transaction`] that modifies a [`Character`].
 #[derive(Clone, Debug, Default, PartialEq)]
 #[must_use]
@@ -804,6 +766,8 @@ impl core::error::Error for CharacterTransactionConflict {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 /// Description of a change to a [`Character`] for use in listeners.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[expect(clippy::exhaustive_enums)] // any change will probably be breaking anyway
@@ -813,9 +777,4 @@ pub enum CharacterChange {
     Inventory(inv::InventoryChange),
     /// Which inventory slots are selected.
     Selections,
-}
-
-fn is_on_ground(body: &Body, po: &PhysicsOutputs) -> bool {
-    body.velocity().y <= 0.0
-        && po.colliding_cubes.iter().any(|contact| contact.normal() == Face7::PY)
 }
