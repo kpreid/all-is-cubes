@@ -99,7 +99,7 @@ pub(crate) struct ParentSpace(pub Handle<Space>);
 /// Data produced by running [`Body`] physics for debugging and reactions.
 /// TODO(ecs): this should be part of the body module instead.
 #[derive(Clone, Debug, Default, ecs::Component)]
-#[doc(hidden)]
+#[doc(hidden)] // public for all-is-cubes-gpu debug visualizations
 #[non_exhaustive]
 pub struct PhysicsOutputs {
     pub colliding_cubes: HbHashSet<Contact>,

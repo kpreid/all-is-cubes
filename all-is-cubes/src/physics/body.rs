@@ -847,19 +847,24 @@ impl<'de> serde::Deserialize<'de> for Body {
 /// because it contains specific spatial details of the body step.
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
+#[doc(hidden)] // public only for all-is-cubes-gpu debug visualization, and testing
 pub struct BodyStepInfo {
     /// Whether movement computation was skipped due to approximately zero velocity.
-    pub quiescent: bool,
-    #[allow(missing_docs)] // TODO: explain
+    quiescent: bool,
+
+    /// If the body was pushed out of something it was found to be already colliding with,
+    /// then this is the change in its position.
+    #[doc(hidden)] // pub for fuzz_physics
     pub push_out: Option<FreeVector>,
-    #[allow(missing_docs)] // TODO: explain
-    pub already_colliding: Option<Contact>,
+
+    already_colliding: Option<Contact>,
+
     /// Details on movement and collision. A single frame's movement may have up to three
     /// segments as differently oriented faces are collided with.
-    pub move_segments: [MoveSegment; 3],
+    move_segments: [MoveSegment; 3],
 
     /// Change in velocity during this step.
-    pub(crate) delta_v: Vector3D<NotNan<f64>, Velocity>,
+    delta_v: Vector3D<NotNan<f64>, Velocity>,
 }
 
 impl Fmt<ConciseDebug> for BodyStepInfo {
@@ -891,7 +896,7 @@ impl BodyStepInfo {
 /// One of the individual straight-line movement segments of a [`BodyStepInfo`].
 #[derive(Clone, Copy, Debug)]
 #[non_exhaustive]
-pub struct MoveSegment {
+pub(crate) struct MoveSegment {
     /// The change in position.
     pub delta_position: FreeVector,
     /// What solid object stopped this segment from continuing further
