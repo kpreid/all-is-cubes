@@ -1,10 +1,18 @@
 use core::cmp::Ordering;
+use core::fmt;
 use core::ops;
+
+use crate::util::ConciseDebug;
+use manyfmt::Refmt as _;
+
+// -------------------------------------------------------------------------------------------------
 
 #[doc(no_inline)]
 pub use bevy_platform::time::Instant;
 #[doc(no_inline)]
 pub use core::time::Duration;
+
+// -------------------------------------------------------------------------------------------------
 
 /// A request regarding how much real time should be spent on a computation.
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
@@ -110,6 +118,93 @@ impl From<Instant> for Deadline {
         Self::At(value)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Summary of the time taken by a set of events.
+///
+/// This type is produced by performance measurements within several subsystems of All is Cubes.
+///
+/// It may be created by [`TimeStats::default()`] (empty), or [`TimeStats::one()`] (single event),
+/// and multiple events may be aggregated using the `+=` operator.
+/// It may be formatted for reading using the [`fmt::Display`] implementation.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[non_exhaustive]
+#[expect(clippy::module_name_repetitions, reason = "TODO: find a better name")]
+pub struct TimeStats {
+    /// The number of events aggregated into this [`TimeStats`].
+    pub count: usize,
+    /// The sum of the durations of all events.
+    pub sum: Duration,
+    /// The minimum duration of all events, or [`None`] if there were no events.
+    pub min: Option<Duration>,
+    /// The maximum duration of all events, or [`Duration::ZERO`] if there were no events.
+    pub max: Duration,
+}
+
+impl TimeStats {
+    /// Constructs a [`TimeStats`] for a single event.
+    ///
+    /// Multiple of these may then be aggregated using the `+=` operator.
+    #[inline]
+    pub const fn one(duration: Duration) -> Self {
+        Self {
+            count: 1,
+            sum: duration,
+            min: Some(duration),
+            max: duration,
+        }
+    }
+
+    /// Record an event based on the given previous time and current time, then update
+    /// the previous time value.
+    ///
+    /// Returns the duration that was recorded.
+    #[doc(hidden)] // for now, not making writing conveniences public
+    #[inline]
+    pub fn record_consecutive_interval(
+        &mut self,
+        last_marked_instant: &mut Instant,
+        now: Instant,
+    ) -> Duration {
+        let previous = *last_marked_instant;
+        *last_marked_instant = now;
+
+        let duration = now.saturating_duration_since(previous);
+        *self += Self::one(duration);
+        duration
+    }
+}
+
+impl ops::AddAssign for TimeStats {
+    #[inline]
+    fn add_assign(&mut self, rhs: Self) {
+        *self = TimeStats {
+            count: self.count + rhs.count,
+            sum: self.sum + rhs.sum,
+            min: self.min.map_or(rhs.min, |value| Some(value.min(rhs.min?))),
+            max: self.max.max(rhs.max),
+        };
+    }
+}
+
+impl fmt::Display for TimeStats {
+    #[allow(clippy::missing_inline_in_public_items)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let max = self.max.refmt(&ConciseDebug);
+        let count = self.count;
+        let sum = self.sum.refmt(&ConciseDebug);
+        match self.min {
+            None => write!(f, "(-------- .. {max}) for {count:3}, total {sum}"),
+            Some(min) => {
+                let min = min.refmt(&ConciseDebug);
+                write!(f, "({min} .. {max}) for {count:3}, total {sum}")
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

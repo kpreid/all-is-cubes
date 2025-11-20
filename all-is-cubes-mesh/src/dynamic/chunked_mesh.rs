@@ -12,9 +12,9 @@ use all_is_cubes::math::{Cube, Face6, FreeCoordinate, GridCoordinate, OctantMask
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::space::{BlockIndex, Space, SpaceChange};
-use all_is_cubes::time::{self, Duration};
+use all_is_cubes::time::{self, Duration, TimeStats};
 use all_is_cubes::universe::{Handle, ReadTicket};
-use all_is_cubes::util::{ConciseDebug, Fmt, Refmt, StatusText, TimeStats};
+use all_is_cubes::util::{ConciseDebug, Fmt, Refmt, StatusText};
 use all_is_cubes_render::{Flaws, camera::Camera};
 
 use crate::dynamic::blocks::InstanceMesh;

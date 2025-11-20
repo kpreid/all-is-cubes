@@ -25,11 +25,11 @@ use crate::space::{
     self, Contents, LightStorage, LightUpdatesInfo, Notifiers, Palette, Space, SpacePhysics,
     SpaceStepInfo, SpaceTransaction, Ticks,
 };
+use crate::time::TimeStats;
 use crate::transaction::{Merge as _, Transaction as _};
 use crate::universe::{
     self, InfoCollector, QueryStateBundle as _, ReadTicket, SealedMember as _, UniverseId,
 };
-use crate::util::TimeStats;
 
 use super::palette;
 

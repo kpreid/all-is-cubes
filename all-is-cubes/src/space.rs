@@ -19,9 +19,9 @@ use crate::drawing::DrawingPlane;
 use crate::fluff::Fluff;
 use crate::listen::{self, Listen, Notifier};
 use crate::math::{Cube, GridAab, Gridgid, Vol};
-use crate::universe::SealedMember as _;
-use crate::universe::{self, HandleVisitor, ReadTicket, VisitHandles};
-use crate::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
+use crate::time::TimeStats;
+use crate::universe::{self, HandleVisitor, ReadTicket, SealedMember as _, VisitHandles};
+use crate::util::{ConciseDebug, Refmt as _, StatusText};
 
 #[cfg(doc)]
 use crate::{

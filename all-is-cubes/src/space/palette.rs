@@ -22,9 +22,8 @@ use crate::block::{self, AIR, AIR_EVALUATED, Block, BlockChange, EvaluatedBlock}
 use crate::listen::{self, IntoListener as _, Listener as _};
 use crate::math::{self, OpacityCategory};
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
-use crate::time;
+use crate::time::{self, TimeStats};
 use crate::universe::{self, ReadTicket};
-use crate::util::TimeStats;
 
 #[cfg(doc)]
 use crate::space;

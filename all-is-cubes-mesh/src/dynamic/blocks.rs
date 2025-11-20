@@ -9,8 +9,8 @@ use futures_channel::oneshot::Canceled;
 use all_is_cubes::block::{self, EvaluatedBlock, Resolution};
 use all_is_cubes::math::Cube;
 use all_is_cubes::space::{self, BlockIndex};
-use all_is_cubes::time;
-use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText, TimeStats};
+use all_is_cubes::time::{self, TimeStats};
+use all_is_cubes::util::{ConciseDebug, Refmt as _, StatusText};
 
 #[cfg(doc)]
 use crate::dynamic::ChunkedSpaceMesh;

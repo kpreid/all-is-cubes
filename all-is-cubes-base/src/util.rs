@@ -3,11 +3,8 @@
 use alloc::sync::Arc;
 use core::fmt;
 use core::marker::PhantomData;
-use core::ops::AddAssign;
-use core::time::Duration;
 
 use futures_core::future::BoxFuture;
-use manyfmt::Refmt as _;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -167,92 +164,6 @@ where
         I: IntoIterator<Item = In>,
     {
         self.target.extend(iter.into_iter().map(&self.function));
-    }
-}
-
-/// Aggregation of the time taken by a set of events.
-///
-/// TODO: Consider including an identifier for the longest.
-/// TODO: Consider generalizing this to quantities other than time? Probably not.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-#[non_exhaustive]
-pub struct TimeStats {
-    /// The number of events aggregated into this [`TimeStats`].
-    pub count: usize,
-    /// The sum of the durations of all events.
-    pub sum: Duration,
-    /// The minimum duration of all events, or [`None`] if there were no events.
-    pub min: Option<Duration>,
-    /// The maximum duration of all events, or [`Duration::ZERO`] if there were no events.
-    pub max: Duration,
-}
-
-impl TimeStats {
-    /// Constructs a [`TimeStats`] for a single event.
-    ///
-    /// Multiple of these may then be aggregated using the `+=` operator.
-    #[inline]
-    pub const fn one(duration: Duration) -> Self {
-        Self {
-            count: 1,
-            sum: duration,
-            min: Some(duration),
-            max: duration,
-        }
-    }
-
-    /// Record an event based on the given previous time and current time, then update
-    /// the previous time value.
-    ///
-    /// Returns the duration that was recorded.
-    #[doc(hidden)] // for now, not making writing conveniences public
-    #[inline]
-    pub fn record_consecutive_interval(
-        &mut self,
-        last_marked_instant: &mut crate::time::Instant,
-        now: crate::time::Instant,
-    ) -> Duration {
-        let previous = *last_marked_instant;
-        *last_marked_instant = now;
-
-        let duration = now.saturating_duration_since(previous);
-        *self += Self::one(duration);
-        duration
-    }
-}
-
-impl AddAssign for TimeStats {
-    #[inline]
-    fn add_assign(&mut self, rhs: Self) {
-        *self = TimeStats {
-            count: self.count + rhs.count,
-            sum: self.sum + rhs.sum,
-            min: self.min.map_or(rhs.min, |value| Some(value.min(rhs.min?))),
-            max: self.max.max(rhs.max),
-        };
-    }
-}
-
-impl fmt::Display for TimeStats {
-    #[allow(clippy::missing_inline_in_public_items)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.min {
-            None => write!(
-                f,
-                "(-------- .. {}) for {:3}, total {}",
-                self.max.refmt(&ConciseDebug),
-                self.count,
-                self.sum.refmt(&ConciseDebug),
-            ),
-            Some(min) => write!(
-                f,
-                "({} .. {}) for {:3}, total {}",
-                min.refmt(&ConciseDebug),
-                self.max.refmt(&ConciseDebug),
-                self.count,
-                self.sum.refmt(&ConciseDebug),
-            ),
-        }
     }
 }
 
