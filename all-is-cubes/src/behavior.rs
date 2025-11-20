@@ -7,11 +7,9 @@ use core::any::{Any, TypeId};
 use core::fmt;
 use core::mem;
 use core::ops;
+use core::task::Waker;
 use core::time::Duration;
 use manyfmt::Refmt as _;
-
-#[cfg(doc)]
-use core::task::Waker;
 
 use bevy_ecs::prelude as ecs;
 use bevy_platform::{sync::Mutex, time::Instant};
@@ -70,7 +68,7 @@ pub struct Context<'ctx, 'read, H: Host> {
     /// the host should be affected by the behavior.
     pub attachment: &'ctx H::Attachment,
 
-    waker: &'ctx BehaviorWaker,
+    waker: &'ctx Waker,
 
     host_transaction_binder: &'ctx dyn Fn(H::Transaction) -> UniverseTransaction,
     self_transaction_binder: &'ctx dyn Fn(Arc<dyn Behavior<H>>) -> UniverseTransaction,
@@ -81,9 +79,8 @@ impl<'a, H: Host> Context<'a, '_, H> {
     /// [`step()`](Behavior::step) should be called again, in the case where it
     /// returns [`Then::Sleep`].
     ///
-    /// This is precisely analogous to the use of [`Waker`] with [`Future::poll()`];
-    /// see the comment on [`BehaviorWaker`] for the rationale for not being a `Waker`.
-    pub fn waker(&self) -> &'a BehaviorWaker {
+    /// This is precisely analogous to the use of [`Waker`] with [`Future::poll()`].
+    pub fn waker(&self) -> &'a Waker {
         self.waker
     }
 
@@ -392,7 +389,7 @@ pub(crate) struct BehaviorSetEntry<H: Host> {
     pub(crate) behavior: Arc<dyn Behavior<H>>,
     /// None if the entry is not yet inserted in a behavior set.
     /// TODO: This could be just a separate type or generic instead of a run-time Option.
-    waker: Option<BehaviorWaker>,
+    waker: Option<Waker>,
 }
 
 impl<H: Host> Clone for BehaviorSetEntry<H> {
@@ -438,28 +435,20 @@ impl<H: Host> VisitHandles for BehaviorSetEntry<H> {
 
 type WokenSet = Mutex<BTreeSet<Key>>;
 
-/// Handle to wake up a [`Behavior`].
-//
-// TODO: This is distinct from `core::task::Waker` for obsolete no_std reasons.
-// Use it instead if we don't replace Behavior with something else first.
-#[derive(Clone, Debug)]
-#[expect(clippy::module_name_repetitions)] // TODO: rename to Waker? Or would that be confusing?
-pub struct BehaviorWaker(Arc<BehaviorWakerInner>);
-impl BehaviorWaker {
-    /// Wake up the behavior; cause it to be invoked during the next [`Universe`] step.
-    ///
-    /// This function has the same characteristics as [`Waker::wake()`] except that it
-    /// addresses a [`Behavior`] rather than a [`Future`].
-    pub fn wake(self) {
+/// Struct that implements [`Wake`] to provide the [`Waker`] for behavior sets.
+#[derive(Debug)]
+struct BehaviorWakerInner {
+    key: Key,
+    set: Weak<WokenSet>,
+}
+
+impl alloc::task::Wake for BehaviorWakerInner {
+    fn wake(self: Arc<Self>) {
         self.wake_by_ref()
     }
 
-    /// Wake up the behavior; cause it to be invoked during the next [`Universe`] step.
-    ///
-    /// This function has the same characteristics as [`Waker::wake()`] except that it
-    /// addresses a [`Behavior`] rather than a [`Future`].
-    pub fn wake_by_ref(&self) {
-        let Some(strong_set) = self.0.set.upgrade() else {
+    fn wake_by_ref(self: &Arc<Self>) {
+        let Some(strong_set) = self.set.upgrade() else {
             // behavior set was dropped, so it will never step anything again
             return;
         };
@@ -467,18 +456,13 @@ impl BehaviorWaker {
             // a previous panic corrupted state
             return;
         };
-        mut_set.insert(self.0.key);
+        mut_set.insert(self.key);
     }
 }
 
-#[derive(Debug)]
-struct BehaviorWakerInner {
-    key: Key,
-    set: Weak<WokenSet>,
-}
 impl BehaviorWakerInner {
-    fn create_waker(key: Key, woken: &Arc<WokenSet>) -> BehaviorWaker {
-        BehaviorWaker(Arc::new(BehaviorWakerInner {
+    fn create_waker(key: Key, woken: &Arc<WokenSet>) -> Waker {
+        Waker::from(Arc::new(BehaviorWakerInner {
             key,
             set: Arc::downgrade(woken),
         }))
@@ -1130,7 +1114,7 @@ mod tests {
 
         #[derive(Debug)]
         struct SleepBehavior {
-            tx: mpsc::Sender<BehaviorWaker>,
+            tx: mpsc::Sender<Waker>,
         }
         impl Behavior<Space> for SleepBehavior {
             fn step(&self, context: &Context<'_, '_, Space>) -> (UniverseTransaction, Then) {
@@ -1157,7 +1141,7 @@ mod tests {
 
         // First step
         u.step(false, time::Deadline::Whenever);
-        let waker: BehaviorWaker = rx.try_recv().unwrap();
+        let waker: Waker = rx.try_recv().unwrap();
 
         // Second step — should *not* step the behavior because it didn't wake.
         u.step(false, time::Deadline::Whenever);
