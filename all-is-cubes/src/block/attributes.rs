@@ -182,6 +182,13 @@ pub struct BlockAttributes {
     )]
     pub inventory: InvInBlock,
 
+    /// Continuous sound emission and absorption by this block.
+    #[custom(
+        arbitrary_type = crate::sound::Ambient,
+        builder_param_style = exact,
+    )]
+    pub ambient_sound: crate::sound::Ambient,
+
     /// Rule about how this block should be rotated, or not, when placed in a [`Space`] by
     /// some agent not otherwise specifying rotation.
     ///
@@ -235,6 +242,7 @@ impl BlockAttributes {
         display_name: arcstr::literal!(""),
         selectable: true,
         inventory: InvInBlock::EMPTY,
+        ambient_sound: crate::sound::Ambient::SILENT,
         rotation_rule: RotationPlacementRule::Never,
         placement_action: None,
         tick_action: None,
@@ -260,6 +268,7 @@ impl BlockAttributes {
             display_name: _,
             selectable: _,
             inventory,
+            ambient_sound: _,
             rotation_rule,
             placement_action,
             tick_action,
@@ -279,6 +288,7 @@ impl BlockAttributes {
             display_name,
             selectable,
             inventory,
+            ambient_sound,
             rotation_rule,
             placement_action,
             tick_action,
@@ -290,6 +300,7 @@ impl BlockAttributes {
             display_name,
             selectable,
             inventory: inventory.rotate(rotation),
+            ambient_sound,
             rotation_rule: rotation_rule.rotate(rotation),
             placement_action: placement_action.map(|a| a.rotate(rotation)),
             tick_action: tick_action.map(|a| a.rotate(rotation)),

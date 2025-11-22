@@ -16,6 +16,11 @@ use crate::universe;
 
 // -------------------------------------------------------------------------------------------------
 
+mod ambient;
+pub use ambient::Ambient;
+
+// -------------------------------------------------------------------------------------------------
+
 /// A sound effect or grain.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, bevy_ecs::component::Component)]
 #[expect(clippy::module_name_repetitions)]

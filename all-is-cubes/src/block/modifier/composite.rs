@@ -263,6 +263,7 @@ fn evaluate_composition(
         },
         selectable: src_att.selectable | dst_att.selectable,
         inventory: src_att.inventory.concatenate(dst_att.inventory),
+        ambient_sound: dst_att.ambient_sound, // TODO merge
         rotation_rule: dst_att.rotation_rule, // TODO merge
         placement_action: operator
             .blend_operations(

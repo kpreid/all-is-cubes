@@ -207,6 +207,7 @@ mod block {
                 ref display_name,
                 selectable,
                 ref inventory,
+                ref ambient_sound,
                 rotation_rule,
                 ref placement_action,
                 ref tick_action,
@@ -217,6 +218,7 @@ mod block {
                 display_name: display_name.clone(),
                 selectable,
                 inventory: inventory.into(),
+                ambient_sound: ambient_sound.into(),
                 rotation_rule: rotation_rule.into(),
                 placement_action: placement_action.as_ref().map(
                     |&PlacementAction {
@@ -248,6 +250,7 @@ mod block {
                 display_name,
                 selectable,
                 inventory,
+                ambient_sound,
                 rotation_rule,
                 placement_action,
                 tick_action,
@@ -258,6 +261,7 @@ mod block {
                 display_name,
                 selectable,
                 inventory: inventory.into(),
+                ambient_sound: ambient_sound.into(),
                 rotation_rule: rotation_rule.into(),
                 placement_action: placement_action.map(
                     |schema::PlacementActionSer {
@@ -885,6 +889,18 @@ mod sound {
                     amplitude,
                 }),
             }
+        }
+    }
+
+    impl From<&sound::Ambient> for schema::AmbientSoundSer {
+        fn from(_: &sound::Ambient) -> Self {
+            Self::AmbientSoundV0 {}
+        }
+    }
+
+    impl From<schema::AmbientSoundSer> for sound::Ambient {
+        fn from(_: schema::AmbientSoundSer) -> Self {
+            Self {}
         }
     }
 }

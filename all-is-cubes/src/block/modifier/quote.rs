@@ -31,6 +31,7 @@ impl Quote {
                 display_name,
                 selectable,
                 inventory,
+                mut ambient_sound,
                 rotation_rule,
                 mut placement_action,
                 mut tick_action,
@@ -52,6 +53,8 @@ impl Quote {
                 for voxel in voxels.as_vol_mut().as_linear_mut().iter_mut() {
                     voxel.emission = Rgb::ZERO;
                 }
+
+                ambient_sound = crate::sound::Ambient::SILENT;
             }
         }
 
@@ -60,6 +63,7 @@ impl Quote {
                 display_name,
                 selectable,
                 inventory,
+                ambient_sound,
                 rotation_rule,
                 placement_action,
                 tick_action,

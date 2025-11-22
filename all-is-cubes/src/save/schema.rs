@@ -118,6 +118,8 @@ pub(crate) struct BlockAttributesV1Ser {
     pub selectable: bool,
     #[serde(default, skip_serializing_if = "is_default")]
     pub inventory: InvInBlockSer,
+    #[serde(default, skip_serializing_if = "AmbientSoundSer::is_silent")]
+    pub ambient_sound: AmbientSoundSer,
     #[serde(default, skip_serializing_if = "is_default")]
     pub rotation_rule: RotationPlacementRuleSer,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -453,6 +455,29 @@ pub(crate) enum SoundDefSer {
         frequency: PositiveSign<f32>,
         amplitude: ZeroOne<f32>,
     },
+}
+
+//------------------------------------------------------------------------------------------------//
+// Schema corresponding to the `sound` module
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "type")]
+pub(crate) enum AmbientSoundSer {
+    AmbientSoundV0 {
+        // TODO: no actual fields yet
+    },
+}
+
+impl Default for AmbientSoundSer {
+    fn default() -> Self {
+        Self::AmbientSoundV0 {}
+    }
+}
+
+impl AmbientSoundSer {
+    fn is_silent(&self) -> bool {
+        matches!(self, Self::AmbientSoundV0 {})
+    }
 }
 
 //------------------------------------------------------------------------------------------------//

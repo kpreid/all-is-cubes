@@ -544,6 +544,8 @@ mod tests {
                 inv::IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
             ],
         );
+        // TODO: we can only actually make this nondefault when ambient sound features actually exist
+        let ambient_sound = crate::sound::Ambient::SILENT;
         let rotation_rule = block::RotationPlacementRule::Attach { by: Face6::NZ };
         let placement_action = Some(block::PlacementAction {
             operation: Operation::Become(block::from_color!(1.0, 0.0, 1.0)),
@@ -560,6 +562,7 @@ mod tests {
                 .rotation_rule(rotation_rule)
                 .selectable(false)
                 .light_emission(emission)
+                .ambient_sound(ambient_sound.clone())
                 .placement_action(placement_action.clone())
                 .tick_action(tick_action.clone())
                 .activation_action(activation_action.clone())
@@ -578,6 +581,7 @@ mod tests {
                 selectable: false,
                 placement_action,
                 inventory,
+                ambient_sound,
                 rotation_rule,
                 tick_action,
                 activation_action,

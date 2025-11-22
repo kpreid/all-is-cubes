@@ -209,31 +209,31 @@ fn block_atom_with_all_attributes() {
                     "selectable": false,
                     "inventory": {
                         "type": "InvInBlockV1",
-                            "size": 1,
-                            "icon_scale": 4,
-                            "icon_resolution": 16,
-                            "icon_rows": [
-                                {
-                                    "count": 3,
-                                    "first_slot": 0,
-                                    "origin": [1, 1, 1],
-                                    "stride": [5, 0, 0],
-                                },
-                                {
-                                    "count": 3,
-                                    "first_slot": 3,
-                                    "origin": [1, 1, 6],
-                                    "stride": [5, 0, 0],
-                                },
-                                {
-                                    "count": 3,
-                                    "first_slot": 6,
-                                    "origin": [1, 1, 11],
-                                    "stride": [5, 0, 0],
-                                },
-                            ],
-                        },
-                                        "rotation_rule": {
+                        "size": 1,
+                        "icon_scale": 4,
+                        "icon_resolution": 16,
+                        "icon_rows": [
+                            {
+                                "count": 3,
+                                "first_slot": 0,
+                                "origin": [1, 1, 1],
+                                "stride": [5, 0, 0],
+                            },
+                            {
+                                "count": 3,
+                                "first_slot": 3,
+                                "origin": [1, 1, 6],
+                                "stride": [5, 0, 0],
+                            },
+                            {
+                                "count": 3,
+                                "first_slot": 6,
+                                "origin": [1, 1, 11],
+                                "stride": [5, 0, 0],
+                            },
+                        ],
+                    },
+                    "rotation_rule": {
                         "type": "AttachV1",
                         "by": "PX",
                     },
