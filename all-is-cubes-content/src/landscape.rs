@@ -14,8 +14,9 @@ use all_is_cubes::euclid::{Point2D, point2};
 use all_is_cubes::linking::{BlockModule, BlockProvider, DefaultProvision, GenError, InGenError};
 use all_is_cubes::math::{
     Cube, GridAab, GridCoordinate, GridRotation, GridVector, Rgb, Rgb01, ZeroOne, chebyshev_length,
-    zo32,
+    ps32, zo32,
 };
+use all_is_cubes::sound;
 use all_is_cubes::space::{self, SetCubeError, Sky};
 use all_is_cubes::universe::{ReadTicket, UniverseTransaction};
 use all_is_cubes::util::YieldProgress;
@@ -254,6 +255,8 @@ pub async fn install_landscape_blocks(
         move |cube: Cube| noise.at_grid(cube.lower_bounds()) * 0.4 + 0.7
     };
 
+    let grass_sound = sound::Ambient::noise_at_frequency(ps32(0.01), ps32(2000.0));
+
     let attributes_from = |block: &Block| -> Result<BlockAttributes, InGenError> {
         Ok(block
             .evaluate(ReadTicket::stub())
@@ -281,6 +284,7 @@ pub async fn install_landscape_blocks(
 
             Ok(Block::builder()
                 .attributes(attributes_from(&grass_blade_atom)?)
+                .ambient_sound(grass_sound.clone())
                 .display_name(arcstr::format!("Grass Blades {}", height as u8))
                 .voxels_fn(resolution, |cube| {
                     let mut cube_for_lookup = cube;
@@ -302,11 +306,13 @@ pub async fn install_landscape_blocks(
         Ok(match key {
             Stone => Block::builder()
                 .attributes(attributes_from(&colors[Stone])?)
+                .ambient_sound(sound::Ambient::noise_at_frequency(ps32(0.5), ps32(20.0)))
                 .voxels_fn(resolution, &stone_pattern)?
                 .build_txn(txn),
 
             Grass => Block::builder()
                 .attributes(attributes_from(&colors[Grass])?)
+                .ambient_sound(grass_sound.clone())
                 .voxels_fn(resolution, |cube| {
                     if f64::from(cube.y) >= overhang_noise[cube] {
                         scale_color(colors[Grass].clone(), blade_color_noise(cube), 0.02)
@@ -347,6 +353,7 @@ pub async fn install_landscape_blocks(
 
             key @ Leaves(growth) => Block::builder()
                 .attributes(attributes_from(&colors[key])?)
+                .ambient_sound(grass_sound.clone())
                 .voxels_fn(resolution, |cube| {
                     // Distance this cube is from the center.
                     // TODO: This is the same computation as done by square_radius() but

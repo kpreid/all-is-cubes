@@ -20,6 +20,7 @@ use all_is_cubes::math::{
     Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
+use all_is_cubes::sound;
 use all_is_cubes::space::{Space, SpacePhysics, SpaceTransaction};
 use all_is_cubes::time;
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -123,6 +124,7 @@ pub async fn install_demo_blocks(
     });
     let lamppost_metal = Block::builder().color(palette::ALMOST_BLACK.with_alpha_one()).build();
     let lamppost_edge = Block::from(palette::ALMOST_BLACK.saturating_scale(ps32(1.12)));
+    let lamp_sound = sound::Ambient::noise_at_frequency(ps32(0.02), ps32(10000.0));
 
     let pedestal_voxel = block::from_color!(palette::STONE);
 
@@ -186,6 +188,11 @@ pub async fn install_demo_blocks(
                 let globe_r2 = resolution_g.pow(2);
                 Block::builder()
                     .display_name("Lamp")
+                    .ambient_sound(if on {
+                        lamp_sound.clone()
+                    } else {
+                        sound::Ambient::SILENT
+                    })
                     .voxels_fn(resolution, |cube| {
                         let r2 = (cube.lower_bounds() * 2 + one_diagonal - center_point_doubled)
                             .square_length();
@@ -259,6 +266,11 @@ pub async fn install_demo_blocks(
                 Block::builder()
                     .display_name("Sconce")
                     .rotation_rule(RotationPlacementRule::Attach { by: Face6::NZ })
+                    .ambient_sound(if on {
+                        lamp_sound.clone()
+                    } else {
+                        sound::Ambient::SILENT
+                    })
                     .voxels_fn(resolution, |cube| {
                         // TODO: fancier/tidier appearance; this was just some tinkering from the original `Lamp` sphere
                         let r2 = (cube.lower_bounds() * 2 + one_diagonal
@@ -458,6 +470,10 @@ pub async fn install_demo_blocks(
 
             BecomeBlinker(state) => Block::builder()
                 .color(if state { Rgba::WHITE } else { Rgba::BLACK })
+                .ambient_sound(sound::Ambient::noise_at_frequency(
+                    ps32(0.3),
+                    if state { ps32(320.0) } else { ps32(160.0) },
+                ))
                 .display_name(format!("Blinker {state:?}"))
                 .animation_hint(AnimationHint::replacement(
                     block::AnimationChange::ColorSameCategory,
@@ -561,6 +577,18 @@ pub async fn install_demo_blocks(
                     .tick_action(TickAction {
                         operation: Operation::Neighbors(neighbor_ops),
                         schedule: time::Schedule::from_period(NonZeroU16::new(2).unwrap()),
+                    })
+                    .ambient_sound(match timer {
+                        // fuse burning
+                        ..0 => sound::Ambient::noise_at_frequency(ps32(2.0), ps32(500.0)),
+                        // exploding
+                        // TODO: wider frequency range + shift from high to low
+                        0..10 => sound::Ambient::noise_at_frequency(
+                            ps32((decay as f32).powf(4.0) * 30.0),
+                            ps32(20.0),
+                        ),
+                        // dissipating
+                        10.. => sound::Ambient::SILENT,
                     })
                     .build_txn(txn)
             }
