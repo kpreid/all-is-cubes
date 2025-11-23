@@ -4,8 +4,7 @@ use core::hash;
 use core::iter;
 use core::ops;
 
-use num_traits::{ConstOne as _, ConstZero as _};
-use ordered_float::FloatCore;
+use num_traits::{ConstOne as _, ConstZero as _, float::FloatCore};
 use ordered_float::NotNan;
 
 // -------------------------------------------------------------------------------------------------
@@ -59,6 +58,20 @@ impl<T: FloatCore> PositiveSign<T> {
         Self(value)
     }
 
+    /// As `Self::new_clamped()` but generic in exchange for not being `const fn`.
+    #[track_caller]
+    #[inline]
+    #[allow(clippy::eq_op)]
+    fn new_clamped_generic_nonconst(value: T) -> Self {
+        if value > T::zero() {
+            Self(value)
+        } else if value == value {
+            Self(T::zero())
+        } else {
+            positive_sign_nan_panic()
+        }
+    }
+
     /// Unwraps the value without modifying it.
     #[inline]
     pub const fn into_inner(self) -> T {
@@ -68,6 +81,29 @@ impl<T: FloatCore> PositiveSign<T> {
     pub(crate) const fn into_nn(self) -> NotNan<T> {
         // SAFETY: `PositiveSign`’s restrictions are a superset of `NotNan`’s.
         unsafe { NotNan::new_unchecked(self.0) }
+    }
+
+    /// Returns the largest integer less than or equal to `self`.
+    #[inline]
+    #[must_use]
+    pub fn floor(self) -> Self {
+        // should never need to clamp, but to be safe...
+        Self::new_clamped_generic_nonconst(FloatCore::floor(self.0))
+    }
+
+    /// Returns the smallest integer greater than or equal to `self`.
+    #[inline]
+    #[must_use]
+    pub fn ceil(self) -> Self {
+        Self::new_clamped_generic_nonconst(FloatCore::ceil(self.0))
+    }
+
+    /// Returns the nearest integer to `self`.
+    /// If a value is half-way between two integers, round up from 0.0.
+    #[inline]
+    #[must_use]
+    pub fn round(self) -> Self {
+        Self::new_clamped_generic_nonconst(FloatCore::round(self.0))
     }
 
     /// Returns whether the value is finite.
@@ -949,6 +985,39 @@ mod tests {
     #[test]
     fn ps_closed_under_multiplication() {
         assert_eq!(ps32(0.0) * PositiveSign::<f32>::INFINITY, ps32(0.0));
+    }
+
+    #[test]
+    fn ps_floor() {
+        assert_eq!(ps32(0.0).floor(), ps32(0.0));
+        assert_eq!(ps32(0.25).floor(), ps32(0.0));
+        assert_eq!(ps32(0.5).floor(), ps32(0.0));
+        assert_eq!(ps32(0.75).floor(), ps32(0.0));
+        assert_eq!(ps32(1.0).floor(), ps32(1.0));
+        assert_eq!(ps32(1.5).floor(), ps32(1.0));
+        assert_eq!(ps32(7.89).floor(), ps32(7.0));
+    }
+
+    #[test]
+    fn ps_ceil() {
+        assert_eq!(ps32(0.0).ceil(), ps32(0.0));
+        assert_eq!(ps32(0.25).ceil(), ps32(1.0));
+        assert_eq!(ps32(0.5).ceil(), ps32(1.0));
+        assert_eq!(ps32(0.75).ceil(), ps32(1.0));
+        assert_eq!(ps32(1.0).ceil(), ps32(1.0));
+        assert_eq!(ps32(1.5).ceil(), ps32(2.0));
+        assert_eq!(ps32(7.89).ceil(), ps32(8.0));
+    }
+
+    #[test]
+    fn ps_round() {
+        assert_eq!(ps32(0.0).round(), ps32(0.0));
+        assert_eq!(ps32(0.25).round(), ps32(0.0));
+        assert_eq!(ps32(0.5).round(), ps32(1.0));
+        assert_eq!(ps32(0.75).round(), ps32(1.0));
+        assert_eq!(ps32(1.0).round(), ps32(1.0));
+        assert_eq!(ps32(1.5).round(), ps32(2.0));
+        assert_eq!(ps32(7.89).round(), ps32(8.0));
     }
 
     #[test]
