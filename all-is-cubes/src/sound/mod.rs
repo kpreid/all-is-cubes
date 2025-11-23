@@ -1,6 +1,12 @@
-//! Definition of a short sound that may be played by game events.
+//! Defining sounds that are game content.
 //!
-//! [`SoundDef`]s are used as members of [`Universe`s][crate::universe::Universe].
+//! All is Cubes (incompletely) supports two kinds of sounds:
+//!
+//! * [`SoundDef`]s, which define short sounds played in response to game events.
+//! * [`Ambient`], which define continuous sounds played based on a character's position in space.
+//!
+//! Currently, all sounds are synthesized based on a small set of parameters.
+//! In the future, short samples may be allowed.
 
 use core::fmt;
 
@@ -17,11 +23,14 @@ use crate::universe;
 // -------------------------------------------------------------------------------------------------
 
 mod ambient;
-pub use ambient::Ambient;
+pub use ambient::{Ambient, Band};
 
 // -------------------------------------------------------------------------------------------------
 
 /// A sound effect or grain.
+///
+/// [`SoundDef`]s are used as members of [`Universe`s][crate::universe::Universe]
+/// and may be referenced by ... TODO document
 #[derive(Clone, Debug, Eq, Hash, PartialEq, bevy_ecs::component::Component)]
 #[expect(clippy::module_name_repetitions)]
 #[non_exhaustive]
