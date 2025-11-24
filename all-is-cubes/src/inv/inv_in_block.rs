@@ -310,6 +310,7 @@ mod tests {
     use euclid::{point3, vec3};
     use pretty_assertions::assert_eq;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn inv_in_block_debug() {
         let iib = InvInBlock::new(
