@@ -1391,6 +1391,7 @@ mod tests {
         }
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn face_map_debug_cmp() {
         let strings =
