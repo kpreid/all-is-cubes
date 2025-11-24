@@ -1275,6 +1275,7 @@ mod tests {
         )
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_empty() {
         let transaction = UniverseTransaction::default();
@@ -1282,6 +1283,7 @@ mod tests {
         pretty_assertions::assert_str_eq!(format!("{transaction:#?}"), "UniverseTransaction");
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_full() {
         let [block] = make_some_blocks();
