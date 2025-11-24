@@ -246,10 +246,15 @@ impl Character {
         let body = handle.query::<Body>(read_ticket)?;
         let space = &handle.query::<ParentSpace>(read_ticket)?.0;
         let eye = handle.query::<eye::CharacterEye>(read_ticket)?; // TODO(ecs): need to distinguish "missing component"
-        let transform = eye
-            .view_transform
-            .unwrap_or_else(|| eye::compute_view_transform(body, FreeVector::zero()));
-        Ok((space, transform, eye.exposure()))
+        let transform = eye.view_transform.unwrap_or_else(|| {
+            // Handle initial frame where the possibly-displaced view hasn't been computed yet.
+            eye::compute_view_transform(body, FreeVector::zero())
+        });
+        Ok((
+            space,
+            transform,
+            handle.query::<exposure::State>(read_ticket)?.exposure(),
+        ))
     }
 
     /// Returns the character's current inventory.

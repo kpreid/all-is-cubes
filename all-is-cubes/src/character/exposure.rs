@@ -1,5 +1,6 @@
 //! Analyzes the scene around a character to choose a camera “exposure” (brightness scale) value.
 
+use bevy_ecs::prelude as ecs;
 use euclid::{Point3D, vec3};
 
 /// Acts as polyfill for float methods
@@ -26,7 +27,12 @@ const TARGET_LUMINANCE: f32 = 0.9;
 const ADJUSTMENT_STRENGTH: f32 = 0.375;
 const EXPOSURE_CHANGE_RATE: f32 = 2.0;
 
-#[derive(Clone)]
+/// The state of a moving average of the luminance seen by a character
+/// (as defined by [`CharacterEye`])
+/// for purposes of determining “exposure” (brightness scale).
+///
+/// This is an ECS component itself, but the systems that drive it are in [`crate::character::eye`].
+#[derive(Clone, ecs::Component)]
 pub(crate) struct State {
     /// Incrementally updated samples of neighboring light levels, used for
     /// determining exposure / eye adaptation.
@@ -50,6 +56,8 @@ impl Default for State {
 }
 
 impl State {
+    /// Returns the character's current automatic-exposure calculation based on the light
+    /// around it.
     pub fn exposure(&self) -> f32 {
         self.exposure_log.exp()
     }
@@ -141,7 +149,6 @@ fn compute_target_exposure(luminance: f32) -> f32 {
 mod tests {
     use super::*;
     use crate::character::Character;
-    use crate::character::eye::CharacterEye;
     use crate::math::{GridAab, Rgb};
     use crate::space::Space;
     use crate::time;
@@ -197,8 +204,7 @@ mod tests {
         // Let exposure sampling reach steady state
         for i in 0..100 {
             {
-                let exposure =
-                    &character.query::<CharacterEye>(universe.read_ticket()).unwrap().exposure;
+                let exposure = &character.query::<State>(universe.read_ticket()).unwrap();
                 eprintln!(
                     "{i:3} {exp_log} {exp}",
                     exp_log = exposure.exposure_log,
@@ -210,7 +216,7 @@ mod tests {
 
         // Done running; examine results.
 
-        let exposure = &character.query::<CharacterEye>(universe.read_ticket()).unwrap().exposure;
+        let exposure = &character.query::<State>(universe.read_ticket()).unwrap();
 
         // Luminance sampling should match the scene we set up.
         eprintln!("{:?}", exposure.luminance_samples);

@@ -21,7 +21,7 @@ use crate::math::{Cube, FreeCoordinate, FreeVector};
 use crate::physics::{Body, Velocity};
 use crate::space;
 use crate::time;
-use crate::universe::{self, UniverseId};
+use crate::universe;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -35,14 +35,12 @@ use crate::universe::{self, UniverseId};
 /// * A suggestion for camera automatic exposure / eye-adaptation simulation, based on the light
 ///   around it.
 #[derive(Clone, Default, ecs::Component)]
+#[require(exposure::State)]
 pub(crate) struct CharacterEye {
     /// Offset to be added to the body position to produce the drawn eye (camera) position.
     displacement_pos: Vector3D<FreeCoordinate, Cube>,
     /// Velocity of the `eye_displacement_pos` point (relative to body position).
     displacement_vel: Vector3D<FreeCoordinate, Velocity>,
-
-    /// Exposure calculation state.
-    pub(in crate::character) exposure: exposure::State,
 
     /// View transform for this character's eye; translation and rotation from
     /// the camera coordinate system (whose look direction is the -Z axis) to the [`Space`]'s
@@ -52,15 +50,7 @@ pub(crate) struct CharacterEye {
     pub view_transform: Option<ViewTransform>,
 }
 
-impl CharacterEye {
-    /// Returns the character's current automatic-exposure calculation based on the light
-    /// around it.
-    pub fn exposure(&self) -> f32 {
-        self.exposure.exposure()
-    }
-}
-
-/// Records velocity from the previous frame,
+/// Records velocity from the previous step as an input to [`CharacterEye`] deplacement.
 /// TODO(ecs): figure out how we want to handle computing delta-v/impulse and put this in a more appropriate place
 #[derive(Clone, Copy, Debug, Default, ecs::Component)]
 struct PreviousBodyVelocity(Vector3D<FreeCoordinate, Velocity>);
@@ -77,7 +67,8 @@ pub(crate) fn add_eye_systems(world: &mut ecs::World) {
     schedules.add_systems(
         time::schedule::Step,
         // This chain relation doesn’t matter semantically but we have to pick one.
-        // TODO(ecs): Consider splitting into more components so we can let them be independent.
+        // TODO(ecs): Consider whether we should arrange for possible parallel execution
+        // (exposure being computed using last frame's data).
         (
             step_eye_position
                 .after(crate::physics::step::BodyPhysicsSet)
@@ -128,30 +119,26 @@ fn step_eye_position(
 }
 
 fn step_exposure(
-    universe_id: ecs::Res<UniverseId>,
     current_step: ecs::Res<universe::CurrentStep>,
-    characters: ecs::Query<(&ParentSpace, &mut CharacterEye)>,
-    spaces: ecs::Query<universe::ReadMember<space::Space>>,
+    eyes: ecs::Query<(&ParentSpace, &CharacterEye, &mut exposure::State)>,
+    spaces: universe::HandleReadQuery<space::Space>,
 ) -> ecs::Result {
     let tick = current_step.get()?.tick;
     let dt = tick.delta_t().as_secs_f64();
-    let universe_id = *universe_id;
 
     // TODO(ecs): This'll be a good candidate for parallel execution *if* we have many characters.
     // In any case, maybe hold off until we have reconciled Bevy and Rayon’s thread pools, or
     // have some profiling available to see how it performs.
 
-    for (ParentSpace(space_handle), mut eye) in characters {
-        let eye = &mut *eye;
-        let Ok(space_entity) = space_handle.as_entity(universe_id) else {
+    for (ParentSpace(space_handle), eye, mut exposure) in eyes {
+        let Ok(space) = space_handle.read_from_query(&spaces) else {
             continue;
         };
         let Some(view_transform) = eye.view_transform else {
             continue;
         };
-        let space = spaces.get(space_entity)?.read();
 
-        eye.exposure.step(&space, view_transform, dt);
+        exposure.step(&space, view_transform, dt);
     }
 
     Ok(())

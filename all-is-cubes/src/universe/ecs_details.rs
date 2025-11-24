@@ -163,20 +163,6 @@ where
 
 // -------------------------------------------------------------------------------------------------
 
-/// Type that can be used in [`ecs::Query`] to obtain [`UniverseMember::Read`] data.
-#[derive(Clone, bevy_ecs::query::QueryData)]
-pub(crate) struct ReadMember<T: UniverseMember>(<T as super::SealedMember>::ReadQueryData);
-
-impl<'w, T: UniverseMember> ReadMemberItem<'w, T> {
-    // TODO(ecs): Consider avoiding needing this method by implementing `QueryData` unsafely
-    // to make `T::Read` the item itself.
-    pub fn read(self) -> T::Read<'w> {
-        T::read_from_query(self.0)
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-
 /// Get mutable access to `QueryData` of one entity, and read-only access to all other entities.
 ///
 /// Returns [`None`] if there is no such entity or component.
