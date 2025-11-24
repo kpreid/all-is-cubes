@@ -1278,6 +1278,7 @@ mod tests {
     }
 
     /// Test `Debug` formatting. Note this should be similar to the [`Aab`] formatting.
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug() {
         let b = GridAab::from_lower_size([1, 2, 3], [10, 20, 30]);

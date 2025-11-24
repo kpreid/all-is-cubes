@@ -524,6 +524,7 @@ fn indirect_becomes_evaluation_error() {
     );
 }
 
+#[cfg(fmt_debug = "full")]
 #[test]
 fn space_debug() {
     let mut space = Space::empty_positive(1, 1, 1);
