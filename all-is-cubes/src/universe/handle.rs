@@ -1441,6 +1441,7 @@ mod tests {
     use core::hash::BuildHasher as _;
     use pretty_assertions::assert_eq;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn handle_debug_in_universe() {
         let mut u = Universe::new();
@@ -1459,6 +1460,7 @@ mod tests {
         assert_eq!(format!("{erased:?}"), "Handle('foo')");
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn handle_debug_pending() {
         let mut txn = UniverseTransaction::default();
