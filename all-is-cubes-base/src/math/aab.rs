@@ -642,6 +642,7 @@ mod tests {
         }
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     /// Test `Debug` formatting. Note this should be similar to the [`GridAab`]
     /// formatting.
