@@ -637,6 +637,15 @@ mod tests {
     use super::*;
     use alloc::string::String;
 
+    #[test]
+    fn size() {
+        let size = size_of::<BlockAttributes>();
+        assert!(
+            size <= 360,
+            "size_of::<BlockAttributes>() = {size} unexpectedly large"
+        );
+    }
+
     /// [`BlockAttributes`] has an inherent `default()` function, which should be
     /// equivalent to the [`Default`] trait function.
     #[test]

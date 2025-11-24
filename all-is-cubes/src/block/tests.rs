@@ -5,7 +5,7 @@ use pretty_assertions::assert_eq;
 
 use crate::block::{
     self, AIR, Block, BlockChange, BlockDef, BlockDefTransaction, EvalBlockError, Modifier,
-    Resolution::*,
+    Primitive, Resolution::*,
 };
 use crate::content::make_some_blocks;
 use crate::listen::{self, Log, NullListener};
@@ -35,12 +35,21 @@ fn listen(
 }
 
 #[test]
-fn block_is_approximately_a_pointer() {
+fn block_size_is_pointerish() {
     let block_size = size_of::<Block>();
     let ptr_size = size_of::<*const ()>();
     assert!(
         ptr_size < block_size && block_size <= 2 * ptr_size,
         "unexpected size: {block_size}",
+    );
+}
+
+#[test]
+fn primitive_size() {
+    let size = size_of::<Primitive>();
+    assert!(
+        size <= 96,
+        "size_of::<Primitive>() = {size} unexpectedly large"
     );
 }
 
