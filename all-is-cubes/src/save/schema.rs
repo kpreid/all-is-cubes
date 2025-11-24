@@ -16,8 +16,8 @@
 //! * [`Cow`] is sometimes used to avoid unnecessary clones during serialization.
 
 #![allow(
-    unexpected_cfgs,
-    reason = "https://github.com/Lokathor/bytemuck/issues/286"
+    clippy::large_enum_variant,
+    reason = "schema enums are used only momentarily"
 )]
 
 use alloc::borrow::Cow;
@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::block::Block;
 use crate::math::{
-    Aab, Face6, GridAab, GridCoordinate, GridRotation, NotNan, PositiveSign, ZeroOne,
+    Aab, Face6, GridAab, GridCoordinate, GridRotation, NotNan, PositiveSign, ZeroOne, ps32, zo32,
 };
 use crate::save::compress::{GzSerde, Leu16};
 use crate::time::Schedule;
@@ -463,20 +463,29 @@ pub(crate) enum SoundDefSer {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub(crate) enum AmbientSoundSer {
-    AmbientSoundV0 {
-        // TODO: no actual fields yet
+    AmbientSoundV1 {
+        noise_bands: [PositiveSign<f32>; 20],
+        absorption_bands: [ZeroOne<f32>; 20],
     },
 }
 
 impl Default for AmbientSoundSer {
     fn default() -> Self {
-        Self::AmbientSoundV0 {}
+        Self::AmbientSoundV1 {
+            noise_bands: [ps32(0.0); 20],
+            absorption_bands: [zo32(0.0); 20],
+        }
     }
 }
 
 impl AmbientSoundSer {
     fn is_silent(&self) -> bool {
-        matches!(self, Self::AmbientSoundV0 {})
+        match self {
+            AmbientSoundSer::AmbientSoundV1 {
+                noise_bands,
+                absorption_bands,
+            } => noise_bands == &[ps32(0.0); _] && absorption_bands == &[zo32(0.0); _],
+        }
     }
 }
 

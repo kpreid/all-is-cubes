@@ -893,14 +893,29 @@ mod sound {
     }
 
     impl From<&sound::Ambient> for schema::AmbientSoundSer {
-        fn from(_: &sound::Ambient) -> Self {
-            Self::AmbientSoundV0 {}
+        fn from(value: &sound::Ambient) -> Self {
+            let &sound::Ambient {
+                noise_bands,
+                absorption_bands,
+            } = value;
+            Self::AmbientSoundV1 {
+                noise_bands,
+                absorption_bands,
+            }
         }
     }
 
     impl From<schema::AmbientSoundSer> for sound::Ambient {
-        fn from(_: schema::AmbientSoundSer) -> Self {
-            Self {}
+        fn from(value: schema::AmbientSoundSer) -> Self {
+            match value {
+                schema::AmbientSoundSer::AmbientSoundV1 {
+                    noise_bands,
+                    absorption_bands,
+                } => Self {
+                    noise_bands,
+                    absorption_bands,
+                },
+            }
         }
     }
 }

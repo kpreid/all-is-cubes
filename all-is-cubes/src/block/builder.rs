@@ -502,7 +502,7 @@ mod tests {
     use crate::block::{self, Resolution::*, TickAction};
     use crate::content::palette;
     use crate::inv;
-    use crate::math::{Face6, GridRotation, Vol};
+    use crate::math::{Face6, GridRotation, Vol, zo32};
     use crate::op::Operation;
     use crate::space::SpacePhysics;
     use crate::transaction::Transactional as _;
@@ -544,8 +544,11 @@ mod tests {
                 inv::IconRow::new(6..9, point3(1, 1, 11), vec3(5, 0, 0)),
             ],
         );
-        // TODO: we can only actually make this nondefault when ambient sound features actually exist
-        let ambient_sound = crate::sound::Ambient::SILENT;
+        let ambient_sound = {
+            let mut s = crate::sound::Ambient::SILENT;
+            s.absorption_bands[0] = zo32(0.5);
+            s
+        };
         let rotation_rule = block::RotationPlacementRule::Attach { by: Face6::NZ };
         let placement_action = Some(block::PlacementAction {
             operation: Operation::Become(block::from_color!(1.0, 0.0, 1.0)),

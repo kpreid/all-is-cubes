@@ -1,7 +1,7 @@
 //! Ambient sound.
 //!
-//! Ambient sound is sound that is not emitted at a time by a simulated event,
-//! but is derived from the listener’s immediate environment.
+//! Ambient sound is sound that is not explicitly emitted by a simulated event, but is presented
+//! to any listener based on their position in space.
 //!
 //! TODO: This module and functionality is highly incomplete.
 
@@ -9,13 +9,14 @@ use core::fmt;
 use core::ops;
 
 use exhaust::Exhaust;
+use num_traits::ConstZero as _;
 
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::math::PositiveSign;
+use crate::math::{PositiveSign, ZeroOne};
 use crate::universe;
 
 // -------------------------------------------------------------------------------------------------
@@ -43,6 +44,8 @@ macro_rules! band_list_for_doc {
 pub struct Band {
     index: u8,
 }
+
+type Spectrum<T> = [T; Band::COUNT];
 
 impl Band {
     /// Number of bands that exist.
@@ -138,12 +141,39 @@ impl Exhaust for Band {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[non_exhaustive]
 pub struct Ambient {
-    // No fields yet because the ambient sound system is not implemented yet.
+    /// Noise emitted by this source.
+    ///
+    /// TODO: specify units for these values
+    pub noise_bands: Spectrum<PositiveSign<f32>>,
+
+    /// Sound absorption.
+    ///
+    /// TODO: specify units for these values
+    ///
+    /// TODO: Should this be reflection? Reflectivity? Whatever you call it
+    pub absorption_bands: Spectrum<ZeroOne<f32>>,
 }
 
 impl Ambient {
     /// No sound emission. TODO: Define and explain default absorption assumptions
-    pub const SILENT: Self = Self {};
+    pub const SILENT: Self = Self {
+        noise_bands: [PositiveSign::ZERO; Band::COUNT],
+        absorption_bands: [ZeroOne::ZERO; Band::COUNT],
+    };
+
+    /// Constructs an [`Ambient`] denoting noise output of the given power and center frequency.
+    ///
+    /// TODO: should be dB instead of power. at what distance etc?
+    /// TODO: Specify bandwidth
+    pub fn noise_at_frequency(
+        power: PositiveSign<f32>,
+        center_frequency: PositiveSign<f32>,
+    ) -> Self {
+        let mut new_self = Self::SILENT;
+        let band = Band::from_frequency(center_frequency);
+        new_self.noise_bands[band] = power;
+        new_self
+    }
 }
 
 impl Default for Ambient {
@@ -154,7 +184,10 @@ impl Default for Ambient {
 
 impl universe::VisitHandles for Ambient {
     fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
-        let Self {} = self;
+        let Self {
+            noise_bands: _,
+            absorption_bands: _,
+        } = self;
     }
 }
 
