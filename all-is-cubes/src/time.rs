@@ -364,6 +364,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn clock_debug() {
         let mut clock = Clock::new(TickSchedule::per_second(25), 0);

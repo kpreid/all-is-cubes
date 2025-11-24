@@ -4,6 +4,7 @@
 #![feature(const_index)]
 #![feature(const_trait_impl)]
 #![feature(doc_cfg)]
+#![cfg_attr(test, feature(fmt_debug))]
 #![feature(large_assignments)]
 #![move_size_limit = "256"]
 #![feature(never_type)]
