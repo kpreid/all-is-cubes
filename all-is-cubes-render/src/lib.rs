@@ -1,4 +1,5 @@
 #![feature(doc_cfg)]
+#![cfg_attr(test, feature(fmt_debug))]
 
 //! Raytracer and rendering abstractions for the all-is-cubes engine.
 //!
