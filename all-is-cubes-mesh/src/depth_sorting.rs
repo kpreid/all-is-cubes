@@ -842,6 +842,7 @@ mod tests {
     use alloc::format;
     use std::println;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn ordering_debug() {
         assert_eq!(
