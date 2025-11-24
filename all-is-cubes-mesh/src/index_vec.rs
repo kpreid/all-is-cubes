@@ -822,11 +822,13 @@ mod tests {
     use alloc::format;
     use alloc::vec;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_empty() {
         assert_eq!(format!("{:#?}", IndexVec::new()), "U16[]");
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_nonempty() {
         assert_eq!(
