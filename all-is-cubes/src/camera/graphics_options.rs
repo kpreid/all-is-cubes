@@ -618,6 +618,7 @@ mod tests {
     use alloc::format;
     use pretty_assertions::assert_eq;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug() {
         let options = GraphicsOptions::default();
