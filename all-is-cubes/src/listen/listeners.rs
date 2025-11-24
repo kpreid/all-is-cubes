@@ -61,6 +61,7 @@ where
 mod tests {
     use super::*;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn fn_debug() {
         let listener = FnListener::new(&Arc::new(()), |_recipient: &(), _msg: ()| {});
