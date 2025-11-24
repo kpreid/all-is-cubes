@@ -1017,6 +1017,7 @@ mod tests {
 
     type TestMesh = SpaceMesh<TextureMt>;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_empty() {
         let mesh = TestMesh::default();
@@ -1072,6 +1073,7 @@ mod tests {
         );
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_opaque() {
         let (_, _, mesh) = mesh_blocks_and_space(
@@ -1165,6 +1167,7 @@ mod tests {
         );
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_transparent() {
         let (_, _, mut mesh) = mesh_blocks_and_space(
