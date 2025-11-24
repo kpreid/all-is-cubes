@@ -344,6 +344,7 @@ mod tests {
         assert_eq!(size_of::<Modifier>(), 3 * size_of::<*const ()>());
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn modifier_debug() {
         let modifiers: Vec<Modifier> = vec![
