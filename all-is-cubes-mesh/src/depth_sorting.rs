@@ -825,6 +825,7 @@ mod tests {
     use all_is_cubes::math::{Aab, Cube, GridAab};
     use all_is_cubes::space::Space;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn ordering_debug() {
         assert_eq!(

@@ -1143,6 +1143,7 @@ mod tests {
         )
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_empty() {
         let transaction = UniverseTransaction::default();
@@ -1150,6 +1151,7 @@ mod tests {
         pretty_assertions::assert_str_eq!(format!("{transaction:#?}"), "UniverseTransaction");
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_full() {
         let [block] = make_some_blocks();
@@ -1368,6 +1370,7 @@ mod tests {
     // Remove the cases that are now impossible.
 
     // This panic is not specifically desirable, but more work will be needed to avoid it.
+    #[cfg(fmt_debug = "full")] // TODO: make test runnable regardless
     #[test]
     #[should_panic = "Attempted to execute transaction with target already borrowed: HandleError { name: Specific(\"foo\"), handle_universe_id: None, kind: Gone { reason: CreatedGone } }"]
     fn handle_error_from_universe_txn() {

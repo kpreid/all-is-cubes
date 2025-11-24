@@ -6,6 +6,7 @@
 #![feature(const_trait_impl)]
 #![feature(const_try)]
 #![feature(doc_cfg)]
+#![feature(fmt_debug)]
 #![feature(large_assignments)]
 #![move_size_limit = "256"]
 #![feature(never_type)]

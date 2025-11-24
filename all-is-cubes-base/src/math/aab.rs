@@ -559,6 +559,7 @@ mod tests {
         Aab::from_lower_upper([0., 0., 0.], [1., 1., f64::NAN]);
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     /// Test `Debug` formatting. Note this should be similar to the [`GridAab`]
     /// formatting.

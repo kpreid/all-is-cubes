@@ -1162,6 +1162,7 @@ mod tests {
 
     // TODO: Add tests of the color not-NaN mechanisms.
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn rgba_to_srgb8() {
         assert_eq!(

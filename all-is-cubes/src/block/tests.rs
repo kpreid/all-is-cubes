@@ -60,11 +60,13 @@ fn block_static_eq_to_non_static() {
     assert_eq!(foo, bar);
 }
 
+#[cfg(fmt_debug = "full")]
 #[test]
 fn block_debug_air() {
     assert_eq!(&format!("{:?}", &AIR), "Block { primitive: Air }");
 }
 
+#[cfg(fmt_debug = "full")]
 #[test]
 fn block_debug_with_modifiers() {
     assert_eq!(

@@ -546,11 +546,13 @@ fn fmt_index_list<Ix: IndexInt>(
 mod tests {
     use super::*;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_empty() {
         assert_eq!(format!("{:#?}", IndexVec::new()), "U16[]");
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_nonempty() {
         assert_eq!(

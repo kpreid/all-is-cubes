@@ -510,6 +510,7 @@ mod tests {
         );
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug() {
         let universe = Universe::new();
@@ -533,6 +534,7 @@ mod tests {
         );
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_stub() {
         let ticket = ReadTicket::stub();
