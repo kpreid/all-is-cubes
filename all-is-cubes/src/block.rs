@@ -171,7 +171,10 @@ pub enum Primitive {
     /// It cannot be serialized.
     #[doc(hidden)]
     Raw {
-        attributes: BlockAttributes,
+        // Note: the `Arc` is indirection so that `Primitive` is not made very large by this
+        // special case enum, and is an `Arc` in particular so that cloning a `Primitive` does not
+        // allocate.
+        attributes: Arc<BlockAttributes>,
         voxels: Evoxels,
     },
 }
@@ -750,7 +753,7 @@ impl Block {
             Primitive::Raw {
                 ref attributes,
                 ref voxels,
-            } => MinEval::new(attributes.clone(), voxels.clone()),
+            } => MinEval::new(BlockAttributes::clone(attributes), voxels.clone()),
         };
 
         #[cfg(debug_assertions)]

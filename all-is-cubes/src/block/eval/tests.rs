@@ -2,6 +2,8 @@
 //!
 //! Tests for the [`EvaluatedBlock`] type are under [`super::evaluated::tests`].
 
+use alloc::sync::Arc;
+
 use euclid::Vector3D;
 use pretty_assertions::assert_eq;
 use rstest::rstest;
@@ -581,10 +583,10 @@ fn indirect_has_derived_value_cache_internally() {
 
 #[test]
 fn raw_primitive() {
-    let attributes = BlockAttributes {
+    let attributes = Arc::new(BlockAttributes {
         display_name: arcstr::literal!("foo"),
         ..Default::default()
-    };
+    });
     let voxels = Evoxels::from_many(
         R4,
         Vol::repeat(
@@ -601,7 +603,7 @@ fn raw_primitive() {
     });
     let e = block.evaluate(ReadTicket::stub()).unwrap();
 
-    assert_eq!(e.attributes(), &attributes);
+    assert_eq!(e.attributes(), &*attributes);
     assert_eq!(e.voxels(), &voxels);
     assert_eq!(
         e.cost,

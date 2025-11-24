@@ -386,7 +386,7 @@ fn block_text_with_optional() {
 #[test]
 fn block_raw_not_serializable() {
     let error = to_value(Block::from_primitive(block::Primitive::Raw {
-        attributes: block::BlockAttributes::default(),
+        attributes: Default::default(),
         voxels: block::AIR_EVALUATED.voxels().clone(),
     }))
     .unwrap_err();

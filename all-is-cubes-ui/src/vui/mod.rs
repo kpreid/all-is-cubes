@@ -4,6 +4,8 @@
 //!
 //! [`Space`]: all_is_cubes::space::Space
 
+use alloc::sync::Arc;
+
 use all_is_cubes::block::EvalBlockError;
 use all_is_cubes::{block, universe};
 
@@ -40,7 +42,7 @@ pub(crate) fn quote_and_snapshot_block(
     }
     let evaluated = eval_result.unwrap_or_else(|e| e.to_placeholder());
     let snapshotted = block::Block::from(block::Primitive::Raw {
-        attributes: evaluated.attributes().clone(),
+        attributes: Arc::new(evaluated.attributes().clone()),
         voxels: evaluated.voxels().clone(),
     });
 
