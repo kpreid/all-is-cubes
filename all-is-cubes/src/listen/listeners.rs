@@ -62,6 +62,7 @@ mod tests {
     use super::*;
     use alloc::format;
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn fn_debug() {
         let listener = FnListener::new(&Arc::new(()), |_recipient: &(), _msg: ()| {});
