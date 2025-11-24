@@ -1077,6 +1077,7 @@ mod tests {
         Cube::new(x, y, z)
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_no_elements() {
         let vol = GridAab::from_lower_size([10, 0, 0], [4, 1, 1]).to_vol::<ZMaj>().unwrap();
@@ -1094,6 +1095,7 @@ mod tests {
         )
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_with_contents() {
         let vol = VolBox::from_fn(GridAab::from_lower_size([10, 0, 0], [4, 1, 1]), |p| p.x);
@@ -1117,6 +1119,7 @@ mod tests {
         )
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn debug_without_contents() {
         let vol = VolBox::from_fn(GridAab::from_lower_size([0, 0, 0], [64, 1, 1]), |p| p.x);

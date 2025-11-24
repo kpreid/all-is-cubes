@@ -1218,6 +1218,7 @@ mod tests {
         _ = Rgba::new(0.0, 0.0, 0.0, f32::NAN);
     }
 
+    #[cfg(fmt_debug = "full")]
     #[test]
     fn rgba_to_srgb8() {
         assert_eq!(
