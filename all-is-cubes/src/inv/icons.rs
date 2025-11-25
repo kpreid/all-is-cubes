@@ -1,6 +1,7 @@
 use alloc::vec;
 use core::fmt;
 
+use descriptive_unwrap::ResultExt as _;
 use euclid::vec3;
 use exhaust::Exhaust;
 
@@ -214,7 +215,7 @@ impl Icons {
             })
         })
         .await
-        .unwrap()
+        .err_is_unreachable()
     }
 }
 

@@ -1,5 +1,7 @@
 //! Runs the software raytracer and writes the results into a texture.
 
+#![expect(clippy::unwrap_used, reason = "TODO")]
+
 use alloc::sync::Arc;
 // TODO: if not using threads, don't even use a Mutex as it's entirely wasted
 use alloc::boxed::Box;

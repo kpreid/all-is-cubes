@@ -4,6 +4,7 @@ use core::fmt;
 use core::iter::Sum;
 use core::ops::{Add, AddAssign, Mul};
 
+use descriptive_unwrap::ResultExt as _;
 use euclid::{Vector3D, vec3};
 use ordered_float::NotNan;
 
@@ -931,7 +932,8 @@ impl Sum for Rgb {
         // Using Vector3 as the accumulator type avoids intermediate NaN checks.
         Rgb::try_from(iter.fold(Vector3D::<f32, Intensity>::zero(), |accum, rgb| {
             accum + Vector3D::<f32, Intensity>::from(rgb)
-        })).unwrap(/* impossible NaN */)
+        }))
+        .err_is_unreachable()
     }
 }
 

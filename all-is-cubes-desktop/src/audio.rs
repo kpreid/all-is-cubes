@@ -9,6 +9,7 @@ use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, atomic};
 use std::time::Duration;
 
+use descriptive_unwrap::ResultExt as _;
 use kira::listener::ListenerHandle;
 use kira::sound::static_sound::{StaticSoundData, StaticSoundSettings};
 use kira::track::SpatialTrackBuilder;
@@ -159,8 +160,8 @@ fn audio_command_thread(
                 .resonance(0.8),
         );
         let volume = track_builder.add_effect(StereoVolume::new());
-        let mut ambient_track = manager.add_sub_track(track_builder).unwrap(); // TODO: log instead of unwrap
-        ambient_track.play(white_noise.clone()).unwrap();
+        let mut ambient_track = manager.add_sub_track(track_builder).err_is_unreachable();
+        ambient_track.play(white_noise.clone()).err_is_unreachable();
         (Some(volume), Some(ambient_track))
     });
 

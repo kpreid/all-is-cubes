@@ -4,6 +4,8 @@ use alloc::borrow::Cow;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use descriptive_unwrap::ResultExt as _;
+
 use crate::block::{
     self, AIR, Block, BlockAttributes, BlockCollision, BlockParts, BlockPtr, Modifier, Primitive,
     Resolution,
@@ -59,6 +61,8 @@ pub struct Builder<'u, P, Txn> {
 
     /// If this is a [`UniverseTransaction`], then it must be produced for the caller to execute.
     /// If this is `()`, then it may be disregarded.
+    ///
+    /// Currently, when this is a transaction, it is always an anonymous insertion.
     transaction: Txn,
 }
 
@@ -388,8 +392,9 @@ impl<P: BuildPrimitive> Builder<'_, P, UniverseTransaction> {
         let (block, transaction) = self.build_block_and_txn_internal();
 
         // The transaction is always an insert_anonymous, which cannot fail.
-        #[expect(clippy::missing_panics_doc, reason = "infallible")]
-        transaction.execute(universe, (), &mut transaction::no_outputs).unwrap();
+        transaction
+            .execute(universe, (), &mut transaction::no_outputs)
+            .err_is_unreachable();
 
         block
     }
@@ -400,8 +405,7 @@ impl<P: BuildPrimitive> Builder<'_, P, UniverseTransaction> {
         let (block, txn) = self.build_block_and_txn_internal();
         // Note that if we add more control over the transaction than "add an anonymous space",
         // this will need to start returning errors.
-        #[expect(clippy::missing_panics_doc, reason = "infallible")]
-        transaction.merge_from(txn).unwrap();
+        transaction.merge_from(txn).err_is_unreachable();
         block
     }
 }

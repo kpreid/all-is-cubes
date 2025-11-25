@@ -9,6 +9,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::num::NonZero;
 
+use descriptive_unwrap::ResultExt as _;
 use euclid::{Point3D, Vector3D};
 use hashbrown::HashMap;
 
@@ -119,7 +120,7 @@ impl RayTreeNode {
                 self.relative_cube.map(i32::from).into(),
                 relative_cube.map(i32::from).into(),
             )
-            .unwrap();
+            .err_is_unreachable();
             self.children[direction]
                 .get_or_insert_with(|| {
                     Box::new(RayTreeNode {

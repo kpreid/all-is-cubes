@@ -7,6 +7,7 @@ use core::any::Any;
 use core::fmt;
 
 use bevy_ecs::prelude as ecs;
+use descriptive_unwrap::ResultExt as _;
 use hashbrown::HashMap as HbHashMap;
 
 use crate::transaction::{
@@ -98,7 +99,7 @@ where
 {
     world
         .run_system_cached_with(commit_system::<O>, (target, transaction, check))
-        .unwrap()
+        .err_is_unreachable()
 }
 
 /// A `bevy_ecs` system function that executes a member’s `Transactional::Transaction` type.
@@ -475,8 +476,7 @@ impl UniverseTransaction {
     pub fn insert<T: UniverseMember>(name: Name, value: T) -> (Handle<T>, Self) {
         let mut txn = Self::default();
         // can't fail because the transaction has no conflicting names
-        #[expect(clippy::missing_panics_doc)]
-        let handle = txn.insert_mut(name, value).unwrap();
+        let handle = txn.insert_mut(name, value).err_is_unreachable();
         (handle, txn)
     }
 

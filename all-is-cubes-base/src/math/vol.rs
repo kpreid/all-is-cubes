@@ -14,6 +14,7 @@ use core::ops::{Deref, DerefMut};
 )]
 use alloc::vec::Vec;
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _, none_is_unreachable};
 use euclid::{Point3D, Size3D, point3, size3, vec3};
 use manyfmt::Refmt as _;
 
@@ -206,7 +207,7 @@ impl<'a, O, V> Vol<&'a [V], O> {
     ) -> Self {
         let bounds = GridAab::tiny(lower_bounds, size);
         assert!(
-            bounds.volume().unwrap() == contents.len(),
+            none_is_unreachable(bounds.volume()) == contents.len(),
             "element count does not match AAB volume"
         );
         Self {
@@ -276,7 +277,9 @@ where
         F: FnMut(Cube) -> V,
     {
         match bounds.to_vol::<ZMaj>() {
-            Ok(bounds) => bounds.with_elements(bounds.iter_cubes().map(f).collect()).unwrap(),
+            Ok(bounds) => {
+                bounds.with_elements(bounds.iter_cubes().map(f).collect()).err_is_unreachable()
+            }
             Err(length_error) => panic!("{length_error}"),
         }
     }
@@ -298,7 +301,7 @@ where
         match bounds.to_vol::<ZMaj>() {
             Ok(bounds) => Ok(bounds
                 .with_elements(bounds.iter_cubes().map(f).collect::<Result<C, E>>()?)
-                .unwrap()),
+                .err_is_unreachable()),
             Err(length_error) => panic!("{length_error}"),
         }
     }
@@ -315,9 +318,9 @@ where
         V: Clone,
     {
         match bounds.to_vol::<ZMaj>() {
-            Ok(bounds) => {
-                bounds.with_elements(iter::repeat_n(value, bounds.volume()).collect()).unwrap()
-            }
+            Ok(bounds) => bounds
+                .with_elements(iter::repeat_n(value, bounds.volume()).collect())
+                .err_is_unreachable(),
             Err(length_error) => panic!("{length_error}"),
         }
     }
@@ -633,7 +636,7 @@ impl<V: Clone, O: Copy> Vol<Arc<[V]>, O> {
     #[allow(clippy::missing_inline_in_public_items)]
     pub fn make_mut(&mut self) -> Vol<&mut [V], O> {
         let slice: &mut [V] = Arc::make_mut(&mut self.contents);
-        debug_assert_eq!(slice.len(), self.bounds.volume().unwrap());
+        debug_assert_eq!(slice.len(), self.bounds.volume().none_is_unreachable());
 
         Vol {
             bounds: self.bounds,
@@ -647,7 +650,7 @@ impl<V: Clone, O: Copy> Vol<Arc<[V]>, O> {
     #[allow(clippy::missing_inline_in_public_items)]
     pub fn make_linear_mut(&mut self) -> &mut [V] {
         let slice: &mut [V] = Arc::make_mut(&mut self.contents);
-        debug_assert_eq!(slice.len(), self.bounds.volume().unwrap());
+        debug_assert_eq!(slice.len(), self.bounds.volume().none_is_unreachable());
         slice
     }
 }

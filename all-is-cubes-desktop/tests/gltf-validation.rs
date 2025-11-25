@@ -3,6 +3,8 @@
 //! TODO: This should really be a test in [`all_is_cubes_port`], but right now, some of
 //! the top-level glTF output logic is in this package so we need to test it here.
 
+#![expect(clippy::unwrap_used, reason = "test")]
+
 use std::process;
 
 fn gltf_round_trip_test(args: &[&str]) {

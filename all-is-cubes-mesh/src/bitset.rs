@@ -91,7 +91,9 @@ impl<T: Copy + Zero + Into<u32> + TryFrom<u32>> FromIterator<T> for BitSet<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let mut set = Self::new();
         for item in iter {
-            set.insert(item).unwrap();
+            set.insert(item).unwrap_or_else(|_| {
+                panic!("out of memory error not propagated by `impl FromIterator for BitSet`")
+            });
         }
         set
     }

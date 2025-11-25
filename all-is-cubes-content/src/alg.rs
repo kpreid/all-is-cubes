@@ -7,6 +7,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::iter;
 
+use descriptive_unwrap::ResultExt as _;
 /// Acts as polyfill for float methods
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
@@ -184,25 +185,25 @@ pub(crate) fn four_walls(bounding_box: GridAab) -> [FirstThroughFourthWall; 4] {
             bottom_corner: Cube::from(low),
             counterclockwise_direction: Face::PZ,
             length: size.depth,
-            bounds_excluding_corners: interior.abut(Face::NX, 1).unwrap(),
+            bounds_excluding_corners: interior.abut(Face::NX, 1).err_is_unreachable(),
         },
         FirstThroughFourthWall {
             bottom_corner: Cube::new(low.x, low.y, high.z),
             counterclockwise_direction: Face::PX,
             length: size.width,
-            bounds_excluding_corners: interior.abut(Face::PZ, 1).unwrap(),
+            bounds_excluding_corners: interior.abut(Face::PZ, 1).err_is_unreachable(),
         },
         FirstThroughFourthWall {
             bottom_corner: Cube::new(high.x, low.y, high.z),
             counterclockwise_direction: Face::NZ,
             length: size.depth,
-            bounds_excluding_corners: interior.abut(Face::PX, 1).unwrap(),
+            bounds_excluding_corners: interior.abut(Face::PX, 1).err_is_unreachable(),
         },
         FirstThroughFourthWall {
             bottom_corner: Cube::new(high.x, low.y, low.z),
             counterclockwise_direction: Face::NX,
             length: size.width,
-            bounds_excluding_corners: interior.abut(Face::NZ, 1).unwrap(),
+            bounds_excluding_corners: interior.abut(Face::NZ, 1).err_is_unreachable(),
         },
     ]
 }

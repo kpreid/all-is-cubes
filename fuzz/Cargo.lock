@@ -22,6 +22,7 @@ dependencies = [
  "bitflags",
  "bytemuck",
  "derive_more",
+ "descriptive-unwrap",
  "displaydoc",
  "erasable",
  "euclid",
@@ -57,6 +58,7 @@ dependencies = [
  "arbitrary",
  "bevy_platform",
  "bytemuck",
+ "descriptive-unwrap",
  "displaydoc",
  "euclid",
  "exhaust",
@@ -94,6 +96,7 @@ dependencies = [
  "all-is-cubes-render",
  "bytemuck",
  "derive_more",
+ "descriptive-unwrap",
  "flume",
  "futures-channel",
  "futures-core",
@@ -128,6 +131,7 @@ dependencies = [
  "arbitrary",
  "bytemuck",
  "derive_more",
+ "descriptive-unwrap",
  "either",
  "exhaust",
  "flume",
@@ -153,6 +157,7 @@ dependencies = [
  "all-is-cubes-render",
  "base64",
  "bytemuck",
+ "descriptive-unwrap",
  "displaydoc",
  "dot_vox",
  "futures-channel",
@@ -176,6 +181,7 @@ dependencies = [
  "all-is-cubes",
  "bitflags",
  "derive_more",
+ "descriptive-unwrap",
  "displaydoc",
  "futures-core",
  "hashbrown 0.17.0",
@@ -543,6 +549,12 @@ dependencies = [
  "syn",
  "unicode-xid",
 ]
+
+[[package]]
+name = "descriptive-unwrap"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29d94afafcc83cc6bc08bfe15008a5199024568294d531bc565671e4750d17e9"
 
 [[package]]
 name = "diff"

@@ -8,6 +8,7 @@ use core::ops;
 use core::time::Duration;
 
 use bevy_ecs::prelude as ecs;
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use hashbrown::HashSet as HbHashSet;
 use manyfmt::Fmt;
 
@@ -325,7 +326,8 @@ impl Space {
 
         Ok(Space {
             palette,
-            contents: bounds.with_elements(contents).unwrap(),
+            // length of contents is checked by builder
+            contents: bounds.with_elements(contents).err_is_unreachable(),
             light,
 
             physics,
@@ -753,7 +755,7 @@ impl Read<'_> {
             extractor(Extract {
                 space: self,
                 cube,
-                cube_index: self.contents.index(cube).unwrap(),
+                cube_index: self.contents.index(cube).none_is_unreachable(),
                 block_index: Default::default(),
             })
         })

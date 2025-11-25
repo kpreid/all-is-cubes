@@ -2,6 +2,7 @@
 
 use core::iter;
 
+use descriptive_unwrap::OptionExt as _;
 use itertools::iproduct;
 
 use all_is_cubes::euclid::{self, Size2D, Vector2D, point2, size2};
@@ -150,5 +151,5 @@ pub(crate) fn generate_texture_atlas(
         atlas_cell_size,
         cell_margin: outline_radius_u,
     };
-    (dt.view().unwrap().clone(), metrics)
+    (dt.view().none_is_unreachable().clone(), metrics)
 }

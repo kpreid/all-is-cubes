@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use clap::builder::{PossibleValue, PossibleValuesParser, TypedValueParser};
 use clap::{Parser, ValueEnum};
+use descriptive_unwrap::ResultExt as _;
 use strum::IntoEnumIterator;
 
 use all_is_cubes::euclid::Size2D;
@@ -225,7 +226,7 @@ static GRAPHICS_HELP_LONG: LazyLock<String> = LazyLock::new(|| {
             pv.get_name(),
             pv.get_help().unwrap_or_default()
         )
-        .unwrap();
+        .err_is_unreachable();
     }
     text
 });

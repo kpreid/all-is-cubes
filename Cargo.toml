@@ -95,6 +95,7 @@ bytemuck = { version = "1.25.0", default-features = false, features = ["derive",
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
 criterion = { version = "0.8.0", features = ["async", "cargo_bench_support", "html_reports"] }
 derive_more = { version = "2.1.1", default-features = false, features = ["add", "add_assign", "sum"] }
+descriptive-unwrap = { version = "0.1.0", default-features = false }
 displaydoc = { version = "0.2.5", default-features = false }
 either = { version = "1.10.0", default-features = false }
 # used together with `slice-dst`
@@ -281,6 +282,7 @@ uninlined_format_args = "warn"
 unnecessary_self_imports = "warn"
 unnecessary_wraps = "warn"
 unused_async = "warn"
+unwrap_used = "warn"
 wrong_self_convention = "warn"
 
 [profile.dev]

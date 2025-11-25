@@ -128,6 +128,7 @@ bevy_platform = { workspace = true }
 bitflags = { workspace = true }
 bytemuck = { workspace = true, features = ["derive"] }
 derive_more = { workspace = true } # features specified in workspace
+descriptive-unwrap = { workspace = true }
 displaydoc = { workspace = true }
 erasable = { workspace = true }
 # mint feature to guarantee that our callers can use mint types

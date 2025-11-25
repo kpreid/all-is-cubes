@@ -97,7 +97,9 @@ where
             use alloc::collections::btree_map::Entry::*;
             match self.entry(k) {
                 Occupied(mut entry) => {
-                    let entry_check = check.remove(entry.key()).unwrap();
+                    let entry_check = check
+                        .remove(entry.key())
+                        .unwrap_or_else(|| panic!("merge check inconsistent with transactions"));
                     entry.get_mut().commit_merge(v2, entry_check);
                 }
                 Vacant(entry) => {

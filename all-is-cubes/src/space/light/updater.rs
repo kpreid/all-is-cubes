@@ -7,6 +7,7 @@ use core::cmp::Ordering;
 use core::{fmt, mem};
 
 use bevy_ecs::prelude as ecs;
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use manyfmt::Fmt;
 
 #[cfg(feature = "auto-threads")]
@@ -87,11 +88,16 @@ impl LightStorage {
         self.block_sky = physics.sky.for_blocks();
 
         if self.physics != old_physics {
-            // TODO: If the new physics is broadly similar, then reuse the old data as a
-            // starting point instead of immediately throwing it out.
-            // TODO: propagate allocation failure cleanly instead of unwrap()
-            self.contents =
-                self.physics.initialize_light(uc.contents.without_elements(), opacity).unwrap();
+            #[expect(
+                clippy::unwrap_used,
+                reason = "TODO: propagate allocation failure cleanly instead of unwrap()"
+            )]
+            {
+                // TODO: If the new physics is broadly similar, then reuse the old data as a
+                // starting point instead of immediately throwing it out.
+                self.contents =
+                    self.physics.initialize_light(uc.contents.without_elements(), opacity).unwrap();
+            }
 
             match self.physics {
                 LightPhysics::None => {
@@ -541,7 +547,7 @@ impl LightStorage {
                 let mut covered = false;
                 for y in bounds.y_range().into_iter().rev() {
                     let cube = Cube::new(x, y, z);
-                    let index = self.contents.index(cube).unwrap();
+                    let index = self.contents.index(cube).none_is_unreachable();
 
                     let this_cube_evaluated = uc.get_evaluated_by_index(index);
                     self.contents.as_linear_mut()[index] =
@@ -654,7 +660,7 @@ impl LightPhysics {
             .map_err(|_| crate::space::builder::Error::OutOfMemory {})?;
         storage.resize(volume, value);
 
-        Ok(Vol::with_elements(storage_bounds, storage.into_boxed_slice()).unwrap())
+        Ok(Vol::with_elements(storage_bounds, storage.into_boxed_slice()).err_is_unreachable())
     }
 }
 

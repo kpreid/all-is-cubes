@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use std::io::{self, Write as _};
 
+use descriptive_unwrap::ResultExt as _;
 use serde::de::Error as _;
 
 /// A slice of `T` which, when serialized, will be compressed in the gzip format.
@@ -34,15 +35,15 @@ impl<T: bytemuck::NoUninit> serde::Serialize for GzSerde<'_, T> {
                 base64::write::EncoderStringWriter::new(&BASE64_ENGINE),
                 compression,
             );
-            gz_encoder.write_all(uncompressed_bytes).unwrap();
-            let b64_encoder = gz_encoder.finish().unwrap();
+            gz_encoder.write_all(uncompressed_bytes).err_is_unreachable();
+            let b64_encoder = gz_encoder.finish().err_is_unreachable();
             let b64string = b64_encoder.into_inner();
 
             GzSerdeInternal::Base64Gzip(Cow::Borrowed(b64string.as_str())).serialize(serializer)
         } else {
             let mut gz_encoder = flate2::GzBuilder::new().write(Vec::<u8>::new(), compression);
-            gz_encoder.write_all(uncompressed_bytes).unwrap();
-            let compressed_bytes = gz_encoder.finish().unwrap();
+            gz_encoder.write_all(uncompressed_bytes).err_is_unreachable();
+            let compressed_bytes = gz_encoder.finish().err_is_unreachable();
 
             GzSerdeInternal::Gzip(Cow::Borrowed(compressed_bytes.as_slice())).serialize(serializer)
         }

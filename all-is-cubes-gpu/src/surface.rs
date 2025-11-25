@@ -2,6 +2,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use core::cmp::Reverse;
 
+use descriptive_unwrap::OptionExt as _;
 use wgpu::TextureViewDescriptor;
 
 use all_is_cubes::character::Cursor;
@@ -288,10 +289,9 @@ fn choose_surface_format_and_color_space(
     let surface_color_spaces = capabilities.color_spaces(best_format);
 
     let chosen_color_space: wgpu::SurfaceColorSpace = if let Some(hdr_color_space) =
-        PREFERRED_HDR_COLOR_SPACES
-            .into_iter()
-            .find(|space| surface_color_spaces.contains(space.to_color_spaces().unwrap()))
-    {
+        PREFERRED_HDR_COLOR_SPACES.into_iter().find(|space| {
+            surface_color_spaces.contains(space.to_color_spaces().none_is_unreachable())
+        }) {
         hdr_color_space
     } else {
         wgpu::SurfaceColorSpace::Srgb

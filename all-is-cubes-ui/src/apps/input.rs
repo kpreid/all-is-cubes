@@ -2,6 +2,8 @@ use alloc::vec::Vec;
 use core::time::Duration;
 use std::collections::{HashMap, HashSet};
 
+use descriptive_unwrap::OptionExt as _;
+
 use all_is_cubes::character::{self, Character};
 use all_is_cubes::euclid::{Point2D, Vector2D};
 use all_is_cubes::inv;
@@ -423,7 +425,7 @@ impl InputProcessor {
                     }
                 }
                 Key::Character(numeral) if numeral.is_ascii_digit() => {
-                    let digit = numeral.to_digit(10).unwrap() as inv::Ix;
+                    let digit = numeral.to_digit(10).none_is_unreachable() as inv::Ix;
                     let slot = (digit + 9).rem_euclid(10); // wrap 0 to 9
                     if let (Some(universe), Some(character_handle)) = (&mut universe, character_opt)
                     {

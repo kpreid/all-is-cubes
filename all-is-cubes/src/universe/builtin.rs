@@ -3,6 +3,7 @@ use alloc::string::String;
 use core::fmt;
 
 use bevy_platform::sync::LazyLock;
+use descriptive_unwrap::ResultExt as _;
 
 use crate::block::{self, BlockDef};
 use crate::math::{ps32, zo32};
@@ -129,7 +130,7 @@ impl Builtin {
         <&Handle<T>>::try_from(self.erased_handle())
             .unwrap_or_else(|error| panic!("type mismatch in Builtin::handle(): {error}"))
             .read(ReadTicket::stub())
-            .unwrap()
+            .err_is_unreachable()
     }
 }
 

@@ -4,10 +4,12 @@
 //! for testing changes to the underlying data structures being built.
 
 #![allow(missing_docs)]
+#![expect(clippy::unwrap_used, reason = "test")]
 
 use std::hint::black_box;
 use std::time::Duration;
 
+use descriptive_unwrap::ResultExt as _;
 use rand::SeedableRng as _;
 use strum::IntoEnumIterator as _;
 
@@ -57,7 +59,9 @@ fn component_benches(c: &mut criterion::Criterion) {
     c.bench_function("install_demo_blocks", |b| {
         b.to_async(Executor).iter_with_large_drop(|| async {
             let mut txn = UniverseTransaction::default();
-            () = content::install_demo_blocks(&mut txn, YieldProgress::noop()).await.unwrap();
+            () = content::install_demo_blocks(&mut txn, YieldProgress::noop())
+                .await
+                .err_is_unreachable();
             txn
         });
     });

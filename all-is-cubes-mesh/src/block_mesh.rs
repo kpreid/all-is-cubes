@@ -521,8 +521,9 @@ impl<M: MeshTypes> SubMesh<M> {
     #[cfg(debug_assertions)]
     fn consistency_check(&self, is_oom: bool) {
         use all_is_cubes::math::u32size;
+        use descriptive_unwrap::ResultExt as _;
 
-        let vertex_count = u32::try_from(self.vertices.0.len()).unwrap();
+        let vertex_count = u32::try_from(self.vertices.0.len()).err_is_unreachable();
 
         // Vertex struct-of-arrays should have matching lengths.
         assert_eq!(self.vertices.1.len(), u32size(vertex_count));

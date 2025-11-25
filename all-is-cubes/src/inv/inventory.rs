@@ -8,6 +8,8 @@ use alloc::{vec, vec::Vec};
 use core::fmt;
 use core::num::NonZeroU16;
 
+use descriptive_unwrap::ResultExt as _;
+
 use crate::block::Block;
 use crate::character::{Character, CharacterTransaction, Cursor};
 use crate::inv::{Icons, Ix, Tool, ToolError, ToolInput};
@@ -143,7 +145,7 @@ impl Inventory {
                                 ),
                             )
                             .merge(InventoryTransaction::insert([new_tool]))
-                            .unwrap(),
+                            .err_is_unreachable(),
                         )
                     }
                 };

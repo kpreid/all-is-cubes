@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
 
+use descriptive_unwrap::ResultExt as _;
 use manyfmt::Fmt;
 /// Acts as polyfill for float methods
 #[cfg(not(any(feature = "std", test)))]
@@ -355,7 +356,7 @@ impl<D: RtBlockData> SpaceRaytracer<D> {
 
         // Apply weight
         let [r, g, b, final_weight] = final_mix;
-        Rgb::try_from(Vector3D::from([r, g, b]) / final_weight.max(0.1)).unwrap()
+        Rgb::try_from(Vector3D::new(r, g, b) / final_weight.max(0.1)).err_is_unreachable()
     }
 }
 

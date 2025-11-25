@@ -15,6 +15,7 @@
 
 // Crate-specific lint settings. (General settings can be found in the workspace manifest.)
 #![forbid(unsafe_code)]
+#![expect(clippy::unwrap_used, reason = "development tooling")]
 
 use std::collections::BTreeSet;
 use std::fs;

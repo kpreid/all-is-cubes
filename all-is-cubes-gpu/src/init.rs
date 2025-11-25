@@ -9,6 +9,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use std::io::Write as _;
 
+use descriptive_unwrap::ResultExt as _;
+
 use all_is_cubes::euclid::Size3D;
 use all_is_cubes::math;
 use all_is_cubes_render::{Flaws, Rendering, camera};
@@ -350,7 +352,7 @@ impl TextureCopyParameters {
         // by copying it one row at a time.
         let mut texel_vector: Vec<C> = Vec::with_capacity(element_count);
         {
-            let mapped: &[u8] = &buffer.get_mapped_range().unwrap();
+            let mapped: &[u8] = &buffer.get_mapped_range().err_is_unreachable();
             for row in 0..self.row_count() {
                 let byte_start_of_row = math::u32size(self.padded_bytes_per_row()) * row;
                 // TODO: this cast_slice() could fail if `C`’s alignment is higher than the buffer.

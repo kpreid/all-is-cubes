@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use descriptive_unwrap::OptionExt as _;
+
 use all_is_cubes::block::{Block, EvaluatedBlock};
 use all_is_cubes::character::Spawn;
 use all_is_cubes::content::free_editing_starter_inventory;
@@ -43,7 +45,7 @@ pub(crate) fn to_space(
     let bounds =
         GridAab::from_lower_size([0, 0, 0], vec3(model.size.x, model.size.y, model.size.z))
             .transform(transform)
-            .unwrap(); // overflow should be impossible
+            .none_is_unreachable(); // overflow should be impossible
 
     let mut space = Space::builder(bounds)
         .physics(if import_as_block {
@@ -114,8 +116,8 @@ pub(crate) fn from_space(
 
     let mut voxels: Vec<dot_vox::Voxel> = Vec::new();
     for cube in bounds.interior_iter() {
-        if let Some(i) =
-            block_index_to_palette_index[usize::from(space.get_block_index(cube).unwrap())]
+        if let Some(i) = block_index_to_palette_index
+            [usize::from(space.get_block_index(cube).none_is_unreachable())]
         {
             voxels.push(voxel_out(transform, cube, i));
         } else {

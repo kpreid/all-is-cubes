@@ -24,6 +24,7 @@ use {
     alloc::{vec, vec::Vec},
     core::iter,
     core::mem,
+    descriptive_unwrap::OptionExt as _,
     itertools::Itertools as _,
 };
 
@@ -381,7 +382,7 @@ impl Viz {
 #[cfg(feature = "rerun")]
 impl Inner {
     fn layer_box(&self, face: Face, layer: GridCoordinate) -> GridAab {
-        self.analysis.occupied_plane_box(face, layer).unwrap()
+        self.analysis.occupied_plane_box(face, layer).none_is_unreachable()
     }
 
     /// Logs the current contents of the [`Analysis`], replacing any prior data.

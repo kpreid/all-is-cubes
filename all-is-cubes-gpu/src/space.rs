@@ -10,6 +10,7 @@ use core::mem;
 use core::time::Duration;
 use std::sync::{Mutex, PoisonError};
 
+use descriptive_unwrap::ResultExt as _;
 use hashbrown::HashSet;
 
 use all_is_cubes::chunking::ChunkPos;
@@ -367,7 +368,7 @@ impl SpaceRenderer {
                 deadline, // TODO: decrease deadline by some guess at texture writing time
                 |u| {
                     #[expect(clippy::shadow_unrelated)]
-                    let bwp = &mut *bwp_mutex.lock().unwrap();
+                    let bwp = &mut *bwp_mutex.lock().err_is_unreachable();
                     if let Some(index_range) = u.indices_only {
                         if let Some(index_buf) =
                             u.render_data.as_ref().and_then(|b| b.index_buf.get())

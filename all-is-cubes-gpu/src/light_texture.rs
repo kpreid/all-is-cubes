@@ -2,6 +2,7 @@ use alloc::format;
 use alloc::vec::Vec;
 use core::array;
 
+use descriptive_unwrap::OptionExt as _;
 #[cfg(feature = "auto-threads")]
 use rayon::{
     iter::{IndexedParallelIterator as _, IntoParallelIterator as _, ParallelIterator as _},
@@ -256,6 +257,8 @@ impl LightTexture {
         space: &space::Read<'_>,
         region: GridAab,
     ) -> usize {
+        #![expect(clippy::unwrap_used, reason = "TODO")]
+
         let Some(region) = region.intersection_cubes(space.bounds().expand(FaceMap::splat(1)))
         else {
             return 0;
@@ -346,7 +349,7 @@ impl LightTexture {
             });
         });
 
-        region.volume().unwrap()
+        region.volume().none_is_unreachable()
     }
 
     /// Primitive operation to copy a contiguous volume of light data to a contiguous volume
@@ -359,7 +362,7 @@ impl LightTexture {
         region: GridAab,
         buffer: &mut Vec<Texel>,
     ) -> usize {
-        let volume = region.volume().unwrap();
+        let volume = region.volume().none_is_unreachable();
 
         buffer.clear();
         cfg_select! {

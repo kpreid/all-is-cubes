@@ -16,6 +16,9 @@ use crate::OutOfMemory;
 use crate::TransparencyFormat;
 use crate::block_mesh::viz::Viz;
 
+#[cfg(feature = "rerun")]
+use descriptive_unwrap::ResultExt as _;
+
 #[cfg(doc)]
 use crate::BlockMesh;
 
@@ -287,7 +290,7 @@ impl Analysis {
     #[cfg(feature = "rerun")]
     #[doc(hidden)] // not yet clear whether we want to expose the layer coordinate system
     pub fn occupied_plane_box(&self, face: Face, layer: GridCoordinate) -> Option<GridAab> {
-        let pbox = self.occupied_planes[face][usize::try_from(layer).unwrap()];
+        let pbox = self.occupied_planes[face][usize::try_from(layer).err_is_unreachable()];
         if pbox.0.is_empty() {
             return None;
         }

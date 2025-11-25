@@ -3,6 +3,8 @@ use alloc::vec;
 use core::fmt;
 use std::sync::Mutex;
 
+use descriptive_unwrap::ResultExt as _;
+
 use all_is_cubes::inv::Icons;
 use all_is_cubes::linking::BlockProvider;
 use all_is_cubes::listen;
@@ -152,9 +154,10 @@ impl HudBlocks {
     ) -> Self {
         let [p12, p3] = p.split(0.667);
         let [p1, p2] = p12.split(0.5);
-        let widget_theme = widgets::WidgetTheme::new(read_ticket, txn, p1).await.unwrap();
-        let ui_blocks = UiBlocks::new(txn, p2).await.install(read_ticket, txn).unwrap();
-        let icons = Icons::new(txn, p3).await.install(read_ticket, txn).unwrap();
+        let widget_theme =
+            widgets::WidgetTheme::new(read_ticket, txn, p1).await.err_is_unreachable();
+        let ui_blocks = UiBlocks::new(txn, p2).await.install(read_ticket, txn).err_is_unreachable();
+        let icons = Icons::new(txn, p3).await.install(read_ticket, txn).err_is_unreachable();
         Self {
             widget_theme,
             ui_blocks,

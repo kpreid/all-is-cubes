@@ -3,6 +3,7 @@ use core::sync::atomic;
 use core::sync::atomic::Ordering::{Acquire, Relaxed};
 
 use bevy_ecs::prelude as ecs;
+use descriptive_unwrap::OptionExt as _;
 
 #[cfg(doc)]
 use crate::universe::{Handle, Universe};
@@ -55,7 +56,9 @@ impl OnceUniverseId {
     pub fn set(&self, new_id: UniverseId) -> Result<(), UniverseId> {
         match self.0.compare_exchange(0, to_atomic_value(new_id.0), Acquire, Relaxed) {
             Ok(_) => Ok(()),
-            Err(existing) => Err(UniverseId(from_atomic_value(existing).unwrap())),
+            Err(existing) => Err(UniverseId(
+                from_atomic_value(existing).none_is_unreachable(),
+            )),
         }
     }
 

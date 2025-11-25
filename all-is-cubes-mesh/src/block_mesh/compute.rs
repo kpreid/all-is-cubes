@@ -2,6 +2,7 @@
 
 use alloc::vec::Vec;
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use itertools::Itertools as _;
 
 use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Resolution};
@@ -65,7 +66,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             // TODO: It would be more direct for `EvaluatedBlock` to provide us this value since
             // it is trivial to compute there, but is it worth storing that value always?
             let voxels_surface_area =
-                block.voxels().bounds().abut(face, 1).unwrap().volume().unwrap() as f32;
+                block.voxels().bounds().abut(face, 1).err_is_unreachable().volume_f64() as f32;
             let full_surface_area = GridSizeCoord::from(resolution).pow(2) as f32;
             let partial_face_color =
                 full_face_color.to_rgb().with_alpha(ZeroOne::<f32>::new_clamped(
@@ -294,7 +295,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                         layer..layer + 1,
                     ])
                     .transform(face.face_transform(resolution_g))
-                    .unwrap();
+                    .none_is_unreachable();
 
                     Some(texture.slice(slice_range))
                 } else {

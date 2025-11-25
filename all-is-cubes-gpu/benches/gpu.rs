@@ -1,4 +1,6 @@
-#![allow(missing_docs)]
+//! Benchmarks for [`all_is_cubes_gpu`] code that uses the GPU.
+
+#![expect(clippy::unwrap_used, reason = "test")]
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 use core::fmt;
 use core::time::Duration;
 
+use descriptive_unwrap::ResultExt as _;
 use strum::EnumCount;
 
 use all_is_cubes::util::{Refmt as _, StatusText};
@@ -145,7 +146,9 @@ impl Queries {
                     Ok(()) => {
                         let mut data = [0u64; Query::COUNT];
                         bytemuck::bytes_of_mut(&mut data).copy_from_slice(
-                            &read_buffer.get_mapped_range(0..QUERY_BUFFER_SIZE).unwrap(),
+                            &read_buffer
+                                .get_mapped_range(0..QUERY_BUFFER_SIZE)
+                                .err_is_unreachable(),
                         );
                         read_buffer.unmap();
 

@@ -13,6 +13,7 @@ use core::time::Duration;
 
 use bevy_ecs::{prelude as ecs, schedule::IntoScheduleConfigs as _, system::IntoSystem as _};
 use bevy_platform::time::Instant;
+use descriptive_unwrap::OptionExt as _;
 use hashbrown::{HashMap as HbHashMap, HashSet as HbHashSet};
 
 use crate::behavior;
@@ -312,7 +313,7 @@ pub(crate) fn execute_tick_actions_system(
                         // hqve the proper fine-grained conflict detector.
                         {
                             let (other_cube, other_txn) =
-                                first_pass_conflicts.iter().next().unwrap();
+                                first_pass_conflicts.iter().next().none_is_unreachable();
                             other_txn.bounds().unwrap_or_else(|| other_cube.grid_aab())
                         },
                     )),

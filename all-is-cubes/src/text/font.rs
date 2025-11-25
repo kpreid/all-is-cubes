@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
+use descriptive_unwrap::OptionExt as _;
 use euclid::{Box2D, Length, Point2D, Size2D, Translation2D, point2, size2, vec2};
 use itertools::iproduct;
 
@@ -401,7 +402,9 @@ impl Glyphs {
                     .filter(|&position_in_glyph| {
                         let input_position =
                             input_glyph_pixel_offset.transform_point(position_in_glyph.to_u32());
-                        rgba_to_bit(image.get_pixel(input_position.cast_unit()).unwrap())
+                        rgba_to_bit(
+                            image.get_pixel(input_position.cast_unit()).none_is_unreachable(),
+                        )
                     })
             };
 

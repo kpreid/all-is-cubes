@@ -430,7 +430,9 @@ where
     S: num_traits::NumCast,
 {
     let rot = [rot.i, rot.j, rot.k, rot.r];
-    datatypes::Quaternion(rot.map(|c| c.to_f32().unwrap()))
+    datatypes::Quaternion(
+        rot.map(|c| c.to_f32().expect("quaternion components must be convertible to f32")),
+    )
 }
 
 pub fn convert_transform<S, Src, Dst>(

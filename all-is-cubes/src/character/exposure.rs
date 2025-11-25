@@ -84,7 +84,10 @@ impl State {
             };
             let vt = vt.to_transform();
             let sqrtedge = (self.luminance_samples.len() as FreeCoordinate).sqrt();
-            let ray_origin = vt.transform_point3d(Point3D::origin()).unwrap();
+            let Some(ray_origin) = vt.transform_point3d(Point3D::origin()) else {
+                // TODO: set an error flag?
+                return;
+            };
             'rays: for _ray in 0..10 {
                 // TODO: better idea for what ray count should be
                 let index =

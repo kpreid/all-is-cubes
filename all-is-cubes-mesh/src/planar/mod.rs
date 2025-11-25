@@ -484,7 +484,7 @@ impl Triangulator {
                                 .nth_back(1)
                                 .expect("preceding vertex in new frontier missing"),
                             &input_vertex,
-                            self.old_frontier.front().unwrap(),
+                            self.old_frontier.front().expect("next vertex in old frontier missing"),
                         ],
                     )?;
                 }

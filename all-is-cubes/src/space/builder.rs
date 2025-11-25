@@ -144,7 +144,7 @@ impl<'universe> Builder<'universe, ()> {
     pub fn bounds(self, bounds: GridAab) -> Builder<'universe, Vol<()>> {
         Builder {
             read_ticket: self.read_ticket,
-            bounds: bounds.to_vol().unwrap(),
+            bounds: bounds.to_vol().expect("bounds must fit in memory"),
             spawn: self.spawn,
             physics: self.physics,
             behaviors: self.behaviors,
@@ -270,7 +270,12 @@ impl Builder<'_, Vol<()>> {
     // TODO: Consider offering only a `Result`-returning `build()` instead of this.
     #[track_caller]
     pub fn build(self) -> Space {
-        Space::new_from_builder(self).unwrap()
+        Space::new_from_builder(self).unwrap_or_else(|e| {
+            panic!(
+                "Space::build() failed: {e}",
+                e = crate::util::ErrorChain(&e)
+            )
+        })
     }
 
     /// Construct a [`Space`] with the contents and settings from this builder.
@@ -361,6 +366,7 @@ mod sealed {
 impl<'a> arbitrary::Arbitrary<'a> for Space {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         use crate::content::make_some_blocks;
+        use descriptive_unwrap::ResultExt as _;
 
         // TODO: Should be reusing Vol as Arbitrary for this.
 
@@ -392,7 +398,7 @@ impl<'a> arbitrary::Arbitrary<'a> for Space {
                     }
                 })
             })
-            .unwrap();
+            .err_is_unreachable();
 
         if let Some(e) = failure {
             return Err(e);

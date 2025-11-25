@@ -2,6 +2,8 @@
 
 use alloc::vec::Vec;
 
+use descriptive_unwrap::OptionExt as _;
+
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D, point2, vec3};
 use all_is_cubes::math::{
@@ -39,7 +41,7 @@ pub(crate) fn push_box<M: MeshTypes>(
     let fully_opaque = opacity_category == OpacityCategory::Opaque;
     for face in Face::ALL {
         let volume_to_planar = face.face_transform(GridCoordinate::from(resolution)).inverse();
-        let aab_in_face_coordinates = aab.transform(volume_to_planar).unwrap();
+        let aab_in_face_coordinates = aab.transform(volume_to_planar).none_is_unreachable();
 
         let lower_bounds = aab_in_face_coordinates.lower_bounds().xy();
         let upper_bounds = aab_in_face_coordinates.upper_bounds().xy();
@@ -342,14 +344,14 @@ impl QuadTransform {
     fn transform_position(&self, voxel_grid_point: Position) -> Position {
         self.position_transform
             .transform_point3d(voxel_grid_point)
-            .unwrap(/* would only fail in case of perspective projection */)
+            .none_is_unreachable() // // would only fail in case of perspective projection
     }
 
     /// Transform a point from quad U-V-depth coordinates with a scale of
     /// 1 unit = 1 texel/voxel, to 0-to-1 coordinates within the 3D `texture::Tile` space.
     #[inline]
     fn transform_texture_point(&self, point: TilePoint) -> TilePoint {
-        self.texture_transform.transform_point3d(point).unwrap()
+        self.texture_transform.transform_point3d(point).none_is_unreachable()
     }
 }
 

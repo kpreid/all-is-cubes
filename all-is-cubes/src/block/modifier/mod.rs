@@ -1,7 +1,8 @@
-use core::fmt;
-
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::fmt;
+
+use descriptive_unwrap::OptionExt as _;
 
 use crate::block::{self, BlRotate, Block, Evoxels, MinEval};
 use crate::inv;
@@ -326,7 +327,7 @@ fn evaluate_rotate(
                     Evoxels::from_paletted(resolution, palette, {
                         let indices = paletted.indices();
                         Vol::from_fn(
-                            indices.bounds().transform(inner_to_outer).unwrap(),
+                            indices.bounds().transform(inner_to_outer).none_is_unreachable(),
                             // We can use wrapping_transform_cube() here because the inputs
                             // are known to be within the block coordinate range.
                             |cube| indices[outer_to_inner.wrapping_transform_cube(cube)],

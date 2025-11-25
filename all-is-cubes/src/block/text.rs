@@ -204,7 +204,10 @@ impl Text {
         let dst_to_src_transform = transform.inverse();
         let block_rotation = transform.rotation;
         Ok(SpaceTransaction::filling(
-            measurement.rendering_bounding_blocks().transform(transform).unwrap(),
+            measurement
+                .rendering_bounding_blocks()
+                .transform(transform)
+                .expect("coordinate overflow"),
             |cube| {
                 space::CubeTransaction::replacing(
                     None,

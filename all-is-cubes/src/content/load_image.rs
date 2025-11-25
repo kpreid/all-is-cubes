@@ -4,6 +4,11 @@
 //! This has the disadvantage of requiring a decoder, but makes up for it in the
 //! compactness of individual images.
 
+#![expect(
+    clippy::unwrap_used,
+    reason = "TODO: better, unified handling of coordinate overflows"
+)]
+
 use alloc::vec::Vec;
 use core::fmt;
 

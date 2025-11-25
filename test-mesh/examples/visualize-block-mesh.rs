@@ -3,6 +3,8 @@
 //! Note: This is *not* a code sample to be imitated, as it uses unstable/pseudo-private APIs.
 //! It is listed as an “example” because it is a program that only makes sense to run manually.
 
+#![expect(clippy::unwrap_used)]
+
 use std::thread;
 
 use pollster::block_on;

@@ -9,10 +9,11 @@ use core::fmt;
 use core::mem;
 use core::task::Waker;
 use core::time::Duration;
-use manyfmt::Refmt as _;
 
 use bevy_ecs::prelude as ecs;
 use bevy_platform::{sync::Mutex, time::Instant};
+use descriptive_unwrap::OptionExt as _;
+use manyfmt::Refmt as _;
 
 use crate::time::Tick;
 use crate::transaction::{self, Merge as _, Transaction};
@@ -167,7 +168,8 @@ impl<H: Host> BehaviorSet<H> {
              }| QueryItem {
                 attachment,
                 #[allow(clippy::missing_panics_doc)]
-                behavior: <dyn Any>::downcast_ref::<T>(behavior).unwrap(),
+                behavior: <dyn Any>::downcast_ref::<T>(behavior)
+                    .expect("query filter should only return results of the correct type"),
             },
         )
     }
@@ -236,7 +238,8 @@ impl<H: Host> BehaviorSet<H> {
                 read_ticket,
                 host,
                 attachment: &entry.attachment,
-                waker: entry.waker.as_ref().unwrap(),
+                // waker is non-None because it is set upon insertion into the behavior set
+                waker: entry.waker.as_ref().none_is_unreachable(),
                 host_transaction_binder,
                 self_transaction_binder: &|new_behavior| {
                     host_transaction_binder(set_transaction_binder(

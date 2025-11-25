@@ -2,6 +2,7 @@ use core::cmp::Ordering;
 use core::iter::FusedIterator;
 use core::range::Range;
 
+use descriptive_unwrap::ResultExt as _;
 use euclid::point2;
 
 use crate::math::{Cube, GridAab, GridCoordinate, GridPoint, range_len};
@@ -115,7 +116,7 @@ impl Iterator for GridIter {
                 let rows_remaining = planes_remaining * range_len(self.y_range)
                     + usize::try_from((self.y_range.end - self.cube.y) - 1).unwrap_or(0);
                 let cubes_remaining = rows_remaining * range_len(self.z_range)
-                    + usize::try_from(self.z_range.end - self.cube.z).unwrap();
+                    + usize::try_from(self.z_range.end - self.cube.z).err_is_unreachable();
 
                 (cubes_remaining, Some(cubes_remaining))
             }

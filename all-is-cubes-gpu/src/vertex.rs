@@ -1,5 +1,7 @@
 use core::fmt::{self, Write as _};
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
+
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Box3D, Point3D, Vector3D};
 use all_is_cubes::math::{Cube, Face, GridVector, Rgba};
@@ -173,14 +175,14 @@ impl BPosition {
         Face::from_discriminant(
             ((self.position_in_cube_and_normal_and_resolution_packed >> 24) & 0xF) as u8,
         )
-        .unwrap()
+        .none_is_unreachable()
     }
 
     fn resolution(self) -> Resolution {
         Resolution::try_from(
             1 << ((self.position_in_cube_and_normal_and_resolution_packed >> 28) & 0xF),
         )
-        .unwrap()
+        .err_is_unreachable()
     }
 }
 

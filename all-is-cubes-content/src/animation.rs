@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::fmt;
 
+use descriptive_unwrap::ResultExt as _;
 use rand::{RngExt as _, SeedableRng as _};
 use rand_xoshiro::Xoshiro256Plus;
 
@@ -59,7 +60,10 @@ impl<F: Fn(Cube, u64) -> Block + Clone + Send + Sync + 'static> behavior::Behavi
             mut_self.frame = mut_self.frame.wrapping_add(1);
 
             let paint_txn = mut_self.paint(context.attachment.bounds());
-            context.replace_self(mut_self).merge(context.bind_host(paint_txn)).unwrap()
+            context
+                .replace_self(mut_self)
+                .merge(context.bind_host(paint_txn))
+                .err_is_unreachable()
         } else {
             UniverseTransaction::default()
         };

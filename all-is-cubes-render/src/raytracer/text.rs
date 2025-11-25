@@ -101,7 +101,7 @@ impl Accumulate for CharacterBuf {
                     _ => State::Empty,
                 })
             })
-            .unwrap()
+            .expect("number of pixels must be > 0")
     }
 }
 

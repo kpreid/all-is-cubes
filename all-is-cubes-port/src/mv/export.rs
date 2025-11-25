@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use descriptive_unwrap::OptionExt as _;
 use itertools::{Itertools as _, izip};
 
 use all_is_cubes::block::Resolution;
@@ -121,7 +122,10 @@ async fn export_space_as_scene(
         p.set_label(format!("Exporting block model {block_index}"));
         p.progress(0.0).await;
 
-        block_index_to_model_index.insert(block_index, u32::try_from(models_out.len()).unwrap());
+        block_index_to_model_index.insert(
+            block_index,
+            u32::try_from(models_out.len()).expect("overflow in vox model count?!"),
+        );
         models_out.push(mv::model::from_block(
             space_handle.name(), // TODO: use block's Indirect handle name if it has one.
             block_data.evaluated(),
@@ -138,9 +142,10 @@ async fn export_space_as_scene(
     });
 
     for cube in space.bounds().interior_iter() {
-        let block_index = space.get_block_index(cube).unwrap();
+        let block_index = space.get_block_index(cube).none_is_unreachable();
         if let Some(&model_id) = block_index_to_model_index.get(&block_index) {
-            let index_of_transform_node = u32::try_from(scene_out.len()).unwrap();
+            let index_of_transform_node =
+                u32::try_from(scene_out.len()).expect("overflow in scene count?!");
 
             let translation = cube.lower_bounds() * i32::from(resolution);
 

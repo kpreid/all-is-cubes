@@ -67,6 +67,7 @@ auto-threads = [
 # Non-optional generally required dependencies
 # need all-is-cubes/std because we have boxed Send futures and errors
 all-is-cubes = { workspace = true, features = ["std"] }
+descriptive-unwrap = { workspace = true }
 displaydoc = { workspace = true }
 futures-channel = { workspace = true }
 futures-core = { workspace = true }

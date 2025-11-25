@@ -3,6 +3,8 @@ use core::fmt;
 use core::iter;
 use core::ops;
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
+
 use euclid::Vector3D;
 use itertools::{AllEqualValueError, Itertools as _, iproduct};
 
@@ -120,7 +122,8 @@ pub(in crate::block::eval) fn compute_derived(voxels: &Evoxels) -> Derived {
         // (This is a similar structure to the algorithm we use for mesh generation.)
         for face in Face::ALL {
             let transform = face.face_transform(resolution.into());
-            let rotated_voxel_range = data_bounds.transform(transform.inverse()).unwrap();
+            let rotated_voxel_range =
+                data_bounds.transform(transform.inverse()).none_is_unreachable();
 
             let face_sum: VoxSum =
                 iproduct!(rotated_voxel_range.y_range(), rotated_voxel_range.x_range())
@@ -198,7 +201,7 @@ pub(in crate::block::eval) fn compute_derived(voxels: &Evoxels) -> Derived {
             // TODO: This test should be refined by flood-filling in from the face,
             // so that we can also consider a face opaque if it has hollows/engravings.
             // Merge this with the raytracer above.
-            let surface_volume = full_block_bounds.abut(face, -1).unwrap();
+            let surface_volume = full_block_bounds.abut(face, -1).err_is_unreachable();
             if surface_volume.intersection_cubes(voxels.bounds()) == Some(surface_volume) {
                 surface_volume.interior_iter().all(
                     #[inline(always)]

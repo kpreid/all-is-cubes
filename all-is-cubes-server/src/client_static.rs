@@ -43,6 +43,7 @@ mod embedded {
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
+    use descriptive_unwrap::{OptionExt as _, ResultExt as _};
     use include_dir::DirEntry;
     use tokio::io::{AsyncRead, AsyncSeek};
     use tower_http::services::fs;
@@ -55,7 +56,10 @@ mod embedded {
         if path == "./" {
             Some(&CLIENT_STATIC)
         } else {
-            CLIENT_STATIC.as_dir().unwrap().get_entry(path.strip_prefix("./").unwrap())
+            CLIENT_STATIC
+                .as_dir()
+                .none_is_unreachable()
+                .get_entry(path.strip_prefix("./").err_is_unreachable())
         }
     }
 

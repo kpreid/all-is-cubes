@@ -37,7 +37,9 @@ pub(crate) struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
-            samples: vec![SpatialAmbient::SILENT; STORED_SAMPLE_COUNT].try_into().unwrap(),
+            samples: vec![SpatialAmbient::SILENT; STORED_SAMPLE_COUNT]
+                .try_into()
+                .expect("static array length should match"),
             last_sample_index: 0,
             rng: rand_xoshiro::Xoroshiro128Plus::seed_from_u64(0),
             output: SpatialAmbient::SILENT,
@@ -61,7 +63,10 @@ impl State {
         type HeadVector = Vector3D<f64, camera::Eye>;
 
         let vt: euclid::Transform3D<f64, camera::Eye, Cube> = vt.to_transform();
-        let ray_origin = vt.transform_point3d(Point3D::origin()).unwrap();
+        let Some(ray_origin) = vt.transform_point3d(Point3D::origin()) else {
+            // TODO: set an error flag?
+            return;
+        };
 
         for _ray in 0..SAMPLES_PER_FRAME_COUNT {
             let index = (self.last_sample_index + 1).rem_euclid(self.samples.len());

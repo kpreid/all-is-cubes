@@ -15,6 +15,7 @@
     clippy::shadow_unrelated,
     reason = "https://github.com/rust-lang/rust-clippy/issues/11827"
 )]
+#![expect(clippy::unwrap_used, reason = "TODO")]
 #![cfg_attr(
     not(test),
     warn(clippy::std_instead_of_core, clippy::std_instead_of_alloc)

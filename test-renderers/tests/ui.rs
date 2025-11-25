@@ -1,6 +1,8 @@
 //! Tests of the visual appearance of [`all_is_cubes_ui`] widgets and pages,
 //! as well as some of the behavior of [`Session`].
 
+#![expect(clippy::unwrap_used, reason = "test")]
+
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 

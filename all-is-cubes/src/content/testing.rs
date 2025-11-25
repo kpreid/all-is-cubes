@@ -1,3 +1,4 @@
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use euclid::vec2;
 use num_traits::Euclid as _;
 use rand::{RngExt as _, SeedableRng as _};
@@ -40,11 +41,13 @@ pub async fn light_bench_space(
         .build_and_mutate(|m| {
             // Ground level
             m.fill_uniform(
-                m.bounds().shrink(FaceMap::default().with(Face::PY, layout.yup())).unwrap(),
+                m.bounds()
+                    .shrink(FaceMap::default().with(Face::PY, layout.yup()))
+                    .none_is_unreachable(),
                 &block::from_color!(0.5, 0.5, 0.5),
             )
         })
-        .unwrap();
+        .err_is_unreachable();
 
     let progress = progress.finish_and_cut(0.25).await;
 
@@ -75,16 +78,16 @@ pub async fn light_bench_space(
             ));
             space.mutate(universe.read_ticket(), |m| match rng.random_range(0..3) {
                 0 => {
-                    m.fill_uniform(section_bounds, &color).unwrap();
+                    m.fill_uniform(section_bounds, &color).err_is_unreachable();
                 }
                 1 => {
                     m.fill_uniform(
                         section_bounds
                             .shrink(FaceMap::default().with(Face::PY, layout.yup()))
-                            .unwrap(),
+                            .none_is_unreachable(),
                         &color,
                     )
-                    .unwrap();
+                    .err_is_unreachable();
                     m.fill_uniform(
                         section_bounds
                             .shrink(FaceMap {
@@ -95,10 +98,10 @@ pub async fn light_bench_space(
                                 py: 0,
                                 pz: 1,
                             })
-                            .unwrap(),
+                            .none_is_unreachable(),
                         &AIR,
                     )
-                    .unwrap();
+                    .err_is_unreachable();
                 }
                 2 => {
                     m.fill(section_bounds, |_| {
@@ -108,7 +111,7 @@ pub async fn light_bench_space(
                             Some(&AIR)
                         }
                     })
-                    .unwrap();
+                    .err_is_unreachable();
                 }
                 _ => unreachable!("rng range"),
             })

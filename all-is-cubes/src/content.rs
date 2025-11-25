@@ -8,6 +8,8 @@ use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
+
 use crate::arcstr::{ArcStr, literal};
 use crate::block::{self, Block, Resolution, Resolution::R16, RotationPlacementRule};
 use crate::inv::{Slot, Tool};
@@ -74,7 +76,9 @@ fn make_one_block(i: usize, n: usize) -> Block {
 ///
 /// [`Primitive::Recur`]: crate::block::Primitive::Recur
 pub fn make_some_voxel_blocks<const COUNT: usize>(universe: &mut Universe) -> [Block; COUNT] {
-    universe.transact(|txn, _| Ok(make_some_voxel_blocks_txn(txn))).unwrap()
+    universe
+        .transact(|txn, _| Ok(make_some_voxel_blocks_txn(txn)))
+        .err_is_unreachable()
 }
 
 #[doc(hidden)] // TODO: make this replace the other version once we've confirmed that `&mut SomeTransaction` is the direction we want to go for composing worldgen transactions
@@ -96,7 +100,7 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
     let block_space = Space::for_block(resolution)
         .filled_with(Block::from(color))
         .build_and_mutate(axes)
-        .unwrap();
+        .err_is_unreachable();
 
     let base_block = Block::builder()
         .display_name(label.clone())
@@ -126,7 +130,7 @@ fn make_one_voxel_block(transaction: &mut UniverseTransaction, i: usize, n: usiz
                             // nudge upward a bit for balance
                             .with(Face::NY, 1),
                     )
-                    .unwrap(),
+                    .none_is_unreachable(),
             )
             .build(),
         offset: GridVector::zero(),
@@ -165,7 +169,7 @@ pub fn make_slab(
 ) -> Block {
     universe
         .transact(|txn, _| Ok(make_slab_txn(txn, numerator, denominator)))
-        .unwrap()
+        .err_is_unreachable()
 }
 
 #[doc(hidden)] // exported for all-is-cubes-content usage, not reexport
@@ -185,7 +189,7 @@ pub fn make_slab_txn(
         [0, 0, 0],
         GridSize::new(
             denominator.into(),
-            numerator.try_into().unwrap(), // can't fail due to earlier check
+            numerator.try_into().err_is_unreachable(), // can't fail due to earlier check
             denominator.into(),
         ),
     );
@@ -197,7 +201,7 @@ pub fn make_slab_txn(
                 Some(&voxel_palette[(cube.x + cube.y + cube.z).rem_euclid(2) as usize])
             })
         })
-        .unwrap();
+        .err_is_unreachable();
 
     Block::builder()
         .display_name(format!("Slab {numerator}/{denominator}"))

@@ -36,6 +36,7 @@ embed = []
 anyhow = { workspace = true }
 axum = { version = "0.8.1", features = ["tower-log"] }
 clap = { workspace = true }
+descriptive-unwrap = { workspace = true }
 include_dir = "0.7.2"
 simplelog = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

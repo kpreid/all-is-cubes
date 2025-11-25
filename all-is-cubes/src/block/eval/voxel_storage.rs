@@ -5,6 +5,7 @@ use core::hash::Hash as _;
 use core::iter;
 use core::ptr;
 
+use descriptive_unwrap::OptionExt as _;
 // TODO: use a maybe-std hasher
 use hashbrown::HashMap;
 
@@ -301,7 +302,7 @@ impl Evoxels {
                                 last = {last:?}\n\
                                 doesn’t fit = {voxel:?}",
                             first = palette[0],
-                            last = palette.last().unwrap(),
+                            last = palette.last().none_is_unreachable(),
                         );
                     }
                 }
@@ -629,9 +630,10 @@ impl<'a> arbitrary::Arbitrary<'a> for Evoxels {
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
         use crate::math::GridCoordinate;
+        use descriptive_unwrap::OptionExt as _;
 
-        let max_data_size =
-            GridAab::for_block(Resolution::MAX).volume().unwrap() * Evoxel::size_hint(0).1.unwrap();
+        let max_data_size = GridAab::for_block(Resolution::MAX).volume().none_is_unreachable()
+            * Evoxel::size_hint(0).1.none_is_unreachable();
 
         arbitrary::size_hint::and(
             Resolution::size_hint(depth),

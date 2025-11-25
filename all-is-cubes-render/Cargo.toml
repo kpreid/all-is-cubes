@@ -49,6 +49,7 @@ all-is-cubes = { workspace = true }
 bitflags = { workspace = true }
 derive_more = { workspace = true } # features specified in workspace
 displaydoc = { workspace = true }
+descriptive-unwrap = { workspace = true }
 futures-core = { workspace = true }
 hashbrown = { workspace = true, optional = true }
 imgref = { workspace = true }

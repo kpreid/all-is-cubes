@@ -16,6 +16,7 @@
     clippy::missing_errors_doc,
     reason = "not currently intended to be a well-designed library"
 )]
+#![expect(clippy::unwrap_used, reason = "TODO")]
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(dead_code_pub_in_binary, reason = "FP on test binaries"))]
 

@@ -4,6 +4,7 @@ use std::fmt;
 
 use all_is_cubes::euclid;
 
+use descriptive_unwrap::ResultExt as _;
 use gltf_json::Index;
 use gltf_json::validation::Checked::Valid;
 
@@ -23,8 +24,8 @@ where
     }
     if mins[0].is_finite() {
         [
-            Some(serde_json::to_value(mins.to_vec()).unwrap()),
-            Some(serde_json::to_value(maxes.to_vec()).unwrap()),
+            Some(serde_json::to_value(mins.to_vec()).err_is_unreachable()),
+            Some(serde_json::to_value(maxes.to_vec()).err_is_unreachable()),
         ]
     } else {
         [None, None]

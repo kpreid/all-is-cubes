@@ -6,6 +6,7 @@ use core::marker::PhantomData;
 use core::range::Range;
 
 use bytemuck::Pod;
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 
 use all_is_cubes::euclid::{Box3D, Point3D, Size2D, Size3D};
 use all_is_cubes::math::{GridSize, Rgba, range_len, u32size};
@@ -163,7 +164,7 @@ pub fn write_part_of_slice_to_part_of_buffer(
     let mut staging = bwp.reborrow().write_buffer(
         destination,
         mapping_range.start as u64,
-        wgpu::BufferSize::new(range_len(mapping_range) as u64).unwrap(),
+        wgpu::BufferSize::new(range_len(mapping_range) as u64).none_is_unreachable(),
     );
 
     // Note that we must not overrun the end of `source`, so we can't just use `mapping_range`;
@@ -246,7 +247,7 @@ impl ResizingBuffer {
             for (address, data) in addresses.into_iter().zip(contents) {
                 if let Some(data_size) = wgpu::BufferSize::new(
                     u64::try_from(data.len().next_multiple_of(Self::BUFFER_AND_MAPPING_SIZE_MULT))
-                        .unwrap(),
+                        .err_is_unreachable(),
                 ) {
                     bwp.reborrow()
                         .write_buffer(buffer, address, data_size)
@@ -278,7 +279,7 @@ impl ResizingBuffer {
             if buffer.size() > 0 {
                 // We could do multiple get_mapped_range() but that would not be particularly useful
                 // since there is no sparseness to them.
-                let mut mapped = buffer.get_mapped_range_mut(..).unwrap();
+                let mut mapped = buffer.get_mapped_range_mut(..).err_is_unreachable();
                 for (address, data) in addresses.into_iter().zip(contents) {
                     mapped.slice(address as usize..).slice(..data.len()).copy_from_slice(data);
                 }

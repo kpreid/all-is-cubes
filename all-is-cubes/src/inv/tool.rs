@@ -4,6 +4,8 @@ use alloc::borrow::Cow;
 use alloc::format;
 use alloc::string::{String, ToString};
 
+use descriptive_unwrap::ResultExt as _;
+
 use crate::block::{self, AIR, Block, Primitive, RotationPlacementRule};
 use crate::character::{self, Character, CharacterTransaction, Cursor};
 use crate::fluff::Fluff;
@@ -125,7 +127,6 @@ impl Tool {
                     ))
                 }
             }
-            #[expect(clippy::missing_panics_doc)]
             Self::RemoveBlock { keep } => {
                 let cursor = input.cursor()?;
                 let mut deletion =
@@ -135,7 +136,7 @@ impl Tool {
                         .merge_from(input.produce_items(
                             cursor.hit().block.unspecialize().into_iter().map(Tool::Block),
                         )?)
-                        .unwrap();
+                        .err_is_unreachable();
                 }
                 Ok((Some(self), deletion))
             }
@@ -522,7 +523,7 @@ impl<'ticket> ToolInput<'ticket> {
                     ))
                 })?,
             ))
-            .unwrap();
+            .err_is_unreachable();
         }
         Ok(txn)
     }

@@ -1,6 +1,8 @@
 use alloc::vec::Vec;
 use core::fmt;
 
+use descriptive_unwrap::OptionExt as _;
+
 use all_is_cubes::math::{Cube, GridAab};
 use all_is_cubes::space::BlockIndex;
 
@@ -116,7 +118,7 @@ impl InstanceMap {
                 // Insert new by_block entry.
                 self.by_block.entry(index).or_default().insert(cube);
                 // Remove old by_block entry.
-                self.by_block.get_mut(&old_index).unwrap().remove(&cube);
+                self.by_block.get_mut(&old_index).none_is_unreachable().remove(&cube);
                 // Update by_cube entry.
                 self.by_cube.insert(cube, index);
             }

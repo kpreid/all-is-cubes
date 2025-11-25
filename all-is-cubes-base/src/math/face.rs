@@ -5,6 +5,7 @@ use core::fmt;
 use core::iter;
 use core::ops;
 
+use descriptive_unwrap::OptionExt as _;
 use euclid::Vector3D;
 
 use manyfmt::Refmt as _;
@@ -1120,7 +1121,7 @@ impl<V> FaceMap<V> {
         // it corresponds to, that might also be useful for Vol rotations.)
         let to_source = rotation.inverse();
         let mut source = self.map(|_, value| Some(value));
-        Self::from_fn(|face| source[to_source.transform(face)].take().unwrap())
+        Self::from_fn(|face| source[to_source.transform(face)].take().none_is_unreachable())
     }
 }
 

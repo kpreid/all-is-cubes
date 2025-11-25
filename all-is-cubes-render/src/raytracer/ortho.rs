@@ -3,6 +3,7 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use descriptive_unwrap::OptionExt as _;
 #[cfg(feature = "auto-threads")]
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
@@ -277,7 +278,7 @@ impl OrthoCamera {
         point: Point2D<u32, ImagePixel>,
     ) -> Option<raycast::AaRay> {
         raycast::Ray {
-            origin: self.transform.transform_point3d(point.to_f64().to_3d()).unwrap(),
+            origin: self.transform.transform_point3d(point.to_f64().to_3d()).none_is_unreachable(),
             direction: self.ray_direction,
         }
         .try_into()
@@ -319,7 +320,7 @@ impl raytracer::Accumulate for OrthoBuf {
     fn mean<const N: usize>(bufs: [Self; N]) -> Self {
         Self {
             color: raytracer::ColorBuf::mean(bufs.each_ref().map(|buf| buf.color)),
-            max_resolution: bufs.iter().map(|buf| buf.max_resolution).max().unwrap(),
+            max_resolution: bufs.iter().map(|buf| buf.max_resolution).max().none_is_unreachable(),
         }
     }
 }

@@ -1,6 +1,5 @@
 //! Algorithms for grouping cubes into cubical batches (chunks).
 
-use all_is_cubes_base::math::{GridSize, Octant};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cmp::Ordering;
@@ -9,6 +8,7 @@ use core::iter::FusedIterator;
 use core::ops::RangeTo; // TODO: When possible, change this to core::range::RangeTo
 
 use bevy_platform::sync::Mutex;
+use descriptive_unwrap::ResultExt as _;
 
 use euclid::{Point3D, Vector3D};
 
@@ -27,7 +27,8 @@ use num_traits::float::FloatCore as _;
 )]
 use crate::math::Euclid as _;
 use crate::math::{
-    Cube, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, GridSizeCoord, OctantMask,
+    Cube, FreeCoordinate, FreePoint, GridAab, GridCoordinate, GridPoint, GridSize, GridSizeCoord,
+    Octant, OctantMask,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -347,11 +348,11 @@ impl<const CHUNK_SIZE: GridCoordinate> ChunkChart<CHUNK_SIZE> {
                     } else {
                         &other_octant_chunk_2
                     };
-                    m.set(pos, block).unwrap();
+                    m.set(pos, block).err_is_unreachable();
                 }
                 Ok(())
             })
-            .unwrap()
+            .err_is_unreachable()
     }
 
     /// Returns the total number of chunks in this chart.
@@ -404,12 +405,14 @@ fn compute_chart_octant(view_distance_in_squared_chunks: GridSizeCoord) -> Arc<[
     // coordinates we work with are (conveniently) the coordinates for the _nearest corner_ of
     // each chunk.
 
-    let candidates = GridAab::from_lower_size(
+    let Ok(candidates) = GridAab::from_lower_size(
         [0, 0, 0],
         GridSize::splat(view_distance_in_squared_chunks.saturating_add(1)),
     )
-    .to_vol()
-    .unwrap();
+    .to_vol() else {
+        // TODO: add restrictions on the *requested* size so that this can't happen
+        panic!("requested view distance {view_distance_in_squared_chunks} too large for memory");
+    };
     let mut octant_chunks: Vec<Ccv> = Vec::with_capacity(candidates.volume());
     // (This for loop has been measured as slightly faster than a .filter().collect().)
     for chunk_cube in candidates.iter_cubes() {

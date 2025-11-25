@@ -1,3 +1,4 @@
+use descriptive_unwrap::OptionExt as _;
 use euclid::Point3D;
 
 use crate::block::{
@@ -100,7 +101,7 @@ impl Zoom {
                     Some(intersected_bounds) => {
                         block::Budget::decrement_voxels(
                             &filter.budget,
-                            intersected_bounds.volume().unwrap(),
+                            intersected_bounds.volume().none_is_unreachable(),
                         )?;
                         let indices = voxels.indices();
                         MinEval::new(

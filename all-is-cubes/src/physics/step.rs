@@ -402,8 +402,8 @@ pub(crate) fn step_one_body(
             delta_v: body.velocity - velocity_before_gravity_and_collision,
         };
     } else if velocity_magnitude_squared.into_inner() > VELOCITY_MAGNITUDE_LIMIT_SQUARED {
-        body.velocity *=
-            NotNan::new(VELOCITY_MAGNITUDE_LIMIT / velocity_magnitude_squared.sqrt()).unwrap();
+        body.velocity *= NotNan::new(VELOCITY_MAGNITUDE_LIMIT / velocity_magnitude_squared.sqrt())
+            .unwrap_or_else(|_| unreachable!("both inputs are nonzero"));
     }
 
     // TODO: correct integration of acceleration due to gravity

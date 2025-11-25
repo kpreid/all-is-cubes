@@ -11,6 +11,7 @@ use core::ops;
 
 use bevy_ecs::prelude as ecs;
 use bevy_ecs::query::QueryData;
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 
 use crate::time;
 use crate::transaction::Transactional;
@@ -52,7 +53,7 @@ fn add_membership_hook(
     mut world: bevy_ecs::world::DeferredWorld<'_>,
     context: bevy_ecs::lifecycle::HookContext,
 ) {
-    let membership = world.get::<Membership>(context.entity).unwrap().clone();
+    let membership = world.get::<Membership>(context.entity).none_is_unreachable().clone();
     world.resource_mut::<NameMap>().map.insert(membership.name, membership.handle);
 }
 
@@ -60,7 +61,7 @@ fn remove_membership_hook(
     mut world: bevy_ecs::world::DeferredWorld<'_>,
     context: bevy_ecs::lifecycle::HookContext,
 ) {
-    let name: Name = world.get::<Membership>(context.entity).unwrap().name.clone();
+    let name: Name = world.get::<Membership>(context.entity).none_is_unreachable().name.clone();
     world.resource_mut::<NameMap>().map.remove(&name);
 }
 
@@ -170,7 +171,7 @@ pub(in crate::universe) fn delete(world: &mut ecs::World, name: &Name) {
         panic!("{name} does not exist in the universe");
     };
     let universe_id = *world.resource::<UniverseId>();
-    let entity = handle.as_entity(universe_id).unwrap();
+    let entity = handle.as_entity(universe_id).err_is_unreachable();
     handle.to_any_handle().set_state_to_gone(universe::GoneReason::Deleted {});
     let success = world.despawn(entity);
     assert!(success);

@@ -1,3 +1,5 @@
+allow-unwrap-in-tests = true
+
 # We haven’t reached the point of making any non-breaking releases,
 # so let’s hear about breaking changes.
 avoid-breaking-exported-api = false
@@ -16,6 +18,7 @@ ignore-interior-mutability = [
 # `% 2 == 0` will trip `manual_is_multiple_of` so we don't want those either, one way or another.
 # (Note that `modulo_arithmetic` does not apply 
 allow-comparison-to-zero = false
+
 
 # --- Configurations for "large values" kinds of lints ---
 # It'd be nice if these were per-package/per-crate, but clippy doesn't support that,

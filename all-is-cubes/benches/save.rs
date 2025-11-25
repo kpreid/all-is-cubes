@@ -1,6 +1,7 @@
 //! Benchmarks for serialization.
 
 #![allow(missing_docs)]
+#![expect(clippy::unwrap_used, reason = "test")]
 
 use core::hint::black_box;
 

@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+#![expect(clippy::unwrap_used, reason = "build-time only")]
 
 fn main() {
     // Make the build profile visible so that we can

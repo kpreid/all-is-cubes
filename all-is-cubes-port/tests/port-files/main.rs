@@ -3,6 +3,7 @@
 //! These tests live in a separate test target so that they can be cleanly excluded from the
 //! published package, to avoid distributing test data files unnecessarily.
 
+#![allow(clippy::unwrap_used, reason = "test")]
 #![cfg_attr(
     not(all(feature = "export", feature = "import", feature = "gltf")),
     allow(

@@ -6,6 +6,8 @@ use core::marker::PhantomData;
 use core::ops;
 use core::range::Range;
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
+
 use all_is_cubes::euclid::{Box3D, Point3D, Size3D, Translation3D};
 use all_is_cubes::math::{
     self, Axis, Cube, GridAab, GridCoordinate, GridSizeCoord, Octant, OctantMap, VectorOps as _,
@@ -90,7 +92,7 @@ impl<A> Alloctree<A> {
             return None;
         }
         let handle = self.root.allocate::<A>(self.size_exponent, Point3D::origin(), request)?;
-        self.used_volume += request.volume().unwrap();
+        self.used_volume += request.volume().none_is_unreachable();
         self.allocated_volume += handle.allocated_volume;
         Some(handle)
     }
@@ -343,7 +345,7 @@ impl AlloctreeNode {
                         *self = AlloctreeNode::Sliced {
                             axis,
                             occupied: vec![Range::from(
-                                0..TreeCoord::try_from(request.size()[axis]).unwrap(),
+                                0..TreeCoord::try_from(request.size()[axis]).err_is_unreachable(),
                             )],
                         };
                         Some(handle)
@@ -381,7 +383,8 @@ impl AlloctreeNode {
                 ref mut occupied,
             } => {
                 let node_size = expsize(size_exponent);
-                let request_size_on_axis = TreeCoord::try_from(request.size()[axis]).unwrap();
+                let request_size_on_axis =
+                    TreeCoord::try_from(request.size()[axis]).err_is_unreachable();
                 let (insert_index, relative_offset): (usize, TreeCoord) = 'pos: {
                     let occupied_iter = occupied.iter().copied();
                     // Iterate over adjacent pairs, including off the beginning and off the end
@@ -628,9 +631,9 @@ fn max_edge_length_exponent(size: math::GridSize) -> u8 {
     }
 
     // Compute exponent.
-    // unwrap cannot fail since the maximum possible value is ilog2(i32::MAX) + 1,
+    // Conversion cannot fail since the maximum possible value is ilog2(i32::MAX) + 1,
     // which is 32, which is < u8::MAX.
-    let mut exp: u8 = max_edge_length.ilog2().try_into().unwrap();
+    let mut exp: u8 = max_edge_length.ilog2().try_into().err_is_unreachable();
     if max_edge_length > expsize(exp) {
         // Round up instead of down
         exp += 1;

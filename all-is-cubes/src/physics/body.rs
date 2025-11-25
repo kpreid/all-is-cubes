@@ -1,5 +1,7 @@
 use core::fmt;
 
+use descriptive_unwrap::OptionExt as _;
+
 use bevy_ecs::prelude as ecs;
 use euclid::{Point3D, Vector3D};
 use ordered_float::NotNan;
@@ -134,7 +136,7 @@ impl Fmt<StatusText> for Body {
             yaw,
             pitch,
         } = self;
-        let dir_face = Face::from_snapped_vector(self.look_direction()).unwrap();
+        let dir_face = Face::from_snapped_vector(self.look_direction()).none_is_unreachable();
         write!(
             fmt,
             "Position: {}  Yaw: {yaw:5.1}°  Pitch: {pitch:5.1}°\n\

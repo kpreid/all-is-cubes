@@ -82,6 +82,7 @@ async-executor = { workspace = true }
 async-io = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
+descriptive-unwrap = { workspace = true }
 directories-next = "2.0.0"
 # "serde" feature for TODO: explain
 # "mint" feature for interop with kira

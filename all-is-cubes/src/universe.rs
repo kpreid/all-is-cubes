@@ -11,6 +11,7 @@ use bevy_ecs::entity::Entity;
 use bevy_ecs::prelude as ecs;
 use bevy_ecs::query::QueryData;
 use bevy_ecs::world::FromWorld as _;
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use manyfmt::Fmt;
 
 use crate::block::{self, BlockDefStepInfo};
@@ -312,6 +313,8 @@ impl Universe {
     /// * `deadline` is when to stop computing flexible things such as light transport.
     #[expect(clippy::missing_panics_doc, reason = "all panics are bugs")]
     pub fn step(&mut self, paused: bool, deadline: time::Deadline) -> UniverseStepInfo {
+        #![expect(clippy::unwrap_used, reason = "TODO")]
+
         let start_time = time::Instant::now();
 
         self.world.run_schedule(time::schedule::BeforeStepReset);
@@ -539,7 +542,7 @@ impl Universe {
     pub(crate) fn validate_deserialized_members(&mut self) -> Result<(), DeserializeHandlesError> {
         self.world
             .run_system_cached(ecs_details::validate_deserialized_members_system)
-            .unwrap()
+            .err_is_unreachable()
     }
 
     /// Unchecked access to the ECS world.
@@ -617,7 +620,7 @@ impl Universe {
                 ecs_details::mutate_member_system,
                 (handle, &mut function_shim),
             )
-            .unwrap()?;
+            .err_is_unreachable()?;
 
         self.update_archetypes();
         Ok(output.expect("function output saved"))
@@ -717,7 +720,7 @@ impl fmt::Debug for Universe {
                         .archetype()
                         .components()
                         .iter()
-                        .map(|&cid| world.components().get_info(cid).unwrap().name())
+                        .map(|&cid| world.components().get_info(cid).none_is_unreachable().name())
                         .collect();
                     let name = er.get::<Membership>().map(|m| m.name.clone());
                     (name, components)

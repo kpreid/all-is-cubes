@@ -7,6 +7,7 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use descriptive_unwrap::OptionExt as _;
 use gltf_json::Index;
 use gltf_json::validation::USize64;
 
@@ -135,7 +136,8 @@ impl GltfDataDestination {
             };
 
             // Construct the file name (which is also the _relative_ path from gltf to data file).
-            let mut buffer_file_name: OsString = file_base_path.file_stem().unwrap().to_owned();
+            let mut buffer_file_name: OsString =
+                file_base_path.file_stem().none_is_unreachable().to_owned();
             buffer_file_name.push(format!("-{unique_file_suffix}.{proposed_file_extension}"));
 
             // Construct the relative URL the glTF file will contain.

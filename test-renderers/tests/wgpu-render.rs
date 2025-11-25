@@ -1,5 +1,7 @@
 //! Runs [`test_renderers_runner::harness_main`] against [`all_is_cubes_gpu`].
 
+#![expect(clippy::unwrap_used, reason = "test")]
+
 use clap::Parser as _;
 use tokio::sync::OnceCell;
 

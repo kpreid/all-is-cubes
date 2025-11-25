@@ -183,6 +183,8 @@ impl LightUpdateQueue {
 }
 
 mod queue_impl {
+    #![expect(clippy::unwrap_used, reason = "all unwraps are internal invariants")]
+
     use super::*;
     use hashbrown::hash_table::Entry;
 

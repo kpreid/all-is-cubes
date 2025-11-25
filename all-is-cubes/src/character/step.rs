@@ -7,6 +7,7 @@
 use core::mem;
 
 use bevy_ecs::prelude as ecs;
+use descriptive_unwrap::ResultExt as _;
 use euclid::Vector3D;
 
 use crate::character::{CharacterChange, CharacterCore, Input, InventoryComponent, PhysicsOutputs};
@@ -109,7 +110,7 @@ fn auto_fly_system(
             }
         }
         if let Some(it) = inventory_transaction {
-            inventory_component.execute(it).unwrap();
+            inventory_component.execute(it).err_is_unreachable();
         }
     }
 }

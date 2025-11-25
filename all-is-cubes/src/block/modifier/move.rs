@@ -1,5 +1,7 @@
 use core::assert_matches;
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
+
 use crate::block::{
     self, AIR, Block, BlockAttributes, Evoxel, Evoxels, MinEval, Modifier, Resolution, TickAction,
     VoxelIndex,
@@ -163,7 +165,7 @@ impl Move {
                             .saturating_add(i32::from(*velocity))
                             .clamp(0, i32::from(VoxelIndex::MAX))
                             .try_into()
-                            .unwrap(/* clamped to range */);
+                            .err_is_unreachable(/* clamped to range */);
                 }
 
                 // Do not include any other modifiers.
@@ -196,7 +198,7 @@ impl Move {
             Some(displaced_bounds) => {
                 block::Budget::decrement_voxels(
                     &filter.budget,
-                    displaced_bounds.volume().unwrap(),
+                    displaced_bounds.volume().none_is_unreachable(),
                 )?;
 
                 let displaced_voxels = match input_voxels.single_voxel() {

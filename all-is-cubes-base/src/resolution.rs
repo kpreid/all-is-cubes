@@ -2,6 +2,8 @@ use core::fmt;
 use core::ops;
 use core::range::RangeInclusive;
 
+use descriptive_unwrap::OptionExt as _;
+
 use crate::math::GridCoordinate;
 
 // -------------------------------------------------------------------------------------------------
@@ -187,14 +189,17 @@ impl Resolution {
     ///     (Resolution::R8, Resolution::R4, Resolution::R1)
     /// );
     /// ```
-    #[expect(clippy::missing_panics_doc, reason = "cannot actually fail")]
     #[expect(clippy::missing_inline_in_public_items, reason = "unclear if wise")]
     pub fn least_common_multiple_and_scales(
         self: Resolution,
         other: Resolution,
     ) -> (Resolution, Resolution, Resolution) {
         let lcm = self.max(other);
-        (lcm, (lcm / self).unwrap(), (lcm / other).unwrap())
+        (
+            lcm,
+            (lcm / self).none_is_unreachable(),
+            (lcm / other).none_is_unreachable(),
+        )
     }
 }
 

@@ -5,6 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::Context as _;
+use descriptive_unwrap::ResultExt as _;
 use directories_next::ProjectDirs;
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -138,7 +139,7 @@ fn read_or_create_default_json_file<V: DeserializeOwned + Serialize>(
                 path = path.to_string_lossy()
             );
             let value = default();
-            let json_text = serde_json::to_string_pretty(&value).unwrap();
+            let json_text = serde_json::to_string_pretty(&value).err_is_unreachable();
             match fs::write(path, json_text.as_bytes()) {
                 Ok(()) => log::trace!(
                     "Wrote default {description} to {path}",

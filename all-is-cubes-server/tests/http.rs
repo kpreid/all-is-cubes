@@ -1,5 +1,7 @@
 //! Test starting and contacting the web server, externally.
 
+#![expect(clippy::unwrap_used, reason = "test")]
+
 use std::process::Stdio;
 
 use reqwest::Url;

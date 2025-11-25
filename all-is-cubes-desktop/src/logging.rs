@@ -8,6 +8,7 @@ use anyhow::Context as _;
 
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
+use descriptive_unwrap::ResultExt as _;
 
 /// A [`clap::Args`] struct for options controlling log output to stderr and Rerun.
 #[derive(Clone, Debug, clap::Args)]
@@ -200,7 +201,7 @@ pub fn common_progress_style() -> indicatif::ProgressStyle {
     #![allow(clippy::literal_string_with_formatting_args)]
     indicatif::ProgressStyle::default_bar()
         .template("{prefix:8} [{elapsed}] {wide_bar} {pos:>6}/{len:6} {msg:30}")
-        .unwrap()
+        .err_is_unreachable()
 }
 
 /// Types of data that command line options can request be written to Rerun.

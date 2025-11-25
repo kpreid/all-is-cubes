@@ -387,6 +387,10 @@ pub(in crate::dynamic) struct CompletedMeshJob<M: DynamicMeshTypes> {
 /// Subsystem for tracking how many jobs currently exist
 /// (which is not the same thing as how many jobs are in the queue).
 mod state {
+    #![expect(
+        clippy::unwrap_used,
+        reason = "TODO: decide what to do with poisoned mutexes"
+    )]
     use super::*;
     use std::collections::HashSet;
     use std::sync::{Condvar, Mutex};

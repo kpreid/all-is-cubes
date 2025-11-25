@@ -4,6 +4,8 @@
 //! Note: This is *not* a code sample to be imitated, as it uses unstable/pseudo-private APIs.
 //! It is listed as an “example” because it is a program that only makes sense to run manually.
 
+#![expect(clippy::unwrap_used, reason = "this is more like a test")]
+
 use core::iter;
 
 use all_is_cubes::block::Resolution::{self, R8};

@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 use core::{fmt, mem};
 
+use descriptive_unwrap::OptionExt as _;
 use hashbrown::hash_map::Entry;
 use indoc::indoc;
 #[cfg(feature = "auto-threads")]
@@ -318,7 +319,7 @@ where
                 todo.all_blocks_and_chunks = true;
                 self.last_mesh_options = Some(current_mesh_options);
             }
-            self.last_mesh_options.as_ref().unwrap()
+            self.last_mesh_options.as_ref().none_is_unreachable()
         };
 
         // If we need to redo everything, then clear all the old blocks.

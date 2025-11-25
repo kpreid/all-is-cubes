@@ -2,6 +2,7 @@
 //! [`texture::Allocator`] implementation for use with [`wgpu`].
 
 #![allow(clippy::arc_with_non_send_sync, reason = "wgpu on wasm")]
+#![expect(clippy::unwrap_used, reason = "TODO")]
 
 use alloc::boxed::Box;
 use alloc::format;

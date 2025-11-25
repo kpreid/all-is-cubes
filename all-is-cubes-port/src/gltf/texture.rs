@@ -6,6 +6,7 @@ use std::iter;
 use std::mem;
 use std::sync::{Arc, Mutex, OnceLock};
 
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use gltf_json::validation::Checked::Valid;
 
 use all_is_cubes::block;
@@ -206,7 +207,7 @@ impl PartialEq for GltfTile {
 
 impl GltfTile {
     fn allocate_texels(&self) -> Vec<[u8; 4]> {
-        vec![[0, 0, 0, 0]; self.bounds.volume().unwrap()]
+        vec![[0, 0, 0, 0]; self.bounds.volume().none_is_unreachable()]
     }
 }
 
@@ -234,7 +235,7 @@ impl texture::Tile for GltfTile {
         if let Some(emission_buffer) = emission_buffer {
             self.emission
                 .as_mut()
-                .unwrap()
+                .none_is_unreachable()
                 .set(emission_buffer)
                 .expect("cannot overwrite glTF textures");
         }
@@ -311,9 +312,9 @@ impl texture::Plane for GltfTexturePlane {
             .with_source::<texture::TexelUnit>() // TODO: avoid these unit changes by being able to get Transform3D straight from GridRotation
             .with_destination::<texture::TexelUnit>()
             .transform_point3d(tc_in_tile.map(f64::from))
-            .unwrap()
+            .none_is_unreachable()
             .map(|c| c as f32);
-        let rot_bounds = self.bounds.transform(self.rotation.into()).unwrap();
+        let rot_bounds = self.bounds.transform(self.rotation.into()).none_is_unreachable();
 
         // Translate to get coordinates within the rotated-to-XY plane.
         let point_within = rot_tc - rot_bounds.lower_bounds().to_f32().cast_unit();
@@ -425,7 +426,7 @@ impl Gatherer {
     /// Inserts a new atlas entry corresponding to a plane and returns its ID.
     pub fn insert(&self, entry: AtlasEntry) -> PlaneId {
         let mut data = self.0.lock().expect("mutex in atlas gatherer");
-        let plane_id = PlaneId(u64::try_from(data.len()).unwrap());
+        let plane_id = PlaneId(u64::try_from(data.len()).err_is_unreachable());
         data.push(entry);
         plane_id
     }
@@ -465,7 +466,7 @@ pub(super) struct AtlasEntry {
 
 impl AtlasEntry {
     pub fn rotated_slice_bounds(&self) -> GridAab {
-        self.sliced_bounds.transform(self.rotation.into()).unwrap() // cannot overflow because block sizes are limited 
+        self.sliced_bounds.transform(self.rotation.into()).none_is_unreachable() // cannot overflow because block sizes are limited 
     }
 }
 
@@ -525,9 +526,9 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> Atlas<image::RgbaImage> {
     ) in iter::zip(0.., entries.iter())
     {
         let size = sliced_bounds
-                    .transform(rotation.into())
-                    .unwrap(/* cannot overflow? */)
-                    .size();
+            .transform(rotation.into())
+            .none_is_unreachable() // we'd run out of memory before running out of coordinate space
+            .size();
         assert_eq!(
             size.depth, 1,
             "failed to rotate slice {sliced_bounds:?} into the XY plane \
@@ -659,7 +660,7 @@ fn build_atlas_impl(entries: Vec<AtlasEntry>) -> Atlas<image::RgbaImage> {
             })
             .collect(),
         scale,
-        white: uv_of_white.unwrap(),
+        white: uv_of_white.none_is_unreachable(),
     };
 
     Atlas {
@@ -709,7 +710,7 @@ fn copy_texels_to_atlas_images(
 
             // Clamp the position to the tile bounds; this causes the `tile_padding` to
             // be filled with copies instead of being out of bounds.
-            let clamped_unrotated = entry.sliced_bounds.clamp_cube(unrotated).unwrap();
+            let clamped_unrotated = entry.sliced_bounds.clamp_cube(unrotated).none_is_unreachable();
 
             // Position relative to 3D tile bounds.
             let position_in_texels =

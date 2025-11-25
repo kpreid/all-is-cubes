@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+#![expect(clippy::unwrap_used, reason = "test")]
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 

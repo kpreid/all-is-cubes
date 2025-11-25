@@ -4,6 +4,8 @@
 
 use core::fmt;
 
+use descriptive_unwrap::OptionExt as _;
+
 use all_is_cubes_base::math::ps64;
 
 use crate::block::{Block, EvaluatedBlock, Evoxel};
@@ -247,9 +249,9 @@ impl lines::Wireframe for Cursor {
             let face_coordinate = expanded_aabb.face_coordinate_on_axis(face);
             let face_aabb = expanded_aabb
                 .expand_or_shrink(FaceMap::splat(inset))
-                .unwrap()
+                .none_is_unreachable()
                 .with_axis_range(face.axis(), face_coordinate, face_coordinate)
-                .unwrap();
+                .none_is_unreachable();
 
             face_aabb.wireframe_points(&mut lines::colorize(output, palette::CURSOR_OUTLINE));
         }

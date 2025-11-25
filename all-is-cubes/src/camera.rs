@@ -724,5 +724,5 @@ fn projected_range(
         .map(|p| p.to_vector().dot(axis))
         .minmax()
         .into_option()
-        .unwrap()
+        .expect("iterator should be non-empty")
 }

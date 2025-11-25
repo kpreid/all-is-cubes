@@ -14,6 +14,7 @@ use core::mem;
 use bevy_ecs::change_detection::DetectChangesMut;
 use bevy_ecs::prelude as ecs;
 use bevy_ecs::schedule::IntoScheduleConfigs as _;
+use descriptive_unwrap::{OptionExt as _, ResultExt as _};
 use nosy::Listen as _;
 
 use crate::block::{self, Block, BlockChange, EvalBlockError, InEvalError, MinEval};
@@ -147,16 +148,15 @@ impl BlockDef {
             .into_iter()
             .map(|(phase, block)| (phase, CachedBlock::new(block, read_ticket)))
             .collect();
-        assert!(
-            !frames.is_empty(),
-            "animated BlockDef must have at least one frame"
-        );
+        let Some(&last_phase) = frames.keys().last() else {
+            panic!("animated BlockDef must have at least one frame");
+        };
         BlockDef {
             state: BlockDefState {
                 current_frame: if frames.contains_key(&0) {
                     0
                 } else {
-                    *frames.keys().last().unwrap()
+                    last_phase
                 },
                 frames,
             },
@@ -192,8 +192,9 @@ impl BlockDef {
             {
                 // This decrement makes the cost consistent with evaluating a
                 // block with Primitive::Indirect.
-                #[expect(clippy::missing_panics_doc, reason = "infallible")]
-                block::Budget::decrement_components(&filter.budget).unwrap();
+                let Ok(()) = block::Budget::decrement_components(&filter.budget) else {
+                    unreachable!("default budget should always fit this")
+                };
 
                 universe::SealedMember::read_from_standalone(self).evaluate_impl(&filter)
             },
@@ -337,7 +338,7 @@ impl BlockDefState {
     }
 
     fn current_frame_mut(&mut self) -> &mut CachedBlock {
-        self.frames.get_mut(&self.current_frame).unwrap()
+        self.frames.get_mut(&self.current_frame).none_is_unreachable()
     }
 }
 
@@ -383,8 +384,8 @@ impl Read<'_> {
             {
                 // This decrement makes the cost consistent with evaluating a
                 // block with Primitive::Indirect.
-                #[expect(clippy::missing_panics_doc, reason = "infallible")]
-                block::Budget::decrement_components(&filter.budget).unwrap();
+                block::Budget::decrement_components(&filter.budget)
+                    .unwrap_or_else(|_| unreachable!("fits in defdult budget"));
 
                 self.evaluate_impl(&filter)
             },
@@ -825,9 +826,9 @@ fn update_phase_1(
             *next = update;
         }
 
-        *info_buffer.lock().unwrap() += info;
+        *info_buffer.lock().err_is_unreachable() += info;
     });
-    info_collector.record(mem::take(&mut info_buffer.lock().unwrap()));
+    info_collector.record(mem::take(&mut info_buffer.lock().err_is_unreachable()));
 }
 
 /// ECS system function that moves new evaluations from `CacheUpdate` to `BlockDef`.

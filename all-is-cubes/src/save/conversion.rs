@@ -1062,7 +1062,9 @@ mod time {
     impl Serialize for time::Schedule {
         fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             schema::ScheduleSer::ScheduleV1 {
-                period: self.to_period().unwrap(),
+                period: self
+                    .to_period()
+                    .unwrap_or_else(|| unreachable!("non-period schedules don't exist yet")),
             }
             .serialize(serializer)
         }

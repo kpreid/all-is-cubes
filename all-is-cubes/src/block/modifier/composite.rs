@@ -2,9 +2,10 @@ use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::mem;
-use hashbrown::hash_map::Entry;
 
+use descriptive_unwrap::OptionExt as _;
 use hashbrown::HashMap;
+use hashbrown::hash_map::Entry;
 
 use crate::block::{
     self, AIR, Block, BlockCollision, Evoxel, Evoxels, MinEval, Modifier, VoxelIndex,
@@ -374,7 +375,10 @@ fn evaluate_composition(
     } else {
         // Allocate new output array that encloses the full output bounds.
 
-        block::Budget::decrement_voxels(&filter.budget, output_bounds.volume().unwrap())?;
+        block::Budget::decrement_voxels(
+            &filter.budget,
+            output_bounds.volume().none_is_unreachable(),
+        )?;
         let src_voxels = src_voxels.read();
         let dst_voxels = dst_voxels.read();
 
@@ -814,7 +818,8 @@ pub(in crate::block) fn render_inventory(
                     // Scale to the icon's voxels' resolution.
                     let translated_and_scaled: Cube =
                         Cube::from(GridPoint::from(translated) * resample_scale);
-                    read.get_palette_index(translated_and_scaled + resample_point_offset).unwrap()
+                    read.get_palette_index(translated_and_scaled + resample_point_offset)
+                        .none_is_unreachable()
                 }),
             )
         });
