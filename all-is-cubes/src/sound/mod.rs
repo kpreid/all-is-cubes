@@ -23,7 +23,7 @@ use crate::universe;
 // -------------------------------------------------------------------------------------------------
 
 mod ambient;
-pub use ambient::{Ambient, Band, Spectrum};
+pub use ambient::{Ambient, Band, SpatialAmbient, Spectrum};
 
 // -------------------------------------------------------------------------------------------------
 

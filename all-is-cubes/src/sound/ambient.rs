@@ -8,6 +8,7 @@
 use core::fmt;
 use core::ops;
 
+use euclid::{Vector3D, vec3};
 use exhaust::Exhaust;
 use num_traits::ConstZero as _;
 
@@ -16,7 +17,8 @@ use num_traits::ConstZero as _;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::math::PositiveSign;
+use crate::camera;
+use crate::math::{FreeCoordinate, PositiveSign, ZeroOne};
 use crate::universe;
 
 // -------------------------------------------------------------------------------------------------
@@ -222,6 +224,33 @@ impl Ambient {
         new_self.noise_bands[band] = power;
         new_self
     }
+
+    /// Given a direction in which this sound lies, in the [`camera::Eye`] listener-relative
+    /// coordinate system,
+    /// construct the corresponding [`SpatialAmbient`] for the listener.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "TODO: ambient sound system is incomplete")
+    )]
+    pub(crate) fn pan(self, direction: Vector3D<f64, camera::Eye>) -> SpatialAmbient {
+        const LEFT_EAR: Vector3D<f64, camera::Eye> = vec3(-1., 0., 0.);
+        const RIGHT_EAR: Vector3D<f64, camera::Eye> = vec3(1., 0., 0.);
+
+        fn panning_function(direction_dot_product: FreeCoordinate) -> PositiveSign<f32> {
+            // Transforms the dot product from -1 .. 1 to 0.33 .. 1
+            // TODO: replace this with a real HRTF(-ish) function
+            ZeroOne::<f32>::new_clamped((direction_dot_product as f32 + 2.0) / 3.0).into()
+        }
+
+        SpatialAmbient {
+            left: Ambient {
+                noise_bands: self.noise_bands * panning_function(direction.dot(LEFT_EAR)),
+            },
+            right: Ambient {
+                noise_bands: self.noise_bands * panning_function(direction.dot(RIGHT_EAR)),
+            },
+        }
+    }
 }
 
 impl Default for Ambient {
@@ -238,9 +267,40 @@ impl universe::VisitHandles for Ambient {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Aggregation of [`Ambient`] sound into stereo.
+// TODO: Eventually we will want some way to express doppler shift?
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::exhaustive_structs, reason = "TODO: add appropriate accessors")]
+pub struct SpatialAmbient {
+    /// Left channel, relative to the listener.
+    pub left: Ambient,
+    /// Right channel, relative to the listener.
+    pub right: Ambient,
+}
+
+impl SpatialAmbient {
+    /// [`Ambient::SILENT`] in stereo.
+    pub const SILENT: Self = Self {
+        left: Ambient::SILENT,
+        right: Ambient::SILENT,
+    };
+}
+
+impl<'a> From<&'a Ambient> for SpatialAmbient {
+    fn from(value: &'a Ambient) -> Self {
+        Self {
+            left: value.clone(),
+            right: value.clone(),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::ps32;
     use alloc::string::String;
     use alloc::vec::Vec;
     use core::fmt::Write as _;
@@ -265,5 +325,25 @@ mod tests {
             let rt_band = Band::from_frequency(frequency);
             assert_eq!(band, rt_band);
         }
+    }
+
+    #[test]
+    fn pan() {
+        let ambient = Ambient {
+            noise_bands: Spectrum::narrow(ps32(1.0), ps32(100.0)),
+        };
+        let spatial: SpatialAmbient = ambient.pan(vec3(1.0, 0.0, 0.0));
+
+        assert_eq!(
+            spatial,
+            SpatialAmbient {
+                left: Ambient {
+                    noise_bands: Spectrum::narrow(ps32(1.0 / 3.0), ps32(100.0)),
+                },
+                right: Ambient {
+                    noise_bands: Spectrum::narrow(ps32(1.0), ps32(100.0)),
+                }
+            }
+        );
     }
 }
