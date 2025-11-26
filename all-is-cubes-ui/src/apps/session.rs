@@ -15,8 +15,9 @@ use all_is_cubes::arcstr::{self, ArcStr, literal};
 use all_is_cubes::character::{self, Character, Cursor};
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::inv::ToolError;
-use all_is_cubes::listen::{self, Listen as _, Listener as _};
+use all_is_cubes::listen::{self, Listen as _, Listener as _, Source as _};
 use all_is_cubes::save::WhenceUniverse;
+use all_is_cubes::sound;
 use all_is_cubes::space::{self, Space};
 use all_is_cubes::time::{self, Duration};
 use all_is_cubes::transaction::{self, Transaction as _};
@@ -76,6 +77,8 @@ pub struct Session {
 
     paused: listen::Cell<bool>,
 
+    ambient_sound_source: listen::DynSource<sound::SpatialAmbient>,
+
     /// Messages for controlling the state that aren't via [`InputProcessor`].
     ///
     /// TODO: This is originally a quick kludge to make onscreen UI buttons work.
@@ -124,6 +127,8 @@ struct Shuttle {
     // TODO: should include spatial information and source information
     fluff_notifier: Arc<listen::Notifier<Fluff>>,
 
+    ambient_sound_state: listen::CellWithLocal<sound::SpatialAmbient>,
+
     /// Notifies when the session transitions to particular states.
     session_event_notifier: Arc<listen::Notifier<Event>>,
 
@@ -140,6 +145,7 @@ impl fmt::Debug for Session {
             main_task,
             task_context_inner: _,
             paused,
+            ambient_sound_source: _,
             control_channel: _,
             control_channel_sender: _,
             last_step_info,
@@ -163,6 +169,7 @@ impl fmt::Debug for Session {
             cursor_result,
             quit_fn,
             fluff_notifier,
+            ambient_sound_state,
             session_event_notifier,
             custom_commands,
         } = &**shuttle;
@@ -178,6 +185,7 @@ impl fmt::Debug for Session {
             .field("main_task", &main_task.as_ref().map(|_| "..."))
             .field("session_event_notifier", session_event_notifier)
             .field("fluff_notifier", fluff_notifier)
+            .field("ambient_sound_state", ambient_sound_state)
             .field("paused", &paused)
             .field("ui", &ui)
             .field(
@@ -316,6 +324,11 @@ impl Session {
     /// sound or particle effects.
     pub fn listen_fluff(&self, listener: impl listen::Listener<Fluff> + Send + Sync + 'static) {
         self.shuttle().fluff_notifier.listen(listener)
+    }
+
+    /// Source of the current ambient sound environment from the game world.
+    pub fn ambient_sound(&self) -> listen::DynSource<sound::SpatialAmbient> {
+        self.ambient_sound_source.clone()
     }
 
     /// Steps the universe if the [`FrameClock`] says it's time to do so.
@@ -739,6 +752,7 @@ impl Shuttle {
     /// * Check if the current game character's current space differs from the current
     ///   `SpaceWatchState`, and update the latter if so.
     /// * Check if the universe or the universe's `WhenceUniverse` have changed.
+    /// * Sync sound state.
     fn sync_universe_and_character_derived(&mut self) {
         // Sync game_universe_info. The WhenceUniverse might in principle be overwritten any time.
         self.game_universe_info.set_if_unequal(SessionUniverseInfo {
@@ -746,7 +760,7 @@ impl Shuttle {
             whence: Arc::clone(&self.game_universe.whence),
         });
 
-        // Sync space_watch_state.world in case the character changed its universe.
+        // Sync space_watch_state.world and ambient_sound_state.
         {
             let character: Option<character::Read<'_>> =
                 self.game_character.get().as_ref().map(|cref| {
@@ -762,6 +776,15 @@ impl Shuttle {
                     &self.fluff_notifier,
                 )
                 .expect("TODO: decide how to handle error");
+            }
+
+            let new_sound_state: &sound::SpatialAmbient = if let Some(character) = &character {
+                character.ambient_sound()
+            } else {
+                &sound::SpatialAmbient::SILENT
+            };
+            if *new_sound_state != self.ambient_sound_state.get() {
+                self.ambient_sound_state.set(new_sound_state.clone());
             }
         }
 
@@ -837,6 +860,7 @@ impl SessionBuilder {
         let game_character = listen::CellWithLocal::new(None);
         let input_processor = InputProcessor::new();
         let paused = listen::Cell::new(false);
+        let ambient_sound_state = listen::CellWithLocal::new(sound::SpatialAmbient::SILENT);
         let (control_send, control_recv) = flume::bounded(100);
         let custom_commands = listen::CellWithLocal::new([].into());
 
@@ -870,6 +894,17 @@ impl SessionBuilder {
 
         Session {
             frame_clock: FrameClock::new(game_universe.clock().schedule()),
+            ambient_sound_source: Arc::new(ambient_sound_state.as_source().map({
+                // TODO: need to properly register `paused` as a dependency
+                let paused = paused.as_source();
+                move |sound| {
+                    if paused.get() {
+                        sound::SpatialAmbient::SILENT
+                    } else {
+                        sound
+                    }
+                }
+            })),
 
             shuttle: Some(Box::new(Shuttle {
                 ui,
@@ -884,6 +919,7 @@ impl SessionBuilder {
                 cursor_result: None,
                 session_event_notifier: Arc::new(listen::Notifier::new()),
                 fluff_notifier: Arc::new(listen::Notifier::new()),
+                ambient_sound_state,
                 control_channel_sender: control_send.clone(),
                 quit_fn,
                 custom_commands,
