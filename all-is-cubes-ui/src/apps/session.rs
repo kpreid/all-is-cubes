@@ -1104,20 +1104,16 @@ impl<T: Fmt<StatusText>> fmt::Display for InfoText<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let fopt = self.fopt;
         let mut empty = true;
-        if fopt.show.contains(ShowStatus::CHARACTER) {
-            if let Some(shuttle) = self.session.shuttle.as_ref()
-                && let Some(character_handle) = shuttle.game_character.get().as_ref()
-            {
-                empty = false;
-                write!(
-                    f,
-                    "{}",
-                    character_handle
-                        .read(shuttle.game_universe.read_ticket())
-                        .unwrap()
-                        .refmt(&fopt)
-                )
-                .unwrap();
+        if fopt.show.contains(ShowStatus::CHARACTER)
+            && let Some(shuttle) = self.session.shuttle.as_ref()
+            && let Some(character_handle) = shuttle.game_character.get().as_ref()
+        {
+            empty = false;
+            match character_handle.read(shuttle.game_universe.read_ticket()) {
+                Ok(character_read) => {
+                    write!(f, "{}", character_read.refmt(&fopt))?;
+                }
+                Err(_) => write!(f, "<error reading character>")?,
             }
         }
         if fopt.show.contains(ShowStatus::STEP) {
@@ -1365,7 +1361,10 @@ impl MainTaskContext {
     // TODO: Replace this entirely with `show_notification`.
     pub fn show_modal_message(&self, message: ArcStr) {
         self.with_ref(|shuttle| {
-            shuttle.control_channel_sender.send(ControlMessage::ShowModal(message)).unwrap();
+            if let Err(e) = shuttle.control_channel_sender.send(ControlMessage::ShowModal(message))
+            {
+                log::warn!("could not send modal message for display: {e:?}");
+            }
         })
     }
 

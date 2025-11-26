@@ -207,12 +207,15 @@ where
     /// Panics if `bounds` has a volume exceeding `usize::MAX`.
     /// (But there will likely be a memory allocation failure well below that point.)
     #[inline]
+    #[track_caller]
     pub fn from_fn<F>(bounds: GridAab, f: F) -> Self
     where
         F: FnMut(Cube) -> V,
     {
-        let bounds = bounds.to_vol::<ZMaj>().unwrap();
-        bounds.with_elements(bounds.iter_cubes().map(f).collect()).unwrap()
+        match bounds.to_vol::<ZMaj>() {
+            Ok(bounds) => bounds.with_elements(bounds.iter_cubes().map(f).collect()).unwrap(),
+            Err(length_error) => panic!("{length_error}"),
+        }
     }
 
     /// Constructs a `Vol<C>` by cloning the provided value for each point.

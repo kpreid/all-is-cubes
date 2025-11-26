@@ -65,10 +65,12 @@ pub(crate) fn init_sound(session: &Session) -> Result<AudioOut, anyhow::Error> {
     // to perform operations, so I either need a dedicated thread (actor) or a mutex.
     // We also don’t want to find ourselves running synthesis inside the Listener.
     // Note that this is *not* a sample-by-sample realtime audio thread.
-    std::thread::Builder::new()
+    if let Err(e) = std::thread::Builder::new()
         .name("all_is_cubes audio core".to_owned())
         .spawn(move || audio_command_thread(receiver, manager, ambient_source))
-        .unwrap();
+    {
+        log::error!("failed to spawn audio command thread; audio disabled: {e}");
+    }
 
     Ok(AudioOut { sender })
 }
