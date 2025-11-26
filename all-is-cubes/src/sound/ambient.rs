@@ -16,7 +16,7 @@ use num_traits::ConstZero as _;
 #[allow(unused_imports)]
 use num_traits::float::Float as _;
 
-use crate::math::{PositiveSign, ZeroOne};
+use crate::math::PositiveSign;
 use crate::universe;
 
 // -------------------------------------------------------------------------------------------------
@@ -44,8 +44,6 @@ macro_rules! band_list_for_doc {
 pub struct Band {
     index: u8,
 }
-
-type Spectrum<T> = [T; Band::COUNT];
 
 impl Band {
     /// Number of bands that exist.
@@ -108,19 +106,6 @@ impl fmt::Debug for Band {
     }
 }
 
-impl<T> ops::Index<Band> for [T; Band::COUNT] {
-    type Output = T;
-
-    fn index(&self, index: Band) -> &Self::Output {
-        &self[usize::from(index.index)]
-    }
-}
-impl<T> ops::IndexMut<Band> for [T; Band::COUNT] {
-    fn index_mut(&mut self, index: Band) -> &mut Self::Output {
-        &mut self[usize::from(index.index)]
-    }
-}
-
 impl Exhaust for Band {
     type Iter = ops::Range<u8>;
     type Factory = u8;
@@ -136,6 +121,76 @@ impl Exhaust for Band {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Stores a value (usually a number) per frequency [`Band`].
+#[derive(Clone, Copy, Default, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[allow(clippy::exhaustive_structs)]
+pub struct Spectrum<T>(pub [T; Band::COUNT]);
+
+impl<T> Spectrum<T> {
+    /// Creates a [`Spectrum`] with a nonzero value at one position.
+    pub fn narrow(value: T, frequency: PositiveSign<f32>) -> Self
+    where
+        T: Copy + Default,
+    {
+        let mut new_self = Self::default();
+        new_self[Band::from_frequency(frequency)] = value;
+        new_self
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Spectrum<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // always single-line formatting
+        write!(f, "Spectrum {:?}", self.0)
+    }
+}
+
+impl<T> ops::Index<Band> for Spectrum<T> {
+    type Output = T;
+
+    fn index(&self, index: Band) -> &Self::Output {
+        &self.0[usize::from(index.index)]
+    }
+}
+impl<T> ops::IndexMut<Band> for Spectrum<T> {
+    fn index_mut(&mut self, index: Band) -> &mut Self::Output {
+        &mut self.0[usize::from(index.index)]
+    }
+}
+
+impl<T: ops::AddAssign> ops::Add for Spectrum<T> {
+    type Output = Self;
+    fn add(mut self, rhs: Self) -> Self::Output {
+        self += rhs;
+        self
+    }
+}
+impl<T: ops::AddAssign> ops::AddAssign for Spectrum<T> {
+    fn add_assign(&mut self, rhs: Self) {
+        for (l, r) in self.0.iter_mut().zip(rhs.0.into_iter()) {
+            *l += r;
+        }
+    }
+}
+
+impl<T: ops::MulAssign<U>, U: Copy> ops::Mul<U> for Spectrum<T> {
+    type Output = Self;
+    fn mul(mut self, rhs: U) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+impl<T: ops::MulAssign<U>, U: Copy> ops::MulAssign<U> for Spectrum<T> {
+    fn mul_assign(&mut self, rhs: U) {
+        for elem in &mut self.0 {
+            *elem *= rhs;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Mix of background sound occurring in some space or emitted by some block.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -145,20 +200,13 @@ pub struct Ambient {
     ///
     /// TODO: specify units for these values
     pub noise_bands: Spectrum<PositiveSign<f32>>,
-
-    /// Sound absorption.
-    ///
-    /// TODO: specify units for these values
-    ///
-    /// TODO: Should this be reflection? Reflectivity? Whatever you call it
-    pub absorption_bands: Spectrum<ZeroOne<f32>>,
+    // TODO: Add other properties such as absorption/reflection and non-white-noise emission
 }
 
 impl Ambient {
-    /// No sound emission. TODO: Define and explain default absorption assumptions
+    /// No sound emission; defaults for other parameters.
     pub const SILENT: Self = Self {
-        noise_bands: [PositiveSign::ZERO; Band::COUNT],
-        absorption_bands: [ZeroOne::ZERO; Band::COUNT],
+        noise_bands: Spectrum([PositiveSign::ZERO; _]),
     };
 
     /// Constructs an [`Ambient`] denoting noise output of the given power and center frequency.
@@ -184,10 +232,7 @@ impl Default for Ambient {
 
 impl universe::VisitHandles for Ambient {
     fn visit_handles(&self, _: &mut dyn universe::HandleVisitor) {
-        let Self {
-            noise_bands: _,
-            absorption_bands: _,
-        } = self;
+        let Self { noise_bands: _ } = self;
     }
 }
 

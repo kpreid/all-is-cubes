@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::block::Block;
 use crate::math::{
-    Aab, Face6, GridAab, GridCoordinate, GridRotation, NotNan, PositiveSign, ZeroOne, ps32, zo32,
+    Aab, Face6, GridAab, GridCoordinate, GridRotation, NotNan, PositiveSign, ZeroOne, ps32,
 };
 use crate::save::compress::{GzSerde, Leu16};
 use crate::time::Schedule;
@@ -465,7 +465,6 @@ pub(crate) enum SoundDefSer {
 pub(crate) enum AmbientSoundSer {
     AmbientSoundV1 {
         noise_bands: [PositiveSign<f32>; 20],
-        absorption_bands: [ZeroOne<f32>; 20],
     },
 }
 
@@ -473,7 +472,6 @@ impl Default for AmbientSoundSer {
     fn default() -> Self {
         Self::AmbientSoundV1 {
             noise_bands: [ps32(0.0); 20],
-            absorption_bands: [zo32(0.0); 20],
         }
     }
 }
@@ -481,10 +479,7 @@ impl Default for AmbientSoundSer {
 impl AmbientSoundSer {
     fn is_silent(&self) -> bool {
         match self {
-            AmbientSoundSer::AmbientSoundV1 {
-                noise_bands,
-                absorption_bands,
-            } => noise_bands == &[ps32(0.0); _] && absorption_bands == &[zo32(0.0); _],
+            AmbientSoundSer::AmbientSoundV1 { noise_bands } => noise_bands == &[ps32(0.0); _],
         }
     }
 }

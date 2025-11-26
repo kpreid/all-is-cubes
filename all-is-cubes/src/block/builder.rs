@@ -502,8 +502,9 @@ mod tests {
     use crate::block::{self, Resolution::*, TickAction};
     use crate::content::palette;
     use crate::inv;
-    use crate::math::{Face6, GridRotation, Vol, zo32};
+    use crate::math::{Face6, GridRotation, Vol, ps32};
     use crate::op::Operation;
+    use crate::sound;
     use crate::space::SpacePhysics;
     use crate::transaction::Transactional as _;
 
@@ -545,8 +546,8 @@ mod tests {
             ],
         );
         let ambient_sound = {
-            let mut s = crate::sound::Ambient::SILENT;
-            s.absorption_bands[0] = zo32(0.5);
+            let mut s = sound::Ambient::SILENT;
+            s.noise_bands[sound::Band::MIN] = ps32(0.5);
             s
         };
         let rotation_rule = block::RotationPlacementRule::Attach { by: Face6::NZ };
