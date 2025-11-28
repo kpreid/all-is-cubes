@@ -290,7 +290,7 @@ impl SpaceTransaction {
         }
 
         self.behaviors
-            .commit(m.behaviors, (), check.behaviors, &mut no_outputs)
+            .commit(m.behaviors, check.behaviors, &mut no_outputs)
             .map_err(|e| e.context("behaviors".into()))?;
 
         if !to_activate.is_empty() {
@@ -354,11 +354,12 @@ impl Transaction for SpaceTransaction {
     fn commit(
         self,
         space: &mut Space,
-        context: Self::Context<'_>,
         check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
-        space.mutate(context, |m| self.commit_common(m, check))
+        // Passing a stub read ticket here is OK because all of our block evaluations will have been
+        // performed by check(). TODO: Can we make that statically checked?
+        space.mutate(ReadTicket::stub(), |m| self.commit_common(m, check))
     }
 }
 
@@ -397,10 +398,11 @@ impl universe::TransactionOnEcs for SpaceTransaction {
             &space::Notifiers,
             ecs::Mut<'_, space::Ticks>,
         ),
-        read_ticket: ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), CommitError> {
-        Mutation::with_write_query(read_ticket, target, |m| self.commit_common(m, check))
+        // Passing a stub read ticket here is OK because all of our block evaluations will have been
+        // performed by check(). TODO: Can we make that statically checked?
+        Mutation::with_write_query(ReadTicket::stub(), target, |m| self.commit_common(m, check))
     }
 }
 impl Merge for SpaceTransaction {
@@ -867,7 +869,7 @@ mod tests {
             )
             .unwrap();
         }
-        space_txn.commit(&mut space, u.read_ticket(), check, &mut no_outputs).unwrap();
+        space_txn.commit(&mut space, check, &mut no_outputs).unwrap();
 
         assert_eq!(
             space.get_evaluated([0, 0, 0]).color(),

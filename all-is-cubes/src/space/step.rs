@@ -92,9 +92,8 @@ impl ops::AddAssign for TickActionsInfo {
 
 /// ECS system that handles the [`block::BlockAttributes::tick_action`]s of blocks in [`Space`]s.
 ///
-/// TODO(ecs): Make this a more proper system with narrower queries that can run in parallel.
-/// This will require changing `SpaceTransaction` and the transaction system to be able to evaluate
-/// new blocks during the check phase instead of the commit phase.
+/// TODO(ecs): Make this a more proper system with narrower queries that can run in parallel
+/// and not need `everything_but()` access.
 pub(crate) fn execute_tick_actions_system(
     world: &mut ecs::World,
     space_write_query_state: &mut ecs::QueryState<(
@@ -108,8 +107,7 @@ pub(crate) fn execute_tick_actions_system(
     read_queries.update_archetypes(world);
     let tick = world.resource::<universe::CurrentStep>().get()?.tick;
 
-    // Need unsafe cell to create "except for this" read tickets.
-    // TODO(ecs): Redesign transactions / space mutations so we can avoid this.
+    // Need unsafe cell to create "everything_but" read tickets.
     let world_cell = world.as_unsafe_world_cell();
 
     let mut ticked_cube_count: usize = 0;
@@ -128,6 +126,10 @@ pub(crate) fn execute_tick_actions_system(
 
         // SAFETY: this ticket is for everything but `space_entity` and the rest of
         // this loop iteration will only access `space_entity`.
+        //
+        // TODO(ecs): Rearrange this system so that we don't need everything_but(),
+        // and can instead provide a normal read ticket because we’re not mutably borrowing
+        // the space.
         let everything_but_read_ticket = unsafe {
             ReadTicket::everything_but(universe_id, world_cell, space_entity, read_queries)
         };

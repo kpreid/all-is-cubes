@@ -50,10 +50,9 @@ where
     ) -> Result<Self::CommitCheck, Self::Mismatch>;
 
     /// See [`Transaction::commit()`].
-    fn commit<'t>(
+    fn commit(
         self,
-        target: <Self::WriteQueryData as bevy_ecs::query::QueryData>::Item<'t>,
-        everything_else: ReadTicket<'t>,
+        target: <Self::WriteQueryData as bevy_ecs::query::QueryData>::Item<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), CommitError>;
 }
@@ -94,16 +93,11 @@ where
 {
     let entity: ecs::Entity = target.as_entity(universe.universe_id()).unwrap();
     let query_state = O::member_mutation_query_state(&mut universe.queries.write_members);
+    let target_query_data = query_state
+        .get_mut(&mut universe.world, entity)
+        .expect("target query failed; universe state changed between check and commit");
 
-    let (target_query_data, everything_but) = super::get_one_mut_and_ticket(
-        &mut universe.world,
-        entity,
-        query_state,
-        &mut universe.queries.read_members,
-    )
-    .expect("target query failed; universe state changed between check and commit");
-
-    TransactionOnEcs::commit(transaction, target_query_data, everything_but, check)
+    TransactionOnEcs::commit(transaction, target_query_data, check)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -156,7 +150,6 @@ where
     fn commit(
         self,
         universe: &mut Universe,
-        (): Self::Context<'_>,
         tu_check: Self::CommitCheck,
         _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
@@ -256,7 +249,7 @@ where
         *(check.downcast().map_err(|_| {
             CommitError::message::<AnyTransaction>("type mismatch in check data".into())
         })?);
-    transaction.commit(universe, (), check, outputs)
+    transaction.commit(universe, check, outputs)
 }
 
 /// A [`Transaction`] which operates on one or more objects in a [`Universe`]
@@ -727,7 +720,6 @@ impl Transaction for UniverseTransaction {
     fn commit(
         self,
         target: &mut Universe,
-        (): Self::Context<'_>,
         checks: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {
@@ -925,7 +917,7 @@ impl MemberTxn {
                 Ok(())
             }
             MemberTxn::Modify(txn) => {
-                txn.commit(universe, (), check.expect("missing check value"), outputs)
+                txn.commit(universe, check.expect("missing check value"), outputs)
             }
             MemberTxn::Insert(pending) => {
                 pending

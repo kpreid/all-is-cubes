@@ -502,7 +502,6 @@ impl Transaction for InventoryTransaction {
     fn commit(
         self,
         inventory: &mut Inventory,
-        (): Self::Context<'_>,
         check: Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), CommitError> {

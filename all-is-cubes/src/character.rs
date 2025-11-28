@@ -644,14 +644,13 @@ impl Transaction for CharacterTransaction {
     fn commit(
         self,
         target: &mut Character,
-        _read_ticket: Self::Context<'_>,
         (body_check, inventory_check): Self::CommitCheck,
         outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
         self.set_space.commit(&mut target.space);
 
         self.body
-            .commit(&mut target.body, (), body_check, outputs)
+            .commit(&mut target.body, body_check, outputs)
             .map_err(|e| e.context("body".into()))?;
 
         target
@@ -695,13 +694,12 @@ impl universe::TransactionOnEcs for CharacterTransaction {
             ecs::Mut<'_, InventoryComponent>,
             ecs::Mut<'_, ParentSpace>,
         ),
-        _read_ticket: ReadTicket<'_>,
         (body_check, inventory_check): Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
         self.set_space.commit(&mut space.0);
 
         self.body
-            .commit(&mut *body, (), body_check, &mut transaction::no_outputs)
+            .commit(&mut *body, body_check, &mut transaction::no_outputs)
             .map_err(|e| e.context("body".into()))?;
 
         inventory

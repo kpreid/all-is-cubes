@@ -47,7 +47,7 @@ impl InventoryComponent {
     ) -> Result<(), transaction::CommitError> {
         txn.commit(
             &mut self.inv,
-            (),
+            
             check,
             &mut notify_adapter(&self.notifier),
         )

@@ -366,7 +366,6 @@ macro_rules! member_enums_and_impls {
             fn commit(
                 self,
                 universe: &mut Universe,
-                (): Self::Context<'_>,
                 check: Self::CommitCheck,
                 outputs: &mut dyn FnMut(Self::Output),
             ) -> Result<(), transaction::CommitError> {
