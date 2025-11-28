@@ -75,10 +75,10 @@ impl Palette {
             read_ticket,
             block.clone(),
             // initial-creation version of listener_for_block()
-            BlockListener {
+            Arc::new(BlockListener {
                 todo: Arc::downgrade(&todo),
                 index: 0,
-            },
+            }),
         );
 
         block_data.count = count;
@@ -260,11 +260,11 @@ impl Palette {
         }
     }
 
-    fn listener_for_block(&self, index: BlockIndex) -> BlockListener {
-        BlockListener {
+    fn listener_for_block(&self, index: BlockIndex) -> Arc<BlockListener> {
+        Arc::new(BlockListener {
             todo: Arc::downgrade(&self.todo),
             index,
-        }
+        })
     }
 
     /// Check that this palette is self-consistent and has `count`s that accurately count the
@@ -445,14 +445,10 @@ impl SpaceBlockData {
         }
     }
 
-    fn new<L>(read_ticket: ReadTicket<'_>, block: Block, listener: L) -> Self
-    where
-        L: listen::Listener<BlockChange>,
-        listen::GateListener<L>:
-            listen::IntoListener<listen::DynListener<BlockChange>, BlockChange>,
-    {
-        // Note: Block evaluation also happens in `Space::step()`.
+    fn new(read_ticket: ReadTicket<'_>, block: Block, listener: Arc<BlockListener>) -> Self {
+        // Note: Block evaluation also happens in `Space` stepping.
 
+        let listener: listen::DynListener<BlockChange> = listener; // coerce to dyn
         let (gate, block_listener) = listen::Listener::gate(listener);
         let block_listener: listen::DynListener<BlockChange> = block_listener.into_listener();
 
