@@ -40,9 +40,7 @@ mod ecs_details;
 use ecs_details::NameMap;
 // TODO(ecs): try to eliminate uses of get_one_mut_and_ticket in favor of normal queries
 pub use ecs_details::PubliclyMutableComponent;
-pub(crate) use ecs_details::{
-    CurrentStep, InfoCollector, Membership, QueryStateBundle, get_one_mut_and_ticket,
-};
+pub(crate) use ecs_details::{CurrentStep, InfoCollector, Membership, QueryStateBundle};
 
 mod gc;
 

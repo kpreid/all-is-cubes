@@ -146,7 +146,6 @@ impl Transaction for DefTransaction {
     fn commit(
         self,
         target: &mut SoundDef,
-        _: Self::Context<'_>,
         (): Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
@@ -175,16 +174,9 @@ impl universe::TransactionOnEcs for DefTransaction {
     fn commit(
         self,
         mut target: ecs::Mut<'_, SoundDef>,
-        read_ticket: universe::ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
-        Transaction::commit(
-            self,
-            &mut *target,
-            read_ticket,
-            check,
-            &mut transaction::no_outputs,
-        )
+        Transaction::commit(self, &mut *target, check, &mut transaction::no_outputs)
     }
 }
 

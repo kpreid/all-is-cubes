@@ -333,7 +333,6 @@ impl Transaction for BlockDefTransaction {
     fn commit(
         self,
         target: &mut BlockDef,
-        _: Self::Context<'_>,
         check: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
@@ -363,13 +362,11 @@ impl universe::TransactionOnEcs for BlockDefTransaction {
     fn commit(
         self,
         mut target: ecs::Mut<'_, BlockDef>,
-        read_ticket: ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
         Transaction::commit(
             self,
             &mut *target,
-            read_ticket,
             check,
             &mut transaction::no_outputs,
         )

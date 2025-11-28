@@ -625,7 +625,6 @@ impl<H: Host> Transaction for BehaviorSetTransaction<H> {
     fn commit(
         self,
         target: &mut BehaviorSet<H>,
-        (): Self::Context<'_>,
         _: Self::CommitCheck,
         _outputs: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {

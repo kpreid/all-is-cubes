@@ -8,7 +8,7 @@ use core::ops;
 use bevy_ecs::prelude as ecs;
 
 use crate::time;
-use crate::universe::{AnyHandle, Handle, Name, ReadTicket, UniverseId, UniverseMember};
+use crate::universe::{AnyHandle, Handle, Name, UniverseMember};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -159,37 +159,6 @@ where
             .take()
             .expect("cannot call InfoCollector::take() while not in a step")
     }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-/// Get mutable access to `QueryData` of one entity, and read-only access to all other entities.
-///
-/// Returns [`None`] if there is no such entity or component.
-///
-/// Panics if the world is not configured as a [`Universe`]’s world.
-#[allow(clippy::elidable_lifetime_names)]
-pub(crate) fn get_one_mut_and_ticket<'w, D>(
-    world: &'w mut ecs::World,
-    entity: ecs::Entity,
-    query_state: &mut ecs::QueryState<D, ()>,
-    read_queries: &'w mut super::MemberReadQueryStates,
-) -> Option<(D::Item<'w>, ReadTicket<'w>)>
-where
-    D: bevy_ecs::query::QueryData,
-{
-    let universe_id: UniverseId = *world.resource::<UniverseId>();
-    read_queries.update_archetypes(world);
-
-    let unsafe_world = world.as_unsafe_world_cell();
-
-    // SAFETY: The query and the `everything_but()` ticket access disjoint parts of the world.
-    Some(unsafe {
-        (
-            query_state.get_unchecked(unsafe_world, entity).ok()?,
-            ReadTicket::everything_but(universe_id, unsafe_world, entity, read_queries),
-        )
-    })
 }
 
 // -------------------------------------------------------------------------------------------------

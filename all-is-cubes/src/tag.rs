@@ -128,7 +128,6 @@ impl transaction::Transaction for DefTransaction {
     fn commit(
         self,
         _: &mut Self::Target,
-        _: Self::Context<'_>,
         (): Self::CommitCheck,
         _: &mut dyn FnMut(Self::Output),
     ) -> Result<(), transaction::CommitError> {
@@ -150,15 +149,8 @@ impl universe::TransactionOnEcs for DefTransaction {
     fn commit(
         self,
         mut target: ecs::Mut<'_, TagDef>,
-        read_ticket: universe::ReadTicket<'_>,
         check: Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
-        transaction::Transaction::commit(
-            self,
-            &mut *target,
-            read_ticket,
-            check,
-            &mut transaction::no_outputs,
-        )
+        transaction::Transaction::commit(self, &mut *target, check, &mut transaction::no_outputs)
     }
 }
