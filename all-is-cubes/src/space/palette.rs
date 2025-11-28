@@ -19,7 +19,7 @@ use hashbrown::HashMap as HbHashMap;
 use itertools::Itertools as _;
 
 use crate::block::{self, AIR, AIR_EVALUATED, Block, BlockChange, EvaluatedBlock};
-use crate::listen::{self, IntoListener as _, Listener as _};
+use crate::listen::{self, Listener as _};
 use crate::math::{self, OpacityCategory};
 use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::time::{self, TimeStats};
@@ -71,14 +71,17 @@ impl Palette {
             };
         }
 
+        let gate = Arc::new(());
         let mut block_data = SpaceBlockData::new(
             read_ticket,
             block.clone(),
             // initial-creation version of listener_for_block()
             Arc::new(BlockListener {
+                gate: Arc::downgrade(&gate),
                 todo: Arc::downgrade(&todo),
                 index: 0,
             }),
+            gate,
         );
 
         block_data.count = count;
@@ -172,10 +175,10 @@ impl Palette {
             if use_zeroed_entries {
                 for new_index in 0..high_mark {
                     if self.entries[new_index].count == 0 {
-                        self.entries[new_index] = SpaceBlockData::new(
+                        self.entries[new_index] = self.create_pending_entry(
                             read_ticket,
                             block.clone(),
-                            self.listener_for_block(new_index as BlockIndex),
+                            new_index as BlockIndex,
                         );
                         self.block_to_index.insert(block.clone(), new_index as BlockIndex);
                         change_buffer.push(SpaceChange::BlockIndex(new_index as BlockIndex));
@@ -188,11 +191,7 @@ impl Palette {
             }
             let new_index = high_mark as BlockIndex;
             // Evaluate the new block type.
-            let new_data = SpaceBlockData::new(
-                read_ticket,
-                block.clone(),
-                self.listener_for_block(new_index),
-            );
+            let new_data = self.create_pending_entry(read_ticket, block.clone(), new_index);
             // Grow the vector.
             self.entries.push(new_data);
             self.block_to_index.insert(block.clone(), new_index);
@@ -215,11 +214,8 @@ impl Palette {
         {
             // Swap out the block_data entry.
             let old_block = {
-                let mut data = SpaceBlockData::new(
-                    read_ticket,
-                    new_block.clone(),
-                    self.listener_for_block(old_block_index),
-                );
+                let mut data =
+                    self.create_pending_entry(read_ticket, new_block.clone(), old_block_index);
                 data.count = 1;
                 core::mem::swap(&mut data, &mut self.entries[old_block_index as usize]);
                 data.block
@@ -260,11 +256,30 @@ impl Palette {
         }
     }
 
-    fn listener_for_block(&self, index: BlockIndex) -> Arc<BlockListener> {
-        Arc::new(BlockListener {
+    /// Creates a [`SpaceBlockData`] for a block newly entering the palette, with its listener
+    /// hooked up.
+    fn create_pending_entry(
+        &self,
+        read_ticket: ReadTicket<'_>,
+        block: Block,
+        index: BlockIndex,
+    ) -> SpaceBlockData {
+        let (listener, gate) = self.listener_for_block(index);
+        SpaceBlockData::new(read_ticket, block, listener, gate)
+    }
+
+    /// Creates the [`BlockListener`] communicating with this palette for a particular index.
+    ///
+    /// This is used when a new block is to be inserted into the palette,
+    /// in order to be notified of changes to the block definition.
+    fn listener_for_block(&self, index: BlockIndex) -> (Arc<BlockListener>, Arc<()>) {
+        let gate = Arc::new(());
+        let listener = Arc::new(BlockListener {
+            gate: Arc::downgrade(&gate),
             todo: Arc::downgrade(&self.todo),
             index,
-        })
+        });
+        (listener, gate)
     }
 
     /// Check that this palette is self-consistent and has `count`s that accurately count the
@@ -408,7 +423,7 @@ pub struct SpaceBlockData {
     count: usize,
     pub(super) evaluated: EvaluatedBlock,
     #[expect(dead_code, reason = "Used only for its `Drop`")]
-    block_listen_gate: Option<listen::Gate>,
+    block_listen_gate: Option<Arc<()>>,
 }
 
 impl fmt::Debug for SpaceBlockData {
@@ -445,12 +460,15 @@ impl SpaceBlockData {
         }
     }
 
-    fn new(read_ticket: ReadTicket<'_>, block: Block, listener: Arc<BlockListener>) -> Self {
+    fn new(
+        read_ticket: ReadTicket<'_>,
+        block: Block,
+        block_listener: Arc<BlockListener>,
+        block_listen_gate: Arc<()>,
+    ) -> Self {
         // Note: Block evaluation also happens in `Space` stepping.
 
-        let listener: listen::DynListener<BlockChange> = listener; // coerce to dyn
-        let (gate, block_listener) = listen::Listener::gate(listener);
-        let block_listener: listen::DynListener<BlockChange> = block_listener.into_listener();
+        let block_listener: listen::DynListener<BlockChange> = block_listener; // coerce to dyn
 
         let original_budget = block::Budget::default();
         let filter = block::EvalFilter {
@@ -472,7 +490,7 @@ impl SpaceBlockData {
             block,
             count: 0,
             evaluated,
-            block_listen_gate: Some(gate),
+            block_listen_gate: Some(block_listen_gate),
         }
     }
 
@@ -508,13 +526,22 @@ struct PaletteTodo {
 /// [`PaletteTodo`]'s listener for block change notifications.
 #[derive(Clone, Debug)]
 struct BlockListener {
+    /// This weak reference breaks when our entry is removed from the palette,
+    /// telling us to stop sending changes even though `todo` may be still alive.
+    gate: Weak<()>,
+
+    /// Way we write notifications to the palette.
     todo: Weak<Mutex<PaletteTodo>>,
+
+    /// Which index of the palette this block is in.
     index: BlockIndex,
 }
 
 impl listen::Listener<BlockChange> for BlockListener {
     fn receive(&self, messages: &[BlockChange]) -> bool {
-        if let Some(todo_mutex) = self.todo.upgrade() {
+        if self.gate.strong_count() == 0 {
+            false
+        } else if let Some(todo_mutex) = self.todo.upgrade() {
             if !messages.is_empty() {
                 if let Ok(mut todo) = todo_mutex.lock() {
                     todo.blocks.insert(self.index);
