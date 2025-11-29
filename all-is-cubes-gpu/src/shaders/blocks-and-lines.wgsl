@@ -430,16 +430,52 @@ struct Material {
 }
 
 // Get the material details from vertex color or texture lookup.
+// Does not apply texel edge antialiasing.
 fn get_material(in: BlockFragmentInput) -> Material {
+    if in.color_or_texture[3] < -0.5 {
+        // Texture coordinates.
+        let atlas_id = get_atlas_id(in);
+
+        let clamped: vec3f = clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max);
+        // Note that coordinate rounding towards zero (truncation) is effectively floor(),
+        // since the input is nonnegative.
+        return get_material_from_texture_unfiltered(vec3i(clamped), atlas_id);
+    } else {
+        // Solid color.
+        return Material(in.color_or_texture, vec3<f32>(0.0));
+    }
+}
+
+// Get the material details from vertex color or texture lookup.
+// Performs interpolation between neighboring voxels to create antialiased edges.
+//
+// This function only produces correct results when the texels belonging to the surface
+// have alpha = 1 and all other texels nearby have alpha ≠ 1.
+fn get_material_antialiased_opaque(in: BlockFragmentInput) -> Material {
     if in.color_or_texture[3] < -0.5 {
         // Texture coordinates.
         let atlas_id = get_atlas_id(in);
 
         if camera.antialiasing_option != 0 {
             let warped: vec3f = antialias_texel_coordinates(in.color_or_texture.xyz);
-            let clamped: vec3f = clamp(warped, in.clamp_min, in.clamp_max);
-            return get_material_from_texture_linear(clamped, atlas_id);
-        } else {
+            let clamped_and_warped: vec3f = clamp(warped, in.clamp_min, in.clamp_max);
+            let interpolated_material =
+                get_material_from_texture_linear(clamped_and_warped, atlas_id);
+            if interpolated_material.reflectance.a == 1.0 {
+                // If interpolated alpha is 1, then all the inputs are 1 (ignoring rounding error).
+                // This tells us that none of our our four lookups were out-of-bounds of the opaque
+                // mesh, and the result is valid.
+                return interpolated_material;
+            } else {
+                // Fall through to the non-antialiasing lookup to handle the edge of the surface.
+                // GPU MSAA will antialias that edge.
+                // (This strategy works for everything but the *corner* where an interior texel
+                // edge meets a MSAA polygon edge; that corner will not have texture antialiasing.)
+            }
+        }
+        
+        // Non-antialiasing lookup
+        {
             let clamped: vec3f = clamp(in.color_or_texture.xyz, in.clamp_min, in.clamp_max);
             // Note that coordinate rounding towards zero (truncation) is effectively floor(),
             // since the input is nonnegative.
@@ -687,7 +723,7 @@ fn finalize(light: vec3f, alpha: f32, in: BlockFragmentInput) -> vec4f {
 // Always returns alpha = 1.
 @fragment
 fn block_fragment_opaque(in: BlockFragmentInput) -> @location(0) vec4<f32> {
-    let material = get_material(in);
+    let material = get_material_antialiased_opaque(in);
     let light_from_lit_surface: vec3f = material.reflectance.rgb * lighting(in) + material.emission;
     
     // material alpha is ignored -- it should always be 1.0 anyway
