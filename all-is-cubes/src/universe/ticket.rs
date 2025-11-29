@@ -280,7 +280,7 @@ impl<'universe> ReadTicket<'universe> {
             match error {
                 // TODO: better error reporting in case it does happen
                 E::QueryDoesNotMatch(..) => panic!("ECS has bad data"),
-                E::EntityDoesNotExist(_) => TicketErrorKind::MissingEntity,
+                E::NotSpawned(_) => TicketErrorKind::MissingEntity,
                 E::AliasedMutability(_) => {
                     unreachable!("not a query for mutable access")
                 }
