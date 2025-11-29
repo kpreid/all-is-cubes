@@ -84,8 +84,8 @@ async-io = { version = "2.5.0", default-features = false } # part of the `smol` 
 async-lock = { version = "3.4.1", default-features = false } # part of the `smol` family
 async_fn_traits = { version = "0.1.1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
-bevy_ecs = { version = "0.18.0", default-features = false }
-bevy_platform = { version = "0.18.0", default-features = false, features = ["alloc"] }
+bevy_ecs = { git = "https://github.com/bevyengine/bevy/", default-features = false }
+bevy_platform = { git = "https://github.com/bevyengine/bevy/", default-features = false, features = ["alloc"] }
 bitflags = { version = "2.11.1", default-features = false }
 # We use bit sets for change tracking. `bit-set` was chosen due to it also being used by `naga`.
 bit-set = { version = "0.9.1", default-features = false }
