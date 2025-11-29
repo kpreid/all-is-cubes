@@ -41,7 +41,7 @@ fn gc_system(
     // Used for the initial scan for roots and final scan for garbage.
     scan_query: ecs::Query<'_, '_, (ecs::Entity, &Membership, &GcState)>,
     // Used for finding handles.
-    walk_query: ecs::Query<'_, '_, bevy_ecs::world::EntityRefExcept<'_, ()>>,
+    walk_query: ecs::Query<'_, '_, bevy_ecs::world::EntityRefExcept<'_, '_, ()>>,
     // Used for marking the referents of found handles.
     gc_state_query: ecs::Query<'_, '_, &GcState>,
     mut commands: ecs::Commands<'_, '_>,

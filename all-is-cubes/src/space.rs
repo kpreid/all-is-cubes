@@ -903,9 +903,9 @@ impl universe::SealedMember for Space {
             notifiers: &value.notifiers,
         }
     }
-    fn read_from_query(
-        data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'_>,
-    ) -> <Self as universe::UniverseMember>::Read<'_> {
+    fn read_from_query<'r>(
+        data: <Self::ReadQueryData as ::bevy_ecs::query::QueryData>::Item<'r, '_>,
+    ) -> <Self as universe::UniverseMember>::Read<'r> {
         let (palette, contents, light, physics, behaviors, default_spawn, notifiers) = data;
         Read {
             palette,
@@ -1270,6 +1270,7 @@ impl<'space> Mutation<'_, 'space> {
     pub(crate) fn with_write_query<Out>(
         read_ticket: ReadTicket<'space>,
         q: bevy_ecs::query::QueryItem<
+            'space,
             'space,
             <SpaceTransaction as universe::TransactionOnEcs>::WriteQueryData,
         >,
