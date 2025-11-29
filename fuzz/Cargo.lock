@@ -262,7 +262,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 [[package]]
 name = "bevy_ecs"
 version = "0.18.0-dev"
-source = "git+https://github.com/bevyengine/bevy/#b908c05d6db2d4dfafa4fbcdaee56e7f3bbf36b6"
+source = "git+https://github.com/kpreid/bevy/?branch=getrandom#32762875c2009fbd29e545323d61eafb91268634"
 dependencies = [
  "bevy_ecs_macros",
  "bevy_platform",
@@ -286,7 +286,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs_macros"
 version = "0.18.0-dev"
-source = "git+https://github.com/bevyengine/bevy/#b908c05d6db2d4dfafa4fbcdaee56e7f3bbf36b6"
+source = "git+https://github.com/kpreid/bevy/?branch=getrandom#32762875c2009fbd29e545323d61eafb91268634"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -297,7 +297,7 @@ dependencies = [
 [[package]]
 name = "bevy_macro_utils"
 version = "0.18.0-dev"
-source = "git+https://github.com/bevyengine/bevy/#b908c05d6db2d4dfafa4fbcdaee56e7f3bbf36b6"
+source = "git+https://github.com/kpreid/bevy/?branch=getrandom#32762875c2009fbd29e545323d61eafb91268634"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -308,7 +308,7 @@ dependencies = [
 [[package]]
 name = "bevy_platform"
 version = "0.18.0-dev"
-source = "git+https://github.com/bevyengine/bevy/#b908c05d6db2d4dfafa4fbcdaee56e7f3bbf36b6"
+source = "git+https://github.com/kpreid/bevy/?branch=getrandom#32762875c2009fbd29e545323d61eafb91268634"
 dependencies = [
  "critical-section",
  "foldhash",
@@ -326,12 +326,12 @@ dependencies = [
 [[package]]
 name = "bevy_ptr"
 version = "0.18.0-dev"
-source = "git+https://github.com/bevyengine/bevy/#b908c05d6db2d4dfafa4fbcdaee56e7f3bbf36b6"
+source = "git+https://github.com/kpreid/bevy/?branch=getrandom#32762875c2009fbd29e545323d61eafb91268634"
 
 [[package]]
 name = "bevy_tasks"
 version = "0.18.0-dev"
-source = "git+https://github.com/bevyengine/bevy/#b908c05d6db2d4dfafa4fbcdaee56e7f3bbf36b6"
+source = "git+https://github.com/kpreid/bevy/?branch=getrandom#32762875c2009fbd29e545323d61eafb91268634"
 dependencies = [
  "async-channel",
  "async-task",
@@ -347,7 +347,7 @@ dependencies = [
 [[package]]
 name = "bevy_utils"
 version = "0.18.0-dev"
-source = "git+https://github.com/bevyengine/bevy/#b908c05d6db2d4dfafa4fbcdaee56e7f3bbf36b6"
+source = "git+https://github.com/kpreid/bevy/?branch=getrandom#32762875c2009fbd29e545323d61eafb91268634"
 dependencies = [
  "bevy_platform",
  "disqualified",

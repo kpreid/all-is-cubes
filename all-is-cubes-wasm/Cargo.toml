@@ -34,7 +34,7 @@ all-is-cubes-port = { path = "../all-is-cubes-port", version = "0.9.0", features
 all-is-cubes-render = { path = "../all-is-cubes-render", version = "0.9.0" }
 all-is-cubes-ui = { path = "../all-is-cubes-ui", version = "0.9.0", features = ["session"] }
 # Feature enabling
-bevy_platform = { git = "https://github.com/bevyengine/bevy/", version = "0.18.0-dev", default-features = false, features = ["web"] }
+bevy_platform = { git = "https://github.com/kpreid/bevy/", branch = "getrandom", default-features = false, features = ["web"] }
 console_log = "1.0.0"
 console_error_panic_hook = "0.1.5"
 # using flume instead of `futures_channel::mpsc` because it has `try_send(&self)` instead of `try_send(&mut self)`, and it is also used elsewhere in the project
@@ -44,8 +44,6 @@ form_urlencoded = "1.0.1"
 futures-channel = { version = "0.3.31", default-features = false, features = ["alloc"] }
 # We only use BoxFuture, which requires alloc
 futures-core = { version = "0.3.31", default-features = false, features = ["alloc"] }
-# We don't use getrandom 0.3 directly, but we need to configure it
-getrandom = { version = "0.3", features = ["wasm_js"] }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
 js-sys = "0.3.77"
 log = { version = "0.4.28", default-features = false }
