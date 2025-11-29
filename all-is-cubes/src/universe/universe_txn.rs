@@ -52,7 +52,7 @@ where
     /// See [`Transaction::commit()`].
     fn commit(
         self,
-        target: <Self::WriteQueryData as bevy_ecs::query::QueryData>::Item<'_>,
+        target: <Self::WriteQueryData as bevy_ecs::query::QueryData>::Item<'_, '_>,
         check: Self::CommitCheck,
     ) -> Result<(), CommitError>;
 }
