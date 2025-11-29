@@ -830,7 +830,7 @@ impl bevy_ecs::system::ExclusiveSystemParam for &mut MemberReadQueryStates {
     fn get_param<'s>(
         state: &'s mut Self::State,
         _: &bevy_ecs::system::SystemMeta,
-    ) -> Self::Item<'s> {
-        state
+    ) -> Result<Self::Item<'s>, bevy_ecs::system::SystemParamValidationError> {
+        Ok(state)
     }
 }
