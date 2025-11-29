@@ -67,7 +67,7 @@ where
 pub(crate) enum Zero {
     Zero = 0,
 }
-/// Allows [`Zero`][struct@Zero] to be used like a unit struct.
+/// Convenient alias for [`Zero::Zero`].
 pub(crate) const ZERO: Zero = Zero::Zero;
 
 /// Three copies of [`Zero`].
@@ -80,7 +80,7 @@ pub(crate) struct Zero3 {
     _zero2: Zero,
     _zero3: Zero,
 }
-/// Allows [`Zero3`][struct@Zero3] to be used like a unit struct.
+/// The only possible value of [`Zero3`].
 pub(crate) const ZERO3: Zero3 = Zero3 {
     _zero1: Zero::Zero,
     _zero2: Zero::Zero,
