@@ -122,6 +122,7 @@ struct BlockFragmentInput {
     @interpolate(flat, either)
     @location(5) normal: vec3<f32>,
     
+    @interpolate(perspective, centroid)
     @location(6) color_or_texture: vec4<f32>,
     @interpolate(flat, either)
     @location(7) clamp_min: vec3<f32>,

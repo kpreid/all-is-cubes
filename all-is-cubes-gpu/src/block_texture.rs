@@ -53,6 +53,9 @@ pub struct AtlasAllocator {
 pub struct AtlasTile {
     /// Original bounds as requested (not texture coordinates).
     requested_bounds: GridAab,
+    /// Bounds expressed in texture coordinates, without any offsets.
+    /// Used for volumetric rendering only.
+    clamp_box_3d: Box3D<FixTexCoord, AtlasTexel>,
     /// Identifies both the requested channels and the vertex attribute to use to select the
     /// matching texture.
     channels: Channels,
@@ -87,6 +90,8 @@ struct WeakTile {
 pub struct AtlasPlane {
     tile: AtlasTile,
     requested_bounds: GridAab,
+    /// Bounds in texture coordinates, with half-texel insets.
+    clamp_box: Box3D<FixTexCoord, AtlasTexel>,
 }
 
 #[derive(Debug)]
@@ -263,6 +268,10 @@ impl texture::Allocator for AtlasAllocator {
 
         let result = AtlasTile {
             requested_bounds,
+            clamp_box_3d: Box3D {
+                min: allocated_bounds.min.map(FixTexCoord::from_int),
+                max: allocated_bounds.max.map(FixTexCoord::from_int),
+            },
             channels,
             // TODO: generalize Alloctree so it doesn't use Cube here and the units match automatically
             offset: Translation3D::<_, texture::TexelUnit, Cube>::identity() + handle.offset,
@@ -302,9 +311,20 @@ impl texture::Tile for AtlasTile {
     #[track_caller]
     fn slice(&self, requested_bounds: GridAab) -> Self::Plane {
         texture::validate_slice(self.requested_bounds, requested_bounds);
+        let bounds_in_atlas = self.requested_bounds.translate(self.offset.to_vector().cast_unit());
         AtlasPlane {
             tile: self.clone(),
             requested_bounds,
+            clamp_box: Box3D {
+                min: bounds_in_atlas
+                    .lower_bounds()
+                    .map(FixTexCoord::from_int_plus_half)
+                    .cast_unit(),
+                max: bounds_in_atlas
+                    .upper_bounds()
+                    .map(FixTexCoord::from_int_minus_half)
+                    .cast_unit(),
+            },
         }
     }
 
@@ -317,6 +337,7 @@ impl texture::Tile for AtlasTile {
                 Channels::ReflectanceEmission => 1,
             },
             tc: float_point.map(FixTexCoord::from_float),
+            clamp_box: self.clamp_box_3d,
         }
     }
 
@@ -667,7 +688,10 @@ impl texture::Plane for AtlasPlane {
     type Point = TexPoint;
 
     fn grid_to_texcoord(&self, in_tile_grid: texture::TilePoint) -> Self::Point {
-        self.tile.grid_to_texcoord_3d(in_tile_grid)
+        TexPoint {
+            clamp_box: self.clamp_box,
+            ..self.tile.grid_to_texcoord_3d(in_tile_grid)
+        }
     }
 }
 

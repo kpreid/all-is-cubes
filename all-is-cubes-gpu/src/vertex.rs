@@ -1,6 +1,6 @@
 use core::fmt::{self, Write as _};
 
-use all_is_cubes::euclid::{Point3D, Vector3D};
+use all_is_cubes::euclid::{Box3D, Point3D, Vector3D};
 use all_is_cubes::math::{Cube, GridVector, Rgba};
 use all_is_cubes_mesh::{self as mesh, BlockVertex, Vertex};
 
@@ -14,11 +14,15 @@ const DEBUG_INSTANCES: bool = false;
 /// This type is public out of necessity; you should not need to refer to it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TexPoint {
-    // Which texture atlas to use; corresponds to [`all_is_cubes_mesh::texture::Channels`].
+    /// Which texture atlas to use; corresponds to [`all_is_cubes_mesh::texture::Channels`].
     pub(crate) atlas_id: u8,
 
     /// Texture coordinates, in units of texels (i.e. the range is 0..256 or similar, not 0..1).
     pub(crate) tc: Point3D<FixTexCoord, AtlasTexel>,
+
+    /// Bounding box of the allocation within the atlas, which interpolated texture coordinates are
+    /// not to exceed.
+    pub(crate) clamp_box: Box3D<FixTexCoord, AtlasTexel>,
 }
 
 /// Coordinate system for texels in the 3D atlas texture.
@@ -187,9 +191,14 @@ impl Vertex for BPosition {
                 )
             }
             mesh::Coloring::Texture {
-                pos: TexPoint { tc, atlas_id },
-                clamp_min,
-                clamp_max,
+                pos:
+                    TexPoint {
+                        tc,
+                        atlas_id,
+                        clamp_box,
+                    },
+                clamp_min: _,
+                clamp_max: _,
                 resolution,
             } => (
                 BPosition {
@@ -204,7 +213,7 @@ impl Vertex for BPosition {
                         tc.z.into(),
                         -1.0 - f32::from(atlas_id),
                     ],
-                    clamp_min_max: clamp_min.tc.zip(clamp_max.tc, FixTexCoord::pack).into(),
+                    clamp_min_max: clamp_box.min.zip(clamp_box.max, FixTexCoord::pack).into(),
                 },
             ),
         }
@@ -314,18 +323,39 @@ impl DebugLineVertex for WgpuLinesVertex {
 ///
 /// This type should not be used directly; it is public as an element of [`BPosition`]'s
 /// trait implementations.
-#[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[allow(unnameable_types)]
 #[repr(C)]
 pub struct FixTexCoord(u16);
 
 impl FixTexCoord {
+    // TODO: tighter bounds assertions
     pub(crate) fn from_float(float_tc: f32) -> Self {
         debug_assert!(
             float_tc >= 0.0,
             "texture coordinate {float_tc:?} should not be negative"
         );
         Self((float_tc * 2.).round() as u16)
+    }
+
+    pub(crate) fn from_int(int_tc: u16) -> Self {
+        Self(int_tc * 2)
+    }
+
+    pub(crate) fn from_int_plus_half(int_tc: i32) -> Self {
+        debug_assert!(
+            int_tc >= 0,
+            "texture coordinate {int_tc:?} should not be negative"
+        );
+        Self((int_tc * 2 + 1) as u16)
+    }
+
+    pub(crate) fn from_int_minus_half(int_tc: i32) -> Self {
+        debug_assert!(
+            int_tc > 0,
+            "texture coordinate {int_tc:?} should not be negative or zero"
+        );
+        Self((int_tc * 2 - 1) as u16)
     }
 
     pub(crate) fn pack(low: Self, high: Self) -> u32 {
