@@ -107,7 +107,7 @@ impl MeshOptions {
         Self {
             transparency: graphics_options.transparency.clone(),
             ignore_voxels: false,
-            use_new_block_triangulator: false,
+            use_new_block_triangulator: true,
         }
     }
 
@@ -118,7 +118,7 @@ impl MeshOptions {
         Self {
             transparency: TransparencyOption::Volumetric,
             ignore_voxels: false,
-            use_new_block_triangulator: false,
+            use_new_block_triangulator: true,
         }
     }
 
