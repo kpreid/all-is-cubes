@@ -94,28 +94,6 @@ pub struct BlockVertex<T> {
     pub coloring: Coloring<T>,
 }
 
-impl<T: Clone> BlockVertex<T> {
-    /// Remove the clamp information for the sake of tidier tests of one thing at a time.
-    #[cfg(test)]
-    pub(crate) fn remove_clamps(mut self) -> Self {
-        self.coloring = match self.coloring {
-            Coloring::Texture {
-                pos,
-                clamp_min: _,
-                clamp_max: _,
-                resolution,
-            } => Coloring::Texture {
-                clamp_min: pos.clone(),
-                clamp_max: pos.clone(),
-                pos,
-                resolution,
-            },
-            other @ Coloring::Solid(_) => other,
-        };
-        self
-    }
-}
-
 /// Two ways a [`BlockVertex`] may be colored: by a solid color or by a texture.
 ///
 /// `T` is the type of texture-coordinate points being used. That is, one `T` value
@@ -132,12 +110,6 @@ pub enum Coloring<T> {
     Texture {
         /// Texture coordinates for this vertex.
         pos: T,
-        /// Lower bounds for clamping the interpolated texture coordinates on this surface.
-        /// All vertices in a triangle are guaranteed to have the same clamp values.
-        /// Together with `clamp_max`, may be used to avoid texture bleed in texture atlases.
-        clamp_min: T,
-        /// Upper bounds for clamping the interpolated texture coordinates on this surface.
-        clamp_max: T,
         /// Resolution of the voxels the texture was created from.
         resolution: Resolution,
     },

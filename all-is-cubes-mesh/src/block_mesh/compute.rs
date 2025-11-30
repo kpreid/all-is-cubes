@@ -15,11 +15,11 @@ use all_is_cubes_render::Flaws;
 use crate::block_mesh::analyze::{Analysis, analyze};
 use crate::block_mesh::extend::{
     BoxColoring, QuadColoring, QuadTransform, push_box, push_full_box, push_quad,
-    push_vertices_from_iter, transform_clamp_box,
+    push_vertices_from_iter,
 };
 use crate::block_mesh::planar::{GmRect, VisualVoxel, greedy_mesh};
 use crate::block_mesh::planar_new;
-use crate::texture::{self, Plane as _, Tile as _, TilePoint};
+use crate::texture::{self, Plane as _, Tile as _};
 use crate::{BlockMesh, IndexSlice, MeshOptions, MeshTypes, PosCoord, SubMesh, Viz, vertex};
 
 /// Generate the [`BlockMesh`] data for the given [`EvaluatedBlock`], writing it into `output`.
@@ -387,20 +387,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     })
                 };
 
-                // Bounding box for the texture lookups that are in this plane.
-                let clamp = if let Some(ref plane) = texture_plane_if_needed {
-                    let low_corner = occupied_rect.min.to_f32();
-                    let high_corner = occupied_rect.max.to_f32();
-                    Some(transform_clamp_box(
-                        plane,
-                        &quad_transform,
-                        TilePoint::new(low_corner.x + 0.5, low_corner.y + 0.5, depth + 0.5),
-                        TilePoint::new(high_corner.x - 0.5, high_corner.y - 0.5, depth + 0.5),
-                    ))
-                } else {
-                    None
-                };
-
                 let index_offset = vertices.0.len().try_into().expect("vertex index overflow");
 
                 // Append this plane's vertices to the SubMesh vertices.
@@ -416,9 +402,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                         // offset to mid-texel for unambiguity
                                             + face.vector(-0.5f32),
                                     ),
-                                    // TODO: avoid unwrap
-                                    clamp_min: clamp.unwrap().0,
-                                    clamp_max: clamp.unwrap().1,
                                     resolution,
                                 }
                             } else {

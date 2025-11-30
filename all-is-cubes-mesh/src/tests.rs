@@ -9,8 +9,8 @@ use all_is_cubes::block::{
     self, AIR, Block,
     Resolution::{self, *},
 };
-use all_is_cubes::content::{make_some_blocks, make_some_voxel_blocks};
-use all_is_cubes::euclid::{Point3D, Size3D, Vector3D, point3};
+use all_is_cubes::content::make_some_blocks;
+use all_is_cubes::euclid::{Point3D, Size3D, point3};
 use all_is_cubes::math::{
     Aab, Cube,
     Face6::{self, *},
@@ -23,7 +23,6 @@ use all_is_cubes_render::Flaws;
 use all_is_cubes_render::camera::TransparencyOption;
 
 use crate::testing::{Allocator, TexPoint, TextureMt, mesh_blocks_and_space};
-use crate::texture::TexelUnit;
 use crate::{
     BlockMesh, BlockMeshes, BlockVertex, Coloring, DepthOrdering, IndexSlice, MeshOptions,
     MeshTypes, PosCoord, SpaceMesh, block_meshes_for_space,
@@ -51,8 +50,6 @@ fn v_t(
         face,
         coloring: Coloring::Texture {
             pos: texture,
-            clamp_min: texture,
-            clamp_max: texture,
             resolution,
         },
     }
@@ -197,8 +194,6 @@ fn animated_atom_uses_texture() {
         mesh.vertices().0[0].coloring,
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
-            clamp_min: point3(0.5, 0.5, 0.5),
-            clamp_max: point3(0.5, 0.5, 0.5),
             resolution: R1,
         }
     )
@@ -229,8 +224,6 @@ fn animated_voxels_uses_texture() {
         mesh.vertices().0[0].coloring,
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
-            clamp_min: point3(0.5, 0.5, 0.5),
-            clamp_max: point3(0.5, 1.5, 1.5),
             resolution: R2,
         }
     )
@@ -256,8 +249,6 @@ fn emissive_atom_uses_texture() {
         mesh.vertices().0[0].coloring,
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
-            clamp_min: point3(0.5, 0.5, 0.5),
-            clamp_max: point3(0.5, 0.5, 0.5),
             resolution: R1,
         }
     )
@@ -280,8 +271,6 @@ fn emissive_only_atom() {
         space_mesh.vertices().0[0].coloring,
         Coloring::Texture {
             pos: point3(0.5, 0., 0.),
-            clamp_min: point3(0.5, 0.5, 0.5),
-            clamp_max: point3(0.5, 0.5, 0.5),
             resolution: R1,
         }
     )
@@ -405,7 +394,7 @@ fn shrunken_box_has_no_extras() {
 
     assert_eq!(tex.count_allocated(), 1);
     assert_eq!(
-        space_rendered.vertices().0.iter().map(|&v| v.remove_clamps()).collect::<Vec<_>>(),
+        space_rendered.vertices().0,
         vec![
             v_t([0.250, 0.250, 0.250], NX, resolution, [2.5, 2.0, 2.0]),
             v_t([0.250, 0.250, 0.750], NX, resolution, [2.5, 2.0, 6.0]),
@@ -738,56 +727,6 @@ fn space_mesh_empty() {
     assert_eq!(t.indices(), IndexSlice::U16(&[]));
 }
 
-/// Test that `clamp_min < clamp_max`, and that `pos` is within the range (± 0.5) too.
-///
-/// (It'd be nice if this was instead a debug assertion when constructing vertices, but
-/// the data is a fully `pub` struct and enum.)
-#[test]
-fn texture_clamp_coordinate_ordering() {
-    const ALL_TRUE: Vector3D<bool, TexelUnit> = Vector3D::new(true, true, true);
-
-    let mut universe = Universe::new();
-    let [block] = make_some_voxel_blocks(&mut universe);
-    let mesh = test_block_mesh(&universe, block);
-    for (face, on_face, face_mesh) in mesh.all_sub_meshes_keyed() {
-        if !on_face {
-            // make_some_voxel_blocks has no interior
-            continue;
-        }
-        let mut had_any_textured = false;
-        for vertex in face_mesh.vertices.0.iter() {
-            match vertex.coloring {
-                Coloring::Solid(_) => {}
-                Coloring::Texture {
-                    pos,
-                    clamp_min,
-                    clamp_max,
-                    resolution: _,
-                } => {
-                    had_any_textured = true;
-                    assert!(
-                        clamp_min.zip(clamp_max, |min, max| min <= max) == ALL_TRUE,
-                        "clamp should be {clamp_min:?} <= {clamp_max:?}"
-                    );
-                    // Texture coordinates may be outside the clamp by 0.5 because the clamp
-                    // coordinates are deliberately kept within the bounds by a half-texel
-                    // (which has no visual effect on the nearest-neighbor interpolated texels
-                    // but ensures good numerical results).
-                    assert!(
-                        clamp_min.zip(pos, |min, pos| min - 0.5 <= pos) == ALL_TRUE
-                            && pos.zip(clamp_max, |pos, max| pos <= max + 0.5) == ALL_TRUE,
-                        "{clamp_min:?} <= {pos:?} <= {clamp_max:?}"
-                    );
-                }
-            }
-        }
-        assert!(
-            !on_face || had_any_textured,
-            "test invalid: {face:?} has no textured vertices"
-        )
-    }
-}
-
 /// Test the texture coordinates for volumetric texturing.
 #[test]
 fn volumetric_vertices_all_transparent() {
@@ -855,21 +794,11 @@ fn assert_is_using_volumetric_texturing_properly(
         }
         for (i, vertex) in sub_mesh.vertices.0.iter().enumerate() {
             match vertex.coloring {
-                Coloring::Texture {
-                    pos,
-                    clamp_min,
-                    clamp_max,
-                    resolution,
-                } => {
+                Coloring::Texture { pos, resolution } => {
                     assert_eq!(
                         pos,
                         vertex.position.to_f32().cast_unit() * f32::from(resolution),
                         "vertex position {face:?} {i:?}"
-                    );
-                    assert_eq!(
-                        (clamp_min, clamp_max),
-                        (point3(0., 0., 0.), point3(4., 4., 4.)),
-                        "clamp {face:?} {i:?}"
                     );
                 }
                 _ if expect_transparent_only => {

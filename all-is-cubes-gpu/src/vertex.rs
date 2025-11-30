@@ -197,8 +197,6 @@ impl Vertex for BPosition {
                         atlas_id,
                         clamp_box,
                     },
-                clamp_min: _,
-                clamp_max: _,
                 resolution,
             } => (
                 BPosition {

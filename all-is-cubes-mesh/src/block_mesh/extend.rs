@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use all_is_cubes::block::Resolution;
 use all_is_cubes::euclid::{Point2D, Scale, Transform3D, Vector2D, point2, vec3};
 use all_is_cubes::math::{
-    Axis, Face6, FaceMap, GridAab, GridCoordinate, OpacityCategory, Rgba, rgba_const,
+    Face6, FaceMap, GridAab, GridCoordinate, OpacityCategory, Rgba, rgba_const,
 };
 
 use crate::texture::{self, Plane as _, TexelUnit, TextureCoordinate, TilePoint};
@@ -72,10 +72,7 @@ pub(crate) fn push_box<M: MeshTypes>(
             lower_bounds.to_f32().cast_unit(),
             upper_bounds.to_f32().cast_unit(),
             match &coloring {
-                BoxColoring::VolumeTexture(tile) => QuadColoring::Volume {
-                    tile,
-                    far_depth: aab_in_face_coordinates.upper_bounds().z as f32,
-                },
+                BoxColoring::VolumeTexture(tile) => QuadColoring::Volume(tile),
                 BoxColoring::Solid(face_colors) => QuadColoring::Solid(face_colors[face]),
             },
             viz,
@@ -153,7 +150,6 @@ pub(crate) fn push_quad<V, Tex>(
     Tex: texture::Tile,
 {
     let index_origin: u32 = vertices.0.len().try_into().expect("vertex index overflow");
-    let half_texel = 0.5;
     let face = transform.face;
 
     // This iterator computes the coordinates but not the vertex --
@@ -198,21 +194,6 @@ pub(crate) fn push_quad<V, Tex>(
             );
         }
         QuadColoring::Texture(plane) => {
-            let (clamp_min, clamp_max) = transform_clamp_box(
-                plane,
-                transform,
-                TilePoint::new(
-                    low_corner.x + half_texel,
-                    low_corner.y + half_texel,
-                    depth + half_texel,
-                ),
-                TilePoint::new(
-                    high_corner.x - half_texel,
-                    high_corner.y - half_texel,
-                    depth + half_texel,
-                ),
-            );
-
             push_vertices_from_iter(
                 vertices,
                 position_iter.map(|voxel_grid_point| {
@@ -225,40 +206,13 @@ pub(crate) fn push_quad<V, Tex>(
                             pos: plane.grid_to_texcoord(transform.transform_texture_point(
                                 (voxel_grid_point + vec3(0., 0., 0.5)).cast_unit(),
                             )),
-                            clamp_min,
-                            clamp_max,
                             resolution: transform.resolution,
                         },
                     })
                 }),
             );
         }
-        QuadColoring::Volume { tile, far_depth } => {
-            let (clamp_min, clamp_max) = {
-                // Transform planar texture coordinates into the 3D coordinate system.
-                let mut clamp_min = transform.transform_texture_point(TilePoint::new(
-                    low_corner.x,
-                    low_corner.y,
-                    depth,
-                ));
-                let mut clamp_max = transform.transform_texture_point(TilePoint::new(
-                    high_corner.x,
-                    high_corner.y,
-                    far_depth,
-                ));
-
-                // Ensure the transformed clamp range is not inverted.
-                for axis in Axis::ALL {
-                    all_is_cubes::math::sort_two(&mut clamp_min[axis], &mut clamp_max[axis]);
-                }
-
-                // Convert to global texture coordinates in the texture tile's format.
-                (
-                    tile.grid_to_texcoord_3d(clamp_min),
-                    tile.grid_to_texcoord_3d(clamp_max),
-                )
-            };
-
+        QuadColoring::Volume(tile) => {
             // TODO: deduplicate this code
             push_vertices_from_iter(
                 vertices,
@@ -272,8 +226,6 @@ pub(crate) fn push_quad<V, Tex>(
                             pos: tile.grid_to_texcoord_3d(
                                 transform.transform_texture_point(voxel_grid_point.cast_unit()),
                             ),
-                            clamp_min,
-                            clamp_max,
                             resolution: transform.resolution,
                         },
                     })
@@ -302,28 +254,6 @@ const QUAD_VERTICES: &[Vector2D<PosCoord, TexelUnit>; 4] = &[
 
 const QUAD_INDICES: &[u32; 6] = &[0, 1, 2, 2, 1, 3];
 
-pub(crate) fn transform_clamp_box<Tex: texture::Plane>(
-    plane: &Tex,
-    transform: &QuadTransform,
-    min: TilePoint,
-    max: TilePoint,
-) -> (Tex::Point, Tex::Point) {
-    // Transform planar texture coordinates into the 3D coordinate system.
-    let mut clamp_min = transform.transform_texture_point(min);
-    let mut clamp_max = transform.transform_texture_point(max);
-
-    // Ensure the transformed clamp range is not inverted.
-    for axis in Axis::ALL {
-        all_is_cubes::math::sort_two(&mut clamp_min[axis], &mut clamp_max[axis]);
-    }
-
-    // Convert to global texture coordinates in the texture tile's format.
-    (
-        plane.grid_to_texcoord(clamp_min),
-        plane.grid_to_texcoord(clamp_max),
-    )
-}
-
 /// Helper for [`push_quad`] which offers the alternatives of solid color or texturing.
 /// Compared to [`Coloring`], it describes texturing for an entire quad rather than a vertex.
 #[derive(Debug)]
@@ -336,11 +266,7 @@ pub(crate) enum QuadColoring<'a, T: texture::Tile> {
 
     /// A textured volume of which this is the surface.
     /// Used only with [`crate::TransparencyFormat::BoundingBox`].
-    Volume {
-        tile: &'a T,
-        /// Depth
-        far_depth: PosCoord,
-    },
+    Volume(&'a T),
 }
 impl<T: texture::Tile> Copy for QuadColoring<'_, T> {}
 #[expect(
