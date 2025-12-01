@@ -220,7 +220,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         let interior_mesh = &mut output.interior_vertices[face];
         let interior_side_octant_mask = OctantMask::ALL.shift(-face);
 
-        let triangulator_basis = planar_new::PtBasis::new(
+        let mut triangulator_basis = planar_new::PtBasis::new(
             face,
             /* sweep_direction: */
             match face {
@@ -240,7 +240,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 Face6::PY => Face6::PZ,
                 Face6::PZ => Face6::PY,
             },
-            // TODO(planar_new): need to do two passes, one transparent and one opaque
+            // Note: transparent will get toggled later. TODO: express this more cleanly?
             /* transparent: */
             false,
         );
@@ -375,85 +375,94 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             let depth = layer as PosCoord; // TODO: centralize this conversion
 
             if options.use_new_block_triangulator {
-                // Iterator over analysis vertices filtered to the current plane.
-                let iter_plane_vertices = || {
-                    analysis.vertices.iter().filter(|&v| {
-                        // Filter to vertices on this layer...
-                        voxel_transform_inverse.transform_point(v.position).z == layer
-                            // ...that have some content on this face and are not purely opposite
-                            // TODO(planar_new): need to check opaque vs transparent here and
-                            // make separate vertices for separate passes
-                            && (v.renderable & interior_side_octant_mask) != OctantMask::NONE
-                    })
-                };
+                for (transparent_pass, indices_destination) in [
+                    (false, &mut *indices_opaque),
+                    (true, &mut *indices_transparent),
+                ] {
+                    // Iterator over analysis vertices filtered to the current plane.
+                    let iter_plane_vertices = || {
+                        analysis.vertices.iter().filter(|&v| {
+                            // Filter to vertices on this layer,
+                            // that have some content on this face and are not purely opposite,
+                            // that are either opaque or transparent as requested.
+                            voxel_transform_inverse.transform_point(v.position).z == layer
+                                && (if transparent_pass {
+                                    v.renderable & !v.opaque
+                                } else {
+                                    v.opaque
+                                } & interior_side_octant_mask
+                                    != OctantMask::NONE)
+                        })
+                    };
 
-                let index_offset = vertices.0.len().try_into().expect("vertex index overflow");
+                    let index_offset = vertices.0.len().try_into().expect("vertex index overflow");
 
-                // Append this plane's vertices to the SubMesh vertices.
-                push_vertices_from_iter(
-                    vertices,
-                    iter_plane_vertices().map(|av| {
-                        let position = scale_to_block.transform_point3d(av.position.to_f32());
-                        let coloring: vertex::Coloring<<M::Tile as texture::Tile>::Point> =
-                            if let Some(ref plane) = texture_plane_if_needed {
-                                vertex::Coloring::Texture {
-                                    pos: plane.grid_to_texcoord(
-                                        av.position.to_f32().cast_unit()
+                    // Append this plane's vertices to the SubMesh vertices.
+                    push_vertices_from_iter(
+                        vertices,
+                        iter_plane_vertices().map(|av| {
+                            let position = scale_to_block.transform_point3d(av.position.to_f32());
+                            let coloring: vertex::Coloring<<M::Tile as texture::Tile>::Point> =
+                                if let Some(ref plane) = texture_plane_if_needed {
+                                    vertex::Coloring::Texture {
+                                        pos: plane.grid_to_texcoord(
+                                            av.position.to_f32().cast_unit()
                                         // offset to mid-texel for unambiguity
                                             + face.vector(-0.5f32),
-                                    ),
-                                    resolution,
-                                }
-                            } else {
-                                // Pick an arbitrary inside voxel to fetch the vertex color from.
-                                // Note: This operation is only valid because
-                                // Analysis::needs_texture will be true if any adjacent voxels
-                                // have distinct colors, even if they're not actually connected.
-                                // If we were to adopt a finer-grained analysis, we wouldn't be
-                                // able to get away with using only 1 mesh vertex per
-                                // analysis vertex per face.
-                                let acceptable_voxel = Cube::from(
-                                    av.position
-                                        + (av.renderable & interior_side_octant_mask)
-                                            .first()
-                                            .unwrap_or_else(|| {
-                                                panic!(
-                                                    "failed to find vertex color for {av:?}\n\
+                                        ),
+                                        resolution,
+                                    }
+                                } else {
+                                    // Pick an arbitrary inside voxel to fetch the vertex color from.
+                                    // Note: This operation is only valid because
+                                    // Analysis::needs_texture will be true if any adjacent voxels
+                                    // have distinct colors, even if they're not actually connected.
+                                    // If we were to adopt a finer-grained analysis, we wouldn't be
+                                    // able to get away with using only 1 mesh vertex per
+                                    // analysis vertex per face.
+                                    let acceptable_voxel = Cube::from(
+                                        av.position
+                                            + (av.renderable & interior_side_octant_mask)
+                                                .first()
+                                                .unwrap_or_else(|| {
+                                                    panic!(
+                                                        "failed to find vertex color for {av:?}\n\
                                                 {interior_side_octant_mask:?}\n {face:?}"
-                                                )
-                                            })
-                                            .to_01()
-                                            .map(|c| GridCoordinate::from(c) - 1), // TODO: add an Octant op for balanced cubes
-                                );
+                                                    )
+                                                })
+                                                .to_01()
+                                                .map(|c| GridCoordinate::from(c) - 1), // TODO: add an Octant op for balanced cubes
+                                    );
 
-                                // Fetch color from voxel data
-                                vertex::Coloring::Solid(voxels_array[acceptable_voxel].color)
-                            };
-                        let v =
-                            <M::Vertex as vertex::Vertex>::from_block_vertex(vertex::BlockVertex {
-                                position,
-                                face,
-                                coloring,
-                            });
-                        bounding_box.opaque.add_point(position);
-                        v
-                    }),
-                );
+                                    // Fetch color from voxel data
+                                    vertex::Coloring::Solid(voxels_array[acceptable_voxel].color)
+                                };
+                            let v = <M::Vertex as vertex::Vertex>::from_block_vertex(
+                                vertex::BlockVertex {
+                                    position,
+                                    face,
+                                    coloring,
+                                },
+                            );
+                            bounding_box.opaque.add_point(position);
+                            v
+                        }),
+                    );
 
-                triangulator.triangulate(
-                    viz,
-                    triangulator_basis,
-                    iter_plane_vertices().copied(),
-                    |triangle_indices| {
-                        let rect_has_alpha = false; // TODO(planar_new): implement transparent support
-                        if rect_has_alpha {
-                            &mut *indices_transparent
-                        } else {
-                            &mut *indices_opaque
-                        }
-                        .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
-                    },
-                );
+                    // Compute triangles and append their indices to SubMesh.
+                    triangulator_basis.transparent = transparent_pass;
+                    triangulator.triangulate(
+                        viz,
+                        triangulator_basis,
+                        iter_plane_vertices().copied(),
+                        |triangle_indices| {
+                            indices_destination.extend_with_offset(
+                                IndexSlice::U32(&triangle_indices),
+                                index_offset,
+                            );
+                        },
+                    );
+                }
             } else {
                 // Traverse `visible_image` using the "greedy meshing" algorithm for
                 // breaking an irregular shape into quads.
