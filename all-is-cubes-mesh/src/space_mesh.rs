@@ -288,7 +288,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                 &mut self.vertices,
                 &mut opaque_indices_deque,
                 &mut transparent_indices,
-                &mut self.meta.bounding_box,
+                &mut self.meta,
                 |face| {
                     let adjacent_cube = cube + face.normal_vector();
                     if let Some(adj_block_index) = space_data_source(adjacent_cube)
@@ -474,11 +474,12 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 /// Copy and adjust vertices from a [`BlockMesh`] into the storage of a [`SpaceMesh`].
 ///
 /// This does not perform depth sorting and does not account for mesh or texture dependencies.
-/// It does not update `flaws`.
 ///
 /// * `block_mesh` is the input mesh to copy.
 /// * `cube` is the position passed to `V::instantiate_block()`.
 /// * `vertices`, `opaque_indices`, and `transparent_indices` are the destination to append to.
+/// * `meta`’s `bounding_box` will be updated to enclose the vertices.
+///   Its index ranges, `flaws` and `textures_used` will not be updated.
 /// * `neighbor_is_fully_opaque` is called to determine whether this block's faces are
 ///   obscured. It is a function so that lookups can be skipped if their answer would
 ///   make no difference.
@@ -489,7 +490,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
     vertices: &mut (Vec<M::Vertex>, Vec<<M::Vertex as Vertex>::SecondaryData>),
     opaque_indices: &mut IndexVecDeque,
     transparent_indices: &mut FaceMap<IndexVec>,
-    bounding_box: &mut Aabbs,
+    meta: &mut MeshMeta<M>,
     mut neighbor_is_fully_opaque: impl FnMut(Face6) -> bool,
 ) {
     if block_mesh.is_empty() {
@@ -525,7 +526,7 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         transparent_indices[face]
             .extend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset);
 
-        bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
+        meta.bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
     }
 }
 
@@ -581,7 +582,7 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
             &mut space_mesh.vertices,
             &mut opaque_indices_deque,
             &mut transparent_indices,
-            &mut space_mesh.meta.bounding_box, // redundant, but hard to skip
+            &mut space_mesh.meta, // partly redundant, but hard to skip
             |_| false,
         );
         space_mesh.store_indices_and_finish_compute(opaque_indices_deque, transparent_indices);
