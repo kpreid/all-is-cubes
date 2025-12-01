@@ -271,7 +271,18 @@ impl PlanarTriangulator {
                 self.advance_sweep_position(viz, &mut triangle_callback, new_sweep_position);
             }
 
-            viz.set_current_triangulation_vertex(&input_fv, format_args!("main"));
+            viz.set_current_triangulation_vertex(
+                &input_fv,
+                format_args!(
+                    "{face:?} {transparency} #{input_index_usize}",
+                    face = basis.face,
+                    transparency = if basis.transparent {
+                        "transparent"
+                    } else {
+                        "opaque"
+                    }
+                ),
+            );
             viz.completed_step();
 
             // Check for vertices in the old frontier that the input vertex is perpendicularly
