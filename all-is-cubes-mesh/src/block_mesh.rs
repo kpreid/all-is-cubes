@@ -109,6 +109,13 @@ pub(super) struct SubMesh<V: Vertex> {
     // TODO: This field may make more sense kept in the BlockMesh, perhaps even as a bitmask
     pub(super) fully_opaque: bool,
 
+    /// Whether `indices_transparent` has any triangles that are not guaranteed to be
+    /// in the form of pairs of consecutive triangles that form rectangles.
+    ///
+    /// This is used to determine whether depth sorting can get away with sorting rectangles instead
+    /// of triangles (halving the number of items to sort).
+    pub(super) has_non_rect_transparency: bool,
+
     /// Bounding box of the mesh’s vertices.
     pub(super) bounding_box: Aabbs,
 }
@@ -386,6 +393,7 @@ impl<V: Vertex> SubMesh<V> {
         indices_opaque: IndexVec::new(),
         indices_transparent: IndexVec::new(),
         fully_opaque: false,
+        has_non_rect_transparency: false,
         bounding_box: Aabbs::EMPTY,
     };
 
@@ -395,6 +403,7 @@ impl<V: Vertex> SubMesh<V> {
             indices_opaque,
             indices_transparent,
             fully_opaque,
+            has_non_rect_transparency,
             bounding_box,
         } = self;
         v0.clear();
@@ -402,6 +411,7 @@ impl<V: Vertex> SubMesh<V> {
         indices_opaque.clear();
         indices_transparent.clear();
         *fully_opaque = false;
+        *has_non_rect_transparency = false;
         *bounding_box = Aabbs::EMPTY;
     }
 
@@ -415,6 +425,7 @@ impl<V: Vertex> SubMesh<V> {
             indices_opaque,
             indices_transparent,
             fully_opaque: _,
+            has_non_rect_transparency: _,
             bounding_box: _,
         } = self;
         indices_opaque.len() + indices_transparent.len()

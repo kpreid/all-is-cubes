@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
-use core::ops::{self, Deref, Range};
+use core::ops::{self, Range};
 
 use exhaust::Exhaust as _;
 use ordered_float::OrderedFloat;
@@ -273,13 +273,13 @@ pub struct DepthSortResult {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct DepthSortInfo {
-    /// How many quads were in the data to be sorted.
+    /// How many individual items (triangles or rectangles) were in the data to be sorted.
     #[doc(hidden)] // public for benchmark checking whether depth sorting happened as expected
-    pub quads_sorted: usize,
+    pub elements_sorted: usize,
 
     /// How many independent sorting operations were performed.
     ///
-    /// All else being equal, it is better if this number is larger for a given `quads_sorted`,
+    /// All else being equal, it is better if this number is larger for a given `elements_sorted`,
     /// since the cost of sorting grows faster than linear.
     pub(crate) groups_sorted: usize,
 
@@ -298,7 +298,7 @@ impl DepthSortResult {
 
 impl DepthSortInfo {
     const DEFAULT: Self = Self {
-        quads_sorted: 0,
+        elements_sorted: 0,
         groups_sorted: 0,
         static_groups_sorted: 0,
     };
@@ -313,13 +313,86 @@ impl Default for DepthSortInfo {
 impl ops::AddAssign for DepthSortInfo {
     fn add_assign(&mut self, rhs: Self) {
         let Self {
-            quads_sorted,
+            elements_sorted,
             groups_sorted,
             static_groups_sorted,
         } = self;
-        *quads_sorted += rhs.quads_sorted;
+        *elements_sorted += rhs.elements_sorted;
         *groups_sorted += rhs.groups_sorted;
         *static_groups_sorted += rhs.static_groups_sorted;
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// An individual depth-sortable item.
+/// Implemented for array chunks of indices.
+///
+/// (This is not literally a GPU drawing primitive, but for our purposes it might as well be.)
+trait Primitive: Copy + Sized {
+    type Item: IndexInt;
+    const LEN: usize;
+    /// Divide the slice reference into chunks. Panics if the slice is not divisible.
+    fn as_chunks(slice: &[Self::Item]) -> &[Self];
+    /// Divide the exclusive slice reference into chunks. Panics if the slice is not divisible.
+    fn as_chunks_mut(slice: &mut [Self::Item]) -> &mut [Self];
+    /// Return 3 indices which together form a bounding box for the primitive.
+    fn indices_for_sorting(&self) -> [Self::Item; 3];
+}
+/// Rectangles (made of 2 triangles).
+/// Note that this does not work for general quadrilaterals because
+/// the full bounding box would not be considered.
+impl<Ix: IndexInt> Primitive for [Ix; 6] {
+    type Item = Ix;
+    const LEN: usize = 6;
+    fn as_chunks(slice: &[Self::Item]) -> &[Self] {
+        let (rects, rest) = slice.as_chunks();
+        assert_eq!(
+            rest.len(),
+            0,
+            "expected an index list divisible into rectangles"
+        );
+        rects
+    }
+    fn as_chunks_mut(slice: &mut [Self::Item]) -> &mut [Self] {
+        let (rects, rest) = slice.as_chunks_mut();
+        assert_eq!(
+            rest.len(),
+            0,
+            "expected an index list divisible into rectangles"
+        );
+        rects
+    }
+
+    fn indices_for_sorting(&self) -> [Ix; 3] {
+        [self[0], self[1], self[2]]
+    }
+}
+/// Triangles.
+impl<Ix: IndexInt> Primitive for [Ix; 3] {
+    type Item = Ix;
+    const LEN: usize = 3;
+    fn as_chunks(slice: &[Self::Item]) -> &[Self] {
+        let (tris, rest) = slice.as_chunks();
+        assert_eq!(
+            rest.len(),
+            0,
+            "expected an index list divisible into triangles"
+        );
+        tris
+    }
+    fn as_chunks_mut(slice: &mut [Self::Item]) -> &mut [Self] {
+        let (tris, rest) = slice.as_chunks_mut();
+        assert_eq!(
+            rest.len(),
+            0,
+            "expected an index list divisible into triangles"
+        );
+        tris
+    }
+
+    fn indices_for_sorting(&self) -> [Ix; 3] {
+        *self
     }
 }
 
@@ -406,10 +479,10 @@ pub(crate) fn store_transparent_indices<M: MeshTypes, I: IndexInt>(
 /// Sort `indices` according to `ordering`, and determine which portions, if any,
 /// need to be “dynamically” sorted later according to the exact view position; then write that
 /// information into `meta`.
-fn static_sort<V: Vertex, Ix: IndexInt>(
+fn static_sort<V: Vertex, P: Primitive>(
     ordering: DepthOrdering,
     vertices: &[V],
-    indices: &mut [Ix],
+    indices: &mut [P::Item],
     meta: &mut TransparentMeta,
 ) {
     debug_assert!(meta.dynamic_sub_ranges.is_empty());
@@ -418,20 +491,20 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
     // what one is right
     let basis = ordering.sort_key_rotation().inverse().to_basis();
 
-    let mut sortable_quads: Vec<OrderedQuad<Ix>> = Vec::with_capacity(indices.len() / 6);
-    sortable_quads.extend(
-        expect_quads(indices.as_chunks::<6>())
+    let mut sortable_primitives: Vec<OrderedPrimitive<P>> =
+        Vec::with_capacity(indices.len() / P::LEN);
+    sortable_primitives.extend(
+        P::as_chunks(indices)
             .iter()
-            .map(|&indices_of_quad| OrderedQuad::new(indices_of_quad, vertices, basis)),
+            .map(|&indices_of_prim| OrderedPrimitive::new(indices_of_prim, vertices, basis)),
     );
 
     // Sort the vertices.
     // Note: Benchmarks show that `sort_by` is faster than `sort_unstable_by` for this.
-    sortable_quads.sort_by(OrderedQuad::cmp);
+    sortable_primitives.sort_by(OrderedPrimitive::cmp);
 
     // Copy the result of the sort back into the index slice.
-    for (src, dst) in itertools::zip_eq(&sortable_quads, expect_quads(indices.as_chunks_mut::<6>()))
-    {
+    for (src, dst) in itertools::zip_eq(&sortable_primitives, P::as_chunks_mut(indices)) {
         *dst = src.indices;
     }
 
@@ -441,7 +514,7 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
     let within_on_axes = ordering.within_on_axes();
     match within_on_axes {
         _ if indices.is_empty() => {
-            // There are no quads to sort, so don't generate any range (that would be empty).
+            // There are no items to sort, so don't generate any range (that would be empty).
             // It is an invariant of `TransparentMeta` that `dynamic_sub_ranges` contains no
             // empty ranges.
             meta.depth_sort_validity = Aabb::EVERYWHERE;
@@ -466,26 +539,28 @@ fn static_sort<V: Vertex, Ix: IndexInt>(
             let projection = basis.x;
             debug_assert_ne!(ordering.0[projection.axis()], Rel::Within);
 
-            let mut quad_group = 0..1; // indices into sortable_quads, not single indices!
-            let mut group_upper_bound = sortable_quads[0].min_max_on_axis(vertices, basis.x).1;
-            for (i, quad) in sortable_quads[1..].iter().enumerate() {
-                let (qmin, qmax) = quad.min_max_on_axis(vertices, basis.x);
+            let mut prim_group = 0..1; // indices into sortable_primitives, not single indices!
+            let mut group_upper_bound = sortable_primitives[0].min_max_on_axis(vertices, basis.x).1;
+            for (i, prim) in sortable_primitives[1..].iter().enumerate() {
+                let (qmin, qmax) = prim.min_max_on_axis(vertices, basis.x);
                 if qmin < group_upper_bound {
-                    // Add this quad to the group because it overlaps on the axis
-                    quad_group.end = i + 1;
+                    // Add this primitive to the group because it overlaps on the axis
+                    prim_group.end = i + 1;
                     group_upper_bound = qmax;
                 } else {
-                    // Quad does not overlap; finish the current group and start a new one.
-                    if quad_group.len() > 1 {
-                        meta.dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
+                    // Primitive does not overlap; finish the current group and start a new one.
+                    if prim_group.len() > 1 {
+                        meta.dynamic_sub_ranges
+                            .push((prim_group.start * P::LEN)..(prim_group.end * P::LEN));
                     }
-                    quad_group = i..(i + 1);
+                    prim_group = i..(i + 1);
                     group_upper_bound = qmax;
                 }
             }
             // Write the last group
-            if quad_group.len() > 1 {
-                meta.dynamic_sub_ranges.push((quad_group.start * 6)..(quad_group.end * 6));
+            if prim_group.len() > 1 {
+                meta.dynamic_sub_ranges
+                    .push((prim_group.start * P::LEN)..(prim_group.end * P::LEN));
             }
 
             if meta.dynamic_sub_ranges.is_empty() {
@@ -522,6 +597,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     ordering: DepthOrdering,
     view_position: Position,
     meta: &mut TransparentMeta,
+    has_non_rect_transparency: bool,
 ) -> DepthSortResult {
     if !M::Vertex::WANTS_DEPTH_SORTING {
         return DepthSortResult::NOTHING_CHANGED;
@@ -538,9 +614,19 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     let needs_static_sort = meta.needs_static_sort();
     if needs_static_sort {
         // let start_time = Instant::now();
-        match &mut indices {
-            IndexSliceMut::U16(indices) => static_sort(ordering, vertices, indices, meta),
-            IndexSliceMut::U32(indices) => static_sort(ordering, vertices, indices, meta),
+        match (&mut indices, has_non_rect_transparency) {
+            (IndexSliceMut::U16(indices), false) => {
+                static_sort::<_, [u16; 6]>(ordering, vertices, indices, meta)
+            }
+            (IndexSliceMut::U32(indices), false) => {
+                static_sort::<_, [u32; 6]>(ordering, vertices, indices, meta)
+            }
+            (IndexSliceMut::U16(indices), true) => {
+                static_sort::<_, [u16; 3]>(ordering, vertices, indices, meta)
+            }
+            (IndexSliceMut::U32(indices), true) => {
+                static_sort::<_, [u32; 3]>(ordering, vertices, indices, meta)
+            }
         }
         // TODO: integrate this into DepthSortInfo instead
         // log::trace!(
@@ -551,13 +637,13 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
     }
 
     #[inline(never)] // save our inlining budget for the *contents* of this function
-    fn generic_sort<M: MeshTypes, Ix: IndexInt>(
-        data: &mut [Ix],
+    fn generic_sort<M: MeshTypes, P: Primitive>(
+        data: &mut [P::Item],
         positions: &[M::Vertex],
         view_position: Position,
         meta: &mut TransparentMeta,
     ) -> DepthSortResult {
-        let mut quads_sorted = 0;
+        let mut prims_sorted = 0;
         let mut groups_sorted = 0;
 
         // Accumulator of the new region of validity of this sort.
@@ -567,11 +653,12 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         let mut new_validity = Aabb::EVERYWHERE;
 
         for sub_range in meta.dynamic_sub_ranges.iter().cloned() {
-            let data_slice: &mut [Ix] = &mut data[sub_range];
-            // We want to sort the quads, so we reinterpret the slice as groups of 6 indices.
-            let quads_slice: &mut [[Ix; 6]] = expect_quads(data_slice.as_chunks_mut::<6>());
+            let data_slice: &mut [P::Item] = &mut data[sub_range];
+            // We want to sort the primitives (rectangles or triangles),
+            // so we reinterpret the slice as groups of indices.
+            let primitives_slice: &mut [P] = P::as_chunks_mut(data_slice);
 
-            quads_slice.sort_unstable_by_key(
+            primitives_slice.sort_unstable_by_key(
                 #[inline]
                 |indices| {
                     -OrderedFloat(manhattan_length(
@@ -579,7 +666,7 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
                     ))
                 },
             );
-            quads_sorted += quads_slice.len();
+            prims_sorted += primitives_slice.len();
             groups_sorted += 1;
 
             // Update the range of validity to not go past any of the sorted vertices.
@@ -601,23 +688,33 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
                 )
             },
             info: DepthSortInfo {
-                quads_sorted,
+                elements_sorted: prims_sorted,
                 groups_sorted,
                 static_groups_sorted: 0,
             },
         }
     }
 
-    let mut result = match indices {
-        IndexSliceMut::U16(slice) => generic_sort::<M, u16>(slice, vertices, view_position, meta),
-        IndexSliceMut::U32(slice) => generic_sort::<M, u32>(slice, vertices, view_position, meta),
+    let mut result = match (indices, has_non_rect_transparency) {
+        (IndexSliceMut::U16(slice), false) => {
+            generic_sort::<M, [u16; 6]>(slice, vertices, view_position, meta)
+        }
+        (IndexSliceMut::U32(slice), false) => {
+            generic_sort::<M, [u32; 6]>(slice, vertices, view_position, meta)
+        }
+        (IndexSliceMut::U16(slice), true) => {
+            generic_sort::<M, [u16; 3]>(slice, vertices, view_position, meta)
+        }
+        (IndexSliceMut::U32(slice), true) => {
+            generic_sort::<M, [u32; 3]>(slice, vertices, view_position, meta)
+        }
     };
     if needs_static_sort {
         // If we did a static sort, then all indices in the range changed,
         // not just the ones the dynamic sort touched.
         result.changed = Some(meta.index_range.clone());
 
-        result.info.quads_sorted += meta.index_range.len();
+        result.info.elements_sorted += meta.index_range.len();
         result.info.static_groups_sorted += 1;
     }
     result
@@ -625,32 +722,23 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
 
 // -------------------------------------------------------------------------------------------------
 
-/// Temporary depth-sortable version of a single quad (two triangles) extracted from an
+/// Temporary depth-sortable version of a single primitive (rectangle or triangle) extracted from an
 /// [`IndexVec`].
 ///
 /// This is used for “static” sorts which look like “sort on +X then +Z then -Y”, not for
 /// “dynamic” sorts which use distance from a specific view point.
-///
-/// This strategy assumes that the input `BlockMesh`es contain strictly quads and no other polygons,
-/// but that is true of the outputs of the block mesh generator currently, and will likely continue
-/// to be true for transparent geoemtry even once we fix the T-junction problems with opaque
-/// geometry.
-struct OrderedQuad<Ix> {
+struct OrderedPrimitive<P> {
     /// Sort key. Derived from the vertices but not actually a point. Never contains NaN.
     order: [f32; 3],
-    /// Original index data. Not used in ordering.
-    indices: [Ix; 6],
+    /// Original index data; an array of 3 or 6 indices. Not used in ordering.
+    indices: P,
 }
-impl<Ix: IndexInt> OrderedQuad<Ix> {
+impl<P: Primitive> OrderedPrimitive<P> {
     #[inline(always)]
-    fn new<V: Vertex>(
-        indices_of_quad: [Ix; 6],
-        vertices: &[V],
-        basis: Vector3D<Face6, ()>,
-    ) -> Self {
-        let midpoint = midpoint(vertices, indices_of_quad).to_vector();
-        OrderedQuad {
-            indices: indices_of_quad,
+    fn new<V: Vertex>(primitive: P, vertices: &[V], basis: Vector3D<Face6, ()>) -> Self {
+        let midpoint = midpoint(vertices, primitive).to_vector();
+        OrderedPrimitive {
+            indices: primitive,
             order: [
                 basis.x.dot(midpoint),
                 basis.y.dot(midpoint),
@@ -659,7 +747,7 @@ impl<Ix: IndexInt> OrderedQuad<Ix> {
         }
     }
 
-    /// Compare two quads according to the desired sort order.
+    /// Compare two primitives according to the desired sort order.
     ///
     /// This is not a [`PartialOrd`] implementation so that we don't have to follow the `Eq`
     /// consistency rules, which would be either weird (`Eq` ignoring `indices` which are the actual
@@ -676,7 +764,7 @@ impl<Ix: IndexInt> OrderedQuad<Ix> {
     fn min_max_on_axis<V: Vertex>(&self, vertices: &[V], direction: Face6) -> (PosCoord, PosCoord) {
         // We only need to look at one of the two triangles,
         // because they have the same bounding rectangle.
-        let [i0, i1, i2, ..] = self.indices;
+        let [i0, i1, i2] = self.indices.indices_for_sorting();
         // This is unrolled because map()ing it might end up not inlining it, which would be very bad.
         let p0 = vertices[i0.to_slice_index()].position();
         let p1 = vertices[i1.to_slice_index()].position();
@@ -688,15 +776,15 @@ impl<Ix: IndexInt> OrderedQuad<Ix> {
     }
 }
 
-/// Compute quad midpoint from quad vertices, for depth sorting.
+/// Compute primitive midpoint from vertices, for depth sorting.
 ///
 /// (The midpoint isn’t actually very meaningful to depth sorting, but it’s cheap to compute and,
 /// AFAIK, correct in all the cases we currently care about.)
 #[inline(always)] // the very hottest of inner loop code
-fn midpoint<V: Vertex, Ix: IndexInt>(vertices: &[V], indices: [Ix; 6]) -> Position {
+fn midpoint<V: Vertex, P: Primitive>(vertices: &[V], indices: P) -> Position {
     // We only need to look at one of the two triangles,
     // because they have the same bounding rectangle.
-    let [i0, i1, i2, ..] = indices;
+    let [i0, i1, i2] = indices.indices_for_sorting();
     // This is unrolled because map()ing it might end up not inlining it, which would be very bad.
     let p0 = vertices[i0.to_slice_index()].position();
     let p1 = vertices[i1.to_slice_index()].position();
@@ -733,14 +821,6 @@ fn assume_no_nan_cmp(a: f32, b: f32) -> Ordering {
 #[inline]
 fn manhattan_length(v: Vector3D<PosCoord, MeshRel>) -> f32 {
     v.x.abs() + v.y.abs() + v.z.abs()
-}
-
-/// Takes the return value of `as_chunks()` or `as_chunks_mut()` and asserts it is evenly divisible.
-fn expect_quads<Ix: IndexInt, Q: Deref<Target = [[Ix; 6]]>, R: Deref<Target = [Ix]>>(
-    (quads, rest): (Q, R),
-) -> Q {
-    assert_eq!(rest.len(), 0, "expected an index list divisible into quads");
-    quads
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -889,7 +969,7 @@ mod tests {
                     // other cases might have shorter rather than equal ranges
                     changed: Some(space_mesh.transparent_range(DepthOrdering::WITHIN)),
                     info: DepthSortInfo {
-                        quads_sorted: 12,
+                        elements_sorted: 12,
                         groups_sorted: 1,
                         static_groups_sorted: 0,
                     },
@@ -898,7 +978,7 @@ mod tests {
                 DepthSortResult {
                     changed: None,
                     info: DepthSortInfo {
-                        quads_sorted: 0,
+                        elements_sorted: 0,
                         groups_sorted: 0,
                         static_groups_sorted: 0,
                     },
@@ -975,7 +1055,7 @@ mod tests {
         assert_eq!(
             space_mesh.transparent_range(ordering).len(),
             6 * 3,
-            "expected 3 quads",
+            "expected 3 rects",
         );
         assert_eq!(space_mesh.needs_depth_sorting(ordering, position), true);
 

@@ -65,7 +65,7 @@ impl IndexVec {
     /// Creates an empty [`IndexVec`] with the given capacity.
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        // Predict whether we will need 32-bit indices. Generally, indices will be of quads,
+        // Predict whether we will need 32-bit indices. Most often, indices will be of quads,
         // meaning that we have 6 indices for 4 vertices. Therefore, if capacity * 4/6
         // is greater than u16::MAX, some of the index *values* will be greater than u16::MAX.
         // TODO: Ask callers for this info directly?
@@ -523,7 +523,10 @@ fn fmt_index_list<Ix: IndexInt>(
                 // Line breaks
                 write!(f, "\n    ")?;
             } else if i.rem_euclid(6) == 0 {
-                // Extra padding between quads
+                // Extra padding between rectangles (each having 6 indices).
+                // Index lists most often (but do not always) contain rectangles.
+                // TODO: Can we arrange to check the flag stored elsewhere that says whether or not
+                // they do contain rectangles?
                 write!(f, "  ")?;
             }
         }

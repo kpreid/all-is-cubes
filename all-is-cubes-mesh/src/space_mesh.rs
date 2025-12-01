@@ -155,6 +155,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
                     opaque_range: _,
                     transparent: _,
                     textures_used,
+                    has_non_rect_transparency: _,
                     bounding_box: _,
                     flaws: _,
                 },
@@ -315,12 +316,15 @@ impl<M: MeshTypes> SpaceMesh<M> {
     ///
     /// ## Depth ordering of transparency
     ///
-    /// Given the indices of vertices of transparent quads (triangle pairs), this function copies
-    /// them in various depth-sorted permutations into `self.indices` and record the array-index
-    /// ranges which contain each of the orderings in `self.opaque_range` and
-    /// `self.transparent_ranges`. The orderings are identified by [`DepthOrdering`] values.
+    /// Given the indices of vertices of transparent geometry, this function copies them
+    /// in various combinations into `self.indices`, and records the array-index ranges which
+    /// contain each of these copies in `self.opaque_range` and `self.transparent_ranges`.
+    /// Each of these copies corresponds to a separate [`DepthOrdering`] value, so that it may
+    /// be depth sorted later, and is filtered so that it does not contain any triangles which are
+    /// guaranteed to be never visible from the possible viewing directions corresponding to that
+    /// [`DepthOrdering`].
     ///
-    /// The indices of the opaque quads must have already been written into `self.indices`.
+    /// The indices of the opaque triangles must have already been written into `self.indices`.
     fn store_indices_and_finish_compute(
         &mut self,
         opaque_indices_deque: IndexVecDeque,
@@ -334,7 +338,6 @@ impl<M: MeshTypes> SpaceMesh<M> {
 
         // Dispatch to the depth sorting algorithm in its u16 or u32 version.
         #[rustfmt::skip]
-        #[allow(clippy::unnecessary_semicolon, reason = "<https://github.com/rust-lang/rust-clippy/issues/15426>; remove after Rust 1.91")]
         match transparent_indices {
             FaceMap {
                 nx: IndexVec::U16(nx),
@@ -411,6 +414,7 @@ impl<M: MeshTypes> SpaceMesh<M> {
             ordering,
             view_position,
             &mut self.meta.transparent[ordering.to_index()],
+            self.meta.has_non_rect_transparency,
         )
     }
 }
@@ -478,7 +482,7 @@ impl<M: MeshTypes> Clone for SpaceMesh<M> {
 /// * `block_mesh` is the input mesh to copy.
 /// * `cube` is the position passed to `V::instantiate_block()`.
 /// * `vertices`, `opaque_indices`, and `transparent_indices` are the destination to append to.
-/// * `meta`’s `bounding_box` will be updated to enclose the vertices.
+/// * `meta`’s `bounding_box` and `has_non_rect_transparency` will be updated.
 ///   Its index ranges, `flaws` and `textures_used` will not be updated.
 /// * `neighbor_is_fully_opaque` is called to determine whether this block's faces are
 ///   obscured. It is a function so that lookups can be skipped if their answer would
@@ -526,6 +530,8 @@ fn write_block_mesh_to_space_mesh<M: MeshTypes>(
         transparent_indices[face]
             .extend_with_offset(sub_mesh.indices_transparent.as_slice(..), index_offset);
 
+        meta.has_non_rect_transparency |= sub_mesh.has_non_rect_transparency;
+
         meta.bounding_box.union_mut(sub_mesh.bounding_box.translate(bb_translation));
     }
 }
@@ -565,6 +571,9 @@ impl<M: MeshTypes> From<&BlockMesh<M>> for SpaceMesh<M> {
                 opaque_range: 0..0,
                 transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
                 textures_used: block_mesh.textures().to_vec(),
+                has_non_rect_transparency: block_mesh
+                    .all_sub_meshes()
+                    .any(|sm| sm.has_non_rect_transparency),
                 bounding_box: block_mesh.bounding_box(),
                 flaws: block_mesh.flaws(),
             },
@@ -716,6 +725,13 @@ pub struct MeshMeta<M: MeshTypes> {
     /// the texture coordinates remain allocated to the intended texels.
     textures_used: Vec<M::Tile>,
 
+    /// Whether the transparent triangles of this mesh include any that are not guaranteed to be
+    /// in the form of pairs of consecutive triangles that form rectangles.
+    ///
+    /// This is used to determine whether depth sorting can get away with sorting rectangles instead
+    /// of triangles (halving the number of items to sort).
+    has_non_rect_transparency: bool,
+
     /// Bounding box of this mesh’s vertices.
     bounding_box: Aabbs,
 
@@ -776,12 +792,14 @@ impl<M: MeshTypes> MeshMeta<M> {
             opaque_range,
             transparent,
             textures_used,
+            has_non_rect_transparency,
             bounding_box,
             flaws,
         } = self;
         *opaque_range = 0..0;
         *transparent = [TransparentMeta::EMPTY; DepthOrdering::COUNT];
         textures_used.clear();
+        *has_non_rect_transparency = false;
         *bounding_box = Aabbs::EMPTY;
         *flaws = Flaws::empty();
     }
@@ -796,6 +814,7 @@ impl<M: MeshTypes> Default for MeshMeta<M> {
             opaque_range: 0..0,
             transparent: [TransparentMeta::EMPTY; DepthOrdering::COUNT],
             textures_used: Vec::new(),
+            has_non_rect_transparency: false,
             bounding_box: Aabbs::EMPTY,
             flaws: Flaws::empty(),
         }
@@ -808,6 +827,7 @@ impl<M: MeshTypes> PartialEq for MeshMeta<M> {
             opaque_range,
             transparent,
             textures_used,
+            has_non_rect_transparency,
             bounding_box,
             flaws,
         } = self;
@@ -815,6 +835,7 @@ impl<M: MeshTypes> PartialEq for MeshMeta<M> {
             && *opaque_range == other.opaque_range
             && *transparent == other.transparent
             && *textures_used == other.textures_used
+            && *has_non_rect_transparency == other.has_non_rect_transparency
             && *flaws == other.flaws
     }
 }
@@ -837,6 +858,7 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
             opaque_range,
             transparent,
             textures_used,
+            has_non_rect_transparency,
             bounding_box,
             flaws,
         } = self;
@@ -844,6 +866,7 @@ impl<M: MeshTypes> fmt::Debug for MeshMeta<M> {
             .field("opaque_range", opaque_range)
             .field("transparent", &OrderingAsKey(transparent))
             .field("textures_used", textures_used)
+            .field("has_non_rect_transparency", has_non_rect_transparency)
             .field("bounding_box", bounding_box)
             .field("flaws", &DebugAsDisplay(flaws))
             .finish()
@@ -856,6 +879,7 @@ impl<M: MeshTypes> Clone for MeshMeta<M> {
             opaque_range: self.opaque_range.clone(),
             transparent: self.transparent.clone(),
             textures_used: self.textures_used.clone(),
+            has_non_rect_transparency: self.has_non_rect_transparency,
             bounding_box: self.bounding_box,
             flaws: self.flaws,
         }
@@ -1029,6 +1053,7 @@ mod tests {
                             +++: 0..0 [] sorted for EVERYWHERE,
                         },
                         textures_used: [],
+                        has_non_rect_transparency: false,
                         bounding_box: Aabbs {
                             opaque: EMPTY,
                             transparent: EMPTY,
@@ -1115,6 +1140,7 @@ mod tests {
                             +++: 36..36 [] sorted for EVERYWHERE,
                         },
                         textures_used: [],
+                        has_non_rect_transparency: false,
                         bounding_box: Aabbs {
                             opaque: Aabb(
                                 0.0..=1.0,
@@ -1255,6 +1281,7 @@ mod tests {
                             +++: 630..648 unsorted,
                         },
                         textures_used: [],
+                        has_non_rect_transparency: false,
                         bounding_box: Aabbs {
                             opaque: EMPTY,
                             transparent: Aabb(

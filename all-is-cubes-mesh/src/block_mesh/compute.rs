@@ -366,6 +366,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 indices_opaque,
                 indices_transparent,
                 bounding_box,
+                has_non_rect_transparency,
                 ..
             } = if layer == 0 {
                 &mut *face_mesh
@@ -450,6 +451,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     );
 
                     // Compute triangles and append their indices to SubMesh.
+                    let indices_before_this_pass = indices_destination.len();
                     triangulator_basis.transparent = transparent_pass;
                     triangulator.triangulate(
                         viz,
@@ -462,6 +464,13 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                             );
                         },
                     );
+
+                    // If we added more than 2 transparent triangles, then they might not form
+                    // rectangles. Depth sorting needs to be aware of that in order to disable
+                    // its optimization for sorting rectangles.
+                    *has_non_rect_transparency |=
+                        (indices_destination.len() - indices_before_this_pass > 6)
+                            & transparent_pass;
                 }
             } else {
                 // Traverse `visible_image` using the "greedy meshing" algorithm for

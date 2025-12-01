@@ -726,7 +726,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             chunk_mesh_callback_times,
             depth_sort_info:
                 DepthSortInfo {
-                    quads_sorted,
+                    elements_sorted,
                     groups_sorted,
                     static_groups_sorted,
                 },
@@ -743,7 +743,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
                 Chunk scan     {chunk_scan_time}
                       mesh gen {chunk_mesh_generation_times}
                       inst gen {chunk_instance_generation_times}
-                      Z sort   {depth_sort_times} ({quads_sorted:6} quads grouped in {groups_sorted:3} dyn + {static_groups_sorted:3} static)
+                      Z sort   {depth_sort_times} ({elements_sorted:6} elems grouped in {groups_sorted:3} dyn + {static_groups_sorted:3} static)
                       upload   {chunk_mesh_callback_times}
                 Mem: {chunk_mib} MiB for {chunk_count} chunks\
             "},
@@ -754,7 +754,7 @@ impl Fmt<StatusText> for CsmUpdateInfo {
             chunk_mesh_generation_times = chunk_mesh_generation_times,
             chunk_instance_generation_times = chunk_instance_generation_times,
             chunk_mesh_callback_times = chunk_mesh_callback_times,
-            quads_sorted = quads_sorted,
+            elements_sorted = elements_sorted,
             groups_sorted = groups_sorted,
             static_groups_sorted = static_groups_sorted,
             depth_sort_times = depth_sort_times,

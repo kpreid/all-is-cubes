@@ -336,7 +336,7 @@ fn dynamic_benches(c: &mut Criterion) {
                     time::Deadline::Whenever,
                     dynamic::noop_render_data_updater,
                 );
-                assert_ne!(info.depth_sort_info.quads_sorted, 0);
+                assert_ne!(info.depth_sort_info.elements_sorted, 0);
             }
         }
 
