@@ -110,6 +110,7 @@ impl texture::Tile for GltfTile {
     type Point = GltfAtlasPoint;
     type Plane = GltfTexturePlane;
     const REUSABLE: bool = false;
+    const SUPPORTS_3D: bool = false;
 
     fn write(&mut self, data: Vol<&[Evoxel]>) {
         assert_eq!(data.bounds(), self.bounds());
@@ -152,6 +153,10 @@ impl texture::Tile for GltfTile {
             bounds: sliced_bounds,
             rotation,
         }
+    }
+
+    fn grid_to_texcoord_3d(&self, _: TilePoint) -> Self::Point {
+        unimplemented!()
     }
 }
 

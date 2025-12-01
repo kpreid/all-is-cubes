@@ -8,7 +8,7 @@ use all_is_cubes::math::{
     Axis, Face6, FaceMap, GridAab, GridCoordinate, OpacityCategory, Rgba, rgba_const,
 };
 
-use crate::texture::{self, TexelUnit, TextureCoordinate, Tile as _, TilePoint};
+use crate::texture::{self, Plane as _, TexelUnit, TextureCoordinate, TilePoint};
 use crate::{
     Aabb, BlockMesh, BlockVertex, Coloring, IndexVec, MeshRel, MeshTypes, PosCoord, Position, Viz,
 };
@@ -58,7 +58,6 @@ pub(crate) fn push_box<M: MeshTypes>(
 
         // TODO: reduce duplication of code between push_box and push_full_box by factoring out
         // "reserve 6 indices" but in a way that borrow checking likes
-        let plane: <M::Tile as texture::Tile>::Plane;
         push_quad(
             &mut sub_mesh.vertices,
             if fully_opaque {
@@ -73,14 +72,10 @@ pub(crate) fn push_box<M: MeshTypes>(
             lower_bounds.to_f32().cast_unit(),
             upper_bounds.to_f32().cast_unit(),
             match &coloring {
-                // TODO: for our actual purposes, this should be a volume and not face slices
-                BoxColoring::VolumeTexture(tile) => {
-                    plane = tile.slice(aab.abut(face, -1).unwrap());
-                    QuadColoring::Volume {
-                        plane: &plane,
-                        far_depth: (aab_in_face_coordinates.upper_bounds().z as f32),
-                    }
-                }
+                BoxColoring::VolumeTexture(tile) => QuadColoring::Volume {
+                    tile,
+                    far_depth: aab_in_face_coordinates.upper_bounds().z as f32,
+                },
                 BoxColoring::Solid(face_colors) => QuadColoring::Solid(face_colors[face]),
             },
             viz,
@@ -100,7 +95,7 @@ pub(crate) fn push_box<M: MeshTypes>(
 pub(crate) fn push_full_box<M: MeshTypes>(
     output: &mut BlockMesh<M>,
     opacity_category: OpacityCategory,
-    coloring: QuadColoring<'_, <M::Tile as texture::Tile>::Plane>,
+    coloring: QuadColoring<'_, M::Tile>,
     viz: &mut Viz,
 ) {
     let fully_opaque = opacity_category == OpacityCategory::Opaque;
@@ -155,7 +150,7 @@ pub(crate) fn push_quad<V, Tex>(
     bounding_box: &mut Aabb,
 ) where
     V: crate::Vertex<TexPoint = Tex::Point>,
-    Tex: texture::Plane,
+    Tex: texture::Tile,
 {
     let index_origin: u32 = vertices.0.len().try_into().expect("vertex index overflow");
     let half_texel = 0.5;
@@ -238,15 +233,31 @@ pub(crate) fn push_quad<V, Tex>(
                 }),
             );
         }
-        QuadColoring::Volume { plane, far_depth } => {
-            let (clamp_min, clamp_max) = transform_clamp_box(
-                plane,
-                transform,
-                // No half-texel offsets because the raymarcher uses the clamp box as the
-                // actual volume boundaries, and is precise about applying them.
-                TilePoint::new(low_corner.x, low_corner.y, depth),
-                TilePoint::new(high_corner.x, high_corner.y, far_depth),
-            );
+        QuadColoring::Volume { tile, far_depth } => {
+            let (clamp_min, clamp_max) = {
+                // Transform planar texture coordinates into the 3D coordinate system.
+                let mut clamp_min = transform.transform_texture_point(TilePoint::new(
+                    low_corner.x,
+                    low_corner.y,
+                    depth,
+                ));
+                let mut clamp_max = transform.transform_texture_point(TilePoint::new(
+                    high_corner.x,
+                    high_corner.y,
+                    far_depth,
+                ));
+
+                // Ensure the transformed clamp range is not inverted.
+                for axis in Axis::ALL {
+                    all_is_cubes::math::sort_two(&mut clamp_min[axis], &mut clamp_max[axis]);
+                }
+
+                // Convert to global texture coordinates in the texture tile's format.
+                (
+                    tile.grid_to_texcoord_3d(clamp_min),
+                    tile.grid_to_texcoord_3d(clamp_max),
+                )
+            };
 
             // TODO: deduplicate this code
             push_vertices_from_iter(
@@ -258,7 +269,7 @@ pub(crate) fn push_quad<V, Tex>(
                         position,
                         face,
                         coloring: Coloring::Texture {
-                            pos: plane.grid_to_texcoord(
+                            pos: tile.grid_to_texcoord_3d(
                                 transform.transform_texture_point(voxel_grid_point.cast_unit()),
                             ),
                             clamp_min,
@@ -316,27 +327,27 @@ pub(crate) fn transform_clamp_box<Tex: texture::Plane>(
 /// Helper for [`push_quad`] which offers the alternatives of solid color or texturing.
 /// Compared to [`Coloring`], it describes texturing for an entire quad rather than a vertex.
 #[derive(Debug)]
-pub(crate) enum QuadColoring<'a, T> {
+pub(crate) enum QuadColoring<'a, T: texture::Tile> {
     /// A single color (“vertex color”).
     Solid(Rgba),
 
     /// A textured surface.
-    Texture(&'a T),
+    Texture(&'a T::Plane),
 
     /// A textured volume of which this is the surface.
     /// Used only with [`crate::TransparencyFormat::BoundingBox`].
-    ///
-    /// TODO(volumetric): It is a technically incorrect kludge that this holds a [`texture::Plane`];
-    /// we are accessing texels that are outside of it. We need a new type of texture handle that is
-    /// a 3D slice of a [`texture::Tile`].
     Volume {
-        plane: &'a T,
+        tile: &'a T,
         /// Depth
         far_depth: PosCoord,
     },
 }
-impl<T> Copy for QuadColoring<'_, T> {}
-impl<T> Clone for QuadColoring<'_, T> {
+impl<T: texture::Tile> Copy for QuadColoring<'_, T> {}
+#[expect(
+    clippy::expl_impl_clone_on_copy,
+    reason = "TODO: report false positive"
+)]
+impl<T: texture::Tile> Clone for QuadColoring<'_, T> {
     fn clone(&self) -> Self {
         *self
     }

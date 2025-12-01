@@ -21,7 +21,7 @@ use all_is_cubes::math::{Cube, GridAab, GridCoordinate, VectorOps as _, Vol};
 #[cfg(feature = "rerun")]
 use all_is_cubes::rerun_glue as rg;
 use all_is_cubes::time;
-use all_is_cubes_mesh::texture::{self, Channels};
+use all_is_cubes_mesh::texture::{self, Channels, Tile as _};
 
 use crate::common::{BlockTextureInfo, Identified, Msw};
 use crate::glue::{size3d_to_extent, write_texture_by_aab};
@@ -289,6 +289,7 @@ impl texture::Tile for AtlasTile {
     type Point = TexPoint;
     type Plane = AtlasPlane;
     const REUSABLE: bool = true;
+    const SUPPORTS_3D: bool = true;
 
     fn bounds(&self) -> GridAab {
         self.requested_bounds
@@ -304,6 +305,18 @@ impl texture::Tile for AtlasTile {
         AtlasPlane {
             tile: self.clone(),
             requested_bounds,
+        }
+    }
+
+    fn grid_to_texcoord_3d(&self, in_tile_grid: texture::TilePoint) -> Self::Point {
+        // TODO: assert in bounds, just in case
+        let float_point = (in_tile_grid + self.offset.to_vector().map(|c| c as f32)).cast_unit();
+        TexPoint {
+            atlas_id: match self.channels {
+                Channels::Reflectance => 0,
+                Channels::ReflectanceEmission => 1,
+            },
+            tc: float_point.map(FixTexCoord::from_float),
         }
     }
 
@@ -654,16 +667,7 @@ impl texture::Plane for AtlasPlane {
     type Point = TexPoint;
 
     fn grid_to_texcoord(&self, in_tile_grid: texture::TilePoint) -> Self::Point {
-        // TODO: assert in bounds, just in case
-        let float_point =
-            (in_tile_grid + self.tile.offset.to_vector().map(|c| c as f32)).cast_unit();
-        TexPoint {
-            atlas_id: match self.tile.channels {
-                Channels::Reflectance => 0,
-                Channels::ReflectanceEmission => 1,
-            },
-            tc: float_point.map(FixTexCoord::from_float),
-        }
+        self.tile.grid_to_texcoord_3d(in_tile_grid)
     }
 }
 

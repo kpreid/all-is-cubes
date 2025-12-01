@@ -124,6 +124,7 @@ impl texture::Tile for Tile {
     type Point = TexPoint;
     type Plane = Tile;
     const REUSABLE: bool = true;
+    const SUPPORTS_3D: bool = true;
 
     fn bounds(&self) -> GridAab {
         self.bounds
@@ -137,6 +138,10 @@ impl texture::Tile for Tile {
     fn slice(&self, bounds: GridAab) -> Self::Plane {
         texture::validate_slice(self.bounds, bounds);
         self.clone()
+    }
+
+    fn grid_to_texcoord_3d(&self, in_tile: TexPoint) -> Self::Point {
+        in_tile
     }
 
     #[track_caller]

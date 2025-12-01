@@ -75,10 +75,13 @@ pub trait Tile: Clone + PartialEq {
     type Plane: Plane<Point = Self::Point>;
 
     /// Type of points within the texture, that vertices store.
-    type Point;
+    type Point: Copy;
 
     /// Whether `write()` may be called more than once.
     const REUSABLE: bool;
+
+    /// Whether `grid_to_texcoord_3d()` will succeed.
+    const SUPPORTS_3D: bool;
 
     /// Returns the [`GridAab`] originally passed to the texture allocator for this tile.
     fn bounds(&self) -> GridAab;
@@ -98,7 +101,20 @@ pub trait Tile: Clone + PartialEq {
     ///
     /// Depending on the texture implementation, this may be merely a coordinate system
     /// helper (for 3D texturing) or it may actually allocate a region of 2D texture.
+    //---
+    // TODO: this needs to be fallible to fully support the 2D case.
     fn slice(&self, bounds: GridAab) -> Self::Plane;
+
+    /// Transform a point in the coordinate system of, and within, [`Self::bounds()`]
+    /// (that is, 1 unit = 1 texel) into texture coordinates suitable for
+    /// the target [`Vertex`](super::Vertex) type when texturing for volumetric rendering.
+    ///
+    /// Implementations may declare whether they support 3D texturing using the constant
+    /// [`Self::SUPPORTS_3D`], and may panic if called when unsupported.
+    ///
+    /// The returned texture coordinates are guaranteed to be valid only as long as
+    /// this [`Tile`] (or a clone of it) has not been dropped.
+    fn grid_to_texcoord_3d(&self, in_tile_grid: TilePoint) -> Self::Point;
 
     /// Copy the given voxels' color into this texture volume.
     ///
@@ -310,6 +326,7 @@ impl Tile for NoTexture {
     type Point = Self;
     type Plane = Self;
     const REUSABLE: bool = true;
+    const SUPPORTS_3D: bool = true;
 
     fn bounds(&self) -> GridAab {
         match *self {}
@@ -326,12 +343,16 @@ impl Tile for NoTexture {
     fn write(&mut self, _data: Vol<&[Evoxel]>) {
         match *self {}
     }
+
+    fn grid_to_texcoord_3d(&self, _: TilePoint) -> Self::Point {
+        match *self {}
+    }
 }
 
 impl Plane for NoTexture {
     type Point = Self;
 
-    fn grid_to_texcoord(&self, _: Point3D<TextureCoordinate, TexelUnit>) -> Self::Point {
+    fn grid_to_texcoord(&self, _: TilePoint) -> Self::Point {
         match *self {}
     }
 }

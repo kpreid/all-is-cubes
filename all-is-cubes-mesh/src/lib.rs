@@ -127,6 +127,7 @@ impl MeshOptions {
     pub(crate) fn transparency_format(&self) -> TransparencyFormat {
         match self.transparency {
             TransparencyOption::Surface => TransparencyFormat::Surfaces,
+            // TODO: Do this only if the textures support it (but we don't have MeshTypes here)
             TransparencyOption::Volumetric => TransparencyFormat::BoundingBox,
             TransparencyOption::Threshold(_) => TransparencyFormat::Surfaces,
             ref o => {

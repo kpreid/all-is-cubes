@@ -491,9 +491,9 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                         if let Some(single_color) = single_color.filter(|_| !prefer_textures) {
                             // The quad we're going to draw has identical texels, so we might as
                             // well use a solid color and skip needing a texture.
-                            QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(single_color)
+                            QuadColoring::<M::Tile>::Solid(single_color)
                         } else if let Some(ref plane) = texture_plane_if_needed {
-                            QuadColoring::<<M::Tile as texture::Tile>::Plane>::Texture(plane)
+                            QuadColoring::<M::Tile>::Texture(plane)
                         } else {
                             // Texture allocation failure.
                             // Report the flaw and use block color as a fallback.
@@ -502,7 +502,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                             // * Offer the alternative of generating as much
                             //   geometry as needed.
                             *flaws |= Flaws::MISSING_TEXTURES;
-                            QuadColoring::<<M::Tile as texture::Tile>::Plane>::Solid(
+                            QuadColoring::<M::Tile>::Solid(
                                 options.transparency.limit_alpha(placeholder_color),
                             )
                         };
