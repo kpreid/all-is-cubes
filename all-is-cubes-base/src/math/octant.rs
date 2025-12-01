@@ -358,6 +358,19 @@ impl ops::Not for OctantMask {
     }
 }
 
+impl ops::BitOrAssign for OctantMask {
+    #[inline]
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = *self | rhs
+    }
+}
+impl ops::BitAndAssign for OctantMask {
+    #[inline]
+    fn bitand_assign(&mut self, rhs: Self) {
+        *self = *self & rhs
+    }
+}
+
 impl FromIterator<Octant> for OctantMask {
     #[inline]
     fn from_iter<T: IntoIterator<Item = Octant>>(iter: T) -> Self {

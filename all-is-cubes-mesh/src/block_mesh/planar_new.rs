@@ -253,10 +253,12 @@ impl PlanarTriangulator {
         for (input_index_usize, mut input_vertex) in input.enumerate() {
             // Forget about hidden voxel faces -- transform “this volume is solid” mask into
             // “this is a visible surface” mask. TODO(planar_new): express this more strongly typed?
-            input_vertex.opaque =
-                input_vertex.opaque & !input_vertex.opaque.shift(self.basis.face.opposite());
-            input_vertex.renderable =
-                input_vertex.renderable & !input_vertex.opaque.shift(self.basis.face.opposite());
+            input_vertex.opaque &= !input_vertex.opaque.shift(self.basis.face.opposite());
+            // Note: transparent counts as obscuring transparent, in the sense that we don't try
+            // to generate faces for it. If we did, not only would we generate way too much
+            // geometry, we'd fail assertions because the analysis vertices aren't meant to provide
+            // the corners needed for those surfaces.
+            input_vertex.renderable &= !input_vertex.renderable.shift(self.basis.face.opposite());
 
             let input_index = u32::try_from(input_index_usize).unwrap();
             let input_fv = FrontierVertex {
