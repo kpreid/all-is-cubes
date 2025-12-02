@@ -175,6 +175,14 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
         Iterator::chain(self.interior_vertices.values(), self.face_vertices.values())
     }
 
+    #[cfg(test)]
+    fn all_sub_meshes_mut(&mut self) -> impl Iterator<Item = &mut SubMesh<M::Vertex>> {
+        Iterator::chain(
+            self.interior_vertices.values_mut(),
+            self.face_vertices.values_mut(),
+        )
+    }
+
     /// Return the textures used for this block. This may be used to retain the textures
     /// for as long as the associated vertices are being used, rather than only as long as
     /// the life of this mesh.
@@ -313,6 +321,14 @@ impl<M: MeshTypes + 'static> BlockMesh<M> {
     fn consistency_check(&self) {
         for sub_mesh in self.all_sub_meshes() {
             sub_mesh.consistency_check();
+        }
+    }
+
+    /// For testing depth sorting without requiring complex input.
+    #[cfg(test)]
+    pub(crate) fn force_non_rect_depth_sorting(&mut self) {
+        for sub_mesh in self.all_sub_meshes_mut() {
+            sub_mesh.has_non_rect_transparency = true;
         }
     }
 }

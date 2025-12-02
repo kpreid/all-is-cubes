@@ -828,6 +828,7 @@ fn manhattan_length(v: Vector3D<PosCoord, MeshRel>) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SpaceMesh;
     use all_is_cubes::block;
     use all_is_cubes::euclid::point3;
     use all_is_cubes::math::{Aab, Cube, GridAab};
@@ -934,9 +935,17 @@ mod tests {
         assert_eq!(problems, vec![]);
     }
 
-    /// Tests that the correct [`DepthSortResult`] is produced.
+    /// Tests that the expected [`DepthSortResult`] is produced under various conditions.
+    /// Also serves as a smoke test for the `has_non_rect_transparency` case
+    /// (checks that it doesn’t panic, but not that the actual sort is correct).
     #[rstest::rstest]
-    fn depth_sort_result_from_space_mesh(#[values(false, true)] transparent: bool) {
+    fn depth_sort_result_from_space_mesh(
+        #[values(false, true)] transparent: bool,
+        #[values(false, true)] force_non_rect: bool,
+    ) {
+        let options =
+            &crate::MeshOptions::new(&all_is_cubes_render::camera::GraphicsOptions::default());
+        let tex = crate::testing::Allocator::new();
         let opaque_block = &block::from_color!(1.0, 0.0, 0.0, 1.0);
         let maybe_transparent_block = if transparent {
             &block::from_color!(1.0, 0.0, 0.0, 0.5)
@@ -953,7 +962,14 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        let (_, _, mut space_mesh) = crate::testing::mesh_blocks_and_space(&space);
+        let mut block_meshes = crate::block_meshes_for_space(&space.read(), &tex, options);
+        if force_non_rect {
+            for mesh in &mut block_meshes {
+                mesh.force_non_rect_depth_sorting();
+            }
+        }
+        let mut space_mesh: SpaceMesh<crate::testing::TextureMt> =
+            SpaceMesh::new(&space.read(), space.bounds(), options, &*block_meshes);
 
         let result = space_mesh.depth_sort_for_view(DepthOrdering::WITHIN, point3(0., 0., 0.));
 
@@ -969,7 +985,13 @@ mod tests {
                     // other cases might have shorter rather than equal ranges
                     changed: Some(space_mesh.transparent_range(DepthOrdering::WITHIN)),
                     info: DepthSortInfo {
-                        elements_sorted: 12,
+                        elements_sorted: if force_non_rect {
+                            // 2 transparent blocks × 6 faces × 2 triangles
+                            24
+                        } else {
+                            // 2 transparent blocks × 6 faces × 1 square
+                            12
+                        },
                         groups_sorted: 1,
                         static_groups_sorted: 0,
                     },
