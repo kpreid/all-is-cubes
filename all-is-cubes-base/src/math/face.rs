@@ -867,6 +867,19 @@ impl<V> FaceMap<V> {
         Face6::ALL.iter().copied().map(move |f| &self[f])
     }
 
+    /// Iterate over the map values by mutable reference, in the same order as [`Face6::ALL`].
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> {
+        [
+            &mut self.nx,
+            &mut self.ny,
+            &mut self.nz,
+            &mut self.px,
+            &mut self.py,
+            &mut self.pz,
+        ]
+        .into_iter()
+    }
+
     /// Convert to an array, whose elements are arranged in the same order as [`Face6::ALL`].
     pub fn into_values(self) -> [V; 6] {
         [self.nx, self.ny, self.nz, self.px, self.py, self.pz]
