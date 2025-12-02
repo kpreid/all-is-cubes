@@ -200,7 +200,11 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     }
 
     let texture_if_needed: Option<M::Tile> = if prefer_textures || analysis.needs_texture {
-        texture::copy_voxels_to_new_texture(texture_allocator, voxels)
+        let allocation = texture::copy_voxels_to_new_texture(texture_allocator, voxels);
+        if allocation.is_none() {
+            *flaws |= Flaws::MISSING_TEXTURES;
+        }
+        allocation
     } else {
         None
     };
@@ -421,6 +425,10 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                     // If we were to adopt a finer-grained analysis, we wouldn't be
                                     // able to get away with using only 1 mesh vertex per
                                     // analysis vertex per face.
+                                    //
+                                    // It will also pick a vertex color in the case that the
+                                    // texture allocation failed.
+                                    // TODO: Use block average color instead.
                                     let acceptable_voxel = Cube::from(
                                         av.position
                                             + (av.renderable & interior_side_octant_mask)
@@ -434,6 +442,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                                 .to_01()
                                                 .map(|c| GridCoordinate::from(c) - 1), // TODO: add an Octant op for balanced cubes
                                     );
+
+                                    used_any_vertex_colors = true;
 
                                     // Fetch color from voxel data
                                     vertex::Coloring::Solid(voxels_array[acceptable_voxel].color)
@@ -502,7 +512,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                             // * Compute and use per-face colors in EvaluatedBlock
                             // * Offer the alternative of generating as much
                             //   geometry as needed.
-                            *flaws |= Flaws::MISSING_TEXTURES;
                             QuadColoring::<M::Tile>::Solid(
                                 options.transparency.limit_alpha(placeholder_color),
                             )

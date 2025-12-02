@@ -78,7 +78,7 @@ fn voxel_opacity_mask_not_set_with_voxel_colors() {
     );
 
     // Check what we actually care about: given the vertex colors we must not have a mask.
-    assert!(mesh.voxel_opacity_mask.is_none());
+    assert_eq!(mesh.voxel_opacity_mask, None);
 }
 
 #[test]
