@@ -87,9 +87,7 @@ bytemuck = { version = "1.24.0", default-features = false, features = ["derive",
 cfg-if = { version = "1.0.0", default-features = false }
 # When upgrading clap, beware text output changes causing integration tests to fail.
 clap = { version = "4.5", default-features = false, features = ["cargo", "deprecated", "derive", "help", "std", "suggestions", "usage", "wrap_help"] }
-# Note: async_tokio feature is not needed globally but is enabled to avoid compiling two versions
-# when benching/testing specific packages
-criterion = { version = "0.7.0", features = ["async", "cargo_bench_support", "html_reports"] }
+criterion = { version = "0.8.0", features = ["async", "cargo_bench_support", "html_reports"] }
 displaydoc = { version = "0.2.5", default-features = false }
 either = { version = "1.10.0", default-features = false }
 # embedded-graphics and embedded-graphics-core must match
