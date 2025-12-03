@@ -1,5 +1,7 @@
 //! The algorithm for generating block meshes, and nothing else.
 
+use alloc::vec::Vec;
+
 use itertools::Itertools as _;
 
 use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
@@ -10,7 +12,7 @@ use all_is_cubes::math::{
 };
 use all_is_cubes_render::Flaws;
 
-use crate::block_mesh::analyze::{Analysis, analyze};
+use crate::block_mesh::analyze::{Analysis, AnalysisVertex, analyze};
 use crate::block_mesh::extend::{
     BoxColoring, QuadColoring, push_box, push_full_box, push_vertices_from_iter,
 };
@@ -206,6 +208,8 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     // TODO: Allow reusing them across multiple blocks, if that is faster.
     let mut triangulator = planar::PlanarTriangulator::new();
 
+    let mut vertex_subset: Vec<AnalysisVertex> = Vec::with_capacity(analysis.vertices.len() / 2);
+
     // Walk through the planes (layers) of the block, figuring out what geometry to
     // generate for each layer and whether it needs a texture.
     for face in Face6::ALL {
@@ -330,27 +334,26 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 ),
             ] {
                 // Iterator over analysis vertices filtered to the current plane.
-                let iter_plane_vertices = || {
-                    analysis.vertices.iter().filter(|&v| {
-                        // Filter to vertices on this layer,
-                        // that have some content on this face and are not purely opposite,
-                        // that are either opaque or transparent as requested.
-                        voxel_transform_inverse.transform_point(v.position).z == layer
-                            && (if pass_is_transparent {
-                                v.renderable & !v.opaque
-                            } else {
-                                v.opaque
-                            } & interior_side_octant_mask
-                                != OctantMask::NONE)
-                    })
-                };
+                vertex_subset.clear();
+                vertex_subset.extend(analysis.vertices.iter().filter(|&v| {
+                    // Filter to vertices on this layer,
+                    // that have some content on this face and are not purely opposite,
+                    // that are either opaque or transparent as requested.
+                    voxel_transform_inverse.transform_point(v.position).z == layer
+                        && (if pass_is_transparent {
+                            v.renderable & !v.opaque
+                        } else {
+                            v.opaque
+                        } & interior_side_octant_mask
+                            != OctantMask::NONE)
+                }));
 
                 let index_offset = vertices.0.len().try_into().expect("vertex index overflow");
 
                 // Append this plane's vertices to the SubMesh vertices.
                 push_vertices_from_iter(
                     vertices,
-                    iter_plane_vertices().map(|av| {
+                    vertex_subset.iter().map(|av| {
                         let position = scale_to_block.transform_point3d(av.position.to_f32());
                         let coloring: vertex::Coloring<<M::Tile as texture::Tile>::Point> =
                             if let Some(ref plane) = texture_plane_if_needed {
@@ -410,7 +413,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 triangulator.triangulate(
                     viz,
                     triangulator_basis,
-                    iter_plane_vertices().copied(),
+                    vertex_subset.iter().copied(),
                     |triangle_indices| {
                         pass_indices
                             .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
