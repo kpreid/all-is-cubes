@@ -3,10 +3,13 @@
 use criterion::{BatchSize, Criterion, criterion_main};
 
 use all_is_cubes::block::{self, AIR, Block, Resolution::R16};
-use all_is_cubes::content::make_some_voxel_blocks;
-use all_is_cubes::math::{GridAab, Rgba};
+use all_is_cubes::linking::BlockProvider;
+use all_is_cubes::math::{GridAab, GridCoordinate, Rgba};
 use all_is_cubes::space::Space;
-use all_is_cubes::universe::Universe;
+use all_is_cubes::transaction::{self, Transaction};
+use all_is_cubes::universe::{self, Universe};
+use all_is_cubes::util::YieldProgress;
+use all_is_cubes_content::{DemoBlocks, install_demo_blocks, make_some_voxel_blocks};
 use all_is_cubes_render::camera::GraphicsOptions;
 
 use all_is_cubes_mesh as mesh;
@@ -27,72 +30,98 @@ fn block_mesh_benches(c: &mut Criterion) {
     let mut g = c.benchmark_group("block");
     let options = &MeshOptions::new(&GraphicsOptions::default());
 
+    // Benchmarks are in order from least to most complex blocks.
+    // Each one not explicitly marked -fresh/-reuse reuses the BlockMesh value.
+
     // Exercise the code paths that only apply to resolution 1;
     // all the other benchmarks use larger resolutions.
     g.bench_function("r1-fresh", |b| {
-        let universe = Universe::new();
+        let universe = &mut Universe::new();
         iter_new_block_mesh(
             b,
-            &universe,
+            universe,
             options,
             &Block::builder().color(Rgba::WHITE).build(),
         );
     });
     g.bench_function("r1-reused", |b| {
-        let universe = Universe::new();
+        let universe = &mut Universe::new();
         iter_reused_block_mesh(
             b,
-            &universe,
+            universe,
             options,
             &Block::builder().color(Rgba::WHITE).build(),
         );
     });
 
-    g.bench_function("checker-fresh", |b| {
-        let mut universe = Universe::new();
-        let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
-        iter_new_block_mesh(b, &universe, options, &block);
-    });
-    g.bench_function("checker-reused", |b| {
-        let mut universe = Universe::new();
-        let block = checkerboard_block(&mut universe, &[AIR, block::from_color!(Rgba::WHITE)]);
-        iter_reused_block_mesh(b, &universe, options, &block);
+    // This block requires texturing but is otherwise trivial.
+    g.bench_function("opaque", |b| {
+        let universe = &mut Universe::new();
+        let block = checkerboard_block(
+            universe,
+            &[
+                block::from_color!(Rgba::BLACK),
+                block::from_color!(Rgba::WHITE),
+            ],
+        );
+        iter_new_block_mesh(b, universe, options, &block);
     });
 
+    // Exercise the standard test blocks from `make_some_voxel_blocks`.
+    // This is very similar to the "opaque" benchmark but also has light emission.
+    g.bench_function("msvb", |b| {
+        let universe = &mut Universe::new();
+        let [block] = make_some_voxel_blocks(universe);
+        iter_new_block_mesh(b, universe, options, &block);
+    });
+
+    // Elsewhere this kind of block is called a slab, but “half” is consistent with the
+    // terminology of the space mesh benches in this file.
+    // Note also that unlike `make_slab()`, `half_space()` is not shrinkwrapping the space
+    // — there are empty voxels the analysis is obligated to check.
     g.bench_function("half", |b| {
-        let mut universe = Universe::new();
-        // Elsewhere this kind of block is called a slab, but “half” is consistent with the
-        // terminology of the space mesh benches in this file.
-        // Note also that unlike `make_slab()`, `half_space()` is not shrinkwrapping the space
-        // — there are empty voxels.
+        let universe = &mut Universe::new();
         let block = Block::builder()
             .voxels_handle(
                 R16,
                 universe.insert_anonymous(half_space(&block::from_color!(Rgba::WHITE))),
             )
             .build();
-        iter_new_block_mesh(b, &universe, options, &block);
+        iter_reused_block_mesh(b, universe, options, &block);
     });
 
-    g.bench_function("opaque", |b| {
-        let mut universe = Universe::new();
-        let block = checkerboard_block(
-            &mut universe,
-            &[
-                block::from_color!(Rgba::BLACK),
-                block::from_color!(Rgba::WHITE),
-            ],
-        );
-        iter_new_block_mesh(b, &universe, options, &block);
+    // The tetrahedron shape is one that has a reasonably complex surface,
+    // but spread across many separate planes (so each plane has little work).
+    g.bench_function("tetrahedron", |b| {
+        let universe = &mut Universe::new();
+        let block = tetrahedron_block(universe);
+        iter_reused_block_mesh(b, universe, options, &block);
     });
 
-    g.bench_function("msvb", |b| {
-        let mut universe = Universe::new();
-        let [block] = make_some_voxel_blocks(&mut universe);
-        iter_new_block_mesh(b, &universe, options, &block);
+    // The greebly block has very complex surface detail confined to only a few planes.
+    g.bench_function("greebly", |b| {
+        let universe = &mut Universe::new();
+        {
+            let mut txn = universe::UniverseTransaction::default();
+            pollster::block_on(install_demo_blocks(&mut txn, YieldProgress::noop())).unwrap();
+            txn.execute(universe, (), &mut transaction::no_outputs).unwrap();
+        }
+        let block = &BlockProvider::<DemoBlocks>::using(universe).unwrap()[DemoBlocks::Greebly];
+        iter_reused_block_mesh(b, universe, options, block);
     });
 
-    // TODO: Add meshing a block that has a complex but not worst-case shape.
+    // The empty/opaque checkerboard is the “worst case” for these benchmarks, because it has almost
+    // the maximum possible number of vertices and triangles.
+    g.bench_function("checker-fresh", |b| {
+        let universe = &mut Universe::new();
+        let block = checkerboard_block(universe, &[AIR, block::from_color!(Rgba::WHITE)]);
+        iter_new_block_mesh(b, universe, options, &block);
+    });
+    g.bench_function("checker-reused", |b| {
+        let universe = &mut Universe::new();
+        let block = checkerboard_block(universe, &[AIR, block::from_color!(Rgba::WHITE)]);
+        iter_reused_block_mesh(b, universe, options, &block);
+    });
 }
 
 fn iter_reused_block_mesh(
@@ -204,7 +233,7 @@ fn dynamic_benches(c: &mut Criterion) {
     let default_camera = Camera::new(graphics_options, Viewport::with_scale(1.0, [100, 100]));
 
     g.bench_function("initial-update", |b| {
-        let mut universe = Universe::new();
+        let universe = &mut Universe::new();
         let space_handle = universe.insert_anonymous(half_space(&block::from_color!(Rgba::WHITE)));
         b.iter_batched_ref(
             || {
@@ -332,7 +361,7 @@ fn dynamic_benches(c: &mut Criterion) {
             }
         }
 
-        let mut universe = Universe::new();
+        let universe = &mut Universe::new();
         // transparent block so we cause depth sorting
         let space_handle = universe.insert_anonymous(half_space(&block::from_color!(Rgba::new(
             0.0, 1.0, 0.0, 0.5
@@ -343,7 +372,7 @@ fn dynamic_benches(c: &mut Criterion) {
             b.iter_batched_ref(
                 || {
                     State::<Mt>::new(
-                        &universe,
+                        universe,
                         space_handle.clone(),
                         default_camera.clone(),
                         Allocator::new(),
@@ -359,7 +388,7 @@ fn dynamic_benches(c: &mut Criterion) {
             b.iter_batched_ref(
                 || {
                     State::<PovMt>::new(
-                        &universe,
+                        universe,
                         space_handle.clone(),
                         default_camera.clone(),
                         mesh::texture::NoTextures,
@@ -373,7 +402,8 @@ fn dynamic_benches(c: &mut Criterion) {
     // TODO: Add a test for updates past the initial one
 }
 
-// --- End of benches, beginning helpers ---
+// -------------------------------------------------------------------------------------------------
+// Helpers, not benches
 
 fn checkerboard_space_bench_setup(options: MeshOptions, transparent: bool) -> SpaceMeshIngredients {
     SpaceMeshIngredients::new(
@@ -414,6 +444,22 @@ fn half_space(block: &Block) -> Space {
             m.fill_uniform(GridAab::from_lower_size([0, 0, 0], [16, 8, 16]), block)
         })
         .unwrap()
+}
+
+/// A block occupied by a tetrahedron extending from the low corner.
+fn tetrahedron_block(universe: &mut Universe) -> Block {
+    let resolution = R16;
+    let solid = block::from_color!(Rgba::WHITE);
+    Block::builder()
+        .voxels_fn(resolution, |p| {
+            if p.x + p.y + p.z >= GridCoordinate::from(resolution) {
+                &AIR
+            } else {
+                &solid
+            }
+        })
+        .unwrap()
+        .build_into(universe)
 }
 
 /// Data prepared for a benchmark of [`SpaceMesh::new`] or [`SpaceMesh::compute`].
