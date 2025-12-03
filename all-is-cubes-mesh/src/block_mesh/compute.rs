@@ -1,7 +1,5 @@
 //! The algorithm for generating block meshes, and nothing else.
 
-use alloc::vec::Vec;
-
 use itertools::Itertools as _;
 
 use all_is_cubes::block::{self, AnimationChange, EvaluatedBlock, Evoxel, Evoxels, Resolution};
@@ -14,13 +12,11 @@ use all_is_cubes_render::Flaws;
 
 use crate::block_mesh::analyze::{Analysis, analyze};
 use crate::block_mesh::extend::{
-    BoxColoring, QuadColoring, QuadTransform, push_box, push_full_box, push_quad,
-    push_vertices_from_iter,
+    BoxColoring, QuadColoring, push_box, push_full_box, push_vertices_from_iter,
 };
-use crate::block_mesh::planar::{GmRect, VisualVoxel, greedy_mesh};
 use crate::block_mesh::planar_new;
 use crate::texture::{self, Plane as _, Tile as _};
-use crate::{BlockMesh, IndexSlice, MeshOptions, MeshTypes, PosCoord, SubMesh, Viz, vertex};
+use crate::{BlockMesh, IndexSlice, MeshOptions, MeshTypes, SubMesh, Viz, vertex};
 
 /// Generate the [`BlockMesh`] data for the given [`EvaluatedBlock`], writing it into `output`.
 ///
@@ -52,7 +48,7 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
 
     let resolution = block.resolution();
 
-    if resolution != Resolution::R1 && (options.ignore_voxels) {
+    if resolution != Resolution::R1 && options.ignore_voxels {
         // Substitute the block color for the actual voxels.
         // Note: This discards emission, which we are considering acceptable for now.
         let face_colors = block.face_colors().map(|face, full_face_color| {
@@ -144,7 +140,6 @@ pub(super) fn compute_block_mesh<M: MeshTypes>(
             prefer_textures,
             texture_allocator,
             options,
-            block.color(),
             block.voxel_opacity_mask(),
             &mut viz,
         );
@@ -177,7 +172,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     prefer_textures: bool,
     texture_allocator: &M::Alloc,
     options: &MeshOptions,
-    placeholder_color: Rgba,
     voxel_opacity_mask: &block::VoxelOpacityMask,
     viz: &mut Viz,
 ) {
@@ -189,7 +183,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
     let scale_to_block: Scale<f32, Cube, crate::MeshRel> = Scale::new(resolution.recip_f32());
     let voxels_array = voxels.as_vol_ref();
 
-    // Construct empty output to mutate.
     for (_, sub_mesh) in output.face_vertices.iter_mut() {
         // Start assuming opacity; if we find any transparent pixels we'll set
         // this to false. `Within` is always "transparent" because the algorithm
@@ -219,7 +212,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         // TODO: rename voxel_transform to be clearer about what coordinate system this is
         let voxel_transform = face.face_transform(resolution_g);
         let voxel_transform_inverse = voxel_transform.inverse();
-        let quad_transform = QuadTransform::new(face, resolution);
         let face_mesh = &mut output.face_vertices[face];
         let interior_mesh = &mut output.interior_vertices[face];
         let interior_side_octant_mask = OctantMask::ALL.shift(-face);
@@ -272,25 +264,34 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                 continue;
             }
 
-            // Check the case where we aren't iterating over the entire front face.
-            // If they are, then we'll take care of `fully_opaque` later, but if we don't even
-            // iterate over the whole face, we need this extra check.
-            if layer == 0
-                && (occupied_rect.x_range() != (0..resolution_g)
-                    || occupied_rect.y_range() != (0..resolution_g))
-            {
-                face_mesh.fully_opaque = false;
+            // Check whether the block face is fully opaque and can be considered to occlude
+            // adjacent blocks.
+            // TODO: It would make sense to move this calculation to block evaluation, which
+            // already has to do 99% of the work.
+            if layer == 0 {
+                if occupied_rect.x_range() != (0..resolution_g)
+                    || occupied_rect.y_range() != (0..resolution_g)
+                {
+                    // Not full coverage
+                    face_mesh.fully_opaque = false;
+                } else {
+                    // Check all the voxels
+                    for (t, s) in occupied_rect.y_range().cartesian_product(occupied_rect.x_range())
+                    {
+                        let cube: Cube = voxel_transform.transform_cube(Cube::new(s, t, layer));
+                        let evoxel = get_voxel_with_limit(voxels_array, cube, options);
+
+                        if !evoxel.color.fully_opaque() {
+                            // If the first layer is transparent in any cube at all, then the face is
+                            // not fully opaque
+                            face_mesh.fully_opaque = false;
+                        }
+                    }
+                }
             }
 
             viz.set_layer_in_progress(face, layer);
             viz.completed_step();
-
-            // Contains a color with alpha > 0 for every voxel that _should be drawn_.
-            // That is, it excludes all obscured interior volume.
-            // First, we traverse the block and fill this with non-obscured voxels,
-            // then we erase it as we convert contiguous rectangles of it to quads.
-            let mut visible_image: Vec<VisualVoxel> =
-                Vec::with_capacity(usize::try_from(occupied_rect.area()).unwrap_or(0));
 
             let texture_plane_if_needed: Option<<M::Tile as texture::Tile>::Plane> =
                 if let Some(ref texture) = texture_if_needed {
@@ -310,57 +311,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     None
                 };
 
-            for (t, s) in occupied_rect.y_range().cartesian_product(occupied_rect.x_range()) {
-                let cube: Cube = voxel_transform.transform_cube(Cube::new(s, t, layer));
-                let evoxel = get_voxel_with_limit(voxels_array, cube, options);
-
-                if layer == 0 && !evoxel.color.fully_opaque() {
-                    // If the first layer is transparent in any cube at all, then the face is
-                    // not fully opaque
-                    face_mesh.fully_opaque = false;
-                }
-
-                let voxel_is_visible = {
-                    use OpacityCategory::{Invisible, Opaque, Partial};
-                    let this_cat = evoxel.opacity_category();
-                    if this_cat == Invisible {
-                        false
-                    } else {
-                        // Compute whether this voxel is not hidden behind another
-                        let obscuring_cat = get_voxel_with_limit(
-                            voxels_array,
-                            cube + face.normal_vector(),
-                            options,
-                        )
-                        .opacity_category();
-                        match (this_cat, obscuring_cat) {
-                            // Nothing to draw no matter what
-                            (Invisible, _) => false,
-                            // Definitely obscured
-                            (_, Opaque) => false,
-                            // Completely visible.
-                            (Partial | Opaque, Invisible) => true,
-                            // Partially obscured, therefore visible.
-                            (Opaque, Partial) => true,
-                            // This is the weird one: we count transparency adjacent to
-                            // transparency as if there was nothing to draw. This is because if
-                            // we didn't, we would end up generating large numbers (bad) of
-                            // intersecting (also bad) quads for any significant volume of
-                            // transparency. Also, when using `TransparencyFormat::BoundingBox`,
-                            // this does not come up.
-                            (Partial, Partial) => false,
-                        }
-                    }
-                };
-                if voxel_is_visible {
-                    visible_image.push(VisualVoxel::from(&evoxel));
-                } else {
-                    // All obscured voxels are treated as transparent ones, in that we don't
-                    // generate geometry for them.
-                    visible_image.push(VisualVoxel::INVISIBLE);
-                }
-            }
-
             // Pick where we're going to store the quads.
             // Only the cube-surface faces go anywhere but `Within`.
             // (We could generalize this to blocks with concavities that still form a
@@ -377,180 +327,112 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             } else {
                 &mut *interior_mesh
             };
-            let depth = layer as PosCoord; // TODO: centralize this conversion
 
-            if options.use_new_block_triangulator {
-                for (pass_is_transparent, pass_indices, pass_bounding_box) in [
-                    (
-                        false, // opaque
-                        &mut *indices_opaque,
-                        &mut bounding_box.opaque,
-                    ),
-                    (
-                        true, // transparent
-                        &mut *indices_transparent,
-                        &mut bounding_box.transparent,
-                    ),
-                ] {
-                    // Iterator over analysis vertices filtered to the current plane.
-                    let iter_plane_vertices = || {
-                        analysis.vertices.iter().filter(|&v| {
-                            // Filter to vertices on this layer,
-                            // that have some content on this face and are not purely opposite,
-                            // that are either opaque or transparent as requested.
-                            voxel_transform_inverse.transform_point(v.position).z == layer
-                                && (if pass_is_transparent {
-                                    v.renderable & !v.opaque
-                                } else {
-                                    v.opaque
-                                } & interior_side_octant_mask
-                                    != OctantMask::NONE)
-                        })
-                    };
+            for (pass_is_transparent, pass_indices, pass_bounding_box) in [
+                (
+                    false, // opaque
+                    &mut *indices_opaque,
+                    &mut bounding_box.opaque,
+                ),
+                (
+                    true, // transparent
+                    &mut *indices_transparent,
+                    &mut bounding_box.transparent,
+                ),
+            ] {
+                // Iterator over analysis vertices filtered to the current plane.
+                let iter_plane_vertices = || {
+                    analysis.vertices.iter().filter(|&v| {
+                        // Filter to vertices on this layer,
+                        // that have some content on this face and are not purely opposite,
+                        // that are either opaque or transparent as requested.
+                        voxel_transform_inverse.transform_point(v.position).z == layer
+                            && (if pass_is_transparent {
+                                v.renderable & !v.opaque
+                            } else {
+                                v.opaque
+                            } & interior_side_octant_mask
+                                != OctantMask::NONE)
+                    })
+                };
 
-                    let index_offset = vertices.0.len().try_into().expect("vertex index overflow");
+                let index_offset = vertices.0.len().try_into().expect("vertex index overflow");
 
-                    // Append this plane's vertices to the SubMesh vertices.
-                    push_vertices_from_iter(
-                        vertices,
-                        iter_plane_vertices().map(|av| {
-                            let position = scale_to_block.transform_point3d(av.position.to_f32());
-                            let coloring: vertex::Coloring<<M::Tile as texture::Tile>::Point> =
-                                if let Some(ref plane) = texture_plane_if_needed {
-                                    vertex::Coloring::Texture {
-                                        pos: plane.grid_to_texcoord(
-                                            av.position.to_f32().cast_unit()
-                                        // offset to mid-texel for unambiguity
-                                            + face.vector(-0.5f32),
-                                        ),
-                                        resolution,
-                                    }
-                                } else {
-                                    // Pick an arbitrary inside voxel to fetch the vertex color from.
-                                    // Note: This operation is only valid because
-                                    // Analysis::needs_texture will be true if any adjacent voxels
-                                    // have distinct colors, even if they're not actually connected.
-                                    // If we were to adopt a finer-grained analysis, we wouldn't be
-                                    // able to get away with using only 1 mesh vertex per
-                                    // analysis vertex per face.
-                                    //
-                                    // It will also pick a vertex color in the case that the
-                                    // texture allocation failed.
-                                    // TODO: Use block average color instead.
-                                    let acceptable_voxel = Cube::from(
-                                        av.position
-                                            + (av.renderable & interior_side_octant_mask)
-                                                .first()
-                                                .unwrap_or_else(|| {
-                                                    panic!(
-                                                        "failed to find vertex color for {av:?}\n\
-                                                {interior_side_octant_mask:?}\n {face:?}"
-                                                    )
-                                                })
-                                                .to_01()
-                                                .map(|c| GridCoordinate::from(c) - 1), // TODO: add an Octant op for balanced cubes
-                                    );
+                // Append this plane's vertices to the SubMesh vertices.
+                push_vertices_from_iter(
+                    vertices,
+                    iter_plane_vertices().map(|av| {
+                        let position = scale_to_block.transform_point3d(av.position.to_f32());
+                        let coloring: vertex::Coloring<<M::Tile as texture::Tile>::Point> =
+                            if let Some(ref plane) = texture_plane_if_needed {
+                                vertex::Coloring::Texture {
+                                    pos: plane.grid_to_texcoord(
+                                        av.position.to_f32().cast_unit()
+                                    // offset to mid-texel for unambiguity
+                                        + face.vector(-0.5f32),
+                                    ),
+                                    resolution,
+                                }
+                            } else {
+                                // Pick an arbitrary inside voxel to fetch the vertex color from.
+                                // Note: This operation is only valid because
+                                // Analysis::needs_texture will be true if any adjacent voxels
+                                // have distinct colors, even if they're not actually connected.
+                                // If we were to adopt a finer-grained analysis, we wouldn't be
+                                // able to get away with using only 1 mesh vertex per
+                                // analysis vertex per face.
+                                //
+                                // It will also pick a vertex color in the case that the
+                                // texture allocation failed.
+                                // TODO: Use block average color instead.
+                                let acceptable_voxel = Cube::from(
+                                    av.position
+                                        + (av.renderable & interior_side_octant_mask)
+                                            .first()
+                                            .unwrap_or_else(|| {
+                                                panic!(
+                                                    "failed to find vertex color for {av:?}\n\
+                                            {interior_side_octant_mask:?}\n {face:?}"
+                                                )
+                                            })
+                                            .to_01()
+                                            .map(|c| GridCoordinate::from(c) - 1), // TODO: add an Octant op for balanced cubes
+                                );
 
-                                    used_any_vertex_colors = true;
+                                used_any_vertex_colors = true;
 
-                                    // Fetch color from voxel data
-                                    vertex::Coloring::Solid(voxels_array[acceptable_voxel].color)
-                                };
-                            let v = <M::Vertex as vertex::Vertex>::from_block_vertex(
-                                vertex::BlockVertex {
-                                    position,
-                                    face,
-                                    coloring,
-                                },
-                            );
-                            pass_bounding_box.add_point(position);
-                            v
-                        }),
-                    );
+                                // Fetch color from voxel data
+                                vertex::Coloring::Solid(voxels_array[acceptable_voxel].color)
+                            };
+                        let v =
+                            <M::Vertex as vertex::Vertex>::from_block_vertex(vertex::BlockVertex {
+                                position,
+                                face,
+                                coloring,
+                            });
+                        pass_bounding_box.add_point(position);
+                        v
+                    }),
+                );
 
-                    // Compute triangles and append their indices to SubMesh.
-                    let indices_before_this_pass = pass_indices.len();
-                    triangulator_basis.transparent = pass_is_transparent;
-                    triangulator.triangulate(
-                        viz,
-                        triangulator_basis,
-                        iter_plane_vertices().copied(),
-                        |triangle_indices| {
-                            pass_indices.extend_with_offset(
-                                IndexSlice::U32(&triangle_indices),
-                                index_offset,
-                            );
-                        },
-                    );
+                // Compute triangles and append their indices to SubMesh.
+                let indices_before_this_pass = pass_indices.len();
+                triangulator_basis.transparent = pass_is_transparent;
+                triangulator.triangulate(
+                    viz,
+                    triangulator_basis,
+                    iter_plane_vertices().copied(),
+                    |triangle_indices| {
+                        pass_indices
+                            .extend_with_offset(IndexSlice::U32(&triangle_indices), index_offset);
+                    },
+                );
 
-                    // If we added more than 2 transparent triangles, then they might not form
-                    // rectangles. Depth sorting needs to be aware of that in order to disable
-                    // its optimization for sorting rectangles.
-                    *has_non_rect_transparency |=
-                        (pass_indices.len() - indices_before_this_pass > 6) & pass_is_transparent;
-                }
-            } else {
-                // Traverse `visible_image` using the "greedy meshing" algorithm for
-                // breaking an irregular shape into quads.
-                greedy_mesh(
-                    visible_image,
-                    occupied_rect.x_range(),
-                    occupied_rect.y_range(),
-                )
-                .for_each(|rect| {
-                    let GmRect {
-                        single_color,
-                        has_alpha: rect_has_alpha,
-                        low_corner,
-                        high_corner,
-                    } = rect;
-                    // Generate quad.
-                    let coloring =
-                        if let Some(single_color) = single_color.filter(|_| !prefer_textures) {
-                            // The quad we're going to draw has identical texels, so we might as
-                            // well use a solid color and skip needing a texture.
-                            QuadColoring::<M::Tile>::Solid(single_color)
-                        } else if let Some(ref plane) = texture_plane_if_needed {
-                            QuadColoring::<M::Tile>::Texture(plane)
-                        } else {
-                            // Texture allocation failure.
-                            // Report the flaw and use block color as a fallback.
-                            // Further improvement that could be had here:
-                            // * Compute and use per-face colors in EvaluatedBlock
-                            // * Offer the alternative of generating as much
-                            //   geometry as needed.
-                            QuadColoring::<M::Tile>::Solid(
-                                options.transparency.limit_alpha(placeholder_color),
-                            )
-                        };
-
-                    if matches!(coloring, QuadColoring::Solid(_)) {
-                        used_any_vertex_colors = true;
-                    }
-
-                    push_quad(
-                        vertices,
-                        if rect_has_alpha {
-                            indices_transparent
-                        } else {
-                            indices_opaque
-                        },
-                        &quad_transform,
-                        depth,
-                        // cannot fail or round because the maximum resolution of a block is well below
-                        // f32 precision -- TODO: write a function to centralize this claim.
-                        low_corner.cast::<PosCoord>(),
-                        high_corner.cast::<PosCoord>(),
-                        coloring,
-                        viz,
-                        if rect_has_alpha {
-                            &mut bounding_box.transparent
-                        } else {
-                            &mut bounding_box.opaque
-                        },
-                    );
-                    viz.completed_step();
-                });
+                // If we added more than 2 transparent triangles, then they might not form
+                // rectangles. Depth sorting needs to be aware of that in order to disable
+                // its optimization for sorting rectangles.
+                *has_non_rect_transparency |=
+                    (pass_indices.len() - indices_before_this_pass > 6) & pass_is_transparent;
             }
         }
     }

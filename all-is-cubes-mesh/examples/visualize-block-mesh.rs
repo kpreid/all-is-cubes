@@ -5,7 +5,6 @@
 
 use std::thread;
 
-use itertools::iproduct;
 use pollster::block_on;
 
 use all_is_cubes::block::{self, Block, EvaluatedBlock, Resolution};
@@ -66,31 +65,21 @@ fn main() {
             let x = next_x;
             next_x += f32::from(evaluated.resolution()) + 4.0;
 
-            for (use_new_triangulator, (ti, transparency)) in iproduct!(
-                [false, true],
-                [
-                    // TODO: add command line options to use the other or both
-                    TransparencyOption::Surface,
-                    //TransparencyOption::Volumetric,
-                ]
-                .into_iter()
-                .enumerate()
-            ) {
+            for (ti, transparency) in [
+                // TODO: add command line options to use the other or both
+                TransparencyOption::Surface,
+                //TransparencyOption::Volumetric,
+            ]
+            .into_iter()
+            .enumerate()
+            {
                 let entity_path = rg::EntityPath::from_iter([
                     block_name_part.clone(),
-                    rg::EntityPathPart::new(format!(
-                        "{},{}",
-                        if use_new_triangulator {
-                            "newtri"
-                        } else {
-                            "greedy"
-                        },
-                        match transparency {
-                            TransparencyOption::Volumetric => "volumetric",
-                            TransparencyOption::Surface => "surface",
-                            _ => unreachable!(),
-                        }
-                    )),
+                    rg::EntityPathPart::new(match transparency {
+                        TransparencyOption::Volumetric => "volumetric",
+                        TransparencyOption::Surface => "surface",
+                        _ => unreachable!(),
+                    }),
                 ]);
 
                 let destination = destination.child(&entity_path);
@@ -98,18 +87,11 @@ fn main() {
                 let join_handle = thread::Builder::new()
                     .name(block_name.to_string())
                     .spawn_scoped(scope, move || {
-                        show(
-                            destination,
-                            point3(x, f32::from(use_new_triangulator) * 32., ti as f32 * 64.),
-                            &evaluated,
-                            &{
-                                let mut graphics_options = GraphicsOptions::default();
-                                graphics_options.transparency = transparency;
-                                let mut options = mesh::MeshOptions::new(&graphics_options);
-                                options.use_new_block_triangulator = use_new_triangulator;
-                                options
-                            },
-                        )
+                        show(destination, point3(x, 0., ti as f32 * 64.), &evaluated, &{
+                            let mut graphics_options = GraphicsOptions::default();
+                            graphics_options.transparency = transparency;
+                            mesh::MeshOptions::new(&graphics_options)
+                        })
                     })
                     .unwrap();
 

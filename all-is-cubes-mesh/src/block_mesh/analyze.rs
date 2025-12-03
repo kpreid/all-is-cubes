@@ -11,8 +11,9 @@ use all_is_cubes::math::{
 };
 
 use crate::TransparencyFormat;
-use crate::block_mesh::planar::VisualVoxel;
 use crate::block_mesh::viz::Viz;
+
+// -------------------------------------------------------------------------------------------------
 
 /// Maximum number of occupied planes/layers in any block.
 ///
@@ -275,7 +276,7 @@ fn analyze_one_window(
                 .values()
                 .copied()
                 .filter(|voxel| voxel.opacity_category() != OpacityCategory::Invisible)
-                .map(VisualVoxel::from)
+                .map(|voxel| (voxel.color, voxel.emission))
                 .all_equal();
 
         // Bitmask of which axes are going to have a visible surface
