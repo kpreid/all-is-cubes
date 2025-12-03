@@ -241,11 +241,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             false,
         );
 
-        // Rotate the voxel array's extent into our local coordinate system, so we can find
-        // out what range to iterate over.
-        let rotated_voxel_range =
-            voxels_array.bounds().transform(voxel_transform.inverse()).unwrap();
-
         // Check the case where the block's voxels don't meet its front face.
         // If they do, then we'll take care of `fully_opaque` later, but if we don't even
         // iterate over layer 0, we need this extra check.
@@ -258,12 +253,6 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         // `occupied_planes()` tells us which planes have any actually visible voxel surfaces,
         // so this loop can skip fully solid or empty volumes.
         for (layer, occupied_rect) in analysis.occupied_planes(face) {
-            if !rotated_voxel_range.z_range().contains(&layer) {
-                // TODO: This is a workaround for a bug in the analyzer; it should not be
-                // marking out-of-bounds planes as occupied.
-                continue;
-            }
-
             // Check whether the block face is fully opaque and can be considered to occlude
             // adjacent blocks.
             // TODO: It would make sense to move this calculation to block evaluation, which
