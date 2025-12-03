@@ -380,9 +380,17 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
             let depth = layer as PosCoord; // TODO: centralize this conversion
 
             if options.use_new_block_triangulator {
-                for (transparent_pass, indices_destination) in [
-                    (false, &mut *indices_opaque),
-                    (true, &mut *indices_transparent),
+                for (pass_is_transparent, pass_indices, pass_bounding_box) in [
+                    (
+                        false, // opaque
+                        &mut *indices_opaque,
+                        &mut bounding_box.opaque,
+                    ),
+                    (
+                        true, // transparent
+                        &mut *indices_transparent,
+                        &mut bounding_box.transparent,
+                    ),
                 ] {
                     // Iterator over analysis vertices filtered to the current plane.
                     let iter_plane_vertices = || {
@@ -391,7 +399,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                             // that have some content on this face and are not purely opposite,
                             // that are either opaque or transparent as requested.
                             voxel_transform_inverse.transform_point(v.position).z == layer
-                                && (if transparent_pass {
+                                && (if pass_is_transparent {
                                     v.renderable & !v.opaque
                                 } else {
                                     v.opaque
@@ -455,20 +463,20 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                                     coloring,
                                 },
                             );
-                            bounding_box.opaque.add_point(position);
+                            pass_bounding_box.add_point(position);
                             v
                         }),
                     );
 
                     // Compute triangles and append their indices to SubMesh.
-                    let indices_before_this_pass = indices_destination.len();
-                    triangulator_basis.transparent = transparent_pass;
+                    let indices_before_this_pass = pass_indices.len();
+                    triangulator_basis.transparent = pass_is_transparent;
                     triangulator.triangulate(
                         viz,
                         triangulator_basis,
                         iter_plane_vertices().copied(),
                         |triangle_indices| {
-                            indices_destination.extend_with_offset(
+                            pass_indices.extend_with_offset(
                                 IndexSlice::U32(&triangle_indices),
                                 index_offset,
                             );
@@ -479,8 +487,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     // rectangles. Depth sorting needs to be aware of that in order to disable
                     // its optimization for sorting rectangles.
                     *has_non_rect_transparency |=
-                        (indices_destination.len() - indices_before_this_pass > 6)
-                            & transparent_pass;
+                        (pass_indices.len() - indices_before_this_pass > 6) & pass_is_transparent;
                 }
             } else {
                 // Traverse `visible_image` using the "greedy meshing" algorithm for
