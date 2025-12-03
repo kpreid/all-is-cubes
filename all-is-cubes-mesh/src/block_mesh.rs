@@ -22,7 +22,7 @@ use {crate::SpaceMesh, all_is_cubes::space::Space};
 mod analyze;
 mod compute;
 mod extend;
-mod planar_new;
+mod planar;
 mod viz;
 #[cfg_attr(feature = "_special_testing", visibility::make(pub))]
 pub(crate) use viz::Viz;
