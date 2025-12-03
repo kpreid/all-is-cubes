@@ -339,13 +339,13 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
                     // Filter to vertices on this layer,
                     // that have some content on this face and are not purely opposite,
                     // that are either opaque or transparent as requested.
-                    voxel_transform_inverse.transform_point(v.position).z == layer
-                        && (if pass_is_transparent {
-                            v.renderable & !v.opaque
-                        } else {
-                            v.opaque
-                        } & interior_side_octant_mask
-                            != OctantMask::NONE)
+                    (if pass_is_transparent {
+                        v.renderable & !v.opaque
+                    } else {
+                        v.opaque
+                    } & interior_side_octant_mask
+                        != OctantMask::NONE)
+                        && voxel_transform_inverse.transform_point(v.position).z == layer
                 }));
 
                 let index_offset = vertices.0.len().try_into().expect("vertex index overflow");
