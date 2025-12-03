@@ -24,8 +24,7 @@ jobs:
         run: rustup toolchain install stable --profile=minimal
 
       - name: Install cargo-mutants
-        # Not locked so that we can have a newer `syn` than is in the lockfile
-        run: cargo install cargo-mutants@24.9.0
+        run: cargo install --locked cargo-mutants@25.3.1
 
       - name: Run mutation testing for all-is-cubes
         timeout-minutes: 60
