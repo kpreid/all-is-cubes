@@ -14,7 +14,7 @@ use crate::block_mesh::analyze::{Analysis, analyze};
 use crate::block_mesh::extend::{
     BoxColoring, QuadColoring, push_box, push_full_box, push_vertices_from_iter,
 };
-use crate::block_mesh::planar_new;
+use crate::block_mesh::planar;
 use crate::texture::{self, Plane as _, Tile as _};
 use crate::{BlockMesh, IndexSlice, MeshOptions, MeshTypes, SubMesh, Viz, vertex};
 
@@ -204,7 +204,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
 
     // Triangulator contains allocations that we reuse for all planes of the block.
     // TODO: Allow reusing them across multiple blocks, if that is faster.
-    let mut triangulator = planar_new::PlanarTriangulator::new();
+    let mut triangulator = planar::PlanarTriangulator::new();
 
     // Walk through the planes (layers) of the block, figuring out what geometry to
     // generate for each layer and whether it needs a texture.
@@ -216,7 +216,7 @@ fn compute_block_mesh_from_analysis<M: MeshTypes>(
         let interior_mesh = &mut output.interior_vertices[face];
         let interior_side_octant_mask = OctantMask::ALL.shift(-face);
 
-        let mut triangulator_basis = planar_new::PtBasis::new(
+        let mut triangulator_basis = planar::PtBasis::new(
             face,
             /* sweep_direction: */
             match face {

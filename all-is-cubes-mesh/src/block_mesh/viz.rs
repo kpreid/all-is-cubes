@@ -11,7 +11,7 @@ use all_is_cubes::math::{Face6, GridCoordinate, GridPoint, Rgba, Vol};
 
 use crate::Position;
 use crate::block_mesh::analyze::Analysis;
-use crate::block_mesh::planar_new::FrontierVertex;
+use crate::block_mesh::planar::FrontierVertex;
 
 #[cfg(feature = "rerun")]
 use {
