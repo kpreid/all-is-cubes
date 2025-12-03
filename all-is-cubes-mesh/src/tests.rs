@@ -795,10 +795,14 @@ fn assert_is_using_volumetric_texturing_properly(
         for (i, vertex) in sub_mesh.vertices.0.iter().enumerate() {
             match vertex.coloring {
                 Coloring::Texture { pos, resolution } => {
-                    assert_eq!(
-                        pos,
-                        vertex.position.to_f32().cast_unit() * f32::from(resolution),
-                        "vertex position {face:?} {i:?}"
+                    // Valid texture coordinates are either on the surface (for volumetric)
+                    // or offset inward by 0.5 texel (for unambiguous opaque surface texturing)
+                    let vertex_position =
+                        vertex.position.to_f32().cast_unit() * f32::from(resolution);
+                    assert!(
+                        pos == vertex_position || pos == vertex_position - face.vector(0.5),
+                        "vertex position {face:?} {i:?} = {vertex_position:?} does not match \
+                        texture coordinates {pos:?}"
                     );
                 }
                 _ if expect_transparent_only => {
