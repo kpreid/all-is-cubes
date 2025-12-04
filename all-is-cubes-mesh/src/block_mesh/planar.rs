@@ -215,7 +215,9 @@ impl PlanarTriangulator {
         // Move the end-of-row old frontier vertices to new frontier.
         self.new_frontier.extend(self.old_frontier.drain(..));
 
-        self.clip_ears_in_new_frontier(viz, triangle_callback);
+        if self.needs_ears_fixed {
+            self.clip_ears_in_new_frontier(viz, triangle_callback);
+        }
 
         // Discard all vertices that are connected only to area that is behind the line.
         // It would be more efficient to not insert them in the first place, but that would
@@ -450,18 +452,29 @@ impl PlanarTriangulator {
     ///
     /// While this algorithm could in principle do a lot of the work that is handled by other means,
     /// it is O(n²), so we want to give it as little work as possible.
+    #[cold]
     fn clip_ears_in_new_frontier(
         &mut self,
         viz: &mut Viz,
         triangle_callback: &mut impl FnMut([u32; 3]),
     ) {
-        // TODO: be smarter about the range we iterate over after the first time; we only need to
-        // consider the vertices in the neighborhood of the vertices we deleted on the previous
-        // iteration.
-        while self.needs_ears_fixed {
-            self.needs_ears_fixed = false;
-            let mut i: usize = 0;
-            while i.saturating_add(2) < self.new_frontier.len() {
+        #![allow(clippy::reversed_empty_ranges)]
+
+        debug_assert!(self.needs_ears_fixed);
+        self.needs_ears_fixed = false;
+
+        // Range consisting of all the vertices that *might* form clippable triangles.
+        let mut range_to_check_next_pass = 0..self.new_frontier.len();
+
+        while !range_to_check_next_pass.is_empty() {
+            let mut range_to_iterate_now = range_to_check_next_pass.clone();
+
+            // Reset to inverted empty, for min/max accumulation of what the next pass should check
+            range_to_check_next_pass = usize::MAX..0;
+
+            // Loop invariant: i + 2 < range_to_iterate_now.end <= new_frontier.len()
+            let mut i: usize = range_to_iterate_now.start;
+            while i.saturating_add(2) < range_to_iterate_now.end {
                 let first = &self.new_frontier[i];
                 let middle = &self.new_frontier[i + 1];
                 let last = &self.new_frontier[i + 2];
@@ -489,11 +502,27 @@ impl PlanarTriangulator {
                     // the frontier.
                     self.new_frontier.remove(i + 1);
 
+                    // Update iteration range for new vertex numbering
+                    range_to_iterate_now.end -= 1;
+
                     viz.set_frontier(&self.old_frontier, &self.new_frontier);
                     viz.completed_step();
 
                     // There might be further triangles that were enabled by this deletion.
-                    self.needs_ears_fixed = true;
+                    // Check vertices starting from one before this triangle, to one after
+                    // (accounting for the the deleted vertex).
+                    //
+                    // old:        i   i+1  i+2
+                    //    ----•----•----X----•----•----...
+                    // new:  i-1   i        i+1  i+2  i+3
+                    //     (start)                   (end)
+                    range_to_check_next_pass.start =
+                        range_to_check_next_pass.start.min(i.saturating_sub(1));
+                    range_to_check_next_pass.end = range_to_check_next_pass
+                        .end
+                        .saturating_sub(1) // we deleted a vertex from the range to check
+                        .max(i.saturating_add(3)) // add what we just touched
+                        .min(self.new_frontier.len()) // but don't overflow
                 }
 
                 i += 1;
