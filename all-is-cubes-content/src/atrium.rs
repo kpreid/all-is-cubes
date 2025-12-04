@@ -85,6 +85,8 @@ fn atrium_non_async(
         cube.y = 0;
         if atrium_footprint.contains_cube(cube) {
             None
+        } else if arches_footprint.contains_cube(cube) {
+            Some(&blocks[AtriumBlocks::GroovedBricks])
         } else {
             Some(&blocks[AtriumBlocks::UpperFloor])
         }
@@ -132,10 +134,12 @@ fn atrium_non_async(
                 && face.axis() != Axis::Y
             {
                 Some(
-                    blocks[AtriumBlocks::GroundFloor]
+                    blocks[AtriumBlocks::GroovedBricks]
                         .clone()
                         .rotate(GridRotation::from_to(Face6::NX, face, Face6::PY).unwrap()),
                 )
+            } else if part.is_edge() && !part.is_on_face(Face6::PY) {
+                Some(blocks[AtriumBlocks::SolidBricks].clone())
             } else {
                 None
             }
@@ -339,7 +343,7 @@ fn map_text_block(
     match ascii {
         b' ' => existing_block,
         b'.' => AIR,
-        b'#' => blocks[AtriumBlocks::SolidBricks].clone().rotate(Face6::PY.clockwise()),
+        b'#' => blocks[AtriumBlocks::GroovedBricks].clone().rotate(Face6::PY.clockwise()),
         b'G' => blocks[AtriumBlocks::GroundColumn].clone(),
         b'o' => blocks[AtriumBlocks::SmallColumn].clone(),
         b'|' => blocks[AtriumBlocks::SquareColumn].clone(),
@@ -484,10 +488,12 @@ fn fill_space_transformed(
 enum AtriumBlocks {
     Sun,
 
-    // Stone
     GroundFloor,
     UpperFloor,
+    /// Bricks used for filling solid wall volumes.
     SolidBricks,
+    /// Bricks which have grooves, used only on the surfaces of walls.
+    GroovedBricks,
     GroundArch,
     UpperArch,
     /// Axis of the vault shape that is as wide as the `GroundArch`es
@@ -528,6 +534,7 @@ impl fmt::Display for AtriumBlocks {
             AtriumBlocks::GroundFloor => write!(f, "ground-floor"),
             AtriumBlocks::UpperFloor => write!(f, "upper-floor"),
             AtriumBlocks::SolidBricks => write!(f, "solid-bricks"),
+            AtriumBlocks::GroovedBricks => write!(f, "grooved-bricks"),
             AtriumBlocks::GroundArch => write!(f, "ground-arch"),
             AtriumBlocks::UpperArch => write!(f, "upper-arch"),
             AtriumBlocks::VaultArch => write!(f, "vault-arch"),
@@ -576,6 +583,11 @@ async fn install_atrium_blocks(
     const GROUT_BASE: &Block = &block::from_color!(0.32, 0.30, 0.28, 1.0);
     const CEILING_PAINT: &Block = &block::from_color!(0.975, 0.975, 0.975, 1.0);
     const POLE_COLOR: &Block = &block::from_color!(0.27, 0.20, 0.18, 1.0);
+    let solid_air: &Block = &Block::from_primitive(block::Primitive::Atom(block::Atom {
+        color: Rgba::TRANSPARENT,
+        emission: Rgb::ZERO,
+        collision: block::BlockCollision::Hard,
+    }));
 
     // TODO: This whole section is about having noise pick from a fixed set of pregenerated shades.
     // We should abstract it out if we like this style
@@ -595,7 +607,7 @@ async fn install_atrium_blocks(
         |value| &stone_range[(value * 8.0 + 2.5).round().clamp(0.0, 4.0) as usize],
     );
 
-    let brick_pattern = |mut p: Cube| {
+    let brick_pattern = |mut p: Cube, grooves: bool| {
         if (p.x.rem_euclid(RESOLUTION_G) > RESOLUTION_G / 2)
             ^ (p.y.rem_euclid(RESOLUTION_G) > RESOLUTION_G / 2)
         {
@@ -604,7 +616,14 @@ async fn install_atrium_blocks(
         }
         let bricking = (p.x.rem_euclid(8)).min(p.y.rem_euclid(8)).min(p.z.rem_euclid(16));
         if bricking == 0 {
-            GROUT_BASE
+            if grooves && p.x == RESOLUTION_G - 1 {
+                // Recess the grout.
+                // Using solid_air so as to avoid needing to invoke voxel-level collision detection
+                // for these tiny gaps.
+                solid_air
+            } else {
+                GROUT_BASE
+            }
         } else {
             stone_base_array[Cube::from(p.lower_bounds().map(|c| c.rem_euclid(RESOLUTION_G)))] // TODO: add way to express this transformation on `Cube` without going through points
         }
@@ -619,7 +638,7 @@ async fn install_atrium_blocks(
     let molding_fn = |p: Cube| {
         let shape: [GridCoordinate; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 2, 3, 4, 4, 3];
         if p.x < shape[p.y as usize] {
-            brick_pattern(p)
+            brick_pattern(p, false)
         } else {
             &AIR
         }
@@ -684,7 +703,7 @@ async fn install_atrium_blocks(
                     if p.x == 0 {
                         HEAVY_GROUT_BASE
                     } else {
-                        brick_pattern(p)
+                        brick_pattern(p, false)
                     }
                 })?
                 .build_txn(txn),
@@ -695,18 +714,22 @@ async fn install_atrium_blocks(
                     if p.y == 0 {
                         CEILING_PAINT
                     } else {
-                        brick_pattern(p)
+                        brick_pattern(p, false)
                     }
                 })?
                 .build_txn(txn),
             AtriumBlocks::SolidBricks => Block::builder()
-                .display_name("Atrium Wall Bricks")
-                .voxels_fn(RESOLUTION, brick_pattern)?
+                .display_name("Atrium Wall Solid Bricks")
+                .voxels_fn(RESOLUTION, |cube| brick_pattern(cube, false))?
+                .build_txn(txn),
+            AtriumBlocks::GroovedBricks => Block::builder()
+                .display_name("Atrium Wall Grooved Bricks")
+                .voxels_fn(RESOLUTION, |cube| brick_pattern(cube, true))?
                 .build_txn(txn),
             AtriumBlocks::GroundArch => generate_arch(
                 txn,
                 &stone_range,
-                brick_pattern,
+                |cube| brick_pattern(cube, true),
                 RESOLUTION,
                 ArchStyle::GroundFloor,
                 7,
@@ -715,7 +738,7 @@ async fn install_atrium_blocks(
             AtriumBlocks::UpperArch => generate_arch(
                 txn,
                 &stone_range,
-                brick_pattern,
+                |cube| brick_pattern(cube, true),
                 RESOLUTION,
                 ArchStyle::UpperFloor,
                 3,
