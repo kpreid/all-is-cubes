@@ -1,2 +1,2 @@
 bin.name = "all-is-cubes"
-args = "--no-config-files -Slighting_display='\"None\"' --template lighting-bench --graphics record -o test-record-lighting-bench.png --display-size 120x90"
+args = "--no-config-files -Sgraphics/lighting-display=None --template lighting-bench --graphics record -o test-record-lighting-bench.png --display-size 120x90"

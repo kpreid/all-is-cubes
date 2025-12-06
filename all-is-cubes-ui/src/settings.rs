@@ -3,8 +3,13 @@
 //! [`Settings`] is the primary type of this module.
 
 use alloc::sync::Arc;
+use core::any::Any;
 use core::fmt;
 
+use bevy_platform::sync::{LazyLock, OnceLock};
+use hashbrown::HashMap;
+
+use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::listen::{self, Source as _};
 use all_is_cubes_render::camera::GraphicsOptions;
 
@@ -14,12 +19,9 @@ use all_is_cubes_render::camera::GraphicsOptions;
 mod schema;
 pub use schema::*;
 
-// -------------------------------------------------------------------------------------------------
+mod serialize;
 
-/// Currently, the settings data is *only* graphics options.
-/// We want to add more settings (e.g. keybindings, startup behavior options, etc),
-/// and not use `GraphicsOptions`'s exact serialization, but that will come later.
-pub(crate) type Data = Arc<GraphicsOptions>;
+// -------------------------------------------------------------------------------------------------
 
 /// User-facing interactively editable and persisted settings for All is Cubes sessions.
 ///
@@ -91,9 +93,7 @@ impl Settings {
                             match (data, &inherit) {
                                 (Some(data), _) => listen::constant(data),
                                 (None, Some(settings)) => settings.as_source(),
-                                (None, None) => {
-                                    listen::constant(Arc::new(GraphicsOptions::default()))
-                                }
+                                (None, None) => listen::constant(Data::default()),
                             }
                         }
                     })
@@ -111,37 +111,77 @@ impl Settings {
         self.0.final_data_source.clone()
     }
 
-    /// Returns the current graphics options.
-    pub fn get_graphics_options(&self) -> Arc<GraphicsOptions> {
-        self.as_source().get()
-    }
-
-    /// Overwrites the graphics options.
-    pub fn set_graphics_options(&self, new_options: GraphicsOptions) {
-        self.set_state(Arc::new(new_options));
-    }
-
-    /// Overwrites the graphics options with a modified version.
+    /// Returns a snapshot of the current settings.
     ///
-    /// This operation is not atomic; that is,
-    /// if multiple threads are calling it, then one’s effect may be overwritten.
-    // TODO: Fix that (will require support from ListenableCell...compare-and-swap?)
-    #[doc(hidden)]
-    pub fn mutate_graphics_options(&self, f: impl FnOnce(&mut GraphicsOptions)) {
-        let mut options: Arc<GraphicsOptions> = self.get_graphics_options();
-        f(Arc::make_mut(&mut options));
-        self.set_state(options);
+    /// This is slightly more efficient than `self.as_source().get()`.
+    pub fn get(&self) -> Data {
+        self.0.final_data_source.get()
+    }
+
+    /// Changes the value of one setting.
+    ///
+    /// This change may affect the persistent storage of the [`Settings`] these settings were
+    /// [inherited][Self::inherit] from, unless [`Settings::disinherit()`] is called first.
+    pub fn set<T: Send + Sync + 'static>(&self, key: &'static TypedKey<T>, value: T) {
+        let sv = StoredValue {
+            unparsed: (key.serialize)(&value),
+            parsed: Some(Arc::new(value)),
+        };
+        self.set_raw(key.key, sv);
+    }
+
+    /// Changes the value of one setting, by giving the string representation of the value.
+    ///
+    /// This change may affect the persistent storage of the [`Settings`] these settings were
+    /// [inherited][Self::inherit] from, unless [`Settings::disinherit()`] is called first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value is not valid for the key.
+    pub fn set_untyped(&self, key: Key, value: Value) -> Result<(), ParseError> {
+        self.set_raw(
+            key,
+            StoredValue {
+                parsed: Some(key.deserialize_erased(&value)?),
+                unparsed: value,
+            },
+        );
+        Ok(())
+    }
+
+    /// Common implementation of [`Self::set()`] and [`Self::set_untyped()`].
+    /// Does not check that the value has a correct value type.
+    fn set_raw(&self, key: Key, sv: StoredValue) {
+        let current_data = self.0.final_data_source.get();
+        if current_data.0.map.get(&key).map(|existing| &existing.unparsed) == Some(&sv.unparsed) {
+            // No difference.
+            return;
+        }
+
+        let mut new_map: HashMap<Key, StoredValue> = current_data.0.map.clone();
+
+        new_map.insert(key, sv);
+
+        self.set_state(Data(Arc::new(DataInner {
+            map: new_map,
+            graphics_options: OnceLock::new(),
+        })));
     }
 
     /// Modify one setting by calling `updater` with the old value to compute a new value.
     ///
     /// This operation is not atomic; that is,
     /// if multiple threads are calling it, then one’s effect may be overwritten.
-    pub fn update<T: Clone>(&self, key: &TypedKey<T>, updater: impl FnOnce(T, &Data) -> T) {
+    /// Future versions might improve that situation.
+    pub fn update<T: Clone + Send + Sync + 'static>(
+        &self,
+        key: &'static TypedKey<T>,
+        updater: impl FnOnce(T, &Data) -> T,
+    ) {
         let data = self.as_source().get();
-        let old_value: T = key.read(&data).clone();
-        let new_value: T = updater(old_value, &data);
-        key.write(self, new_value);
+        let old_value: T = data.get(key).clone();
+        let new_value = updater(old_value, &data);
+        self.set(key, new_value);
     }
 
     /// If this `Settings` was constructed to share another’s state using
@@ -186,29 +226,151 @@ impl Default for Settings {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Current state of [`Settings`].
+///
+/// Unlike [`Settings`], this struct does not provide shared *mutable* access to settings,
+/// but is a snapshot.
+//---
+// TODO: rename this to a better name. Maybe this is Settings and the other is SettingsStore.
+#[derive(Debug, Clone, Default)]
+pub struct Data(Arc<DataInner>);
+
+#[derive(Debug, Default)]
+struct DataInner {
+    map: HashMap<Key, StoredValue>,
+
+    /// Derived graphics options.
+    graphics_options: OnceLock<Arc<GraphicsOptions>>,
+    // TODO: Data gets cloned a lot currently and so the graphics_options cache will work poorly
+    // TODO: Add storage for unknown preserved keys.
+}
+
+impl Data {
+    // Note: Does not check for consistency between key and value type.
+    fn from_sv(map: HashMap<Key, StoredValue>) -> Self {
+        Self(Arc::new(DataInner {
+            map,
+            graphics_options: OnceLock::new(),
+        }))
+    }
+
+    /// Returns the current value of this setting, or the default if it is unset or invalid.
+    pub fn get<T>(&self, key: &'static TypedKey<T>) -> &T {
+        match self.0.map.get(&key.key) {
+            Some(StoredValue {
+                unparsed: _,
+                parsed: Some(value),
+            }) => value.downcast_ref().expect("downcast failure"),
+            _ => &key.default,
+        }
+    }
+
+    /// Returns [`GraphicsOptions`] derived from these settings.
+    pub fn to_graphics_options(&self) -> Arc<GraphicsOptions> {
+        Arc::clone(
+            self.0
+                .graphics_options
+                .get_or_init(|| Arc::new(assemble_graphics_options(self))),
+        )
+    }
+
+    /// Iterates over every key-value pair that has a value which may be different from the
+    /// default.
+    ///
+    /// This is appropriate to use for saving settings. It produces the same results as
+    /// the [`serde::Serialize`] implementation for [`Data`].
+    /// It is not appropriate for listing the values of all settings that exist.
+    pub fn iter_set(&self) -> impl Iterator<Item = (Key, Value)> {
+        self.0.map.iter().map(|(k, sv)| (*k, sv.unparsed.clone()))
+    }
+}
+
+impl Eq for Data {}
+impl PartialEq for Data {
+    fn eq(&self, other: &Self) -> bool {
+        if self.0.map.len() != other.0.map.len() {
+            return false;
+        }
+        for (key, value) in self.0.map.iter() {
+            let Some(other_value) = other.0.map.get(key) else {
+                return false;
+            };
+            if value.unparsed != other_value.unparsed {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl FromIterator<(ArcStr, Value)> for Data {
+    fn from_iter<T: IntoIterator<Item = (ArcStr, Value)>>(iter: T) -> Self {
+        Self::from_sv(HashMap::from_iter(iter.into_iter().filter_map(
+            |(key_str, value_str)| {
+                // TODO: preserve unknown keys instead of discarding them
+                let key: Key = key_str.parse().ok()?;
+                Some((
+                    key,
+                    StoredValue {
+                        parsed: key.deserialize_erased(&value_str).ok(),
+                        unparsed: value_str,
+                    },
+                ))
+            },
+        )))
+    }
+}
+
+impl serde::Serialize for Data {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Convert HashMap to BTreeMap so that the keys are serialized in a deterministic order.
+        let ordered_map: alloc::collections::BTreeMap<&str, &str> =
+            self.0.map.iter().map(|(k, v)| (k.as_str(), v.unparsed.as_str())).collect();
+        serde::Serialize::serialize(&ordered_map, serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Data {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let map = <HashMap<ArcStr, ArcStr> as serde::Deserialize>::deserialize(deserializer)?;
+        Ok(Self::from_iter(map))
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Identifies an individual setting in [`Settings`], and allows accessing it as type `T`.
 ///
 /// You can obtain these from [the constants in this module](self#constants), such as [`FOG`].
 pub struct TypedKey<T> {
     key: Key,
-    reader: fn(&GraphicsOptions) -> &T,
-    writer: fn(&mut GraphicsOptions, T),
+    serialize: fn(&T) -> ArcStr,
+    deserialize: fn(&str) -> Result<T, serialize::DeserializeError>,
+    default: LazyLock<T>,
 }
 
-impl<T> TypedKey<T> {
-    /// Returns the untyped key.
+impl<T: Send + Sync + 'static> TypedKey<T> {
+    /// Returns the untyped form of this key.
     pub fn key(&self) -> &Key {
         &self.key
     }
 
-    /// Returns the current value of this setting.
-    pub fn read<'d>(&self, data: &'d Data) -> &'d T {
-        (self.reader)(data)
+    /// Gets the current value of this setting.
+    // TODO: remove by inlining
+    pub fn read<'d>(&'static self, data: &'d Data) -> &'d T {
+        data.get(self)
     }
 
     /// Overwrites the current value of this setting.
-    pub fn write(&self, settings: &Settings, value: T) {
-        settings.mutate_graphics_options(|g| (self.writer)(g, value));
+    // TODO: remove by inlining
+    pub fn write(&'static self, settings: &Settings, value: T) {
+        settings.set(self, value)
     }
 }
 
@@ -220,41 +382,115 @@ impl<T> fmt::Debug for TypedKey<T> {
 
 // -------------------------------------------------------------------------------------------------
 
+// TODO: should we have an `enum Value`? Or are those more trouble than they’re worth due to
+// mismatches with serialization formats (NaN, integer width, etc)?
+type Value = ArcStr;
+
+#[derive(Clone, Debug)]
+struct StoredValue {
+    unparsed: ArcStr,
+    /// This field is [`Some`] if and only if the value successfully parsed.
+    parsed: Option<Arc<dyn Any + Send + Sync>>,
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Error when a setting’s value is given as an unparseable string or an out-of-range value.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct ParseError {
+    /// The key whose value this was trying to be.
+    pub key: Key,
+    /// The string value that was not valid.
+    pub unparseable_value: ArcStr,
+    /// Explanation of how the value was invalid.
+    detail: ArcStr,
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            key,
+            unparseable_value,
+            detail,
+        } = self;
+        write!(
+            f,
+            "could not parse “{unparseable_value}” as a value for setting “{key}”: {detail}"
+        )
+    }
+}
+
+impl core::error::Error for ParseError {}
+
+// -------------------------------------------------------------------------------------------------
+
+// -------------------------------------------------------------------------------------------------
+
+/// Errors produced by [`Settings::set()`].
+#[derive(Clone, Debug, PartialEq, displaydoc::Display)]
+#[non_exhaustive]
+pub enum SetError {
+    // /// A key was specified that is not part of the settings schema.
+    // #[displaydoc("unknown setting key “{key}”")]
+    // UnknownKey {
+    //     #[allow(missing_docs)]
+    //     key: ArcStr,
+    // },
+    /// A value was provided as a string, but the string did not parse or otherwise is not valid
+    /// for the setting.
+    #[displaydoc("value “{value}” is not valid for key “{key}”")]
+    InvalidValue {
+        #[allow(missing_docs)]
+        key: Key,
+        /// The erroneous value.
+        value: ArcStr,
+    },
+}
+
+impl core::error::Error for SetError {}
+
+// -------------------------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use all_is_cubes::arcstr::literal;
     use all_is_cubes::math::ps64;
 
     #[test]
+    fn update() {
+        let settings = Settings::new(Data::default());
+        settings.update(SHOW_UI, |value, _data| {
+            assert!(value);
+            false
+        });
+        assert_eq!(*settings.get().get(SHOW_UI), false);
+    }
+
+    #[test]
     fn disinherit() {
-        let parent = Settings::new(Arc::new({
-            let mut g = GraphicsOptions::default();
-            g.fov_y = ps64(20.0);
-            g
-        }));
+        let parent = Settings::new(Data::from_iter([(
+            literal!("graphics/fov-y"),
+            literal!("20.0"),
+        )]));
         let child = Settings::inherit(parent.clone());
 
         // Inherited values before child
         assert_eq!(
-            (
-                parent.get_graphics_options().fov_y,
-                child.get_graphics_options().fov_y
-            ),
+            (*FOV_Y.read(&parent.get()), *FOV_Y.read(&child.get())),
             (ps64(20.0), ps64(20.0))
         );
         assert_eq!(
-            child.get_graphics_options().show_ui,
+            *SHOW_UI.read(&child.get()),
             true,
             "original value for show_ui"
         );
 
         // Writing upward and reading downward
-        child.mutate_graphics_options(|g| g.show_ui = false);
+        child.set(SHOW_UI, false);
         assert_eq!(
-            (
-                parent.get_graphics_options().show_ui,
-                child.get_graphics_options().show_ui
-            ),
+            (*SHOW_UI.read(&parent.get()), *SHOW_UI.read(&child.get())),
             (false, false),
             "parent and child mutated"
         );
@@ -263,18 +499,15 @@ mod tests {
 
         // After disinheriting, child still has values from parent
         assert_eq!(
-            child.get_graphics_options().fov_y,
+            *FOV_Y.read(&child.get()),
             ps64(20.0),
             "inherited value after disinherit"
         );
 
         // After disinheriting, child doesn't mutate parent
-        child.mutate_graphics_options(|g| g.fov_y = ps64(10.0));
+        child.set(FOV_Y, ps64(10.0));
         assert_eq!(
-            (
-                parent.get_graphics_options().fov_y,
-                child.get_graphics_options().fov_y
-            ),
+            (*FOV_Y.read(&parent.get()), *FOV_Y.read(&child.get())),
             (ps64(20.0), ps64(10.0)),
             "mutated values after disinherit"
         );
@@ -293,14 +526,28 @@ mod tests {
         // No initial write
         assert_eq!(prx.try_recv(), Err(Empty));
 
-        settings.mutate_graphics_options(|g| g.show_ui = false);
+        settings.set(SHOW_UI, false);
         assert_eq!(
             prx.try_recv(),
-            Ok(Arc::new({
-                let mut g = GraphicsOptions::default();
-                g.show_ui = false;
-                g
-            }))
+            Ok(Data::from_iter([(
+                literal!("graphics/show-ui"),
+                literal!("false"),
+            )]))
+        );
+    }
+
+    #[test]
+    fn invalid_string_value_constructing_data() {
+        let data = Data::from_iter([(literal!("graphics/fov-y"), literal!("nonsense"))]);
+
+        // For typed reads, the default is used instead of the invalid value.
+        assert_eq!(data.get(FOV_Y), &ps64(90.0));
+
+        // But the invalid value is preserved in case it is wanted.
+        let sv = &data.0.map[&FOV_Y.key];
+        assert_eq!(
+            (&sv.unparsed, sv.parsed.is_none()),
+            (&literal!("nonsense"), true)
         );
     }
 }

@@ -100,11 +100,11 @@ pub(crate) fn graphics_options_widgets(
             hud_inputs,
             style,
             UiBlocks::AntialiasButtonLabel,
-            |s| *settings::ANTIALIASING.read(s) != AntialiasingOption::None,
+            |s| *s.get(settings::ANTIALIASING) != AntialiasingOption::None,
             |s, _v| {
-                settings::ANTIALIASING.write(
-                    s,
-                    match *settings::ANTIALIASING.read(&s.get_graphics_options()) {
+                s.set(
+                    settings::ANTIALIASING,
+                    match s.get().get(settings::ANTIALIASING) {
                         AntialiasingOption::None => AntialiasingOption::Always,
                         AntialiasingOption::IfCheap => AntialiasingOption::None,
                         AntialiasingOption::Always => AntialiasingOption::None,
@@ -196,7 +196,7 @@ fn arb_toggle_button(
         {
             let settings = hud_inputs.settings.clone();
             move || {
-                setter(&settings, getter(&settings.get_graphics_options()));
+                setter(&settings, getter(&settings.get()));
             }
         },
     );
@@ -229,13 +229,13 @@ fn setting_toggle_button(
     };
     let button = widgets::ToggleButton::new(
         hud_inputs.settings.as_source(),
-        move |data| *key.read(data),
+        move |data| *data.get(key),
         label,
         &hud_inputs.hud_blocks.widget_theme,
         {
             let settings = hud_inputs.settings.clone();
             move || {
-                key.write(&settings, !key.read(&settings.get_graphics_options()));
+                key.write(&settings, !settings.get().get(key));
             }
         },
     );
@@ -272,14 +272,14 @@ fn setting_enum_button<T: Clone + fmt::Debug + PartialEq + Send + Sync + 'static
                         hud_inputs.settings.as_source(),
                         {
                             let value_to_compare = value.clone();
-                            move |options| *key.read(options) == value_to_compare
+                            move |options| *options.get(key) == value_to_compare
                         },
                         arcstr::format!("{:?}", value), // TODO: quick kludge; need real labels
                         &hud_inputs.hud_blocks.widget_theme,
                         {
                             let settings = hud_inputs.settings.clone();
                             move || {
-                                key.write(&settings, value.clone());
+                                settings.set(key, value.clone());
                             }
                         },
                     );

@@ -105,6 +105,9 @@ pub struct Session {
 struct Shuttle {
     settings: Settings,
 
+    /// Pre-computed clonable source for graphics options from `settings`.
+    graphics_options_source: listen::DynSource<Arc<GraphicsOptions>>,
+
     game_universe: Universe,
 
     /// Subset of information from `game_universe` that is largely immutable and can be
@@ -160,6 +163,7 @@ impl fmt::Debug for Session {
         };
         let Shuttle {
             settings,
+            graphics_options_source: _,
             game_universe,
             game_universe_info,
             game_character,
@@ -295,7 +299,7 @@ impl Session {
 
     /// Allows reading, and observing changes to, the current graphics options.
     pub fn graphics_options(&self) -> listen::DynSource<Arc<GraphicsOptions>> {
-        self.shuttle().settings.as_source()
+        Arc::new(self.shuttle().settings.as_source().map(|data| data.to_graphics_options()))
     }
 
     /// Allows changing the settings associated with this session.
@@ -657,7 +661,7 @@ impl Session {
     /// containing diagnostic information about rendering and stepping.
     pub fn info_text<T: Fmt<StatusText>>(&self, render: T) -> InfoText<'_, T> {
         let fopt = StatusText {
-            show: self.shuttle().settings.get_graphics_options().debug_info_text_contents,
+            show: self.shuttle().graphics_options_source.get().debug_info_text_contents,
         };
 
         if LOG_FIRST_FRAMES && self.tick_counter_for_logging <= 10 {
@@ -860,6 +864,8 @@ impl SessionBuilder {
         } = self;
 
         let settings = settings.unwrap_or_else(|| Settings::new(Default::default()));
+        let graphics_options_source =
+            Arc::new(settings.as_source().map(|data| data.to_graphics_options()));
         let game_character = listen::CellWithLocal::new(None);
         let input_processor = InputProcessor::new();
         let paused = listen::Cell::new(false);
@@ -912,6 +918,7 @@ impl SessionBuilder {
             shuttle: Some(Box::new(Shuttle {
                 ui,
                 settings,
+                graphics_options_source,
                 game_character,
                 game_universe_info: listen::Cell::new(SessionUniverseInfo {
                     id: game_universe.universe_id(),
@@ -1242,7 +1249,7 @@ impl MainTaskContext {
     pub fn create_cameras(&self, viewport_source: listen::DynSource<Viewport>) -> StandardCameras {
         self.with_ref(|shuttle| {
             let mut c = StandardCameras::new(
-                shuttle.settings.as_source(),
+                shuttle.graphics_options_source.clone(),
                 viewport_source,
                 shuttle.game_character.as_source(),
                 shuttle.ui_view(),

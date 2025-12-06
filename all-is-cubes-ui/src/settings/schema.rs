@@ -1,14 +1,21 @@
+use alloc::borrow::Cow;
 use alloc::string::String;
+use alloc::sync::Arc;
+use core::any::Any;
 use core::fmt;
 use core::str::FromStr;
 
+use bevy_platform::sync::LazyLock;
+
+use all_is_cubes::arcstr::ArcStr;
 use all_is_cubes::math::{FreeCoordinate, PositiveSign, ZeroOne};
 use all_is_cubes_render::camera::{self, GraphicsOptions};
 
-use super::TypedKey;
+use crate::settings::serialize::{DeserializeError, StringForm};
+use crate::settings::{ParseError, TypedKey};
 
 #[cfg(doc)]
-use super::Settings;
+use crate::settings::Settings;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -20,9 +27,7 @@ macro_rules! derive_settings_schema_from_keys {
                 key = $key_string:literal,
                 type = $value_type:ty,
                 display_name = $display_name:literal,
-                // Currently, this is hardcoded to work with fields of `GraphicsOptions`,
-                // but that will change to a general key-value system.
-                field = $field:ident $(,)?
+                default = $default_expr:expr $(,)?
             )]
             $variant:ident,
         )*
@@ -39,7 +44,29 @@ macro_rules! derive_settings_schema_from_keys {
             /// Returns the name for this setting to show to users.
             pub fn display_name(&self) -> &str {
                 match self {
+                    // TODO: have an actual name rather than reiterating the for-machines string.
                     $( Key::$variant => $key_string, )*
+                }
+            }
+
+            /// Deserialize the value as by [`TypedKey`], but in boxed form.
+            ///
+            /// Design note: This function may need to go away when we make the schema extensible.
+            /// We’ll see.
+            pub(crate) fn deserialize_erased(&self, value: &str) -> Result<Arc<dyn Any + Send + Sync>, ParseError> {
+                paste::paste! {
+                    match self {
+                        $( Key::$variant => {
+                            match ([< $variant:snake:upper >].deserialize)(value) {
+                                Ok(value) => Ok(Arc::new(value)),
+                                Err(DeserializeError(detail)) => Err(ParseError {
+                                    key: Key::$variant,
+                                    unparseable_value: ArcStr::from(value),
+                                    detail,
+                                })
+                            }
+                        })*
+                    }
                 }
             }
         }
@@ -66,7 +93,6 @@ macro_rules! derive_settings_schema_from_keys {
             }
         }
 
-        #[cfg(false)] // TODO: not used yet since we currently serialize a GraphicsOptions struct and not key-value pairs
         impl serde::Serialize for Key {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
@@ -77,15 +103,20 @@ macro_rules! derive_settings_schema_from_keys {
 
         paste::paste! {
             $(
+                static [< STATIC_ $variant:snake:upper >]: TypedKey<$value_type> = TypedKey {
+                    key: Key::$variant,
+                    // TODO: if we stick to this, no need for the struct fields...?
+                    serialize: <$value_type as StringForm>::serialize,
+                    deserialize: <$value_type as StringForm>::deserialize,
+                    default: LazyLock::new(|| { $default_expr }),
+                };
+
                 #[doc = concat!(
                     "Allows accessing the `",$key_string, "` setting as a `",
                     stringify!($value_type), "`."
                 )]
-                pub const [< $variant:snake:upper >]: &TypedKey<$value_type> = &TypedKey {
-                    key: Key::$variant,
-                    reader: |g: &GraphicsOptions| &g.$field,
-                    writer: |g: &mut GraphicsOptions, value: $value_type| { g.$field = value },
-                };
+                pub const [< $variant:snake:upper >]: &TypedKey<$value_type> =
+                     &[< STATIC_ $variant:snake:upper >];
             )*
         }
     }
@@ -93,22 +124,18 @@ macro_rules! derive_settings_schema_from_keys {
 
 /// Identifies an individual setting in [`Settings`].
 ///
-/// This type can be converted to and parsed from a string.
-///
-/// See also [`TypedKey`][super::TypedKey].
-///
 /// TODO: This will eventually be replaced with a more extensible mechanism, possibly involving
 /// multiple enums.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, exhaust::Exhaust)]
-#[non_exhaustive]
 #[expect(missing_docs, reason = "TODO")]
+#[non_exhaustive]
 #[macro_rules_attribute::derive(derive_settings_schema_from_keys!)]
 pub enum Key {
     #[custom(
         key = "graphics/render-method",
         type = camera::RenderMethod,
         display_name = "Render method",
-        field = render_method,
+        default = GraphicsOptions::default().render_method
     )]
     RenderMethod,
 
@@ -116,7 +143,7 @@ pub enum Key {
         key = "graphics/fog",
         type = camera::FogOption,
         display_name = "Fog",
-        field = fog,
+        default = GraphicsOptions::default().fog
     )]
     Fog,
 
@@ -124,7 +151,7 @@ pub enum Key {
         key = "graphics/fov-y",
         type = PositiveSign<FreeCoordinate>,
         display_name = "FOV",
-        field = fov_y,
+        default = GraphicsOptions::default().fov_y
     )]
     FovY,
 
@@ -132,7 +159,7 @@ pub enum Key {
         key = "graphics/tone-mapping",
         type = camera::ToneMappingOperator,
         display_name = "Tone mapping",
-        field = tone_mapping,
+        default = GraphicsOptions::default().tone_mapping
     )]
     ToneMapping,
 
@@ -140,7 +167,7 @@ pub enum Key {
         key = "graphics/maximum-intensity",
         type = PositiveSign<f32>,
         display_name = "Maximum intensity",
-        field = maximum_intensity,
+        default = GraphicsOptions::default().maximum_intensity
     )]
     MaximumIntensity,
 
@@ -149,7 +176,7 @@ pub enum Key {
         key = "graphics/exposure",
         type = camera::ExposureOption,
         display_name = "Exposure",
-        field = exposure, 
+        default = GraphicsOptions::default().exposure
     )]
     Exposure,
 
@@ -157,7 +184,7 @@ pub enum Key {
         key = "graphics/bloom-intensity",
         type = ZeroOne<f32>,
         display_name = "Bloom",
-        field = bloom_intensity,
+        default = GraphicsOptions::default().bloom_intensity
     )]
     BloomIntensity,
 
@@ -165,7 +192,7 @@ pub enum Key {
         key = "graphics/view-distance",
         type = PositiveSign<FreeCoordinate>,
         display_name = "View distance (blocks)",
-        field = view_distance,
+        default = GraphicsOptions::default().view_distance
     )]
     ViewDistance,
 
@@ -173,7 +200,7 @@ pub enum Key {
         key = "graphics/lighting-display",
         type = camera::LightingOption,
         display_name = "Lighting",
-        field = lighting_display,
+        default = GraphicsOptions::default().lighting_display
     )]
     LightingDisplay,
 
@@ -181,7 +208,7 @@ pub enum Key {
         key = "graphics/transparency",
         type = camera::TransparencyOption, // TODO: split threshold to its own option to not lose it
         display_name = "Transparency",
-        field = transparency,
+        default = GraphicsOptions::default().transparency
     )]
     Transparency,
 
@@ -189,7 +216,7 @@ pub enum Key {
         key = "graphics/show-ui",
         type = bool,
         display_name = "Show UI",
-        field = show_ui,
+        default = GraphicsOptions::default().show_ui
     )]
     ShowUi,
 
@@ -197,7 +224,7 @@ pub enum Key {
         key = "graphics/antialiasing",
         type = camera::AntialiasingOption,
         display_name = "Antialiasing",
-        field = antialiasing,
+        default = GraphicsOptions::default().antialiasing
     )]
     Antialiasing,
 
@@ -205,7 +232,7 @@ pub enum Key {
         key = "graphics/debug-info-text",
         type = bool,
         display_name = "Debug: Show info text",
-        field = debug_info_text,
+        default = GraphicsOptions::default().debug_info_text
     )]
     DebugInfoText,
 
@@ -213,7 +240,7 @@ pub enum Key {
         key = "graphics/debug-info-text-contents",
         type = all_is_cubes::util::ShowStatus,
         display_name = "Debug: Info text contents",
-        field = debug_info_text_contents,
+        default = GraphicsOptions::default().debug_info_text_contents
     )]
     DebugInfoTextContents,
 
@@ -221,7 +248,7 @@ pub enum Key {
         key = "graphics/debug-behaviors",
         type = bool,
         display_name = "Debug: Show behaviors",
-        field = debug_behaviors,
+        default = GraphicsOptions::default().debug_behaviors
     )]
     DebugBehaviors,
 
@@ -229,7 +256,7 @@ pub enum Key {
         key = "graphics/debug-chunk-boxes",
         type = bool,
         display_name = "Debug: Show chunk boxes",
-        field = debug_chunk_boxes,
+        default = GraphicsOptions::default().debug_chunk_boxes
     )]
     DebugChunkBoxes,
 
@@ -237,7 +264,7 @@ pub enum Key {
         key = "graphics/debug-collision-boxes",
         type = bool,
         display_name = "Debug: Show collision boxes",
-        field = debug_collision_boxes,
+        default = GraphicsOptions::default().debug_collision_boxes
     )]
     DebugCollisionBoxes,
 
@@ -245,7 +272,7 @@ pub enum Key {
         key = "graphics/debug-light-rays-at-cursor",
         type = bool,
         display_name = "Debug: Show light rays at cursor",
-        field = debug_light_rays_at_cursor,
+        default = GraphicsOptions::default().debug_light_rays_at_cursor
     )]
     DebugLightRaysAtCursor,
 
@@ -253,7 +280,7 @@ pub enum Key {
         key = "graphics/debug-pixel-cost",
         type = bool,
         display_name = "Debug: Show rendering cost",
-        field = debug_pixel_cost,
+        default = GraphicsOptions::default().debug_pixel_cost
     )]
     DebugPixelCost,
 
@@ -261,20 +288,47 @@ pub enum Key {
         key = "graphics/debug-reduce-view-frustum",
         type = bool,
         display_name = "Debug: Increase frustum culling",
-        field = debug_reduce_view_frustum,
+        default = GraphicsOptions::default().debug_reduce_view_frustum
     )]
     DebugReduceViewFrustum,
 }
 
-#[cfg(false)] // TODO: not used yet since we currently serialize a GraphicsOptions struct and not key-value pairs
 impl<'de> serde::Deserialize<'de> for Key {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let string = Cow::<'de, str>::deserialize(deserializer)?;
+        let string = <Cow<'de, str> as serde::Deserialize<'de>>::deserialize(deserializer)?;
         string.parse::<Self>().map_err(serde::de::Error::custom)
     }
+}
+
+pub(super) fn assemble_graphics_options(data: &super::Data) -> GraphicsOptions {
+    // TODO: add exhaustivity, perhaps by moving code to the all-is-cubes crate.
+    let mut options = GraphicsOptions::default();
+
+    options.render_method = data.get(RENDER_METHOD).clone();
+    options.fog = data.get(FOG).clone();
+    options.fov_y = *data.get(FOV_Y);
+    options.tone_mapping = data.get(TONE_MAPPING).clone();
+    options.maximum_intensity = *data.get(MAXIMUM_INTENSITY);
+    options.exposure = data.get(EXPOSURE).clone();
+    options.bloom_intensity = *data.get(BLOOM_INTENSITY);
+    options.view_distance = *data.get(VIEW_DISTANCE);
+    options.lighting_display = data.get(LIGHTING_DISPLAY).clone();
+    options.transparency = data.get(TRANSPARENCY).clone();
+    options.show_ui = *data.get(SHOW_UI);
+    options.antialiasing = data.get(ANTIALIASING).clone();
+    options.debug_info_text = *data.get(DEBUG_INFO_TEXT);
+    options.debug_info_text_contents = *data.get(DEBUG_INFO_TEXT_CONTENTS);
+    options.debug_behaviors = *data.get(DEBUG_BEHAVIORS);
+    options.debug_chunk_boxes = *data.get(DEBUG_CHUNK_BOXES);
+    options.debug_collision_boxes = *data.get(DEBUG_COLLISION_BOXES);
+    options.debug_light_rays_at_cursor = *data.get(DEBUG_LIGHT_RAYS_AT_CURSOR);
+    options.debug_pixel_cost = *data.get(DEBUG_PIXEL_COST);
+    options.debug_reduce_view_frustum = *data.get(DEBUG_REDUCE_VIEW_FRUSTUM);
+
+    options
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -303,12 +357,12 @@ mod tests {
     fn read_write_round_trip() {
         let settings = Settings::default();
         assert_eq!(
-            *RENDER_METHOD.read(&settings.get_graphics_options()),
+            *RENDER_METHOD.read(&settings.get()),
             camera::RenderMethod::Preferred
         );
         RENDER_METHOD.write(&settings, camera::RenderMethod::Reference);
         assert_eq!(
-            *RENDER_METHOD.read(&settings.get_graphics_options()),
+            *RENDER_METHOD.read(&settings.get()),
             camera::RenderMethod::Reference
         );
     }

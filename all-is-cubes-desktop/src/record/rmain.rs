@@ -4,6 +4,7 @@ use std::time::Duration;
 use all_is_cubes::character::Character;
 use all_is_cubes::listen;
 use all_is_cubes::universe::{Handle, UniverseTransaction};
+use all_is_cubes_ui::settings;
 
 use crate::record::RecordOptions;
 use crate::session::{ClockSource, DesktopSession};
@@ -34,10 +35,8 @@ where
     // TODO: instead of blanket disinheriting, there should be a way to set explicitly ephemeral
     // settings.
     settings.disinherit();
-    settings.mutate_graphics_options(|graphics_options| {
-        graphics_options.show_ui = false;
-        graphics_options.debug_info_text = false;
-    });
+    settings.set(settings::SHOW_UI, false);
+    settings.set(settings::DEBUG_INFO_TEXT, false);
 
     Ok(())
 }

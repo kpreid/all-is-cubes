@@ -2,5 +2,5 @@
 # The current answer is: produce both, but the adjustments for recording also influence what is printed.
 # Not ideal but that's more of a problem with recording in general.
 bin.name = "all-is-cubes"
-args = "--no-config-files --simplify-log-format -Slighting_display='\"None\"' --template=lighting-bench --seed=0 --graphics=print --output=test-output-path-with-graphics.png --display-size 40x40"
+args = "--no-config-files --simplify-log-format -Sgraphics/lighting-display=None --template=lighting-bench --seed=0 --graphics=print --output=test-output-path-with-graphics.png --display-size 40x40"
 status.code = 0

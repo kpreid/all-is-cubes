@@ -163,7 +163,7 @@ impl Vui {
 
         let changed_graphics_options = listen::Flag::listening(false, &params.settings.as_source());
         let ui_graphics_options = listen::Cell::new(Arc::new(Self::graphics_options(
-            GraphicsOptions::clone(&params.settings.get_graphics_options()),
+            GraphicsOptions::clone(&params.settings.get().to_graphics_options()),
         )));
 
         let changed_custom_commands = listen::Flag::listening(false, &params.custom_commands);
@@ -346,7 +346,7 @@ impl Vui {
         if self.changed_graphics_options.get_and_clear() {
             anything_changed = true;
             self.ui_graphics_options.set_if_unequal(Arc::new(Self::graphics_options(
-                GraphicsOptions::clone(&self.hud_inputs.settings.get_graphics_options()),
+                GraphicsOptions::clone(&self.hud_inputs.settings.get().to_graphics_options()),
             )));
         }
 

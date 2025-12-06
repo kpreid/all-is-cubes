@@ -8,8 +8,8 @@ use anyhow::Context as _;
 use directories_next::ProjectDirs;
 use serde::{Serialize, de::DeserializeOwned};
 
-use all_is_cubes_render::camera::GraphicsOptions;
-use all_is_cubes_ui::settings::Settings;
+use all_is_cubes::arcstr::ArcStr;
+use all_is_cubes_ui::settings::{self, Settings};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -32,16 +32,13 @@ pub fn load_config() -> Result<Settings, anyhow::Error> {
         .ok_or_else(|| anyhow::anyhow!("could not find configuration directory"))?;
     fs::create_dir_all(project_dirs.config_dir())?;
 
-    let settings_path = project_dirs.config_dir().join("graphics.json");
+    let settings_path = project_dirs.config_dir().join("settings.json");
 
-    let graphics_options = read_or_create_default_json_file(
-        "graphics options",
-        &settings_path,
-        GraphicsOptions::default,
-    );
+    let settings_data =
+        read_or_create_default_json_file("settings", &settings_path, settings::Data::default);
 
     Ok(Settings::with_persistence(
-        Arc::new(graphics_options),
+        settings_data,
         // TODO: ideally, writes would be performed asynchronously and with rate-limiting
         Arc::new(move |data| {
             write_json_file("graphics options", &settings_path, &data);
@@ -58,17 +55,16 @@ pub struct SettingsArgs {
     #[arg(long = "no-config-files")]
     pub(crate) no_config_files: bool,
 
-    #[expect(clippy::doc_markdown, reason = "will be displayed in --help")]
     /// Override the value of a setting for this session, instead of taking it from files
     /// or defaults.
     ///
     /// The value is specified as a key-value pair where the key is an unquoted string, the
-    /// separator is “=”, and the value is a JSON value (which, if a string, must be quoted);
-    /// for example: -Slighting_display='"None"'
+    /// separator is “=”, and the value is a string depending on the particular setting;
+    /// for example: -Sgraphics/lighting-display=None
     ///
     /// Using this option disables writing settings back to disk.
-    #[arg(long = "set", short = 'S', value_parser = parse_configure, value_name="NAME=JSON")]
-    pub(crate) set: Vec<(String, serde_json::Value)>,
+    #[arg(long = "set", short = 'S', value_parser = parse_configure, value_name="NAME=VALUE")]
+    pub(crate) set: Vec<(String, ArcStr)>,
 }
 
 impl SettingsArgs {
@@ -80,7 +76,7 @@ impl SettingsArgs {
         } = self;
 
         let persisted_settings = if no_config_files {
-            Settings::new(Arc::new(GraphicsOptions::default()))
+            Settings::default()
         } else {
             load_config().context("Error loading configuration files")?
         };
@@ -88,31 +84,25 @@ impl SettingsArgs {
         let session_settings = Settings::inherit(persisted_settings);
 
         if !to_override.is_empty() {
-            session_settings.disinherit();
-            // TODO: this is weirdly specific because right now, graphics options are the *only*
-            // settings. This code *should* change when we have more settings and the data model
-            // is more like a generic key-value store.
-            let Ok(serde_json::Value::Object(mut current_settings)) =
-                serde_json::to_value(session_settings.get_graphics_options())
-            else {
-                unreachable!("graphis options should appear as a json object");
-            };
-            for (key, value) in to_override {
-                current_settings.insert(key, value);
+            session_settings.disinherit(); // TODO: should be able to override single keys instead, at which point this function will not be needed but the right flavor of set() will be
+            for (key_string, value) in to_override {
+                let Ok(key) = key_string.parse::<settings::Key>() else {
+                    anyhow::bail!("unknown setting “{key_string}” cannot be set with “--set”")
+                };
+
+                session_settings.set_untyped(key, value).with_context(|| {
+                    format!("setting specified with “--set {key_string}” is not valid")
+                })?;
             }
-            session_settings.set_graphics_options(
-                serde_json::from_value(serde_json::Value::Object(current_settings))
-                    .context("--set did not produce valid settings")?,
-            );
         }
 
         Ok(session_settings)
     }
 }
 
-fn parse_configure(arg: &str) -> Result<(String, serde_json::Value), anyhow::Error> {
+fn parse_configure(arg: &str) -> Result<(String, ArcStr), anyhow::Error> {
     let (key, value) = arg.split_once('=').ok_or_else(|| anyhow::anyhow!("missing '='"))?;
-    let value = serde_json::from_str(value)?;
+    let value = ArcStr::from(value);
     Ok((key.to_owned(), value))
 }
 

@@ -71,9 +71,8 @@ all-is-cubes-gpu = { workspace = true, features = ["auto-threads", "wgpu"] }
 all-is-cubes-mesh = { workspace = true, optional = true, features = ["dynamic"] }
 # TODO: make all file access an optional feature
 all-is-cubes-port = { workspace = true, features = ["auto-threads", "import", "native"] }
-# TODO: serde feature is for saving GraphicsOptions — when we change how settings serialization works, it will no longer be relevant
 # TODO: make raytracer optional
-all-is-cubes-render = { workspace = true, features = ["raytracer", "serde"] }
+all-is-cubes-render = { workspace = true, features = ["raytracer"] }
 all-is-cubes-ui = { workspace = true, features = ["session"] }
 async_fn_traits = { workspace = true }
 async-channel = { workspace = true }

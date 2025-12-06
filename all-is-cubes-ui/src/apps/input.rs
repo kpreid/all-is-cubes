@@ -359,7 +359,9 @@ impl InputProcessor {
                                 LightingOption::Smooth => {
                                     // TODO: the question we actually want to ask is,
                                     // what does the *current renderer* support?
-                                    if others.render_method == RenderMethod::Reference {
+                                    if others.to_graphics_options().render_method
+                                        == RenderMethod::Reference
+                                    {
                                         LightingOption::Bounce
                                     } else {
                                         LightingOption::None

@@ -23,12 +23,15 @@ bench = false
 # and require `std` support.
 session = [
     "all-is-cubes/std",
+    "all-is-cubes-render/serde", # for settings storage - may be replaced
     "dep:async_fn_traits",
     "dep:flume",
     "dep:futures-core",
     "dep:futures-task",
     "dep:futures-util",
+    "dep:hashbrown", # for settings storage
     "dep:scopeguard",
+    "dep:serde", # for settings storage -- may be replaced
     "dep:sync_wrapper",
 ]
 
@@ -43,12 +46,15 @@ flume = { workspace = true, optional = true }
 futures-core = { workspace = true, optional = true }
 futures-task = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
+hashbrown = { workspace = true, optional = true, features = ["serde"] }
 indoc = { workspace = true }
 log = { workspace = true }
 macro_rules_attribute = { workspace = true }
+mutants = { workspace = true }
 num-traits = { workspace = true }
 paste = { workspace = true }
 scopeguard = { workspace = true, optional = true }
+serde = { workspace = true, optional = true, features = ["rc"] }
 sync_wrapper = { workspace = true, optional = true }
 
 [dev-dependencies]

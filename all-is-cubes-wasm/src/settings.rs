@@ -3,54 +3,46 @@ use std::sync::Arc;
 use send_wrapper::SendWrapper;
 use web_sys::window;
 
-use all_is_cubes_render::camera::GraphicsOptions;
-use all_is_cubes_ui::settings::Settings;
+use all_is_cubes::arcstr::ArcStr;
+use all_is_cubes_ui::settings::{Data, Settings};
 
-/// `localStorage` key we stash the graphics options in.
+/// `localStorage` key prefix we stash our settings values in.
 ///
 /// This is namespace-prefixed to reduce the chances of conflicting with e.g.
 /// other servers run on random `localhost` ports.
-///
-/// When we have The Real Settings System and no longer use this, we should remember to
-/// migrate and delete it.
-const GRAPHICS_OPTIONS_KEY: &str = "all-is-cubes.settings.graphics-options";
+const PREFIX: &str = "all-is-cubes.settings.";
 
 /// Returns `None` if access to `localStorage` failed for any reason.
 fn load_settings_from_local_storage() -> Option<Settings> {
     let storage: web_sys::Storage = window()?.local_storage().ok()??;
 
-    let initial_data: GraphicsOptions = match storage.get_item(GRAPHICS_OPTIONS_KEY).ok()? {
-        Some(data_string) => match serde_json::from_str(&data_string) {
-            Ok(value) => {
-                log::trace!("Loaded settings from {GRAPHICS_OPTIONS_KEY}");
-                value
+    let len = storage.length().unwrap();
+    let initial_data: Data =
+        Data::from_iter((0..len).filter_map(|i: u32| -> Option<(ArcStr, ArcStr)> {
+            let storage_key: String = storage.key(i).unwrap().unwrap();
+            if let Some(settings_key) = storage_key.strip_prefix(PREFIX) {
+                let value = ArcStr::from(storage.get_item(&storage_key).unwrap().unwrap());
+                Some((ArcStr::from(settings_key), value))
+            } else {
+                None
             }
-            Err(e) => {
-                log::warn!(
-                    "Syntax error in settings loaded from {GRAPHICS_OPTIONS_KEY}; using default values. Error: {e}",
-                );
-                GraphicsOptions::default()
-            }
-        },
-        None => {
-            log::trace!("No settings found in {GRAPHICS_OPTIONS_KEY}; using defaults");
-            GraphicsOptions::default()
-        }
-    };
+        }));
+
+    log::trace!("Loaded settings: {initial_data:?}");
 
     let storage = SendWrapper::new(storage);
 
     Some(Settings::with_persistence(
-        Arc::new(initial_data),
-        Arc::new(
-            move |data: &Arc<GraphicsOptions>| match serde_json::to_string(data) {
-                Ok(data_string) => match storage.set_item(GRAPHICS_OPTIONS_KEY, &data_string) {
-                    Ok(()) => log::trace!("Stored settings to {GRAPHICS_OPTIONS_KEY}"),
-                    Err(e) => log::error!("Failed to store settings: {e:?}"),
-                },
-                Err(e) => log::error!("Failed to serialize settings: {e}"),
-            },
-        ),
+        initial_data,
+        Arc::new(move |data: &Data| {
+            for (key, value) in data.iter_set() {
+                let storage_key = format!("{PREFIX}{key}");
+                match storage.set_item(&storage_key, value.as_str()) {
+                    Ok(()) => log::trace!("Stored {storage_key}"),
+                    Err(e) => log::error!("Failed to store setting: {e:?}"),
+                }
+            }
+        }),
     ))
 }
 
