@@ -14,7 +14,7 @@ use all_is_cubes::block::{
 };
 use all_is_cubes::drawing::VoxelBrush;
 use all_is_cubes::euclid::Vector3D;
-use all_is_cubes::linking::{BlockModule, BlockProvider, GenError};
+use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
     Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
     Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
@@ -84,6 +84,25 @@ pub async fn install_demo_blocks(
     p: YieldProgress,
 ) -> Result<(), GenError> {
     let resolution = R16;
+
+    let [landscape_p, p] = p.split(0.5);
+    install_landscape_blocks(txn, resolution, landscape_p).await?;
+    p.progress(0.0).await;
+
+    BlockProvider::<DemoBlocks>::new_installed_cyclic(p, txn, demo_blocks_generator(resolution))
+        .await?;
+
+    Ok(())
+}
+
+/// Non-async innards of [`install_demo_blocks()`].
+///
+/// (Separating this function reduces binary size and `Future` size by keeping the
+/// complex code out of the `async` context.)
+fn demo_blocks_generator(
+    resolution: block::Resolution,
+) -> impl Fn(&BlockProvider<DemoBlocks>, &mut UniverseTransaction, DemoBlocks) -> Result<Block, InGenError>
+{
     let resolution_g = GridCoordinate::from(resolution);
 
     // In order to have consistent radii from the center point, we need to work with
@@ -94,15 +113,11 @@ pub async fn install_demo_blocks(
     let one_diagonal = GridVector::new(1, 1, 1);
     let center_point_doubled = (one_diagonal * resolution_g).to_point();
 
-    let [landscape_p, p] = p.split(0.5);
-    install_landscape_blocks(txn, resolution, landscape_p).await?;
-    p.progress(0.0).await;
-
     let curb_color: Block = Rgba::new(0.788, 0.765, 0.741, 1.0).into();
     let road_noise_v = noise::Value::new(0x52b19f6a);
     let road_noise = move |cube: Cube| road_noise_v.at_grid(cube.lower_bounds()) * 0.12 + 1.0;
 
-    let curb_fn = |cube: Cube| {
+    let curb_fn = move |cube: Cube| {
         let width = resolution_g / 3;
         if (cube - Cube::new(width / 2 + 2, 0, 0))
             .component_mul(GridVector::new(1, 2, 0))
@@ -130,7 +145,7 @@ pub async fn install_demo_blocks(
 
     use DemoBlocks::*;
 
-    BlockProvider::<DemoBlocks>::new_installed_cyclic(p, txn, |provider, txn, key| {
+    move |provider, txn, key| {
         Ok(match key {
             GlassBlock => {
                 let glass_densities = [
@@ -348,7 +363,7 @@ pub async fn install_demo_blocks(
                 .display_name("Curb")
                 // TODO: rotation should specify curb line direction
                 .rotation_rule(RotationPlacementRule::Attach { by: Face6::NY })
-                .voxels_fn(resolution, curb_fn)?
+                .voxels_fn(resolution, &curb_fn)?
                 .build_txn(txn),
 
             ExhibitBackground => {
@@ -661,10 +676,7 @@ pub async fn install_demo_blocks(
                 )
             }
         })
-    })
-    .await?;
-
-    Ok(())
+    }
 }
 
 #[cfg(test)]

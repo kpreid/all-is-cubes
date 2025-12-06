@@ -198,6 +198,9 @@ impl DefaultProvision<Block> for LandscapeBlocks {
 ///
 /// This is an async function for the sake of cancellation and optional cooperative
 /// multitasking. It may be blocked on from a synchronous context.
+//---
+// TODO: Apply the "make the inner function non-async" pattern, like we did for instalL_demo_blocks,
+// but we need to make `voronoi_pattern()` owning to achieve that.
 pub async fn install_landscape_blocks(
     txn: &mut UniverseTransaction,
     resolution: Resolution,
