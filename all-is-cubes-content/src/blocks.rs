@@ -19,8 +19,8 @@ use all_is_cubes::euclid::Vector3D;
 use all_is_cubes::fluff::Fluff;
 use all_is_cubes::linking::{BlockModule, BlockProvider, GenError, InGenError};
 use all_is_cubes::math::{
-    Cube, Face6, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord, GridVector,
-    Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
+    Cube, Face6, FaceMap, FreeCoordinate, GridAab, GridCoordinate, GridRotation, GridSizeCoord,
+    GridVector, Rgb, Rgb01, Rgba, ps32, rgb_const, rgba_const,
 };
 use all_is_cubes::op::Operation;
 use all_is_cubes::sound;
@@ -40,6 +40,7 @@ use crate::palette;
 #[non_exhaustive]
 #[allow(missing_docs)]
 pub enum DemoBlocks {
+    Crate,
     GlassBlock,
     Lamp(bool),
     LamppostSegment,
@@ -146,10 +147,38 @@ fn demo_blocks_generator(
 
     let pedestal_voxel = block::from_color!(palette::STONE);
 
+    let crate_inner_voxel = block::from_color!(palette::PLANK);
+    let crate_outer_voxel = block::from_color!(palette::STEEL);
+
     use DemoBlocks::*;
 
     move |provider, txn, key| {
         Ok(match key {
+            // It's in Rust, gotta have crates ;)
+            Crate => {
+                let outer = GridAab::for_block(R32);
+                let in1 = outer.shrink(FaceMap::symmetric([1, 0, 1])).unwrap();
+                let in2 = in1.shrink(FaceMap::symmetric([1, 0, 1])).unwrap();
+                Block::builder()
+                    .display_name("Crate")
+                    .voxels_fn(R32, |cube| {
+                        if in2.contains_cube(cube) {
+                            &crate_inner_voxel
+                        } else if in1.contains_cube(cube) {
+                            if (cube.x + cube.z).rem_euclid(5) >= 2 {
+                                &crate_inner_voxel
+                            } else {
+                                &AIR
+                            }
+                        } else if cube.y < 3 || cube.y >= 29 {
+                            &crate_outer_voxel
+                        } else {
+                            &AIR
+                        }
+                    })?
+                    .build_txn(txn)
+            }
+
             GlassBlock => {
                 let glass_densities = [
                     //block::from_color!(1.0, 0.0, 0.0, 1.0),
