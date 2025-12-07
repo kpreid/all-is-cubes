@@ -77,12 +77,14 @@ impl Executor {
         });
         for i in 0..parallelism {
             let executor: Arc<Executor> = new_self.clone();
-            std::thread::Builder::new()
+            if let Err(e) = std::thread::Builder::new()
                 .name(format!("all-is-cubes-desktop executor thread {i}"))
                 .spawn(move || {
                     async_io::block_on(executor.inner().run(std::future::pending::<()>()))
                 })
-                .unwrap();
+            {
+                log::warn!("failed to spawn executor thread (parallelism will be reduced): {e}")
+            }
         }
         new_self
     }

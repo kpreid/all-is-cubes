@@ -78,7 +78,10 @@ pub fn install(
         let stream = re_sdk::RecordingStreamBuilder::new("all-is-cubes")
             .default_enabled(true)
             .connect_grpc()
-            .unwrap();
+            .unwrap_or_else(|e| {
+                log::error!("failed to build Rerun stream; will not log: {e}");
+                rg::RecordingStream::disabled()
+            });
         let destination = rg::Destination {
             stream,
             // Note: This must not be empty for ViewCoordinates to work
@@ -173,7 +176,7 @@ impl log::Log for AicLogger {
         }
         #[cfg(feature = "rerun")]
         if self.rerun_destination.is_enabled() {
-            self.rerun_destination.stream.flush_async().unwrap();
+            let _ = self.rerun_destination.stream.flush_async();
         }
     }
 }
