@@ -139,14 +139,25 @@ fn read_or_create_default_json_file<V: DeserializeOwned + Serialize>(
                 default()
             }
         },
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+        Err(open_for_read_error) if open_for_read_error.kind() == std::io::ErrorKind::NotFound => {
             log::info!(
                 "No {description} file found; creating {path}",
                 path = path.to_string_lossy()
             );
             let value = default();
             let json_text = serde_json::to_string_pretty(&value).unwrap();
-            fs::write(path, json_text.as_bytes()).expect("Error writing default file");
+            match fs::write(path, json_text.as_bytes()) {
+                Ok(()) => log::trace!(
+                    "Wrote default {description} to {path}",
+                    path = path.to_string_lossy()
+                ),
+                Err(write_error) => {
+                    log::error!(
+                        "Error while writing default {description} file {path}: {write_error}",
+                        path = path.to_string_lossy(),
+                    );
+                }
+            }
             value
         }
         Err(e) => {
