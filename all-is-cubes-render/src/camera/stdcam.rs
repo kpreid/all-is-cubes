@@ -360,7 +360,7 @@ impl StandardCameras {
             if let res @ (Ok(Some(_)) | Err(_)) = cursor_raycast(
                 read_tickets.world,
                 ray,
-                character_handle.read(read_tickets.world).unwrap().space(),
+                character_handle.read(read_tickets.world)?.space(),
                 6.0,
             ) {
                 return res;
