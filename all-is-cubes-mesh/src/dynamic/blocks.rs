@@ -41,7 +41,7 @@ impl<M: DynamicMeshTypes> VersionedBlockMeshes<M> {
         Self {
             meshes: Vec::new(),
             always_instanced_or_empty: Arc::from(Vec::new()),
-            last_version_counter: NonZeroU32::new(u32::MAX).unwrap(),
+            last_version_counter: const { NonZeroU32::new(u32::MAX).unwrap() },
             jobs: job::QueueOwner::new(texture_allocator),
         }
     }
@@ -95,11 +95,9 @@ where
         }
         let start_time = time::Instant::now();
 
-        // Bump version number.
-        self.last_version_counter = match self.last_version_counter.get().checked_add(1) {
-            None => NonZeroU32::MIN,
-            Some(n) => NonZeroU32::new(n).unwrap(),
-        };
+        // Bump version number, wrapping.
+        self.last_version_counter =
+            self.last_version_counter.checked_add(1).unwrap_or(NonZeroU32::MIN);
         let current_version_number = BlockMeshVersion::Numbered(self.last_version_counter);
 
         let block_data = space.block_data();
