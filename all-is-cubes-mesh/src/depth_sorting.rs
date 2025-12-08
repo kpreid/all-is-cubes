@@ -679,13 +679,13 @@ pub(crate) fn dynamic_depth_sort_for_view<M: MeshTypes>(
         meta.depth_sort_validity = new_validity;
 
         DepthSortResult {
-            changed: if meta.dynamic_sub_ranges.is_empty() {
-                None
-            } else {
-                Some(
-                    (meta.index_range.start + meta.dynamic_sub_ranges[0].start)
-                        ..(meta.index_range.start + meta.dynamic_sub_ranges.last().unwrap().end),
-                )
+            // Find start and end of the union of all dynamic_sub_ranges.
+            changed: match meta.dynamic_sub_ranges.as_slice() {
+                [Range { start, end }] | [Range { start, .. }, .., Range { end, .. }] => {
+                    let base = meta.index_range.start;
+                    Some((base + start)..(base + end))
+                }
+                [] => None,
             },
             info: DepthSortInfo {
                 elements_sorted: prims_sorted,
