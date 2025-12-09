@@ -241,8 +241,10 @@ pub fn axes(m: &mut space::Mutation<'_, '_>) -> Result<(), SetCubeError> {
             let cube = step.cube_ahead();
             let i = cube.lower_bounds()[axis] * direction; // always positive
             let (color, display_name): (Rgb01, ArcStr) = if i.rem_euclid(2) == 0 {
+                // Color half according to axis...
                 (axis.color(), i.rem_euclid(10).to_string().into())
             } else {
+                // ...and half according to direction.
                 if direction > 0 {
                     (rgb01!(1.0, 1.0, 1.0), DIR_NAMES[face].clone())
                 } else {

@@ -219,6 +219,7 @@ impl SpaceTransaction {
                     }
                 }
             } else {
+                // Out of bounds.
                 if *conserved || old.0.is_some() {
                     // It is an error for conserved cube txns to be out of bounds,
                     // or for a precondition to be not meetable because it is out of bounds.

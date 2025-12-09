@@ -552,29 +552,27 @@ impl LightStorage {
                         if opaque_for_light_computation(this_cube_evaluated) {
                             covered = true;
                             PackedLight::OPAQUE
-                        } else {
-                            if this_cube_evaluated.visible_or_animated()
-                                || Face6::ALL.into_iter().any(|face| {
-                                    uc.get_evaluated(cube + face.normal_vector())
-                                        .visible_or_animated()
-                                })
-                            {
-                                // In this case (and only this case), we are guessing rather than being certain,
-                                // so we need to schedule a proper update.
-                                // (Bypassing `self.light_needs_update()` to skip bounds checks).
-                                self.light_update_queue.insert(LightUpdateRequest {
-                                    priority: Priority::ESTIMATED,
-                                    cube,
-                                });
+                        } else if this_cube_evaluated.visible_or_animated()
+                            || Face6::ALL.into_iter().any(|face| {
+                                uc.get_evaluated(cube + face.normal_vector()).visible_or_animated()
+                            })
+                        {
+                            // In this case (and only this case), we are guessing rather than being certain,
+                            // so we need to schedule a proper update.
+                            // (Bypassing `self.light_needs_update()` to skip bounds checks).
+                            self.light_update_queue.insert(LightUpdateRequest {
+                                priority: Priority::ESTIMATED,
+                                cube,
+                            });
 
-                                if covered {
-                                    PackedLight::UNINITIALIZED_AND_BLACK
-                                } else {
-                                    self.block_sky.in_direction(Face6::PY)
-                                }
+                            if covered {
+                                PackedLight::UNINITIALIZED_AND_BLACK
                             } else {
-                                PackedLight::NO_RAYS
+                                self.block_sky.in_direction(Face6::PY)
                             }
+                        } else {
+                            // Not visible at all; does not interact with rays.
+                            PackedLight::NO_RAYS
                         };
                 }
             }

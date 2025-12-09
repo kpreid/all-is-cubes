@@ -257,6 +257,7 @@ impl StandardCameras {
                 }
             }
         } else {
+            // We now have no character. Drop the previous character's space if there is one.
             if self.world_space.get().is_some() {
                 anything_changed = true;
                 self.world_space.set(None);
