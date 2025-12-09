@@ -138,6 +138,10 @@ pub fn write_part_of_slice_to_part_of_buffer(
 ) {
     const ALIGN: usize = wgpu::COPY_BUFFER_ALIGNMENT as usize;
 
+    if byte_range.is_empty() {
+        return;
+    }
+
     // Widen the range to ensure the alignment is acceptable to wgpu.
     // (This is okay because the only reason we are picking a range
     // less than the entire buffer is to avoid copying unchanged data.)
