@@ -364,12 +364,7 @@ impl universe::TransactionOnEcs for BlockDefTransaction {
         mut target: ecs::Mut<'_, BlockDef>,
         check: Self::CommitCheck,
     ) -> Result<(), transaction::CommitError> {
-        Transaction::commit(
-            self,
-            &mut *target,
-            check,
-            &mut transaction::no_outputs,
-        )
+        Transaction::commit(self, &mut *target, check, &mut transaction::no_outputs)
     }
 }
 
@@ -562,11 +557,10 @@ pub(crate) fn update_phase_1(
                 .map(MinEval::from);
 
             // Write the new cache data *unless* it is a transient error.
-            if !matches!(new_cache, Err(ref e) if e.is_transient()) {
-                if new_cache != def.state.cache {
-                    *next = BlockDefNextValue::NewEvaluation(new_cache);
-                    info.updated += 1;
-                }
+            if !matches!(new_cache, Err(ref e) if e.is_transient()) && new_cache != def.state.cache
+            {
+                *next = BlockDefNextValue::NewEvaluation(new_cache);
+                info.updated += 1;
             }
         }
 

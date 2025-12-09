@@ -181,12 +181,12 @@ impl MultiOrthoCamera {
     ) -> Option<raycast::AaRay> {
         // Find which camera's rectangle contains the point
         for &(ref cam, origin) in self.views.iter() {
-            if let (Some(x), Some(y)) =
-                (point.x.checked_sub(origin.x), point.y.checked_sub(origin.y))
+            if let Some(x) = point.x.checked_sub(origin.x)
+                && let Some(y) = point.y.checked_sub(origin.y)
+                && x < cam.image_size.width
+                && y < cam.image_size.height
             {
-                if x < cam.image_size.width && y < cam.image_size.height {
-                    return cam.project_pixel_into_world(point2(x, y));
-                }
+                return cam.project_pixel_into_world(point2(x, y));
             }
         }
         None

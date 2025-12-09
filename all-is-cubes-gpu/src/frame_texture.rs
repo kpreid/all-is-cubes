@@ -92,45 +92,45 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
 
     pub fn upload(&mut self, queue: &wgpu::Queue) {
         let dirty_rect = self.local_buffer.dirty_rect();
-        if !dirty_rect.is_zero_sized() {
-            if let Some(texture) = &self.texture {
-                let full_width = self.local_buffer.size().width;
-                queue.write_texture(
-                    wgpu::TexelCopyTextureInfo {
-                        texture,
-                        mip_level: 0,
-                        origin: wgpu::Origin3d {
-                            x: dirty_rect.top_left.x.cast_unsigned(),
-                            y: dirty_rect.top_left.y.cast_unsigned(),
-                            z: 0,
-                        },
-                        // kludge that only works as long as we don't plan to use stencil textures
-                        aspect: if texture.format().has_depth_aspect() {
-                            wgpu::TextureAspect::DepthOnly
-                        } else {
-                            wgpu::TextureAspect::All
-                        },
-                    },
-                    bytemuck::must_cast_slice::<Out, u8>(
-                        &self.local_buffer.data()[full_width as usize
-                            * dirty_rect.top_left.y as usize
-                            + dirty_rect.top_left.x as usize..],
-                    ),
-                    wgpu::TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some(u32::try_from(size_of::<Out>()).unwrap() * full_width),
-                        rows_per_image: None,
-                    },
-                    wgpu::Extent3d {
-                        width: dirty_rect.size.width,
-                        height: dirty_rect.size.height,
-                        depth_or_array_layers: 1,
-                    },
-                );
-
-                self.local_buffer.mark_not_dirty();
-            }
+        if dirty_rect.is_zero_sized() {
+            return;
         }
+        let Some(texture) = &self.texture else { return };
+        let full_width = self.local_buffer.size().width;
+
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d {
+                    x: dirty_rect.top_left.x.cast_unsigned(),
+                    y: dirty_rect.top_left.y.cast_unsigned(),
+                    z: 0,
+                },
+                // kludge that only works as long as we don't plan to use stencil textures
+                aspect: if texture.format().has_depth_aspect() {
+                    wgpu::TextureAspect::DepthOnly
+                } else {
+                    wgpu::TextureAspect::All
+                },
+            },
+            bytemuck::must_cast_slice::<Out, u8>(
+                &self.local_buffer.data()[full_width as usize * dirty_rect.top_left.y as usize
+                    + dirty_rect.top_left.x as usize..],
+            ),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(u32::try_from(size_of::<Out>()).unwrap() * full_width),
+                rows_per_image: None,
+            },
+            wgpu::Extent3d {
+                width: dirty_rect.size.width,
+                height: dirty_rect.size.height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        self.local_buffer.mark_not_dirty();
     }
 }
 

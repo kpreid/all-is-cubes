@@ -143,15 +143,13 @@ impl InventoryWatcher {
                         )
                     }
                     Err(handle_error) => {
-                        if handle_error.is_transient() {
-                            if listener_to_install.is_some() {
-                                // spin until we can successfully write the listener
-                                // TODO: send some kind of deduplicated warning on this case...
-                                // or even better, give Handles a way to notify when they become ready
-                                // to read.
-                                self.dirty.set();
-                                self.notifier.notify(&WatcherChange::NeedsUpdate);
-                            }
+                        if handle_error.is_transient() && listener_to_install.is_some() {
+                            // spin until we can successfully write the listener
+                            // TODO: send some kind of deduplicated warning on this case...
+                            // or even better, give Handles a way to notify when they become ready
+                            // to read.
+                            self.dirty.set();
+                            self.notifier.notify(&WatcherChange::NeedsUpdate);
                         }
                         empty_inventory
                     }

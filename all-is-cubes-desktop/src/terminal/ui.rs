@@ -521,17 +521,15 @@ impl InventoryDisplay {
 
     pub fn new(read_ticket: ReadTicket<'_>, character_handle: Option<Handle<Character>>) -> Self {
         // TODO: reimplement character inventory viewing in a safely asynchronous way
-        if let Some(character_handle) = character_handle {
-            if let Ok(character) = character_handle.read(read_ticket) {
-                let slots = character.inventory().slots();
+        if let Some(character_handle) = character_handle
+            && let Ok(character) = character_handle.read(read_ticket)
+        {
+            let slots = character.inventory().slots();
 
-                return Self {
-                    slots: std::array::from_fn(|i| {
-                        slots.get(i).unwrap_or(&inv::Slot::Empty).clone()
-                    }),
-                    selected_slots: character.selected_slots(),
-                };
-            }
+            return Self {
+                slots: std::array::from_fn(|i| slots.get(i).unwrap_or(&inv::Slot::Empty).clone()),
+                selected_slots: character.selected_slots(),
+            };
         }
 
         Self {

@@ -44,9 +44,7 @@ async fn get_factory(
         init::create_adapter_for_test(WGPU_INSTANCE.get().expect("instance not initialized")).await;
     let known_incorrect = adapter.get_info().backend == wgpu::Backend::Noop;
     if known_incorrect {
-        if adapter.get_info().backend == wgpu::Backend::Noop {
-            log::warn!("*** NOOP BACKEND IN USE; TESTS WILL NOT COMPARE ANY IMAGES");
-        }
+        log::warn!("*** NOOP BACKEND IN USE; TESTS WILL NOT COMPARE ANY IMAGES");
     }
     let builder = headless::Builder::from_adapter(&label, adapter.clone()).await?;
     Ok(WgpuFactory {

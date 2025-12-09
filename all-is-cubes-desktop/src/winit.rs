@@ -86,14 +86,12 @@ impl WinAndState {
 
         // If we picked a size based on guessing the monitor, resize based on which monitor we
         // now know we got, then show the window.
-        if guessed_monitor {
-            if let Some(monitor) = window.current_monitor() {
-                _ = window.request_inner_size(to_logical_size(choose_graphical_window_size(Some(
-                    monitor_size_for_window(&monitor),
-                ))));
+        if guessed_monitor && let Some(monitor) = window.current_monitor() {
+            _ = window.request_inner_size(to_logical_size(choose_graphical_window_size(Some(
+                monitor_size_for_window(&monitor),
+            ))));
 
-                // TODO: Reposition the window too.
-            }
+            // TODO: Reposition the window too.
         }
 
         Ok(WinAndState {

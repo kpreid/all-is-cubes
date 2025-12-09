@@ -132,18 +132,18 @@ impl LightUpdateQueue {
     #[inline]
     #[mutants::skip] // if it fails to pop, causes hangs
     pub fn pop(&mut self) -> Option<LightUpdateRequest> {
-        if let Some(sweep) = &mut self.sweep {
-            if self.queue.peek_priority().is_none_or(|p| self.sweep_priority > p) {
-                if let Some(cube) = sweep.next() {
-                    return Some(LightUpdateRequest {
-                        cube,
-                        priority: self.sweep_priority,
-                    });
-                } else {
-                    // Sweep ended
-                    self.sweep = None;
-                    self.sweep_priority = Priority::MIN;
-                }
+        if let Some(sweep) = &mut self.sweep
+            && self.queue.peek_priority().is_none_or(|p| self.sweep_priority > p)
+        {
+            if let Some(cube) = sweep.next() {
+                return Some(LightUpdateRequest {
+                    cube,
+                    priority: self.sweep_priority,
+                });
+            } else {
+                // Sweep ended
+                self.sweep = None;
+                self.sweep_priority = Priority::MIN;
             }
         }
 

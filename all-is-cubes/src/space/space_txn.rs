@@ -197,16 +197,15 @@ impl SpaceTransaction {
         {
             // TODO: This is a lot of possibly redundant hash lookups.
             // `SpaceTransaction`s should use their own palettes to aovid this.
-            if let Equal(Some(new_block)) = new {
-                if let hashbrown::hash_map::Entry::Vacant(ve) =
+            if let Equal(Some(new_block)) = new
+                && let hashbrown::hash_map::Entry::Vacant(ve) =
                     new_block_evaluations.entry(new_block.clone())
-                {
-                    ve.insert(PendingEvaluation::new(
-                        read_ticket,
-                        palette,
-                        new_block.clone(),
-                    ));
-                }
+            {
+                ve.insert(PendingEvaluation::new(
+                    read_ticket,
+                    palette,
+                    new_block.clone(),
+                ));
             }
 
             let cube = Cube::from(cube);
