@@ -43,8 +43,8 @@ pub(crate) use eye::add_eye_systems;
 mod spawn;
 pub use spawn::*;
 
-mod main_systems;
-pub(crate) use main_systems::add_main_systems;
+mod step;
+pub(crate) use step::add_main_systems;
 
 #[cfg(test)]
 mod tests;

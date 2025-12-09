@@ -62,7 +62,7 @@ pub(crate) fn add_eye_systems(world: &mut ecs::World) {
     let mut schedules = world.resource_mut::<ecs::Schedules>();
     schedules.add_systems(
         time::schedule::BeforeStep,
-        record_previous_velocity.before(super::main_systems::early_character_input_system),
+        record_previous_velocity.before(super::step::early_character_input_system),
     );
     schedules.add_systems(
         time::schedule::Step,
