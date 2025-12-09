@@ -202,6 +202,9 @@ pub(crate) struct ResizingBuffer {
 }
 
 impl ResizingBuffer {
+    // Buffers, mapped ranges, and copy lengths are all required to be a multiple of 4.
+    const BUFFER_AND_MAPPING_SIZE_MULT: usize = 4;
+
     pub(crate) fn get(&self) -> Option<&wgpu::Buffer> {
         self.buffer.as_ref()
     }
@@ -219,31 +222,16 @@ impl ResizingBuffer {
         usage: wgpu::BufferUsages,
         contents: [&[u8]; N],
     ) -> [wgpu::BufferAddress; N] {
-        // Buffers, mapped ranges, and copy lengths are all required to be a multiple of 4.
-        const BUFFER_AND_MAPPING_SIZE_MULT: usize = 4;
-
-        // Compute the size and offsets that fit all the given slices.
-        // Note we are using Layout as a handy utility here, not to define any *Rust* memory layout.
-        // Technically this is restrictive for 32-bit usize, but we're probably doomed then anyway
-        // if the amount of data to load doesn't fit in CPU memory.
-        let mut addresses = [0; N];
-        let mut layout = Layout::new::<()>();
-        for (i, slice) in contents.into_iter().enumerate() {
-            let (next_layout, addr) = layout
-                .extend(Layout::from_size_align(slice.len(), wgpu::MAP_ALIGNMENT as usize).unwrap())
-                .unwrap();
-            layout = next_layout;
-            addresses[i] = u64::try_from(addr).unwrap();
-        }
-
-        let new_size: u64 =
-            layout.size().next_multiple_of(BUFFER_AND_MAPPING_SIZE_MULT).try_into().unwrap();
+        let slice_sizes = contents.map(<[_]>::len);
+        let Some((new_size, addresses)) = Self::layout(slice_sizes) else {
+            panic!("write_with_resizing() given too-large slices: {slice_sizes:?}");
+        };
 
         if let Some(buffer) = self.buffer.as_ref().filter(|b| b.size() >= new_size) {
             // Buffer is already big enough to fit the data.
             for (address, data) in addresses.into_iter().zip(contents) {
                 if let Some(data_size) = wgpu::BufferSize::new(
-                    u64::try_from(data.len().next_multiple_of(BUFFER_AND_MAPPING_SIZE_MULT))
+                    u64::try_from(data.len().next_multiple_of(Self::BUFFER_AND_MAPPING_SIZE_MULT))
                         .unwrap(),
                 ) {
                     bwp.reborrow().write_buffer(buffer, address, data_size)[..data.len()] // trim off the padding
@@ -284,6 +272,40 @@ impl ResizingBuffer {
         }
 
         addresses
+    }
+
+    /// Compute buffer size and addresses in the buffer that will store slices of the given sizes,
+    /// while obeying all [`wgpu`] size and alignment restrictions.
+    ///
+    /// Returns [`None`] if the slices are individually or collectively too large.
+    ///
+    /// Edge case: the total size is limited to approximately `isize::MAX`, even when the
+    /// target architecture is 32-bit but [`wgpu`] in principle lets us address more than that.
+    /// This is unlikely to be a practical problem.
+    //--
+    // Note we are using `Layout` as a handy utility here, not to define any *Rust* memory layout.
+    // It would be more principled to write the math from scratch on `u64`s and not have any
+    // 32-bit caveat.
+    fn layout<const N: usize>(
+        byte_sizes: [usize; N],
+    ) -> Option<(wgpu::BufferAddress, [wgpu::BufferAddress; N])> {
+        let mut addresses = [0; N];
+        let mut layout = Layout::new::<()>();
+        for (i, size) in byte_sizes.into_iter().enumerate() {
+            let (next_layout, addr) = layout
+                .extend(Layout::from_size_align(size, wgpu::MAP_ALIGNMENT as usize).ok()?)
+                .ok()?;
+            layout = next_layout;
+            addresses[i] = wgpu::BufferAddress::try_from(addr).ok()?;
+        }
+
+        let new_size: wgpu::BufferAddress = layout
+            .size()
+            .next_multiple_of(Self::BUFFER_AND_MAPPING_SIZE_MULT)
+            .try_into()
+            .ok()?;
+
+        Some((new_size, addresses))
     }
 
     pub(crate) fn map_without_resizing(
