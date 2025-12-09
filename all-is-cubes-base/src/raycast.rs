@@ -698,19 +698,14 @@ impl State {
             let range = self.bounds.axis_range(axis);
             let oob_low = self.cube[axis] < range.start;
             let oob_high = self.cube[axis] >= range.end;
-            if self.param.step[axis] == 0 {
+            let (oob_enter_on_axis, oob_exit_on_axis) = match self.param.step[axis] {
                 // Case where the ray has no motion on that axis.
-                oob_enter |= oob_low | oob_high;
-                oob_exit |= oob_low | oob_high;
-            } else {
-                if self.param.step[axis] > 0 {
-                    oob_enter |= oob_low;
-                    oob_exit |= oob_high;
-                } else {
-                    oob_enter |= oob_high;
-                    oob_exit |= oob_low;
-                }
-            }
+                0 => (oob_low | oob_high, oob_low | oob_high),
+                ..=-1 => (oob_high, oob_low),
+                1.. => (oob_low, oob_high),
+            };
+            oob_enter |= oob_enter_on_axis;
+            oob_exit |= oob_exit_on_axis;
         }
         (oob_enter, oob_exit)
     }
