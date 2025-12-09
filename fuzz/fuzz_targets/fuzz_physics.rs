@@ -42,7 +42,7 @@ fuzz_target!(|input: (
 
     let mut universe = Universe::new();
     let space_handle = universe.insert_anonymous(space);
-    let mut character = Character::spawn_default(universe.read_ticket(), space_handle);
+    let mut character = Character::spawn_default(universe.read_ticket(), space_handle).unwrap();
     character.body.set_position(position);
     character.body.add_velocity(velocity);
     let character = StrongHandle::from(universe.insert_anonymous(character));

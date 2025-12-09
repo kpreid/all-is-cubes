@@ -485,7 +485,7 @@ async fn follow_character_change(mut context: RenderTestContext) {
     let mut character_of_a_color = |color: Rgb| -> StrongHandle<Character> {
         let space = Space::builder(GridAab::ORIGIN_CUBE).sky_color(color).build();
         let space = context.universe_mut().insert_anonymous(space);
-        let character = Character::spawn_default(context.universe().read_ticket(), space);
+        let character = Character::spawn_default(context.universe().read_ticket(), space).unwrap();
         StrongHandle::from(context.universe_mut().insert_anonymous(character))
     };
     let c1 = character_of_a_color(rgb_const!(1.0, 0.0, 0.0));

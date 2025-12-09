@@ -648,7 +648,7 @@ mod tests {
         let u = &mut Universe::new();
         let space = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let character =
-            u.insert("c".into(), Character::spawn_default(u.read_ticket(), space)).unwrap();
+            u.insert("c".into(), Character::spawn_default(u.read_ticket(), space).unwrap()).unwrap();
         let mut input = InputProcessor::new();
 
         input.key_down(Key::Character('5'));

@@ -477,7 +477,7 @@ mod tests {
         let character = universe
             .insert(
                 "character".into(),
-                Character::spawn_default(universe.read_ticket(), space_handle.clone()),
+                Character::spawn_default(universe.read_ticket(), space_handle.clone()).unwrap(),
             )
             .unwrap();
         character_cell.set(Some(StrongHandle::new(character)));

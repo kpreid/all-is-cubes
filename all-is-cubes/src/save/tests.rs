@@ -888,7 +888,7 @@ fn universe_with_one_of_each() -> Box<Universe> {
 
     let space_handle = universe.insert("a_space".into(), space).unwrap();
 
-    let character = Character::spawn_default(universe.read_ticket(), space_handle);
+    let character = Character::spawn_default(universe.read_ticket(), space_handle).unwrap();
     universe.insert("a_character".into(), character).unwrap();
 
     universe

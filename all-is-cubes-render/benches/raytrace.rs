@@ -34,7 +34,7 @@ impl TestData {
         .unwrap();
         let space = universe.insert_anonymous(space);
         let character = StrongHandle::from(
-            universe.insert_anonymous(Character::spawn_default(universe.read_ticket(), space)),
+            universe.insert_anonymous(Character::spawn_default(universe.read_ticket(), space).unwrap()),
         );
         Self {
             universe,

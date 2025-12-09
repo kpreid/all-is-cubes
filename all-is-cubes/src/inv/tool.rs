@@ -699,7 +699,7 @@ mod tests {
                 character_handle: universe
                     .insert(
                         "ToolTester/character".into(),
-                        Character::spawn_default(read_ticket, space_handle.clone()),
+                        Character::spawn_default(read_ticket, space_handle.clone()).unwrap(),
                     )
                     .unwrap(),
                 space_handle,

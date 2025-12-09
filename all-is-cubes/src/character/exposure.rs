@@ -199,7 +199,7 @@ mod tests {
                 })
                 .unwrap()
         });
-        let mut character = Character::spawn_default(universe.read_ticket(), space);
+        let mut character = Character::spawn_default(universe.read_ticket(), space).unwrap();
         character.body.set_position(point3(5., 5., 5.));
         let character = universe.insert("character".into(), character).unwrap();
 

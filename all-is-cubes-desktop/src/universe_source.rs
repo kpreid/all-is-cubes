@@ -88,7 +88,7 @@ impl UniverseSource {
                     all_is_cubes::character::Character::spawn_default(
                         universe.read_ticket(),
                         space,
-                    ),
+                    )?,
                 )?;
 
                 universe

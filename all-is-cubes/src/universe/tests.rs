@@ -116,7 +116,7 @@ fn get_any() {
     let sp = u.insert("test_space".into(), Space::empty_positive(1, 1, 1)).unwrap();
     u.insert(
         "test_char".into(),
-        Character::spawn_default(u.read_ticket(), sp),
+        Character::spawn_default(u.read_ticket(), sp).unwrap(),
     )
     .unwrap();
 
@@ -436,7 +436,7 @@ fn visit_handles_character() {
     // Character's space
     let space_handle = u.insert("space".into(), Space::empty_positive(1, 1, 1)).unwrap();
 
-    let mut character = Character::spawn_default(u.read_ticket(), space_handle.clone());
+    let mut character = Character::spawn_default(u.read_ticket(), space_handle.clone()).unwrap();
 
     // A block handle in inventory.
     let block_handle = u.insert("block".into(), BlockDef::new(u.read_ticket(), AIR)).unwrap();

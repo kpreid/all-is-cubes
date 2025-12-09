@@ -257,10 +257,9 @@ mod tests {
         pub fn new() -> Self {
             let mut universe = Universe::new();
             let space = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
-            let character = StrongHandle::new(universe.insert_anonymous(Character::spawn_default(
-                universe.read_ticket(),
-                space.clone(),
-            )));
+            let character = StrongHandle::new(universe.insert_anonymous(
+                Character::spawn_default(universe.read_ticket(), space.clone()).unwrap(),
+            ));
             let character_cell = listen::Cell::new(Some(character.clone()));
             let mut watcher = InventoryWatcher::new(
                 character_cell.as_source(),
@@ -316,7 +315,7 @@ mod tests {
 
         // Construct new character with different inventory.
         let new_character = StrongHandle::new(t.universe.insert_anonymous(
-            Character::spawn_default(t.universe.read_ticket(), t.space.clone()),
+            Character::spawn_default(t.universe.read_ticket(), t.space.clone()).unwrap(),
         ));
         t.universe
             .execute_1(

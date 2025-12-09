@@ -100,7 +100,7 @@ async fn create_updated_renderer(
     universe
         .insert(
             "character".into(),
-            Character::spawn_default(universe.read_ticket(), space.clone()),
+            Character::spawn_default(universe.read_ticket(), space.clone()).unwrap(),
         )
         .unwrap();
 

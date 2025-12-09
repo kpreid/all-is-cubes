@@ -85,7 +85,7 @@ fn inventory_transaction() {
     let mut universe = Universe::new();
     let space = Space::empty_positive(1, 1, 1);
     let space_handle = universe.insert_anonymous(space);
-    let character = Character::spawn_default(universe.read_ticket(), space_handle.clone());
+    let character = Character::spawn_default(universe.read_ticket(), space_handle.clone()).unwrap();
     let log = Log::new();
     let character_handle = universe.insert_anonymous(character);
     character_handle.read(universe.read_ticket()).unwrap().listen(log.listener());
@@ -190,10 +190,10 @@ fn transaction_systematic() {
                 )
             },
         )
-        .target(|| Character::spawn_default(universe.read_ticket(), space_handle.clone()))
+        .target(|| Character::spawn_default(universe.read_ticket(), space_handle.clone()).unwrap())
         .target(|| {
             let mut character =
-                Character::spawn_default(universe.read_ticket(), space_handle.clone());
+                Character::spawn_default(universe.read_ticket(), space_handle.clone()).unwrap();
             CharacterTransaction::inventory(InventoryTransaction::insert([old_item.clone()]))
                 .execute(
                     &mut character,
@@ -215,7 +215,7 @@ fn jumping() {
             .filled_with(block::from_color!(Rgb01::WHITE))
             .build(),
     );
-    let mut character = Character::spawn_default(universe.read_ticket(), space);
+    let mut character = Character::spawn_default(universe.read_ticket(), space).unwrap();
     character.body.set_position(point3(
         0.,
         character.body.collision_box_rel().face_coordinate(Face6::NY) + 1.001,
@@ -285,10 +285,8 @@ fn click_wrong_space_or_correct_space() {
     };
     let sp1 = make_space();
     let sp2 = make_space();
-    let character = universe.insert_anonymous(Character::spawn_default(
-        universe.read_ticket(),
-        sp2.clone(),
-    ));
+    let character = universe
+        .insert_anonymous(Character::spawn_default(universe.read_ticket(), sp2.clone()).unwrap());
 
     // Click in wrong space
     {
@@ -330,7 +328,7 @@ fn click_wrong_space_or_correct_space() {
 fn selected_slot_notification() {
     let mut universe = Universe::new();
     let space_handle = universe.insert_anonymous(Space::empty_positive(1, 1, 1));
-    let mut character = Character::spawn_default(universe.read_ticket(), space_handle);
+    let mut character = Character::spawn_default(universe.read_ticket(), space_handle).unwrap();
     let log = Log::new();
     character.listen(log.listener());
 

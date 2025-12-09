@@ -180,7 +180,8 @@ pub(crate) async fn dot_vox_data_to_universe(
     universe
         .insert(
             "character".into(),
-            Character::spawn_default(universe.read_ticket(), viewed_space_handle),
+            Character::spawn_default(universe.read_ticket(), viewed_space_handle)
+                .map_err(|e| DotVoxConversionError::Unexpected(InGenError::other(e)))?,
         )
         .map_err(|e| DotVoxConversionError::Unexpected(InGenError::from(e)))?;
 

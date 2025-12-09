@@ -154,7 +154,7 @@ async fn export_character_not_supported() {
     universe
         .insert(
             "x".into(),
-            Character::spawn_default(universe.read_ticket(), space),
+            Character::spawn_default(universe.read_ticket(), space).unwrap(),
         )
         .unwrap();
 

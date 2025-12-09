@@ -223,9 +223,11 @@ impl UniverseTemplate {
 
             // TODO: "character" is a special default name used for finding the character the
             // player actually uses, and we should replace that or handle it more formally.
+            let character_name = Name::from("character");
             universe.insert(
-                "character".into(),
-                Character::spawn_default(universe.read_ticket(), space_handle),
+                character_name.clone(),
+                Character::spawn_default(universe.read_ticket(), space_handle)
+                    .map_err(|e| GenError::failure(InGenError::other(e), character_name))?,
             )?;
         }
 

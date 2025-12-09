@@ -16,10 +16,9 @@ fuzz_target!(|input: ArbitraryWithUniverse<StrongHandle<Space>>| {
     // TODO: this condition is a kludge because Character::spawn_default is panicky
     if space_handle.read(universe.read_ticket()).is_ok() {
         // TODO: arbitrary-ize character except for the space ref
-        let _character = StrongHandle::from(universe.insert_anonymous(Character::spawn_default(
-            universe.read_ticket(),
-            space_handle.to_weak(),
-        )));
+        let _character = StrongHandle::from(universe.insert_anonymous(
+            Character::spawn_default(universe.read_ticket(), space_handle.to_weak()).unwrap(),
+        ));
     }
 
     for _ in 1..100 {

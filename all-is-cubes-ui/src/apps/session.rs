@@ -1460,7 +1460,7 @@ mod tests {
         let space1 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let space2 = u.insert_anonymous(Space::empty_positive(1, 1, 1));
         let character = StrongHandle::from(
-            u.insert_anonymous(Character::spawn_default(u.read_ticket(), space1.clone())),
+            u.insert_anonymous(Character::spawn_default(u.read_ticket(), space1.clone()).unwrap()),
         );
         let st = space::CubeTransaction::fluff(Fluff::Happened).at(Cube::ORIGIN);
 
@@ -1540,7 +1540,7 @@ mod tests {
         new_universe
             .insert(
                 Name::from("character"),
-                Character::spawn_default(new_universe.read_ticket(), new_space),
+                Character::spawn_default(new_universe.read_ticket(), new_space).unwrap(),
             )
             .unwrap();
         send.send(new_universe).unwrap();
