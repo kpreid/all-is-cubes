@@ -10,6 +10,7 @@ use all_is_cubes_render::camera::{GraphicsOptions, ToneMappingOperator};
 use crate::common::{Id, Memo};
 use crate::everything::InfoTextTexture;
 use crate::frame_texture;
+use crate::glue::buffer_size_of;
 use crate::shaders::Shaders;
 
 // -------------------------------------------------------------------------------------------------
@@ -103,7 +104,7 @@ impl PostprocessResources {
             bind_group: Memo::new(),
             camera_buffer: device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("PostprocessResources::camera_buffer"),
-                size: size_of::<PostprocessUniforms>().try_into().unwrap(),
+                size: const { buffer_size_of::<PostprocessUniforms>().get() },
                 usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }),
@@ -119,6 +120,9 @@ impl PostprocessResources {
         info_text_sampler: &wgpu::Sampler,
         output: &wgpu::TextureView,
     ) -> (wgpu::CommandBuffer, Flaws) {
+        const INFO_TEXT_ERROR: &str =
+            "info_text_texture should be ready before PostprocessResources::run()";
+
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("add_info_text_and_postprocess() encoder"),
         });
@@ -149,7 +153,7 @@ impl PostprocessResources {
                 0,
                 &*self.bind_group.get_or_insert(
                     (
-                        info_text_texture.view().unwrap().global_id(),
+                        info_text_texture.view().expect(INFO_TEXT_ERROR).global_id(),
                         fb.global_id(),
                     ),
                     || {
@@ -189,7 +193,7 @@ impl PostprocessResources {
                                 wgpu::BindGroupEntry {
                                     binding: 3,
                                     resource: wgpu::BindingResource::TextureView(
-                                        info_text_texture.view().unwrap(), // TODO: have a better plan than unwrap
+                                        info_text_texture.view().expect(INFO_TEXT_ERROR),
                                     ),
                                 },
                                 wgpu::BindGroupEntry {

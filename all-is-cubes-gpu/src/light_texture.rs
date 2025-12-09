@@ -205,15 +205,15 @@ impl LightTexture {
                 texture.create_view(&wgpu::TextureViewDescriptor::default()),
             ),
             texture,
-            copy_buffer: device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some(&format!("{label_prefix} space light copy buffer")),
-                size: u64::try_from(
-                    Self::COPY_BUFFER_CHUNKS * LIGHT_CHUNK_VOLUME * Self::COMPONENTS,
-                )
-                .unwrap(),
-                usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-                mapped_at_creation: false,
-            }),
+            copy_buffer:
+                device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some(&format!("{label_prefix} space light copy buffer")),
+                    size: const {
+                        (Self::COPY_BUFFER_CHUNKS * LIGHT_CHUNK_VOLUME * Self::COMPONENTS) as u64
+                    },
+                    usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+                    mapped_at_creation: false,
+                }),
             mapped_region: GridAab::ORIGIN_EMPTY,
         }
     }

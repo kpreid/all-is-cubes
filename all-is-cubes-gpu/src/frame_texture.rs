@@ -120,7 +120,7 @@ impl<In, Out: Copy + Default + bytemuck::Pod> DrawableTexture<In, Out> {
             ),
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(u32::try_from(size_of::<Out>()).unwrap() * full_width),
+                bytes_per_row: Some(const { size_of::<Out>() as u32 } * full_width),
                 rows_per_image: None,
             },
             wgpu::Extent3d {

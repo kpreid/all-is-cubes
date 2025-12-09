@@ -163,7 +163,7 @@ impl RerunImageExport {
                 0,
                 const { buffer_size_of::<RerunCopyCamera>() },
             )
-            .unwrap()
+            .expect("TODO: when does this even fail?")
             .copy_from_slice(bytemuck::bytes_of(&RerunCopyCamera {
                 // a bit wasteful to construct entire `ShaderSpaceCamera`, but avoids inconsistency
                 inverse_projection_matrix: ShaderSpaceCamera::new(normal_camera)

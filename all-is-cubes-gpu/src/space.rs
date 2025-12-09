@@ -520,7 +520,7 @@ impl SpaceRenderer {
         // that's a chunk mesh (i.e. instance range is length 1).
         #[allow(clippy::too_many_arguments)]
         fn draw_chunk_instance<'pass>(
-            range: Range<usize>,
+            index_range: Range<usize>,
             render_pass: &mut wgpu::RenderPass<'pass>,
             buffers: &'pass ChunkBuffers,
             instance_buffer_writer: &mut MapVec<'_, WgpuInstanceData>,
@@ -529,9 +529,15 @@ impl SpaceRenderer {
             flaws: &mut Flaws,
             in_world_debug_label: &'static str,
         ) {
-            if !range.is_empty() {
+            if !index_range.is_empty() {
                 set_buffers(render_pass, buffers);
-                let id = u32::try_from(instance_buffer_writer.len()).unwrap();
+                let Ok(id) = u32::try_from(instance_buffer_writer.len()) else {
+                    if !flaws.contains(Flaws::UNFINISHED) {
+                        *flaws |= Flaws::UNFINISHED;
+                        log::warn!("tried to have more than 2^32 instances");
+                    }
+                    return;
+                };
 
                 let ok = instance_buffer_writer.push(&WgpuInstanceData::new(
                     chunk_pos.bounds().lower_bounds().to_vector(),
@@ -545,8 +551,8 @@ impl SpaceRenderer {
                     return;
                 }
 
-                render_pass.draw_indexed(to_wgpu_index_range(range.clone()), 0, id..(id + 1));
-                *squares_drawn += range.len() / 6;
+                render_pass.draw_indexed(to_wgpu_index_range(index_range.clone()), 0, id..(id + 1));
+                *squares_drawn += index_range.len() / 6;
             }
         }
 
@@ -670,7 +676,13 @@ impl SpaceRenderer {
             };
             set_buffers(render_pass, buffers);
 
-            let first_instance_index = u32::try_from(instance_buffer_writer.len()).unwrap();
+            let Ok(first_instance_index) = u32::try_from(instance_buffer_writer.len()) else {
+                if !flaws.contains(Flaws::UNFINISHED) {
+                    flaws |= Flaws::UNFINISHED;
+                    log::warn!("tried to have more than 2^32 instances");
+                }
+                break;
+            };
             let mut count: u32 = 0;
             for cube in cubes {
                 let ok = instance_buffer_writer.push(&WgpuInstanceData::new(
@@ -864,7 +876,7 @@ impl SpaceCameraBuffer {
     pub fn new(space_label: &str, device: &wgpu::Device, pipelines: &Pipelines) -> Self {
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(&format!("{space_label} camera_buffer")),
-            size: size_of::<ShaderSpaceCamera>().try_into().unwrap(),
+            size: const { buffer_size_of::<ShaderSpaceCamera>().get() },
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });

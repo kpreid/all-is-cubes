@@ -49,8 +49,12 @@ pub fn to_wgpu_index_format(slice: IndexSlice<'_>) -> wgpu::IndexFormat {
     }
 }
 
+#[track_caller]
 pub fn to_wgpu_index_range(range: Range<usize>) -> Range<u32> {
-    range.start.try_into().unwrap()..range.end.try_into().unwrap()
+    match (range.start.try_into(), range.end.try_into()) {
+        (Ok(start), Ok(end)) => start..end,
+        _ => panic!("index range {range:?} too large for u32"),
+    }
 }
 
 /// Write to the specified region of a 3D texture.

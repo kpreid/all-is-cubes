@@ -348,7 +348,7 @@ impl EverythingRenderer {
         let ui_deadline = world_deadline + frame_budget.update_meshes.ui;
 
         let space_infos: Layers<SpaceUpdateInfo> = if should_raytrace(&self.cameras) {
-            self.rt.update(read_tickets, cursor_result).unwrap(); // TODO: don't unwrap
+            self.rt.update(read_tickets, cursor_result)?;
             // TODO: convey update info instead of zeroes
             Layers::default()
         } else {

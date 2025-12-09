@@ -240,8 +240,7 @@ impl Texture {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
         });
 
-        let mut render_bundles =
-            Vec::with_capacity(usize::try_from(mip_level_count).unwrap() * 2 - 1);
+        let mut render_bundles = Vec::with_capacity(mip_level_count as usize * 2 - 1);
 
         // Repeat the downsample-upsample several times.
         // This can give us a larger radius of effect in cases where downsampling further
