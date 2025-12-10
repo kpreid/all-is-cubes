@@ -214,9 +214,15 @@ impl<H: Host> BehaviorSet<H> {
         };
         let start_time = Instant::now();
 
-        // TODO: Find a way to drain the set without holding the lock and without
-        // reallocating.
-        let woken: BTreeSet<_> = mem::take(&mut self.woken.lock().unwrap());
+        let woken: BTreeSet<_> = mem::take(&mut self.woken.lock().unwrap_or_else(|poison| {
+            // If the lock is poisoned, a previous operation panicked.
+            // That panic constitutes sufficient error reporting.
+            // The best *recovery* we can possibly do here is to carry on with whatever we have, and
+            // the mem::take() we are about to do means that the state of the mutex will be reset
+            // and the poison flag no longer means anything.
+            self.woken.clear_poison();
+            poison.into_inner()
+        }));
 
         for key in woken {
             let Some(entry) = self.members.get(&key) else {

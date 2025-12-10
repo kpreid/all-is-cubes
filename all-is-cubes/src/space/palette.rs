@@ -26,6 +26,7 @@ use crate::space::{BlockIndex, ChangeBuffer, SetCubeError, SpaceChange};
 use crate::time::{self, TimeStats};
 use crate::universe::{self, ReadTicket};
 use crate::util::atomic_cell::{AtomicCell32 as AtomicCell, ZERO, ZERO3, Zero, Zero3};
+use crate::util::ignore_poison;
 
 #[cfg(doc)]
 use crate::space;
@@ -285,7 +286,8 @@ impl Palette {
                     data.take().expect("shouldn’t happen: new entry already taken");
                 let already_changed = listener.set_index(index);
                 if already_changed {
-                    self.todo.lock().unwrap().blocks.insert(index);
+                    // ignore_poison is valid because we are appending only
+                    ignore_poison(self.todo.lock()).blocks.insert(index);
                 }
                 entry
             }
@@ -653,12 +655,8 @@ impl listen::Listener<BlockChange> for BlockListener {
                     Err(ListenerIndexState::Unset(ZERO3)) => unreachable!(),
                 };
 
-                if let Ok(mut todo) = todo_mutex.lock() {
-                    todo.blocks.insert(index);
-                } else {
-                    // If the mutex is poisoned, don't panic but do die
-                    return false;
-                }
+                // ignore_poison is valid because we are appending only
+                ignore_poison(todo_mutex.lock()).blocks.insert(index);
             }
             true
         } else {
@@ -817,7 +815,18 @@ pub(crate) fn update_palette_phase_1(
         let mut evaluations = TimeStats::default();
 
         let mut try_eval_again = hashbrown::HashSet::new();
-        let mut todo = current_palette.todo.lock().unwrap();
+        let mut todo = match current_palette.todo.lock() {
+            Ok(guard) => guard,
+            Err(poison_error) => {
+                // We're draining the collection, so poison is no longer meaningful.
+                current_palette.todo.clear_poison();
+
+                // TODO: Should we reevaluate everything? Or will that just make broken cases
+                // gratuitously expensive?
+
+                poison_error.into_inner()
+            }
+        };
         for block_index in todo.blocks.drain() {
             let data: &SpaceBlockData = &current_palette.entries[usize::from(block_index)];
 

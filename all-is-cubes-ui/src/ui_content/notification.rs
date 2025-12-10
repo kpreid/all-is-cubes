@@ -109,7 +109,7 @@ impl Notification {
 
     /// Replace the existing content of the notification.
     pub fn set_content(&self, content: NotificationContent) {
-        *self.shared.content.lock().unwrap() = content;
+        *self.shared.content.lock().unwrap_or_else(|poison| poison.into_inner()) = content;
         self.shared.notifier.notify(&());
     }
 }

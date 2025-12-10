@@ -30,6 +30,7 @@ use crate::transaction::{Merge as _, Transaction as _};
 use crate::universe::{
     self, InfoCollector, QueryStateBundle as _, ReadTicket, SealedMember as _, UniverseId,
 };
+use crate::util::ignore_poison;
 
 use super::palette;
 
@@ -339,7 +340,8 @@ pub(crate) fn update_light_system(
                 step_input.deadline_for_space().remaining_since(Instant::now()),
             );
 
-            info_collector.lock().unwrap().record(info);
+            // ignore_poison is valid because we are appending only
+            ignore_poison(info_collector.lock()).record(info);
         },
     );
 

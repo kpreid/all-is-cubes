@@ -29,6 +29,7 @@ pub type CellWithLocal<T> = nosy::Cell<mutex::Mutex<T>, DynListener<()>>;
 /// Module for public-in-private hidden type.
 mod mutex {
     use super::*;
+    use crate::util::ignore_poison;
 
     /// Mutex type for use with [`nosy::LoadStore`].
     ///
@@ -49,17 +50,21 @@ mod mutex {
             Mutex(bsync::Mutex::new(value))
         }
 
+        // Lock poisoning can be ignored for `LoadStore`, because the only way we ever modify the
+        // value in the mutex is by [`mem::replace`] which does not panic, so the value is, at
+        // worst, stale, not internally inconsistent.
+
         fn get(&self) -> T {
-            unpoison(self.0.lock()).clone()
+            ignore_poison(self.0.lock()).clone()
         }
         fn replace(&self, new_value: T) -> T {
-            mem::replace(&mut *unpoison(self.0.lock()), new_value)
+            mem::replace(&mut *ignore_poison(self.0.lock()), new_value)
         }
         fn replace_if_unequal(&self, new_value: Self::Value) -> Result<T, T>
         where
             Self::Value: PartialEq,
         {
-            let mut guard: bsync::MutexGuard<'_, T> = unpoison(self.0.lock());
+            let mut guard: bsync::MutexGuard<'_, T> = ignore_poison(self.0.lock());
             if new_value == *guard {
                 Err(new_value)
             } else {
@@ -79,16 +84,6 @@ mod mutex {
     impl<T: ?Sized + fmt::Debug> fmt::Debug for Mutex<T> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             self.0.fmt(f)
-        }
-    }
-
-    /// Lock poisoning can be ignored for `LoadStore`, because the only way we ever modify the
-    /// value in the mutex is by [`mem::replace`] which does not panic, so the value is, at worst,
-    /// stale, not internally inconsistent.
-    fn unpoison<T>(result: Result<T, bevy_platform::sync::PoisonError<T>>) -> T {
-        match result {
-            Ok(guard) => guard,
-            Err(error) => error.into_inner(),
         }
     }
 }

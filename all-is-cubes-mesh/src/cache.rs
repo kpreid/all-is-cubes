@@ -56,8 +56,19 @@ impl<M: MeshTypes> BlockMeshCache<M> {
         block: &EvaluatedBlock,
     ) -> impl Deref<Target = BlockMesh<M>> + use<M> {
         let key = EvKey::new(block);
-        let cell: Arc<OnceLock<BlockMesh<M>>> =
-            self.storage.lock().unwrap().blocks.entry(key).or_default().clone();
+        let cell: Arc<OnceLock<BlockMesh<M>>> = self
+            .storage
+            .lock()
+            .unwrap_or_else(|poison| {
+                // Cache cannot be corrupted by panic, because the only thing we do is insert
+                // new entries and at worst, the entry could be an uninitialized OnceLock
+                // which we will initialize.
+                poison.into_inner()
+            })
+            .blocks
+            .entry(key)
+            .or_default()
+            .clone();
 
         cell.get_or_init(|| BlockMesh::new(block, &self.texture_allocator, &self.options));
 
@@ -70,6 +81,8 @@ impl<M: MeshTypes> Deref for Ptr<M> {
     type Target = BlockMesh<M>;
 
     fn deref(&self) -> &Self::Target {
-        self.0.get().unwrap()
+        self.0
+            .get()
+            .unwrap_or_else(|| panic!("can’t happen: cache entry not initialized"))
     }
 }
