@@ -14,6 +14,7 @@ use crate::mv;
 use crate::mv::coord::MV_TO_AIC_ROTATION;
 
 /// Index a slice with `u32` instead of `usize`, treating overflow as not-found.
+#[cfg(feature = "import")]
 fn get_with_u32<T>(slice: &[T], index: u32) -> Option<&T> {
     slice.get(usize::try_from(index).ok()?)
 }

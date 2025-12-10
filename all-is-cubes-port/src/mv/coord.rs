@@ -7,9 +7,6 @@ use all_is_cubes::math::{
     Face6, GridAab, GridCoordinate, GridRotation, GridSize, GridVector, Gridgid,
 };
 
-use crate::ExportError;
-use crate::mv::DotVoxConversionError;
-
 // -------------------------------------------------------------------------------------------------
 
 pub(crate) const MV_TO_AIC_ROTATION: GridRotation = GridRotation::RXzY;
@@ -20,13 +17,12 @@ pub(crate) const MV_TO_AIC_ROTATION: GridRotation = GridRotation::RXzY;
 /// The input size should be in the original MagicaVoxel coordinate system.
 pub(crate) fn mv_to_aic_coordinate_transform(
     mv_size: dot_vox::Size,
-) -> Result<Gridgid, DotVoxConversionError> {
+) -> Result<Gridgid, CoordinateOverflow> {
     // Coordinates are Z-up right-handed compared to our Y-up right-handed,
     // so swap Z into Y and invert Y as Z.
     // (This is not a `GridRotation::to_positive_octant_matrix()` because the `sizes` are
     // not necessarily equal.)
-    let mv_y_size = GridCoordinate::try_from(mv_size.y)
-        .map_err(|_| DotVoxConversionError::TransformOverflow)?;
+    let mv_y_size = GridCoordinate::try_from(mv_size.y).map_err(|_| CoordinateOverflow)?;
     Ok(Gridgid {
         translation: GridVector::new(0, 0, mv_y_size),
         rotation: MV_TO_AIC_ROTATION,
@@ -37,20 +33,16 @@ pub(crate) fn mv_to_aic_coordinate_transform(
 ///
 /// Also translates coordinates so that the lower bounds are zero, since the dot-vox format
 /// does not support arbitrary lower bounds.
-pub(crate) fn aic_to_mv_coordinate_transform(aic_bounds: GridAab) -> Result<Gridgid, ExportError> {
+pub(crate) fn aic_to_mv_coordinate_transform(
+    aic_bounds: GridAab,
+) -> Result<Gridgid, CoordinateOverflow> {
     let rotated_size = MV_TO_AIC_ROTATION.inverse().transform_size(aic_bounds.size());
     let mv_size = dot_vox::Size {
         x: rotated_size.width,
         y: rotated_size.height,
         z: rotated_size.depth,
     };
-    Ok(mv_to_aic_coordinate_transform(mv_size)
-        .map_err(|_| ExportError::NotRepresentable {
-            format: crate::Format::DotVox,
-            name: None,
-            reason: String::from("coordinates larger than supported"),
-        })?
-        .inverse()
+    Ok(mv_to_aic_coordinate_transform(mv_size)?.inverse()
         * Gridgid::from_translation(-aic_bounds.lower_bounds().to_vector()))
 }
 
@@ -65,6 +57,31 @@ pub(crate) fn mv_to_aic_rotation(rotation: dot_vox::Rotation) -> GridRotation {
         let col = GridVector::from(col.map(|el| el as i32));
         Face6::try_from(col).unwrap_or_else(|_| unreachable!())
     }))
+}
+
+// -------------------------------------------------------------------------------------------------
+
+/// Error type for coordinate overflows occurring in both import and export.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CoordinateOverflow;
+
+#[cfg(feature = "import")]
+impl From<CoordinateOverflow> for crate::mv::DotVoxConversionError {
+    fn from(CoordinateOverflow: CoordinateOverflow) -> Self {
+        crate::mv::DotVoxConversionError::TransformOverflow
+    }
+}
+
+impl CoordinateOverflow {
+    #[cfg(feature = "export")]
+    #[expect(clippy::unused_self)]
+    pub(crate) fn to_export_error(self, name: all_is_cubes::universe::Name) -> crate::ExportError {
+        crate::ExportError::NotRepresentable {
+            format: crate::Format::DotVox,
+            name: Some(name),
+            reason: String::from("coordinates larger than supported"),
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

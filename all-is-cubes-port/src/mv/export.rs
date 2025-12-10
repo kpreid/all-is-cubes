@@ -44,6 +44,7 @@ pub(crate) async fn export_to_dot_vox_data(
     {
         progress.set_label(format!("Exporting block {}", block_def_handle.name()));
         models.push(mv::model::from_block(
+            block_def_handle.name(),
             &block_def_handle.read(read_ticket)?.evaluate(read_ticket).map_err(|error| {
                 ExportError::Eval {
                     name: block_def_handle.name(),

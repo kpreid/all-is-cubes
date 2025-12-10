@@ -7,6 +7,8 @@ use all_is_cubes::euclid::{Point3D, vec3};
 use all_is_cubes::math::{Cube, GridAab, Gridgid, OpacityCategory};
 
 use all_is_cubes::space::{self, Space};
+#[cfg(feature = "export")]
+use all_is_cubes::universe::Name;
 use all_is_cubes::universe::{Handle, ReadTicket};
 use all_is_cubes::util::{ConciseDebug, Refmt};
 
@@ -87,7 +89,8 @@ pub(crate) fn from_space(
         });
     }
 
-    let transform = aic_to_mv_coordinate_transform(bounds)?;
+    let transform = aic_to_mv_coordinate_transform(bounds)
+        .map_err(|e| e.to_export_error(space_handle.name()))?;
     let block_index_to_palette_index: Vec<Option<u8>> = space
         .block_data()
         .iter()
@@ -119,12 +122,13 @@ pub(crate) fn from_space(
 
 #[cfg(feature = "export")]
 pub(crate) fn from_block(
+    name: Name,
     block: &EvaluatedBlock,
     palette: &mut Vec<dot_vox::Color>,
     // TODO: Add option to export at higher than native resolution
 ) -> Result<dot_vox::Model, ExportError> {
     let bounds = GridAab::for_block(block.resolution());
-    let transform = aic_to_mv_coordinate_transform(bounds)?;
+    let transform = aic_to_mv_coordinate_transform(bounds).map_err(|e| e.to_export_error(name))?;
 
     let mut evoxel_to_palette_index: HashMap<Evoxel, Option<u8>> = HashMap::new();
     let mut voxels: Vec<dot_vox::Voxel> = Vec::new();

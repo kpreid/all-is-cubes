@@ -1,7 +1,7 @@
 use all_is_cubes::linking::InGenError;
 use all_is_cubes::space::SetCubeError;
 
-/// Note: This is not a well-designed error enum (yet)
+/// Errors that may occur while importing `.vox` data.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub(crate) enum DotVoxConversionError {

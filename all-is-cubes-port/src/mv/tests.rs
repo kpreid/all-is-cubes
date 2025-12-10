@@ -248,6 +248,7 @@ fn exported_space_equals_exported_block() {
     )
     .unwrap();
     let model_from_block = mv::model::from_block(
+        "msvb[0]".into(),
         &block.evaluate(universe.read_ticket()).unwrap(),
         &mut palette_from_block,
     )
