@@ -14,10 +14,13 @@ use all_is_cubes::util::YieldProgress;
 /// Used for filesystem operations.
 pub(crate) async fn spawn_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
     let (tx, rx) = futures_channel::oneshot::channel();
-    std::thread::spawn(move || {
-        let (Ok(()) | Err(_)) = tx.send(f());
-    });
-    rx.await.unwrap()
+    std::thread::Builder::new()
+        .name("all_is_cubes_port::util::spawn_blocking".into())
+        .spawn(move || {
+            let (Ok(()) | Err(_)) = tx.send(f());
+        })
+        .unwrap_or_else(|e| panic!("failed to spawn blocking thread: {e}"));
+    rx.await.unwrap_or_else(|_| panic!("blocking thread panicked"))
 }
 
 /// Execute `function` on all of `items`, in parallel if the `"auto-threads"` feature is enabled,
