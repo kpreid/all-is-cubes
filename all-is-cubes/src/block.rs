@@ -410,11 +410,11 @@ impl Block {
     /// Add a [`Modifier::Attributes`] if there isn't one already.
     /// Evaluates the block if needed to get existing attributes.
     ///
-    /// TODO: bad API probably, because it overwrites/freezes attributes; this was added in a hurry
-    /// to tidy up the attributes-is-a-modifer refactor. The proper API is more like with_modifier()
+    /// TODO: bad API, because it overwrites/freezes attributes; this was added in a hurry to tidy
+    /// up the attributes-is-a-modifer refactor. The proper API is more like `with_modifier()`
     /// for a single attribute, but we don't have single attribute override modifiers yet.
-    #[doc(hidden)]
-    pub fn freezing_get_attributes_mut(
+    #[cfg(test)]
+    pub(crate) fn freezing_get_attributes_mut(
         &mut self,
         read_ticket: ReadTicket<'_>,
     ) -> &mut BlockAttributes {
