@@ -192,6 +192,40 @@ impl<'a, O, V> Vol<&'a [V], O> {
     }
 }
 
+impl<'a, V> Vol<&'a [V], ZMaj> {
+    /// Constructs a shared [`Vol`] reference to a single element, with bounds
+    /// [`GridAab::ORIGIN_CUBE`].
+    ///
+    /// If the single element should be at a different location, you can call
+    /// [`.translate(offset)`](Self::translate), or use [`Vol::from_elements()`]
+    /// instead.
+    #[inline]
+    pub const fn from_element_ref(element: &'a V) -> Self {
+        Self {
+            bounds: GridAab::ORIGIN_CUBE,
+            ordering: ZMaj,
+            contents: core::slice::from_ref(element),
+        }
+    }
+}
+
+impl<'a, V> Vol<&'a mut [V], ZMaj> {
+    /// Constructs a mutable [`Vol`] reference to a single element, with bounds
+    /// [`GridAab::ORIGIN_CUBE`].
+    ///
+    /// If the single element should be at a different location, you can call
+    /// [`.translate(offset)`](Self::translate), or use [`Vol::from_elements()`]
+    /// instead.
+    #[inline]
+    pub const fn from_element_mut(element: &'a mut V) -> Self {
+        Self {
+            bounds: GridAab::ORIGIN_CUBE,
+            ordering: ZMaj,
+            contents: core::slice::from_mut(element),
+        }
+    }
+}
+
 /// Constructors from elements not already stored linearly.
 //---
 // TODO: This should be `O: Ordering` instead of `ZMaj` once we have alternative orderings
@@ -923,7 +957,6 @@ fn unreachable_wrong_size<T>(error: VolLengthError) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::string::String;
     use euclid::{point3, size3};
     use pretty_assertions::assert_eq;
 
@@ -1048,10 +1081,20 @@ mod tests {
 
     #[test]
     fn from_element() {
-        let element = String::from("x");
+        #[derive(Debug, PartialEq)]
+        struct Foo;
+
         assert_eq!(
-            VolBox::from_element(element.clone()),
-            VolBox::from_elements(GridAab::ORIGIN_CUBE, [element]).unwrap(),
+            VolBox::from_element(Foo),
+            VolBox::from_elements(GridAab::ORIGIN_CUBE, [Foo]).unwrap(),
+        );
+        assert_eq!(
+            Vol::from_element_ref(&Foo),
+            Vol::from_elements(GridAab::ORIGIN_CUBE, [Foo].as_slice()).unwrap(),
+        );
+        assert_eq!(
+            Vol::from_element_mut(&mut Foo),
+            Vol::from_elements(GridAab::ORIGIN_CUBE, [Foo].as_mut_slice()).unwrap(),
         );
     }
 

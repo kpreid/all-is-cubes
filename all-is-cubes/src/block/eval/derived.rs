@@ -501,10 +501,7 @@ mod tests {
     fn opacity_mask_constructor_consistency() {
         assert_eq!(
             VoxelOpacityMask::R1_INVISIBLE,
-            VoxelOpacityMask::new(
-                R1,
-                Vol::from_elements(GridAab::ORIGIN_CUBE, [Evoxel::AIR].as_slice()).unwrap()
-            )
+            VoxelOpacityMask::new(R1, Vol::from_element_ref(&Evoxel::AIR))
         );
         assert_eq!(
             VoxelOpacityMask::R1_INVISIBLE,

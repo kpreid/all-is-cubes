@@ -186,9 +186,7 @@ impl Evoxels {
     /// Returns a [`Vol`] borrowing these voxels.
     pub fn as_vol_ref(&self) -> Vol<&[Evoxel]> {
         match self.0 {
-            EvoxelsInner::One(ref voxel) => {
-                Vol::from_elements(GridAab::ORIGIN_CUBE, core::slice::from_ref(voxel)).unwrap()
-            }
+            EvoxelsInner::One(ref voxel) => Vol::from_element_ref(voxel),
             EvoxelsInner::Many(_, ref voxels) => voxels.as_ref(),
         }
     }
@@ -196,9 +194,7 @@ impl Evoxels {
     /// Returns a [`Vol`] mutably borrowing these voxels.
     pub fn as_vol_mut(&mut self) -> Vol<&mut [Evoxel]> {
         match self.0 {
-            EvoxelsInner::One(ref mut voxel) => {
-                Vol::from_elements(GridAab::ORIGIN_CUBE, core::slice::from_mut(voxel)).unwrap()
-            }
+            EvoxelsInner::One(ref mut voxel) => Vol::from_element_mut(voxel),
             EvoxelsInner::Many(_, ref mut voxels) => {
                 Vol::from_elements(voxels.bounds(), voxels.make_linear_mut()).unwrap()
             }
