@@ -44,9 +44,6 @@
 //!
 //! [sweep line algorithm]: https://en.wikipedia.org/wiki/Sweep_line_algorithm
 //! [orthogonal polygons]: https://en.wikipedia.org/wiki/Rectilinear_polygon
-//
-// TODO(planar_new): This algorithm is not yet complete and is only conditionally used.
-// It will eventually replace [`crate::block_mesh::planar::greedy_mesh`].
 
 use alloc::collections::VecDeque;
 use core::cmp::Ordering;
