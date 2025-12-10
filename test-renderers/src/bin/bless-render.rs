@@ -1,8 +1,6 @@
 //! Copies and compresses an image file from the test-renderers output directory
 //! to the `expected/` directory.
 
-use std::num::NonZeroU8;
-
 use clap::Parser as _;
 
 use test_renderers::{ImageId, RendererId, SuiteId, TestId, image_path};
@@ -84,9 +82,7 @@ fn main() -> Result<(), anyhow::Error> {
                 palette_reduction: true,
                 grayscale_reduction: true,
                 idat_recoding: true,
-                deflate: oxipng::Deflaters::Zopfli {
-                    iterations: NonZeroU8::new(15).unwrap(),
-                },
+                deflater: oxipng::Deflater::Zopfli(oxipng::ZopfliOptions::default()),
                 fast_evaluation: false,
                 timeout: None,
                 ..oxipng::Options::default()

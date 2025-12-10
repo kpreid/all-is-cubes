@@ -126,6 +126,11 @@ who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"
 version = "9.1.3"
 
+[[audits.oxipng]]
+who = "Kevin Reid <kpreid@switchb.org>"
+criteria = "safe-to-run"
+delta = "9.1.3 -> 10.0.0"
+
 [[audits.page_size]]
 who = "Kevin Reid <kpreid@switchb.org>"
 criteria = "safe-to-run"

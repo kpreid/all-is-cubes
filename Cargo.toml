@@ -104,7 +104,7 @@ futures-util = { version = "0.3.31", default-features = false, features = ["allo
 gilrs = { version = "0.11.0" }
 gloo-timers = { version = "0.3.0", default-features = false }
 half = { version = "2.6.0", default-features = false, features = ["bytemuck"] }
-hashbrown = { version = "0.16.0", default-features = false, features = ["default-hasher", "inline-more"] }
+hashbrown = { version = "0.16.1", default-features = false, features = ["default-hasher", "inline-more"] }
 image = { version = "0.25.1", default-features = false }
 imgref = { version = "1.10.1", default-features = false }
 indoc = { version = "2.0.1", default-features = false }
