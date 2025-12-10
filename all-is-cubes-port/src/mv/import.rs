@@ -199,7 +199,8 @@ fn view_all_models_as_blocks(
     assert!(!models.is_empty(), "zero models not supported");
 
     let row_length = space_handles.len().isqrt();
-    let row_length_g = i32::try_from(row_length).unwrap();
+    let row_length_g =
+        i32::try_from(row_length).map_err(|_| DotVoxConversionError::TransformOverflow)?;
     let maximum_size_of_model_in_blocks = 4u32;
     let spacing_between_models = 4u8;
     let bounds = GridAab::from_lower_size(

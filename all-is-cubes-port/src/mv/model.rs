@@ -25,7 +25,7 @@ pub(crate) fn to_space(
     model: &dot_vox::Model,
     import_as_block: bool,
 ) -> Result<Space, mv::DotVoxConversionError> {
-    let transform = mv_to_aic_coordinate_transform(model.size);
+    let transform = mv_to_aic_coordinate_transform(model.size)?;
     let bounds =
         GridAab::from_lower_size([0, 0, 0], vec3(model.size.x, model.size.y, model.size.z))
             .transform(transform)
@@ -87,7 +87,7 @@ pub(crate) fn from_space(
         });
     }
 
-    let transform = aic_to_mv_coordinate_transform(bounds);
+    let transform = aic_to_mv_coordinate_transform(bounds)?;
     let block_index_to_palette_index: Vec<Option<u8>> = space
         .block_data()
         .iter()
@@ -118,25 +118,25 @@ pub(crate) fn from_space(
 }
 
 #[cfg(feature = "export")]
-#[expect(
-    clippy::unnecessary_wraps,
-    reason = "eventually we should error on unrepresentables"
-)]
 pub(crate) fn from_block(
     block: &EvaluatedBlock,
     palette: &mut Vec<dot_vox::Color>,
     // TODO: Add option to export at higher than native resolution
 ) -> Result<dot_vox::Model, ExportError> {
     let bounds = GridAab::for_block(block.resolution());
-    let transform = aic_to_mv_coordinate_transform(bounds);
+    let transform = aic_to_mv_coordinate_transform(bounds)?;
 
     let mut evoxel_to_palette_index: HashMap<Evoxel, Option<u8>> = HashMap::new();
     let mut voxels: Vec<dot_vox::Voxel> = Vec::new();
     for (cube, evoxel) in block.voxels().as_vol_ref().iter() {
+        // TODO: warn-or-error on voxels that have properties we can't represent
+
         let i = *evoxel_to_palette_index.entry(*evoxel).or_insert_with(|| {
             if evoxel.opacity_category() == OpacityCategory::Invisible {
                 None
             } else {
+                // TODO: if this returns None then that means we are failing to represent some
+                // voxels, and should report that incompleteness, rather than treating it as air.
                 mv::palette::push(palette, mv::palette::color_out(evoxel.color))
             }
         });

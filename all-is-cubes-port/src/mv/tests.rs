@@ -20,7 +20,8 @@ use crate::{ExportError, ExportSet};
 #[ignore = "debug tool, not a test"]
 fn print_many_transforms() {
     let gbox = GridAab::from_lower_size([0, 0, 0], [2, 2, 2]);
-    let transform = coord::mv_to_aic_coordinate_transform(dot_vox::Size { x: 2, y: 2, z: 2 });
+    let transform =
+        coord::mv_to_aic_coordinate_transform(dot_vox::Size { x: 2, y: 2, z: 2 }).unwrap();
     for point in gbox.interior_iter() {
         let tmat = transform.transform_cube(point);
 

@@ -13,6 +13,11 @@ use all_is_cubes::util::YieldProgress;
 use crate::mv;
 use crate::mv::coord::MV_TO_AIC_ROTATION;
 
+/// Index a slice with `u32` instead of `usize`, treating overflow as not-found.
+fn get_with_u32<T>(slice: &[T], index: u32) -> Option<&T> {
+    slice.get(usize::try_from(index).ok()?)
+}
+
 #[cfg(feature = "import")]
 pub(crate) async fn scene_to_space(
     mut progress: YieldProgress,
@@ -54,12 +59,15 @@ pub(crate) async fn scene_to_space(
 
         let (transform_in_blocks, remainder_of_transform) = leaf.div_rem_transform(scale_to_blocks);
 
-        let model_uid = usize::try_from(leaf.shape_model.model_id).unwrap();
+        let model_id = leaf.shape_model.model_id;
+        let imported_model: Handle<Space> = get_with_u32(&imported_models, model_id)
+            .ok_or_else(|| mv::DotVoxConversionError::MissingModel(model_id))?
+            .clone();
         space
             .mutate(read_ticket, |m| -> Result<(), InGenError> {
                 for (rel_cube, block_for_this_model) in model_space_to_blocks(
                     leaf.model,
-                    imported_models[model_uid].clone(),
+                    imported_model,
                     block::BlockAttributes::default(),
                     scale_to_blocks,
                     remainder_of_transform,
@@ -134,9 +142,7 @@ fn walk_scene_graph<'data>(
         scene_index,
     )?);
 
-    match data
-        .scenes
-        .get(usize::try_from(scene_index).unwrap())
+    match get_with_u32(&data.scenes, scene_index)
         .ok_or_else(|| mv::DotVoxConversionError::MissingSceneNode(scene_index))?
     {
         &dot_vox::SceneNode::Transform {
@@ -169,9 +175,19 @@ fn walk_scene_graph<'data>(
                             .split(' ')
                             .map(|s| s.parse::<i32>())
                             .collect::<Result<Vec<i32>, _>>()
-                            .unwrap(),
+                            .map_err(|_| mv::DotVoxConversionError::SceneAttributeParse {
+                                scene_index,
+                                attribute: "_t",
+                                // TODO: include the value
+                            })?,
                     )
-                    .unwrap(),
+                    .map_err(|_| {
+                        mv::DotVoxConversionError::SceneAttributeParse {
+                            scene_index,
+                            attribute: "_t",
+                            // TODO: include the value
+                        }
+                    })?,
                 )
             } else {
                 GridVector::zero()
@@ -181,7 +197,13 @@ fn walk_scene_graph<'data>(
                 && let Some(r_string) = frame.attributes.get("_r")
             {
                 // TODO: Rotation::from_byte() may panic on invalid data. Send a patch to fix that.
-                dot_vox::Rotation::from_byte(r_string.parse().unwrap())
+                dot_vox::Rotation::from_byte(r_string.parse().map_err(|_| {
+                    mv::DotVoxConversionError::SceneAttributeParse {
+                        scene_index,
+                        attribute: "_r",
+                        // TODO: include the value
+                    }
+                })?)
             } else {
                 dot_vox::Rotation::IDENTITY
             };
@@ -222,12 +244,9 @@ fn walk_scene_graph<'data>(
                 );
                 output.push(SceneElement {
                     transform: parent_transform,
-                    model: data
-                        .models
-                        .get(usize::try_from(shape_model.model_id).unwrap())
-                        .ok_or_else(|| {
-                            mv::DotVoxConversionError::MissingModel(shape_model.model_id)
-                        })?,
+                    model: get_with_u32(&data.models, shape_model.model_id).ok_or_else(|| {
+                        mv::DotVoxConversionError::MissingModel(shape_model.model_id)
+                    })?,
                     shape_model,
                 })
             }

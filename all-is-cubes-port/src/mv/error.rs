@@ -7,20 +7,37 @@ use all_is_cubes::space::SetCubeError;
 pub(crate) enum DotVoxConversionError {
     #[error("{0}")]
     Parse(&'static str),
+
     #[error("file contains no models or scenes to import")]
     FileEmpty,
+
     #[error("file refers to scene node with ID {0} but does not define it")]
     MissingSceneNode(u32),
+
     #[error("scene graph contains cycle (involving node with ID {0})")]
     SceneGraphCycle(u32),
+
     #[error("scene graph is too complex")]
     SceneGraphRecursion,
+
+    #[error("attribute “{attribute}” of scene node with ID {scene_index} is invalid")]
+    SceneAttributeParse {
+        scene_index: u32,
+        attribute: &'static str,
+    },
+
     #[error("file refers to model with ID {0} but does not define it")]
     MissingModel(u32),
+
     #[error("palette of {len} colors too short to contain index {index}")]
     PaletteTooShort { len: usize, index: u8 },
+
+    #[error("position/transform too large")]
+    TransformOverflow,
+
     #[error("failed to place block")]
     SetCube(#[source] SetCubeError),
+
     #[error("unexpected error")]
     Unexpected(#[source] InGenError),
 }
