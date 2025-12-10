@@ -79,7 +79,7 @@ imgref = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 # Used to compress images when those images are to be stored in the repository.
-oxipng = { version = "=9.1.3", default-features = false, features = ["parallel", "zopfli"] }
+oxipng = { version = "=10.0.0", default-features = false, features = ["parallel", "zopfli"] }
 rendiff = { workspace = true }
 send_wrapper = { workspace = true }
 serde = { workspace = true }
