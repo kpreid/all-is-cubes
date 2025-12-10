@@ -61,6 +61,14 @@ impl GltfDataDestination {
     /// `foo/bar.gltf`, then buffer files will be written to paths like `foo/bar-buffername.glbin`.
     /// If it is `None`, then buffers may not exceed `maximum_inline_length`.
     pub fn new(file_base_path: Option<PathBuf>, maximum_inline_length: usize) -> Self {
+        if let Some(file_base_path) = &file_base_path {
+            assert!(
+                file_base_path.file_stem().is_some(),
+                "file_base_path must include a file name, but does not: “{}”",
+                file_base_path.display()
+            );
+        }
+
         Self(Arc::new(Inner {
             discard: false,
             maximum_inline_length,
