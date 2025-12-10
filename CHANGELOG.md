@@ -8,17 +8,23 @@ In order to resolve various design problems interfering with development, the `a
 
 * It is no longer possible to read from a `universe::Handle` without providing a `universe::ReadTicket` — a new type that denotes read access to a `Universe` (or, in some cases, part of it).
 
+* `universe::Handle<T>::read()` no longer returns a guard object that dereferences to `T`, but instead a `<T as UniverseMember>::Read` which does not dereference to `T` but serves the same function.
+
 * Methods such as `Character::step()` and `Space::step()` no longer exist; stepping must be performed on a whole `Universe`.
 
 * All types that were generic over `<I: all_is_cubes::time::Instant>` no longer are, and the `Instant` trait no longer exists.
   Instead, `all_is_cubes::time::Instant` is a re-export of the type `bevy_platform::time::Instant`, which is itself a re-export of `std::time::Instant` when possible, and on platforms not supported by default, can have its time source installed at run time.
+
+* Previously, when the `"std"` feature of `all-is-cubes` was disabled, many of its types did not implement `Send + Sync`; now they always do.
+  However, under this condition, spinlocks are used for synchronization (as a portable placeholder), so if `all-is-cubes` types are being used from multiple threads, the `"std"` feature should be enabled to avoid poor performance.
 
 [Issue #620](https://github.com/kpreid/all-is-cubes/issues/620) contains more information on the motivation for this change.
 
 ### Added
 
 - User-visible functionality:
-    - In the desktop version, changes to graphics options are now persisted across launches.
+    - The interior volumes of transparent blocks with resolution greater than 1 are now rendered more correctly.
+    - In the desktop and web applications, changes to graphics options are now persisted across sessions.
     - `.vox` import (but not export) now supports:
         - Files containing a scene graph, or just multiple models.
           Positioning of models is currently flawed.
@@ -26,43 +32,103 @@ In order to resolve various design problems interfering with development, the `a
 
 - `all-is-cubes` library:
     - `block::Block::find_inventory()`
+    - `block::BlockAttributes::ambient_sound`, sound that is heard continuously when near blocks.
+    - `block::Modifier::Tag`, for marking blocks as being of particular kinds.
+      Does not interact with anything else yet.
+    - `block::Resolution::log2()`
+    - `block::Resolution::recip_{f32,f64}()`
     - `inv::Ix`
     - `inv::InvInBlock` and `inv::IconRow` now have public `new()` functions.
     - `inv::InventoryTransaction::is_empty()`
+    - `linking::BlockProvider::new_installed_cyclic()` allows construction of modules whose blocks refer to each other.
+    - `math::Aab::corner_point()` allows obtaining any one of the corners of the box.
     - `math::BoxPart::centered_on()`
+    - `math::BoxPart::to_face()`
+    - `math::chebyshev_length()`
     - `math::Face6::{clockwise, counterclockwise, r180}` for constructing rotations.
+    - `math::Face[67]::vector()`, like `normal_vector()` but with an arbitrary length.
     - `math::FaceMap::sum()`
     - `math::FaceMap::values_mut()`
+    - `math::FaceMap` supports assignment operators (like `+=`).
+    - `math::FaceMap` implements `IntoIterator`
+    - `math::GridAab::size()` is now a `const fn`.
+    - `math::GridAab::tiny()` allows constructing `GridAab`s in `const` contexts when the bounds cannot overflow.
+    - `math::GridAab::volume()` is now a `const fn`.
+    - `math::Gridgid::checked_transform_point()`
+    - `impl From<math::Octant> for math::OctantMask`
+    - `math::PositiveSign::INFINITY`
+    - `math::PositiveSign` and `math::ZeroOne` support assignment operators.
     - `math::Rgb01` is a float, linear color type that is restricted to the range 0 to 1.
+    - `math::Vol::tiny()` and `from_tiny_elements()` allow constructing `Vol`s in `const` contexts when the bounds cannot overflow.
+    - `op::Operation::MoveInventory`
+    - `raycast::Raycaster::within()` allows optional inclusion of the step where the raycast *exits* the given bounds.
     - `space::Builder::build_and_mutate()`
     - `space::Builder::try_build()` produces recoverable out-of-memory errors where `build()` does not.
-    - New universe member type `sound::SoundDef` allows defining synthesized sounds as game content.
-    - `impl IntoIterator for math::FaceMap`
-    - `math::PositiveSign::INFINITY`
+    - `space::Mutation`, a new interface for performing bulk changes to a `Space`.
+    - `sound::Ambient`, used to define sounds that are heard when near blocks.
+    - `sound::SoundDef`, allows defining short synthesized sounds.
+    - `tag` module, for use with `block::Modifier::Tag`.
+    - Universe garbage collection is now fully implemented.
+      `Handle`s not stored inside a universe no longer prevent a member from being collected; use the new type `StrongHandle` for this purpose.
+    - `universe::HandleError` is now a `struct` instead of an `enum`.
+      - `universe::HandleError::gone()` may be used to learn the reason why a handle is defunct.
+    - `universe::Universe::set_clock()`
+    - `universe::UniverseMember` is a trait which bounds various operations on `Universe` and `Handle`. It previously existed but was not public.
     - `universe::UniverseTransaction::is_empty()`
+    - `universe::UniverseTransaction::insert_without_value()` allows the construction of cyclic structures of handles (e.g. multiple `BlockDef`s which refer to each other).
+
+- `all-is-cubes-content` library:
+    - `BoxPart::{is_face, is_edge, is_corner}()`
+    - `UniverseTemplate` now allows custom sizes for the `CornellBox` and `MengerSponge` templates.
+    - `UniverseTemplate::DemoCity` has more exhibits, and hills at the edges.
+    - `UniverseTemplate::Dungeon` now requires the player to actually find a key to unlock gates.
+
+- `all-is-cubes-gpu` library:
+    - Support for `TransparencyOption::Volumetric` now extends to blocks with resolutions higher than 1, using raymarching.
+      Quality is poor but will be improved in the future.
+    - `SurfaceRenderer::render_frame()` now takes a parameter of type `FrameBudget`, which allows controlling the amount of time spent on calculations.
+    - Bloom rendering has been improved.
+    - Edges between adjacent voxels on a surface are now antialiased, if requested.
 
 - `all-is-cubes-mesh` library:
+    - Supports generating meshes suitable for raymarched volumetric transparency.
+      This feature is controlled by the `transparency` in the provided `GraphicsOptions`;
+      when it is set to `TransparencyOption::Volumetric`, a single bounding box will be generated for all transparent voxels, rather than generating a mesh for the boundary of the transparent volume.
+
+    - Supports generating vertices which have “secondary data”, an associated type which makes up a second “column” of vertex attribute data that is stored separately in meshes.
+      Data may be arbitrarily subdivided between primary and secondary, except that the primary type must contain the vertex’s position. This allows vertex positions to be stored more densely in memory, which may improve performance for depth sorting and rendering.
+
     - `BlockMesh::bounding_box()` and `SpaceMesh::bounding_box()` now return the new type `Aabbs` which provides separate boxes for opaque and transparent geometry. This allows precise culling when rendering in separate opaque and transparent passes.
+    - `Coloring::Texture` now includes the `Resolution` of the texture/voxels.
     - New type aliases `Position` and `PosCoord` for vertex positions.
+    - `SpaceMesh`es’ opaque triangles are now semi-sorted; for each face/normal, triangles with that normal will be in roughly front-to-back order.
     - We now use `euclid`’s static coordinate system checking for distinguishing between points in a `Space` and points in a mesh. The new marker type `MeshRel` identifies the coordinates used in a mesh.
     - `dynamic::ChunkMesh::depth_ordering_for_view()`
 
 - `all-is-cubes-port` library:
     - `export_to_path()` no longer accesses the `Universe` while its future is running, but instead only when initially called. This allows the latter portion of the export operation to run concurrently with other uses of the `Universe`.
     - `.vox` import now partially supports materials and scenes.
+    - glTF export now preserves the translation of an exported `Space` instead of translating it so that its lower corner is at (0, 0, 0).
     
 - `all-is-cubes-render` library:
+    - Raytracer now supports distance fog.
     - `camera::GraphicsOptions::maximum_intensity` may be used to specify the maximum brightness of the output device and thus properly apply tone mapping to HDR output. It may also be used to choose to restrict output to SDR.
+    - `camera::LightingOption::Bounce` requests per-pixel rather than per-block illumination.
+      This option is currently only supported by the CPU raytracer (in which case it adds 4 secondary rays to the primary ray, without any denoising).
     - `raytracer::Accumulate` is implemented for tuples of up to 2 elements.
     - `raytracer::Accumulate::add()` takes a new struct type `Hit` instead of separate arguments,
       and `Hit` includes cube position, distance/depth information, and a new enum `Exception`.
     - `raytracer::DepthBuf` can be used to produce depth images.
     - `raytracer::Exception`, part of `Hit` which distinguishes special situations such as “hitting” the sky.
     - `raytracer::Hit`, used by `Accumulate` implementors.
+    - `raytracer::RtRenderer` now takes separate custom options for the world and UI layers.
 
 - `all-is-cubes-ui` library:
+    - `apps::MainTaskContext::add_custom_command()` allows adding arbitrary command buttons to the UI; currently, they only appear in the pause menu.
+    - `apps::MainTaskContext::set_universe_async()` allows telling the UI about a long-running world generation or loading process, displaying a progress bar to the user.
     - `apps::Settings` manages user-editable settings that eventually will be more than just the graphics options.
     - `apps::SessionBuilder::settings()` links a possibly-shared `Settings` to the created session.
+    - `widgets::TextBox` for displaying changing text (not yet editable)
 
 ### Changed
 
@@ -73,22 +139,34 @@ In order to resolve various design problems interfering with development, the `a
     
     - Inventories are now indexed using the new type `inv::Ix`.
     - `inv::Inventory` no longer has public fields. Use the new accessor functions `slots()` or `get()` instead.
+    - `inv::InvInBlock` is now more correctly affected by block rotation.
 
     - `math::Axis::color()` now returns `Rgb01` instead of `Rgb`.
     - `math::Rgb::clamp()` now takes a parameter for the upper bound.
+    - `math::Wireframe` has been renamed to `math::lines::Wireframe` and now produces vertices in pairs, representing whole line segments instead of each end separately.
 
-    - `universe::UniverseTransaction::{insert, insert_mut}` now take a name and value rather than a `Handle`.
+    - `transaction::Transaction::commit()` and `execute()` take the transaction by value instead of reference. This allows transactions to be committed more efficiently by moving instead of cloning data that they contain.
+
+    - `universe::Handle<T>::read()` no longer returns a guard object that dereferences to `T`, but instead a `<T as UniverseMember>::Read` which does not dereference to `T` but serves the same function.
+    - `universe::Universe::new()` now returns `Box<Universe>` instead of `Universe`, to make it easier to avoid unnecessarily large futures and stack frames.
+    - `universe::UniverseTransaction::{insert, insert_mut}()` now take a name and value rather than a `Handle`.
     - `universe::WhenceUniverse::load()` now returns `Box<Universe>` instead of `Universe`.
 
     - Renamed `block::Move::to_paired()` to `into_paired()`.
     - Renamed `block::Text::to_builder()` to `into_builder()`.
     - Renamed `all_is_cubes::color_block!()` to `all_is_cubes::block::from_color!()`.
     - Renamed `math::Cube::midpoint()` to `center()`.
+    - Renamed `math::LineVertex` to `math::lines::Vertex`.
 
 - `all-is-cubes-content` library:
     - `UniverseTemplate::build()` now returns `Box<Universe>` instead of `Universe`.
 
 - `all-is-cubes-mesh` library:
+    - The block mesh construction algorithm has been significantly improved.
+      Block meshes will no longer contain “T-junctions” which may create pixel-sized gaps when rendered, or otherwise interfere with further processing of the mesh, and they will have fewer vertices.
+
+      However, it can no longer be assumed that triangles will appear in pairs that form rectangles.
+
     - Depth sorting of transparent meshes has been near-completely redesigned to be more correct and more efficient.
       
       - All depth sorting is now lazy.
@@ -103,6 +181,7 @@ In order to resolve various design problems interfering with development, the `a
 
 
     - Renamed `GfxVertex` to `Vertex`.
+    - Vertices are now constructed via the `Vertex` trait’s function `from_block_vertex()` instead of `impl From<Vertex> for YourVertexType`.
     - Vertex position coordinates are now conveyed as `f32` (you may use the new type alias `PosCoord`) instead of `f64`.
       (This will not reduce the precision of any mesh of reasonable size, because vertex positions are relative to the bounds of the individual mesh.)
       Furthermore, their coordinate system marker type is now `MeshRel` instead of `Cube`, indicating that the coordinate system origin for a mesh is not the same as that of the `Space` it was created from.
@@ -110,6 +189,8 @@ In order to resolve various design problems interfering with development, the `a
 - `all-is-cubes-render` library:
     - `HeadlessRenderer::update()` is no longer async.
     - `raytracer::Accumulate::add()` takes a new struct type `Hit` instead of separate arguments.
+    - `raytracer::Raytracer::trace_ray()` now takes an `&mut` reference to an `Accumulator` instead of constructing a new accumulator using `Default`. This allows specifying the initial state of the accumulator (which need not implement `Default`), and composition of the results of multiple traces.
+    - `raytracer::RtBlockData::{error,sky}()` have been replaced with a single function `exception()` which takes an `Exception` enum describing the situation for which data should be constructed.
 
 - `all-is-cubes-ui` library:
     - `apps::Session::settings()` replaces `graphics_options_mut()`.
@@ -119,15 +200,30 @@ In order to resolve various design problems interfering with development, the `a
 - `all-is-cubes` library:
     - The public functions `Character::step()` and `Space::step()` no longer exist.
       In general, to make time pass, create a `Universe` and `step()` it instead.
-    - `universe::Handle::new_pending()` has been replaced by `UniverseTransaction::insert()`.
-      Handles are now always associated with some container, either `Universe` or `UniverseTransaction`, except for those in the “gone” defunct state.
     - Behaviors are deprecated. They are no longer supported by `Character` and `Universe`.
+    - `behavior::BehaviorWaker` no longer exists; use the standard library type `core::task::Waker` instead.
+    - `math::Cube` no longer implements the `Borrow` trait (incorrectly).
     - `math::GridRotation::{CLOCKWISE, COUNTERCLOCKWISE}` have been replaced by `Face6::PY.{clockwise, counterclockwise}()`.
     - `math::Rgb::UNIFORM_LUMINANCE_*` have been replaced by constants on `Rgb01`.
     - `math::Rgb` can no longer be converted to `Block`, `Primitive`, or `Atom`.
       Use `Rgb01` instead.
+    - `math::Vol` no longer implements `ops::Index` generically, only for `Cube` (preferred), and
+    `[GridCoordinate; 3]` (convenience).
+      This restriction is intended to minimize confusion between corner points and cubes which can result in bugs in the presence of rotation.
+    - `physics::Body` can no longer be constructed with NaN values.
+    - `space::Space` has several direct mutation methods removed and relocated to the `Mutation` type.
+      Use `Space::mutate()` to access them.
+    - `universe::Handle::execute()` has been replaced by `Universe::execute_1()`.
+    - `universe::Handle::new_pending()` has been replaced by `UniverseTransaction::insert()`.
+      Handles are now always associated with some container, either `Universe` or `UniverseTransaction`, except for those in the “gone” defunct state.
+    - `universe::Handle::try_modify()` no longer exists.
+      Use `Universe::mutate_space()` for `Space`s, and transactions for other cases.
+    - `universe::UniverseTransaction` no longer implements `Clone`.
+    - It is no longer possible to mutate pending `Handle`s.
+      In order to construct cyclic structures, use `UniverseTransaction::insert_without_value()`.
 
 - `all-is-cubes-mesh` library:
+    - Texture “clamp” coordinates are no longer produced.
     - The associated type `GfxVertex::Coordinate` no longer exists.
       `GfxVertex` (now `Vertex`) implementors may still use whatever coordinate storage format they wish, but must be able to convert it back to `f32`.
 
